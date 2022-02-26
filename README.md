@@ -42,7 +42,8 @@ Check [plugNmeet-install](https://github.com/mynaparrot/plugNmeet-install) repo.
 
 **SDK**
 
-1) [PHP](https://github.com/mynaparrot/plugNmeet-php-sdk)
+1) [PHP](https://github.com/mynaparrot/plugNmeet-sdk-php)
+2) [Example of API](https://github.com/mynaparrot/plugNmeet-server/wiki/API-Information-(examples))
 
 Following ready to use extensions:
 
