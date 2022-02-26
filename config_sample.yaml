@@ -1,0 +1,55 @@
+client:
+  port: 8080
+  debug: true
+  path: "/app/client/dist"
+  ## this will require during authentication. Use random secret.
+  # openssl rand -hex 32
+  # OR
+  # cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 36 | head -n 1
+  api_key: "plugnmeet"
+  secret: "zumyyYWqv7KR2kUqvYdq4z4sXg7XTBD2ljT6"
+log_settings:
+  log_file: "./log/plugNmeet.log"
+  # maxsize of log file in MB
+  maxsize: 20
+  maxbackups: 4
+  # max age of log before rotate in days
+  maxage: 2
+livekit_info:
+  host: "http://livekit:7880"
+  api_key: "APIiYAA5w37Cfo2"
+  secret: "6aNur7qqupeZhFYNOJVUyeXxXhVw8f4lm13pEDUx8SgB"
+  # value in minutes. Default 10 minutes. Client will renew token automatically
+  token_validity: 2h
+redis_info:
+  host: redis
+  port: "6379"
+  username: ""
+  password: ""
+  db: 0
+mysql_info:
+  host: "db"
+  port: "3306"
+  username: "root"
+  password: "12345"
+  db: "plugnmeet"
+  prefix: "pnm_"
+upload_file_settings:
+  path: "./upload"
+  # file size in MB. Default 10MB
+  max_size: 500
+  # By default, files will be deleted as soon as the session will be finish.
+  # You can set it true to disable deleting files.
+  keep_forever: false
+  allowed_types:
+    - "jpg"
+    - "png"
+    - "pdf"
+    - "docx"
+    - "psd"
+    - "zip"
+    - "rar"
+recorder_info:
+  # this value should be same as recorder's copy_to_dir path
+  recording_files_path: "/app/recording_files"
+  token_validity: 30m

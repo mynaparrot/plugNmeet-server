@@ -1,0 +1,40 @@
+version: "3"
+services:
+  redis:
+    image: redis
+    ports:
+      - "6379:6379/tcp"
+  db:
+    image: mariadb:10.6
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 12345
+    volumes:
+      - ./mariadb-data:/var/lib/mysql
+      - ./sql_dump/install.sql:/docker-entrypoint-initdb.d/install.sql
+  livekit:
+    image: livekit/livekit-server
+    ports:
+      - "7880:7880/tcp"
+      - "7881:7881/tcp"
+      - "7882:7882/udp"
+    volumes:
+      - .:/app
+      - ../client:/app/client
+      - ../recording_files:/app/recording_files
+    command: --config "/app/livekit.yaml" --dev
+    depends_on:
+      - redis
+  plugnmeet-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8080:8080/tcp"
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - db
+      - livekit
+    #command: --config "./config.yaml"
