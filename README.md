@@ -43,13 +43,16 @@ Check [plugNmeet-install](https://github.com/mynaparrot/plugNmeet-install) repo.
 **SDK**
 
 1) [PHP](https://github.com/mynaparrot/plugNmeet-sdk-php)
-2) [Example of API](https://github.com/mynaparrot/plugNmeet-server/wiki/API-Information-(examples))
 
 Following ready to use extensions:
 
 1) [Joomla component](https://github.com/mynaparrot/plugNmeet-joomla)
 2) [Moodle Plugin](https://github.com/mynaparrot/plugNmeet-moodle)
 3) [Wordpress Plugin](https://github.com/mynaparrot/plugNmeet-wordpress)
+
+Examples:
+
+1) [Example of API](https://github.com/mynaparrot/plugNmeet-server/wiki/API-Information-(examples))
 
 ## Manually
 
