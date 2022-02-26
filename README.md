@@ -26,7 +26,7 @@ The components of Plug-N-Meet are as follows:
 2) [plugNmeet-client](https://github.com/mynaparrot/plugNmeet-client), which is the main interface/frontend. It's built
    with React and Redux.
 
-3) [plugNmeet-recoder](https://github.com/mynaparrot/plugNmeet-recoder), a node module for recording/rtmp broadcasting
+3) [plugNmeet-recoder](https://github.com/mynaparrot/plugNmeet-recorder), a node module for recording/rtmp broadcasting
    which is written in TypeScript.
 
 ## Requirements
