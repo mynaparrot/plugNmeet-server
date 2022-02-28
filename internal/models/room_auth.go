@@ -62,11 +62,13 @@ type ActiveRoomInfoRes struct {
 
 type roomAuthModel struct {
 	mux *sync.RWMutex
+	rs  *RoomService
 }
 
 func NewRoomAuthModel() *roomAuthModel {
 	return &roomAuthModel{
 		mux: &sync.RWMutex{},
+		rs:  NewRoomService(),
 	}
 }
 
@@ -100,7 +102,7 @@ func (am *roomAuthModel) CreateRoom(r *RoomCreateReq) (bool, string, *livekit.Ro
 	if err != nil {
 		return false, "Error: " + err.Error(), nil
 	}
-	
+
 	ri := &RoomInfo{
 		RoomTitle:          r.RoomMetadata.RoomTitle,
 		RoomId:             room.Name,
@@ -126,11 +128,23 @@ func (am *roomAuthModel) IsRoomActive(r *IsRoomActiveReq) (bool, string) {
 	m := NewRoomModel()
 	roomDbInfo, _ := m.GetRoomInfo(r.RoomId, "", 1)
 
-	if roomDbInfo.Id > 0 {
-		return true, "room is active"
+	if roomDbInfo.Id == 0 {
+		return false, "room is not active"
 	}
 
-	return false, "room is not active"
+	// let's make sure room actually active
+	_, err := am.rs.LoadRoomInfoFromRedis(r.RoomId)
+	if err != nil {
+		// room isn't active. Change status
+		_, _ = m.UpdateRoomStatus(&RoomInfo{
+			RoomId:    r.RoomId,
+			IsRunning: 0,
+			Ended:     time.Now().Format("2006-01-02 15:04:05"),
+		})
+		return false, "room is not active"
+	}
+
+	return true, "room is active"
 }
 
 func (am *roomAuthModel) GetActiveRoomInfo(r *IsRoomActiveReq) (bool, string, *ActiveRoomInfoRes) {
