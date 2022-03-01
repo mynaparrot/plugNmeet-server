@@ -31,6 +31,10 @@ The components of Plug-N-Meet are as follows:
 3) [plugNmeet-recoder](https://github.com/mynaparrot/plugNmeet-recorder), a node module for recording/rtmp broadcasting
    which is written in TypeScript.
 
+**Demo:**
+
+https://demo.plugnmeet.com/login.html
+
 ## Requirements
 
 1) Livekit configured with Redis.
