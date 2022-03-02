@@ -1,23 +1,25 @@
-# Plug-N-Meet - Scalable, Open source web conference system
+# Plug-N-Meet - Scalable, Open source web conferencing system.
 
 Plug-N-Meet is an open source web conferencing system based on high performance WebRTC
 infrastructure [livekit](https://github.com/livekit/livekit-server).
 
-![](./github_files/banner.jpg)
+![](./github_files/banner.png)
 
 ## Features:
 
 1) Compatible with all devices. Browser recommendation: Google Chrome, Firefox. For iOS: Safari.
 2) WebRTC based secured & encrypted communication.
-3) Easy integration with any existing website or system.
-4) Easy customization with functionality, URL, logo, and branding colors.
-5) HD audio and video call.
-6) HD Screensharing.
-7) Lock settings.
-8) Raise hand.
-9) Chatting with File sharing.
-10) MP4 Recordings.
-11) RTMP Broadcasting
+3) Scalable and high performance system written in Go programming language which made it possible to distributed as a
+   [single binary](https://github.com/mynaparrot/plugNmeet-server/releases) file!
+4) Easy integration with any existing website or system.
+5) Easy customization with functionality, URL, logo, and branding colors.
+6) HD audio and video call.
+7) HD Screensharing.
+8) Lock settings.
+9) Raise hand.
+10) Chatting with File sharing.
+11) MP4 Recordings.
+12) RTMP Broadcasting
 
 And many more!
 
@@ -55,6 +57,10 @@ Following ready to use extensions:
 1) [Joomla component](https://github.com/mynaparrot/plugNmeet-joomla)
 2) [Moodle Plugin](https://github.com/mynaparrot/plugNmeet-moodle)
 3) [Wordpress Plugin](https://github.com/mynaparrot/plugNmeet-wordpress)
+
+Docker:
+
+1. [plugnmeet-server](https://hub.docker.com/r/mynaparrot/plugnmeet-server)
 
 Examples:
 
@@ -97,3 +103,9 @@ cp docker-compose_sample.yaml docker-compose.yaml
 3) Now run `docker-compose up --build` & wait to finish process. If you're running this first time then you may see some
    errors. Hit `control + c` or `ctrl + c` & re-run `docker-compose up --build`. Everytime need to run this command to
    boot servers.
+
+Or you can build or run directly if you've `go` language install in your PC.
+
+```
+go run ./cmd/server/*.go
+```
