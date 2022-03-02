@@ -8,6 +8,16 @@ client:
   # cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 36 | head -n 1
   api_key: "plugnmeet"
   secret: "zumyyYWqv7KR2kUqvYdq4z4sXg7XTBD2ljT6"
+  webhook_conf:
+    # enable webhook. This will post response for different events
+    enable: false
+    # set url bellow. This will be use as global.
+    # this is optional
+    url: ""
+    # During create room you can set custom hook URL too.
+    # if you set enable_for_per_meeting: true
+    # then extra post response will send in that address too
+    enable_for_per_meeting: false
 log_settings:
   log_file: "./log/plugNmeet.log"
   # maxsize of log file in MB
