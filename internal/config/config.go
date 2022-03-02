@@ -31,11 +31,18 @@ type AppConfig struct {
 }
 
 type ClientInfo struct {
-	Port   int    `yaml:"port"`
-	Debug  bool   `yaml:"debug"`
-	Path   string `yaml:"path"`
-	ApiKey string `yaml:"api_key"`
-	Secret string `yaml:"secret"`
+	Port        int         `yaml:"port"`
+	Debug       bool        `yaml:"debug"`
+	Path        string      `yaml:"path"`
+	ApiKey      string      `yaml:"api_key"`
+	Secret      string      `yaml:"secret"`
+	WebhookConf WebhookConf `yaml:"webhook_conf"`
+}
+
+type WebhookConf struct {
+	Enable              bool   `yaml:"enable"`
+	Url                 string `yaml:"url,omitempty"`
+	EnableForPerMeeting bool   `yaml:"enable_for_per_meeting"`
 }
 
 type LogSettings struct {

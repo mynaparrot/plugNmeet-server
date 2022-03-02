@@ -15,6 +15,7 @@ type webhookEvent struct {
 	roomService    *RoomService
 	recordingModel *recordingModel
 	userModel      *userModel
+	notifier       *notifier
 }
 
 func NewWebhookModel(e *livekit.WebhookEvent) {
@@ -24,6 +25,7 @@ func NewWebhookModel(e *livekit.WebhookEvent) {
 		roomService:    NewRoomService(),
 		recordingModel: NewRecordingModel(),
 		userModel:      NewUserModel(),
+		notifier:       NewWebhookNotifier(),
 	}
 
 	switch e.GetEvent() {
@@ -51,9 +53,13 @@ func (w *webhookEvent) roomStarted() int64 {
 		CreationTime: event.Room.CreationTime,
 	}
 	lastId, err := w.roomModel.InsertRoomData(room)
+
 	if err != nil {
 		log.Errorln(err)
 	}
+
+	// webhook notification
+	w.sendToWebhookNotifier(event)
 
 	return lastId
 }
@@ -69,6 +75,10 @@ func (w *webhookEvent) participantJoined() int64 {
 		log.Errorln(err)
 	}
 
+	// webhook notification
+	if !event.Participant.Hidden {
+		w.sendToWebhookNotifier(event)
+	}
 	return affected
 }
 
@@ -81,6 +91,11 @@ func (w *webhookEvent) participantLeft() int64 {
 	affected, err := w.roomModel.UpdateRoomParticipants(room, "-")
 	if err != nil {
 		log.Errorln(err)
+	}
+
+	// webhook notification
+	if !event.Participant.Hidden {
+		w.sendToWebhookNotifier(event)
 	}
 
 	return affected
@@ -120,5 +135,34 @@ func (w *webhookEvent) roomFinished() int64 {
 		config.AppCnf.RDS.Publish(context.Background(), "plug-n-meet-websocket", marshal)
 	}
 
+	// webhook notification
+	w.sendToWebhookNotifier(event)
+
 	return affected
+}
+
+func (w *webhookEvent) sendToWebhookNotifier(event *livekit.WebhookEvent) {
+	msg := CommonNotifyEvent{
+		Event: event.Event,
+		Room: NotifyEventRoom{
+			Sid:             event.Room.Sid,
+			RoomId:          event.Room.Name,
+			EmptyTimeout:    event.Room.EmptyTimeout,
+			MaxParticipants: event.Room.MaxParticipants,
+			CreationTime:    event.Room.CreationTime,
+			EnabledCodecs:   event.Room.EnabledCodecs,
+			Metadata:        event.Room.Metadata,
+			NumParticipants: event.Room.NumParticipants,
+		},
+		Participant: event.Participant,
+		EgressInfo:  event.EgressInfo,
+		Track:       event.Track,
+		Id:          event.Id,
+		CreatedAt:   event.CreatedAt,
+	}
+
+	err := w.notifier.Notify(event.Room.Sid, msg)
+	if err != nil {
+		log.Errorln(err)
+	}
 }

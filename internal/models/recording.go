@@ -61,21 +61,26 @@ func (rm *recordingModel) HandleRecorderResp(r *RecorderResp) {
 	switch r.Task {
 	case "recording-started":
 		rm.recordingStarted(r)
+		rm.sendToWebhookNotifier(r)
 
 	case "recording-ended":
 		rm.recordingEnded(r)
+		rm.sendToWebhookNotifier(r)
 
 	case "rtmp-started":
 		rm.rtmpStarted(r)
+		rm.sendToWebhookNotifier(r)
 
 	case "rtmp-ended":
 		rm.rtmpEnded(r)
+		rm.sendToWebhookNotifier(r)
 
-	case "proceeded":
+	case "recording-proceeded":
 		err := rm.addRecording(r)
 		if err != nil {
 			log.Errorln(err)
 		}
+		rm.sendToWebhookNotifier(r)
 	case "addRecorder":
 		err := rm.addRecorder(r)
 		if err != nil {
@@ -494,6 +499,29 @@ func (rm *recordingModel) addRecording(r *RecorderResp) error {
 	}
 
 	return nil
+}
+
+func (rm *recordingModel) sendToWebhookNotifier(r *RecorderResp) {
+	n := NewWebhookNotifier()
+	msg := CommonNotifyEvent{
+		Event: r.Task,
+		Room: NotifyEventRoom{
+			Sid:    r.Sid,
+			RoomId: r.RoomId,
+		},
+		RecordingInfo: RecordingInfoEvent{
+			RecordId:    r.RecordId,
+			RecorderId:  r.RecorderId,
+			RecorderMsg: r.Msg,
+			FilePath:    r.FilePath,
+			FileSize:    r.FileSize,
+		},
+	}
+
+	err := n.Notify(r.Sid, msg)
+	if err != nil {
+		log.Errorln(err)
+	}
 }
 
 type RecorderReq struct {
