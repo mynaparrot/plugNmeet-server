@@ -11,15 +11,17 @@ infrastructure [livekit](https://github.com/livekit/livekit-server).
 2) WebRTC based secured & encrypted communication.
 3) Scalable and high performance system written in Go programming language which made it possible to distributed as a
    [single binary](https://github.com/mynaparrot/plugNmeet-server/releases) file!
-4) Easy integration with any existing website or system.
-5) Easy customization with functionality, URL, logo, and branding colors.
-6) HD audio and video call.
-7) HD Screensharing.
-8) Lock settings.
-9) Raise hand.
-10) Chatting with File sharing.
-11) MP4 Recordings.
-12) RTMP Broadcasting
+4) Simulcast and Dynacast features will allow you to continue online conferencing even if your internet connection is
+   slow!
+5) Easy integration with any existing website or system.
+6) Easy customization with functionality, URL, logo, and branding colors.
+7) HD audio and video call.
+8) HD Screensharing.
+9) Lock settings.
+10) Raise hand.
+11) Chatting with File sharing.
+12) MP4 Recordings.
+13) RTMP Broadcasting
 
 And many more!
 
