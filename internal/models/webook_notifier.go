@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"github.com/livekit/protocol/auth"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugNmeet/internal/config"
@@ -80,7 +79,6 @@ func (n *notifier) Notify(roomSid string, msg interface{}) error {
 	}
 
 	if len(n.urls) > 0 {
-		fmt.Println(n.urls)
 		err := n._notify(msg)
 
 		if err != nil {
