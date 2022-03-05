@@ -91,23 +91,4 @@ You can manually download server from [release](https://github.com/mynaparrot/pl
 
 ## Development
 
-1) Clone the project & navigate to the directory. Make sure you've docker install in your
-   PC. https://www.docker.com/products/docker-desktop
-
-2) Copy to rename this files:
-
-```
-cp config_sample.yaml config.yaml
-cp livekit_sample.yaml livekit.yaml
-cp docker-compose_sample.yaml docker-compose.yaml
-```
-
-3) Now run `docker-compose up --build` & wait to finish process. If you're running this first time then you may see some
-   errors. Hit `control + c` or `ctrl + c` & re-run `docker-compose up --build`. Everytime need to run this command to
-   boot servers.
-
-Or you can build or run directly if you've `go` language install in your PC.
-
-```
-go run ./cmd/server/*.go
-```
+Please follow [this wiki](https://github.com/mynaparrot/plugNmeet-server/wiki/Development) for details.
