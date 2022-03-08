@@ -72,6 +72,12 @@ func Router() *fiber.App {
 	api.Post("/dataMessage", controllers.HandleDataMessage)
 	api.Post("/endRoom", controllers.HandleEndRoomForAPI)
 
+	// etherpad group
+	etherpad := api.Group("/etherpad", controllers.HandleVerifyHeaderToken)
+	etherpad.Post("/create", controllers.HandleCreateEtherpad)
+	etherpad.Post("/cleanPad", controllers.HandleCleanPad)
+	etherpad.Post("/changeStatus", controllers.HandleChangeEtherpadStatus)
+
 	// for resumable.js need both methods.
 	// https://github.com/23/resumable.js#how-do-i-set-it-up-with-my-server
 	api.Get("/fileUpload", controllers.HandleChatFileUpload)

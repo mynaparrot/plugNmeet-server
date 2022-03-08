@@ -25,6 +25,19 @@ services:
     command: --config "/app/livekit.yaml" --dev
     depends_on:
       - redis
+  etherpad:
+    build:
+      # https://github.com/ether/etherpad-lite/releases/tag/1.8.17
+      context: https://github.com/ether/etherpad-lite.git#c85ab49444a50af39e6d571abc1672934d80bd72
+      args:
+        - ETHERPAD_PLUGINS=ep_disable_chat
+    ports:
+      - "9001:9001/tcp"
+    volumes:
+      - ./etc/etherpad/APIKEY.txt:/opt/etherpad-lite/APIKEY.txt
+      - ./etc/etherpad/settings.json:/opt/etherpad-lite/settings.json
+    depends_on:
+      - redis
   plugnmeet-api:
     build:
       context: .
