@@ -50,8 +50,6 @@ type SharedNotePadFeatures struct {
 	IsActive             bool   `json:"is_active"`
 	NodeId               string `json:"node_id"`
 	Host                 string `json:"host"`
-	GroupId              string `json:"group_id"`    // groupId created for current room using roomId
-	AuthorId             string `json:"author_id"`   // here author roomId
 	NotePadId            string `json:"note_pad_id"` // the shared session Id
 	ReadOnlyPadId        string `json:"read_only_pad_id"`
 }

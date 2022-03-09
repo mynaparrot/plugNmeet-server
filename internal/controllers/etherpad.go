@@ -85,7 +85,7 @@ func HandleCleanPad(c *fiber.Ctx) error {
 	}
 
 	m := models.NewEtherpadModel()
-	err = m.CleanPad(req.RoomId, req.NodeId, req.GroupId, req.SessionId, req.PadId)
+	err = m.CleanPad(req.RoomId, req.NodeId, req.PadId)
 	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
