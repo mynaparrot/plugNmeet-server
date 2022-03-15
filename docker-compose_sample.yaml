@@ -31,6 +31,7 @@ services:
       context: https://github.com/ether/etherpad-lite.git#c85ab49444a50af39e6d571abc1672934d80bd72
       args:
         - ETHERPAD_PLUGINS=ep_disable_chat
+        - INSTALL_SOFFICE=true
     ports:
       - "9001:9001/tcp"
     volumes:
