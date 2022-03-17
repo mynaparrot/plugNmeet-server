@@ -48,8 +48,9 @@ func (w *websocketService) HandleDataMessages(payload *DataMessageRes, roomId *s
 		w.userMessages()
 	case "SYSTEM":
 		w.handleSystemMessages()
+	case "WHITEBOARD":
+		w.handleWhiteboardMessages()
 	}
-
 }
 
 func (w *websocketService) userMessages() {
@@ -67,6 +68,14 @@ func (w *websocketService) handleSystemMessages() {
 		w.handleRenewToken()
 	case "INFO", "ALERT":
 		w.handleSendPushMsg()
+	}
+}
+
+func (w *websocketService) handleWhiteboardMessages() {
+	switch w.pl.Body.Type {
+	case "SCENE_UPDATE",
+		"POINTER_UPDATE":
+		w.handleWhiteboard()
 	}
 }
 
@@ -177,6 +186,29 @@ func (w *websocketService) handleSendPushMsg() {
 					}
 				} else {
 					// for everyone in the room
+					to = append(to, p.UUID)
+				}
+			}
+		}
+	}
+
+	if len(to) > 0 {
+		ikisocket.EmitToList(to, jm)
+	}
+}
+
+func (w *websocketService) handleWhiteboard() {
+	jm, err := json.Marshal(w.pl)
+	if err != nil {
+		return
+	}
+
+	var to []string
+	if w.participants != nil {
+		for _, p := range w.participants {
+			if p.RoomSid == *w.rSid {
+				// we don't need to send update to sender
+				if w.pl.Body.From.UserId != p.UserId {
 					to = append(to, p.UUID)
 				}
 			}

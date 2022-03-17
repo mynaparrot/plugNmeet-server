@@ -23,7 +23,7 @@ type DataMessageReq struct {
 }
 
 type DataMessageRes struct {
-	Type      string          `json:"type"` // 'SYSTEM' | 'USER'
+	Type      string          `json:"type"` // 'SYSTEM' | 'USER' | 'WHITEBOARD'
 	MessageId string          `json:"message_id"`
 	RoomSid   string          `json:"room_sid"`
 	RoomId    string          `json:"room_id"`
@@ -32,7 +32,7 @@ type DataMessageRes struct {
 }
 
 type DataMessageBody struct {
-	Type      string  `json:"type"` // RAISE_HAND, LOWER_HAND, FILE_UPLOAD, INFO, ALERT, SEND_CHAT_MSGS, RENEW_TOKEN
+	Type      string  `json:"type"` // RAISE_HAND, LOWER_HAND, FILE_UPLOAD, INFO, ALERT, SEND_CHAT_MSGS, RENEW_TOKEN, INIT_WHITEBOARD, SCENE_UPDATE, POINTER_UPDATE
 	MessageId string  `json:"message_id"`
 	Time      string  `json:"time"`
 	From      ReqFrom `json:"from"`
