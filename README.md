@@ -15,13 +15,14 @@ infrastructure [livekit](https://github.com/livekit/livekit-server).
    connection is slow!
 5) Easy integration with any existing website or system.
 6) Easy customization with functionality, URL, logo, and branding colors.
-7) HD audio, video call and Screensharing.
-8) Shared notepad for live collaboration.
-9) Lock settings.
-10) Raise hand.
-11) Chatting with File sharing.
-12) MP4 Recordings.
-13) RTMP Broadcasting
+7) HD audio, video call and Screen sharing.
+8) **Shared notepad** for live collaboration.
+9) **Virtual background** for webcams.
+10) Lock settings.
+11) Raise hand.
+12) Chatting with File sharing.
+13) MP4 Recordings.
+14) RTMP Broadcasting
 
 And many more!
 
