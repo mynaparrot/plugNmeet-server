@@ -138,6 +138,10 @@ func (w *webhookEvent) roomFinished() int64 {
 	// webhook notification
 	w.sendToWebhookNotifier(event)
 
+	// clean shared note
+	em := NewEtherpadModel()
+	_ = em.CleanAfterRoomEnd(event.Room.Name, event.Room.Metadata)
+
 	return affected
 }
 

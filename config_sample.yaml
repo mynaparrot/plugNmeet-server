@@ -63,3 +63,13 @@ recorder_info:
   # this value should be same as recorder's copy_to_dir path
   recording_files_path: "/app/recording_files"
   token_validity: 30m
+shared_notepad:
+  enabled: true
+  # multiple hosts can be added here
+  # server will be selected based on load
+  # the value of id should be unique
+  etherpad_hosts:
+    -
+      id: "node_01"
+      host: "http://host.docker.internal:9001"
+      api_key: "eb2fb3fb78ca29eb6896852517d34a1be5f320664e3cce3a522a06dfa278f169"

@@ -28,6 +28,7 @@ type AppConfig struct {
 	MySqlInfo          MySqlInfo          `yaml:"mysql_info"`
 	UploadFileSettings UploadFileSettings `yaml:"upload_file_settings"`
 	RecorderInfo       RecorderInfo       `yaml:"recorder_info"`
+	SharedNotePad      SharedNotePad      `yaml:"shared_notepad"`
 }
 
 type ClientInfo struct {
@@ -86,6 +87,17 @@ type UploadFileSettings struct {
 type RecorderInfo struct {
 	RecordingFilesPath string        `yaml:"recording_files_path"`
 	TokenValidity      time.Duration `yaml:"token_validity"`
+}
+
+type SharedNotePad struct {
+	Enabled       bool           `yaml:"enabled"`
+	EtherpadHosts []EtherpadInfo `yaml:"etherpad_hosts"`
+}
+
+type EtherpadInfo struct {
+	Id     string `yaml:"id"`
+	Host   string `yaml:"host"`
+	ApiKey string `yaml:"api_key"`
 }
 
 type ChatParticipant struct {

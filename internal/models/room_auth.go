@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 	"github.com/livekit/protocol/livekit"
+	"github.com/mynaparrot/plugNmeet/internal/config"
 	"sync"
 	"time"
 )
@@ -25,15 +26,16 @@ type RoomMetadata struct {
 }
 
 type RoomCreateFeatures struct {
-	AllowWebcams               bool         `json:"allow_webcams"`
-	MuteOnStart                bool         `json:"mute_on_start"`
-	AllowScreenShare           bool         `json:"allow_screen_share"`
-	AllowRecording             bool         `json:"allow_recording"`
-	AllowRTMP                  bool         `json:"allow_rtmp"`
-	AllowViewOtherWebcams      bool         `json:"allow_view_other_webcams"`
-	AllowViewOtherParticipants bool         `json:"allow_view_other_users_list"`
-	AdminOnlyWebcams           bool         `json:"admin_only_webcams"`
-	ChatFeatures               ChatFeatures `json:"chat_features"`
+	AllowWebcams               bool                  `json:"allow_webcams"`
+	MuteOnStart                bool                  `json:"mute_on_start"`
+	AllowScreenShare           bool                  `json:"allow_screen_share"`
+	AllowRecording             bool                  `json:"allow_recording"`
+	AllowRTMP                  bool                  `json:"allow_rtmp"`
+	AllowViewOtherWebcams      bool                  `json:"allow_view_other_webcams"`
+	AllowViewOtherParticipants bool                  `json:"allow_view_other_users_list"`
+	AdminOnlyWebcams           bool                  `json:"admin_only_webcams"`
+	ChatFeatures               ChatFeatures          `json:"chat_features"`
+	SharedNotePadFeatures      SharedNotePadFeatures `json:"shared_note_pad_features"`
 }
 
 type ChatFeatures struct {
@@ -41,6 +43,15 @@ type ChatFeatures struct {
 	AllowFileUpload  bool     `json:"allow_file_upload"`
 	AllowedFileTypes []string `json:"allowed_file_types,omitempty"`
 	MaxFileSize      int      `json:"max_file_size,omitempty"`
+}
+
+type SharedNotePadFeatures struct {
+	AllowedSharedNotePad bool   `json:"allowed_shared_note_pad"`
+	IsActive             bool   `json:"is_active"`
+	NodeId               string `json:"node_id"`
+	Host                 string `json:"host"`
+	NotePadId            string `json:"note_pad_id"` // the shared session Id
+	ReadOnlyPadId        string `json:"read_only_pad_id"`
 }
 
 type RoomEndReq struct {
@@ -91,6 +102,11 @@ func (am *roomAuthModel) CreateRoom(r *RoomCreateReq) (bool, string, *livekit.Ro
 			return false, "can't create room. try again", nil
 		}
 		return true, "room already exists", rf
+	}
+
+	// we'll disable if SharedNotePad isn't enable in config
+	if !config.AppCnf.SharedNotePad.Enabled {
+		r.RoomMetadata.Features.SharedNotePadFeatures.AllowedSharedNotePad = false
 	}
 
 	meta, err := json.Marshal(r.RoomMetadata)
