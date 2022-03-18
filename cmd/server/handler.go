@@ -71,6 +71,7 @@ func Router() *fiber.App {
 	api.Post("/removeParticipant", controllers.HandleRemoveParticipant)
 	api.Post("/dataMessage", controllers.HandleDataMessage)
 	api.Post("/endRoom", controllers.HandleEndRoomForAPI)
+	api.Post("/changeVisibility", controllers.HandleChangeVisibilityForAPI)
 
 	// etherpad group
 	etherpad := api.Group("/etherpad", controllers.HandleVerifyHeaderToken)

@@ -165,3 +165,47 @@ func HandleEndRoomForAPI(c *fiber.Ctx) error {
 		"msg":    msg,
 	})
 }
+
+func HandleChangeVisibilityForAPI(c *fiber.Ctx) error {
+	isAdmin := c.Locals("isAdmin")
+	roomId := c.Locals("roomId")
+
+	if !isAdmin.(bool) {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    "only admin can perform this task",
+		})
+	}
+
+	req := new(models.ChangeVisibilityRes)
+	err := c.BodyParser(req)
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	check := config.AppCnf.DoValidateReq(req)
+	if len(check) > 0 {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    check,
+		})
+	}
+
+	if roomId != req.RoomId {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    "requested roomId & token roomId mismatched",
+		})
+	}
+
+	m := models.NewRoomAuthModel()
+	status, msg := m.ChangeVisibility(req)
+
+	return c.JSON(fiber.Map{
+		"status": status,
+		"msg":    msg,
+	})
+}

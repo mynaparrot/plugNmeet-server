@@ -62,8 +62,9 @@ func (w *websocketService) userMessages() {
 
 func (w *websocketService) handleSystemMessages() {
 	switch w.pl.Body.Type {
-	case "SEND_CHAT_MSGS":
-		w.handleSendChatMsgs()
+	case "SEND_CHAT_MSGS",
+		"INIT_WHITEBOARD":
+		w.handleSendChatMsgs() // we can use same method for both
 	case "RENEW_TOKEN":
 		w.handleRenewToken()
 	case "INFO", "ALERT":
@@ -207,8 +208,13 @@ func (w *websocketService) handleWhiteboard() {
 	if w.participants != nil {
 		for _, p := range w.participants {
 			if p.RoomSid == *w.rSid {
-				// we don't need to send update to sender
-				if w.pl.Body.From.UserId != p.UserId {
+				// this is basically for initial request
+				if w.pl.To != "" {
+					if w.pl.To == p.UserSid {
+						to = append(to, p.UUID)
+					}
+				} else if w.pl.Body.From.UserId != p.UserId {
+					// we don't need to send update to sender
 					to = append(to, p.UUID)
 				}
 			}
