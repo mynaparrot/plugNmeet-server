@@ -56,9 +56,8 @@ upload_file_settings:
     - "png"
     - "pdf"
     - "docx"
-    - "psd"
     - "zip"
-    - "rar"
+    - "svg"
 recorder_info:
   # this value should be same as recorder's copy_to_dir path
   recording_files_path: "/app/recording_files"
