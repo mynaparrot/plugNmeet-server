@@ -118,6 +118,12 @@ func (am *roomAuthModel) CreateRoom(r *RoomCreateReq) (bool, string, *livekit.Ro
 	if r.RoomMetadata.Features.WhiteboardFeatures.AllowedWhiteboard {
 		r.RoomMetadata.Features.WhiteboardFeatures.Visible = true
 	}
+	if len(r.RoomMetadata.Features.ChatFeatures.AllowedFileTypes) == 0 {
+		r.RoomMetadata.Features.ChatFeatures.AllowedFileTypes = config.AppCnf.UploadFileSettings.AllowedTypes
+	}
+	if r.RoomMetadata.Features.ChatFeatures.MaxFileSize == 0 {
+		r.RoomMetadata.Features.ChatFeatures.MaxFileSize = config.AppCnf.UploadFileSettings.MaxSize
+	}
 
 	meta, err := json.Marshal(r.RoomMetadata)
 	if err != nil {
