@@ -115,9 +115,6 @@ func (am *roomAuthModel) CreateRoom(r *RoomCreateReq) (bool, string, *livekit.Ro
 	if !config.AppCnf.SharedNotePad.Enabled {
 		r.RoomMetadata.Features.SharedNotePadFeatures.AllowedSharedNotePad = false
 	}
-	if r.RoomMetadata.Features.WhiteboardFeatures.AllowedWhiteboard {
-		r.RoomMetadata.Features.WhiteboardFeatures.Visible = true
-	}
 	if len(r.RoomMetadata.Features.ChatFeatures.AllowedFileTypes) == 0 {
 		r.RoomMetadata.Features.ChatFeatures.AllowedFileTypes = config.AppCnf.UploadFileSettings.AllowedTypes
 	}
