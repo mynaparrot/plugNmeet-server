@@ -16,7 +16,7 @@ infrastructure [livekit](https://github.com/livekit/livekit-server).
 5) Easy integration with any existing website or system.
 6) Easy customization with functionality, URL, logo, and branding colors.
 7) HD audio, video call and Screen sharing.
-8) **Shared notepad** for live collaboration.
+8) **Shared notepad** and **Whiteboard** for live collaboration.
 9) **Virtual background** for webcams.
 10) Lock settings.
 11) Raise hand.

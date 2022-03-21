@@ -53,12 +53,12 @@ upload_file_settings:
   keep_forever: false
   allowed_types:
     - "jpg"
+    - "jpeg"
     - "png"
+    - "svg"
     - "pdf"
     - "docx"
-    - "psd"
     - "zip"
-    - "rar"
 recorder_info:
   # this value should be same as recorder's copy_to_dir path
   recording_files_path: "/app/recording_files"

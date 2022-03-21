@@ -36,6 +36,7 @@ type RoomCreateFeatures struct {
 	AdminOnlyWebcams           bool                  `json:"admin_only_webcams"`
 	ChatFeatures               ChatFeatures          `json:"chat_features"`
 	SharedNotePadFeatures      SharedNotePadFeatures `json:"shared_note_pad_features"`
+	WhiteboardFeatures         WhiteboardFeatures    `json:"whiteboard_features"`
 }
 
 type ChatFeatures struct {
@@ -48,10 +49,16 @@ type ChatFeatures struct {
 type SharedNotePadFeatures struct {
 	AllowedSharedNotePad bool   `json:"allowed_shared_note_pad"`
 	IsActive             bool   `json:"is_active"`
+	Visible              bool   `json:"visible"`
 	NodeId               string `json:"node_id"`
 	Host                 string `json:"host"`
 	NotePadId            string `json:"note_pad_id"` // the shared session Id
 	ReadOnlyPadId        string `json:"read_only_pad_id"`
+}
+
+type WhiteboardFeatures struct {
+	AllowedWhiteboard bool `json:"allowed_whiteboard"`
+	Visible           bool `json:"visible"`
 }
 
 type RoomEndReq struct {
@@ -107,6 +114,12 @@ func (am *roomAuthModel) CreateRoom(r *RoomCreateReq) (bool, string, *livekit.Ro
 	// we'll disable if SharedNotePad isn't enable in config
 	if !config.AppCnf.SharedNotePad.Enabled {
 		r.RoomMetadata.Features.SharedNotePadFeatures.AllowedSharedNotePad = false
+	}
+	if len(r.RoomMetadata.Features.ChatFeatures.AllowedFileTypes) == 0 {
+		r.RoomMetadata.Features.ChatFeatures.AllowedFileTypes = config.AppCnf.UploadFileSettings.AllowedTypes
+	}
+	if r.RoomMetadata.Features.ChatFeatures.MaxFileSize == 0 {
+		r.RoomMetadata.Features.ChatFeatures.MaxFileSize = config.AppCnf.UploadFileSettings.MaxSize
 	}
 
 	meta, err := json.Marshal(r.RoomMetadata)
@@ -258,6 +271,44 @@ func (am *roomAuthModel) EndRoom(r *RoomEndReq) (bool, string) {
 		IsRunning: 0,
 		Ended:     time.Now().Format("2006-01-02 15:04:05"),
 	})
+
+	return true, "success"
+}
+
+type ChangeVisibilityRes struct {
+	RoomId            string `json:"room_id"`
+	VisibleNotepad    *bool  `json:"visible_notepad,omitempty"`
+	VisibleWhiteBoard *bool  `json:"visible_white_board,omitempty"`
+}
+
+func (am *roomAuthModel) ChangeVisibility(r *ChangeVisibilityRes) (bool, string) {
+	room, err := am.rs.LoadRoomInfoFromRedis(r.RoomId)
+	if err != nil {
+		return false, err.Error()
+	}
+
+	m := make([]byte, len(room.Metadata))
+	copy(m, room.Metadata)
+
+	roomMeta := new(RoomMetadata)
+	err = json.Unmarshal(m, roomMeta)
+	if err != nil {
+		return false, err.Error()
+	}
+
+	if r.VisibleWhiteBoard != nil {
+		roomMeta.Features.WhiteboardFeatures.Visible = *r.VisibleWhiteBoard
+	}
+	if r.VisibleNotepad != nil {
+		roomMeta.Features.SharedNotePadFeatures.Visible = *r.VisibleNotepad
+	}
+
+	metadata, _ := json.Marshal(roomMeta)
+	_, err = am.rs.UpdateRoomMetadata(r.RoomId, string(metadata))
+
+	if err != nil {
+		return false, err.Error()
+	}
 
 	return true, "success"
 }
