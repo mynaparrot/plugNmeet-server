@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -27,6 +28,11 @@ func Router() *fiber.App {
 
 	if config.AppCnf.Client.Debug {
 		app.Use(logger.New())
+	}
+	if config.AppCnf.Client.PrometheusConf.Enable {
+		prometheus := fiberprometheus.New("plugNmeet")
+		prometheus.RegisterAt(app, config.AppCnf.Client.PrometheusConf.MetricsPath)
+		app.Use(prometheus.Middleware)
 	}
 	app.Use(recover.New())
 	app.Use(cors.New(cors.Config{
