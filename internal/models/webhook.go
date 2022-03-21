@@ -76,7 +76,7 @@ func (w *webhookEvent) participantJoined() int64 {
 	}
 
 	// webhook notification
-	if !event.Participant.Hidden {
+	if !event.Participant.Permission.Hidden {
 		w.sendToWebhookNotifier(event)
 	}
 	return affected
@@ -94,7 +94,7 @@ func (w *webhookEvent) participantLeft() int64 {
 	}
 
 	// webhook notification
-	if !event.Participant.Hidden {
+	if !event.Participant.Permission.Hidden {
 		w.sendToWebhookNotifier(event)
 	}
 
