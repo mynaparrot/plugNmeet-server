@@ -32,18 +32,24 @@ type AppConfig struct {
 }
 
 type ClientInfo struct {
-	Port        int         `yaml:"port"`
-	Debug       bool        `yaml:"debug"`
-	Path        string      `yaml:"path"`
-	ApiKey      string      `yaml:"api_key"`
-	Secret      string      `yaml:"secret"`
-	WebhookConf WebhookConf `yaml:"webhook_conf"`
+	Port           int            `yaml:"port"`
+	Debug          bool           `yaml:"debug"`
+	Path           string         `yaml:"path"`
+	ApiKey         string         `yaml:"api_key"`
+	Secret         string         `yaml:"secret"`
+	WebhookConf    WebhookConf    `yaml:"webhook_conf"`
+	PrometheusConf PrometheusConf `yaml:"prometheus"`
 }
 
 type WebhookConf struct {
 	Enable              bool   `yaml:"enable"`
 	Url                 string `yaml:"url,omitempty"`
 	EnableForPerMeeting bool   `yaml:"enable_for_per_meeting"`
+}
+
+type PrometheusConf struct {
+	Enable      bool   `yaml:"enable"`
+	MetricsPath string `yaml:"metrics_path"`
 }
 
 type LogSettings struct {

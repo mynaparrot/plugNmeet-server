@@ -18,6 +18,9 @@ client:
     # if you set enable_for_per_meeting: true
     # then extra post response will send in that address too
     enable_for_per_meeting: false
+  prometheus:
+    enable: false
+    metrics_path: "/metrics"
 log_settings:
   log_file: "./log/plugNmeet.log"
   # maxsize of log file in MB
