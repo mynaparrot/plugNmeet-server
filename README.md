@@ -36,18 +36,13 @@ The components of Plug-N-Meet are as follows:
 3) [plugNmeet-recoder](https://github.com/mynaparrot/plugNmeet-recorder), a node module for recording/rtmp broadcasting
    which is written in TypeScript.
 
-**Demo:**
+####Demo
 
 https://demo.plugnmeet.com/login.html
 
-## Requirements
-
-1) Livekit configured with Redis.
-2) `plugNmeet-server` configured with same Redis instance using for livekit.
-3) Mariadb server for data storage.
-
-We've created an easy to install script which can be used to install all the necessary components in 5 minutes.
-Check [plugNmeet-install](https://github.com/mynaparrot/plugNmeet-install) repo.
+## Installation
+We've created an easy to install script which can be used to install all the necessary components in few minutes.
+Please check [plugNmeet-install](https://github.com/mynaparrot/plugNmeet-install) repo.
 
 ## SDKs & Tools
 
@@ -69,7 +64,12 @@ Examples:
 
 1) [Example of API](https://github.com/mynaparrot/plugNmeet-server/wiki/API-Information-(examples))
 
-## Manually
+## Manually installation
+
+**Requirements:**
+1) Livekit configured with Redis.
+2) `plugNmeet-server` configured with same Redis instance using for livekit.
+3) Mariadb server for data storage.
 
 Create `config.yaml`
 from [config_sample.yaml](https://raw.githubusercontent.com/mynaparrot/plugNmeet-server/main/config_sample.yaml) &
