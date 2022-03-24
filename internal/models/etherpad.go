@@ -30,11 +30,14 @@ type EtherpadHttpRes struct {
 }
 
 type EtherpadDataTypes struct {
-	AuthorID   string `json:"authorID"`
-	GroupID    string `json:"groupID"`
-	SessionID  string `json:"sessionID"`
-	PadID      string `json:"padID"`
-	ReadOnlyID string `json:"readOnlyID"`
+	AuthorID        string `json:"authorID"`
+	GroupID         string `json:"groupID"`
+	SessionID       string `json:"sessionID"`
+	PadID           string `json:"padID"`
+	ReadOnlyID      string `json:"readOnlyID"`
+	TotalPads       int64  `json:"totalPads"`
+	TotalSessions   int64  `json:"totalSessions"`
+	TotalActivePads int64  `json:"totalActivePads"`
 }
 
 const (
@@ -62,7 +65,11 @@ func (m *EtherpadModel) CreateSession(roomId string) (*CreateSessionRes, error) 
 	if len(m.SharedNotePad.EtherpadHosts) < 1 {
 		return nil, errors.New("need at least one etherpad host")
 	}
-	m.selectHost()
+	err := m.selectHost()
+	if err != nil {
+		return nil, err
+	}
+
 	res := new(CreateSessionRes)
 	res.PadId = uuid.NewString()
 
@@ -214,7 +221,7 @@ func (m *EtherpadModel) createReadonlyPad(sessionId string) (*EtherpadHttpRes, e
 }
 
 // selectHost will choose server based on simple active number
-func (m *EtherpadModel) selectHost() {
+func (m *EtherpadModel) selectHost() error {
 	type host struct {
 		i      int
 		id     string
@@ -223,12 +230,18 @@ func (m *EtherpadModel) selectHost() {
 	var hosts []host
 
 	for i, h := range m.SharedNotePad.EtherpadHosts {
-		c := m.rc.SCard(m.context, EtherpadKey+h.Id)
-		hosts = append(hosts, host{
-			i:      i,
-			id:     h.Id,
-			active: c.Val(),
-		})
+		ok := m.checkStatus(h)
+		if ok {
+			c := m.rc.SCard(m.context, EtherpadKey+h.Id)
+			hosts = append(hosts, host{
+				i:      i,
+				id:     h.Id,
+				active: c.Val(),
+			})
+		}
+	}
+	if len(hosts) == 0 {
+		return errors.New("no active etherpad host found")
 	}
 
 	sort.Slice(hosts, func(i, j int) bool {
@@ -239,6 +252,21 @@ func (m *EtherpadModel) selectHost() {
 	m.NodeId = selectedHost.Id
 	m.Host = selectedHost.Host
 	m.ApiKey = selectedHost.ApiKey
+
+	return nil
+}
+
+func (m *EtherpadModel) checkStatus(h config.EtherpadInfo) bool {
+	m.Host = h.Host
+	m.ApiKey = h.ApiKey
+
+	vals := url.Values{}
+	_, err := m.postToEtherpad("getStats", vals)
+	if err != nil {
+		return false
+	}
+
+	return true
 }
 
 func (m *EtherpadModel) postToEtherpad(method string, vals url.Values) (*EtherpadHttpRes, error) {
