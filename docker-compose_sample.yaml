@@ -26,12 +26,7 @@ services:
     depends_on:
       - redis
   etherpad:
-    build:
-      # https://github.com/ether/etherpad-lite/releases/tag/1.8.17
-      context: https://github.com/ether/etherpad-lite.git#c85ab49444a50af39e6d571abc1672934d80bd72
-      args:
-        - ETHERPAD_PLUGINS=ep_disable_chat ep_sticky_attributes
-        - INSTALL_SOFFICE=true
+    image: mynaparrot/plugnmeet-etherpad
     ports:
       - "9001:9001/tcp"
     volumes:
