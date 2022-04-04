@@ -74,8 +74,8 @@ type GetRoomInfoReq struct {
 }
 
 type ActiveRoomInfoRes struct {
-	RoomInfo         *ActiveRoomInfo
-	ParticipantsInfo []*livekit.ParticipantInfo
+	RoomInfo         *ActiveRoomInfo            `json:"room_info"`
+	ParticipantsInfo []*livekit.ParticipantInfo `json:"participants_info"`
 }
 
 type roomAuthModel struct {
