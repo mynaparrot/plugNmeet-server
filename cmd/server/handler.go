@@ -24,7 +24,7 @@ func Router() *fiber.App {
 		Views: templateEngine,
 	})
 	app.Static("/assets", config.AppCnf.Client.Path+"/assets")
-	app.Static("/favicon.ico", config.AppCnf.Client.Path+"/assets/favicon.ico")
+	app.Static("/favicon.ico", config.AppCnf.Client.Path+"/assets/imgs/favicon.ico")
 
 	if config.AppCnf.Client.Debug {
 		app.Use(logger.New())
