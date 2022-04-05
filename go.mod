@@ -1,6 +1,6 @@
 module github.com/mynaparrot/plugNmeet
 
-go 1.17
+go 1.18
 
 require (
 	github.com/ansrivas/fiberprometheus/v2 v2.2.0
