@@ -9,15 +9,15 @@ require (
 	github.com/go-playground/validator/v10 v10.10.1
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-sql-driver/mysql v1.6.0
-	github.com/gofiber/fiber/v2 v2.29.0
-	github.com/gofiber/template v1.6.25
-	github.com/gofiber/websocket/v2 v2.0.18
+	github.com/gofiber/fiber/v2 v2.31.0
+	github.com/gofiber/template v1.6.26
+	github.com/gofiber/websocket/v2 v2.0.20
 	github.com/google/uuid v1.3.0
-	github.com/livekit/protocol v0.12.0
-	github.com/livekit/server-sdk-go v0.9.2
+	github.com/livekit/protocol v0.13.0
+	github.com/livekit/server-sdk-go v0.9.3
 	github.com/sirupsen/logrus v1.8.1
 	github.com/urfave/cli/v2 v2.4.0
-	google.golang.org/protobuf v1.27.1
+	google.golang.org/protobuf v1.28.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/square/go-jose.v2 v2.6.0
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
@@ -37,7 +37,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-playground/locales v0.14.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect
-	github.com/gofiber/adaptor/v2 v2.1.20 // indirect
+	github.com/gofiber/adaptor/v2 v2.1.22 // indirect
 	github.com/gofiber/utils v0.1.2 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
@@ -62,24 +62,24 @@ require (
 	github.com/pion/transport v0.13.0 // indirect
 	github.com/pion/turn/v2 v2.0.8 // indirect
 	github.com/pion/udp v0.1.1 // indirect
-	github.com/pion/webrtc/v3 v3.1.26 // indirect
+	github.com/pion/webrtc/v3 v3.1.27 // indirect
 	github.com/prometheus/client_golang v1.12.1 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
-	github.com/prometheus/common v0.32.1 // indirect
+	github.com/prometheus/common v0.33.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/savsgio/gotils v0.0.0-20220201163454-d252f0a44d5b // indirect
+	github.com/savsgio/gotils v0.0.0-20220401102855-e56b59f40436 // indirect
 	github.com/thoas/go-funk v0.9.2 // indirect
 	github.com/twitchtv/twirp v8.1.1+incompatible // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.34.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
-	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd // indirect
-	golang.org/x/net v0.0.0-20220225172249-27dd8689420f // indirect
-	golang.org/x/sys v0.0.0-20220319134239-a9b59b0215f8 // indirect
+	golang.org/x/crypto v0.0.0-20220331220935-ae2d96664a29 // indirect
+	golang.org/x/net v0.0.0-20220403103023-749bd193bc2b // indirect
+	golang.org/x/sys v0.0.0-20220405052023-b1e9470b6e64 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
-	google.golang.org/genproto v0.0.0-20220317150908-0efb43f6373e // indirect
+	google.golang.org/genproto v0.0.0-20220401170504-314d38edb7de // indirect
 	google.golang.org/grpc v1.45.0 // indirect
 )
