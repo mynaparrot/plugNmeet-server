@@ -122,6 +122,22 @@ func (am *roomAuthModel) CreateRoom(r *RoomCreateReq) (bool, string, *livekit.Ro
 		r.RoomMetadata.Features.ChatFeatures.MaxFileSize = config.AppCnf.UploadFileSettings.MaxSize
 	}
 
+	// by default, we'll lock screen share, whiteboard & shared notepad
+	// so that only admin can use those features.
+	lock := new(bool)
+	if r.RoomMetadata.DefaultLockSettings.LockScreenSharing == nil {
+		*lock = true
+		r.RoomMetadata.DefaultLockSettings.LockScreenSharing = lock
+	}
+	if r.RoomMetadata.DefaultLockSettings.LockWhiteboard == nil {
+		*lock = true
+		r.RoomMetadata.DefaultLockSettings.LockWhiteboard = lock
+	}
+	if r.RoomMetadata.DefaultLockSettings.LockSharedNotepad == nil {
+		*lock = true
+		r.RoomMetadata.DefaultLockSettings.LockSharedNotepad = lock
+	}
+
 	meta, err := json.Marshal(r.RoomMetadata)
 	if err != nil {
 		return false, "Error: " + err.Error(), nil
