@@ -34,6 +34,8 @@ type LockSettings struct {
 	LockChat            *bool `json:"lock_chat,omitempty"`
 	LockChatSendMessage *bool `json:"lock_chat_send_message,omitempty"`
 	LockChatFileShare   *bool `json:"lock_chat_file_share,omitempty"`
+	LockWhiteboard      *bool `json:"lock_whiteboard,omitempty"`
+	LockSharedNotepad   *bool `json:"lock_shared_notepad,omitempty"`
 }
 
 type authTokenModel struct {
@@ -90,6 +92,8 @@ func (a *authTokenModel) assignLockSettings(g *GenTokenReq) *LockSettings {
 		l.LockChat = lock
 		l.LockChatSendMessage = lock
 		l.LockChatFileShare = lock
+		l.LockWhiteboard = lock
+		l.LockSharedNotepad = lock
 	} else {
 		roomInfo, err := a.rs.LoadRoomInfoFromRedis(g.RoomId)
 		if err != nil {
@@ -122,6 +126,12 @@ func (a *authTokenModel) assignLockSettings(g *GenTokenReq) *LockSettings {
 		}
 		if ul.LockChatFileShare == nil && dl.LockChatFileShare != nil {
 			l.LockChatFileShare = dl.LockChatFileShare
+		}
+		if ul.LockWhiteboard == nil && dl.LockWhiteboard != nil {
+			l.LockWhiteboard = dl.LockWhiteboard
+		}
+		if ul.LockSharedNotepad == nil && dl.LockSharedNotepad != nil {
+			l.LockSharedNotepad = dl.LockSharedNotepad
 		}
 	}
 
