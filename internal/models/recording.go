@@ -9,17 +9,19 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/mynaparrot/plugNmeet/internal/config"
 	log "github.com/sirupsen/logrus"
+	"net/url"
 	"sort"
 	"strconv"
 	"time"
 )
 
 type recordingModel struct {
-	app         *config.AppConfig
-	db          *sql.DB
-	roomService *RoomService
-	rds         *redis.Client
-	ctx         context.Context
+	app          *config.AppConfig
+	db           *sql.DB
+	roomService  *RoomService
+	rds          *redis.Client
+	ctx          context.Context
+	RecordingReq *RecordingReq // we need to get custom design value
 }
 
 func NewRecordingModel() *recordingModel {
@@ -33,9 +35,10 @@ func NewRecordingModel() *recordingModel {
 }
 
 type RecordingReq struct {
-	Task    string `json:"task" validate:"required"`
-	Sid     string `json:"sid" validate:"required"`
-	RtmpUrl string `json:"rtmp_url"`
+	Task         string  `json:"task" validate:"required"`
+	Sid          string  `json:"sid" validate:"required"`
+	RtmpUrl      string  `json:"rtmp_url"`
+	CustomDesign *string `json:"custom_design,omitempty"`
 }
 
 func (rm *recordingModel) Validation(r *RecordingReq) []*config.ErrorResponse {
@@ -119,7 +122,7 @@ func (rm *recordingModel) recordingStarted(r *RecorderResp) {
 
 	// send message to room
 	err = NewDataMessage(&DataMessageReq{
-		MsgType: "info",
+		MsgType: "INFO",
 		Msg:     "notifications.recording-started",
 		RoomId:  r.RoomId,
 	})
@@ -244,7 +247,7 @@ func (rm *recordingModel) rtmpStarted(r *RecorderResp) {
 
 	// send message to room
 	err = NewDataMessage(&DataMessageReq{
-		MsgType: "info",
+		MsgType: "INFO",
 		Msg:     "notifications.rtmp-started",
 		RoomId:  r.RoomId,
 	})
@@ -594,8 +597,14 @@ func (rm *recordingModel) addTokenAndRecorder(rq *RecorderReq, userId string) er
 		return err
 	}
 
-	rq.AccessToken = token
 	rq.RecorderId = recorderId
+	rq.AccessToken = token
+
+	// if we have custom design then we'll set custom design with token
+	// don't need to change anything in recorder.
+	if rm.RecordingReq.CustomDesign != nil && *rm.RecordingReq.CustomDesign != "" {
+		rq.AccessToken += "&custom_design=" + url.QueryEscape(*rm.RecordingReq.CustomDesign)
+	}
 
 	return nil
 }
