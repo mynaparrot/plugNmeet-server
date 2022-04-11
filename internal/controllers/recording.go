@@ -101,6 +101,8 @@ func HandleRecording(c *fiber.Ctx) error {
 		})
 	}
 
+	// we need to get custom design value
+	m.RecordingReq = req
 	err = m.SendMsgToRecorder(req.Task, room.RoomId, room.Sid, "")
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -190,6 +192,8 @@ func HandleRTMP(c *fiber.Ctx) error {
 		})
 	}
 
+	// we need to get custom design value
+	m.RecordingReq = req
 	err = m.SendMsgToRecorder(req.Task, room.RoomId, room.Sid, req.RtmpUrl)
 	if err != nil {
 		return c.JSON(fiber.Map{
