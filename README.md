@@ -3,7 +3,7 @@
 Plug-N-Meet is an open source web conferencing system based on high performance WebRTC
 infrastructure [livekit](https://github.com/livekit/livekit-server).
 
-![](./github_files/banner.png)
+![banner](./github_files/banner.png)
 
 ## Features:
 
@@ -28,13 +28,13 @@ And many more!
 
 The components of Plug-N-Meet are as follows:
 
-1) [plugNmeet-server](https://github.com/mynaparrot/plugNmeet-server), the main backend server written in go.
+1) [plugNmeet-server](https://github.com/mynaparrot/plugNmeet-server), the main backend server written in **Go**.
 
 2) [plugNmeet-client](https://github.com/mynaparrot/plugNmeet-client), which is the main interface/frontend. It's built
-   with React and Redux.
+   with **React** and **Redux**.
 
-3) [plugNmeet-recoder](https://github.com/mynaparrot/plugNmeet-recorder), a node module for recording/rtmp broadcasting
-   which is written in TypeScript.
+3) [plugNmeet-recoder](https://github.com/mynaparrot/plugNmeet-recorder), a **NodeJS** application for recording/rtmp broadcasting
+   which is written in **TypeScript**.
 
 #### Demo
 
@@ -49,6 +49,7 @@ Please check [plugNmeet-install](https://github.com/mynaparrot/plugNmeet-install
 **SDK**
 
 1) [PHP](https://github.com/mynaparrot/plugNmeet-sdk-php)
+2) [JavaScript](https://github.com/mynaparrot/plugNmeet-sdk-js) for NodeJS and [Deno](https://github.com/mynaparrot/plugNmeet-sdk-js/tree/main/deno_dist)
 
 Following ready to use extensions:
 
@@ -60,9 +61,7 @@ Docker:
 
 1. [plugnmeet-server](https://hub.docker.com/r/mynaparrot/plugnmeet-server)
 
-Examples:
-
-1) [Example of API](https://github.com/mynaparrot/plugNmeet-server/wiki/API-Information-(examples))
+Server API information can be found in [API doc](https://www.plugnmeet.org/docs/api/intro) section.
 
 ## Manually installation
 
@@ -92,4 +91,4 @@ You can manually download server from [release](https://github.com/mynaparrot/pl
 
 ## Development
 
-Please follow [this wiki](https://github.com/mynaparrot/plugNmeet-server/wiki/Development) for details.
+Please follow [this article](https://www.plugnmeet.org/docs/developer-guide/setup-development) for details.
