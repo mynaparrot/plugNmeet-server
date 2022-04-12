@@ -191,46 +191,34 @@ func (a *AppConfig) FormatDBTable(table string) string {
 
 func (a *AppConfig) AddChatUser(roomId string, participant *ChatParticipant) {
 	a.mux.Lock()
-	_, ok := a.chatRooms[roomId]
-	a.mux.Unlock()
+	defer a.mux.Unlock()
 
-	if !ok {
-		a.mux.Lock()
+	if _, ok := a.chatRooms[roomId]; !ok {
 		a.chatRooms[roomId] = make(map[string]*ChatParticipant)
-		a.mux.Unlock()
 	}
-	a.mux.Lock()
 	a.chatRooms[roomId][participant.UserId] = participant
-	a.mux.Unlock()
 }
 
 func (a *AppConfig) GetChatParticipants(roomId string) map[string]*ChatParticipant {
-	a.mux.Lock()
-	participants := a.chatRooms[roomId]
-	a.mux.Unlock()
+	a.mux.RLock()
+	defer a.mux.RUnlock()
 
-	return participants
+	return a.chatRooms[roomId]
 }
 
 func (a *AppConfig) RemoveChatParticipant(roomId, userId string) {
 	a.mux.Lock()
-	_, ok := a.chatRooms[roomId]
-	a.mux.Unlock()
+	defer a.mux.Unlock()
 
-	if ok {
-		a.mux.Lock()
+	if _, ok := a.chatRooms[roomId]; ok {
 		delete(a.chatRooms[roomId], userId)
-		a.mux.Unlock()
 	}
 }
 func (a *AppConfig) DeleteChatRoom(roomId string) {
 	a.mux.Lock()
-	_, ok := a.chatRooms[roomId]
-	a.mux.Unlock()
+	defer a.mux.Unlock()
 
-	if ok {
-		a.mux.Lock()
+	if _, ok := a.chatRooms[roomId]; ok {
 		delete(a.chatRooms, roomId)
-		a.mux.Unlock()
 	}
 }
