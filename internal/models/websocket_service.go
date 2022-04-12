@@ -17,10 +17,10 @@ type WebsocketRedisMsg struct {
 }
 
 type websocketService struct {
-	pl           *DataMessageRes // payload msg
-	rSid         *string         // room sid
-	isAdmin      bool
-	participants map[string]*config.ChatParticipant
+	pl      *DataMessageRes // payload msg
+	rSid    *string         // room sid
+	isAdmin bool
+	roomId  *string
 }
 
 func NewWebsocketService() *websocketService {
@@ -36,12 +36,8 @@ func (w *websocketService) HandleDataMessages(payload *DataMessageRes, roomId *s
 	}
 	w.pl = payload            // payload messages
 	w.rSid = &payload.RoomSid // room sid
-
-	if _, ok := config.AppCnf.ChatRooms[*roomId]; ok {
-		w.participants = config.AppCnf.ChatRooms[*roomId]
-	}
-
 	w.isAdmin = isAdmin
+	w.roomId = roomId
 
 	switch payload.Type {
 	case "USER":
@@ -88,18 +84,16 @@ func (w *websocketService) handleChat() {
 	}
 
 	var to []string
-	if w.participants != nil {
-		for _, p := range w.participants {
-			if p.RoomSid == *w.rSid {
-				// only for specific user
-				if w.pl.To != "" {
-					if w.pl.To == p.UserSid {
-						to = append(to, p.UUID)
-					}
-				} else {
-					// for everyone in the room
+	for _, p := range config.AppCnf.GetChatParticipants(*w.roomId) {
+		if p.RoomSid == *w.rSid {
+			// only for specific user
+			if w.pl.To != "" {
+				if w.pl.To == p.UserSid {
 					to = append(to, p.UUID)
 				}
+			} else {
+				// for everyone in the room
+				to = append(to, p.UUID)
 			}
 		}
 	}
@@ -114,16 +108,19 @@ func (w *websocketService) handleSendChatMsgs() {
 	if err != nil {
 		return
 	}
-	if w.participants != nil {
-		for _, p := range w.participants {
-			if p.RoomSid == *w.rSid {
-				if w.pl.To == p.UserSid {
-					err = ikisocket.EmitTo(p.UUID, jm)
-					if err != nil {
-						fmt.Println(err)
-					}
-				}
+	var userUUID string
+	for _, p := range config.AppCnf.GetChatParticipants(*w.roomId) {
+		if p.RoomSid == *w.rSid {
+			if w.pl.To == p.UserSid {
+				userUUID = p.UUID
+				break
 			}
+		}
+	}
+	if userUUID != "" {
+		err = ikisocket.EmitTo(userUUID, jm)
+		if err != nil {
+			fmt.Println(err)
 		}
 	}
 }
@@ -157,14 +154,12 @@ func (w *websocketService) handleRenewToken() {
 		return
 	}
 
-	if w.participants != nil {
-		for _, p := range w.participants {
-			if p.RoomSid == *w.rSid {
-				if w.pl.Body.From.UserId == p.UserId {
-					err = ikisocket.EmitTo(p.UUID, jm)
-					if err != nil {
-						fmt.Println(err)
-					}
+	for _, p := range config.AppCnf.GetChatParticipants(*w.roomId) {
+		if p.RoomSid == *w.rSid {
+			if w.pl.Body.From.UserId == p.UserId {
+				err = ikisocket.EmitTo(p.UUID, jm)
+				if err != nil {
+					fmt.Println(err)
 				}
 			}
 		}
@@ -178,18 +173,16 @@ func (w *websocketService) handleSendPushMsg() {
 	}
 	var to []string
 
-	if w.participants != nil {
-		for _, p := range w.participants {
-			if p.RoomSid == *w.rSid {
-				// only for specific user
-				if w.pl.To != "" {
-					if w.pl.To == p.UserSid {
-						to = append(to, p.UUID)
-					}
-				} else {
-					// for everyone in the room
+	for _, p := range config.AppCnf.GetChatParticipants(*w.roomId) {
+		if p.RoomSid == *w.rSid {
+			// only for specific user
+			if w.pl.To != "" {
+				if w.pl.To == p.UserSid {
 					to = append(to, p.UUID)
 				}
+			} else {
+				// for everyone in the room
+				to = append(to, p.UUID)
 			}
 		}
 	}
@@ -206,18 +199,16 @@ func (w *websocketService) handleWhiteboard() {
 	}
 
 	var to []string
-	if w.participants != nil {
-		for _, p := range w.participants {
-			if p.RoomSid == *w.rSid {
-				// this is basically for initial request
-				if w.pl.To != "" {
-					if w.pl.To == p.UserSid {
-						to = append(to, p.UUID)
-					}
-				} else if w.pl.Body.From.UserId != p.UserId {
-					// we don't need to send update to sender
+	for _, p := range config.AppCnf.GetChatParticipants(*w.roomId) {
+		if p.RoomSid == *w.rSid {
+			// this is basically for initial request
+			if w.pl.To != "" {
+				if w.pl.To == p.UserSid {
 					to = append(to, p.UUID)
 				}
+			} else if w.pl.Body.From.UserId != p.UserId {
+				// we don't need to send update to sender
+				to = append(to, p.UUID)
 			}
 		}
 	}
