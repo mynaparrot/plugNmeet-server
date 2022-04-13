@@ -3,7 +3,7 @@
 Plug-N-Meet is an open source web conferencing system based on high performance WebRTC
 infrastructure [livekit](https://github.com/livekit/livekit-server).
 
-![banner](./github_files/banner.png)
+![banner](./github_files/banner.jpg)
 
 ## Features:
 
