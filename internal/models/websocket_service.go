@@ -12,7 +12,7 @@ import (
 type WebsocketRedisMsg struct {
 	Type    string
 	Payload *DataMessageRes
-	RoomId  *string
+	RoomId  string
 	IsAdmin bool
 }
 
@@ -20,14 +20,14 @@ type websocketService struct {
 	pl      *DataMessageRes // payload msg
 	rSid    *string         // room sid
 	isAdmin bool
-	roomId  *string
+	roomId  string
 }
 
 func NewWebsocketService() *websocketService {
 	return &websocketService{}
 }
 
-func (w *websocketService) HandleDataMessages(payload *DataMessageRes, roomId *string, isAdmin bool) {
+func (w *websocketService) HandleDataMessages(payload *DataMessageRes, roomId string, isAdmin bool) {
 	if payload.MessageId == "" {
 		payload.MessageId = uuid.NewString()
 	}
@@ -84,7 +84,9 @@ func (w *websocketService) handleChat() {
 	}
 
 	var to []string
-	for _, p := range config.AppCnf.GetChatParticipants(*w.roomId) {
+
+	config.AppCnf.RLock()
+	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
 		if p.RoomSid == *w.rSid {
 			// only for specific user
 			if w.pl.To != "" {
@@ -97,6 +99,7 @@ func (w *websocketService) handleChat() {
 			}
 		}
 	}
+	config.AppCnf.RUnlock()
 
 	if len(to) > 0 {
 		ikisocket.EmitToList(to, jm)
@@ -109,7 +112,9 @@ func (w *websocketService) handleSendChatMsgs() {
 		return
 	}
 	var userUUID string
-	for _, p := range config.AppCnf.GetChatParticipants(*w.roomId) {
+
+	config.AppCnf.RLock()
+	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
 		if p.RoomSid == *w.rSid {
 			if w.pl.To == p.UserSid {
 				userUUID = p.UUID
@@ -117,6 +122,8 @@ func (w *websocketService) handleSendChatMsgs() {
 			}
 		}
 	}
+	config.AppCnf.RUnlock()
+
 	if userUUID != "" {
 		err = ikisocket.EmitTo(userUUID, jm)
 		if err != nil {
@@ -154,7 +161,8 @@ func (w *websocketService) handleRenewToken() {
 		return
 	}
 
-	for _, p := range config.AppCnf.GetChatParticipants(*w.roomId) {
+	config.AppCnf.RLock()
+	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
 		if p.RoomSid == *w.rSid {
 			if w.pl.Body.From.UserId == p.UserId {
 				err = ikisocket.EmitTo(p.UUID, jm)
@@ -164,6 +172,7 @@ func (w *websocketService) handleRenewToken() {
 			}
 		}
 	}
+	config.AppCnf.RUnlock()
 }
 
 func (w *websocketService) handleSendPushMsg() {
@@ -173,7 +182,8 @@ func (w *websocketService) handleSendPushMsg() {
 	}
 	var to []string
 
-	for _, p := range config.AppCnf.GetChatParticipants(*w.roomId) {
+	config.AppCnf.RLock()
+	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
 		if p.RoomSid == *w.rSid {
 			// only for specific user
 			if w.pl.To != "" {
@@ -186,6 +196,7 @@ func (w *websocketService) handleSendPushMsg() {
 			}
 		}
 	}
+	config.AppCnf.RUnlock()
 
 	if len(to) > 0 {
 		ikisocket.EmitToList(to, jm)
@@ -199,7 +210,9 @@ func (w *websocketService) handleWhiteboard() {
 	}
 
 	var to []string
-	for _, p := range config.AppCnf.GetChatParticipants(*w.roomId) {
+
+	config.AppCnf.RLock()
+	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
 		if p.RoomSid == *w.rSid {
 			// this is basically for initial request
 			if w.pl.To != "" {
@@ -212,6 +225,7 @@ func (w *websocketService) handleWhiteboard() {
 			}
 		}
 	}
+	config.AppCnf.RUnlock()
 
 	if len(to) > 0 {
 		ikisocket.EmitToList(to, jm)

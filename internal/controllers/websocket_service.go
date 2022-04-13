@@ -15,7 +15,7 @@ type websocketController struct {
 	mux         *sync.RWMutex
 	kws         *ikisocket.Websocket
 	token       string
-	participant *config.ChatParticipant
+	participant config.ChatParticipant
 }
 
 func newWebsocketController(kws *ikisocket.Websocket) *websocketController {
@@ -36,7 +36,7 @@ func newWebsocketController(kws *ikisocket.Websocket) *websocketController {
 	return &websocketController{
 		mux:         &sync.RWMutex{},
 		kws:         kws,
-		participant: &p,
+		participant: p,
 		token:       authToken,
 	}
 }
@@ -119,7 +119,7 @@ func SetupSocketListeners() {
 		msg := models.WebsocketRedisMsg{
 			Type:    "sendMsg",
 			Payload: payload,
-			RoomId:  &roomId,
+			RoomId:  roomId,
 			IsAdmin: false,
 		}
 		isAdmin := ep.Kws.GetAttribute("isAdmin")
@@ -181,7 +181,7 @@ func SubscribeToWebsocketChannel() {
 		if res.Type == "sendMsg" {
 			m.HandleDataMessages(res.Payload, res.RoomId, res.IsAdmin)
 		} else if res.Type == "deleteRoom" {
-			config.AppCnf.DeleteChatRoom(*res.RoomId)
+			config.AppCnf.DeleteChatRoom(res.RoomId)
 		}
 	}
 }
