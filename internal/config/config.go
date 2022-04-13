@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -19,7 +20,8 @@ var AppCnf *AppConfig
 type AppConfig struct {
 	DB        *sql.DB
 	RDS       *redis.Client
-	ChatRooms map[string]map[string]*ChatParticipant
+	chatRooms map[string]map[string]*ChatParticipant
+	mux       *sync.RWMutex
 
 	Client             ClientInfo         `yaml:"client"`
 	LogSettings        LogSettings        `yaml:"log_settings"`
@@ -117,7 +119,8 @@ type ChatParticipant struct {
 
 func SetAppConfig(a *AppConfig) {
 	AppCnf = a
-	AppCnf.ChatRooms = make(map[string]map[string]*ChatParticipant)
+	AppCnf.chatRooms = make(map[string]map[string]*ChatParticipant)
+	AppCnf.mux = &sync.RWMutex{}
 	setLogger()
 }
 
@@ -183,6 +186,39 @@ func (a *AppConfig) FormatDBTable(table string) string {
 	if a.MySqlInfo.Prefix != "" {
 		return a.MySqlInfo.Prefix + table
 	}
-
 	return table
+}
+
+func (a *AppConfig) AddChatUser(roomId string, participant *ChatParticipant) {
+	a.mux.Lock()
+	defer a.mux.Unlock()
+
+	if _, ok := a.chatRooms[roomId]; !ok {
+		a.chatRooms[roomId] = make(map[string]*ChatParticipant)
+	}
+	a.chatRooms[roomId][participant.UserId] = participant
+}
+
+func (a *AppConfig) GetChatParticipants(roomId string) map[string]*ChatParticipant {
+	a.mux.RLock()
+	defer a.mux.RUnlock()
+
+	return a.chatRooms[roomId]
+}
+
+func (a *AppConfig) RemoveChatParticipant(roomId, userId string) {
+	a.mux.Lock()
+	defer a.mux.Unlock()
+
+	if _, ok := a.chatRooms[roomId]; ok {
+		delete(a.chatRooms[roomId], userId)
+	}
+}
+func (a *AppConfig) DeleteChatRoom(roomId string) {
+	a.mux.Lock()
+	defer a.mux.Unlock()
+
+	if _, ok := a.chatRooms[roomId]; ok {
+		delete(a.chatRooms, roomId)
+	}
 }

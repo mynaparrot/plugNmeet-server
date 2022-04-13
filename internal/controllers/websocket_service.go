@@ -3,7 +3,6 @@ package controllers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/antoniodipinto/ikisocket"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugNmeet/internal/config"
@@ -87,14 +86,7 @@ func (c *websocketController) validation() bool {
 }
 
 func (c *websocketController) addUser() {
-	c.mux.Lock()
-	defer c.mux.Unlock()
-
-	if _, ok := config.AppCnf.ChatRooms[c.participant.RoomId]; !ok {
-		config.AppCnf.ChatRooms[c.participant.RoomId] = make(map[string]*config.ChatParticipant)
-	}
-	// we'll store users in memory to get info faster
-	config.AppCnf.ChatRooms[c.participant.RoomId][c.participant.UserId] = c.participant
+	config.AppCnf.AddChatUser(c.participant.RoomId, c.participant)
 	c.kws.SetAttribute("userId", c.participant.UserId)
 	c.kws.SetAttribute("roomId", c.participant.RoomId)
 }
@@ -113,7 +105,6 @@ func HandleWebSocket() func(*fiber.Ctx) error {
 }
 
 func SetupSocketListeners() {
-	ctx := context.Background()
 	// On message event
 	ikisocket.On(ikisocket.EventMessage, func(ep *ikisocket.EventPayload) {
 		//fmt.Println(fmt.Sprintf("Message event - User: %s - Message: %s", ep.Kws.GetStringAttribute("userId"), string(ep.Data)))
@@ -124,7 +115,6 @@ func SetupSocketListeners() {
 			log.Errorln(err)
 			return
 		}
-
 		roomId := ep.Kws.GetStringAttribute("roomId")
 		msg := models.WebsocketRedisMsg{
 			Type:    "sendMsg",
@@ -143,6 +133,7 @@ func SetupSocketListeners() {
 			return
 		}
 
+		ctx := context.Background()
 		config.AppCnf.RDS.Publish(ctx, "plug-n-meet-websocket", marshal)
 	})
 
@@ -151,7 +142,7 @@ func SetupSocketListeners() {
 		roomId := ep.Kws.GetStringAttribute("roomId")
 		userId := ep.Kws.GetStringAttribute("userId")
 		// Remove the user from the local clients
-		removeChatParticipant(roomId, userId)
+		config.AppCnf.RemoveChatParticipant(roomId, userId)
 	})
 
 	// This event is called when the server disconnects the user actively with .Close() method
@@ -159,26 +150,13 @@ func SetupSocketListeners() {
 		roomId := ep.Kws.GetStringAttribute("roomId")
 		userId := ep.Kws.GetStringAttribute("userId")
 		// Remove the user from the local clients
-		removeChatParticipant(roomId, userId)
-		log.Infoln("Close event")
+		config.AppCnf.RemoveChatParticipant(roomId, userId)
 	})
 
 	// On error event
-	ikisocket.On(ikisocket.EventError, func(ep *ikisocket.EventPayload) {
-		log.Errorln(fmt.Sprintf("Error event - User: %s", ep.Kws.GetStringAttribute("userSid")), ep.Error)
-	})
-}
-
-func removeChatParticipant(roomId string, userId string) {
-	if _, ok := config.AppCnf.ChatRooms[roomId]; ok {
-		delete(config.AppCnf.ChatRooms[roomId], userId)
-	}
-}
-
-func deleteChatRoom(roomId string) {
-	if _, ok := config.AppCnf.ChatRooms[roomId]; ok {
-		delete(config.AppCnf.ChatRooms, roomId)
-	}
+	//ikisocket.On(ikisocket.EventError, func(ep *ikisocket.EventPayload) {
+	//	log.Errorln(fmt.Sprintf("Error event - User: %s", ep.Kws.GetStringAttribute("userSid")), ep.Error)
+	//})
 }
 
 // SubscribeToWebsocketChannel will delivery message to websocket
@@ -203,7 +181,7 @@ func SubscribeToWebsocketChannel() {
 		if res.Type == "sendMsg" {
 			m.HandleDataMessages(res.Payload, res.RoomId, res.IsAdmin)
 		} else if res.Type == "deleteRoom" {
-			deleteChatRoom(*res.RoomId)
+			config.AppCnf.DeleteChatRoom(*res.RoomId)
 		}
 	}
 }
