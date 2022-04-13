@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugNmeet/internal/config"
-	"sync"
 	"time"
 )
 
@@ -79,21 +78,16 @@ type ActiveRoomInfoRes struct {
 }
 
 type roomAuthModel struct {
-	mux *sync.RWMutex
-	rs  *RoomService
+	rs *RoomService
 }
 
 func NewRoomAuthModel() *roomAuthModel {
 	return &roomAuthModel{
-		mux: &sync.RWMutex{},
-		rs:  NewRoomService(),
+		rs: NewRoomService(),
 	}
 }
 
 func (am *roomAuthModel) CreateRoom(r *RoomCreateReq) (bool, string, *livekit.Room) {
-	am.mux.Lock()
-	defer am.mux.Unlock()
-
 	m := NewRoomModel()
 	rs := NewRoomService()
 	roomDbInfo, _ := m.GetRoomInfo(r.RoomId, "", 1)
@@ -167,9 +161,6 @@ func (am *roomAuthModel) CreateRoom(r *RoomCreateReq) (bool, string, *livekit.Ro
 }
 
 func (am *roomAuthModel) IsRoomActive(r *IsRoomActiveReq) (bool, string) {
-	am.mux.RLock()
-	defer am.mux.RUnlock()
-
 	m := NewRoomModel()
 	roomDbInfo, _ := m.GetRoomInfo(r.RoomId, "", 1)
 
@@ -193,9 +184,6 @@ func (am *roomAuthModel) IsRoomActive(r *IsRoomActiveReq) (bool, string) {
 }
 
 func (am *roomAuthModel) GetActiveRoomInfo(r *IsRoomActiveReq) (bool, string, *ActiveRoomInfoRes) {
-	am.mux.RLock()
-	defer am.mux.RUnlock()
-
 	m := NewRoomModel()
 	roomDbInfo, _ := m.GetRoomInfo(r.RoomId, "", 1)
 
@@ -228,9 +216,6 @@ func (am *roomAuthModel) GetActiveRoomInfo(r *IsRoomActiveReq) (bool, string, *A
 }
 
 func (am *roomAuthModel) GetActiveRoomsInfo() (bool, string, []*ActiveRoomInfoRes) {
-	am.mux.RLock()
-	defer am.mux.RUnlock()
-
 	m := NewRoomModel()
 	rs := NewRoomService()
 	roomsInfo, err := m.GetActiveRoomsInfo()
@@ -266,9 +251,6 @@ func (am *roomAuthModel) GetActiveRoomsInfo() (bool, string, []*ActiveRoomInfoRe
 }
 
 func (am *roomAuthModel) EndRoom(r *RoomEndReq) (bool, string) {
-	am.mux.Lock()
-	defer am.mux.Unlock()
-
 	m := NewRoomModel()
 	rs := NewRoomService()
 	roomDbInfo, _ := m.GetRoomInfo(r.RoomId, "", 1)
