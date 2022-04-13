@@ -2,6 +2,8 @@ FROM golang:1.18-alpine
 
 WORKDIR /app
 
+RUN apk add build-base
+
 #COPY . .
 COPY go.mod go.mod
 COPY go.sum go.sum

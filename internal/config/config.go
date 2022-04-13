@@ -18,10 +18,11 @@ import (
 var AppCnf *AppConfig
 
 type AppConfig struct {
-	DB        *sql.DB
-	RDS       *redis.Client
-	chatRooms map[string]map[string]*ChatParticipant
-	mux       *sync.RWMutex
+	DB  *sql.DB
+	RDS *redis.Client
+
+	sync.RWMutex
+	chatRooms map[string]map[string]ChatParticipant
 
 	Client             ClientInfo         `yaml:"client"`
 	LogSettings        LogSettings        `yaml:"log_settings"`
@@ -119,8 +120,7 @@ type ChatParticipant struct {
 
 func SetAppConfig(a *AppConfig) {
 	AppCnf = a
-	AppCnf.chatRooms = make(map[string]map[string]*ChatParticipant)
-	AppCnf.mux = &sync.RWMutex{}
+	AppCnf.chatRooms = make(map[string]map[string]ChatParticipant)
 	setLogger()
 }
 
@@ -189,34 +189,34 @@ func (a *AppConfig) FormatDBTable(table string) string {
 	return table
 }
 
-func (a *AppConfig) AddChatUser(roomId string, participant *ChatParticipant) {
-	a.mux.Lock()
-	defer a.mux.Unlock()
+func (a *AppConfig) AddChatUser(roomId string, participant ChatParticipant) {
+	a.Lock()
+	defer a.Unlock()
 
 	if _, ok := a.chatRooms[roomId]; !ok {
-		a.chatRooms[roomId] = make(map[string]*ChatParticipant)
+		a.chatRooms[roomId] = make(map[string]ChatParticipant)
 	}
 	a.chatRooms[roomId][participant.UserId] = participant
 }
 
-func (a *AppConfig) GetChatParticipants(roomId string) map[string]*ChatParticipant {
-	a.mux.RLock()
-	defer a.mux.RUnlock()
+func (a *AppConfig) GetChatParticipants(roomId string) map[string]ChatParticipant {
+	// we don't need to lock implementation
+	// as we'll require locking before looping over anyway
 
 	return a.chatRooms[roomId]
 }
 
 func (a *AppConfig) RemoveChatParticipant(roomId, userId string) {
-	a.mux.Lock()
-	defer a.mux.Unlock()
+	a.Lock()
+	defer a.Unlock()
 
 	if _, ok := a.chatRooms[roomId]; ok {
 		delete(a.chatRooms[roomId], userId)
 	}
 }
 func (a *AppConfig) DeleteChatRoom(roomId string) {
-	a.mux.Lock()
-	defer a.mux.Unlock()
+	a.Lock()
+	defer a.Unlock()
 
 	if _, ok := a.chatRooms[roomId]; ok {
 		delete(a.chatRooms, roomId)
