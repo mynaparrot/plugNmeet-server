@@ -31,16 +31,20 @@ func NewWebhookModel(e *livekit.WebhookEvent) {
 	switch e.GetEvent() {
 	case "room_started":
 		w.roomStarted()
+	case "room_finished":
+		w.roomFinished()
 
 	case "participant_joined":
 		w.participantJoined()
-
 	case "participant_left":
 		w.participantLeft()
 
-	case "room_finished":
-		w.roomFinished()
+	case "track_published":
+		w.participantJoined()
+	case "track_unpublished":
+		w.participantLeft()
 	}
+
 }
 
 func (w *webhookEvent) roomStarted() int64 {
@@ -62,43 +66,6 @@ func (w *webhookEvent) roomStarted() int64 {
 	w.sendToWebhookNotifier(event)
 
 	return lastId
-}
-
-func (w *webhookEvent) participantJoined() int64 {
-	event := w.event
-
-	room := &RoomInfo{
-		Sid: event.Room.Sid,
-	}
-	affected, err := w.roomModel.UpdateRoomParticipants(room, "+")
-	if err != nil {
-		log.Errorln(err)
-	}
-
-	// webhook notification
-	if !event.Participant.Permission.Hidden {
-		w.sendToWebhookNotifier(event)
-	}
-	return affected
-}
-
-func (w *webhookEvent) participantLeft() int64 {
-	event := w.event
-
-	room := &RoomInfo{
-		Sid: event.Room.Sid,
-	}
-	affected, err := w.roomModel.UpdateRoomParticipants(room, "-")
-	if err != nil {
-		log.Errorln(err)
-	}
-
-	// webhook notification
-	if !event.Participant.Permission.Hidden {
-		w.sendToWebhookNotifier(event)
-	}
-
-	return affected
 }
 
 func (w *webhookEvent) roomFinished() int64 {
@@ -143,6 +110,53 @@ func (w *webhookEvent) roomFinished() int64 {
 	_ = em.CleanAfterRoomEnd(event.Room.Name, event.Room.Metadata)
 
 	return affected
+}
+
+func (w *webhookEvent) participantJoined() int64 {
+	event := w.event
+
+	room := &RoomInfo{
+		Sid: event.Room.Sid,
+	}
+	affected, err := w.roomModel.UpdateRoomParticipants(room, "+")
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	// webhook notification
+	if !event.Participant.Permission.Hidden {
+		w.sendToWebhookNotifier(event)
+	}
+	return affected
+}
+
+func (w *webhookEvent) participantLeft() int64 {
+	event := w.event
+
+	room := &RoomInfo{
+		Sid: event.Room.Sid,
+	}
+	affected, err := w.roomModel.UpdateRoomParticipants(room, "-")
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	// webhook notification
+	if !event.Participant.Permission.Hidden {
+		w.sendToWebhookNotifier(event)
+	}
+
+	return affected
+}
+
+func (w *webhookEvent) trackPublished() {
+	// webhook notification
+	w.sendToWebhookNotifier(w.event)
+}
+
+func (w *webhookEvent) trackUnpublished() {
+	// webhook notification
+	w.sendToWebhookNotifier(w.event)
 }
 
 func (w *webhookEvent) sendToWebhookNotifier(event *livekit.WebhookEvent) {
