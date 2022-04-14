@@ -8,11 +8,9 @@ import (
 	"github.com/mynaparrot/plugNmeet/internal/config"
 	"github.com/mynaparrot/plugNmeet/internal/models"
 	log "github.com/sirupsen/logrus"
-	"sync"
 )
 
 type websocketController struct {
-	mux         *sync.RWMutex
 	kws         *ikisocket.Websocket
 	token       string
 	participant config.ChatParticipant
@@ -34,7 +32,6 @@ func newWebsocketController(kws *ikisocket.Websocket) *websocketController {
 	}
 
 	return &websocketController{
-		mux:         &sync.RWMutex{},
 		kws:         kws,
 		participant: p,
 		token:       authToken,
@@ -63,14 +60,8 @@ func (c *websocketController) validation() bool {
 	}
 
 	c.participant.Name = claims.Name
-
 	// default set false
 	c.kws.SetAttribute("isAdmin", false)
-
-	//// for recorder may not have set metadata. So, we'll return true
-	//if claims.Metadata == "" {
-	//	return true
-	//}
 
 	metadata := new(models.UserMetadata)
 	err = json.Unmarshal([]byte(claims.Metadata), metadata)
