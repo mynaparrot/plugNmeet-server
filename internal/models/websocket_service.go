@@ -18,7 +18,7 @@ type WebsocketRedisMsg struct {
 
 type websocketService struct {
 	pl      *DataMessageRes // payload msg
-	rSid    *string         // room sid
+	rSid    string          // room sid
 	isAdmin bool
 	roomId  string
 }
@@ -34,8 +34,8 @@ func (w *websocketService) HandleDataMessages(payload *DataMessageRes, roomId st
 	if payload.Body.Time == "" {
 		payload.Body.Time = time.Now().Format(time.RFC1123Z)
 	}
-	w.pl = payload            // payload messages
-	w.rSid = &payload.RoomSid // room sid
+	w.pl = payload           // payload messages
+	w.rSid = payload.RoomSid // room sid
 	w.isAdmin = isAdmin
 	w.roomId = roomId
 
@@ -87,7 +87,7 @@ func (w *websocketService) handleChat() {
 
 	config.AppCnf.RLock()
 	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
-		if p.RoomSid == *w.rSid {
+		if p.RoomSid == w.rSid {
 			// only for specific user
 			if w.pl.To != "" {
 				if w.pl.To == p.UserSid {
@@ -115,7 +115,7 @@ func (w *websocketService) handleSendChatMsgs() {
 
 	config.AppCnf.RLock()
 	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
-		if p.RoomSid == *w.rSid {
+		if p.RoomSid == w.rSid {
 			if w.pl.To == p.UserSid {
 				userUUID = p.UUID
 				break
@@ -163,7 +163,7 @@ func (w *websocketService) handleRenewToken() {
 
 	config.AppCnf.RLock()
 	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
-		if p.RoomSid == *w.rSid {
+		if p.RoomSid == w.rSid {
 			if w.pl.Body.From.UserId == p.UserId {
 				err = ikisocket.EmitTo(p.UUID, jm)
 				if err != nil {
@@ -184,7 +184,7 @@ func (w *websocketService) handleSendPushMsg() {
 
 	config.AppCnf.RLock()
 	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
-		if p.RoomSid == *w.rSid {
+		if p.RoomSid == w.rSid {
 			// only for specific user
 			if w.pl.To != "" {
 				if w.pl.To == p.UserSid {
@@ -213,7 +213,7 @@ func (w *websocketService) handleWhiteboard() {
 
 	config.AppCnf.RLock()
 	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
-		if p.RoomSid == *w.rSid {
+		if p.RoomSid == w.rSid {
 			// this is basically for initial request
 			if w.pl.To != "" {
 				if w.pl.To == p.UserSid {
