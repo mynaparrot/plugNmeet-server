@@ -79,23 +79,23 @@ type ActiveRoomInfoRes struct {
 
 type roomAuthModel struct {
 	rs *RoomService
+	rm *roomModel
 }
 
 func NewRoomAuthModel() *roomAuthModel {
 	return &roomAuthModel{
 		rs: NewRoomService(),
+		rm: NewRoomModel(),
 	}
 }
 
 func (am *roomAuthModel) CreateRoom(r *RoomCreateReq) (bool, string, *livekit.Room) {
-	m := NewRoomModel()
-	rs := NewRoomService()
-	roomDbInfo, _ := m.GetRoomInfo(r.RoomId, "", 1)
+	roomDbInfo, _ := am.rm.GetRoomInfo(r.RoomId, "", 1)
 
 	if roomDbInfo.Id > 0 {
-		rf, err := rs.LoadRoomInfoFromRedis(r.RoomId)
+		rf, err := am.rs.LoadRoomInfoFromRedis(r.RoomId)
 		if err != nil {
-			_, err = m.UpdateRoomStatus(&RoomInfo{
+			_, err = am.rm.UpdateRoomStatus(&RoomInfo{
 				RoomId:    r.RoomId,
 				IsRunning: 0,
 				Ended:     time.Now().Format("2006-01-02 15:04:05"),
@@ -137,7 +137,7 @@ func (am *roomAuthModel) CreateRoom(r *RoomCreateReq) (bool, string, *livekit.Ro
 		return false, "Error: " + err.Error(), nil
 	}
 
-	room, err := rs.CreateRoom(r.RoomId, r.EmptyTimeout, r.MaxParticipants, string(meta))
+	room, err := am.rs.CreateRoom(r.RoomId, r.EmptyTimeout, r.MaxParticipants, string(meta))
 	if err != nil {
 		return false, "Error: " + err.Error(), nil
 	}
@@ -152,7 +152,7 @@ func (am *roomAuthModel) CreateRoom(r *RoomCreateReq) (bool, string, *livekit.Ro
 		WebhookUrl:         r.RoomMetadata.WebhookUrl,
 	}
 
-	_, err = m.InsertRoomData(ri)
+	_, err = am.rm.InsertRoomData(ri)
 	if err != nil {
 		return false, "Error: " + err.Error(), nil
 	}
@@ -161,8 +161,7 @@ func (am *roomAuthModel) CreateRoom(r *RoomCreateReq) (bool, string, *livekit.Ro
 }
 
 func (am *roomAuthModel) IsRoomActive(r *IsRoomActiveReq) (bool, string) {
-	m := NewRoomModel()
-	roomDbInfo, _ := m.GetRoomInfo(r.RoomId, "", 1)
+	roomDbInfo, _ := am.rm.GetRoomInfo(r.RoomId, "", 1)
 
 	if roomDbInfo.Id == 0 {
 		return false, "room is not active"
@@ -172,7 +171,7 @@ func (am *roomAuthModel) IsRoomActive(r *IsRoomActiveReq) (bool, string) {
 	_, err := am.rs.LoadRoomInfoFromRedis(r.RoomId)
 	if err != nil {
 		// room isn't active. Change status
-		_, _ = m.UpdateRoomStatus(&RoomInfo{
+		_, _ = am.rm.UpdateRoomStatus(&RoomInfo{
 			RoomId:    r.RoomId,
 			IsRunning: 0,
 			Ended:     time.Now().Format("2006-01-02 15:04:05"),
@@ -184,15 +183,13 @@ func (am *roomAuthModel) IsRoomActive(r *IsRoomActiveReq) (bool, string) {
 }
 
 func (am *roomAuthModel) GetActiveRoomInfo(r *IsRoomActiveReq) (bool, string, *ActiveRoomInfoRes) {
-	m := NewRoomModel()
-	roomDbInfo, _ := m.GetRoomInfo(r.RoomId, "", 1)
+	roomDbInfo, _ := am.rm.GetRoomInfo(r.RoomId, "", 1)
 
 	if roomDbInfo.Id == 0 {
 		return false, "no room found", nil
 	}
 
-	rs := NewRoomService()
-	rrr, err := rs.LoadRoomInfoFromRedis(r.RoomId)
+	rrr, err := am.rs.LoadRoomInfoFromRedis(r.RoomId)
 	if err != nil {
 		return false, err.Error(), nil
 	}
@@ -210,15 +207,13 @@ func (am *roomAuthModel) GetActiveRoomInfo(r *IsRoomActiveReq) (bool, string, *A
 		CreationTime:       roomDbInfo.CreationTime,
 		Metadata:           rrr.Metadata,
 	}
-	res.ParticipantsInfo, _ = rs.LoadParticipantsFromRedis(roomDbInfo.RoomId)
+	res.ParticipantsInfo, _ = am.rs.LoadParticipantsFromRedis(roomDbInfo.RoomId)
 
 	return true, "success", res
 }
 
 func (am *roomAuthModel) GetActiveRoomsInfo() (bool, string, []*ActiveRoomInfoRes) {
-	m := NewRoomModel()
-	rs := NewRoomService()
-	roomsInfo, err := m.GetActiveRoomsInfo()
+	roomsInfo, err := am.rm.GetActiveRoomsInfo()
 
 	if err != nil {
 		return false, "no active room found", nil
@@ -234,12 +229,12 @@ func (am *roomAuthModel) GetActiveRoomsInfo() (bool, string, []*ActiveRoomInfoRe
 		i := new(ActiveRoomInfoRes)
 		i.RoomInfo = &roomInfo
 
-		participants, err := rs.LoadParticipantsFromRedis(r.RoomId)
+		participants, err := am.rs.LoadParticipantsFromRedis(r.RoomId)
 		if err == nil {
 			i.ParticipantsInfo = participants
 		}
 
-		rri, err := rs.LoadRoomInfoFromRedis(r.RoomId)
+		rri, err := am.rs.LoadRoomInfoFromRedis(r.RoomId)
 		if err == nil {
 			i.RoomInfo.Metadata = rri.Metadata
 		}
@@ -251,20 +246,18 @@ func (am *roomAuthModel) GetActiveRoomsInfo() (bool, string, []*ActiveRoomInfoRe
 }
 
 func (am *roomAuthModel) EndRoom(r *RoomEndReq) (bool, string) {
-	m := NewRoomModel()
-	rs := NewRoomService()
-	roomDbInfo, _ := m.GetRoomInfo(r.RoomId, "", 1)
+	roomDbInfo, _ := am.rm.GetRoomInfo(r.RoomId, "", 1)
 
 	if roomDbInfo.Id == 0 {
 		return false, "room not active"
 	}
 
-	_, err := rs.EndRoom(r.RoomId)
+	_, err := am.rs.EndRoom(r.RoomId)
 	if err != nil {
 		return false, "can't end room"
 	}
 
-	_, _ = m.UpdateRoomStatus(&RoomInfo{
+	_, _ = am.rm.UpdateRoomStatus(&RoomInfo{
 		RoomId:    r.RoomId,
 		IsRunning: 0,
 		Ended:     time.Now().Format("2006-01-02 15:04:05"),
