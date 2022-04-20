@@ -72,6 +72,7 @@ func (c *websocketController) validation() bool {
 
 	if metadata.IsAdmin {
 		c.kws.SetAttribute("isAdmin", true)
+		c.participant.IsAdmin = true
 	}
 	return true
 }
