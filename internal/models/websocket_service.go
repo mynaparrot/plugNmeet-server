@@ -74,7 +74,8 @@ func (w *websocketService) handleWhiteboardMessages() {
 	switch w.pl.Body.Type {
 	case "SCENE_UPDATE",
 		"POINTER_UPDATE",
-		"ADD_WHITEBOARD_FILE":
+		"ADD_WHITEBOARD_FILE",
+		"PAGE_CHANGE":
 		w.handleWhiteboard()
 	}
 }
