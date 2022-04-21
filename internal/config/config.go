@@ -116,6 +116,7 @@ type ChatParticipant struct {
 	UserSid string
 	UserId  string
 	UUID    string
+	IsAdmin bool
 }
 
 func SetAppConfig(a *AppConfig) {

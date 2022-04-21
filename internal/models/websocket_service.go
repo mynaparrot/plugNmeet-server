@@ -65,6 +65,8 @@ func (w *websocketService) handleSystemMessages() {
 		w.handleRenewToken()
 	case "INFO", "ALERT":
 		w.handleSendPushMsg()
+	case "USER_VISIBILITY_CHANGE":
+		w.handleUserVisibility()
 	}
 }
 
@@ -220,6 +222,30 @@ func (w *websocketService) handleWhiteboard() {
 					to = append(to, p.UUID)
 				}
 			} else if w.pl.Body.From.UserId != p.UserId {
+				// we don't need to send update to sender
+				to = append(to, p.UUID)
+			}
+		}
+	}
+	config.AppCnf.RUnlock()
+
+	if len(to) > 0 {
+		ikisocket.EmitToList(to, jm)
+	}
+}
+
+func (w *websocketService) handleUserVisibility() {
+	jm, err := json.Marshal(w.pl)
+	if err != nil {
+		return
+	}
+
+	var to []string
+
+	config.AppCnf.RLock()
+	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
+		if p.RoomSid == w.rSid {
+			if w.pl.Body.From.UserId != p.UserId && p.IsAdmin {
 				// we don't need to send update to sender
 				to = append(to, p.UUID)
 			}
