@@ -33,10 +33,10 @@ services:
       - ./etc/etherpad/APIKEY.txt:/opt/etherpad-lite/APIKEY.txt
       - ./etc/etherpad/settings.json:/opt/etherpad-lite/settings.json
       # mount fonts as read only mood
-#      - /usr/share/fonts/:/usr/share/fonts/:ro
-#      - /etc/fonts/:/etc/fonts/:ro
-#      - /usr/share/fontconfig/:/usr/share/fontconfig/:ro
-#      - /var/cache/fontconfig/:/var/cache/fontconfig/:ro     
+      - /usr/share/fonts/:/usr/share/fonts/:ro
+      - /etc/fonts/:/etc/fonts/:ro
+      - /usr/share/fontconfig/:/usr/share/fontconfig/:ro
+      - /var/cache/fontconfig/:/var/cache/fontconfig/:ro     
     depends_on:
       - redis
   plugnmeet-api:
@@ -47,6 +47,11 @@ services:
       - "8080:8080/tcp"
     volumes:
       - .:/app
+      # mount fonts as read only mood
+#      - /usr/share/fonts/:/usr/share/fonts/:ro
+#      - /etc/fonts/:/etc/fonts/:ro
+#      - /usr/share/fontconfig/:/usr/share/fontconfig/:ro
+#      - /var/cache/fontconfig/:/var/cache/fontconfig/:ro
     depends_on:
       - redis
       - db
