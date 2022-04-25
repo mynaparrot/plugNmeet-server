@@ -19,6 +19,8 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH GO111MODULE=on go build -ldflags
 
 FROM alpine
 
+RUN apk add --no-cache libreoffice mupdf-tools
+
 COPY --from=builder /go/src/app/plugnmeet-server /usr/bin/plugnmeet-server
 
 # Run the binary.
