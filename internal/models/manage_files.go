@@ -14,6 +14,7 @@ import (
 	"mime/multipart"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -275,7 +276,7 @@ func (m *ManageFile) DeleteRoomUploadedDir() error {
 
 type convertStatus struct {
 	status bool
-	msg    string
+	err    error
 }
 type ConvertWhiteboardFileRes struct {
 	FileName   string `json:"file_name"`
@@ -297,8 +298,8 @@ func (m *ManageFile) ConvertWhiteboardFile() (*ConvertWhiteboardFileRes, error) 
 	}
 
 	fileId := uuid.NewString()
-	dir := fmt.Sprintf("%s/%s/%s", m.uploadFileSettings.Path, m.Sid, fileId)
-	err = os.MkdirAll(dir, os.ModePerm)
+	outputDir := fmt.Sprintf("%s/%s/%s", m.uploadFileSettings.Path, m.Sid, fileId)
+	err = os.MkdirAll(outputDir, os.ModePerm)
 	if err != nil {
 		return nil, err
 	}
@@ -323,8 +324,7 @@ func (m *ManageFile) ConvertWhiteboardFile() (*ConvertWhiteboardFileRes, error) 
 	}
 
 	if needConvertToPdf {
-		newFile := strings.Replace(m.FilePath, mtype.Extension(), ".pdf", 1)
-		outputDir := fmt.Sprintf("%s/%s", m.uploadFileSettings.Path, m.Sid)
+		newFile := strings.Replace(info.Name(), mtype.Extension(), ".pdf", 1)
 
 		status := make(chan convertStatus)
 		go func(file, variant, outputDir string) {
@@ -332,17 +332,17 @@ func (m *ManageFile) ConvertWhiteboardFile() (*ConvertWhiteboardFileRes, error) 
 			_, err = cmd.Output()
 
 			if err != nil {
-				status <- convertStatus{status: false, msg: err.Error()}
+				status <- convertStatus{status: false, err: err}
 				return
 			}
-			status <- convertStatus{status: true, msg: "success"}
+			status <- convertStatus{status: true, err: nil}
 		}(file, variant, outputDir)
 
 		resStatus := <-status
 		if !resStatus.status {
-			return nil, errors.New(resStatus.msg)
+			return nil, resStatus.err
 		}
-		file = fmt.Sprintf("%s/%s", m.uploadFileSettings.Path, newFile)
+		file = fmt.Sprintf("%s/%s", outputDir, newFile)
 	}
 
 	status := make(chan convertStatus)
@@ -351,18 +351,19 @@ func (m *ManageFile) ConvertWhiteboardFile() (*ConvertWhiteboardFileRes, error) 
 		_, err = cmd.Output()
 
 		if err != nil {
-			status <- convertStatus{status: false, msg: err.Error()}
+			status <- convertStatus{status: false, err: err}
 			return
 		}
-		status <- convertStatus{status: true, msg: "success"}
-	}(file, dir)
+		status <- convertStatus{status: true, err: nil}
+	}(file, outputDir)
 
 	resStatus := <-status
 	if !resStatus.status {
-		return nil, errors.New(resStatus.msg)
+		return nil, resStatus.err
 	}
 
-	totalPages, _ := os.ReadDir(dir)
+	pattern := filepath.Join(outputDir, "*.svg")
+	totalPages, _ := filepath.Glob(pattern)
 
 	res := &ConvertWhiteboardFileRes{
 		FileName:   info.Name(),
