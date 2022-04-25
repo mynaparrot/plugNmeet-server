@@ -28,7 +28,7 @@ And many more!
 
 The components of Plug-N-Meet are as follows:
 
-1) [plugNmeet-server](https://github.com/mynaparrot/plugNmeet-server), the main backend server written in **Go**.
+1) [plugNmeet-server](https://github.com/mynaparrot/plugNmeet-server), the main backend server written in **Go** (Golang).
 
 2) [plugNmeet-client](https://github.com/mynaparrot/plugNmeet-client), which is the main interface/frontend. It's built
    with **React** and **Redux**.

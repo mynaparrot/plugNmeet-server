@@ -303,7 +303,47 @@ func (m *ManageFile) ConvertWhiteboardFile() (*ConvertWhiteboardFileRes, error) 
 		return nil, err
 	}
 
-	fmt.Println(mtype.Extension())
+	needConvertToPdf := false
+	variant := "pdf:writer_pdf_Export"
+	switch mtype.Extension() {
+	case ".docx", ".doc", ".odt", ".txt", ".rtf", ".xml":
+		needConvertToPdf = true
+	case ".xlsx", ".xls", ".ods", ".csv":
+		needConvertToPdf = true
+		variant = "pdf:calc_pdf_Export"
+	case ".pptx", ".ppt", ".odp":
+		needConvertToPdf = true
+		variant = "pdf:impress_pdf_Export"
+	case ".vsd", ".odg":
+		needConvertToPdf = true
+		variant = "pdf:draw_pdf_Export"
+	case ".html":
+		needConvertToPdf = true
+		variant = "pdf:writer_web_pdf_Export"
+	}
+
+	if needConvertToPdf {
+		newFile := strings.Replace(m.FilePath, mtype.Extension(), ".pdf", 1)
+		outputDir := fmt.Sprintf("%s/%s", m.uploadFileSettings.Path, m.Sid)
+
+		status := make(chan convertStatus)
+		go func(file, variant, outputDir string) {
+			cmd := exec.Command("/usr/bin/soffice", "--headless", "--invisible", "--nologo", "--nolockcheck", "--convert-to", variant, "--outdir", outputDir, file)
+			_, err = cmd.Output()
+
+			if err != nil {
+				status <- convertStatus{status: false, msg: err.Error()}
+				return
+			}
+			status <- convertStatus{status: true, msg: "success"}
+		}(file, variant, outputDir)
+
+		resStatus := <-status
+		if !resStatus.status {
+			return nil, errors.New(resStatus.msg)
+		}
+		file = fmt.Sprintf("%s/%s", m.uploadFileSettings.Path, newFile)
+	}
 
 	status := make(chan convertStatus)
 	go func(file, outputDir string) {
