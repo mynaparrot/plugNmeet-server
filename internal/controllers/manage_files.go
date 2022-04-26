@@ -43,10 +43,8 @@ func HandleChatFileUpload(c *fiber.Ctx) error {
 		})
 	}
 
-	var filePath string
-	var fileName string
 	if req.Resumable {
-		filePath, fileName, err = m.ResumableFileUpload(c)
+		res, err := m.ResumableFileUpload(c)
 		if err != nil {
 			return c.JSON(fiber.Map{
 				"status": false,
@@ -54,26 +52,33 @@ func HandleChatFileUpload(c *fiber.Ctx) error {
 			})
 		}
 
-		if filePath == "part_uploaded" {
+		if res.FilePath == "part_uploaded" {
 			_ = c.SendStatus(fiber.StatusOK)
-			return c.SendString(filePath)
+			return c.SendString(res.FilePath)
+		} else {
+			return c.JSON(fiber.Map{
+				"status":        true,
+				"msg":           "file uploaded successfully",
+				"filePath":      res.FilePath,
+				"fileName":      res.FileName,
+				"fileExtension": res.FileExtension,
+				"fileMimeType":  res.FileMimeType,
+			})
 		}
 	}
 
 	return c.JSON(fiber.Map{
-		"status":   true,
-		"msg":      "file uploaded successfully",
-		"filePath": filePath,
-		"fileName": fileName,
+		"status": false,
+		"msg":    "upload method not supported",
 	})
 }
 
-func HandleDownloadChatFile(c *fiber.Ctx) error {
+func HandleDownloadUploadedFile(c *fiber.Ctx) error {
 	sid := c.Params("sid")
-	fileName := c.Params("fileName")
-	fileName, _ = url.QueryUnescape(fileName)
+	otherParts := c.Params("*")
+	otherParts, _ = url.QueryUnescape(otherParts)
 
-	file := fmt.Sprintf("%s/%s/%s", config.AppCnf.UploadFileSettings.Path, sid, fileName)
+	file := fmt.Sprintf("%s/%s/%s", config.AppCnf.UploadFileSettings.Path, sid, otherParts)
 	fileInfo, err := os.Lstat(file)
 	if err != nil {
 		_ = c.SendStatus(fiber.StatusNotFound)
@@ -84,4 +89,47 @@ func HandleDownloadChatFile(c *fiber.Ctx) error {
 	c.Set("Content-Disposition", "attachment; filename="+strconv.Quote(fileInfo.Name()))
 	c.Set("Content-Type", "application/octet-stream")
 	return c.SendFile(file)
+}
+
+func HandleConvertWhiteboardFile(c *fiber.Ctx) error {
+	req := new(models.ManageFile)
+	err := c.BodyParser(req)
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+	check := config.AppCnf.DoValidateReq(req)
+	if len(check) > 0 {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    check,
+		})
+	}
+
+	if req.FilePath == "" {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    "file path require",
+		})
+	}
+
+	m := models.NewManageFileModel(req)
+	res, err := m.ConvertWhiteboardFile()
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"status":      true,
+		"msg":         "success",
+		"file_id":     res.FileId,
+		"file_name":   res.FileName,
+		"file_path":   res.FilePath,
+		"total_pages": res.TotalPages,
+	})
 }

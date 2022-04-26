@@ -2,7 +2,7 @@ FROM golang:1.18-alpine
 
 WORKDIR /app
 
-RUN apk add build-base
+RUN apk add --no-cache build-base libreoffice mupdf-tools
 
 #COPY . .
 COPY go.mod go.mod

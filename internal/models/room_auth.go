@@ -56,8 +56,13 @@ type SharedNotePadFeatures struct {
 }
 
 type WhiteboardFeatures struct {
-	AllowedWhiteboard bool `json:"allowed_whiteboard"`
-	Visible           bool `json:"visible"`
+	AllowedWhiteboard bool   `json:"allowed_whiteboard"`
+	Visible           bool   `json:"visible"`
+	PreloadFile       string `json:"preload_file"`
+	WhiteboardFileId  string `json:"whiteboard_file_id"`
+	FileName          string `json:"file_name"`
+	FilePath          string `json:"file_path"`
+	TotalPages        int    `json:"total_pages"`
 }
 
 type RoomEndReq struct {
@@ -114,6 +119,13 @@ func (am *roomAuthModel) CreateRoom(r *RoomCreateReq) (bool, string, *livekit.Ro
 	}
 	if r.RoomMetadata.Features.ChatFeatures.MaxFileSize == 0 {
 		r.RoomMetadata.Features.ChatFeatures.MaxFileSize = config.AppCnf.UploadFileSettings.MaxSize
+	}
+
+	if r.RoomMetadata.Features.WhiteboardFeatures.AllowedWhiteboard {
+		r.RoomMetadata.Features.WhiteboardFeatures.FileName = "default"
+		r.RoomMetadata.Features.WhiteboardFeatures.FileName = "default"
+		r.RoomMetadata.Features.WhiteboardFeatures.WhiteboardFileId = "default"
+		r.RoomMetadata.Features.WhiteboardFeatures.TotalPages = 10
 	}
 
 	// by default, we'll lock screen share, whiteboard & shared notepad

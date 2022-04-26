@@ -46,7 +46,7 @@ func Router() *fiber.App {
 		return c.Render("login", nil)
 	})
 	app.Post("/webhook", controllers.HandleWebhook)
-	app.Get("/download/chat/:sid/:fileName", controllers.HandleDownloadChatFile)
+	app.Get("/download/uploadedFile/:sid/*", controllers.HandleDownloadUploadedFile)
 	app.Get("/download/recording/:token", controllers.HandleDownloadRecording)
 
 	// auth group, will require API-KEY & API-SECRET as header value
@@ -78,6 +78,7 @@ func Router() *fiber.App {
 	api.Post("/dataMessage", controllers.HandleDataMessage)
 	api.Post("/endRoom", controllers.HandleEndRoomForAPI)
 	api.Post("/changeVisibility", controllers.HandleChangeVisibilityForAPI)
+	api.Post("/convertWhiteboardFile", controllers.HandleConvertWhiteboardFile)
 
 	// etherpad group
 	etherpad := api.Group("/etherpad", controllers.HandleVerifyHeaderToken)

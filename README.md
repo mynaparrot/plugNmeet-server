@@ -17,18 +17,19 @@ infrastructure [livekit](https://github.com/livekit/livekit-server).
 6) Easy customization with functionality, URL, logo, and branding colors.
 7) HD audio, video call and Screen sharing.
 8) **Shared notepad** and **Whiteboard** for live collaboration.
-9) **Virtual background** for webcams.
-10) Lock settings.
-11) Raise hand.
-12) Chatting with File sharing.
-13) MP4 Recordings.
-14) RTMP Broadcasting
+9) Can upload & share various office file (pdf, docx, pptx, xlsx, txt etc.) in whiteboard directly.
+10) **Virtual background** for webcams.
+11) Lock settings.
+12) Raise hand.
+13) Chatting with File sharing.
+14) MP4 Recordings.
+15) RTMP Broadcasting
 
 And many more!
 
 The components of Plug-N-Meet are as follows:
 
-1) [plugNmeet-server](https://github.com/mynaparrot/plugNmeet-server), the main backend server written in **Go**.
+1) [plugNmeet-server](https://github.com/mynaparrot/plugNmeet-server), the main backend server written in **Go** (Golang).
 
 2) [plugNmeet-client](https://github.com/mynaparrot/plugNmeet-client), which is the main interface/frontend. It's built
    with **React** and **Redux**.
@@ -60,6 +61,7 @@ Following ready to use extensions:
 Docker:
 
 1. [plugnmeet-server](https://hub.docker.com/r/mynaparrot/plugnmeet-server)
+2. [plugNmeet-etherpad](https://hub.docker.com/r/mynaparrot/plugnmeet-etherpad)
 
 Server API information can be found in [API doc](https://www.plugnmeet.org/docs/api/intro) section.
 
@@ -69,6 +71,7 @@ Server API information can be found in [API doc](https://www.plugnmeet.org/docs/
 1) Livekit configured with Redis.
 2) `plugNmeet-server` configured with same Redis instance using for livekit.
 3) Mariadb server for data storage.
+4) Install `libreoffice` & `mupdf-tools` for office files support in whiteboard.
 
 Create `config.yaml`
 from [config_sample.yaml](https://raw.githubusercontent.com/mynaparrot/plugNmeet-server/main/config_sample.yaml) &
