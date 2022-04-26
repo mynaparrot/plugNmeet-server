@@ -25,17 +25,18 @@ type RoomMetadata struct {
 }
 
 type RoomCreateFeatures struct {
-	AllowWebcams               bool                  `json:"allow_webcams"`
-	MuteOnStart                bool                  `json:"mute_on_start"`
-	AllowScreenShare           bool                  `json:"allow_screen_share"`
-	AllowRecording             bool                  `json:"allow_recording"`
-	AllowRTMP                  bool                  `json:"allow_rtmp"`
-	AllowViewOtherWebcams      bool                  `json:"allow_view_other_webcams"`
-	AllowViewOtherParticipants bool                  `json:"allow_view_other_users_list"`
-	AdminOnlyWebcams           bool                  `json:"admin_only_webcams"`
-	ChatFeatures               ChatFeatures          `json:"chat_features"`
-	SharedNotePadFeatures      SharedNotePadFeatures `json:"shared_note_pad_features"`
-	WhiteboardFeatures         WhiteboardFeatures    `json:"whiteboard_features"`
+	AllowWebcams                bool                        `json:"allow_webcams"`
+	MuteOnStart                 bool                        `json:"mute_on_start"`
+	AllowScreenShare            bool                        `json:"allow_screen_share"`
+	AllowRecording              bool                        `json:"allow_recording"`
+	AllowRTMP                   bool                        `json:"allow_rtmp"`
+	AllowViewOtherWebcams       bool                        `json:"allow_view_other_webcams"`
+	AllowViewOtherParticipants  bool                        `json:"allow_view_other_users_list"`
+	AdminOnlyWebcams            bool                        `json:"admin_only_webcams"`
+	ChatFeatures                ChatFeatures                `json:"chat_features"`
+	SharedNotePadFeatures       SharedNotePadFeatures       `json:"shared_note_pad_features"`
+	WhiteboardFeatures          WhiteboardFeatures          `json:"whiteboard_features"`
+	ExternalMediaPlayerFeatures ExternalMediaPlayerFeatures `json:"external_media_player_features"`
 }
 
 type ChatFeatures struct {
@@ -63,6 +64,13 @@ type WhiteboardFeatures struct {
 	FileName          string `json:"file_name"`
 	FilePath          string `json:"file_path"`
 	TotalPages        int    `json:"total_pages"`
+}
+
+type ExternalMediaPlayerFeatures struct {
+	AllowedExternalMediaPlayer bool   `json:"allowed_external_media_player"`
+	IsActive                   bool   `json:"is_active"`
+	SharedBy                   string `json:"shared_by,omitempty"`
+	Url                        string `json:"url,omitempty"`
 }
 
 type RoomEndReq struct {
