@@ -80,6 +80,7 @@ func Router() *fiber.App {
 	api.Post("/changeVisibility", controllers.HandleChangeVisibilityForAPI)
 	api.Post("/convertWhiteboardFile", controllers.HandleConvertWhiteboardFile)
 	api.Post("/externalMediaPlayer", controllers.HandleExternalMediaPlayer)
+	api.Post("/switchPresenter", controllers.HandleSwitchPresenter)
 
 	// etherpad group
 	etherpad := api.Group("/etherpad", controllers.HandleVerifyHeaderToken)

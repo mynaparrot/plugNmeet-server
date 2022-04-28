@@ -226,3 +226,50 @@ func HandleRemoveParticipant(c *fiber.Ctx) error {
 		"msg":    "success",
 	})
 }
+
+func HandleSwitchPresenter(c *fiber.Ctx) error {
+	isAdmin := c.Locals("isAdmin")
+	roomId := c.Locals("roomId")
+	requestedUserId := c.Locals("requestedUserId")
+
+	if !isAdmin.(bool) {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    "only admin can perform this task",
+		})
+	}
+
+	req := new(models.SwitchPresenterReq)
+	err := c.BodyParser(req)
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	check := config.AppCnf.DoValidateReq(req)
+	if len(check) > 0 {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    check,
+		})
+	}
+
+	m := models.NewUserModel()
+	req.RoomId = roomId.(string)
+	req.RequestedUserId = requestedUserId.(string)
+	err = m.SwitchPresenter(req)
+
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"status": true,
+		"msg":    "success",
+	})
+}

@@ -252,3 +252,82 @@ func (u *userModel) RemoveParticipant(r *RemoveParticipantReq) error {
 
 	return nil
 }
+
+type SwitchPresenterReq struct {
+	Task            string `json:"task" validate:"required"`
+	UserId          string `json:"user_id" validate:"required"`
+	RoomId          string
+	RequestedUserId string
+}
+
+func (u *userModel) SwitchPresenter(r *SwitchPresenterReq) error {
+	participants, err := u.roomService.LoadParticipantsFromRedis(r.RoomId)
+	if err != nil {
+		return err
+	}
+
+	for _, p := range participants {
+		meta := make([]byte, len(p.Metadata))
+		copy(meta, p.Metadata)
+
+		m := new(UserMetadata)
+		_ = json.Unmarshal(meta, m)
+
+		if r.Task == "promote" {
+			if m.IsPresenter {
+				// demote current presenter from presenter
+				m.IsPresenter = false
+				err = u.updateUserMetadata(m, r.RoomId, p.Identity)
+				if err != nil {
+					return errors.New("can't demote current presenter")
+				}
+			}
+		} else if r.Task == "demote" {
+			if p.Identity == r.RequestedUserId {
+				// we'll update requested user as presenter
+				// otherwise in the session there won't have any presenter
+				m.IsPresenter = true
+				err = u.updateUserMetadata(m, r.RoomId, p.Identity)
+				if err != nil {
+					return errors.New("can't change alternative presenter")
+				}
+			}
+		}
+	}
+
+	// if everything goes well in top then we'll go ahead
+	p, err := u.roomService.LoadParticipantInfoFromRedis(r.RoomId, r.UserId)
+	if err != nil {
+		return err
+	}
+	meta := make([]byte, len(p.Metadata))
+	copy(meta, p.Metadata)
+
+	m := new(UserMetadata)
+	_ = json.Unmarshal(meta, m)
+
+	if r.Task == "promote" {
+		m.IsPresenter = true
+		err = u.updateUserMetadata(m, r.RoomId, p.Identity)
+		if err != nil {
+			return errors.New("can't promote to presenter")
+		}
+	} else if r.Task == "demote" {
+		m.IsPresenter = false
+		err = u.updateUserMetadata(m, r.RoomId, p.Identity)
+		if err != nil {
+			return errors.New("can't demote to presenter. try again")
+		}
+	}
+
+	return nil
+}
+
+func (u *userModel) updateUserMetadata(meta *UserMetadata, roomId, userId string) error {
+	newMeta, err := json.Marshal(meta)
+	if err != nil {
+		return err
+	}
+	_, err = u.roomService.UpdateParticipantMetadata(roomId, userId, string(newMeta))
+	return err
+}
