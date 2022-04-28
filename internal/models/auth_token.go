@@ -141,7 +141,7 @@ func (a *authTokenModel) assignLockSettings(g *GenTokenReq) *LockSettings {
 }
 
 func (a *authTokenModel) makePresenter(g *GenTokenReq) {
-	if g.UserInfo.IsAdmin {
+	if g.UserInfo.IsAdmin && !g.UserInfo.IsHidden {
 		participants, err := a.rs.LoadParticipantsFromRedis(g.RoomId)
 		if err != nil {
 			return
