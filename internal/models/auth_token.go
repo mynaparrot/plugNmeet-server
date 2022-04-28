@@ -54,7 +54,10 @@ func NewAuthTokenModel() *authTokenModel {
 func (a *authTokenModel) DoGenerateToken(g *GenTokenReq) (string, error) {
 	l := a.assignLockSettings(g)
 	g.UserInfo.UserMetadata.LockSettings = *l
-	a.makePresenter(g)
+
+	if g.UserInfo.IsAdmin {
+		a.makePresenter(g)
+	}
 
 	metadata, err := json.Marshal(g.UserInfo.UserMetadata)
 	if err != nil {
@@ -146,17 +149,21 @@ func (a *authTokenModel) makePresenter(g *GenTokenReq) {
 		if err != nil {
 			return
 		}
+
 		hasPresenter := false
 		for _, p := range participants {
 			meta := make([]byte, len(p.Metadata))
 			copy(meta, p.Metadata)
+
 			m := new(UserMetadata)
 			_ = json.Unmarshal(meta, m)
-			if m.IsPresenter {
+
+			if m.IsAdmin && m.IsPresenter {
 				hasPresenter = true
 				break
 			}
 		}
+
 		if !hasPresenter {
 			g.UserInfo.UserMetadata.IsPresenter = true
 		}
