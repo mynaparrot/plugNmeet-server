@@ -23,6 +23,7 @@ type UserInfo struct {
 type UserMetadata struct {
 	ProfilePic   string       `json:"profile_pic"`
 	IsAdmin      bool         `json:"is_admin"`
+	IsPresenter  bool         `json:"is_presenter"`
 	RaisedHand   bool         `json:"raised_hand"`
 	LockSettings LockSettings `json:"lock_settings"`
 }
@@ -53,6 +54,7 @@ func NewAuthTokenModel() *authTokenModel {
 func (a *authTokenModel) DoGenerateToken(g *GenTokenReq) (string, error) {
 	l := a.assignLockSettings(g)
 	g.UserInfo.UserMetadata.LockSettings = *l
+	a.makePresenter(g)
 
 	metadata, err := json.Marshal(g.UserInfo.UserMetadata)
 	if err != nil {
@@ -136,6 +138,29 @@ func (a *authTokenModel) assignLockSettings(g *GenTokenReq) *LockSettings {
 	}
 
 	return l
+}
+
+func (a *authTokenModel) makePresenter(g *GenTokenReq) {
+	if g.UserInfo.IsAdmin {
+		participants, err := a.rs.LoadParticipantsFromRedis(g.RoomId)
+		if err != nil {
+			return
+		}
+		hasPresenter := false
+		for _, p := range participants {
+			meta := make([]byte, len(p.Metadata))
+			copy(meta, p.Metadata)
+			m := new(UserMetadata)
+			_ = json.Unmarshal(meta, m)
+			if m.IsPresenter {
+				hasPresenter = true
+				break
+			}
+		}
+		if !hasPresenter {
+			g.UserInfo.UserMetadata.IsPresenter = true
+		}
+	}
 }
 
 // GenTokenForRecorder only for either recorder or RTMP bot
