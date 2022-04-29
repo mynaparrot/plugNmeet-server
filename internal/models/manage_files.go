@@ -347,7 +347,7 @@ func (m *ManageFile) ConvertWhiteboardFile() (*ConvertWhiteboardFileRes, error) 
 
 	status := make(chan convertStatus)
 	go func(file, outputDir string) {
-		cmd := exec.Command("/usr/bin/mutool", "convert", "-o", outputDir+"/page_%d.svg", file)
+		cmd := exec.Command("/usr/bin/mutool", "convert", "-o", outputDir+"/page_%d.png", file)
 		_, err = cmd.Output()
 
 		if err != nil {
@@ -362,7 +362,7 @@ func (m *ManageFile) ConvertWhiteboardFile() (*ConvertWhiteboardFileRes, error) 
 		return nil, resStatus.err
 	}
 
-	pattern := filepath.Join(outputDir, "*.svg")
+	pattern := filepath.Join(outputDir, "*.png")
 	totalPages, _ := filepath.Glob(pattern)
 
 	res := &ConvertWhiteboardFileRes{
