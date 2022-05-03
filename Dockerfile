@@ -1,4 +1,4 @@
-FROM golang:1.18-alpine as builder
+FROM golang:1.18-buster as builder
 
 ARG TARGETPLATFORM
 ARG TARGETARCH
@@ -17,9 +17,13 @@ COPY internal/ internal/
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH GO111MODULE=on go build -ldflags '-w -s -buildid=' -a -o plugnmeet-server ./cmd/server
 
-FROM alpine
+FROM debian:buster-slim
 
-RUN apk add --no-cache libreoffice mupdf-tools
+RUN export DEBIAN_FRONTEND=noninteractive; \
+    apt update && \
+    apt install --no-install-recommends -y libreoffice mupdf-tools && \
+    apt clean && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /go/src/app/plugnmeet-server /usr/bin/plugnmeet-server
 
