@@ -44,7 +44,7 @@ func (c *websocketController) validation() bool {
 		Token: c.token,
 	}
 
-	claims, err := m.DoValidateToken(info)
+	claims, err := m.DoValidateToken(info, false)
 	if err != nil {
 		err = c.kws.EmitTo(c.kws.UUID, []byte("invalid token"))
 		if err == nil {

@@ -64,7 +64,7 @@ func (a *authTokenModel) DoGenerateToken(g *GenTokenReq) (string, error) {
 		return "", err
 	}
 
-	at := auth.NewAccessToken(a.app.LivekitInfo.ApiKey, a.app.LivekitInfo.Secret)
+	at := auth.NewAccessToken(a.app.Client.ApiKey, a.app.Client.Secret)
 	grant := &auth.VideoGrant{
 		RoomJoin:  true,
 		Room:      g.RoomId,
@@ -76,6 +76,27 @@ func (a *authTokenModel) DoGenerateToken(g *GenTokenReq) (string, error) {
 		SetIdentity(g.UserInfo.UserId).
 		SetName(g.UserInfo.Name).
 		SetMetadata(string(metadata)).
+		SetValidFor(a.app.LivekitInfo.TokenValidity)
+
+	return at.ToJWT()
+}
+
+// GenerateLivekitToken will generate token to join livekit server
+// It will use info as other validation. We just don't want user simple copy/past token from url
+// instated plugNmeet-server will generate once validation will be completed.
+func (a *authTokenModel) GenerateLivekitToken(claims *auth.ClaimGrants) (string, error) {
+	at := auth.NewAccessToken(a.app.LivekitInfo.ApiKey, a.app.LivekitInfo.Secret)
+	grant := &auth.VideoGrant{
+		RoomJoin:  true,
+		Room:      claims.Video.Room,
+		RoomAdmin: claims.Video.RoomAdmin,
+		Hidden:    claims.Video.Hidden,
+	}
+
+	at.AddGrant(grant).
+		SetIdentity(claims.Identity).
+		SetName(claims.Name).
+		SetMetadata(claims.Metadata).
 		SetValidFor(a.app.LivekitInfo.TokenValidity)
 
 	return at.ToJWT()
@@ -174,7 +195,7 @@ func (a *authTokenModel) makePresenter(g *GenTokenReq) {
 // Because we don't want to add any service settings which may
 // prevent to work recorder/rtmp bot as expected.
 func (a *authTokenModel) GenTokenForRecorder(g *GenTokenReq) (string, error) {
-	at := auth.NewAccessToken(a.app.LivekitInfo.ApiKey, a.app.LivekitInfo.Secret)
+	at := auth.NewAccessToken(a.app.Client.ApiKey, a.app.Client.Secret)
 	// basic permission
 	grant := &auth.VideoGrant{
 		RoomJoin:  true,
@@ -201,13 +222,19 @@ type ValidateTokenReq struct {
 	grant  *auth.APIKeyTokenVerifier
 }
 
-func (a *authTokenModel) DoValidateToken(v *ValidateTokenReq) (*auth.ClaimGrants, error) {
+// DoValidateToken can be use to validate both livekit & plugnmeet token
+func (a *authTokenModel) DoValidateToken(v *ValidateTokenReq, livekit bool) (*auth.ClaimGrants, error) {
 	grant, err := auth.ParseAPIToken(v.Token)
 	if err != nil {
 		return nil, err
 	}
 
-	claims, err := grant.Verify(a.app.LivekitInfo.Secret)
+	secret := a.app.Client.Secret
+	if livekit {
+		secret = a.app.LivekitInfo.Secret
+	}
+
+	claims, err := grant.Verify(secret)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +244,7 @@ func (a *authTokenModel) DoValidateToken(v *ValidateTokenReq) (*auth.ClaimGrants
 }
 
 func (a *authTokenModel) verifyTokenWithRoomInfo(v *ValidateTokenReq) (*auth.ClaimGrants, *RoomInfo, error) {
-	claims, err := a.DoValidateToken(v)
+	claims, err := a.DoValidateToken(v, false)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -249,7 +276,7 @@ func (a *authTokenModel) DoRenewToken(v *ValidateTokenReq) (string, error) {
 		return "", err
 	}
 
-	at := auth.NewAccessToken(a.app.LivekitInfo.ApiKey, a.app.LivekitInfo.Secret)
+	at := auth.NewAccessToken(a.app.Client.ApiKey, a.app.Client.Secret)
 
 	at.AddGrant(claims.Video).
 		SetIdentity(claims.Identity).

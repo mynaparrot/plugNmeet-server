@@ -1,7 +1,9 @@
 package controllers
 
 import (
+	"encoding/json"
 	"github.com/gofiber/fiber/v2"
+	"github.com/livekit/protocol/auth"
 	"github.com/mynaparrot/plugNmeet/internal/config"
 	"github.com/mynaparrot/plugNmeet/internal/models"
 	"strings"
@@ -98,6 +100,35 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 		})
 	}
 
+	cm := c.Locals("claims")
+	// after usage, we can make it null
+	// as we don't need this value again.
+	c.Locals("claims", nil)
+
+	claims := new(auth.ClaimGrants)
+	err = json.Unmarshal([]byte(cm.(string)), claims)
+
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	// if user id isn't string then will have problem
+	// so, we'll set it again here
+	claims.Identity = requestedUserId.(string)
+	claims.Video.Room = roomId.(string)
+
+	au := models.NewAuthTokenModel()
+	token, err := au.GenerateLivekitToken(claims)
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
 	// if nil then assume production
 	if req.IsProduction == nil {
 		b := new(bool)
@@ -109,6 +140,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"status": true,
 			"msg":    "token is valid",
+			"token":  token,
 		})
 	}
 
@@ -123,6 +155,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"status": status,
 		"msg":    msg,
+		"token":  token,
 	})
 }
 
@@ -148,7 +181,7 @@ func HandleVerifyHeaderToken(c *fiber.Ctx) error {
 		Token: authToken,
 	}
 
-	claims, err := m.DoValidateToken(info)
+	claims, err := m.DoValidateToken(info, false)
 	if err != nil {
 		_ = c.SendStatus(errStatus)
 		return c.JSON(fiber.Map{
@@ -157,13 +190,23 @@ func HandleVerifyHeaderToken(c *fiber.Ctx) error {
 		})
 	}
 
-	// TO-DO verify if meeting is running or not.
-	// If not running then we'll send error response.
-	// new livekit server won't allow creat room by join.
+	// we only need this during verify token
+	// because it will return livekit token, if success
+	if strings.Contains(c.Path(), "verifyToken") {
+		j, err := json.Marshal(claims)
+		if err != nil {
+			return c.JSON(fiber.Map{
+				"status": false,
+				"msg":    err.Error(),
+			})
+		}
+		c.Locals("claims", string(j))
+	}
 
 	c.Locals("isAdmin", claims.Video.RoomAdmin)
 	c.Locals("roomId", claims.Video.Room)
 	c.Locals("requestedUserId", claims.Identity)
+
 	return c.Next()
 }
 
