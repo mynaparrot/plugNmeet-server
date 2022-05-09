@@ -245,6 +245,6 @@ func (r *RoomService) IsUserExistInBlockList(roomId, userId string) bool {
 }
 
 func (r *RoomService) DeleteRoomBlockList(roomId string) (int64, error) {
-	key := BlockedUsersList + ":" + roomId
+	key := BlockedUsersList + roomId
 	return r.rc.Del(r.ctx, key).Result()
 }
