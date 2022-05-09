@@ -74,6 +74,18 @@ func HandleGenerateJoinToken(c *fiber.Ctx) error {
 }
 
 func HandleVerifyToken(c *fiber.Ctx) error {
+	roomId := c.Locals("roomId")
+	requestedUserId := c.Locals("requestedUserId")
+
+	rs := models.NewRoomService()
+	exist := rs.IsUserExistInBlockList(roomId.(string), requestedUserId.(string))
+	if exist {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    "notifications.you-are-blocked",
+		})
+	}
+
 	req := new(struct {
 		IsProduction *bool `json:"is_production,omitempty"`
 	})
@@ -103,7 +115,6 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	// if production then we'll check if room is active or not
 	// if not active then we don't allow to join user
 	// livekit also don't allow but throw 500 error which make confused to user.
-	roomId := c.Locals("roomId")
 	m := models.NewRoomAuthModel()
 	status, msg := m.IsRoomActive(&models.IsRoomActiveReq{
 		RoomId: roomId.(string),
