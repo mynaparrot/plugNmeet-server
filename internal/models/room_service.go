@@ -231,12 +231,12 @@ func (r *RoomService) SendData(roomId string, data []byte, dataPacket_Kind livek
 }
 
 func (r *RoomService) AddUserToBlockList(roomId, userId string) (int64, error) {
-	key := BlockedUsersList + ":" + roomId
+	key := BlockedUsersList + roomId
 	return r.rc.SAdd(r.ctx, key, userId).Result()
 }
 
 func (r *RoomService) IsUserExistInBlockList(roomId, userId string) bool {
-	key := BlockedUsersList + ":" + roomId
+	key := BlockedUsersList + roomId
 	exist, err := r.rc.SIsMember(r.ctx, key, userId).Result()
 	if err != nil {
 		return false
