@@ -233,6 +233,7 @@ type RemoveParticipantReq struct {
 	Sid    string `json:"sid" validate:"required"`
 	RoomId string `json:"room_id" validate:"required"`
 	UserId string `json:"user_id" validate:"required"`
+	Msg    string `json:"msg" validate:"required"`
 }
 
 func (u *userModel) RemoveParticipant(r *RemoveParticipantReq) error {
@@ -245,6 +246,15 @@ func (u *userModel) RemoveParticipant(r *RemoveParticipantReq) error {
 		return errors.New("user isn't active now")
 	}
 
+	// send message to user first
+	_ = NewDataMessage(&DataMessageReq{
+		MsgType: "ALERT",
+		Msg:     r.Msg,
+		RoomId:  r.RoomId,
+		SendTo:  []string{p.Sid},
+	})
+
+	// now remove
 	_, err = u.roomService.RemoveParticipant(r.RoomId, r.UserId)
 	if err != nil {
 		return err

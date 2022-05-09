@@ -12,11 +12,12 @@ import (
 )
 
 type DataMessageReq struct {
-	Sid             string `json:"sid" validate:"required"`
-	RoomId          string `json:"room_id" validate:"required"`
-	MsgType         string `json:"msg_type" validate:"required"`
-	Msg             string `json:"msg" validate:"required"`
-	RequestedUserId string `json:"-"`
+	Sid             string   `json:"sid" validate:"required"`
+	RoomId          string   `json:"room_id" validate:"required"`
+	MsgType         string   `json:"msg_type" validate:"required"`
+	Msg             string   `json:"msg" validate:"required"`
+	RequestedUserId string   `json:"-"`
+	SendTo          []string // user sids
 	IsAdmin         bool
 	db              *sql.DB
 	roomService     *RoomService
@@ -58,7 +59,7 @@ func NewDataMessage(r *DataMessageReq) error {
 	case "OTHER_USER_LOWER_HAND":
 		return r.OtherUserLowerHand()
 	case "INFO", "ALERT":
-		return r.SendNotification()
+		return r.SendNotification(r.SendTo)
 
 	default:
 		return errors.New(r.MsgType + " yet not ready")
@@ -174,7 +175,7 @@ func (d *DataMessageReq) OtherUserLowerHand() error {
 	return nil
 }
 
-func (d *DataMessageReq) SendNotification() error {
+func (d *DataMessageReq) SendNotification(sendTo []string) error {
 	msg := DataMessageRes{
 		Type:      "SYSTEM",
 		MessageId: uuid.NewString(),
@@ -193,7 +194,7 @@ func (d *DataMessageReq) SendNotification() error {
 		return err
 	}
 
-	_, err = d.roomService.SendData(d.RoomId, data, livekit.DataPacket_RELIABLE, nil)
+	_, err = d.roomService.SendData(d.RoomId, data, livekit.DataPacket_RELIABLE, sendTo)
 	if err != nil {
 		return err
 	}
