@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"encoding/json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/livekit/protocol/auth"
 	"github.com/mynaparrot/plugNmeet/internal/config"
@@ -101,24 +100,9 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	}
 
 	cm := c.Locals("claims")
-	// after usage, we can make it null
-	// as we don't need this value again.
+	// after usage, we can make it null as we don't need this value again.
 	c.Locals("claims", nil)
-
-	claims := new(auth.ClaimGrants)
-	err = json.Unmarshal([]byte(cm.(string)), claims)
-
-	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
-	}
-
-	// if user id isn't string then will have problem
-	// so, we'll set it again here
-	claims.Identity = requestedUserId.(string)
-	claims.Video.Room = roomId.(string)
+	claims := cm.(*auth.ClaimGrants)
 
 	au := models.NewAuthTokenModel()
 	token, err := au.GenerateLivekitToken(claims)
@@ -193,14 +177,7 @@ func HandleVerifyHeaderToken(c *fiber.Ctx) error {
 	// we only need this during verify token
 	// because it will return livekit token, if success
 	if strings.Contains(c.Path(), "verifyToken") {
-		j, err := json.Marshal(claims)
-		if err != nil {
-			return c.JSON(fiber.Map{
-				"status": false,
-				"msg":    err.Error(),
-			})
-		}
-		c.Locals("claims", string(j))
+		c.Locals("claims", claims)
 	}
 
 	c.Locals("isAdmin", claims.Video.RoomAdmin)
