@@ -109,6 +109,9 @@ func (w *webhookEvent) roomFinished() int64 {
 	em := NewEtherpadModel()
 	_ = em.CleanAfterRoomEnd(event.Room.Name, event.Room.Metadata)
 
+	// clear users block list
+	_, _ = w.roomService.DeleteRoomBlockList(event.Room.Name)
+
 	return affected
 }
 

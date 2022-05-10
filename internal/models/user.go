@@ -230,10 +230,11 @@ func (u *userModel) muteUnmuteAllMic(r *MuteUnMuteTrackReq) error {
 }
 
 type RemoveParticipantReq struct {
-	Sid    string `json:"sid" validate:"required"`
-	RoomId string `json:"room_id" validate:"required"`
-	UserId string `json:"user_id" validate:"required"`
-	Msg    string `json:"msg" validate:"required"`
+	Sid       string `json:"sid" validate:"required"`
+	RoomId    string `json:"room_id" validate:"required"`
+	UserId    string `json:"user_id" validate:"required"`
+	Msg       string `json:"msg" validate:"required"`
+	BlockUser bool   `json:"block_user"`
 }
 
 func (u *userModel) RemoveParticipant(r *RemoveParticipantReq) error {
@@ -258,6 +259,11 @@ func (u *userModel) RemoveParticipant(r *RemoveParticipantReq) error {
 	_, err = u.roomService.RemoveParticipant(r.RoomId, r.UserId)
 	if err != nil {
 		return err
+	}
+
+	// finally check if requested to block as well as
+	if r.BlockUser {
+		_, _ = u.roomService.AddUserToBlockList(r.RoomId, r.UserId)
 	}
 
 	return nil
