@@ -40,9 +40,9 @@ func NewWebhookModel(e *livekit.WebhookEvent) {
 		w.participantLeft()
 
 	case "track_published":
-		w.participantJoined()
+		w.trackPublished()
 	case "track_unpublished":
-		w.participantLeft()
+		w.trackUnpublished()
 	}
 
 }
