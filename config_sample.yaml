@@ -33,7 +33,7 @@ livekit_info:
   api_key: "APIiYAA5w37Cfo2"
   secret: "6aNur7qqupeZhFYNOJVUyeXxXhVw8f4lm13pEDUx8SgB"
   # value in minutes. Default 10 minutes. Client will renew token automatically
-  token_validity: 2h
+  token_validity: 10m
 redis_info:
   host: redis
   port: "6379"
