@@ -49,15 +49,16 @@ type RecorderResp struct {
 	RecorderId string `json:"recorder_id"` //
 	MaxLimit   int    `json:"max_limit"`
 
-	From     string  `json:"from"`
-	Task     string  `json:"task"`
-	Status   bool    `json:"status"`
-	Msg      string  `json:"msg"`
-	RecordId string  `json:"record_id"`
-	Sid      string  `json:"sid"`
-	RoomId   string  `json:"room_id"`
-	FilePath string  `json:"file_path"`
-	FileSize float64 `json:"file_size"`
+	ToServerId string  `json:"to_server_id"`
+	From       string  `json:"from"`
+	Task       string  `json:"task"`
+	Status     bool    `json:"status"`
+	Msg        string  `json:"msg"`
+	RecordId   string  `json:"record_id"`
+	Sid        string  `json:"sid"`
+	RoomId     string  `json:"room_id"`
+	FilePath   string  `json:"file_path"`
+	FileSize   float64 `json:"file_size"`
 }
 
 func (rm *recordingModel) HandleRecorderResp(r *RecorderResp) {
@@ -528,25 +529,27 @@ func (rm *recordingModel) sendToWebhookNotifier(r *RecorderResp) {
 }
 
 type RecorderReq struct {
-	From        string `json:"from"`
-	Task        string `json:"task"`
-	RoomId      string `json:"room_id"`
-	Sid         string `json:"sid"`
-	RecordId    string `json:"record_id"`
-	AccessToken string `json:"access_token"`
-	RecorderId  string `json:"recorder_id"`
-	RtmpUrl     string `json:"rtmp_url"`
+	From         string `json:"from"`
+	FromServerId string `json:"from_server_id"`
+	Task         string `json:"task"`
+	RoomId       string `json:"room_id"`
+	Sid          string `json:"sid"`
+	RecordId     string `json:"record_id"`
+	AccessToken  string `json:"access_token"`
+	RecorderId   string `json:"recorder_id"`
+	RtmpUrl      string `json:"rtmp_url"`
 }
 
 func (rm *recordingModel) SendMsgToRecorder(task string, roomId string, sid string, rtmpUrl string) error {
 	recordId := time.Now().UnixMilli()
 
 	toSend := &RecorderReq{
-		From:     "plugnmeet",
-		Task:     task,
-		RoomId:   roomId,
-		Sid:      sid,
-		RecordId: sid + "-" + strconv.Itoa(int(recordId)),
+		From:         "plugnmeet",
+		FromServerId: config.AppCnf.Client.ServerId,
+		Task:         task,
+		RoomId:       roomId,
+		Sid:          sid,
+		RecordId:     sid + "-" + strconv.Itoa(int(recordId)),
 	}
 	switch task {
 	case "start-recording":

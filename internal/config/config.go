@@ -35,6 +35,7 @@ type AppConfig struct {
 }
 
 type ClientInfo struct {
+	ServerId       string         `yaml:"id"`
 	Port           int            `yaml:"port"`
 	Debug          bool           `yaml:"debug"`
 	Path           string         `yaml:"path"`

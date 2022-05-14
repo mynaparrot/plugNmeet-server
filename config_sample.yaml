@@ -1,4 +1,5 @@
 client:
+  id: "node_01"
   port: 8080
   debug: true
   path: "/app/client/dist"

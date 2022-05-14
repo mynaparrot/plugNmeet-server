@@ -28,7 +28,7 @@ func SubscribeToRecorderChannel() {
 			fmt.Println(err)
 		}
 
-		if res.From == "recorder" {
+		if res.From == "recorder" && res.ToServerId == config.AppCnf.Client.ServerId {
 			m.HandleRecorderResp(res)
 		}
 	}
