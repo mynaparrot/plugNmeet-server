@@ -306,34 +306,6 @@ func (rm *recordingModel) updateRoomRTMPStatus(r *RecorderResp, isActiveRtmp int
 	return nil
 }
 
-type recorderInfo struct {
-	recorderId      string
-	maxLimit        int
-	currentProgress int
-}
-
-func (rm *recordingModel) getAllRecorders() ([]*recorderInfo, error) {
-	ctx := context.Background()
-	res := rm.rds.HGetAll(ctx, "pnm:recorders")
-	result, err := res.Result()
-	if err != nil {
-		return nil, err
-	}
-
-	var recorders []*recorderInfo
-	for id, data := range result {
-		recorder := new(recorderInfo)
-		err = json.Unmarshal([]byte(data), recorder)
-		if err != nil {
-			continue
-		}
-		recorder.recorderId = id
-		recorders = append(recorders, recorder)
-	}
-
-	return recorders, err
-}
-
 func (rm *recordingModel) updateRecorderCurrentProgress(r *RecorderResp) error {
 	db := rm.db
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -503,6 +475,39 @@ func (rm *recordingModel) addTokenAndRecorder(rq *RecorderReq, userId string) er
 	return nil
 }
 
+type recorderInfo struct {
+	RecorderId      string
+	MaxLimit        int   `json:"maxLimit"`
+	CurrentProgress int   `json:"currentProgress"`
+	LastPing        int64 `json:"lastPing"`
+}
+
+func (rm *recordingModel) getAllRecorders() ([]*recorderInfo, error) {
+	ctx := context.Background()
+	res := rm.rds.HGetAll(ctx, "pnm:recorders")
+	result, err := res.Result()
+	if err != nil {
+		return nil, err
+	}
+
+	var recorders []*recorderInfo
+	valid := time.Now().Unix() - 8
+
+	for id, data := range result {
+		recorder := new(recorderInfo)
+		err = json.Unmarshal([]byte(data), recorder)
+		if err != nil {
+			continue
+		}
+		if recorder.LastPing >= valid {
+			recorder.RecorderId = id
+			recorders = append(recorders, recorder)
+		}
+	}
+
+	return recorders, err
+}
+
 func (rm *recordingModel) selectRecorder() (string, error) {
 	recorders, err := rm.getAllRecorders()
 	if err != nil {
@@ -513,11 +518,11 @@ func (rm *recordingModel) selectRecorder() (string, error) {
 	}
 	// let's sort it based on active processes & max limit.
 	sort.Slice(recorders, func(i int, j int) bool {
-		iA := (recorders[i].currentProgress) / recorders[i].maxLimit
-		jA := (recorders[j].currentProgress) / recorders[j].maxLimit
+		iA := (recorders[i].CurrentProgress) / recorders[i].MaxLimit
+		jA := (recorders[j].CurrentProgress) / recorders[j].MaxLimit
 		return iA < jA
 	})
 
 	// we'll return the first one
-	return recorders[0].recorderId, nil
+	return recorders[0].RecorderId, nil
 }
