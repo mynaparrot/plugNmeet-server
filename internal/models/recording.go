@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/go-redis/redis/v8"
 	"github.com/mynaparrot/plugNmeet/internal/config"
 	log "github.com/sirupsen/logrus"
@@ -49,16 +48,15 @@ type RecorderResp struct {
 	RecorderId string `json:"recorder_id"` //
 	MaxLimit   int    `json:"max_limit"`
 
-	ToServerId string  `json:"to_server_id"`
-	From       string  `json:"from"`
-	Task       string  `json:"task"`
-	Status     bool    `json:"status"`
-	Msg        string  `json:"msg"`
-	RecordId   string  `json:"record_id"`
-	Sid        string  `json:"sid"`
-	RoomId     string  `json:"room_id"`
-	FilePath   string  `json:"file_path"`
-	FileSize   float64 `json:"file_size"`
+	From     string  `json:"from"`
+	Task     string  `json:"task"`
+	Status   bool    `json:"status"`
+	Msg      string  `json:"msg"`
+	RecordId string  `json:"record_id"`
+	Sid      string  `json:"sid"`
+	RoomId   string  `json:"room_id"`
+	FilePath string  `json:"file_path"`
+	FileSize float64 `json:"file_size"`
 }
 
 func (rm *recordingModel) HandleRecorderResp(r *RecorderResp) {
@@ -85,16 +83,6 @@ func (rm *recordingModel) HandleRecorderResp(r *RecorderResp) {
 			log.Errorln(err)
 		}
 		rm.sendToWebhookNotifier(r)
-	case "addRecorder":
-		err := rm.addRecorder(r)
-		if err != nil {
-			log.Errorln(err)
-		}
-	case "ping":
-		err := rm.addRecorderPing(r)
-		if err != nil {
-			log.Errorln(err)
-		}
 	}
 }
 
@@ -191,21 +179,6 @@ func (rm *recordingModel) updateRoomRecordingStatus(r *RecorderResp, isRecording
 	}
 
 	_, err = stmt.Exec(isRecording, r.RecorderId, r.Sid)
-	if err != nil {
-		return err
-	}
-
-	// update recorder table too
-	q := "UPDATE " + rm.app.FormatDBTable("recorder") + " SET current_progress = current_progress + 1 WHERE recorder_id = ?"
-	if isRecording == 0 {
-		q = "UPDATE " + rm.app.FormatDBTable("recorder") + " SET current_progress = current_progress - 1 WHERE recorder_id = ? AND current_progress > 0"
-	}
-	stmt, err = tx.Prepare(q)
-	if err != nil {
-		return err
-	}
-
-	_, err = stmt.Exec(r.RecorderId)
 	if err != nil {
 		return err
 	}
@@ -320,58 +293,11 @@ func (rm *recordingModel) updateRoomRTMPStatus(r *RecorderResp, isActiveRtmp int
 		return err
 	}
 
-	// update recorder table too
-	q := "UPDATE " + rm.app.FormatDBTable("recorder") + " SET current_progress = current_progress + 1 WHERE recorder_id = ?"
-	if isActiveRtmp == 0 {
-		q = "UPDATE " + rm.app.FormatDBTable("recorder") + " SET current_progress = current_progress - 1 WHERE recorder_id = ? AND current_progress > 0"
-	}
-	stmt, err = tx.Prepare(q)
-	if err != nil {
-		return err
-	}
-
-	_, err = stmt.Exec(r.RecorderId)
-	if err != nil {
-		return err
-	}
-
 	err = tx.Commit()
 	if err != nil {
 		return err
 	}
 
-	err = stmt.Close()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// addRecorder will call when new recorder will join in redis channel
-func (rm *recordingModel) addRecorder(r *RecorderResp) error {
-	db := rm.db
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	stmt, err := tx.Prepare("INSERT INTO " + rm.app.FormatDBTable("recorder") + " (recorder_id, max_limit) VALUES (?, ?) ON DUPLICATE KEY UPDATE max_limit = ?")
-	if err != nil {
-		return err
-	}
-
-	_, err = stmt.Exec(r.RecorderId, r.MaxLimit, r.MaxLimit)
-	if err != nil {
-		return err
-	}
-	err = tx.Commit()
-	if err != nil {
-		return err
-	}
 	err = stmt.Close()
 	if err != nil {
 		return err
@@ -387,58 +313,25 @@ type recorderInfo struct {
 }
 
 func (rm *recordingModel) getAllRecorders() ([]*recorderInfo, error) {
-	db := rm.db
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	valid := (time.Now().Unix() - 11) // current time + 11 seconds
-	rows, err := db.QueryContext(ctx, "SELECT recorder_id, max_limit, current_progress FROM "+rm.app.FormatDBTable("recorder ")+" WHERE last_ping >= ?", valid)
+	ctx := context.Background()
+	res := rm.rds.HGetAll(ctx, "pnm:recorders")
+	result, err := res.Result()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	recorder := new(recorderInfo)
 	var recorders []*recorderInfo
-
-	for rows.Next() {
-		err = rows.Scan(&recorder.recorderId, &recorder.maxLimit, &recorder.currentProgress)
+	for id, data := range result {
+		recorder := new(recorderInfo)
+		err = json.Unmarshal([]byte(data), recorder)
 		if err != nil {
-			fmt.Println(err)
+			continue
 		}
+		recorder.recorderId = id
 		recorders = append(recorders, recorder)
 	}
 
-	return recorders, nil
-}
-
-func (rm *recordingModel) addRecorderPing(r *RecorderResp) error {
-	db := rm.db
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	stmt, err := tx.Prepare("UPDATE " + rm.app.FormatDBTable("recorder") + " SET last_ping = ? WHERE recorder_id = ?")
-	if err != nil {
-		return err
-	}
-	_, err = stmt.Exec(time.Now().Unix(), r.RecorderId)
-	if err != nil {
-		return err
-	}
-	err = tx.Commit()
-	if err != nil {
-		return err
-	}
-	err = stmt.Close()
-	if err != nil {
-		return err
-	}
-	return nil
+	return recorders, err
 }
 
 func (rm *recordingModel) updateRecorderCurrentProgress(r *RecorderResp) error {
@@ -529,27 +422,25 @@ func (rm *recordingModel) sendToWebhookNotifier(r *RecorderResp) {
 }
 
 type RecorderReq struct {
-	From         string `json:"from"`
-	FromServerId string `json:"from_server_id"`
-	Task         string `json:"task"`
-	RoomId       string `json:"room_id"`
-	Sid          string `json:"sid"`
-	RecordId     string `json:"record_id"`
-	AccessToken  string `json:"access_token"`
-	RecorderId   string `json:"recorder_id"`
-	RtmpUrl      string `json:"rtmp_url"`
+	From        string `json:"from"`
+	Task        string `json:"task"`
+	RoomId      string `json:"room_id"`
+	Sid         string `json:"sid"`
+	RecordId    string `json:"record_id"`
+	AccessToken string `json:"access_token"`
+	RecorderId  string `json:"recorder_id"`
+	RtmpUrl     string `json:"rtmp_url"`
 }
 
 func (rm *recordingModel) SendMsgToRecorder(task string, roomId string, sid string, rtmpUrl string) error {
 	recordId := time.Now().UnixMilli()
 
 	toSend := &RecorderReq{
-		From:         "plugnmeet",
-		FromServerId: config.AppCnf.Client.ServerId,
-		Task:         task,
-		RoomId:       roomId,
-		Sid:          sid,
-		RecordId:     sid + "-" + strconv.Itoa(int(recordId)),
+		From:     "plugnmeet",
+		Task:     task,
+		RoomId:   roomId,
+		Sid:      sid,
+		RecordId: sid + "-" + strconv.Itoa(int(recordId)),
 	}
 	switch task {
 	case "start-recording":

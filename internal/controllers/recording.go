@@ -1,38 +1,9 @@
 package controllers
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
 	"github.com/gofiber/fiber/v2"
-	"github.com/mynaparrot/plugNmeet/internal/config"
 	"github.com/mynaparrot/plugNmeet/internal/models"
 )
-
-func SubscribeToRecorderChannel() {
-	ctx := context.Background()
-	pubsub := config.AppCnf.RDS.Subscribe(ctx, "plug-n-meet-recorder")
-	defer pubsub.Close()
-
-	_, err := pubsub.Receive(ctx)
-	if err != nil {
-		panic(err)
-	}
-
-	ch := pubsub.Channel()
-	for msg := range ch {
-		res := new(models.RecorderResp)
-		m := models.NewRecordingModel()
-		err = json.Unmarshal([]byte(msg.Payload), res)
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		if res.From == "recorder" && res.ToServerId == config.AppCnf.Client.ServerId {
-			m.HandleRecorderResp(res)
-		}
-	}
-}
 
 func HandleRecording(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
@@ -206,4 +177,23 @@ func HandleRTMP(c *fiber.Ctx) error {
 		"status": true,
 		"msg":    "success",
 	})
+}
+
+func HandleRecorderEvents(c *fiber.Ctx) error {
+	req := new(models.RecorderResp)
+	m := models.NewRecordingModel()
+
+	err := c.BodyParser(req)
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	if req.From == "recorder" {
+		m.HandleRecorderResp(req)
+	}
+
+	return c.SendStatus(fiber.StatusOK)
 }

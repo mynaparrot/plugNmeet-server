@@ -65,6 +65,10 @@ func Router() *fiber.App {
 	recording.Post("/delete", controllers.HandleDeleteRecording)
 	recording.Post("/getDownloadToken", controllers.HandleGetDownloadToken)
 
+	// to handle different events from recorder
+	recorder := auth.Group("/recorder")
+	recorder.Post("/notify", controllers.HandleRecorderEvents)
+
 	// api group, will require sending token as Authorization header value
 	api := app.Group("/api", controllers.HandleVerifyHeaderToken)
 	api.Post("/verifyToken", controllers.HandleVerifyToken)
