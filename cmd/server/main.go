@@ -57,7 +57,6 @@ func startServer(c *cli.Context) error {
 	defer config.AppCnf.RDS.Close()
 
 	// we'll subscribe to redis channels now
-	go controllers.SubscribeToRecorderChannel()
 	go controllers.SubscribeToWebsocketChannel()
 
 	router := Router()

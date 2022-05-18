@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/go-redis/redis/v8"
 	"github.com/mynaparrot/plugNmeet/internal/config"
 	log "github.com/sirupsen/logrus"
@@ -84,16 +83,6 @@ func (rm *recordingModel) HandleRecorderResp(r *RecorderResp) {
 			log.Errorln(err)
 		}
 		rm.sendToWebhookNotifier(r)
-	case "addRecorder":
-		err := rm.addRecorder(r)
-		if err != nil {
-			log.Errorln(err)
-		}
-	case "ping":
-		err := rm.addRecorderPing(r)
-		if err != nil {
-			log.Errorln(err)
-		}
 	}
 }
 
@@ -190,21 +179,6 @@ func (rm *recordingModel) updateRoomRecordingStatus(r *RecorderResp, isRecording
 	}
 
 	_, err = stmt.Exec(isRecording, r.RecorderId, r.Sid)
-	if err != nil {
-		return err
-	}
-
-	// update recorder table too
-	q := "UPDATE " + rm.app.FormatDBTable("recorder") + " SET current_progress = current_progress + 1 WHERE recorder_id = ?"
-	if isRecording == 0 {
-		q = "UPDATE " + rm.app.FormatDBTable("recorder") + " SET current_progress = current_progress - 1 WHERE recorder_id = ? AND current_progress > 0"
-	}
-	stmt, err = tx.Prepare(q)
-	if err != nil {
-		return err
-	}
-
-	_, err = stmt.Exec(r.RecorderId)
 	if err != nil {
 		return err
 	}
@@ -319,21 +293,6 @@ func (rm *recordingModel) updateRoomRTMPStatus(r *RecorderResp, isActiveRtmp int
 		return err
 	}
 
-	// update recorder table too
-	q := "UPDATE " + rm.app.FormatDBTable("recorder") + " SET current_progress = current_progress + 1 WHERE recorder_id = ?"
-	if isActiveRtmp == 0 {
-		q = "UPDATE " + rm.app.FormatDBTable("recorder") + " SET current_progress = current_progress - 1 WHERE recorder_id = ? AND current_progress > 0"
-	}
-	stmt, err = tx.Prepare(q)
-	if err != nil {
-		return err
-	}
-
-	_, err = stmt.Exec(r.RecorderId)
-	if err != nil {
-		return err
-	}
-
 	err = tx.Commit()
 	if err != nil {
 		return err
@@ -344,99 +303,6 @@ func (rm *recordingModel) updateRoomRTMPStatus(r *RecorderResp, isActiveRtmp int
 		return err
 	}
 
-	return nil
-}
-
-// addRecorder will call when new recorder will join in redis channel
-func (rm *recordingModel) addRecorder(r *RecorderResp) error {
-	db := rm.db
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	stmt, err := tx.Prepare("INSERT INTO " + rm.app.FormatDBTable("recorder") + " (recorder_id, max_limit) VALUES (?, ?) ON DUPLICATE KEY UPDATE max_limit = ?")
-	if err != nil {
-		return err
-	}
-
-	_, err = stmt.Exec(r.RecorderId, r.MaxLimit, r.MaxLimit)
-	if err != nil {
-		return err
-	}
-	err = tx.Commit()
-	if err != nil {
-		return err
-	}
-	err = stmt.Close()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-type recorderInfo struct {
-	recorderId      string
-	maxLimit        int
-	currentProgress int
-}
-
-func (rm *recordingModel) getAllRecorders() ([]*recorderInfo, error) {
-	db := rm.db
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	valid := (time.Now().Unix() - 11) // current time + 11 seconds
-	rows, err := db.QueryContext(ctx, "SELECT recorder_id, max_limit, current_progress FROM "+rm.app.FormatDBTable("recorder ")+" WHERE last_ping >= ?", valid)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	recorder := new(recorderInfo)
-	var recorders []*recorderInfo
-
-	for rows.Next() {
-		err = rows.Scan(&recorder.recorderId, &recorder.maxLimit, &recorder.currentProgress)
-		if err != nil {
-			fmt.Println(err)
-		}
-		recorders = append(recorders, recorder)
-	}
-
-	return recorders, nil
-}
-
-func (rm *recordingModel) addRecorderPing(r *RecorderResp) error {
-	db := rm.db
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	stmt, err := tx.Prepare("UPDATE " + rm.app.FormatDBTable("recorder") + " SET last_ping = ? WHERE recorder_id = ?")
-	if err != nil {
-		return err
-	}
-	_, err = stmt.Exec(time.Now().Unix(), r.RecorderId)
-	if err != nil {
-		return err
-	}
-	err = tx.Commit()
-	if err != nil {
-		return err
-	}
-	err = stmt.Close()
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -609,6 +475,39 @@ func (rm *recordingModel) addTokenAndRecorder(rq *RecorderReq, userId string) er
 	return nil
 }
 
+type recorderInfo struct {
+	RecorderId      string
+	MaxLimit        int   `json:"maxLimit"`
+	CurrentProgress int   `json:"currentProgress"`
+	LastPing        int64 `json:"lastPing"`
+}
+
+func (rm *recordingModel) getAllRecorders() ([]*recorderInfo, error) {
+	ctx := context.Background()
+	res := rm.rds.HGetAll(ctx, "pnm:recorders")
+	result, err := res.Result()
+	if err != nil {
+		return nil, err
+	}
+
+	var recorders []*recorderInfo
+	valid := time.Now().Unix() - 8 // we can think maximum 8 seconds delay for valid node
+
+	for id, data := range result {
+		recorder := new(recorderInfo)
+		err = json.Unmarshal([]byte(data), recorder)
+		if err != nil {
+			continue
+		}
+		if recorder.LastPing >= valid {
+			recorder.RecorderId = id
+			recorders = append(recorders, recorder)
+		}
+	}
+
+	return recorders, err
+}
+
 func (rm *recordingModel) selectRecorder() (string, error) {
 	recorders, err := rm.getAllRecorders()
 	if err != nil {
@@ -619,11 +518,11 @@ func (rm *recordingModel) selectRecorder() (string, error) {
 	}
 	// let's sort it based on active processes & max limit.
 	sort.Slice(recorders, func(i int, j int) bool {
-		iA := (recorders[i].currentProgress) / recorders[i].maxLimit
-		jA := (recorders[j].currentProgress) / recorders[j].maxLimit
+		iA := (recorders[i].CurrentProgress) / recorders[i].MaxLimit
+		jA := (recorders[j].CurrentProgress) / recorders[j].MaxLimit
 		return iA < jA
 	})
 
 	// we'll return the first one
-	return recorders[0].recorderId, nil
+	return recorders[0].RecorderId, nil
 }
