@@ -33,6 +33,7 @@ type RoomCreateFeatures struct {
 	AllowViewOtherWebcams       bool                        `json:"allow_view_other_webcams"`
 	AllowViewOtherParticipants  bool                        `json:"allow_view_other_users_list"`
 	AdminOnlyWebcams            bool                        `json:"admin_only_webcams"`
+	ActivateWaitingRoom         bool                        `json:"activate_waiting_room"`
 	ChatFeatures                ChatFeatures                `json:"chat_features"`
 	SharedNotePadFeatures       SharedNotePadFeatures       `json:"shared_note_pad_features"`
 	WhiteboardFeatures          WhiteboardFeatures          `json:"whiteboard_features"`
