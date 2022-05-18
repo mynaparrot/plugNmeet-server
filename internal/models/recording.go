@@ -491,7 +491,7 @@ func (rm *recordingModel) getAllRecorders() ([]*recorderInfo, error) {
 	}
 
 	var recorders []*recorderInfo
-	valid := time.Now().Unix() - 8
+	valid := time.Now().Unix() - 8 // we can think maximum 8 seconds delay for valid node
 
 	for id, data := range result {
 		recorder := new(recorderInfo)
