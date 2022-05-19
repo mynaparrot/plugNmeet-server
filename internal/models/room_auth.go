@@ -33,11 +33,11 @@ type RoomCreateFeatures struct {
 	AllowViewOtherWebcams       bool                        `json:"allow_view_other_webcams"`
 	AllowViewOtherParticipants  bool                        `json:"allow_view_other_users_list"`
 	AdminOnlyWebcams            bool                        `json:"admin_only_webcams"`
-	ActivateWaitingRoom         bool                        `json:"activate_waiting_room"`
 	ChatFeatures                ChatFeatures                `json:"chat_features"`
 	SharedNotePadFeatures       SharedNotePadFeatures       `json:"shared_note_pad_features"`
 	WhiteboardFeatures          WhiteboardFeatures          `json:"whiteboard_features"`
 	ExternalMediaPlayerFeatures ExternalMediaPlayerFeatures `json:"external_media_player_features"`
+	WaitingRoomFeatures         WaitingRoomFeatures         `json:"waiting_room_features"`
 }
 
 type ChatFeatures struct {
@@ -72,6 +72,11 @@ type ExternalMediaPlayerFeatures struct {
 	IsActive                   bool   `json:"is_active"`
 	SharedBy                   string `json:"shared_by,omitempty"`
 	Url                        string `json:"url,omitempty"`
+}
+
+type WaitingRoomFeatures struct {
+	IsActive       bool   `json:"is_active"`
+	WaitingRoomMsg string `json:"waiting_room_msg"`
 }
 
 type RoomEndReq struct {

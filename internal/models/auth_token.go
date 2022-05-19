@@ -162,7 +162,7 @@ func (a *authTokenModel) assignLockSettings(g *GenTokenReq) {
 		}
 
 		// if waiting room feature active then we won't allow direct access
-		if m.Features.ActivateWaitingRoom {
+		if m.Features.WaitingRoomFeatures.IsActive {
 			g.UserInfo.UserMetadata.WaitForApproval = true
 		}
 	}

@@ -85,13 +85,17 @@ func Router() *fiber.App {
 	api.Post("/convertWhiteboardFile", controllers.HandleConvertWhiteboardFile)
 	api.Post("/externalMediaPlayer", controllers.HandleExternalMediaPlayer)
 	api.Post("/switchPresenter", controllers.HandleSwitchPresenter)
-	api.Post("/approveWaitingUser", controllers.HandleApproveWaitingParticipant)
 
 	// etherpad group
-	etherpad := api.Group("/etherpad", controllers.HandleVerifyHeaderToken)
+	etherpad := api.Group("/etherpad")
 	etherpad.Post("/create", controllers.HandleCreateEtherpad)
 	etherpad.Post("/cleanPad", controllers.HandleCleanPad)
 	etherpad.Post("/changeStatus", controllers.HandleChangeEtherpadStatus)
+
+	// waiting room group
+	waitingRoom := api.Group("/waitingRoom")
+	waitingRoom.Post("/approveUsers", controllers.HandleApproveUsers)
+	waitingRoom.Post("/updateMsg", controllers.HandleUpdateWaitingRoomMessage)
 
 	// for resumable.js need both methods.
 	// https://github.com/23/resumable.js#how-do-i-set-it-up-with-my-server

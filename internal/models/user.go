@@ -339,31 +339,6 @@ func (u *userModel) SwitchPresenter(r *SwitchPresenterReq) error {
 	return nil
 }
 
-type ApproveWaitingParticipantReq struct {
-	RoomId string
-	UserId string `json:"user_id" validate:"required"`
-}
-
-func (u *userModel) ApproveWaitingParticipant(r *ApproveWaitingParticipantReq) error {
-	p, err := u.roomService.LoadParticipantInfoFromRedis(r.RoomId, r.UserId)
-	if err != nil {
-		return err
-	}
-	meta := make([]byte, len(p.Metadata))
-	copy(meta, p.Metadata)
-
-	m := new(UserMetadata)
-	_ = json.Unmarshal(meta, m)
-	m.WaitForApproval = false // this mean doesn't need to wait anymore
-
-	err = u.updateUserMetadata(m, r.RoomId, p.Identity)
-	if err != nil {
-		return errors.New("can't approve user. try again")
-	}
-
-	return nil
-}
-
 func (u *userModel) updateUserMetadata(meta *UserMetadata, roomId, userId string) error {
 	newMeta, err := json.Marshal(meta)
 	if err != nil {
