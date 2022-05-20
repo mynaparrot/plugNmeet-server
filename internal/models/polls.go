@@ -123,23 +123,13 @@ type ListPoll struct {
 	Voted          int    `json:"voted"`
 }
 
-func (m *newPollsModel) ListPolls(roomId, userId string) (error, []*ListPoll) {
-	var result map[string]string
-	var polls []*ListPoll
+func (m *newPollsModel) ListPolls(roomId string) (error, []*PollInfo) {
+	var polls []*PollInfo
 
-	err := m.rc.Watch(m.ctx, func(tx *redis.Tx) error {
-		p := tx.HGetAll(m.ctx, pollsKey+roomId)
-		r, err := p.Result()
-		if err != nil {
-			return err
-		}
-		result = r
-
-		return err
-	}, pollsKey+roomId)
-
+	p := m.rc.HGetAll(m.ctx, pollsKey+roomId)
+	result, err := p.Result()
 	if err != nil {
-		return err, polls
+		return err, nil
 	}
 
 	if len(result) == 0 {
@@ -153,83 +143,20 @@ func (m *newPollsModel) ListPolls(roomId, userId string) (error, []*ListPoll) {
 		if err != nil {
 			continue
 		}
-		err, total, userRes := m.getUserResponseWithTotal(roomId, userId, info.Id)
-		if err != nil {
-			continue
-		}
 
-		poll := ListPoll{
-			Id:             info.Id,
-			Question:       info.Question,
-			IsPublished:    info.IsPublished,
-			TotalResponses: total,
-			Voted:          userRes,
-		}
-		polls = append(polls, &poll)
+		polls = append(polls, info)
 	}
 
 	return nil, polls
 }
 
-func (m *newPollsModel) getPollResponsesByField(roomId, pollId, field string) (error, string) {
+func (m *newPollsModel) GetPollResponsesByField(roomId, pollId, field string) (error, string) {
 	key := fmt.Sprintf("%s%s:respondents:%s", pollsKey, roomId, pollId)
-	var result string
 
-	err := m.rc.Watch(m.ctx, func(tx *redis.Tx) error {
-		v := tx.HGet(m.ctx, key, field)
-		r, err := v.Result()
-		result = r
-		return err
-	}, key)
+	v := m.rc.HGet(m.ctx, key, field)
+	result, err := v.Result()
 
 	return err, result
-}
-
-type UserResponseWithTotal struct {
-	TotalResponses       int `json:"total_responses"`
-	UserResponseOptionId int `json:"user_response_option_id"`
-}
-
-type userResponseWithTotal struct {
-	TotalRes       int    `redis:"total_resp"`
-	AllRespondents string `redis:"all_respondents"`
-}
-
-func (m *newPollsModel) getUserResponseWithTotal(roomId, userId, pollId string) (error, int, int) {
-	key := fmt.Sprintf("%s%s:respondents:%s", pollsKey, roomId, pollId)
-	result := new(userResponseWithTotal)
-	fields := []string{"total_resp", "all_respondents"}
-
-	err := m.rc.Watch(m.ctx, func(tx *redis.Tx) error {
-		v := tx.HMGet(m.ctx, key, fields...)
-		err := v.Scan(result)
-		return err
-	}, key)
-
-	if err != nil {
-		return err, 0, 0
-	}
-
-	if result.AllRespondents == "" {
-		return nil, result.TotalRes, 0
-	}
-
-	var respondents []string
-	err = json.Unmarshal([]byte(result.AllRespondents), &respondents)
-	if err != nil {
-		return err, result.TotalRes, 0
-	}
-
-	for _, rr := range respondents {
-		// format userId:option_id
-		p := strings.Split(rr, ":")
-		if p[0] == userId {
-			voted, _ := strconv.Atoi(p[1])
-			return nil, result.TotalRes, voted
-		}
-	}
-
-	return nil, result.TotalRes, 0
 }
 
 func (m *newPollsModel) GetPollResponses(roomId, pollId string) (error, string) {
@@ -308,4 +235,46 @@ func (m *newPollsModel) UserSubmitResponse(r *UserSubmitResponseReq) error {
 	}, key)
 
 	return err
+}
+
+type userResponseWithTotal struct {
+	TotalRes       int    `redis:"total_resp"`
+	AllRespondents string `redis:"all_respondents"`
+}
+
+func (m *newPollsModel) getUserResponseWithTotal(roomId, userId, pollId string) (error, int, int) {
+	key := fmt.Sprintf("%s%s:respondents:%s", pollsKey, roomId, pollId)
+	result := new(userResponseWithTotal)
+	fields := []string{"total_resp", "all_respondents"}
+
+	err := m.rc.Watch(m.ctx, func(tx *redis.Tx) error {
+		v := tx.HMGet(m.ctx, key, fields...)
+		err := v.Scan(result)
+		return err
+	}, key)
+
+	if err != nil {
+		return err, 0, 0
+	}
+
+	if result.AllRespondents == "" {
+		return nil, result.TotalRes, 0
+	}
+
+	var respondents []string
+	err = json.Unmarshal([]byte(result.AllRespondents), &respondents)
+	if err != nil {
+		return err, result.TotalRes, 0
+	}
+
+	for _, rr := range respondents {
+		// format userId:option_id
+		p := strings.Split(rr, ":")
+		if p[0] == userId {
+			voted, _ := strconv.Atoi(p[1])
+			return nil, result.TotalRes, voted
+		}
+	}
+
+	return nil, result.TotalRes, 0
 }

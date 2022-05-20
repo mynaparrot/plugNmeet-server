@@ -100,7 +100,10 @@ func Router() *fiber.App {
 	// polls group
 	polls := api.Group("/polls")
 	polls.Post("/create", controllers.HandleCreatePoll)
-	polls.Get("/listPolls/:userId", controllers.HandleListPolls)
+	polls.Get("/listPolls", controllers.HandleListPolls)
+	polls.Get("/countTotalResponses/:pollId", controllers.HandleCountPollTotalResponses)
+	polls.Get("/userSelectedOption/:pollId/:userId", controllers.HandleUserSelectedOption)
+
 	polls.Get("/pollResponses/:pollId", controllers.HandlePollResponses)
 	polls.Post("/submitResponse", controllers.HandleUserSubmitResponse)
 
