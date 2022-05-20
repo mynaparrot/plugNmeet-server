@@ -100,6 +100,9 @@ func Router() *fiber.App {
 	// polls group
 	polls := api.Group("/polls")
 	polls.Post("/create", controllers.HandleCreatePoll)
+	polls.Get("/listPolls/:userId", controllers.HandleListPolls)
+	polls.Get("/pollResponses/:pollId", controllers.HandlePollResponses)
+	polls.Post("/submitResponse", controllers.HandleUserSubmitResponse)
 
 	// for resumable.js need both methods.
 	// https://github.com/23/resumable.js#how-do-i-set-it-up-with-my-server
