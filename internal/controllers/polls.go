@@ -218,7 +218,8 @@ func HandleUserSubmitResponse(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"status": true,
-		"msg":    "success",
+		"status":  true,
+		"msg":     "success",
+		"poll_id": req.PollId,
 	})
 }
