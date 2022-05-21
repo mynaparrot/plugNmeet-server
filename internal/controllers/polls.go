@@ -226,3 +226,51 @@ func HandleUserSubmitResponse(c *fiber.Ctx) error {
 		"poll_id": req.PollId,
 	})
 }
+
+func HandleClosePoll(c *fiber.Ctx) error {
+	roomId := c.Locals("roomId")
+	isAdmin := c.Locals("isAdmin")
+	requestedUserId := c.Locals("requestedUserId")
+
+	if !isAdmin.(bool) {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    "only admin can perform this task",
+		})
+	}
+
+	m := models.NewPollsModel()
+	req := new(models.ClosePollReq)
+
+	err := c.BodyParser(req)
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	check := config.AppCnf.DoValidateReq(req)
+	if len(check) > 0 {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    check,
+		})
+	}
+
+	req.RoomId = roomId.(string)
+	req.UserId = requestedUserId.(string)
+	err = m.ClosePoll(req, isAdmin.(bool))
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"status":  true,
+		"msg":     "success",
+		"poll_id": req.PollId,
+	})
+}

@@ -23,6 +23,7 @@ type PollInfo struct {
 	IsRunning bool                `json:"is_running"`
 	Created   int64               `json:"created"`
 	CreatedBy string              `json:"created_by"`
+	ClosedBy  string              `json:"closed_by"`
 }
 
 type newPollsModel struct {
@@ -339,6 +340,55 @@ func (m *newPollsModel) CleanUpPolls(roomId string) error {
 	if err != nil {
 		return err
 	}
+
+	return nil
+}
+
+type ClosePollReq struct {
+	RoomId string
+	UserId string
+	PollId string `json:"poll_id" validate:"required"`
+}
+
+func (m *newPollsModel) ClosePoll(r *ClosePollReq, isAdmin bool) error {
+	key := pollsKey + r.RoomId
+
+	err := m.rc.Watch(m.ctx, func(tx *redis.Tx) error {
+		g := tx.HGet(m.ctx, key, r.PollId)
+
+		result, err := g.Result()
+		if err != nil {
+			return err
+		}
+		if result == "" {
+			return errors.New("not found")
+		}
+
+		info := new(PollInfo)
+		err = json.Unmarshal([]byte(result), info)
+		if err != nil {
+			return err
+		}
+
+		info.IsRunning = false
+		marshal, err := json.Marshal(info)
+		if err != nil {
+			return err
+		}
+
+		pollVal := map[string]string{
+			r.PollId: string(marshal),
+		}
+		tx.HMSet(m.ctx, key, pollVal)
+
+		return nil
+	}, key)
+
+	if err != nil {
+		return err
+	}
+
+	_ = m.broadcastNotification(r.RoomId, r.UserId, r.PollId, "POLL_CLOSED", isAdmin)
 
 	return nil
 }

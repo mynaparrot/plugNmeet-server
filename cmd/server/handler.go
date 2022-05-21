@@ -106,6 +106,7 @@ func Router() *fiber.App {
 
 	polls.Get("/pollResponses/:pollId", controllers.HandlePollResponses)
 	polls.Post("/submitResponse", controllers.HandleUserSubmitResponse)
+	polls.Post("/closePoll", controllers.HandleClosePoll)
 
 	// for resumable.js need both methods.
 	// https://github.com/23/resumable.js#how-do-i-set-it-up-with-my-server
