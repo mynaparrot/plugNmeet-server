@@ -190,6 +190,7 @@ type UserSubmitResponseReq struct {
 	RoomId         string
 	PollId         string `json:"poll_id" validate:"required"`
 	UserId         string `json:"user_id" validate:"required"`
+	Name           string `json:"name" validate:"required"`
 	SelectedOption int    `json:"selected_option" validate:"required"`
 }
 
@@ -214,14 +215,15 @@ func (m *newPollsModel) UserSubmitResponse(r *UserSubmitResponseReq, isAdmin boo
 
 		if len(respondents) > 0 {
 			for i := 0; i < len(respondents); i++ {
-				if strings.Contains(respondents[i], r.UserId) {
+				p := strings.Split(respondents[i], ":")
+				if p[0] == r.UserId {
 					return errors.New("user already voted")
 				}
 			}
 		}
 
-		// format userId:option_id
-		respondents = append(respondents, fmt.Sprintf("%s:%d", r.UserId, r.SelectedOption))
+		// format userId:option_id:name
+		respondents = append(respondents, fmt.Sprintf("%s:%d:%s", r.UserId, r.SelectedOption, r.Name))
 		marshal, err := json.Marshal(respondents)
 		if err != nil {
 			return err
@@ -278,7 +280,7 @@ func (m *newPollsModel) getUserResponseWithTotal(roomId, userId, pollId string) 
 	}
 
 	for _, rr := range respondents {
-		// format userId:option_id
+		// format userId:option_id:name
 		p := strings.Split(rr, ":")
 		if p[0] == userId {
 			voted, _ := strconv.Atoi(p[1])
