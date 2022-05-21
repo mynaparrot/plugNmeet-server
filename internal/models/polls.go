@@ -16,13 +16,13 @@ import (
 const pollsKey = "pnm:polls:"
 
 type PollInfo struct {
-	Id          string              `json:"id"`
-	RoomId      string              `json:"roomId"`
-	Question    string              `json:"question"`
-	Options     []CreatePollOptions `json:"options"`
-	IsPublished bool                `json:"is_published"`
-	Created     int64               `json:"created"`
-	CreatedBy   string              `json:"created_by"`
+	Id        string              `json:"id"`
+	RoomId    string              `json:"roomId"`
+	Question  string              `json:"question"`
+	Options   []CreatePollOptions `json:"options"`
+	IsRunning bool                `json:"is_running"`
+	Created   int64               `json:"created"`
+	CreatedBy string              `json:"created_by"`
 }
 
 type newPollsModel struct {
@@ -73,13 +73,13 @@ func (m *newPollsModel) CreatePoll(r *CreatePollReq, isAdmin bool) error {
 // addPollToRoom will insert poll to room hash
 func (m *newPollsModel) addPollToRoom(r *CreatePollReq) error {
 	p := PollInfo{
-		Id:          r.PollId,
-		RoomId:      r.RoomId,
-		Question:    r.Question,
-		Options:     r.Options,
-		IsPublished: false,
-		Created:     time.Now().Unix(),
-		CreatedBy:   r.UserId,
+		Id:        r.PollId,
+		RoomId:    r.RoomId,
+		Question:  r.Question,
+		Options:   r.Options,
+		IsRunning: true,
+		Created:   time.Now().Unix(),
+		CreatedBy: r.UserId,
 	}
 
 	marshal, err := json.Marshal(p)
