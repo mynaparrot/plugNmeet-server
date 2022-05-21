@@ -69,7 +69,9 @@ func (w *websocketService) handleSystemMessages() {
 		w.handleUserVisibility()
 	case "EXTERNAL_MEDIA_PLAYER_EVENTS":
 		w.handleExternalMediaPlayerEvents()
-	case "POLL_CREATED", "NEW_POLL_RESPONSE":
+	case "POLL_CREATED",
+		"NEW_POLL_RESPONSE",
+		"POLL_CLOSED":
 		w.handlePollsNotifications()
 	}
 }
