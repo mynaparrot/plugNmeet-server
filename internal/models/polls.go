@@ -168,7 +168,7 @@ func (m *newPollsModel) GetPollResponsesByField(roomId, pollId, field string) (e
 	return err, result
 }
 
-func (m *newPollsModel) GetPollResponses(roomId, pollId string) (error, string) {
+func (m *newPollsModel) GetPollResponses(roomId, pollId string) (error, map[string]string) {
 	key := fmt.Sprintf("%s%s:respondents:%s", pollsKey, roomId, pollId)
 	var result map[string]string
 
@@ -180,15 +180,10 @@ func (m *newPollsModel) GetPollResponses(roomId, pollId string) (error, string) 
 	}, key)
 
 	if len(result) < 0 {
-		return nil, ""
+		return nil, nil
 	}
 
-	marshal, err := json.Marshal(result)
-	if err != nil {
-		return err, ""
-	}
-
-	return err, string(marshal)
+	return err, result
 }
 
 type UserSubmitResponseReq struct {
