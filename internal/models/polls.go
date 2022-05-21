@@ -38,6 +38,7 @@ func NewPollsModel() *newPollsModel {
 
 type CreatePollReq struct {
 	RoomId   string
+	UserId   string
 	PollId   string
 	Question string              `json:"question" validate:"required"`
 	Options  []CreatePollOptions `json:"options" validate:"required"`
@@ -48,7 +49,7 @@ type CreatePollOptions struct {
 	Text string `json:"text" validate:"required"`
 }
 
-func (m *newPollsModel) CreatePoll(r *CreatePollReq) error {
+func (m *newPollsModel) CreatePoll(r *CreatePollReq, isAdmin bool) error {
 	r.PollId = uuid.NewString()
 
 	// first add to room
@@ -59,7 +60,13 @@ func (m *newPollsModel) CreatePoll(r *CreatePollReq) error {
 
 	// now create empty respondent hash
 	err = m.createRespondentHash(r)
-	return err
+	if err != nil {
+		return err
+	}
+
+	_ = m.broadcastNotification(r.RoomId, r.UserId, r.PollId, "POLL_CREATED", isAdmin)
+
+	return nil
 }
 
 // addPollToRoom will insert poll to room hash
@@ -189,7 +196,7 @@ type UserSubmitResponseReq struct {
 	SelectedOption int    `json:"selected_option" validate:"required"`
 }
 
-func (m *newPollsModel) UserSubmitResponse(r *UserSubmitResponseReq) error {
+func (m *newPollsModel) UserSubmitResponse(r *UserSubmitResponseReq, isAdmin bool) error {
 	key := fmt.Sprintf("%s%s:respondents:%s", pollsKey, r.RoomId, r.PollId)
 
 	err := m.rc.Watch(m.ctx, func(tx *redis.Tx) error {
@@ -234,7 +241,13 @@ func (m *newPollsModel) UserSubmitResponse(r *UserSubmitResponseReq) error {
 		return err
 	}, key)
 
-	return err
+	if err != nil {
+		return err
+	}
+
+	_ = m.broadcastNotification(r.RoomId, r.UserId, r.PollId, "NEW_POLL_RESPONSE", isAdmin)
+
+	return nil
 }
 
 type userResponseWithTotal struct {
@@ -277,4 +290,33 @@ func (m *newPollsModel) getUserResponseWithTotal(roomId, userId, pollId string) 
 	}
 
 	return nil, result.TotalRes, 0
+}
+
+func (m *newPollsModel) broadcastNotification(roomId, userId, pollId, mType string, isAdmin bool) error {
+	payload := DataMessageRes{
+		Type:   "SYSTEM",
+		RoomId: roomId,
+		Body: DataMessageBody{
+			Type: mType,
+			From: ReqFrom{
+				UserId: userId,
+			},
+			Msg: pollId,
+		},
+	}
+
+	msg := WebsocketRedisMsg{
+		Type:    "sendMsg",
+		Payload: &payload,
+		RoomId:  roomId,
+		IsAdmin: isAdmin,
+	}
+
+	marshal, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+
+	m.rc.Publish(m.ctx, "plug-n-meet-websocket", marshal)
+	return nil
 }

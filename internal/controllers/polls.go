@@ -11,6 +11,7 @@ import (
 func HandleCreatePoll(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	isAdmin := c.Locals("isAdmin")
+	requestedUserId := c.Locals("requestedUserId")
 
 	if !isAdmin.(bool) {
 		return c.JSON(fiber.Map{
@@ -39,7 +40,8 @@ func HandleCreatePoll(c *fiber.Ctx) error {
 	}
 
 	req.RoomId = roomId.(string)
-	err = m.CreatePoll(req)
+	req.UserId = requestedUserId.(string)
+	err = m.CreatePoll(req, isAdmin.(bool))
 	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
@@ -189,6 +191,7 @@ func HandlePollResponses(c *fiber.Ctx) error {
 
 func HandleUserSubmitResponse(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
+	isAdmin := c.Locals("isAdmin")
 	m := models.NewPollsModel()
 	req := new(models.UserSubmitResponseReq)
 
@@ -209,7 +212,7 @@ func HandleUserSubmitResponse(c *fiber.Ctx) error {
 	}
 
 	req.RoomId = roomId.(string)
-	err = m.UserSubmitResponse(req)
+	err = m.UserSubmitResponse(req, isAdmin.(bool))
 	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
