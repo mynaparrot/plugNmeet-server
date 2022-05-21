@@ -320,3 +320,26 @@ func (m *newPollsModel) broadcastNotification(roomId, userId, pollId, mType stri
 	m.rc.Publish(m.ctx, "plug-n-meet-websocket", marshal)
 	return nil
 }
+
+func (m *newPollsModel) CleanUpPolls(roomId string) error {
+	err, polls := m.ListPolls(roomId)
+	if err != nil {
+		return err
+	}
+	pp := m.rc.Pipeline()
+
+	for _, p := range polls {
+		key := fmt.Sprintf("%s%s:respondents:%s", pollsKey, roomId, p.Id)
+		pp.Del(m.ctx, key)
+	}
+
+	roomKey := pollsKey + roomId
+	pp.Del(m.ctx, roomKey)
+
+	_, err = pp.Exec(m.ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

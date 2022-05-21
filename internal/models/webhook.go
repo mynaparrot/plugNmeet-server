@@ -112,6 +112,10 @@ func (w *webhookEvent) roomFinished() int64 {
 	// clear users block list
 	_, _ = w.roomService.DeleteRoomBlockList(event.Room.Name)
 
+	// clean polls
+	pm := NewPollsModel()
+	_ = pm.CleanUpPolls(event.Room.Name)
+
 	return affected
 }
 
