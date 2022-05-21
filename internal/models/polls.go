@@ -22,6 +22,7 @@ type PollInfo struct {
 	Options     []CreatePollOptions `json:"options"`
 	IsPublished bool                `json:"is_published"`
 	Created     int64               `json:"created"`
+	CreatedBy   string              `json:"created_by"`
 }
 
 type newPollsModel struct {
@@ -78,6 +79,7 @@ func (m *newPollsModel) addPollToRoom(r *CreatePollReq) error {
 		Options:     r.Options,
 		IsPublished: false,
 		Created:     time.Now().Unix(),
+		CreatedBy:   r.UserId,
 	}
 
 	marshal, err := json.Marshal(p)
