@@ -51,24 +51,24 @@ type CreatePollOptions struct {
 	Text string `json:"text" validate:"required"`
 }
 
-func (m *newPollsModel) CreatePoll(r *CreatePollReq, isAdmin bool) error {
+func (m *newPollsModel) CreatePoll(r *CreatePollReq, isAdmin bool) (error, string) {
 	r.PollId = uuid.NewString()
 
 	// first add to room
 	err := m.addPollToRoom(r)
 	if err != nil {
-		return err
+		return err, ""
 	}
 
 	// now create empty respondent hash
 	err = m.createRespondentHash(r)
 	if err != nil {
-		return err
+		return err, ""
 	}
 
 	_ = m.broadcastNotification(r.RoomId, r.UserId, r.PollId, "POLL_CREATED", isAdmin)
 
-	return nil
+	return nil, r.PollId
 }
 
 // addPollToRoom will insert poll to room hash
@@ -92,14 +92,9 @@ func (m *newPollsModel) addPollToRoom(r *CreatePollReq) error {
 		r.PollId: string(marshal),
 	}
 
-	err = m.rc.Watch(m.ctx, func(tx *redis.Tx) error {
-		pp := tx.Pipeline()
-
-		pp.HSet(m.ctx, pollsKey+r.RoomId, pollVal)
-		_, err = pp.Exec(m.ctx)
-
-		return err
-	}, pollsKey+r.RoomId)
+	pp := m.rc.Pipeline()
+	pp.HSet(m.ctx, pollsKey+r.RoomId, pollVal)
+	_, err = pp.Exec(m.ctx)
 
 	return err
 }
@@ -125,14 +120,6 @@ func (m *newPollsModel) createRespondentHash(r *CreatePollReq) error {
 	return err
 }
 
-type ListPoll struct {
-	Id             string `json:"id"`
-	Question       string `json:"question"`
-	IsPublished    bool   `json:"is_published"`
-	TotalResponses int    `json:"total_responses"`
-	Voted          int    `json:"voted"`
-}
-
 func (m *newPollsModel) ListPolls(roomId string) (error, []*PollInfo) {
 	var polls []*PollInfo
 
@@ -147,9 +134,9 @@ func (m *newPollsModel) ListPolls(roomId string) (error, []*PollInfo) {
 		return nil, polls
 	}
 
-	for _, p := range result {
+	for _, pi := range result {
 		info := new(PollInfo)
-		err = json.Unmarshal([]byte(p), info)
+		err = json.Unmarshal([]byte(pi), info)
 		if err != nil {
 			continue
 		}
@@ -167,6 +154,37 @@ func (m *newPollsModel) GetPollResponsesByField(roomId, pollId, field string) (e
 	result, err := v.Result()
 
 	return err, result
+}
+
+func (m *newPollsModel) UserSelectedOption(roomId, pollId, userId string) (error, int) {
+	err, allRespondents := m.GetPollResponsesByField(roomId, pollId, "all_respondents")
+	if err != nil {
+		return err, 0
+	}
+
+	if allRespondents == "" {
+		return err, 0
+	}
+
+	var respondents []string
+	err = json.Unmarshal([]byte(allRespondents), &respondents)
+	if err != nil {
+		return err, 0
+	}
+
+	for i := 0; i < len(respondents); i++ {
+		// format userId:option_id:name
+		p := strings.Split(respondents[i], ":")
+		if p[0] == userId {
+			voted, err := strconv.Atoi(p[1])
+			if err != nil {
+				return err, 0
+			}
+			return err, voted
+		}
+	}
+
+	return nil, 0
 }
 
 func (m *newPollsModel) GetPollResponses(roomId, pollId string) (error, map[string]string) {
@@ -195,11 +213,16 @@ type UserSubmitResponseReq struct {
 	SelectedOption int    `json:"selected_option" validate:"required"`
 }
 
+type userResponseCommonFields struct {
+	TotalRes       int    `redis:"total_resp"`
+	AllRespondents string `redis:"all_respondents"`
+}
+
 func (m *newPollsModel) UserSubmitResponse(r *UserSubmitResponseReq, isAdmin bool) error {
 	key := fmt.Sprintf("%s%s:respondents:%s", pollsKey, r.RoomId, r.PollId)
 
 	err := m.rc.Watch(m.ctx, func(tx *redis.Tx) error {
-		d := new(userResponseWithTotal)
+		d := new(userResponseCommonFields)
 		v := tx.HMGet(m.ctx, key, "all_respondents")
 		err := v.Scan(d)
 		if err != nil {
@@ -216,6 +239,7 @@ func (m *newPollsModel) UserSubmitResponse(r *UserSubmitResponseReq, isAdmin boo
 
 		if len(respondents) > 0 {
 			for i := 0; i < len(respondents); i++ {
+				// format userId:option_id:name
 				p := strings.Split(respondents[i], ":")
 				if p[0] == r.UserId {
 					return errors.New("user already voted")
@@ -250,48 +274,6 @@ func (m *newPollsModel) UserSubmitResponse(r *UserSubmitResponseReq, isAdmin boo
 	return nil
 }
 
-type userResponseWithTotal struct {
-	TotalRes       int    `redis:"total_resp"`
-	AllRespondents string `redis:"all_respondents"`
-}
-
-func (m *newPollsModel) getUserResponseWithTotal(roomId, userId, pollId string) (error, int, int) {
-	key := fmt.Sprintf("%s%s:respondents:%s", pollsKey, roomId, pollId)
-	result := new(userResponseWithTotal)
-	fields := []string{"total_resp", "all_respondents"}
-
-	err := m.rc.Watch(m.ctx, func(tx *redis.Tx) error {
-		v := tx.HMGet(m.ctx, key, fields...)
-		err := v.Scan(result)
-		return err
-	}, key)
-
-	if err != nil {
-		return err, 0, 0
-	}
-
-	if result.AllRespondents == "" {
-		return nil, result.TotalRes, 0
-	}
-
-	var respondents []string
-	err = json.Unmarshal([]byte(result.AllRespondents), &respondents)
-	if err != nil {
-		return err, result.TotalRes, 0
-	}
-
-	for _, rr := range respondents {
-		// format userId:option_id:name
-		p := strings.Split(rr, ":")
-		if p[0] == userId {
-			voted, _ := strconv.Atoi(p[1])
-			return nil, result.TotalRes, voted
-		}
-	}
-
-	return nil, result.TotalRes, 0
-}
-
 func (m *newPollsModel) broadcastNotification(roomId, userId, pollId, mType string, isAdmin bool) error {
 	payload := DataMessageRes{
 		Type:   "SYSTEM",
@@ -318,29 +300,6 @@ func (m *newPollsModel) broadcastNotification(roomId, userId, pollId, mType stri
 	}
 
 	m.rc.Publish(m.ctx, "plug-n-meet-websocket", marshal)
-	return nil
-}
-
-func (m *newPollsModel) CleanUpPolls(roomId string) error {
-	err, polls := m.ListPolls(roomId)
-	if err != nil {
-		return err
-	}
-	pp := m.rc.Pipeline()
-
-	for _, p := range polls {
-		key := fmt.Sprintf("%s%s:respondents:%s", pollsKey, roomId, p.Id)
-		pp.Del(m.ctx, key)
-	}
-
-	roomKey := pollsKey + roomId
-	pp.Del(m.ctx, roomKey)
-
-	_, err = pp.Exec(m.ctx)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -371,6 +330,7 @@ func (m *newPollsModel) ClosePoll(r *ClosePollReq, isAdmin bool) error {
 		}
 
 		info.IsRunning = false
+		info.ClosedBy = r.UserId
 		marshal, err := json.Marshal(info)
 		if err != nil {
 			return err
@@ -389,6 +349,29 @@ func (m *newPollsModel) ClosePoll(r *ClosePollReq, isAdmin bool) error {
 	}
 
 	_ = m.broadcastNotification(r.RoomId, r.UserId, r.PollId, "POLL_CLOSED", isAdmin)
+
+	return nil
+}
+
+func (m *newPollsModel) CleanUpPolls(roomId string) error {
+	err, polls := m.ListPolls(roomId)
+	if err != nil {
+		return err
+	}
+	pp := m.rc.Pipeline()
+
+	for _, p := range polls {
+		key := fmt.Sprintf("%s%s:respondents:%s", pollsKey, roomId, p.Id)
+		pp.Del(m.ctx, key)
+	}
+
+	roomKey := pollsKey + roomId
+	pp.Del(m.ctx, roomKey)
+
+	_, err = pp.Exec(m.ctx)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

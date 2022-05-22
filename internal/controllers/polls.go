@@ -1,11 +1,9 @@
 package controllers
 
 import (
-	"encoding/json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugNmeet/internal/config"
 	"github.com/mynaparrot/plugNmeet/internal/models"
-	"strings"
 )
 
 func HandleCreatePoll(c *fiber.Ctx) error {
@@ -41,7 +39,7 @@ func HandleCreatePoll(c *fiber.Ctx) error {
 
 	req.RoomId = roomId.(string)
 	req.UserId = requestedUserId.(string)
-	err = m.CreatePoll(req, isAdmin.(bool))
+	err, pollId := m.CreatePoll(req, isAdmin.(bool))
 	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
@@ -50,8 +48,9 @@ func HandleCreatePoll(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"status": true,
-		"msg":    "success",
+		"status":  true,
+		"msg":     "success",
+		"poll_id": pollId,
 	})
 }
 
@@ -116,16 +115,8 @@ func HandleUserSelectedOption(c *fiber.Ctx) error {
 	}
 
 	m := models.NewPollsModel()
-	err, allRespondents := m.GetPollResponsesByField(roomId.(string), pollId, "all_respondents")
-
+	err, voted := m.UserSelectedOption(roomId.(string), pollId, userId)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
-	}
-
-	if allRespondents == "" {
 		return c.JSON(fiber.Map{
 			"status":  true,
 			"msg":     "success",
@@ -134,29 +125,11 @@ func HandleUserSelectedOption(c *fiber.Ctx) error {
 		})
 	}
 
-	var respondents []string
-	err = json.Unmarshal([]byte(allRespondents), &respondents)
-	if err != nil {
-		return err
-	}
-
-	for i := 0; i < len(respondents); i++ {
-		p := strings.Split(respondents[i], ":")
-		if p[0] == userId {
-			return c.JSON(fiber.Map{
-				"status":  true,
-				"msg":     "success",
-				"poll_id": pollId,
-				"voted":   p[1],
-			})
-		}
-	}
-
 	return c.JSON(fiber.Map{
 		"status":  true,
 		"msg":     "success",
 		"poll_id": pollId,
-		"voted":   0,
+		"voted":   voted,
 	})
 }
 
