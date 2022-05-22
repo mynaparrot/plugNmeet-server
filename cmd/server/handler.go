@@ -104,7 +104,9 @@ func Router() *fiber.App {
 	polls.Get("/countTotalResponses/:pollId", controllers.HandleCountPollTotalResponses)
 	polls.Get("/userSelectedOption/:pollId/:userId", controllers.HandleUserSelectedOption)
 
-	polls.Get("/pollResponses/:pollId", controllers.HandlePollResponses)
+	polls.Get("/pollResponsesDetails/:pollId", controllers.HandleGetPollResponsesDetails)
+	polls.Get("/pollResponsesResult/:pollId", controllers.HandleGetResponsesResult)
+
 	polls.Post("/submitResponse", controllers.HandleUserSubmitResponse)
 	polls.Post("/closePoll", controllers.HandleClosePoll)
 

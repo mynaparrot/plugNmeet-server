@@ -187,24 +187,6 @@ func (m *newPollsModel) UserSelectedOption(roomId, pollId, userId string) (error
 	return nil, 0
 }
 
-func (m *newPollsModel) GetPollResponses(roomId, pollId string) (error, map[string]string) {
-	key := fmt.Sprintf("%s%s:respondents:%s", pollsKey, roomId, pollId)
-	var result map[string]string
-
-	err := m.rc.Watch(m.ctx, func(tx *redis.Tx) error {
-		v := tx.HGetAll(m.ctx, key)
-		r, err := v.Result()
-		result = r
-		return err
-	}, key)
-
-	if len(result) < 0 {
-		return nil, nil
-	}
-
-	return err, result
-}
-
 type UserSubmitResponseReq struct {
 	RoomId         string
 	PollId         string `json:"poll_id" validate:"required"`
@@ -374,4 +356,79 @@ func (m *newPollsModel) CleanUpPolls(roomId string) error {
 	}
 
 	return nil
+}
+
+func (m *newPollsModel) GetPollResponsesDetails(roomId, pollId string) (error, map[string]string) {
+	key := fmt.Sprintf("%s%s:respondents:%s", pollsKey, roomId, pollId)
+	var result map[string]string
+
+	err := m.rc.Watch(m.ctx, func(tx *redis.Tx) error {
+		v := tx.HGetAll(m.ctx, key)
+		r, err := v.Result()
+		result = r
+		return err
+	}, key)
+
+	if len(result) < 0 {
+		return nil, nil
+	}
+
+	return err, result
+}
+
+type ResponsesResultRes struct {
+	Question       string                   `json:"question"`
+	TotalResponses int                      `json:"total_responses"`
+	Options        []ResponsesResultOptions `json:"options"`
+}
+
+type ResponsesResultOptions struct {
+	Id        int    `json:"id"`
+	Text      string `json:"text"`
+	VoteCount int    `json:"vote_count"`
+}
+
+func (m *newPollsModel) GetResponsesResult(roomId, pollId string) (*ResponsesResultRes, error) {
+	res := new(ResponsesResultRes)
+
+	p := m.rc.HGet(m.ctx, pollsKey+roomId, pollId)
+	pi, err := p.Result()
+	if err != nil {
+		return nil, err
+	}
+
+	info := new(PollInfo)
+	err = json.Unmarshal([]byte(pi), info)
+	if err != nil {
+		return nil, err
+	}
+	if info.IsRunning {
+		return nil, errors.New("need to wait until poll close")
+	}
+	res.Question = info.Question
+
+	key := fmt.Sprintf("%s%s:respondents:%s", pollsKey, roomId, pollId)
+	c := m.rc.HGetAll(m.ctx, key)
+	result, err := c.Result()
+	if err != nil {
+		return nil, err
+	}
+
+	var options []ResponsesResultOptions
+	for _, opt := range info.Options {
+		f := fmt.Sprintf("%d_count", opt.Id)
+		i, _ := strconv.Atoi(result[f])
+		rr := ResponsesResultOptions{
+			Id:        opt.Id,
+			Text:      opt.Text,
+			VoteCount: i,
+		}
+		options = append(options, rr)
+	}
+
+	res.Options = options
+	i, _ := strconv.Atoi(result["total_resp"])
+	res.TotalResponses = i
+
+	return res, nil
 }

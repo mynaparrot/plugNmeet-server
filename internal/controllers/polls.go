@@ -133,35 +133,6 @@ func HandleUserSelectedOption(c *fiber.Ctx) error {
 	})
 }
 
-func HandlePollResponses(c *fiber.Ctx) error {
-	roomId := c.Locals("roomId")
-	pollId := c.Params("pollId")
-
-	if pollId == "" {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "pollId required",
-		})
-	}
-
-	m := models.NewPollsModel()
-	err, responses := m.GetPollResponses(roomId.(string), pollId)
-
-	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
-	}
-
-	return c.JSON(fiber.Map{
-		"status":    true,
-		"msg":       "success",
-		"poll_id":   pollId,
-		"responses": responses,
-	})
-}
-
 func HandleUserSubmitResponse(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	isAdmin := c.Locals("isAdmin")
@@ -245,5 +216,63 @@ func HandleClosePoll(c *fiber.Ctx) error {
 		"status":  true,
 		"msg":     "success",
 		"poll_id": req.PollId,
+	})
+}
+
+func HandleGetPollResponsesDetails(c *fiber.Ctx) error {
+	roomId := c.Locals("roomId")
+	pollId := c.Params("pollId")
+	isAdmin := c.Locals("isAdmin")
+
+	if !isAdmin.(bool) {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    "only admin can perform this task",
+		})
+	}
+
+	if pollId == "" {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    "pollId required",
+		})
+	}
+
+	m := models.NewPollsModel()
+	err, responses := m.GetPollResponsesDetails(roomId.(string), pollId)
+
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"status":    true,
+		"msg":       "success",
+		"poll_id":   pollId,
+		"responses": responses,
+	})
+}
+
+func HandleGetResponsesResult(c *fiber.Ctx) error {
+	roomId := c.Locals("roomId")
+	pollId := c.Params("pollId")
+
+	m := models.NewPollsModel()
+	result, err := m.GetResponsesResult(roomId.(string), pollId)
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"status":  true,
+		"msg":     "success",
+		"poll_id": pollId,
+		"result":  result,
 	})
 }
