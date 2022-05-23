@@ -432,3 +432,38 @@ func (m *newPollsModel) GetResponsesResult(roomId, pollId string) (*ResponsesRes
 
 	return res, nil
 }
+
+type PollsStatsRes struct {
+	TotalPolls   int `json:"total_polls"`
+	TotalRunning int `json:"total_running"`
+}
+
+func (m *newPollsModel) GetPollsStats(roomId string) (*PollsStatsRes, error) {
+	res := new(PollsStatsRes)
+
+	p := m.rc.HGetAll(m.ctx, pollsKey+roomId)
+	result, err := p.Result()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(result) == 0 {
+		// no polls
+		return res, nil
+	}
+	res.TotalPolls = len(result)
+
+	for _, pi := range result {
+		info := new(PollInfo)
+		err = json.Unmarshal([]byte(pi), info)
+		if err != nil {
+			continue
+		}
+
+		if info.IsRunning {
+			res.TotalRunning += 1
+		}
+	}
+
+	return res, nil
+}

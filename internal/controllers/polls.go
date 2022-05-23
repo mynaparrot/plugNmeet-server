@@ -276,3 +276,22 @@ func HandleGetResponsesResult(c *fiber.Ctx) error {
 		"result":  result,
 	})
 }
+
+func HandleGetPollsStats(c *fiber.Ctx) error {
+	roomId := c.Locals("roomId")
+
+	m := models.NewPollsModel()
+	stats, err := m.GetPollsStats(roomId.(string))
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"status": true,
+		"msg":    "success",
+		"stats":  stats,
+	})
+}
