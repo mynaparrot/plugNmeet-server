@@ -58,6 +58,7 @@ func startServer(c *cli.Context) error {
 
 	// we'll subscribe to redis channels now
 	go controllers.SubscribeToWebsocketChannel()
+	go controllers.StartScheduler()
 
 	router := Router()
 

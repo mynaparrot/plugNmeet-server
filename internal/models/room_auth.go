@@ -20,6 +20,7 @@ type RoomMetadata struct {
 	IsRecording         bool               `json:"is_recording"`
 	IsActiveRTMP        bool               `json:"is_active_rtmp"`
 	WebhookUrl          string             `json:"webhook_url"`
+	StartedAt           int64              `json:"started_at"`
 	Features            RoomCreateFeatures `json:"room_features"`
 	DefaultLockSettings LockSettings       `json:"default_lock_settings"`
 }
@@ -33,6 +34,7 @@ type RoomCreateFeatures struct {
 	AllowViewOtherWebcams       bool                        `json:"allow_view_other_webcams"`
 	AllowViewOtherParticipants  bool                        `json:"allow_view_other_users_list"`
 	AdminOnlyWebcams            bool                        `json:"admin_only_webcams"`
+	RoomDuration                int64                       `json:"room_duration"`
 	ChatFeatures                ChatFeatures                `json:"chat_features"`
 	SharedNotePadFeatures       SharedNotePadFeatures       `json:"shared_note_pad_features"`
 	WhiteboardFeatures          WhiteboardFeatures          `json:"whiteboard_features"`
@@ -158,6 +160,7 @@ func (am *roomAuthModel) CreateRoom(r *RoomCreateReq) (bool, string, *livekit.Ro
 		r.RoomMetadata.DefaultLockSettings.LockSharedNotepad = lock
 	}
 
+	r.RoomMetadata.StartedAt = time.Now().Unix()
 	meta, err := json.Marshal(r.RoomMetadata)
 	if err != nil {
 		return false, "Error: " + err.Error(), nil
