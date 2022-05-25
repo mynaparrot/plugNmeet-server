@@ -34,6 +34,7 @@ type RoomCreateFeatures struct {
 	AllowViewOtherWebcams       bool                        `json:"allow_view_other_webcams"`
 	AllowViewOtherParticipants  bool                        `json:"allow_view_other_users_list"`
 	AdminOnlyWebcams            bool                        `json:"admin_only_webcams"`
+	AllowPolls                  bool                        `json:"allow_polls"`
 	RoomDuration                int64                       `json:"room_duration"`
 	ChatFeatures                ChatFeatures                `json:"chat_features"`
 	SharedNotePadFeatures       SharedNotePadFeatures       `json:"shared_note_pad_features"`
