@@ -87,10 +87,29 @@ func Router() *fiber.App {
 	api.Post("/switchPresenter", controllers.HandleSwitchPresenter)
 
 	// etherpad group
-	etherpad := api.Group("/etherpad", controllers.HandleVerifyHeaderToken)
+	etherpad := api.Group("/etherpad")
 	etherpad.Post("/create", controllers.HandleCreateEtherpad)
 	etherpad.Post("/cleanPad", controllers.HandleCleanPad)
 	etherpad.Post("/changeStatus", controllers.HandleChangeEtherpadStatus)
+
+	// waiting room group
+	waitingRoom := api.Group("/waitingRoom")
+	waitingRoom.Post("/approveUsers", controllers.HandleApproveUsers)
+	waitingRoom.Post("/updateMsg", controllers.HandleUpdateWaitingRoomMessage)
+
+	// polls group
+	polls := api.Group("/polls")
+	polls.Post("/create", controllers.HandleCreatePoll)
+	polls.Get("/listPolls", controllers.HandleListPolls)
+	polls.Get("/pollsStats", controllers.HandleGetPollsStats)
+
+	polls.Get("/countTotalResponses/:pollId", controllers.HandleCountPollTotalResponses)
+	polls.Get("/userSelectedOption/:pollId/:userId", controllers.HandleUserSelectedOption)
+	polls.Get("/pollResponsesDetails/:pollId", controllers.HandleGetPollResponsesDetails)
+	polls.Get("/pollResponsesResult/:pollId", controllers.HandleGetResponsesResult)
+
+	polls.Post("/submitResponse", controllers.HandleUserSubmitResponse)
+	polls.Post("/closePoll", controllers.HandleClosePoll)
 
 	// for resumable.js need both methods.
 	// https://github.com/23/resumable.js#how-do-i-set-it-up-with-my-server

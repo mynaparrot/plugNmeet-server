@@ -21,11 +21,12 @@ type UserInfo struct {
 }
 
 type UserMetadata struct {
-	ProfilePic   string       `json:"profile_pic"`
-	IsAdmin      bool         `json:"is_admin"`
-	IsPresenter  bool         `json:"is_presenter"`
-	RaisedHand   bool         `json:"raised_hand"`
-	LockSettings LockSettings `json:"lock_settings"`
+	ProfilePic      string       `json:"profile_pic"`
+	IsAdmin         bool         `json:"is_admin"`
+	IsPresenter     bool         `json:"is_presenter"`
+	RaisedHand      bool         `json:"raised_hand"`
+	WaitForApproval bool         `json:"wait_for_approval"`
+	LockSettings    LockSettings `json:"lock_settings"`
 }
 
 type LockSettings struct {
@@ -52,8 +53,7 @@ func NewAuthTokenModel() *authTokenModel {
 }
 
 func (a *authTokenModel) DoGenerateToken(g *GenTokenReq) (string, error) {
-	l := a.assignLockSettings(g)
-	g.UserInfo.UserMetadata.LockSettings = *l
+	a.assignLockSettings(g)
 
 	if g.UserInfo.IsAdmin {
 		a.makePresenter(g)
@@ -102,13 +102,14 @@ func (a *authTokenModel) GenerateLivekitToken(claims *auth.ClaimGrants) (string,
 	return at.ToJWT()
 }
 
-func (a *authTokenModel) assignLockSettings(g *GenTokenReq) *LockSettings {
+func (a *authTokenModel) assignLockSettings(g *GenTokenReq) {
 	l := new(LockSettings)
 	ul := g.UserInfo.UserMetadata.LockSettings
 
 	if g.UserInfo.IsAdmin {
 		// we'll keep this for future usage
 		g.UserInfo.UserMetadata.IsAdmin = true
+		g.UserInfo.UserMetadata.WaitForApproval = false
 		lock := new(bool)
 
 		// for admin user don't need to service anything
@@ -123,7 +124,7 @@ func (a *authTokenModel) assignLockSettings(g *GenTokenReq) *LockSettings {
 	} else {
 		roomInfo, err := a.rs.LoadRoomInfoFromRedis(g.RoomId)
 		if err != nil {
-			return l
+			g.UserInfo.UserMetadata.LockSettings = *l
 		}
 
 		meta := make([]byte, len(roomInfo.Metadata))
@@ -159,9 +160,14 @@ func (a *authTokenModel) assignLockSettings(g *GenTokenReq) *LockSettings {
 		if ul.LockSharedNotepad == nil && dl.LockSharedNotepad != nil {
 			l.LockSharedNotepad = dl.LockSharedNotepad
 		}
+
+		// if waiting room feature active then we won't allow direct access
+		if m.Features.WaitingRoomFeatures.IsActive {
+			g.UserInfo.UserMetadata.WaitForApproval = true
+		}
 	}
 
-	return l
+	g.UserInfo.UserMetadata.LockSettings = *l
 }
 
 func (a *authTokenModel) makePresenter(g *GenTokenReq) {

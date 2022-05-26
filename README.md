@@ -15,11 +15,11 @@ infrastructure [livekit](https://github.com/livekit/livekit-server).
    connection is slow! Supported video codecs: `H264`, `VP8`, `VP9` and `AV1`.
 5) Easy integration with any existing website or system.
 6) Easy customization with functionality, URL, logo, and branding colors.
-7) HD audio, video call and Screen sharing.
-8) **Shared notepad** and **Whiteboard** for live collaboration.
-9) Can upload & share various office file (pdf, docx, pptx, xlsx, txt etc.) in whiteboard directly.
-10) **Virtual background** for webcams.
-11) Lock settings.
+7) HD audio, video call and Screen sharing. **Virtual background** for webcams.
+8) **Shared notepad** and **Whiteboard** for live collaboration. Can upload, draw & share various office file (pdf, docx, pptx, xlsx, txt etc.) in whiteboard directly.
+9) Easy to use **Polls** & voting.
+10) Customizable **waiting room**.
+11) Various **Lock & control** settings.
 12) Raise hand.
 13) Chatting with File sharing.
 14) MP4 Recordings.

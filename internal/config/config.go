@@ -22,7 +22,8 @@ type AppConfig struct {
 	RDS *redis.Client
 
 	sync.RWMutex
-	chatRooms map[string]map[string]ChatParticipant
+	chatRooms        map[string]map[string]ChatParticipant
+	roomWithDuration map[string]RoomWithDuration
 
 	Client             ClientInfo         `yaml:"client"`
 	LogSettings        LogSettings        `yaml:"log_settings"`
@@ -119,9 +120,16 @@ type ChatParticipant struct {
 	IsAdmin bool
 }
 
+type RoomWithDuration struct {
+	RoomSid   string
+	Duration  int64
+	StartedAt int64
+}
+
 func SetAppConfig(a *AppConfig) {
 	AppCnf = a
 	AppCnf.chatRooms = make(map[string]map[string]ChatParticipant)
+	AppCnf.roomWithDuration = make(map[string]RoomWithDuration)
 	setLogger()
 }
 
@@ -215,6 +223,7 @@ func (a *AppConfig) RemoveChatParticipant(roomId, userId string) {
 		delete(a.chatRooms[roomId], userId)
 	}
 }
+
 func (a *AppConfig) DeleteChatRoom(roomId string) {
 	a.Lock()
 	defer a.Unlock()
@@ -222,4 +231,24 @@ func (a *AppConfig) DeleteChatRoom(roomId string) {
 	if _, ok := a.chatRooms[roomId]; ok {
 		delete(a.chatRooms, roomId)
 	}
+}
+
+func (a *AppConfig) AddRoomWithDurationMap(roomId string, r RoomWithDuration) {
+	a.Lock()
+	defer a.Unlock()
+	a.roomWithDuration[roomId] = r
+}
+
+func (a *AppConfig) DeleteRoomFromRoomWithDurationMap(roomId string) {
+	a.Lock()
+	defer a.Unlock()
+	if _, ok := a.roomWithDuration[roomId]; ok {
+		delete(a.roomWithDuration, roomId)
+	}
+}
+
+func (a *AppConfig) GetRoomsWithDurationMap() map[string]RoomWithDuration {
+	// we don't need to lock implementation
+	// as we'll require locking before looping over anyway
+	return a.roomWithDuration
 }

@@ -69,6 +69,10 @@ func (w *websocketService) handleSystemMessages() {
 		w.handleUserVisibility()
 	case "EXTERNAL_MEDIA_PLAYER_EVENTS":
 		w.handleExternalMediaPlayerEvents()
+	case "POLL_CREATED",
+		"NEW_POLL_RESPONSE",
+		"POLL_CLOSED":
+		w.handlePollsNotifications()
 	}
 }
 
@@ -273,6 +277,30 @@ func (w *websocketService) handleExternalMediaPlayerEvents() {
 	config.AppCnf.RLock()
 	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
 		if p.RoomSid == w.rSid {
+			if w.pl.Body.From.UserId != p.UserId {
+				// we don't need to send update to sender
+				to = append(to, p.UUID)
+			}
+		}
+	}
+	config.AppCnf.RUnlock()
+
+	if len(to) > 0 {
+		ikisocket.EmitToList(to, jm)
+	}
+}
+
+func (w *websocketService) handlePollsNotifications() {
+	jm, err := json.Marshal(w.pl)
+	if err != nil {
+		return
+	}
+
+	var to []string
+
+	config.AppCnf.RLock()
+	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
+		if p.RoomId == w.roomId {
 			if w.pl.Body.From.UserId != p.UserId {
 				// we don't need to send update to sender
 				to = append(to, p.UUID)

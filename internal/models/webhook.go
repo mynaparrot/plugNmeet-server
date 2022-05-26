@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"encoding/json"
+	"github.com/go-redis/redis/v8"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugNmeet/internal/config"
 	log "github.com/sirupsen/logrus"
@@ -10,6 +11,8 @@ import (
 )
 
 type webhookEvent struct {
+	rc             *redis.Client
+	ctx            context.Context
 	event          *livekit.WebhookEvent
 	roomModel      *roomModel
 	roomService    *RoomService
@@ -20,6 +23,8 @@ type webhookEvent struct {
 
 func NewWebhookModel(e *livekit.WebhookEvent) {
 	w := &webhookEvent{
+		rc:             config.AppCnf.RDS,
+		ctx:            context.Background(),
 		event:          e,
 		roomModel:      NewRoomModel(),
 		roomService:    NewRoomService(),
@@ -60,6 +65,26 @@ func (w *webhookEvent) roomStarted() int64 {
 
 	if err != nil {
 		log.Errorln(err)
+	}
+
+	if event.Room.Metadata != "" {
+		info := new(RoomMetadata)
+		err = json.Unmarshal([]byte(event.Room.Metadata), info)
+		if err == nil {
+			info.StartedAt = time.Now().Unix()
+			if info.Features.RoomDuration > 0 {
+				// we'll add room info in map
+				config.AppCnf.AddRoomWithDurationMap(room.RoomId, config.RoomWithDuration{
+					RoomSid:   room.Sid,
+					Duration:  info.Features.RoomDuration,
+					StartedAt: info.StartedAt, // we can use from livekit
+				})
+			}
+			marshal, err := json.Marshal(info)
+			if err == nil {
+				_, _ = w.roomService.UpdateRoomMetadata(room.RoomId, string(marshal))
+			}
+		}
 	}
 
 	// webhook notification
@@ -111,6 +136,13 @@ func (w *webhookEvent) roomFinished() int64 {
 
 	// clear users block list
 	_, _ = w.roomService.DeleteRoomBlockList(event.Room.Name)
+
+	// clean polls
+	pm := NewPollsModel()
+	_ = pm.CleanUpPolls(event.Room.Name)
+
+	// notify to clean room from room duration map
+	w.rc.Publish(w.ctx, "plug-n-meet-room-duration-checker", event.Room.Name)
 
 	return affected
 }
