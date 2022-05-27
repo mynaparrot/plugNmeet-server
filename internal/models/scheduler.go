@@ -12,6 +12,8 @@ type scheduler struct {
 	rc          *redis.Client
 	ctx         context.Context
 	roomService *RoomService
+	ticker      *time.Ticker
+	closeTicker chan bool
 }
 
 func NewScheduler() *scheduler {
@@ -24,10 +26,18 @@ func NewScheduler() *scheduler {
 
 func (s *scheduler) StartScheduler() {
 	go s.subscribeRedisRoomDurationChecker()
+
+	s.ticker = time.NewTicker(5 * time.Second)
+	s.closeTicker = make(chan bool)
+
 	go func() {
 		for {
-			s.checkRoomWithDuration()
-			time.Sleep(10 * time.Second)
+			select {
+			case <-s.closeTicker:
+				return
+			case <-s.ticker.C:
+				s.checkRoomWithDuration()
+			}
 		}
 	}()
 }
