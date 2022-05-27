@@ -11,7 +11,7 @@ var RDB *redis.Client
 
 func NewRedisConnection() {
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     config.AppCnf.RedisInfo.Host + ":" + config.AppCnf.RedisInfo.Port,
+		Addr:     config.AppCnf.RedisInfo.Host,
 		Username: config.AppCnf.RedisInfo.Username,
 		Password: config.AppCnf.RedisInfo.Password,
 		DB:       config.AppCnf.RedisInfo.DBName,

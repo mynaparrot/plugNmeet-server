@@ -35,14 +35,13 @@ livekit_info:
   # value in minutes. Default 10 minutes. Client will renew token automatically
   token_validity: 10m
 redis_info:
-  host: redis
-  port: "6379"
+  host: redis:6379
   username: ""
   password: ""
   db: 0
 mysql_info:
-  host: "db"
-  port: "3306"
+  host: db
+  port: 3306
   username: "root"
   password: "12345"
   db: "plugnmeet"

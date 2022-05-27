@@ -55,7 +55,7 @@ Please check [plugNmeet-install](https://github.com/mynaparrot/plugNmeet-install
 Following ready to use extensions:
 
 1) [Joomla component](https://github.com/mynaparrot/plugNmeet-joomla)
-2) [Moodle Plugin](https://github.com/mynaparrot/plugNmeet-moodle)
+2) [Moodle Plugin](https://github.com/mynaparrot/moodle-mod_plugnmeet)
 3) [Wordpress Plugin](https://github.com/mynaparrot/plugNmeet-wordpress)
 
 Docker:

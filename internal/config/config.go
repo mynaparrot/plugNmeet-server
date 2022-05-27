@@ -72,7 +72,6 @@ type LivekitInfo struct {
 
 type RedisInfo struct {
 	Host     string `yaml:"host"`
-	Port     string `yaml:"port"`
 	Username string `yaml:"username"`
 	Password string `yaml:"password"`
 	DBName   int    `yaml:"db"`
@@ -80,7 +79,7 @@ type RedisInfo struct {
 
 type MySqlInfo struct {
 	Host     string `yaml:"host"`
-	Port     string `yaml:"port"`
+	Port     int32  `yaml:"port"`
 	Username string `yaml:"username"`
 	Password string `yaml:"password"`
 	DBName   string `yaml:"db"`

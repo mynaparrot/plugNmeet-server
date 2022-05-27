@@ -5,14 +5,14 @@ import (
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/mynaparrot/plugNmeet/internal/config"
-	"time"
 	log "github.com/sirupsen/logrus"
+	"time"
 )
 
 var DB *sql.DB
 
 func NewDbConnection() {
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s)/%s", config.AppCnf.MySqlInfo.Username, config.AppCnf.MySqlInfo.Password, config.AppCnf.MySqlInfo.Host, config.AppCnf.MySqlInfo.DBName))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", config.AppCnf.MySqlInfo.Username, config.AppCnf.MySqlInfo.Password, config.AppCnf.MySqlInfo.Host, config.AppCnf.MySqlInfo.Port, config.AppCnf.MySqlInfo.DBName))
 
 	if err != nil {
 		log.Panicln(err)
