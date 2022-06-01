@@ -186,7 +186,7 @@ func (a *AppConfig) DoValidateReq(r interface{}) []*ErrorResponse {
 }
 
 func ValidateId(fl validator.FieldLevel) bool {
-	isValid := regexp.MustCompile(`^[a-zA-Z0-9\-_.]+$`).MatchString
+	isValid := regexp.MustCompile(`^[a-zA-Z0-9\-_.:]+$`).MatchString
 	return isValid(fl.Field().String())
 }
 

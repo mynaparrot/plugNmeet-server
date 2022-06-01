@@ -19,6 +19,7 @@ type RoomMetadata struct {
 	WelcomeMessage      string             `json:"welcome_message"`
 	IsRecording         bool               `json:"is_recording"`
 	IsActiveRTMP        bool               `json:"is_active_rtmp"`
+	IsBreakoutRoom      bool               `json:"is_breakout_room"`
 	WebhookUrl          string             `json:"webhook_url"`
 	StartedAt           int64              `json:"started_at"`
 	Features            RoomCreateFeatures `json:"room_features"`
@@ -41,6 +42,7 @@ type RoomCreateFeatures struct {
 	WhiteboardFeatures          WhiteboardFeatures          `json:"whiteboard_features"`
 	ExternalMediaPlayerFeatures ExternalMediaPlayerFeatures `json:"external_media_player_features"`
 	WaitingRoomFeatures         WaitingRoomFeatures         `json:"waiting_room_features"`
+	BreakoutRoomFeatures        BreakoutRoomFeatures        `json:"breakout_room_features"`
 }
 
 type ChatFeatures struct {
@@ -80,6 +82,12 @@ type ExternalMediaPlayerFeatures struct {
 type WaitingRoomFeatures struct {
 	IsActive       bool   `json:"is_active"`
 	WaitingRoomMsg string `json:"waiting_room_msg"`
+}
+
+type BreakoutRoomFeatures struct {
+	IsAllow            bool  `json:"is_allow"`
+	IsActive           bool  `json:"is_active"`
+	AllowedNumberRooms int32 `json:"allowed_number_rooms"`
 }
 
 type RoomEndReq struct {
@@ -143,6 +151,13 @@ func (am *roomAuthModel) CreateRoom(r *RoomCreateReq) (bool, string, *livekit.Ro
 		r.RoomMetadata.Features.WhiteboardFeatures.FileName = "default"
 		r.RoomMetadata.Features.WhiteboardFeatures.WhiteboardFileId = "default"
 		r.RoomMetadata.Features.WhiteboardFeatures.TotalPages = 10
+	}
+
+	if r.RoomMetadata.Features.BreakoutRoomFeatures.IsAllow {
+		r.RoomMetadata.Features.BreakoutRoomFeatures.IsActive = false
+		if r.RoomMetadata.Features.BreakoutRoomFeatures.AllowedNumberRooms == 0 {
+			r.RoomMetadata.Features.BreakoutRoomFeatures.AllowedNumberRooms = 6
+		}
 	}
 
 	// by default, we'll lock screen share, whiteboard & shared notepad
