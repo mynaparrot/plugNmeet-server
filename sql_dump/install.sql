@@ -40,3 +40,16 @@ CREATE TABLE IF NOT EXISTS `pnm_recordings` (
   UNIQUE KEY `record_id` (`record_id`),
   KEY `room_id` (`room_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+CREATE TABLE IF NOT EXISTS `pnm_recorder` (
+    `id` int(11) NOT NULL AUTO_INCREMENT,
+    `recorder_id` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+    `max_limit` int(10) NOT NULL,
+    `current_progress` int(10) NOT NULL DEFAULT 0,
+    `last_ping` int(10) NOT NULL DEFAULT 0,
+    `created` datetime NOT NULL DEFAULT current_timestamp(),
+    `modified` datetime NOT NULL DEFAULT '0000-00-00 00:00:00' ON UPDATE current_timestamp(),
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `recorder_id` (`recorder_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
