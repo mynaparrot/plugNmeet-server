@@ -188,6 +188,11 @@ func (am *roomAuthModel) CreateRoom(r *RoomCreateReq) (bool, string, *livekit.Ro
 		return false, "Error: " + err.Error(), nil
 	}
 
+	isBreakoutRoom := 0
+	if r.RoomMetadata.IsBreakoutRoom {
+		isBreakoutRoom = 1
+	}
+
 	ri := &RoomInfo{
 		RoomTitle:          r.RoomMetadata.RoomTitle,
 		RoomId:             room.Name,
@@ -196,6 +201,8 @@ func (am *roomAuthModel) CreateRoom(r *RoomCreateReq) (bool, string, *livekit.Ro
 		IsRunning:          1,
 		CreationTime:       room.CreationTime,
 		WebhookUrl:         r.RoomMetadata.WebhookUrl,
+		IsBreakoutRoom:     int64(isBreakoutRoom),
+		ParentRoomId:       r.RoomMetadata.ParentRoomId,
 	}
 
 	_, err = am.rm.InsertRoomData(ri)
@@ -250,6 +257,8 @@ func (am *roomAuthModel) GetActiveRoomInfo(r *IsRoomActiveReq) (bool, string, *A
 		IsRecording:        roomDbInfo.IsRecording,
 		IsActiveRTMP:       roomDbInfo.IsActiveRTMP,
 		WebhookUrl:         roomDbInfo.WebhookUrl,
+		IsBreakoutRoom:     roomDbInfo.IsBreakoutRoom,
+		ParentRoomId:       roomDbInfo.ParentRoomId,
 		CreationTime:       roomDbInfo.CreationTime,
 		Metadata:           rrr.Metadata,
 	}
