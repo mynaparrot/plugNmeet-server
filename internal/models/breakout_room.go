@@ -8,6 +8,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/mynaparrot/plugNmeet/internal/config"
 	log "github.com/sirupsen/logrus"
+	"time"
 )
 
 const breakoutRoomKey = "pnm:breakoutRoom:"
@@ -42,6 +43,7 @@ type BreakoutRoom struct {
 	Id       string             `json:"id"`
 	Title    string             `json:"title"`
 	Duration int64              `json:"duration"`
+	Created  int64              `json:"created"`
 	Users    []BreakoutRoomUser `json:"users"`
 }
 
@@ -73,6 +75,8 @@ func (m *breakoutRoom) CreateBreakoutRooms(r *CreateBreakoutRoomsReq) error {
 	meta.Features.AllowRecording = false
 	meta.Features.AllowRTMP = false
 
+	e := make(map[string]bool)
+
 	for _, room := range r.Rooms {
 		bRoom := new(RoomCreateReq)
 		bRoom.RoomId = fmt.Sprintf("%s:%s", r.RoomId, room.Id)
@@ -82,15 +86,20 @@ func (m *breakoutRoom) CreateBreakoutRooms(r *CreateBreakoutRoomsReq) error {
 
 		if !status {
 			log.Error(msg)
+			e[bRoom.RoomId] = true
 			continue
 		}
 
 		room.Duration = r.Duration
+		room.Created = time.Now().Unix()
 		marshal, err := json.Marshal(room)
+
 		if err != nil {
 			log.Error(err)
+			e[bRoom.RoomId] = true
 			continue
 		}
+
 		val := map[string]string{
 			bRoom.RoomId: string(marshal),
 		}
@@ -100,6 +109,7 @@ func (m *breakoutRoom) CreateBreakoutRooms(r *CreateBreakoutRoomsReq) error {
 
 		if err != nil {
 			log.Error(err)
+			e[bRoom.RoomId] = true
 			continue
 		}
 
@@ -112,6 +122,11 @@ func (m *breakoutRoom) CreateBreakoutRooms(r *CreateBreakoutRoomsReq) error {
 			}
 		}
 	}
+
+	if len(e) == len(r.Rooms) {
+		return errors.New("breakout room creation wasn't successful")
+	}
+
 	// again here for update
 	origMeta := new(RoomMetadata)
 	err = json.Unmarshal([]byte(mainRoom.Metadata), origMeta)
@@ -136,6 +151,7 @@ type JoinBreakoutRoomReq struct {
 	RoomId         string
 	BreakoutRoomId string `json:"breakout_room_id" validate:"required"`
 	UserId         string `json:"user_id" validate:"required"`
+	IsAdmin        bool   `json:"is_admin"`
 }
 
 func (m *breakoutRoom) JoinBreakoutRoom(r *JoinBreakoutRoomReq) (string, error) {
@@ -144,14 +160,16 @@ func (m *breakoutRoom) JoinBreakoutRoom(r *JoinBreakoutRoomReq) (string, error) 
 		return "", err
 	}
 
-	canJoin := false
-	for _, u := range room.Users {
-		if u.Id == r.UserId {
-			canJoin = true
+	if !r.IsAdmin {
+		canJoin := false
+		for _, u := range room.Users {
+			if u.Id == r.UserId {
+				canJoin = true
+			}
 		}
-	}
-	if !canJoin {
-		return "", errors.New("you can't join in this room")
+		if !canJoin {
+			return "", errors.New("you can't join in this room")
+		}
 	}
 
 	p, err := m.roomService.LoadParticipantInfoFromRedis(r.RoomId, r.UserId)
@@ -261,10 +279,20 @@ func (m *breakoutRoom) EndBreakoutRoom(r *EndBreakoutRoomReq) error {
 	}
 	_, err = m.roomService.EndRoom(r.BreakoutRoomId)
 	if err != nil {
-		return err
+		log.Error(err)
 	}
 
+	// for safety we'll delete rooms
+	_ = m.roomService.DeleteRoomFromRedis(r.BreakoutRoomId)
+	model := NewRoomModel()
+	_, _ = model.UpdateRoomStatus(&RoomInfo{
+		RoomId:    r.BreakoutRoomId,
+		IsRunning: 0,
+		Ended:     time.Now().Format("2006-01-02 15:04:05"),
+	})
+
 	m.rc.HDel(m.ctx, breakoutRoomKey+r.RoomId, r.BreakoutRoomId)
+	_ = m.performPostHookTask(r.RoomId)
 	return nil
 }
 
@@ -275,13 +303,11 @@ func (m *breakoutRoom) EndBreakoutRooms(roomId string) error {
 	}
 
 	for _, r := range rooms {
-		_, err = m.roomService.EndRoom(r.Id)
-		if err != nil {
-			continue
-		}
+		_ = m.EndBreakoutRoom(&EndBreakoutRoomReq{
+			BreakoutRoomId: r.Id,
+			RoomId:         roomId,
+		})
 	}
-	// everything will be clean automatically after rooms ended
-	// check PostTaskAfterRoomEndWebhook
 	return nil
 }
 
@@ -390,7 +416,6 @@ func (m *breakoutRoom) performPostHookTask(roomId string) error {
 		log.Error(err)
 		return err
 	}
-	fmt.Println("COUNT: ", c)
 
 	if c != 0 {
 		return nil

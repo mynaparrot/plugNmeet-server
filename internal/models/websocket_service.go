@@ -99,10 +99,10 @@ func (w *websocketService) handleChat() {
 
 	config.AppCnf.RLock()
 	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
-		if p.RoomSid == w.rSid {
+		if p.RoomId == w.roomId {
 			// only for specific user
 			if w.pl.To != "" {
-				if w.pl.To == p.UserSid {
+				if w.pl.To == p.UserId {
 					to = append(to, p.UUID)
 				}
 			} else {

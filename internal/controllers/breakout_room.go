@@ -78,8 +78,8 @@ func HandleJoinBreakoutRoom(c *fiber.Ctx) error {
 	token, err := m.JoinBreakoutRoom(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
-			"status": true,
-			"msg":    "success",
+			"status": false,
+			"msg":    err.Error(),
 		})
 	}
 

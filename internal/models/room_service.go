@@ -7,6 +7,7 @@ import (
 	"github.com/livekit/protocol/livekit"
 	lksdk "github.com/livekit/server-sdk-go"
 	"github.com/mynaparrot/plugNmeet/internal/config"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -14,6 +15,7 @@ const (
 	RoomsKey               = "rooms"
 	RoomParticipantsPrefix = "room_participants:"
 	BlockedUsersList       = "pnm:block_users_list:"
+	NodeRoomKey            = "room_node_map"
 )
 
 type RoomService struct {
@@ -152,6 +154,18 @@ func (r *RoomService) EndRoom(roomId string) (string, error) {
 	}
 
 	return res.String(), nil
+}
+
+func (r *RoomService) DeleteRoomFromRedis(roomId string) error {
+	pp := r.rc.Pipeline()
+	pp.HDel(r.ctx, RoomsKey, roomId)
+	pp.HDel(r.ctx, NodeRoomKey, roomId)
+	_, err := pp.Exec(r.ctx)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	return nil
 }
 
 func (r *RoomService) UpdateParticipantMetadata(roomId string, userId string, metadata string) (*livekit.ParticipantInfo, error) {
