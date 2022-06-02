@@ -19,6 +19,7 @@ type RoomMetadata struct {
 	WelcomeMessage      string             `json:"welcome_message"`
 	IsRecording         bool               `json:"is_recording"`
 	IsActiveRTMP        bool               `json:"is_active_rtmp"`
+	ParentRoomId        string             `json:"parent_room_id"`
 	IsBreakoutRoom      bool               `json:"is_breakout_room"`
 	WebhookUrl          string             `json:"webhook_url"`
 	StartedAt           int64              `json:"started_at"`

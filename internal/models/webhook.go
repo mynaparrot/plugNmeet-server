@@ -152,7 +152,7 @@ func (w *webhookEvent) roomFinished() int64 {
 
 	// remove all breakout rooms
 	bm := NewBreakoutRoomModel()
-	_ = bm.EndBreakoutRooms(event.Room.Name)
+	_ = bm.PostTaskAfterRoomEndWebhook(event.Room.Name, event.Room.Metadata)
 
 	return affected
 }

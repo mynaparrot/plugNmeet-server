@@ -64,6 +64,7 @@ func (m *breakoutRoom) CreateBreakoutRooms(r *CreateBreakoutRoomsReq) error {
 	meta.Features.RoomDuration = r.Duration
 	meta.IsBreakoutRoom = true
 	meta.WelcomeMessage = r.WelcomeMsg
+	meta.ParentRoomId = mainRoom.Name
 
 	// disable few features
 	meta.Features.BreakoutRoomFeatures.IsAllow = false
@@ -212,7 +213,7 @@ func (m *breakoutRoom) IncreaseBreakoutRoomDuration(r *IncreaseBreakoutRoomDurat
 	m.rc.Publish(m.ctx, "plug-n-meet-room-duration-checker", reqMar)
 
 	// now update redis
-	room.Duration = r.Duration
+	room.Duration += r.Duration
 	marshal, err := json.Marshal(room)
 	if err != nil {
 		return err
@@ -228,9 +229,8 @@ func (m *breakoutRoom) IncreaseBreakoutRoomDuration(r *IncreaseBreakoutRoomDurat
 }
 
 type SendBreakoutRoomMsgReq struct {
-	RoomId         string
-	BreakoutRoomId string `json:"breakout_room_id" validate:"required"`
-	Msg            string `json:"msg" validate:"required"`
+	RoomId string
+	Msg    string `json:"msg" validate:"required"`
 }
 
 func (m *breakoutRoom) SendBreakoutRoomMsg(r *SendBreakoutRoomMsgReq) error {
@@ -280,7 +280,31 @@ func (m *breakoutRoom) EndBreakoutRooms(roomId string) error {
 			continue
 		}
 	}
-	m.rc.Del(m.ctx, breakoutRoomKey+roomId)
+	// everything will be clean automatically after rooms ended
+	// check PostTaskAfterRoomEndWebhook
+	return nil
+}
+
+func (m *breakoutRoom) PostTaskAfterRoomEndWebhook(roomId, metadata string) error {
+	if metadata == "" {
+		return nil
+	}
+	meta := new(RoomMetadata)
+	err := json.Unmarshal([]byte(metadata), meta)
+	if err != nil {
+		return err
+	}
+
+	if meta.IsBreakoutRoom {
+		m.rc.HDel(m.ctx, breakoutRoomKey+meta.ParentRoomId, roomId)
+		_ = m.performPostHookTask(meta.ParentRoomId)
+	} else {
+		err = m.EndBreakoutRooms(roomId)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -341,7 +365,7 @@ func (m *breakoutRoom) fetchBreakoutRooms(roomId string) ([]*BreakoutRoom, error
 	if err != nil {
 		return nil, err
 	}
-	if rooms != nil {
+	if rooms == nil {
 		return nil, errors.New("no breakout room found")
 	}
 
@@ -357,4 +381,44 @@ func (m *breakoutRoom) fetchBreakoutRooms(roomId string) ([]*BreakoutRoom, error
 	}
 
 	return breakoutRooms, nil
+}
+
+func (m *breakoutRoom) performPostHookTask(roomId string) error {
+	cmd := m.rc.HLen(m.ctx, breakoutRoomKey+roomId)
+	c, err := cmd.Result()
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	fmt.Println("COUNT: ", c)
+
+	if c != 0 {
+		return nil
+	}
+
+	// no room left so, delete breakoutRoomKey key for this room
+	m.rc.Del(m.ctx, breakoutRoomKey+roomId)
+
+	// if no rooms left then we can update metadata
+	mainRoom, err := m.roomService.LoadRoomInfoFromRedis(roomId)
+	if err != nil {
+		return err
+	}
+	meta := new(RoomMetadata)
+	err = json.Unmarshal([]byte(mainRoom.Metadata), meta)
+	if err != nil {
+		return err
+	}
+	meta.Features.BreakoutRoomFeatures.IsActive = false
+
+	marshal, err := json.Marshal(meta)
+	if err != nil {
+		return err
+	}
+	_, err = m.roomService.UpdateRoomMetadata(roomId, string(marshal))
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
