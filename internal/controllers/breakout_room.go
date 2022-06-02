@@ -55,8 +55,8 @@ func HandleCreateBreakoutRooms(c *fiber.Ctx) error {
 
 func HandleJoinBreakoutRoom(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
-
 	req := new(models.JoinBreakoutRoomReq)
+
 	err := c.BodyParser(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -87,5 +87,149 @@ func HandleJoinBreakoutRoom(c *fiber.Ctx) error {
 		"status": true,
 		"msg":    "success",
 		"token":  token,
+	})
+}
+
+func HandleGetBreakoutRooms(c *fiber.Ctx) error {
+	roomId := c.Locals("roomId")
+	m := models.NewBreakoutRoomModel()
+	rooms, err := m.GetBreakoutRooms(roomId.(string))
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"status": true,
+		"msg":    "success",
+		"rooms":  rooms,
+	})
+}
+
+func HandleIncreaseBreakoutRoomDuration(c *fiber.Ctx) error {
+	roomId := c.Locals("roomId")
+	req := new(models.IncreaseBreakoutRoomDurationReq)
+
+	err := c.BodyParser(req)
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	check := config.AppCnf.DoValidateReq(req)
+	if len(check) > 0 {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    check,
+		})
+	}
+
+	req.RoomId = roomId.(string)
+	m := models.NewBreakoutRoomModel()
+	err = m.IncreaseBreakoutRoomDuration(req)
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"status": true,
+		"msg":    "success",
+	})
+}
+
+func HandleSendBreakoutRoomMsg(c *fiber.Ctx) error {
+	roomId := c.Locals("roomId")
+	req := new(models.SendBreakoutRoomMsgReq)
+
+	err := c.BodyParser(req)
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	check := config.AppCnf.DoValidateReq(req)
+	if len(check) > 0 {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    check,
+		})
+	}
+
+	req.RoomId = roomId.(string)
+	m := models.NewBreakoutRoomModel()
+	err = m.SendBreakoutRoomMsg(req)
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"status": true,
+		"msg":    "success",
+	})
+}
+
+func HandleEndBreakoutRoom(c *fiber.Ctx) error {
+	roomId := c.Locals("roomId")
+	req := new(models.EndBreakoutRoomReq)
+
+	err := c.BodyParser(req)
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	check := config.AppCnf.DoValidateReq(req)
+	if len(check) > 0 {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    check,
+		})
+	}
+
+	req.RoomId = roomId.(string)
+	m := models.NewBreakoutRoomModel()
+	err = m.EndBreakoutRoom(req)
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"status": true,
+		"msg":    "success",
+	})
+}
+
+func HandleEndBreakoutRooms(c *fiber.Ctx) error {
+	roomId := c.Locals("roomId")
+	m := models.NewBreakoutRoomModel()
+	err := m.EndBreakoutRooms(roomId.(string))
+
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"status": true,
+		"msg":    "success",
 	})
 }

@@ -113,6 +113,11 @@ func Router() *fiber.App {
 	breakoutRoom := api.Group("/breakoutRoom")
 	breakoutRoom.Post("/create", controllers.HandleCreateBreakoutRooms)
 	breakoutRoom.Post("/join", controllers.HandleJoinBreakoutRoom)
+	breakoutRoom.Get("/listRooms", controllers.HandleGetBreakoutRooms)
+	breakoutRoom.Post("/increaseDuration", controllers.HandleIncreaseBreakoutRoomDuration)
+	breakoutRoom.Post("/sendMsg", controllers.HandleSendBreakoutRoomMsg)
+	breakoutRoom.Post("/endRoom", controllers.HandleEndBreakoutRoom)
+	breakoutRoom.Post("/endAllRooms", controllers.HandleEndBreakoutRooms)
 
 	// for resumable.js need both methods.
 	// https://github.com/23/resumable.js#how-do-i-set-it-up-with-my-server

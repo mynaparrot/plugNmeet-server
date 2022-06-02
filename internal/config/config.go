@@ -251,3 +251,15 @@ func (a *AppConfig) GetRoomsWithDurationMap() map[string]RoomWithDuration {
 	// as we'll require locking before looping over anyway
 	return a.roomWithDuration
 }
+
+func (a *AppConfig) IncreaseRoomDuration(roomId string, duration int64) int64 {
+	a.Lock()
+	defer a.Unlock()
+	if r, ok := a.roomWithDuration[roomId]; ok {
+		r.Duration = (r.Duration + duration)
+		a.roomWithDuration[roomId] = r
+		return r.Duration
+	}
+
+	return 0
+}
