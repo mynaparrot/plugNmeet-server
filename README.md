@@ -20,10 +20,11 @@ infrastructure [livekit](https://github.com/livekit/livekit-server).
 9) Easy to use **Polls** & voting.
 10) Customizable **waiting room**.
 11) Various **Lock & control** settings.
-12) Raise hand.
-13) Chatting with File sharing.
-14) MP4 Recordings.
-15) RTMP Broadcasting
+12) **Breakout rooms**
+13) Raise hand.
+14) Chatting with File sharing.
+15) MP4 Recordings.
+16) RTMP Broadcasting
 
 And many more!
 
