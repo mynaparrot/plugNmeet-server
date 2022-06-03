@@ -114,6 +114,7 @@ func Router() *fiber.App {
 	breakoutRoom.Post("/create", controllers.HandleCreateBreakoutRooms)
 	breakoutRoom.Post("/join", controllers.HandleJoinBreakoutRoom)
 	breakoutRoom.Get("/listRooms", controllers.HandleGetBreakoutRooms)
+	breakoutRoom.Get("/myRooms", controllers.HandleGetMyBreakoutRooms)
 	breakoutRoom.Post("/increaseDuration", controllers.HandleIncreaseBreakoutRoomDuration)
 	breakoutRoom.Post("/sendMsg", controllers.HandleSendBreakoutRoomMsg)
 	breakoutRoom.Post("/endRoom", controllers.HandleEndBreakoutRoom)

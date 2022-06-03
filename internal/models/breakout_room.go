@@ -35,7 +35,7 @@ type CreateBreakoutRoomsReq struct {
 	RoomId          string
 	RequestedUserId string
 	Duration        int64          `json:"duration" validate:"required"`
-	WelcomeMsg      string         `json:"welcome_msg" validate:"required"`
+	WelcomeMsg      string         `json:"welcome_msg"`
 	Rooms           []BreakoutRoom `json:"rooms" validate:"required"`
 }
 
@@ -205,6 +205,23 @@ func (m *breakoutRoom) GetBreakoutRooms(roomId string) ([]*BreakoutRoom, error) 
 	}
 
 	return breakoutRooms, nil
+}
+
+func (m *breakoutRoom) GetMyBreakoutRooms(roomId, userId string) (*BreakoutRoom, error) {
+	breakoutRooms, err := m.fetchBreakoutRooms(roomId)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, rr := range breakoutRooms {
+		for _, u := range rr.Users {
+			if u.Id == userId {
+				return rr, nil
+			}
+		}
+	}
+
+	return nil, errors.New("not found")
 }
 
 type IncreaseBreakoutRoomDurationReq struct {

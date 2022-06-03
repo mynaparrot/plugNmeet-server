@@ -108,6 +108,26 @@ func HandleGetBreakoutRooms(c *fiber.Ctx) error {
 	})
 }
 
+func HandleGetMyBreakoutRooms(c *fiber.Ctx) error {
+	roomId := c.Locals("roomId")
+	requestedUserId := c.Locals("requestedUserId")
+
+	m := models.NewBreakoutRoomModel()
+	room, err := m.GetMyBreakoutRooms(roomId.(string), requestedUserId.(string))
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"status": true,
+		"msg":    "success",
+		"room":   room,
+	})
+}
+
 func HandleIncreaseBreakoutRoomDuration(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	req := new(models.IncreaseBreakoutRoomDurationReq)
