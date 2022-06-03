@@ -55,6 +55,7 @@ func HandleCreateBreakoutRooms(c *fiber.Ctx) error {
 
 func HandleJoinBreakoutRoom(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
+	isAdmin := c.Locals("isAdmin")
 	req := new(models.JoinBreakoutRoomReq)
 
 	err := c.BodyParser(req)
@@ -74,6 +75,7 @@ func HandleJoinBreakoutRoom(c *fiber.Ctx) error {
 	}
 
 	req.RoomId = roomId.(string)
+	req.IsAdmin = isAdmin.(bool)
 	m := models.NewBreakoutRoomModel()
 	token, err := m.JoinBreakoutRoom(req)
 	if err != nil {

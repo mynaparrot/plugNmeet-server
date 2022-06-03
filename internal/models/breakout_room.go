@@ -34,9 +34,9 @@ func NewBreakoutRoomModel() *breakoutRoom {
 type CreateBreakoutRoomsReq struct {
 	RoomId          string
 	RequestedUserId string
-	Duration        int64          `json:"duration" validate:"required"`
-	WelcomeMsg      string         `json:"welcome_msg"`
-	Rooms           []BreakoutRoom `json:"rooms" validate:"required"`
+	Duration        int64           `json:"duration" validate:"required"`
+	WelcomeMsg      string          `json:"welcome_msg"`
+	Rooms           []*BreakoutRoom `json:"rooms" validate:"required"`
 }
 
 type BreakoutRoom struct {
@@ -68,7 +68,7 @@ func (m *breakoutRoom) CreateBreakoutRooms(r *CreateBreakoutRoomsReq) error {
 	meta.Features.RoomDuration = r.Duration
 	meta.IsBreakoutRoom = true
 	meta.WelcomeMessage = r.WelcomeMsg
-	meta.ParentRoomId = mainRoom.Name
+	meta.ParentRoomId = r.RoomId
 
 	// disable few features
 	meta.Features.BreakoutRoomFeatures.IsAllow = false
@@ -153,7 +153,7 @@ type JoinBreakoutRoomReq struct {
 	RoomId         string
 	BreakoutRoomId string `json:"breakout_room_id" validate:"required"`
 	UserId         string `json:"user_id" validate:"required"`
-	IsAdmin        bool   `json:"is_admin"`
+	IsAdmin        bool   `json:"-"`
 }
 
 func (m *breakoutRoom) JoinBreakoutRoom(r *JoinBreakoutRoomReq) (string, error) {
