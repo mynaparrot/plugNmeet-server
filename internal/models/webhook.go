@@ -80,6 +80,10 @@ func (w *webhookEvent) roomStarted() int64 {
 					StartedAt: info.StartedAt, // we can use from livekit
 				})
 			}
+			if info.IsBreakoutRoom {
+				bm := NewBreakoutRoomModel()
+				_ = bm.PostTaskAfterRoomStartWebhook(room.RoomId, info)
+			}
 			marshal, err := json.Marshal(info)
 			if err == nil {
 				_, _ = w.roomService.UpdateRoomMetadata(room.RoomId, string(marshal))

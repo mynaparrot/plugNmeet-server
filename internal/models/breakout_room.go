@@ -43,6 +43,7 @@ type BreakoutRoom struct {
 	Id       string             `json:"id"`
 	Title    string             `json:"title"`
 	Duration int64              `json:"duration"`
+	Started  bool               `json:"started"`
 	Created  int64              `json:"created"`
 	Users    []BreakoutRoomUser `json:"users"`
 }
@@ -325,6 +326,30 @@ func (m *breakoutRoom) EndBreakoutRooms(roomId string) error {
 			RoomId:         roomId,
 		})
 	}
+	return nil
+}
+
+func (m *breakoutRoom) PostTaskAfterRoomStartWebhook(roomId string, metadata *RoomMetadata) error {
+	if metadata.IsBreakoutRoom {
+		room, err := m.fetchBreakoutRoom(metadata.ParentRoomId, roomId)
+		if err != nil {
+			return err
+		}
+		room.Created = metadata.StartedAt
+		room.Started = true
+
+		marshal, err := json.Marshal(room)
+		if err != nil {
+			return err
+		}
+		val := map[string]string{
+			roomId: string(marshal),
+		}
+		pp := m.rc.Pipeline()
+		pp.HSet(m.ctx, breakoutRoomKey+metadata.ParentRoomId, val)
+		_, err = pp.Exec(m.ctx)
+	}
+
 	return nil
 }
 
