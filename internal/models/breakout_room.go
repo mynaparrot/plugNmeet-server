@@ -40,17 +40,18 @@ type CreateBreakoutRoomsReq struct {
 }
 
 type BreakoutRoom struct {
-	Id       string             `json:"id"`
-	Title    string             `json:"title"`
-	Duration int64              `json:"duration"`
-	Started  bool               `json:"started"`
-	Created  int64              `json:"created"`
-	Users    []BreakoutRoomUser `json:"users"`
+	Id       string              `json:"id"`
+	Title    string              `json:"title"`
+	Duration int64               `json:"duration"`
+	Started  bool                `json:"started"`
+	Created  int64               `json:"created"`
+	Users    []*BreakoutRoomUser `json:"users"`
 }
 
 type BreakoutRoomUser struct {
-	Id   string `json:"id"`
-	Name string `json:"name"`
+	Id     string `json:"id"`
+	Name   string `json:"name"`
+	Joined bool   `json:"joined"`
 }
 
 func (m *breakoutRoom) CreateBreakoutRooms(r *CreateBreakoutRoomsReq) error {
@@ -445,6 +446,16 @@ func (m *breakoutRoom) fetchBreakoutRooms(roomId string) ([]*BreakoutRoom, error
 			continue
 		}
 		room.Id = i
+		for _, u := range room.Users {
+			if room.Started {
+				joined, err := m.roomService.LoadParticipantInfoFromRedis(room.Id, u.Id)
+				if err == nil {
+					if joined.Identity == u.Id {
+						u.Joined = true
+					}
+				}
+			}
+		}
 		breakoutRooms = append(breakoutRooms, room)
 	}
 
