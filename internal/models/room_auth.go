@@ -328,16 +328,7 @@ type ChangeVisibilityRes struct {
 }
 
 func (am *roomAuthModel) ChangeVisibility(r *ChangeVisibilityRes) (bool, string) {
-	room, err := am.rs.LoadRoomInfoFromRedis(r.RoomId)
-	if err != nil {
-		return false, err.Error()
-	}
-
-	m := make([]byte, len(room.Metadata))
-	copy(m, room.Metadata)
-
-	roomMeta := new(RoomMetadata)
-	err = json.Unmarshal(m, roomMeta)
+	_, roomMeta, err := am.rs.LoadRoomWithMetadata(r.RoomId)
 	if err != nil {
 		return false, err.Error()
 	}
@@ -349,8 +340,7 @@ func (am *roomAuthModel) ChangeVisibility(r *ChangeVisibilityRes) (bool, string)
 		roomMeta.Features.SharedNotePadFeatures.Visible = *r.VisibleNotepad
 	}
 
-	metadata, _ := json.Marshal(roomMeta)
-	_, err = am.rs.UpdateRoomMetadata(r.RoomId, string(metadata))
+	_, err = am.rs.UpdateRoomMetadataByStruct(r.RoomId, roomMeta)
 
 	if err != nil {
 		return false, err.Error()

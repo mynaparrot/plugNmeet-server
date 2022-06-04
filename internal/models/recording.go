@@ -94,20 +94,13 @@ func (rm *recordingModel) recordingStarted(r *RecorderResp) {
 	}
 
 	// update room metadata
-	room, err := rm.roomService.LoadRoomInfoFromRedis(r.RoomId)
+	_, roomMeta, err := rm.roomService.LoadRoomWithMetadata(r.RoomId)
 	if err != nil {
 		return
 	}
 
-	m := make([]byte, len(room.Metadata))
-	copy(m, room.Metadata)
-
-	roomMeta := new(RoomMetadata)
-	_ = json.Unmarshal(m, roomMeta)
 	roomMeta.IsRecording = true
-
-	metadata, _ := json.Marshal(roomMeta)
-	_, _ = rm.roomService.UpdateRoomMetadata(r.RoomId, string(metadata))
+	_, _ = rm.roomService.UpdateRoomMetadataByStruct(r.RoomId, roomMeta)
 
 	// send message to room
 	err = NewDataMessage(&DataMessageReq{
@@ -129,20 +122,13 @@ func (rm *recordingModel) recordingEnded(r *RecorderResp) {
 	}
 
 	// update room metadata
-	room, err := rm.roomService.LoadRoomInfoFromRedis(r.RoomId)
+	_, roomMeta, err := rm.roomService.LoadRoomWithMetadata(r.RoomId)
 	if err != nil {
 		return
 	}
 
-	m := make([]byte, len(room.Metadata))
-	copy(m, room.Metadata)
-
-	roomMeta := new(RoomMetadata)
-	_ = json.Unmarshal(m, roomMeta)
 	roomMeta.IsRecording = false
-
-	metadata, _ := json.Marshal(roomMeta)
-	_, _ = rm.roomService.UpdateRoomMetadata(r.RoomId, string(metadata))
+	_, _ = rm.roomService.UpdateRoomMetadataByStruct(r.RoomId, roomMeta)
 
 	msg := "notifications.recording-ended"
 	msgType := "INFO"
@@ -204,20 +190,13 @@ func (rm *recordingModel) rtmpStarted(r *RecorderResp) {
 	}
 
 	// update room metadata
-	room, err := rm.roomService.LoadRoomInfoFromRedis(r.RoomId)
+	_, roomMeta, err := rm.roomService.LoadRoomWithMetadata(r.RoomId)
 	if err != nil {
 		return
 	}
 
-	m := make([]byte, len(room.Metadata))
-	copy(m, room.Metadata)
-
-	roomMeta := new(RoomMetadata)
-	_ = json.Unmarshal(m, roomMeta)
 	roomMeta.IsActiveRTMP = true
-
-	metadata, _ := json.Marshal(roomMeta)
-	_, _ = rm.roomService.UpdateRoomMetadata(r.RoomId, string(metadata))
+	_, _ = rm.roomService.UpdateRoomMetadataByStruct(r.RoomId, roomMeta)
 
 	// send message to room
 	err = NewDataMessage(&DataMessageReq{
@@ -239,20 +218,13 @@ func (rm *recordingModel) rtmpEnded(r *RecorderResp) {
 	}
 
 	// update room metadata
-	room, err := rm.roomService.LoadRoomInfoFromRedis(r.RoomId)
+	_, roomMeta, err := rm.roomService.LoadRoomWithMetadata(r.RoomId)
 	if err != nil {
 		return
 	}
 
-	m := make([]byte, len(room.Metadata))
-	copy(m, room.Metadata)
-
-	roomMeta := new(RoomMetadata)
-	_ = json.Unmarshal(m, roomMeta)
 	roomMeta.IsActiveRTMP = false
-
-	metadata, _ := json.Marshal(roomMeta)
-	_, _ = rm.roomService.UpdateRoomMetadata(r.RoomId, string(metadata))
+	_, _ = rm.roomService.UpdateRoomMetadataByStruct(r.RoomId, roomMeta)
 
 	msg := "notifications.rtmp-ended"
 	msgType := "INFO"

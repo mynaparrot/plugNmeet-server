@@ -136,17 +136,9 @@ func (m *breakoutRoom) CreateBreakoutRooms(r *CreateBreakoutRoomsReq) error {
 		return err
 	}
 	origMeta.Features.BreakoutRoomFeatures.IsActive = true
+	_, err = m.roomService.UpdateRoomMetadataByStruct(r.RoomId, origMeta)
 
-	marshal, err := json.Marshal(origMeta)
-	if err != nil {
-		return err
-	}
-	_, err = m.roomService.UpdateRoomMetadata(r.RoomId, string(marshal))
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 type JoinBreakoutRoomReq struct {
@@ -174,13 +166,7 @@ func (m *breakoutRoom) JoinBreakoutRoom(r *JoinBreakoutRoomReq) (string, error) 
 		}
 	}
 
-	p, err := m.roomService.LoadParticipantInfoFromRedis(r.RoomId, r.UserId)
-	if err != nil {
-		return "", err
-	}
-
-	meta := new(UserMetadata)
-	err = json.Unmarshal([]byte(p.Metadata), meta)
+	p, meta, err := m.roomService.LoadParticipantWithMetadata(r.RoomId, r.UserId)
 	if err != nil {
 		return "", err
 	}
@@ -478,22 +464,12 @@ func (m *breakoutRoom) performPostHookTask(roomId string) error {
 	m.rc.Del(m.ctx, breakoutRoomKey+roomId)
 
 	// if no rooms left then we can update metadata
-	mainRoom, err := m.roomService.LoadRoomInfoFromRedis(roomId)
-	if err != nil {
-		return err
-	}
-	meta := new(RoomMetadata)
-	err = json.Unmarshal([]byte(mainRoom.Metadata), meta)
+	_, meta, err := m.roomService.LoadRoomWithMetadata(roomId)
 	if err != nil {
 		return err
 	}
 	meta.Features.BreakoutRoomFeatures.IsActive = false
-
-	marshal, err := json.Marshal(meta)
-	if err != nil {
-		return err
-	}
-	_, err = m.roomService.UpdateRoomMetadata(roomId, string(marshal))
+	_, err = m.roomService.UpdateRoomMetadataByStruct(roomId, meta)
 	if err != nil {
 		return err
 	}

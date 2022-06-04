@@ -97,21 +97,14 @@ func (s *scheduler) increaseRoomDuration(roomId string, duration int64) {
 
 	// increase room duration
 	roomService := NewRoomService()
-	lr, err := roomService.LoadRoomInfoFromRedis(roomId)
+	_, meta, err := roomService.LoadRoomWithMetadata(roomId)
 	if err != nil {
 		return
 	}
-	rm := new(RoomMetadata)
-	err = json.Unmarshal([]byte(lr.Metadata), rm)
-	if err != nil {
-		return
-	}
-	rm.Features.RoomDuration = newDuration
-	marshal, err := json.Marshal(rm)
-	if err != nil {
-		return
-	}
-	_, err = roomService.UpdateRoomMetadata(roomId, string(marshal))
+
+	meta.Features.RoomDuration = newDuration
+	_, err = roomService.UpdateRoomMetadataByStruct(roomId, meta)
+
 	if err != nil {
 		return
 	}
