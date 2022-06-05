@@ -22,7 +22,7 @@ infrastructure [livekit](https://github.com/livekit/livekit-server).
 11) Various **Lock & control** settings.
 12) **Breakout rooms**
 13) Raise hand.
-14) Chatting with File sharing.
+14) Public & private chatting with File sharing.
 15) MP4 Recordings.
 16) RTMP Broadcasting
 
