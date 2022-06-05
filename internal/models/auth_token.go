@@ -36,6 +36,7 @@ type LockSettings struct {
 	LockChat            *bool `json:"lock_chat,omitempty"`
 	LockChatSendMessage *bool `json:"lock_chat_send_message,omitempty"`
 	LockChatFileShare   *bool `json:"lock_chat_file_share,omitempty"`
+	LockPrivateChat     *bool `json:"lock_private_chat,omitempty"`
 	LockWhiteboard      *bool `json:"lock_whiteboard,omitempty"`
 	LockSharedNotepad   *bool `json:"lock_shared_notepad,omitempty"`
 }
@@ -121,6 +122,7 @@ func (a *authTokenModel) assignLockSettings(g *GenTokenReq) {
 		l.LockChatFileShare = lock
 		l.LockWhiteboard = lock
 		l.LockSharedNotepad = lock
+		l.LockPrivateChat = lock
 
 		g.UserInfo.UserMetadata.LockSettings = *l
 		return
@@ -152,6 +154,9 @@ func (a *authTokenModel) assignLockSettings(g *GenTokenReq) {
 	}
 	if ul.LockChatFileShare == nil && dl.LockChatFileShare != nil {
 		l.LockChatFileShare = dl.LockChatFileShare
+	}
+	if ul.LockPrivateChat == nil && dl.LockPrivateChat != nil {
+		l.LockPrivateChat = dl.LockPrivateChat
 	}
 	if ul.LockWhiteboard == nil && dl.LockWhiteboard != nil {
 		l.LockWhiteboard = dl.LockWhiteboard
