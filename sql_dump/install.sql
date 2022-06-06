@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS `pnm_room_info` (
   `is_active_rtmp` int(1) NOT NULL DEFAULT 0,
   `rtmp_node_id` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
   `webhook_url` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `is_breakout_room` int(1) NOT NULL DEFAULT 0,
+  `parent_room_id` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
   `creation_time` int(10) NOT NULL,
   `created` datetime NOT NULL DEFAULT current_timestamp(),
   `ended` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',

@@ -20,6 +20,8 @@ type RoomInfo struct {
 	IsActiveRTMP       int    `json:"is_active_rtmp"`
 	NodeIdRTMP         string `json:"rtmp_node_id"`
 	WebhookUrl         string `json:"webhook_url"`
+	IsBreakoutRoom     int64  `json:"is_breakout_room"`
+	ParentRoomId       string `json:"parent_room_id"`
 	CreationTime       int64  `json:"creation_time"`
 	Ended              string
 }
@@ -48,12 +50,12 @@ func (rm *roomModel) InsertRoomData(r *RoomInfo) (int64, error) {
 		return 0, err
 	}
 	defer tx.Rollback()
-	stmt, err := tx.Prepare("INSERT INTO " + rm.app.FormatDBTable("room_info") + " (room_title, roomId, sid, joined_participants, is_running, webhook_url, creation_time) VALUES (?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE is_running = ?")
+	stmt, err := tx.Prepare("INSERT INTO " + rm.app.FormatDBTable("room_info") + " (room_title, roomId, sid, joined_participants, is_running, webhook_url, is_breakout_room, parent_room_id, creation_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE is_running = ?")
 	if err != nil {
 		return 0, err
 	}
 
-	res, err := stmt.Exec(r.RoomTitle, r.RoomId, r.Sid, r.JoinedParticipants, r.IsRunning, r.WebhookUrl, r.CreationTime, 1)
+	res, err := stmt.Exec(r.RoomTitle, r.RoomId, r.Sid, r.JoinedParticipants, r.IsRunning, r.WebhookUrl, r.IsBreakoutRoom, r.ParentRoomId, r.CreationTime, 1)
 	if err != nil {
 		return 0, err
 	}
@@ -180,21 +182,21 @@ func (rm *roomModel) GetRoomInfo(roomId string, sid string, isRunning int) (*Roo
 
 	switch {
 	case len(roomId) > 0 && isRunning == 1 && len(sid) == 0:
-		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, creation_time FROM "+rm.app.FormatDBTable("room_info")+" WHERE roomId = ? AND is_running = 1", roomId)
+		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time FROM "+rm.app.FormatDBTable("room_info")+" WHERE roomId = ? AND is_running = 1", roomId)
 
 	case len(sid) > 0 && isRunning == 1 && len(roomId) == 0:
-		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, creation_time FROM "+rm.app.FormatDBTable("room_info")+" WHERE sid = ? AND is_running = 1", sid)
+		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time FROM "+rm.app.FormatDBTable("room_info")+" WHERE sid = ? AND is_running = 1", sid)
 
 	case len(roomId) > 0 && len(sid) > 0 && isRunning == 1:
-		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, creation_time FROM "+rm.app.FormatDBTable("room_info")+" WHERE roomId = ? AND sid = ? AND is_running = 1", roomId, sid)
+		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time FROM "+rm.app.FormatDBTable("room_info")+" WHERE roomId = ? AND sid = ? AND is_running = 1", roomId, sid)
 
 	default:
-		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, creation_time FROM "+rm.app.FormatDBTable("room_info")+" WHERE sid = ?", sid)
+		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time FROM "+rm.app.FormatDBTable("room_info")+" WHERE sid = ?", sid)
 	}
 
 	var room RoomInfo
 	var msg string
-	err := query.Scan(&room.Id, &room.RoomTitle, &room.RoomId, &room.Sid, &room.JoinedParticipants, &room.IsRunning, &room.IsRecording, &room.IsActiveRTMP, &room.WebhookUrl, &room.CreationTime)
+	err := query.Scan(&room.Id, &room.RoomTitle, &room.RoomId, &room.Sid, &room.JoinedParticipants, &room.IsRunning, &room.IsRecording, &room.IsActiveRTMP, &room.WebhookUrl, &room.IsBreakoutRoom, &room.ParentRoomId, &room.CreationTime)
 
 	switch {
 	case err == sql.ErrNoRows:
@@ -217,6 +219,8 @@ type ActiveRoomInfo struct {
 	IsRecording        int    `json:"is_recording"`
 	IsActiveRTMP       int    `json:"is_active_rtmp"`
 	WebhookUrl         string `json:"webhook_url"`
+	IsBreakoutRoom     int64  `json:"is_breakout_room"`
+	ParentRoomId       string `json:"parent_room_id"`
 	CreationTime       int64  `json:"creation_time"`
 	Metadata           string `json:"metadata"`
 }
@@ -226,7 +230,7 @@ func (rm *roomModel) GetActiveRoomsInfo() ([]ActiveRoomInfo, error) {
 	ctx, cancel := context.WithTimeout(rm.ctx, 3*time.Second)
 	defer cancel()
 
-	rows, err := db.QueryContext(ctx, "select room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, creation_time from "+rm.app.FormatDBTable("room_info")+" where is_running = ?", 1)
+	rows, err := db.QueryContext(ctx, "select room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time from "+rm.app.FormatDBTable("room_info")+" where is_running = ?", 1)
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +240,7 @@ func (rm *roomModel) GetActiveRoomsInfo() ([]ActiveRoomInfo, error) {
 	var rooms []ActiveRoomInfo
 
 	for rows.Next() {
-		err = rows.Scan(&room.RoomTitle, &room.RoomId, &room.Sid, &room.JoinedParticipants, &room.IsRunning, &room.IsRecording, &room.IsActiveRTMP, &room.WebhookUrl, &room.CreationTime)
+		err = rows.Scan(&room.RoomTitle, &room.RoomId, &room.Sid, &room.JoinedParticipants, &room.IsRunning, &room.IsRecording, &room.IsActiveRTMP, &room.WebhookUrl, &room.IsBreakoutRoom, &room.ParentRoomId, &room.CreationTime)
 		if err != nil {
 			fmt.Println(err)
 		}

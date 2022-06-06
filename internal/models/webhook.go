@@ -80,6 +80,10 @@ func (w *webhookEvent) roomStarted() int64 {
 					StartedAt: info.StartedAt, // we can use from livekit
 				})
 			}
+			if info.IsBreakoutRoom {
+				bm := NewBreakoutRoomModel()
+				_ = bm.PostTaskAfterRoomStartWebhook(room.RoomId, info)
+			}
 			marshal, err := json.Marshal(info)
 			if err == nil {
 				_, _ = w.roomService.UpdateRoomMetadata(room.RoomId, string(marshal))
@@ -127,6 +131,15 @@ func (w *webhookEvent) roomFinished() int64 {
 		config.AppCnf.RDS.Publish(context.Background(), "plug-n-meet-websocket", marshal)
 	}
 
+	// notify to clean room from room duration map
+	req := new(RedisRoomDurationCheckerReq)
+	req.Type = "delete"
+	req.RoomId = event.Room.Name
+	marshal, err = json.Marshal(req)
+	if err == nil {
+		w.rc.Publish(w.ctx, "plug-n-meet-room-duration-checker", marshal)
+	}
+
 	// webhook notification
 	w.sendToWebhookNotifier(event)
 
@@ -141,8 +154,9 @@ func (w *webhookEvent) roomFinished() int64 {
 	pm := NewPollsModel()
 	_ = pm.CleanUpPolls(event.Room.Name)
 
-	// notify to clean room from room duration map
-	w.rc.Publish(w.ctx, "plug-n-meet-room-duration-checker", event.Room.Name)
+	// remove all breakout rooms
+	bm := NewBreakoutRoomModel()
+	_ = bm.PostTaskAfterRoomEndWebhook(event.Room.Name, event.Room.Metadata)
 
 	return affected
 }

@@ -71,23 +71,13 @@ type UpdateWaitingRoomMessageReq struct {
 }
 
 func (u *userWaitingRoomModel) UpdateWaitingRoomMessage(r *UpdateWaitingRoomMessageReq) error {
-	room, err := u.roomService.LoadRoomInfoFromRedis(r.RoomId)
+	_, roomMeta, err := u.roomService.LoadRoomWithMetadata(r.RoomId)
 	if err != nil {
 		return err
 	}
 
-	m := make([]byte, len(room.Metadata))
-	copy(m, room.Metadata)
-
-	roomMeta := new(RoomMetadata)
-	_ = json.Unmarshal(m, roomMeta)
 	roomMeta.Features.WaitingRoomFeatures.WaitingRoomMsg = r.Msg
-
-	metadata, err := json.Marshal(roomMeta)
-	if err != nil {
-		return err
-	}
-	_, err = u.roomService.UpdateRoomMetadata(r.RoomId, string(metadata))
+	_, err = u.roomService.UpdateRoomMetadataByStruct(r.RoomId, roomMeta)
 
 	return err
 }

@@ -73,6 +73,8 @@ func (w *websocketService) handleSystemMessages() {
 		"NEW_POLL_RESPONSE",
 		"POLL_CLOSED":
 		w.handlePollsNotifications()
+	case "JOIN_BREAKOUT_ROOM":
+		w.handleSendBreakoutRoomNotification()
 	}
 }
 
@@ -97,11 +99,17 @@ func (w *websocketService) handleChat() {
 
 	config.AppCnf.RLock()
 	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
-		if p.RoomSid == w.rSid {
+		if p.RoomId == w.roomId {
 			// only for specific user
 			if w.pl.To != "" {
-				if w.pl.To == p.UserSid {
+				if w.pl.To == p.UserId {
 					to = append(to, p.UUID)
+				}
+				// for private messages we should send this message back to sender as well as
+				if w.pl.Body.IsPrivate {
+					if w.pl.Body.From.UserId == p.UserId {
+						to = append(to, p.UUID)
+					}
 				}
 			} else {
 				// for everyone in the room
@@ -207,7 +215,6 @@ func (w *websocketService) handleSendPushMsg() {
 		}
 	}
 	config.AppCnf.RUnlock()
-
 	if len(to) > 0 {
 		ikisocket.EmitToList(to, jm)
 	}
@@ -309,6 +316,33 @@ func (w *websocketService) handlePollsNotifications() {
 	}
 	config.AppCnf.RUnlock()
 
+	if len(to) > 0 {
+		ikisocket.EmitToList(to, jm)
+	}
+}
+
+func (w *websocketService) handleSendBreakoutRoomNotification() {
+	jm, err := json.Marshal(w.pl)
+	if err != nil {
+		return
+	}
+	var to []string
+
+	config.AppCnf.RLock()
+	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
+		if p.RoomId == w.roomId {
+			// only for specific user
+			if w.pl.To != "" {
+				if w.pl.To == p.UserId {
+					to = append(to, p.UUID)
+				}
+			} else {
+				// for everyone in the room
+				to = append(to, p.UUID)
+			}
+		}
+	}
+	config.AppCnf.RUnlock()
 	if len(to) > 0 {
 		ikisocket.EmitToList(to, jm)
 	}

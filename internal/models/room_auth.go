@@ -19,6 +19,8 @@ type RoomMetadata struct {
 	WelcomeMessage      string             `json:"welcome_message"`
 	IsRecording         bool               `json:"is_recording"`
 	IsActiveRTMP        bool               `json:"is_active_rtmp"`
+	ParentRoomId        string             `json:"parent_room_id"`
+	IsBreakoutRoom      bool               `json:"is_breakout_room"`
 	WebhookUrl          string             `json:"webhook_url"`
 	StartedAt           int64              `json:"started_at"`
 	Features            RoomCreateFeatures `json:"room_features"`
@@ -41,6 +43,7 @@ type RoomCreateFeatures struct {
 	WhiteboardFeatures          WhiteboardFeatures          `json:"whiteboard_features"`
 	ExternalMediaPlayerFeatures ExternalMediaPlayerFeatures `json:"external_media_player_features"`
 	WaitingRoomFeatures         WaitingRoomFeatures         `json:"waiting_room_features"`
+	BreakoutRoomFeatures        BreakoutRoomFeatures        `json:"breakout_room_features"`
 }
 
 type ChatFeatures struct {
@@ -80,6 +83,12 @@ type ExternalMediaPlayerFeatures struct {
 type WaitingRoomFeatures struct {
 	IsActive       bool   `json:"is_active"`
 	WaitingRoomMsg string `json:"waiting_room_msg"`
+}
+
+type BreakoutRoomFeatures struct {
+	IsAllow            bool  `json:"is_allow"`
+	IsActive           bool  `json:"is_active"`
+	AllowedNumberRooms int32 `json:"allowed_number_rooms"`
 }
 
 type RoomEndReq struct {
@@ -145,6 +154,13 @@ func (am *roomAuthModel) CreateRoom(r *RoomCreateReq) (bool, string, *livekit.Ro
 		r.RoomMetadata.Features.WhiteboardFeatures.TotalPages = 10
 	}
 
+	if r.RoomMetadata.Features.BreakoutRoomFeatures.IsAllow {
+		r.RoomMetadata.Features.BreakoutRoomFeatures.IsActive = false
+		if r.RoomMetadata.Features.BreakoutRoomFeatures.AllowedNumberRooms == 0 {
+			r.RoomMetadata.Features.BreakoutRoomFeatures.AllowedNumberRooms = 6
+		}
+	}
+
 	// by default, we'll lock screen share, whiteboard & shared notepad
 	// so that only admin can use those features.
 	lock := new(bool)
@@ -172,6 +188,11 @@ func (am *roomAuthModel) CreateRoom(r *RoomCreateReq) (bool, string, *livekit.Ro
 		return false, "Error: " + err.Error(), nil
 	}
 
+	isBreakoutRoom := 0
+	if r.RoomMetadata.IsBreakoutRoom {
+		isBreakoutRoom = 1
+	}
+
 	ri := &RoomInfo{
 		RoomTitle:          r.RoomMetadata.RoomTitle,
 		RoomId:             room.Name,
@@ -180,6 +201,8 @@ func (am *roomAuthModel) CreateRoom(r *RoomCreateReq) (bool, string, *livekit.Ro
 		IsRunning:          1,
 		CreationTime:       room.CreationTime,
 		WebhookUrl:         r.RoomMetadata.WebhookUrl,
+		IsBreakoutRoom:     int64(isBreakoutRoom),
+		ParentRoomId:       r.RoomMetadata.ParentRoomId,
 	}
 
 	_, err = am.rm.InsertRoomData(ri)
@@ -234,6 +257,8 @@ func (am *roomAuthModel) GetActiveRoomInfo(r *IsRoomActiveReq) (bool, string, *A
 		IsRecording:        roomDbInfo.IsRecording,
 		IsActiveRTMP:       roomDbInfo.IsActiveRTMP,
 		WebhookUrl:         roomDbInfo.WebhookUrl,
+		IsBreakoutRoom:     roomDbInfo.IsBreakoutRoom,
+		ParentRoomId:       roomDbInfo.ParentRoomId,
 		CreationTime:       roomDbInfo.CreationTime,
 		Metadata:           rrr.Metadata,
 	}
@@ -303,16 +328,7 @@ type ChangeVisibilityRes struct {
 }
 
 func (am *roomAuthModel) ChangeVisibility(r *ChangeVisibilityRes) (bool, string) {
-	room, err := am.rs.LoadRoomInfoFromRedis(r.RoomId)
-	if err != nil {
-		return false, err.Error()
-	}
-
-	m := make([]byte, len(room.Metadata))
-	copy(m, room.Metadata)
-
-	roomMeta := new(RoomMetadata)
-	err = json.Unmarshal(m, roomMeta)
+	_, roomMeta, err := am.rs.LoadRoomWithMetadata(r.RoomId)
 	if err != nil {
 		return false, err.Error()
 	}
@@ -324,8 +340,7 @@ func (am *roomAuthModel) ChangeVisibility(r *ChangeVisibilityRes) (bool, string)
 		roomMeta.Features.SharedNotePadFeatures.Visible = *r.VisibleNotepad
 	}
 
-	metadata, _ := json.Marshal(roomMeta)
-	_, err = am.rs.UpdateRoomMetadata(r.RoomId, string(metadata))
+	_, err = am.rs.UpdateRoomMetadataByStruct(r.RoomId, roomMeta)
 
 	if err != nil {
 		return false, err.Error()

@@ -102,35 +102,24 @@ func (m *EtherpadModel) CreateSession(roomId string) (*CreateSessionRes, error) 
 }
 
 func (m *EtherpadModel) addPadToRoomMetadata(roomId string, c *CreateSessionRes) error {
-	room, err := m.rs.LoadRoomInfoFromRedis(roomId)
+	_, meta, err := m.rs.LoadRoomWithMetadata(roomId)
 	if err != nil {
 		return err
 	}
 
-	meta := make([]byte, len(room.Metadata))
-	copy(meta, room.Metadata)
-
-	roomMeta := new(RoomMetadata)
-	_ = json.Unmarshal(meta, roomMeta)
-
 	f := SharedNotePadFeatures{
-		AllowedSharedNotePad: roomMeta.Features.SharedNotePadFeatures.AllowedSharedNotePad,
+		AllowedSharedNotePad: meta.Features.SharedNotePadFeatures.AllowedSharedNotePad,
 		IsActive:             true,
 		NodeId:               m.NodeId,
 		Host:                 m.Host,
 		NotePadId:            c.PadId,
 		ReadOnlyPadId:        c.ReadOnlyPadId,
 	}
-	roomMeta.Features.SharedNotePadFeatures = f
+	meta.Features.SharedNotePadFeatures = f
 
-	metadata, err := json.Marshal(roomMeta)
-	if err != nil {
-		return err
-	}
+	_, err = m.rs.UpdateRoomMetadataByStruct(roomId, meta)
 
-	_, _ = m.rs.UpdateRoomMetadata(roomId, string(metadata))
-
-	return nil
+	return err
 }
 
 type CleanPadReq struct {
@@ -182,24 +171,14 @@ type ChangeEtherpadStatusReq struct {
 }
 
 func (m *EtherpadModel) ChangeEtherpadStatus(r *ChangeEtherpadStatusReq) error {
-	room, err := m.rs.LoadRoomInfoFromRedis(r.RoomId)
+	_, meta, err := m.rs.LoadRoomWithMetadata(r.RoomId)
 	if err != nil {
 		return err
 	}
 
-	meta := make([]byte, len(room.Metadata))
-	copy(meta, room.Metadata)
+	meta.Features.SharedNotePadFeatures.IsActive = r.IsActive
 
-	roomMeta := new(RoomMetadata)
-	_ = json.Unmarshal(meta, roomMeta)
-
-	roomMeta.Features.SharedNotePadFeatures.IsActive = r.IsActive
-	metadata, err := json.Marshal(roomMeta)
-	if err != nil {
-		return err
-	}
-
-	_, err = m.rs.UpdateRoomMetadata(r.RoomId, string(metadata))
+	_, err = m.rs.UpdateRoomMetadataByStruct(r.RoomId, meta)
 
 	return err
 }

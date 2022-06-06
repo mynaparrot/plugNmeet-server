@@ -186,7 +186,7 @@ func (a *AppConfig) DoValidateReq(r interface{}) []*ErrorResponse {
 }
 
 func ValidateId(fl validator.FieldLevel) bool {
-	isValid := regexp.MustCompile(`^[a-zA-Z0-9\-_.]+$`).MatchString
+	isValid := regexp.MustCompile(`^[a-zA-Z0-9\-_.:]+$`).MatchString
 	return isValid(fl.Field().String())
 }
 
@@ -250,4 +250,16 @@ func (a *AppConfig) GetRoomsWithDurationMap() map[string]RoomWithDuration {
 	// we don't need to lock implementation
 	// as we'll require locking before looping over anyway
 	return a.roomWithDuration
+}
+
+func (a *AppConfig) IncreaseRoomDuration(roomId string, duration int64) int64 {
+	a.Lock()
+	defer a.Unlock()
+	if r, ok := a.roomWithDuration[roomId]; ok {
+		r.Duration = (r.Duration + duration)
+		a.roomWithDuration[roomId] = r
+		return r.Duration
+	}
+
+	return 0
 }

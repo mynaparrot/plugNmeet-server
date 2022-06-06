@@ -1,7 +1,6 @@
 package models
 
 import (
-	"encoding/json"
 	"errors"
 )
 
@@ -66,16 +65,7 @@ func (e *ExternalMediaPlayer) endPlayBack() error {
 }
 
 func (e *ExternalMediaPlayer) updateRoomMetadata(opts *updateRoomMetadataOpts) error {
-	room, err := e.rs.LoadRoomInfoFromRedis(e.req.RoomId)
-	if err != nil {
-		return err
-	}
-
-	data := make([]byte, len(room.Metadata))
-	copy(data, room.Metadata)
-
-	roomMeta := new(RoomMetadata)
-	err = json.Unmarshal(data, roomMeta)
+	_, roomMeta, err := e.rs.LoadRoomWithMetadata(e.req.RoomId)
 	if err != nil {
 		return err
 	}
@@ -90,12 +80,7 @@ func (e *ExternalMediaPlayer) updateRoomMetadata(opts *updateRoomMetadataOpts) e
 		roomMeta.Features.ExternalMediaPlayerFeatures.SharedBy = *opts.sharedBy
 	}
 
-	metadata, _ := json.Marshal(roomMeta)
-	_, err = e.rs.UpdateRoomMetadata(e.req.RoomId, string(metadata))
+	_, err = e.rs.UpdateRoomMetadataByStruct(e.req.RoomId, roomMeta)
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }

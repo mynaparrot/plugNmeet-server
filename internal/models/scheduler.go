@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/go-redis/redis/v8"
 	"github.com/mynaparrot/plugNmeet/internal/config"
 	log "github.com/sirupsen/logrus"
@@ -42,6 +43,12 @@ func (s *scheduler) StartScheduler() {
 	}()
 }
 
+type RedisRoomDurationCheckerReq struct {
+	Type     string `json:"type"`
+	RoomId   string `json:"room_id"`
+	Duration int64  `json:"duration"`
+}
+
 func (s *scheduler) subscribeRedisRoomDurationChecker() {
 	pubsub := s.rc.Subscribe(s.ctx, "plug-n-meet-room-duration-checker")
 	defer pubsub.Close()
@@ -52,7 +59,16 @@ func (s *scheduler) subscribeRedisRoomDurationChecker() {
 	}
 	ch := pubsub.Channel()
 	for msg := range ch {
-		config.AppCnf.DeleteRoomFromRoomWithDurationMap(msg.Payload)
+		req := new(RedisRoomDurationCheckerReq)
+		err := json.Unmarshal([]byte(msg.Payload), req)
+		if err != nil {
+			continue
+		}
+		if req.Type == "delete" {
+			config.AppCnf.DeleteRoomFromRoomWithDurationMap(req.RoomId)
+		} else if req.Type == "increaseDuration" {
+			s.increaseRoomDuration(req.RoomId, req.Duration)
+		}
 	}
 }
 
@@ -70,4 +86,26 @@ func (s *scheduler) checkRoomWithDuration() {
 		}
 	}
 	config.AppCnf.RUnlock()
+}
+
+func (s *scheduler) increaseRoomDuration(roomId string, duration int64) {
+	newDuration := config.AppCnf.IncreaseRoomDuration(roomId, duration)
+	if newDuration == 0 {
+		// so record not found in this server
+		return
+	}
+
+	// increase room duration
+	roomService := NewRoomService()
+	_, meta, err := roomService.LoadRoomWithMetadata(roomId)
+	if err != nil {
+		return
+	}
+
+	meta.Features.RoomDuration = newDuration
+	_, err = roomService.UpdateRoomMetadataByStruct(roomId, meta)
+
+	if err != nil {
+		return
+	}
 }

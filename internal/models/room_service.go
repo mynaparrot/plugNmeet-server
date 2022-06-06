@@ -2,11 +2,13 @@ package models
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"github.com/go-redis/redis/v8"
 	"github.com/livekit/protocol/livekit"
 	lksdk "github.com/livekit/server-sdk-go"
 	"github.com/mynaparrot/plugNmeet/internal/config"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -14,6 +16,7 @@ const (
 	RoomsKey               = "rooms"
 	RoomParticipantsPrefix = "room_participants:"
 	BlockedUsersList       = "pnm:block_users_list:"
+	NodeRoomKey            = "room_node_map"
 )
 
 type RoomService struct {
@@ -154,6 +157,18 @@ func (r *RoomService) EndRoom(roomId string) (string, error) {
 	return res.String(), nil
 }
 
+func (r *RoomService) DeleteRoomFromRedis(roomId string) error {
+	pp := r.rc.Pipeline()
+	pp.HDel(r.ctx, RoomsKey, roomId)
+	pp.HDel(r.ctx, NodeRoomKey, roomId)
+	_, err := pp.Exec(r.ctx)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	return nil
+}
+
 func (r *RoomService) UpdateParticipantMetadata(roomId string, userId string, metadata string) (*livekit.ParticipantInfo, error) {
 	data := livekit.UpdateParticipantRequest{
 		Room:     roomId,
@@ -247,4 +262,64 @@ func (r *RoomService) IsUserExistInBlockList(roomId, userId string) bool {
 func (r *RoomService) DeleteRoomBlockList(roomId string) (int64, error) {
 	key := BlockedUsersList + roomId
 	return r.rc.Del(r.ctx, key).Result()
+}
+
+func (r *RoomService) LoadRoomWithMetadata(roomId string) (*livekit.Room, *RoomMetadata, error) {
+	room, err := r.LoadRoomInfoFromRedis(roomId)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if room.Metadata == "" {
+		return room, nil, err
+	}
+
+	meta := new(RoomMetadata)
+	err = json.Unmarshal([]byte(room.Metadata), meta)
+	if err != nil {
+		return room, nil, err
+	}
+
+	return room, meta, nil
+}
+
+func (r *RoomService) UpdateRoomMetadataByStruct(roomId string, meta *RoomMetadata) (*livekit.Room, error) {
+	marshal, err := json.Marshal(meta)
+	if err != nil {
+		return nil, err
+	}
+	room, err := r.UpdateRoomMetadata(roomId, string(marshal))
+	if err != nil {
+		return nil, err
+	}
+
+	return room, nil
+}
+
+func (r *RoomService) LoadParticipantWithMetadata(roomId, userId string) (*livekit.ParticipantInfo, *UserMetadata, error) {
+	p, err := r.LoadParticipantInfoFromRedis(roomId, userId)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	meta := new(UserMetadata)
+	err = json.Unmarshal([]byte(p.Metadata), meta)
+	if err != nil {
+		return p, nil, err
+	}
+
+	return p, meta, nil
+}
+
+func (r *RoomService) UpdateParticipantMetadataByStruct(roomId, userId string, meta *UserMetadata) (*livekit.ParticipantInfo, error) {
+	marshal, err := json.Marshal(meta)
+	if err != nil {
+		return nil, err
+	}
+	p, err := r.UpdateParticipantMetadata(roomId, userId, string(marshal))
+	if err != nil {
+		return nil, err
+	}
+
+	return p, nil
 }

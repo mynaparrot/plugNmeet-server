@@ -36,6 +36,7 @@ type LockSettings struct {
 	LockChat            *bool `json:"lock_chat,omitempty"`
 	LockChatSendMessage *bool `json:"lock_chat_send_message,omitempty"`
 	LockChatFileShare   *bool `json:"lock_chat_file_share,omitempty"`
+	LockPrivateChat     *bool `json:"lock_private_chat,omitempty"`
 	LockWhiteboard      *bool `json:"lock_whiteboard,omitempty"`
 	LockSharedNotepad   *bool `json:"lock_shared_notepad,omitempty"`
 }
@@ -121,50 +122,52 @@ func (a *authTokenModel) assignLockSettings(g *GenTokenReq) {
 		l.LockChatFileShare = lock
 		l.LockWhiteboard = lock
 		l.LockSharedNotepad = lock
-	} else {
-		roomInfo, err := a.rs.LoadRoomInfoFromRedis(g.RoomId)
-		if err != nil {
-			g.UserInfo.UserMetadata.LockSettings = *l
-		}
+		l.LockPrivateChat = lock
 
-		meta := make([]byte, len(roomInfo.Metadata))
-		copy(meta, roomInfo.Metadata)
+		g.UserInfo.UserMetadata.LockSettings = *l
+		return
+	}
 
-		m := new(RoomMetadata)
-		_ = json.Unmarshal(meta, m)
-		// if no lock settings were for this user
-		// then we'll use default room lock settings
-		dl := m.DefaultLockSettings
+	_, meta, err := a.rs.LoadRoomWithMetadata(g.RoomId)
+	if err != nil {
+		g.UserInfo.UserMetadata.LockSettings = *l
+	}
 
-		if ul.LockWebcam == nil && dl.LockWebcam != nil {
-			l.LockWebcam = dl.LockWebcam
-		}
-		if ul.LockMicrophone == nil && dl.LockMicrophone != nil {
-			l.LockMicrophone = dl.LockMicrophone
-		}
-		if ul.LockScreenSharing == nil && dl.LockScreenSharing != nil {
-			l.LockScreenSharing = dl.LockScreenSharing
-		}
-		if ul.LockChat == nil && dl.LockChat != nil {
-			l.LockChat = dl.LockChat
-		}
-		if ul.LockChatSendMessage == nil && dl.LockChatSendMessage != nil {
-			l.LockChatSendMessage = dl.LockChatSendMessage
-		}
-		if ul.LockChatFileShare == nil && dl.LockChatFileShare != nil {
-			l.LockChatFileShare = dl.LockChatFileShare
-		}
-		if ul.LockWhiteboard == nil && dl.LockWhiteboard != nil {
-			l.LockWhiteboard = dl.LockWhiteboard
-		}
-		if ul.LockSharedNotepad == nil && dl.LockSharedNotepad != nil {
-			l.LockSharedNotepad = dl.LockSharedNotepad
-		}
+	// if no lock settings were for this user
+	// then we'll use default room lock settings
+	dl := meta.DefaultLockSettings
 
-		// if waiting room feature active then we won't allow direct access
-		if m.Features.WaitingRoomFeatures.IsActive {
-			g.UserInfo.UserMetadata.WaitForApproval = true
-		}
+	if ul.LockWebcam == nil && dl.LockWebcam != nil {
+		l.LockWebcam = dl.LockWebcam
+	}
+	if ul.LockMicrophone == nil && dl.LockMicrophone != nil {
+		l.LockMicrophone = dl.LockMicrophone
+	}
+	if ul.LockScreenSharing == nil && dl.LockScreenSharing != nil {
+		l.LockScreenSharing = dl.LockScreenSharing
+	}
+	if ul.LockChat == nil && dl.LockChat != nil {
+		l.LockChat = dl.LockChat
+	}
+	if ul.LockChatSendMessage == nil && dl.LockChatSendMessage != nil {
+		l.LockChatSendMessage = dl.LockChatSendMessage
+	}
+	if ul.LockChatFileShare == nil && dl.LockChatFileShare != nil {
+		l.LockChatFileShare = dl.LockChatFileShare
+	}
+	if ul.LockPrivateChat == nil && dl.LockPrivateChat != nil {
+		l.LockPrivateChat = dl.LockPrivateChat
+	}
+	if ul.LockWhiteboard == nil && dl.LockWhiteboard != nil {
+		l.LockWhiteboard = dl.LockWhiteboard
+	}
+	if ul.LockSharedNotepad == nil && dl.LockSharedNotepad != nil {
+		l.LockSharedNotepad = dl.LockSharedNotepad
+	}
+
+	// if waiting room feature active then we won't allow direct access
+	if meta.Features.WaitingRoomFeatures.IsActive {
+		g.UserInfo.UserMetadata.WaitForApproval = true
 	}
 
 	g.UserInfo.UserMetadata.LockSettings = *l

@@ -149,6 +149,8 @@ func (u *userModel) changeLockSettingsMetadata(service string, direction string,
 		l.LockChatSendMessage = lock
 	case "chatFile":
 		l.LockChatFileShare = lock
+	case "privateChat":
+		l.LockPrivateChat = lock
 	case "whiteboard":
 		l.LockWhiteboard = lock
 	case "sharedNotepad":
