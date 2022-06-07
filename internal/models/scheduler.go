@@ -17,7 +17,7 @@ type scheduler struct {
 	closeTicker chan bool
 }
 
-func NewScheduler() *scheduler {
+func NewSchedulerModel() *scheduler {
 	return &scheduler{
 		rc:          config.AppCnf.RDS,
 		ctx:         context.Background(),
@@ -74,6 +74,8 @@ func (s *scheduler) subscribeRedisRoomDurationChecker() {
 
 func (s *scheduler) checkRoomWithDuration() {
 	config.AppCnf.RLock()
+	defer config.AppCnf.RUnlock()
+
 	rooms := config.AppCnf.GetRoomsWithDurationMap()
 	for i, r := range rooms {
 		now := time.Now().Unix()
@@ -85,7 +87,6 @@ func (s *scheduler) checkRoomWithDuration() {
 			}
 		}
 	}
-	config.AppCnf.RUnlock()
 }
 
 func (s *scheduler) increaseRoomDuration(roomId string, duration int64) {
