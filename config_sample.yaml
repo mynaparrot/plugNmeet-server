@@ -29,7 +29,7 @@ log_settings:
   # max age of log before rotate in days
   maxage: 2
 livekit_info:
-  host: "http://livekit:7880"
+  host: "http://host.docker.internal:7880"
   api_key: "APIiYAA5w37Cfo2"
   secret: "6aNur7qqupeZhFYNOJVUyeXxXhVw8f4lm13pEDUx8SgB"
   # value in minutes. Default 10 minutes. Client will renew token automatically

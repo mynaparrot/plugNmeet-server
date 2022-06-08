@@ -120,11 +120,14 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 		req.IsProduction = b
 	}
 
+	livekitHost := strings.Replace(config.AppCnf.LivekitInfo.Host, "host.docker.internal", "localhost", 1) // without this you won't be able to connect
+
 	if !*req.IsProduction {
 		return c.JSON(fiber.Map{
-			"status": true,
-			"msg":    "token is valid",
-			"token":  token,
+			"status":       true,
+			"msg":          "token is valid",
+			"livekit_host": livekitHost,
+			"token":        token,
 		})
 	}
 
@@ -137,9 +140,10 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	})
 
 	return c.JSON(fiber.Map{
-		"status": status,
-		"msg":    msg,
-		"token":  token,
+		"status":       status,
+		"msg":          msg,
+		"livekit_host": livekitHost,
+		"token":        token,
 	})
 }
 
