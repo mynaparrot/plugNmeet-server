@@ -87,8 +87,7 @@ func HandleDownloadUploadedFile(c *fiber.Ctx) error {
 	}
 
 	c.Set("Content-Disposition", "attachment; filename="+strconv.Quote(fileInfo.Name()))
-	c.Set("Content-Type", "application/octet-stream")
-	return c.SendFile(file)
+	return c.SendFile(file, true)
 }
 
 func HandleConvertWhiteboardFile(c *fiber.Ctx) error {
