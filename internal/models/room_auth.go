@@ -1,7 +1,7 @@
 package models
 
 import (
-	"encoding/json"
+	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugNmeet/internal/config"
 	"time"

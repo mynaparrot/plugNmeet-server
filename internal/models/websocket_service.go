@@ -1,9 +1,9 @@
 package models
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/antoniodipinto/ikisocket"
+	"github.com/goccy/go-json"
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugNmeet/internal/config"
 	"time"

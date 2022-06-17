@@ -2,9 +2,9 @@ package models
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/goccy/go-json"
 	"github.com/google/uuid"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugNmeet/internal/config"

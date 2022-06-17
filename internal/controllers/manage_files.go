@@ -7,7 +7,6 @@ import (
 	"github.com/mynaparrot/plugNmeet/internal/models"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
 )
 
@@ -79,16 +78,14 @@ func HandleDownloadUploadedFile(c *fiber.Ctx) error {
 	otherParts, _ = url.QueryUnescape(otherParts)
 
 	file := fmt.Sprintf("%s/%s/%s", config.AppCnf.UploadFileSettings.Path, sid, otherParts)
-	fileInfo, err := os.Lstat(file)
+	_, err := os.Lstat(file)
 	if err != nil {
-		_ = c.SendStatus(fiber.StatusNotFound)
 		ms := strings.SplitN(err.Error(), "/", -1)
-		return c.SendString(ms[3])
+		return c.Status(fiber.StatusNotFound).SendString(ms[3])
 	}
 
-	c.Set("Content-Disposition", "attachment; filename="+strconv.Quote(fileInfo.Name()))
-	c.Set("Content-Type", "application/octet-stream")
-	return c.SendFile(file)
+	c.Attachment(file)
+	return c.SendFile(file, true)
 }
 
 func HandleConvertWhiteboardFile(c *fiber.Ctx) error {

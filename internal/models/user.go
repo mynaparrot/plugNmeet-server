@@ -2,8 +2,8 @@ package models
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
+	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugNmeet/internal/config"

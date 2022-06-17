@@ -1,10 +1,10 @@
 package models
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/gabriel-vasile/mimetype"
+	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugNmeet/internal/config"
