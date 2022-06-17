@@ -2,10 +2,10 @@ package models
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/go-redis/redis/v8"
+	"github.com/goccy/go-json"
 	"github.com/mynaparrot/plugNmeet/internal/config"
 	log "github.com/sirupsen/logrus"
 	"time"

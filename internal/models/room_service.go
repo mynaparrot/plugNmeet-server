@@ -2,9 +2,9 @@ package models
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"github.com/go-redis/redis/v8"
+	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/livekit"
 	lksdk "github.com/livekit/server-sdk-go"
 	"github.com/mynaparrot/plugNmeet/internal/config"

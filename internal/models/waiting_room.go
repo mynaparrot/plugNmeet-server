@@ -2,8 +2,8 @@ package models
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
+	"github.com/goccy/go-json"
 )
 
 type userWaitingRoomModel struct {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/ansrivas/fiberprometheus/v2"
+	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -21,7 +22,9 @@ func Router() *fiber.App {
 	}
 
 	app := fiber.New(fiber.Config{
-		Views: templateEngine,
+		JSONEncoder: json.Marshal,
+		JSONDecoder: json.Unmarshal,
+		Views:       templateEngine,
 	})
 	app.Static("/assets", config.AppCnf.Client.Path+"/assets")
 	app.Static("/favicon.ico", config.AppCnf.Client.Path+"/assets/imgs/favicon.ico")

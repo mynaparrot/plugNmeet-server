@@ -1,8 +1,8 @@
 package models
 
 import (
-	"encoding/json"
 	"errors"
+	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/auth"
 	"github.com/mynaparrot/plugNmeet/internal/config"
 )

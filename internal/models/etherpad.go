@@ -2,9 +2,9 @@ package models
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"github.com/go-redis/redis/v8"
+	"github.com/goccy/go-json"
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugNmeet/internal/config"
 	"io/ioutil"

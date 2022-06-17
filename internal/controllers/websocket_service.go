@@ -2,8 +2,8 @@ package controllers
 
 import (
 	"context"
-	"encoding/json"
 	"github.com/antoniodipinto/ikisocket"
+	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugNmeet/internal/config"
 	"github.com/mynaparrot/plugNmeet/internal/models"

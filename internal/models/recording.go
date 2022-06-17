@@ -3,9 +3,9 @@ package models
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"github.com/go-redis/redis/v8"
+	"github.com/goccy/go-json"
 	"github.com/mynaparrot/plugNmeet/internal/config"
 	log "github.com/sirupsen/logrus"
 	"net/url"
