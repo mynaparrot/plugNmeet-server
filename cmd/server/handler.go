@@ -52,6 +52,10 @@ func Router() *fiber.App {
 	app.Get("/download/uploadedFile/:sid/*", controllers.HandleDownloadUploadedFile)
 	app.Get("/download/recording/:token", controllers.HandleDownloadRecording)
 
+	// lti group
+	lti := app.Group("/lti")
+	lti.Post("/v1", controllers.HandleLTIV1)
+
 	// auth group, will require API-KEY & API-SECRET as header value
 	auth := app.Group("/auth", controllers.HandleAuthHeaderCheck)
 	// for room
