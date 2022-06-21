@@ -1,7 +1,7 @@
 package models
 
 import (
-	"crypto/md5"
+	"crypto/sha1"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -52,7 +52,7 @@ func (m *LTIV1) LTIV1Landing(c *fiber.Ctx, requests, signingURL string) error {
 
 	userId := params.Get("user_id")
 	if userId == "" {
-		userId = m.genUserId(params.Get("lis_person_contact_email_primary"))
+		userId = m.genHashId(params.Get("lis_person_contact_email_primary"))
 	}
 
 	if userId == "" {
@@ -63,7 +63,7 @@ func (m *LTIV1) LTIV1Landing(c *fiber.Ctx, requests, signingURL string) error {
 		UserId:    userId,
 		Name:      params.Get("lis_person_name_full"),
 		IsAdmin:   false,
-		RoomId:    roomId,
+		RoomId:    m.genHashId(roomId),
 		RoomTitle: params.Get("context_label"),
 	}
 
@@ -117,9 +117,9 @@ func (m *LTIV1) VerifyAuth(requests, signingURL string) (*url.Values, error) {
 	return &params, nil
 }
 
-func (m *LTIV1) genUserId(email string) string {
-	hasher := md5.New()
-	hasher.Write([]byte(email))
+func (m *LTIV1) genHashId(id string) string {
+	hasher := sha1.New()
+	hasher.Write([]byte(id))
 	hash := hex.EncodeToString(hasher.Sum(nil))
 
 	return hash
