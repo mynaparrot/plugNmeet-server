@@ -29,6 +29,12 @@ type LtiClaims struct {
 	RoomTitle string `json:"room_title"`
 }
 
+type LTIV1FetchRecordingsReq struct {
+	From    int    `json:"from"`
+	Limit   int    `json:"limit"`
+	OrderBy string `json:"order_by"`
+}
+
 func NewLTIV1Model() *LTIV1 {
 	return &LTIV1{
 		authModel:      NewRoomAuthModel(),

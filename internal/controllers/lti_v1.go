@@ -106,3 +106,97 @@ func HandleLTIV1EndRoom(c *fiber.Ctx) error {
 		"msg":    msg,
 	})
 }
+
+func HandleLTIV1FetchRecordings(c *fiber.Ctx) error {
+	roomId := c.Locals("roomId")
+
+	req := new(models.LTIV1FetchRecordingsReq)
+	err := c.BodyParser(req)
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	m := models.NewRecordingAuth()
+	result, err := m.FetchRecordings(&models.FetchRecordingsReq{
+		RoomIds: []string{roomId.(string)},
+		From:    req.From,
+		Limit:   req.Limit,
+		OrderBy: req.OrderBy,
+	})
+
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"status": true,
+		"msg":    "success",
+		"result": result,
+	})
+}
+
+func HandleLTIV1GetRecordingDownloadToken(c *fiber.Ctx) error {
+	req := new(models.GetDownloadTokenReq)
+	err := c.BodyParser(req)
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	m := models.NewRecordingAuth()
+	token, err := m.GetDownloadToken(req)
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"status": true,
+		"msg":    "success",
+		"token":  token,
+	})
+}
+
+func HandleLTIV1DeleteRecordings(c *fiber.Ctx) error {
+	isAdmin := c.Locals("isAdmin").(bool)
+
+	if !isAdmin {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    "only admin can perform this",
+		})
+	}
+
+	req := new(models.DeleteRecordingReq)
+	err := c.BodyParser(req)
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	m := models.NewRecordingAuth()
+	err = m.DeleteRecording(req)
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"status": true,
+		"msg":    "success",
+	})
+}
