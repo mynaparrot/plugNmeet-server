@@ -54,7 +54,13 @@ func Router() *fiber.App {
 
 	// lti group
 	lti := app.Group("/lti")
-	lti.Post("/v1", controllers.HandleLTIV1)
+	lti.Post("/v1", controllers.HandleLTIV1Landing)
+	ltiV1API := lti.Group("/v1/api", controllers.HandleLTIV1VerifyHeaderToken)
+	ltiV1API.Post("/room/join", controllers.HandleLTIV1JoinRoom)
+	ltiV1API.Post("/room/isActive", controllers.HandleLTIV1IsRoomActive)
+	ltiV1API.Post("/room/end", controllers.HandleLTIV1EndRoom)
+	//ltiV1API.Post("/recording/delete")
+	//ltiV1API.Post("/recording/download")
 
 	// auth group, will require API-KEY & API-SECRET as header value
 	auth := app.Group("/auth", controllers.HandleAuthHeaderCheck)
