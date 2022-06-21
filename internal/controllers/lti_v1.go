@@ -16,7 +16,7 @@ func HandleLTIV1Landing(c *fiber.Ctx) error {
 
 	signingURL := fmt.Sprintf("%v://%v%v", c.Protocol(), c.Hostname(), c.OriginalURL())
 	m := models.NewLTIV1Model()
-	err := m.Landing(c, string(b), signingURL)
+	err := m.LTIV1Landing(c, string(b), signingURL)
 	if err != nil {
 		return err
 	}
@@ -24,15 +24,28 @@ func HandleLTIV1Landing(c *fiber.Ctx) error {
 	return nil
 }
 
+func HandleLTIV1GETREQUEST(c *fiber.Ctx) error {
+	return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+		"status": false,
+		"msg":    "please use POST request",
+	})
+}
+
 func HandleLTIV1VerifyHeaderToken(c *fiber.Ctx) error {
 	authToken := c.Get("Authorization")
+	if authToken == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"status": false,
+			"msg":    "Authorization header is missing",
+		})
+	}
 
 	m := models.NewLTIV1Model()
 	auth, err := m.LTIV1VerifyHeaderToken(authToken)
 	if err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"status": false,
-			"msg":    "Authorization header is missing",
+			"msg":    "invalid authorization header",
 		})
 	}
 

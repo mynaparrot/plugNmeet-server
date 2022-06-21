@@ -42,7 +42,7 @@ func NewLTIV1Model() *LTIV1 {
 	}
 }
 
-func (m *LTIV1) Landing(c *fiber.Ctx, requests, signingURL string) error {
+func (m *LTIV1) LTIV1Landing(c *fiber.Ctx, requests, signingURL string) error {
 	params, err := m.VerifyAuth(requests, signingURL)
 	if err != nil {
 		return err
@@ -61,9 +61,6 @@ func (m *LTIV1) Landing(c *fiber.Ctx, requests, signingURL string) error {
 	if strings.Contains(params.Get("roles"), "Instructor") {
 		claims.IsAdmin = true
 	}
-
-	fmt.Println(claims)
-	fmt.Println(params.Get("roles"))
 
 	j, err := m.ToJWT(claims)
 	if err != nil {
@@ -114,9 +111,9 @@ func (m *LTIV1) VerifyAuth(requests, signingURL string) (*url.Values, error) {
 func (m *LTIV1) genUserId(email string) string {
 	hasher := md5.New()
 	hasher.Write([]byte(email))
-	sha := hex.EncodeToString(hasher.Sum(nil))
+	hash := hex.EncodeToString(hasher.Sum(nil))
 
-	return sha
+	return hash
 }
 
 func (m *LTIV1) ToJWT(c *LtiClaims) (string, error) {
