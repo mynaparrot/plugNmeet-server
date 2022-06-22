@@ -53,11 +53,12 @@ Please check [plugNmeet-install](https://github.com/mynaparrot/plugNmeet-install
 1) [PHP](https://github.com/mynaparrot/plugNmeet-sdk-php)
 2) [JavaScript](https://github.com/mynaparrot/plugNmeet-sdk-js) for NodeJS and [Deno](https://github.com/mynaparrot/plugNmeet-sdk-js/tree/main/deno_dist)
 
-Following ready to use extensions:
+Following ready to use extensions/solutions:
 
 1) [Joomla component](https://github.com/mynaparrot/plugNmeet-joomla)
 2) [Moodle Plugin](https://github.com/mynaparrot/moodle-mod_plugnmeet)
 3) [Wordpress Plugin](https://github.com/mynaparrot/plugNmeet-wordpress)
+4) [LTI](https://www.plugnmeet.org/docs/user-guide/lti) 
 
 Docker:
 
