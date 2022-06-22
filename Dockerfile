@@ -21,7 +21,7 @@ FROM debian:buster-slim
 
 RUN export DEBIAN_FRONTEND=noninteractive; \
     apt update && \
-    apt install --no-install-recommends -y libreoffice mupdf-tools && \
+    apt install --no-install-recommends -y wget libreoffice mupdf-tools && \
     apt clean && \
     rm -rf /var/lib/apt/lists/*
 
