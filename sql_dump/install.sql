@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS `pnm_room_info` (
   `joined_participants` int(10) NOT NULL DEFAULT 0,
   `is_running` int(1) NOT NULL DEFAULT 0,
   `is_recording` int(1) NOT NULL DEFAULT 0,
-  `recorder_id` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `recorder_id` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
   `is_active_rtmp` int(1) NOT NULL DEFAULT 0,
   `rtmp_node_id` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
   `webhook_url` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
@@ -27,9 +27,9 @@ CREATE TABLE IF NOT EXISTS `pnm_room_info` (
 
 CREATE TABLE IF NOT EXISTS `pnm_recordings` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `record_id` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `room_id` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `room_sid` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `record_id` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `room_id` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `room_sid` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
   `recorder_id` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `file_path` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `size` double NOT NULL,
