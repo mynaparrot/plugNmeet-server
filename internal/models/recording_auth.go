@@ -91,10 +91,11 @@ func (a *authRecording) FetchRecordings(r *FetchRecordingsReq) (*FetchRecordings
 	}
 
 	defer rows.Close()
-	var recording RecordingInfo
 	var recordings []RecordingInfo
 
 	for rows.Next() {
+		var recording RecordingInfo
+
 		err = rows.Scan(&recording.RecordId, &recording.RoomId, &recording.RoomSid, &recording.FilePath, &recording.FileSize, &recording.CreationTime, &recording.RoomCreationTime)
 		if err != nil {
 			fmt.Println(err)
@@ -235,4 +236,31 @@ func (a *authRecording) GetDownloadToken(r *GetDownloadTokenReq) (string, error)
 	}
 
 	return jwt.Signed(sig).Claims(cl).CompactSerialize()
+}
+
+// VerifyRecordingToken verify token & provide file path
+func (a *authRecording) VerifyRecordingToken(token string) (string, error) {
+	tok, err := jwt.ParseSigned(token)
+	if err != nil {
+		return "", err
+	}
+
+	out := jwt.Claims{}
+	if err = tok.Claims([]byte(config.AppCnf.Client.Secret), &out); err != nil {
+		return "", err
+	}
+
+	if err = out.Validate(jwt.Expected{Issuer: config.AppCnf.Client.ApiKey, Time: time.Now()}); err != nil {
+		return "", err
+	}
+
+	file := fmt.Sprintf("%s/%s", config.AppCnf.RecorderInfo.RecordingFilesPath, out.Subject)
+	_, err = os.Lstat(file)
+
+	if err != nil {
+		ms := strings.SplitN(err.Error(), "/", -1)
+		return "", errors.New(ms[4])
+	}
+
+	return file, nil
 }
