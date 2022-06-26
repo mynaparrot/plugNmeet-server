@@ -271,7 +271,7 @@ func (r *RoomService) LoadRoomWithMetadata(roomId string) (*livekit.Room, *RoomM
 	}
 
 	if room.Metadata == "" {
-		return room, nil, err
+		return room, nil, errors.New("empty metadata")
 	}
 
 	meta := new(RoomMetadata)

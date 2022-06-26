@@ -73,6 +73,10 @@ func (a *authTokenModel) DoGenerateToken(g *GenTokenReq) (string, error) {
 		Hidden:    g.UserInfo.IsHidden,
 	}
 
+	if g.UserInfo.UserId == "RECORDER_BOT" || g.UserInfo.UserId == "RTMP_BOT" {
+		grant.Recorder = true
+	}
+
 	at.AddGrant(grant).
 		SetIdentity(g.UserInfo.UserId).
 		SetName(g.UserInfo.Name).
