@@ -29,18 +29,17 @@ func (s *scheduler) StartScheduler() {
 	go s.subscribeRedisRoomDurationChecker()
 
 	s.ticker = time.NewTicker(5 * time.Second)
+	defer s.ticker.Stop()
 	s.closeTicker = make(chan bool)
 
-	go func() {
-		for {
-			select {
-			case <-s.closeTicker:
-				return
-			case <-s.ticker.C:
-				s.checkRoomWithDuration()
-			}
+	for {
+		select {
+		case <-s.closeTicker:
+			return
+		case <-s.ticker.C:
+			s.checkRoomWithDuration()
 		}
-	}()
+	}
 }
 
 type RedisRoomDurationCheckerReq struct {
