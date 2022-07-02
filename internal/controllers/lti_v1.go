@@ -95,12 +95,13 @@ func HandleLTIV1JoinRoom(c *fiber.Ctx) error {
 
 	if len(customParams) > 0 {
 		p := new(models.LtiCustomParameters)
-		_ = json.Unmarshal(customParams, p)
-		claim.LtiCustomParameters = p
+		err := json.Unmarshal(customParams, p)
+		if err == nil {
+			claim.LtiCustomParameters = p
+		}
 	}
 
 	token, err := m.LTIV1JoinRoom(claim)
-
 	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,

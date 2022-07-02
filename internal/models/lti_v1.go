@@ -166,18 +166,8 @@ func (m *LTIV1) assignCustomParams(params *url.Values, claims *LtiClaims) {
 		customDesign.CustomLogo = params.Get("custom_custom_logo")
 	}
 
-	if customPara != nil {
-		claims.LtiCustomParameters = customPara
-	}
-
-	if customDesign != nil {
-		if claims.LtiCustomParameters != nil {
-			claims.LtiCustomParameters.LtiCustomDesign = customDesign
-		} else {
-			claims.LtiCustomParameters = &LtiCustomParameters{}
-			claims.LtiCustomParameters.LtiCustomDesign = customDesign
-		}
-	}
+	claims.LtiCustomParameters = customPara
+	claims.LtiCustomParameters.LtiCustomDesign = customDesign
 }
 
 func (m *LTIV1) VerifyAuth(requests, signingURL string) (*url.Values, error) {
