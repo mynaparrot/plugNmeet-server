@@ -82,9 +82,14 @@ func (m *LTIV1) LTIV1Landing(c *fiber.Ctx, requests, signingURL string) error {
 		return errors.New("either value of user_id or lis_person_contact_email_primary  required")
 	}
 
+	name := params.Get("lis_person_name_full")
+	if name == "" {
+		name = fmt.Sprintf("%s_%s", "User", userId)
+	}
+
 	claims := &LtiClaims{
 		UserId:    userId,
-		Name:      params.Get("lis_person_name_full"),
+		Name:      name,
 		IsAdmin:   false,
 		RoomId:    m.genHashId(roomId),
 		RoomTitle: params.Get("context_label"),
