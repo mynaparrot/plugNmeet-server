@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"fmt"
+	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugNmeet/internal/models"
 )
@@ -56,6 +57,13 @@ func HandleLTIV1VerifyHeaderToken(c *fiber.Ctx) error {
 	c.Locals("name", auth.Name)
 	c.Locals("isAdmin", auth.IsAdmin)
 
+	if auth.LtiCustomParameters != nil {
+		customParams, err := json.Marshal(auth.LtiCustomParameters)
+		if err == nil {
+			c.Locals("customParams", customParams)
+		}
+	}
+
 	return c.Next()
 }
 
@@ -75,14 +83,23 @@ func HandleLTIV1IsRoomActive(c *fiber.Ctx) error {
 
 func HandleLTIV1JoinRoom(c *fiber.Ctx) error {
 	m := models.NewLTIV1Model()
+	customParams := c.Locals("customParams").([]byte)
 
-	token, err := m.LTIV1JoinRoom(&models.LtiClaims{
+	claim := &models.LtiClaims{
 		UserId:    c.Locals("userId").(string),
 		Name:      c.Locals("name").(string),
 		IsAdmin:   c.Locals("isAdmin").(bool),
 		RoomId:    c.Locals("roomId").(string),
 		RoomTitle: c.Locals("roomTitle").(string),
-	})
+	}
+
+	if len(customParams) > 0 {
+		p := new(models.LtiCustomParameters)
+		_ = json.Unmarshal(customParams, p)
+		claim.LtiCustomParameters = p
+	}
+
+	token, err := m.LTIV1JoinRoom(claim)
 
 	if err != nil {
 		return c.JSON(fiber.Map{
