@@ -85,7 +85,7 @@ func HandleDownloadUploadedFile(c *fiber.Ctx) error {
 	}
 
 	c.Attachment(file)
-	return c.SendFile(file, true)
+	return c.SendFile(file)
 }
 
 func HandleConvertWhiteboardFile(c *fiber.Ctx) error {
