@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gabriel-vasile/mimetype"
-	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugNmeet/internal/config"
@@ -197,7 +196,6 @@ func (m *ManageFile) validateMimeType(file multipart.File) error {
 	defer file.Close()
 	mtype, err := mimetype.DetectReader(file)
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
 
@@ -379,30 +377,17 @@ func (m *ManageFile) ConvertWhiteboardFile() (*ConvertWhiteboardFileRes, error) 
 }
 
 func (m *ManageFile) updateRoomMetadataWithOfficeFile(f *ConvertWhiteboardFileRes) error {
-	room, err := m.rs.LoadRoomInfoFromRedis(m.RoomId)
+	_, roomMeta, err := m.rs.LoadRoomWithMetadata(m.RoomId)
 	if err != nil {
 		return err
 	}
 
-	data := make([]byte, len(room.Metadata))
-	copy(data, room.Metadata)
-
-	roomMeta := new(RoomMetadata)
-	err = json.Unmarshal(data, roomMeta)
-	if err != nil {
-		return err
-	}
 	roomMeta.Features.WhiteboardFeatures.WhiteboardFileId = f.FileId
 	roomMeta.Features.WhiteboardFeatures.FileName = f.FileName
 	roomMeta.Features.WhiteboardFeatures.FilePath = f.FilePath
 	roomMeta.Features.WhiteboardFeatures.TotalPages = f.TotalPages
 
-	metadata, _ := json.Marshal(roomMeta)
-	_, err = m.rs.UpdateRoomMetadata(m.RoomId, string(metadata))
+	_, err = m.rs.UpdateRoomMetadataByStruct(m.RoomId, roomMeta)
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }

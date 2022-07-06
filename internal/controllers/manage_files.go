@@ -2,11 +2,12 @@ package controllers
 
 import (
 	"fmt"
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugNmeet/internal/config"
 	"github.com/mynaparrot/plugNmeet/internal/models"
 	"net/url"
-	"os"
+	"strconv"
 	"strings"
 )
 
@@ -78,13 +79,16 @@ func HandleDownloadUploadedFile(c *fiber.Ctx) error {
 	otherParts, _ = url.QueryUnescape(otherParts)
 
 	file := fmt.Sprintf("%s/%s/%s", config.AppCnf.UploadFileSettings.Path, sid, otherParts)
-	_, err := os.Lstat(file)
+	mtype, err := mimetype.DetectFile(file)
 	if err != nil {
 		ms := strings.SplitN(err.Error(), "/", -1)
 		return c.Status(fiber.StatusNotFound).SendString(ms[3])
 	}
 
-	c.Attachment(file)
+	ff := strings.SplitN(file, "/", -1)
+	c.Set("Content-Disposition", "attachment; filename="+strconv.Quote(ff[len(ff)-1]))
+	c.Set("Content-Type", mtype.String())
+
 	return c.SendFile(file)
 }
 
