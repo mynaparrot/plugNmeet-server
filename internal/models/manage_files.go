@@ -196,7 +196,6 @@ func (m *ManageFile) validateMimeType(file multipart.File) error {
 	defer file.Close()
 	mtype, err := mimetype.DetectReader(file)
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
 
