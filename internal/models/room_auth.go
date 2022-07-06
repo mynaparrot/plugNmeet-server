@@ -44,6 +44,7 @@ type RoomCreateFeatures struct {
 	ExternalMediaPlayerFeatures ExternalMediaPlayerFeatures `json:"external_media_player_features"`
 	WaitingRoomFeatures         WaitingRoomFeatures         `json:"waiting_room_features"`
 	BreakoutRoomFeatures        BreakoutRoomFeatures        `json:"breakout_room_features"`
+	DisplayExternalLinkFeatures DisplayExternalLinkFeatures `json:"display_external_link_features"`
 }
 
 type ChatFeatures struct {
@@ -89,6 +90,12 @@ type BreakoutRoomFeatures struct {
 	IsAllow            bool  `json:"is_allow"`
 	IsActive           bool  `json:"is_active"`
 	AllowedNumberRooms int32 `json:"allowed_number_rooms"`
+}
+
+type DisplayExternalLinkFeatures struct {
+	IsAllow  bool   `json:"is_allow"`
+	IsActive bool   `json:"is_active"`
+	Link     string `json:"link"`
 }
 
 type RoomEndReq struct {
