@@ -139,6 +139,13 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 		RoomId: roomId.(string),
 	})
 
+	if !status {
+		return c.JSON(fiber.Map{
+			"status": status,
+			"msg":    msg,
+		})
+	}
+
 	return c.JSON(fiber.Map{
 		"status":       status,
 		"msg":          msg,
