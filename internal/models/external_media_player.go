@@ -37,7 +37,7 @@ func (e *ExternalMediaPlayer) PerformTask(req *ExternalMediaPlayerReq) error {
 		return e.endPlayBack()
 	}
 
-	return nil
+	return errors.New("not valid request")
 }
 
 func (e *ExternalMediaPlayer) startPlayBack() error {

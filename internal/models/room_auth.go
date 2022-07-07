@@ -95,7 +95,8 @@ type BreakoutRoomFeatures struct {
 type DisplayExternalLinkFeatures struct {
 	IsAllow  bool   `json:"is_allow"`
 	IsActive bool   `json:"is_active"`
-	Link     string `json:"link"`
+	Link     string `json:"link,omitempty"`
+	SharedBy string `json:"shared_by,omitempty"`
 }
 
 type RoomEndReq struct {
