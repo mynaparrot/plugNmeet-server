@@ -301,6 +301,9 @@ func (m *LTIV1) createRoomSession(c *LtiClaims) (bool, string, *livekit.Room) {
 				BreakoutRoomFeatures: BreakoutRoomFeatures{
 					IsAllow: true,
 				},
+				DisplayExternalLinkFeatures: DisplayExternalLinkFeatures{
+					IsAllow: true,
+				},
 			},
 		},
 	}
