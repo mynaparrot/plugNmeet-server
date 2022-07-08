@@ -73,9 +73,14 @@ func (m *breakoutRoom) CreateBreakoutRooms(r *CreateBreakoutRoomsReq) error {
 	// disable few features
 	meta.Features.BreakoutRoomFeatures.IsAllow = false
 	meta.Features.WaitingRoomFeatures.IsActive = false
+
 	// we'll disable now. in the future, we can think about those
 	meta.Features.AllowRecording = false
 	meta.Features.AllowRTMP = false
+
+	// clear few main room data
+	meta.Features.DisplayExternalLinkFeatures.IsActive = false
+	meta.Features.ExternalMediaPlayerFeatures.IsActive = false
 
 	e := make(map[string]bool)
 
