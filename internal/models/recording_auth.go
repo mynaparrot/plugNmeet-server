@@ -259,7 +259,7 @@ func (a *authRecording) VerifyRecordingToken(token string) (string, error) {
 
 	if err != nil {
 		ms := strings.SplitN(err.Error(), "/", -1)
-		return "", errors.New(ms[4])
+		return "", errors.New(ms[len(ms)-1])
 	}
 
 	return file, nil
