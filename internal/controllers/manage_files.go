@@ -82,7 +82,7 @@ func HandleDownloadUploadedFile(c *fiber.Ctx) error {
 	mtype, err := mimetype.DetectFile(file)
 	if err != nil {
 		ms := strings.SplitN(err.Error(), "/", -1)
-		return c.Status(fiber.StatusNotFound).SendString(ms[3])
+		return c.Status(fiber.StatusNotFound).SendString(ms[len(ms)-1])
 	}
 
 	ff := strings.SplitN(file, "/", -1)
