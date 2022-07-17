@@ -13,7 +13,7 @@ type RoomInfo struct {
 	RoomTitle          string `json:"room_title"`
 	RoomId             string `json:"room_id"`
 	Sid                string `json:"sid"`
-	JoinedParticipants int    `json:"joined_participants"`
+	JoinedParticipants int64  `json:"joined_participants"`
 	IsRunning          int    `json:"is_running"`
 	IsRecording        int    `json:"is_recording"`
 	RecorderId         string `json:"recorder_id"`
@@ -134,6 +134,7 @@ func (rm *roomModel) UpdateRoomStatus(r *RoomInfo) (int64, error) {
 	return affectedId, nil
 }
 
+// UpdateRoomParticipants will increment or decrement number of Participants
 func (rm *roomModel) UpdateRoomParticipants(r *RoomInfo, operator string) (int64, error) {
 	db := rm.db
 	ctx, cancel := context.WithTimeout(rm.ctx, 3*time.Second)
@@ -151,6 +152,46 @@ func (rm *roomModel) UpdateRoomParticipants(r *RoomInfo, operator string) (int64
 	}
 
 	res, err := stmt.Exec(r.Sid)
+	if err != nil {
+		return 0, err
+	}
+
+	affectedId, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return 0, err
+	}
+
+	err = stmt.Close()
+	if err != nil {
+		return 0, err
+	}
+
+	return affectedId, nil
+}
+
+// UpdateNumParticipants will update total number of Participants
+func (rm *roomModel) UpdateNumParticipants(roomSid string, num int64) (int64, error) {
+	db := rm.db
+	ctx, cancel := context.WithTimeout(rm.ctx, 3*time.Second)
+	defer cancel()
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	stmt, err := tx.Prepare("UPDATE " + rm.app.FormatDBTable("room_info") +
+		" SET joined_participants = ? WHERE sid = ?")
+	if err != nil {
+		return 0, err
+	}
+
+	res, err := stmt.Exec(num, roomSid)
 	if err != nil {
 		return 0, err
 	}
@@ -214,7 +255,7 @@ type ActiveRoomInfo struct {
 	RoomTitle          string `json:"room_title"`
 	RoomId             string `json:"room_id"`
 	Sid                string `json:"sid"`
-	JoinedParticipants int    `json:"joined_participants"`
+	JoinedParticipants int64  `json:"joined_participants"`
 	IsRunning          int    `json:"is_running"`
 	IsRecording        int    `json:"is_recording"`
 	IsActiveRTMP       int    `json:"is_active_rtmp"`

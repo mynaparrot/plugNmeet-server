@@ -12,21 +12,22 @@ import (
 type scheduler struct {
 	rc          *redis.Client
 	ctx         context.Context
-	roomService *RoomService
+	ra          *roomAuthModel
 	ticker      *time.Ticker
 	closeTicker chan bool
 }
 
 func NewSchedulerModel() *scheduler {
 	return &scheduler{
-		rc:          config.AppCnf.RDS,
-		ctx:         context.Background(),
-		roomService: NewRoomService(),
+		rc:  config.AppCnf.RDS,
+		ctx: context.Background(),
+		ra:  NewRoomAuthModel(),
 	}
 }
 
 func (s *scheduler) StartScheduler() {
 	go s.subscribeRedisRoomDurationChecker()
+	go s.startActiveRoomChecker()
 
 	s.ticker = time.NewTicker(5 * time.Second)
 	defer s.ticker.Stop()
@@ -80,7 +81,7 @@ func (s *scheduler) checkRoomWithDuration() {
 		now := time.Now().Unix()
 		valid := r.StartedAt + (r.Duration * 60)
 		if now > valid {
-			_, err := s.roomService.EndRoom(i)
+			_, err := s.ra.rs.EndRoom(i)
 			if err != nil {
 				log.Error(err)
 			}
@@ -107,5 +108,49 @@ func (s *scheduler) increaseRoomDuration(roomId string, duration int64) {
 
 	if err != nil {
 		return
+	}
+}
+
+// startActiveRoomChecker will check & do reconciliation between DB & livekit
+func (s *scheduler) startActiveRoomChecker() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	closeTicker := make(chan bool)
+
+	for {
+		select {
+		case <-closeTicker:
+			return
+		case <-ticker.C:
+			s.activeRoomChecker()
+		}
+	}
+}
+
+func (s *scheduler) activeRoomChecker() {
+	status, _, activeRooms := s.ra.GetActiveRoomsInfo()
+	if !status {
+		return
+	}
+
+	if len(activeRooms) == 0 {
+		return
+	}
+
+	for _, room := range activeRooms {
+		fromRedis, err := s.ra.rs.LoadRoomInfoFromRedis(room.RoomInfo.RoomId)
+
+		if fromRedis == nil && err.Error() == "requested room does not exist" {
+			_, _ = s.ra.rm.UpdateRoomStatus(&RoomInfo{
+				Sid:       room.RoomInfo.Sid,
+				IsRunning: 0,
+				Ended:     time.Now().Format("2006-01-02 15:04:05"),
+			})
+			continue
+		}
+
+		if room.RoomInfo.JoinedParticipants != int64(fromRedis.NumParticipants) {
+			_, _ = s.ra.rm.UpdateNumParticipants(room.RoomInfo.Sid, int64(fromRedis.NumParticipants))
+		}
 	}
 }
