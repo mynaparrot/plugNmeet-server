@@ -13,7 +13,6 @@ type scheduler struct {
 	rc          *redis.Client
 	ctx         context.Context
 	ra          *roomAuthModel
-	ticker      *time.Ticker
 	closeTicker chan bool
 }
 
@@ -27,18 +26,22 @@ func NewSchedulerModel() *scheduler {
 
 func (s *scheduler) StartScheduler() {
 	go s.subscribeRedisRoomDurationChecker()
-	go s.startActiveRoomChecker()
 
-	s.ticker = time.NewTicker(5 * time.Second)
-	defer s.ticker.Stop()
 	s.closeTicker = make(chan bool)
+	checkRoomDuration := time.NewTicker(5 * time.Second)
+	defer checkRoomDuration.Stop()
+
+	roomChecker := time.NewTicker(5 * time.Minute)
+	defer roomChecker.Stop()
 
 	for {
 		select {
 		case <-s.closeTicker:
 			return
-		case <-s.ticker.C:
+		case <-checkRoomDuration.C:
 			s.checkRoomWithDuration()
+		case <-roomChecker.C:
+			s.activeRoomChecker()
 		}
 	}
 }
@@ -111,22 +114,7 @@ func (s *scheduler) increaseRoomDuration(roomId string, duration int64) {
 	}
 }
 
-// startActiveRoomChecker will check & do reconciliation between DB & livekit
-func (s *scheduler) startActiveRoomChecker() {
-	ticker := time.NewTicker(5 * time.Minute)
-	defer ticker.Stop()
-	closeTicker := make(chan bool)
-
-	for {
-		select {
-		case <-closeTicker:
-			return
-		case <-ticker.C:
-			s.activeRoomChecker()
-		}
-	}
-}
-
+// activeRoomChecker will check & do reconciliation between DB & livekit
 func (s *scheduler) activeRoomChecker() {
 	status, _, activeRooms := s.ra.GetActiveRoomsInfo()
 	if !status {
