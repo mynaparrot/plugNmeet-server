@@ -116,8 +116,8 @@ func (s *scheduler) increaseRoomDuration(roomId string, duration int64) {
 
 // activeRoomChecker will check & do reconciliation between DB & livekit
 func (s *scheduler) activeRoomChecker() {
-	status, _, activeRooms := s.ra.GetActiveRoomsInfo()
-	if !status {
+	activeRooms, err := s.ra.rm.GetActiveRoomsInfo()
+	if err != nil {
 		return
 	}
 
@@ -126,19 +126,21 @@ func (s *scheduler) activeRoomChecker() {
 	}
 
 	for _, room := range activeRooms {
-		fromRedis, err := s.ra.rs.LoadRoomInfoFromRedis(room.RoomInfo.RoomId)
+		fromRedis, err := s.ra.rs.LoadRoomInfoFromRedis(room.RoomId)
 
 		if fromRedis == nil && err.Error() == "requested room does not exist" {
 			_, _ = s.ra.rm.UpdateRoomStatus(&RoomInfo{
-				Sid:       room.RoomInfo.Sid,
+				Sid:       room.Sid,
 				IsRunning: 0,
 				Ended:     time.Now().Format("2006-01-02 15:04:05"),
 			})
 			continue
+		} else if fromRedis == nil {
+			continue
 		}
 
-		if room.RoomInfo.JoinedParticipants != int64(fromRedis.NumParticipants) {
-			_, _ = s.ra.rm.UpdateNumParticipants(room.RoomInfo.Sid, int64(fromRedis.NumParticipants))
+		if room.JoinedParticipants != int64(fromRedis.NumParticipants) {
+			_, _ = s.ra.rm.UpdateNumParticipants(room.Sid, int64(fromRedis.NumParticipants))
 		}
 	}
 }
