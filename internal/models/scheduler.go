@@ -135,6 +135,8 @@ func (s *scheduler) activeRoomChecker() {
 				Ended:     time.Now().Format("2006-01-02 15:04:05"),
 			})
 			continue
+		} else if fromRedis == nil {
+			continue
 		}
 
 		if room.RoomInfo.JoinedParticipants != int64(fromRedis.NumParticipants) {
