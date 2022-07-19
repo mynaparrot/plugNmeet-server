@@ -71,10 +71,15 @@ type LivekitInfo struct {
 }
 
 type RedisInfo struct {
-	Host     string `yaml:"host"`
-	Username string `yaml:"username"`
-	Password string `yaml:"password"`
-	DBName   int    `yaml:"db"`
+	Host              string   `yaml:"host"`
+	Username          string   `yaml:"username"`
+	Password          string   `yaml:"password"`
+	DBName            int      `yaml:"db"`
+	UseTLS            bool     `yaml:"use_tls"`
+	MasterName        string   `yaml:"sentinel_master_name"`
+	SentinelUsername  string   `yaml:"sentinel_username"`
+	SentinelPassword  string   `yaml:"sentinel_password"`
+	SentinelAddresses []string `yaml:"sentinel_addresses"`
 }
 
 type MySqlInfo struct {
