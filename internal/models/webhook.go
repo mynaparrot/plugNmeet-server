@@ -128,7 +128,7 @@ func (w *webhookEvent) roomFinished() int64 {
 	}
 	marshal, err := json.Marshal(msg)
 	if err == nil {
-		config.AppCnf.RDS.Publish(context.Background(), "plug-n-meet-websocket", marshal)
+		config.AppCnf.RDS.Publish(context.Background(), "plug-n-meet-user-websocket", marshal)
 	}
 
 	// notify to clean room from room duration map

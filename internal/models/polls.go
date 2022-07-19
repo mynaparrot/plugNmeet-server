@@ -269,19 +269,14 @@ func (m *newPollsModel) broadcastNotification(roomId, userId, pollId, mType stri
 		},
 	}
 
-	msg := WebsocketRedisMsg{
+	msg := &WebsocketRedisMsg{
 		Type:    "sendMsg",
 		Payload: &payload,
 		RoomId:  roomId,
 		IsAdmin: isAdmin,
 	}
+	DistributeWebsocketMsgToRedisChannel(msg)
 
-	marshal, err := json.Marshal(msg)
-	if err != nil {
-		return err
-	}
-
-	m.rc.Publish(m.ctx, "plug-n-meet-websocket", marshal)
 	return nil
 }
 
