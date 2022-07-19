@@ -71,9 +71,7 @@ func SubscribeToWhiteboardWebsocketChannel() {
 		if err != nil {
 			log.Errorln(err)
 		}
-		if res.Type == "sendMsg" {
-			m.HandleDataMessages(res.Payload, res.RoomId, res.IsAdmin)
-		}
+		m.HandleDataMessages(res.Payload, res.RoomId, res.IsAdmin)
 	}
 }
 
@@ -96,8 +94,6 @@ func SubscribeToSystemWebsocketChannel() {
 		if err != nil {
 			log.Errorln(err)
 		}
-		if res.Type == "sendMsg" {
-			m.HandleDataMessages(res.Payload, res.RoomId, res.IsAdmin)
-		}
+		m.HandleDataMessages(res.Payload, res.RoomId, res.IsAdmin)
 	}
 }
