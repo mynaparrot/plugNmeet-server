@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"context"
 	"github.com/antoniodipinto/ikisocket"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
@@ -119,14 +118,7 @@ func SetupSocketListeners() {
 			msg.IsAdmin = isAdmin.(bool)
 		}
 
-		marshal, err := json.Marshal(msg)
-		if err != nil {
-			log.Errorln(err)
-			return
-		}
-
-		ctx := context.Background()
-		config.AppCnf.RDS.Publish(ctx, "plug-n-meet-websocket", marshal)
+		models.DistributeWebsocketMsgToRedisChannel(&msg)
 	})
 
 	// On disconnect event
@@ -151,29 +143,9 @@ func SetupSocketListeners() {
 	//})
 }
 
-// SubscribeToWebsocketChannel will delivery message to websocket
+// SubscribeToWebsocketChannel will subscribe to all websocket channels
 func SubscribeToWebsocketChannel() {
-	ctx := context.Background()
-	pubsub := config.AppCnf.RDS.Subscribe(ctx, "plug-n-meet-websocket")
-	defer pubsub.Close()
-
-	_, err := pubsub.Receive(ctx)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	m := models.NewWebsocketService()
-	ch := pubsub.Channel()
-	for msg := range ch {
-		res := new(models.WebsocketRedisMsg)
-		err = json.Unmarshal([]byte(msg.Payload), res)
-		if err != nil {
-			log.Errorln(err)
-		}
-		if res.Type == "sendMsg" {
-			m.HandleDataMessages(res.Payload, res.RoomId, res.IsAdmin)
-		} else if res.Type == "deleteRoom" {
-			config.AppCnf.DeleteChatRoom(res.RoomId)
-		}
-	}
+	go models.SubscribeToUserWebsocketChannel()
+	go models.SubscribeToWhiteboardWebsocketChannel()
+	go models.SubscribeToSystemWebsocketChannel()
 }
