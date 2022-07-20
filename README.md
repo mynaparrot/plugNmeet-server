@@ -44,7 +44,7 @@ https://demo.plugnmeet.com/login.html
 
 ## Installation
 We've created an easy to install script which can be used to install all the necessary components in few minutes.
-Please check [plugNmeet-install](https://github.com/mynaparrot/plugNmeet-install) repo.
+Please follow installation guide from here: https://www.plugnmeet.org/docs/installation
 
 ## SDKs & Tools
 
