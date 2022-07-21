@@ -17,7 +17,7 @@ require (
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v0.13.4
 	github.com/livekit/server-sdk-go v0.10.4
-	github.com/sirupsen/logrus v1.8.1
+	github.com/sirupsen/logrus v1.9.0
 	github.com/urfave/cli/v2 v2.11.0
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
