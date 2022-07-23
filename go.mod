@@ -18,7 +18,7 @@ require (
 	github.com/livekit/protocol v0.13.4
 	github.com/livekit/server-sdk-go v0.10.4
 	github.com/sirupsen/logrus v1.8.1
-	github.com/urfave/cli/v2 v2.11.0
+	github.com/urfave/cli/v2 v2.11.1
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/square/go-jose.v2 v2.6.0
