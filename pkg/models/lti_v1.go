@@ -10,6 +10,7 @@ import (
 	"github.com/jordic/lti"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugNmeet/pkg/config"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 	"net/url"
@@ -203,6 +204,7 @@ func (m *LTIV1) VerifyAuth(requests, signingURL string) (*url.Values, error) {
 	params := p.Params()
 
 	if sign != providedSignature {
+		log.Errorln("Calculated: " + sign + " provided: " + providedSignature)
 		return nil, errors.New("verification failed")
 	}
 
