@@ -13,7 +13,7 @@ RUN go mod download
 
 # Copy the go source
 COPY cmd/ cmd/
-COPY internal/ internal/
+COPY pkg/ pkg/
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH GO111MODULE=on go build -ldflags '-w -s -buildid=' -a -o plugnmeet-server ./cmd/server
 
