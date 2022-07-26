@@ -1,9 +1,9 @@
 package controllers
 
 import (
-	"fmt"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
+	"github.com/mynaparrot/plugNmeet/pkg/config"
 	"github.com/mynaparrot/plugNmeet/pkg/models"
 )
 
@@ -15,9 +15,8 @@ func HandleLTIV1Landing(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).SendString("empty body")
 	}
 
-	signingURL := fmt.Sprintf("%v://%v%v", c.Protocol(), c.Hostname(), c.OriginalURL())
 	m := models.NewLTIV1Model()
-	err := m.LTIV1Landing(c, string(b), signingURL)
+	err := m.LTIV1Landing(c, string(b), config.AppCnf.LtiInfo.V1ToolUrl)
 	if err != nil {
 		return err
 	}
