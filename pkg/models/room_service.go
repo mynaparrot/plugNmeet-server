@@ -42,6 +42,7 @@ func (r *RoomService) LoadRoomInfoFromRedis(roomId string) (*livekit.Room, error
 		if err == redis.Nil {
 			// if you change this text then make sure
 			// you also update: scheduler.go activeRoomChecker()
+			// also room_auth.go CreateRoom()
 			err = errors.New("requested room does not exist")
 		}
 		return nil, err

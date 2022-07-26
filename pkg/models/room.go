@@ -40,7 +40,7 @@ func NewRoomModel() *roomModel {
 	}
 }
 
-func (rm *roomModel) InsertRoomData(r *RoomInfo) (int64, error) {
+func (rm *roomModel) InsertOrUpdateRoomData(r *RoomInfo, update bool) (int64, error) {
 	db := rm.db
 	ctx, cancel := context.WithTimeout(rm.ctx, 3*time.Second)
 	defer cancel()
@@ -50,12 +50,24 @@ func (rm *roomModel) InsertRoomData(r *RoomInfo) (int64, error) {
 		return 0, err
 	}
 	defer tx.Rollback()
-	stmt, err := tx.Prepare("INSERT INTO " + rm.app.FormatDBTable("room_info") + " (room_title, roomId, sid, joined_participants, is_running, webhook_url, is_breakout_room, parent_room_id, creation_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE is_running = ?")
+
+	query := "INSERT INTO " + rm.app.FormatDBTable("room_info") + " (room_title, roomId, sid, joined_participants, is_running, webhook_url, is_breakout_room, parent_room_id, creation_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE is_running = ?"
+
+	if update {
+		query = "UPDATE " + rm.app.FormatDBTable("room_info") + " SET room_title = ?, roomId = ?, sid = ?, joined_participants = ?, is_running = ?, webhook_url = ?, is_breakout_room = ?, parent_room_id = ?, creation_time = ? WHERE id = ?"
+	}
+
+	stmt, err := tx.Prepare(query)
 	if err != nil {
 		return 0, err
 	}
 
-	res, err := stmt.Exec(r.RoomTitle, r.RoomId, r.Sid, r.JoinedParticipants, r.IsRunning, r.WebhookUrl, r.IsBreakoutRoom, r.ParentRoomId, r.CreationTime, 1)
+	lastVal := 1
+	if update {
+		lastVal = r.Id
+	}
+
+	res, err := stmt.Exec(r.RoomTitle, r.RoomId, r.Sid, r.JoinedParticipants, r.IsRunning, r.WebhookUrl, r.IsBreakoutRoom, r.ParentRoomId, r.CreationTime, lastVal)
 	if err != nil {
 		return 0, err
 	}

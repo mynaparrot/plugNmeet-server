@@ -61,7 +61,7 @@ func (w *webhookEvent) roomStarted() int64 {
 		IsRunning:    1,
 		CreationTime: event.Room.CreationTime,
 	}
-	lastId, err := w.roomModel.InsertRoomData(room)
+	lastId, err := w.roomModel.InsertOrUpdateRoomData(room, false)
 
 	if err != nil {
 		log.Errorln(err)

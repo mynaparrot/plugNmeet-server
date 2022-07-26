@@ -133,15 +133,16 @@ func (am *roomAuthModel) CreateRoom(r *RoomCreateReq) (bool, string, *livekit.Ro
 
 	if roomDbInfo.Id > 0 {
 		rf, err := am.rs.LoadRoomInfoFromRedis(r.RoomId)
-		if err != nil {
-			_, err = am.rm.UpdateRoomStatus(&RoomInfo{
-				RoomId:    r.RoomId,
-				IsRunning: 0,
-				Ended:     time.Now().Format("2006-01-02 15:04:05"),
-			})
+		if err != nil && err.Error() != "requested room does not exist" {
 			return false, "can't create room. try again", nil
 		}
-		return true, "room already exists", rf
+
+		if err == nil && rf.Sid == roomDbInfo.Sid {
+			return true, "room already exists", rf
+		}
+
+		// we'll allow to create room again & use the same DB row
+		// we can just update the DB row. No need to create new one
 	}
 
 	// we'll disable if SharedNotePad isn't enable in config
@@ -201,6 +202,7 @@ func (am *roomAuthModel) CreateRoom(r *RoomCreateReq) (bool, string, *livekit.Ro
 		isBreakoutRoom = 1
 	}
 
+	updateTable := false
 	ri := &RoomInfo{
 		RoomTitle:          r.RoomMetadata.RoomTitle,
 		RoomId:             room.Name,
@@ -213,7 +215,12 @@ func (am *roomAuthModel) CreateRoom(r *RoomCreateReq) (bool, string, *livekit.Ro
 		ParentRoomId:       r.RoomMetadata.ParentRoomId,
 	}
 
-	_, err = am.rm.InsertRoomData(ri)
+	if roomDbInfo.Id > 0 {
+		updateTable = true
+		ri.Id = roomDbInfo.Id
+	}
+
+	_, err = am.rm.InsertOrUpdateRoomData(ri, updateTable)
 	if err != nil {
 		return false, "Error: " + err.Error(), nil
 	}
