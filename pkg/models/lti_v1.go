@@ -99,7 +99,7 @@ func (m *LTIV1) LTIV1Landing(c *fiber.Ctx, requests, signingURL string) error {
 	if strings.Contains(params.Get("roles"), "Instructor") {
 		claims.IsAdmin = true
 	}
-	m.assignCustomParams(params, claims)
+	AssignLTIV1CustomParams(params, claims)
 
 	j, err := m.ToJWT(claims)
 	if err != nil {
@@ -120,60 +120,6 @@ func (m *LTIV1) LTIV1Landing(c *fiber.Ctx, requests, signingURL string) error {
 	}
 
 	return c.Render("assets/lti/v1", vals)
-}
-
-func (m *LTIV1) assignCustomParams(params *url.Values, claims *LtiClaims) {
-	b := new(bool)
-	customPara := new(LtiCustomParameters)
-
-	if params.Get("custom_room_duration") != "" {
-		duration, _ := strconv.Atoi(params.Get("custom_room_duration"))
-		customPara.RoomDuration = int64(duration)
-	}
-	if params.Get("custom_allow_polls") == "false" {
-		customPara.AllowPolls = b
-	}
-	if params.Get("custom_allow_shared_note_pad") == "false" {
-		customPara.AllowSharedNotePad = b
-	}
-	if params.Get("custom_allow_breakout_room") == "false" {
-		customPara.AllowBreakoutRoom = b
-	}
-	if params.Get("custom_allow_recording") == "false" {
-		customPara.AllowRecording = b
-	}
-	if params.Get("custom_allow_rtmp") == "false" {
-		customPara.AllowRTMP = b
-	}
-	if params.Get("custom_allow_view_other_webcams") == "false" {
-		customPara.AllowViewOtherWebcams = b
-	}
-	if params.Get("custom_allow_view_other_users_list") == "false" {
-		customPara.AllowViewOtherParticipants = b
-	}
-	// this should be last bool
-	if params.Get("custom_mute_on_start") == "true" {
-		*b = true
-		customPara.MuteOnStart = b
-	}
-
-	// custom design
-	customDesign := new(LtiCustomDesign)
-	if params.Get("custom_primary_color") != "" {
-		customDesign.PrimaryColor = params.Get("custom_primary_color")
-	}
-	if params.Get("custom_secondary_color") != "" {
-		customDesign.SecondaryColor = params.Get("custom_secondary_color")
-	}
-	if params.Get("custom_background_color") != "" {
-		customDesign.BackgroundColor = params.Get("custom_background_color")
-	}
-	if params.Get("custom_custom_logo") != "" {
-		customDesign.CustomLogo = params.Get("custom_custom_logo")
-	}
-
-	claims.LtiCustomParameters = customPara
-	claims.LtiCustomParameters.LtiCustomDesign = customDesign
 }
 
 func (m *LTIV1) VerifyAuth(requests, signingURL string) (*url.Values, error) {
@@ -275,6 +221,84 @@ func (m *LTIV1) LTIV1JoinRoom(c *LtiClaims) (string, error) {
 }
 
 func (m *LTIV1) createRoomSession(c *LtiClaims) (bool, string, *livekit.Room) {
+	req := PrepareLTIV1RoomCreateReq(c)
+	return m.authModel.CreateRoom(req)
+}
+
+func (m *LTIV1) joinRoom(c *LtiClaims) (string, error) {
+	token, err := m.authTokenModel.DoGenerateToken(&GenTokenReq{
+		RoomId: c.RoomId,
+		UserInfo: UserInfo{
+			UserId:  c.UserId,
+			Name:    c.Name,
+			IsAdmin: c.IsAdmin,
+			UserMetadata: UserMetadata{
+				IsAdmin: c.IsAdmin,
+			},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return token, nil
+}
+
+func AssignLTIV1CustomParams(params *url.Values, claims *LtiClaims) {
+	b := new(bool)
+	customPara := new(LtiCustomParameters)
+
+	if params.Get("custom_room_duration") != "" {
+		duration, _ := strconv.Atoi(params.Get("custom_room_duration"))
+		customPara.RoomDuration = int64(duration)
+	}
+	if params.Get("custom_allow_polls") == "false" {
+		customPara.AllowPolls = b
+	}
+	if params.Get("custom_allow_shared_note_pad") == "false" {
+		customPara.AllowSharedNotePad = b
+	}
+	if params.Get("custom_allow_breakout_room") == "false" {
+		customPara.AllowBreakoutRoom = b
+	}
+	if params.Get("custom_allow_recording") == "false" {
+		customPara.AllowRecording = b
+	}
+	if params.Get("custom_allow_rtmp") == "false" {
+		customPara.AllowRTMP = b
+	}
+	if params.Get("custom_allow_view_other_webcams") == "false" {
+		customPara.AllowViewOtherWebcams = b
+	}
+	if params.Get("custom_allow_view_other_users_list") == "false" {
+		customPara.AllowViewOtherParticipants = b
+	}
+	// this should be last bool
+	if params.Get("custom_mute_on_start") == "true" {
+		*b = true
+		customPara.MuteOnStart = b
+	}
+
+	// custom design
+	customDesign := new(LtiCustomDesign)
+	if params.Get("custom_primary_color") != "" {
+		customDesign.PrimaryColor = params.Get("custom_primary_color")
+	}
+	if params.Get("custom_secondary_color") != "" {
+		customDesign.SecondaryColor = params.Get("custom_secondary_color")
+	}
+	if params.Get("custom_background_color") != "" {
+		customDesign.BackgroundColor = params.Get("custom_background_color")
+	}
+	if params.Get("custom_custom_logo") != "" {
+		customDesign.CustomLogo = params.Get("custom_custom_logo")
+	}
+
+	claims.LtiCustomParameters = customPara
+	claims.LtiCustomParameters.LtiCustomDesign = customDesign
+}
+
+func PrepareLTIV1RoomCreateReq(c *LtiClaims) *RoomCreateReq {
 	req := &RoomCreateReq{
 		RoomId: c.RoomId,
 		RoomMetadata: RoomMetadata{
@@ -345,24 +369,5 @@ func (m *LTIV1) createRoomSession(c *LtiClaims) (bool, string, *livekit.Room) {
 		req.RoomMetadata.Features = f
 	}
 
-	return m.authModel.CreateRoom(req)
-}
-
-func (m *LTIV1) joinRoom(c *LtiClaims) (string, error) {
-	token, err := m.authTokenModel.DoGenerateToken(&GenTokenReq{
-		RoomId: c.RoomId,
-		UserInfo: UserInfo{
-			UserId:  c.UserId,
-			Name:    c.Name,
-			IsAdmin: c.IsAdmin,
-			UserMetadata: UserMetadata{
-				IsAdmin: c.IsAdmin,
-			},
-		},
-	})
-	if err != nil {
-		return "", err
-	}
-
-	return token, nil
+	return req
 }
