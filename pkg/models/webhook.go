@@ -209,7 +209,16 @@ func (w *webhookEvent) trackUnpublished() {
 }
 
 func (w *webhookEvent) sendToWebhookNotifier(event *livekit.WebhookEvent) {
-	msg := CommonNotifyEvent{
+	msg := PrepareCommonWebhookNotifyEvent(event)
+
+	err := w.notifier.Notify(event.Room.Sid, msg)
+	if err != nil {
+		log.Errorln(err)
+	}
+}
+
+func PrepareCommonWebhookNotifyEvent(event *livekit.WebhookEvent) *CommonNotifyEvent {
+	return &CommonNotifyEvent{
 		Event: event.Event,
 		Room: NotifyEventRoom{
 			Sid:             event.Room.Sid,
@@ -226,10 +235,5 @@ func (w *webhookEvent) sendToWebhookNotifier(event *livekit.WebhookEvent) {
 		Track:       event.Track,
 		Id:          event.Id,
 		CreatedAt:   event.CreatedAt,
-	}
-
-	err := w.notifier.Notify(event.Room.Sid, msg)
-	if err != nil {
-		log.Errorln(err)
 	}
 }
