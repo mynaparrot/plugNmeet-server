@@ -57,7 +57,7 @@ func (rm *roomModel) InsertOrUpdateRoomData(r *RoomInfo, update bool) (int64, er
 		query = "UPDATE " + rm.app.FormatDBTable("room_info") + " SET room_title = ?, roomId = ?, sid = ?, joined_participants = ?, is_running = ?, webhook_url = ?, is_breakout_room = ?, parent_room_id = ?, creation_time = ? WHERE id = ?"
 	}
 
-	stmt, err := tx.Prepare(query)
+	stmt, err := tx.PrepareContext(ctx, query)
 	if err != nil {
 		return 0, err
 	}
@@ -67,7 +67,7 @@ func (rm *roomModel) InsertOrUpdateRoomData(r *RoomInfo, update bool) (int64, er
 		lastVal = r.Id
 	}
 
-	res, err := stmt.Exec(r.RoomTitle, r.RoomId, r.Sid, r.JoinedParticipants, r.IsRunning, r.WebhookUrl, r.IsBreakoutRoom, r.ParentRoomId, r.CreationTime, lastVal)
+	res, err := stmt.ExecContext(ctx, r.RoomTitle, r.RoomId, r.Sid, r.JoinedParticipants, r.IsRunning, r.WebhookUrl, r.IsBreakoutRoom, r.ParentRoomId, r.CreationTime, lastVal)
 	if err != nil {
 		return 0, err
 	}
@@ -118,12 +118,12 @@ func (rm *roomModel) UpdateRoomStatus(r *RoomInfo) (int64, error) {
 		args = append(args, r.Sid)
 	}
 
-	stmt, err := tx.Prepare(query)
+	stmt, err := tx.PrepareContext(ctx, query)
 	if err != nil {
 		return 0, err
 	}
 
-	res, err := stmt.Exec(args...)
+	res, err := stmt.ExecContext(ctx, args...)
 	if err != nil {
 		return 0, err
 	}
@@ -157,13 +157,13 @@ func (rm *roomModel) UpdateRoomParticipants(r *RoomInfo, operator string) (int64
 		return 0, err
 	}
 	defer tx.Rollback()
-	stmt, err := tx.Prepare("UPDATE " + rm.app.FormatDBTable("room_info") +
-		" SET joined_participants = joined_participants " + operator + " 1 WHERE sid = ?")
+	stmt, err := tx.PrepareContext(ctx, "UPDATE "+rm.app.FormatDBTable("room_info")+
+		" SET joined_participants = joined_participants "+operator+" 1 WHERE sid = ?")
 	if err != nil {
 		return 0, err
 	}
 
-	res, err := stmt.Exec(r.Sid)
+	res, err := stmt.ExecContext(ctx, r.Sid)
 	if err != nil {
 		return 0, err
 	}
@@ -197,13 +197,13 @@ func (rm *roomModel) UpdateNumParticipants(roomSid string, num int64) (int64, er
 		return 0, err
 	}
 	defer tx.Rollback()
-	stmt, err := tx.Prepare("UPDATE " + rm.app.FormatDBTable("room_info") +
+	stmt, err := tx.PrepareContext(ctx, "UPDATE "+rm.app.FormatDBTable("room_info")+
 		" SET joined_participants = ? WHERE sid = ?")
 	if err != nil {
 		return 0, err
 	}
 
-	res, err := stmt.Exec(num, roomSid)
+	res, err := stmt.ExecContext(ctx, num, roomSid)
 	if err != nil {
 		return 0, err
 	}
@@ -235,15 +235,19 @@ func (rm *roomModel) GetRoomInfo(roomId string, sid string, isRunning int) (*Roo
 
 	switch {
 	case len(roomId) > 0 && isRunning == 1 && len(sid) == 0:
+		// for roomId + isRunning
 		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time FROM "+rm.app.FormatDBTable("room_info")+" WHERE roomId = ? AND is_running = 1", roomId)
 
 	case len(sid) > 0 && isRunning == 1 && len(roomId) == 0:
+		// for sid + isRunning
 		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time FROM "+rm.app.FormatDBTable("room_info")+" WHERE sid = ? AND is_running = 1", sid)
 
 	case len(roomId) > 0 && len(sid) > 0 && isRunning == 1:
+		// for sid + roomId + isRunning
 		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time FROM "+rm.app.FormatDBTable("room_info")+" WHERE roomId = ? AND sid = ? AND is_running = 1", roomId, sid)
 
 	default:
+		// for only sid
 		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time FROM "+rm.app.FormatDBTable("room_info")+" WHERE sid = ?", sid)
 	}
 
