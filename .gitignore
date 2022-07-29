@@ -2,6 +2,8 @@ log
 *.log
 npm-debug.log*
 .DS_Store
+.air.toml
+start.sh
 
 run_livekit.sh
 docker-compose.yaml
@@ -17,3 +19,4 @@ recording_files/
 client/
 recorder/
 etc/tmp/
+tmp/
