@@ -27,7 +27,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/plugnmeet-server:dev
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/plugnmeet-server:buildcache
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/plugnmeet-server:buildcache,mode=max
