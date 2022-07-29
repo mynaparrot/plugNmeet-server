@@ -111,8 +111,11 @@ func (rm *roomModel) UpdateRoomStatus(r *RoomInfo) (int64, error) {
 		args = append(args, r.Ended)
 		args = append(args, r.RoomId)
 	default:
+		// when the meeting will be ended,
+		// we can change sid to make sure that sid always unique
+		// so, here we'll use sid-id
 		query = "UPDATE " + rm.app.FormatDBTable("room_info") +
-			" SET is_running = ?, ended = ? WHERE sid = ?"
+			" SET sid = CONCAT(sid, '-', id), is_running = ?, ended = ? WHERE sid = ?"
 		args = append(args, r.IsRunning)
 		args = append(args, r.Ended)
 		args = append(args, r.Sid)
