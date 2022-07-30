@@ -3,7 +3,7 @@ log
 npm-debug.log*
 .DS_Store
 .air.toml
-start.sh
+start_air.sh
 
 run_livekit.sh
 docker-compose.yaml
