@@ -159,12 +159,12 @@ func (rm *recordingModel) updateRoomRecordingStatus(r *RecorderResp, isRecording
 		return err
 	}
 	defer tx.Rollback()
-	stmt, err := tx.Prepare("UPDATE " + rm.app.FormatDBTable("room_info") + " SET is_recording = ?, recorder_id = ? WHERE sid = ?")
+	stmt, err := tx.Prepare("UPDATE " + rm.app.FormatDBTable("room_info") + " SET is_recording = ?, recorder_id = ? WHERE sid = ? OR sid = CONCAT(?, '-', id)")
 	if err != nil {
 		return err
 	}
 
-	_, err = stmt.Exec(isRecording, r.RecorderId, r.Sid)
+	_, err = stmt.Exec(isRecording, r.RecorderId, r.Sid, r.Sid)
 	if err != nil {
 		return err
 	}
@@ -255,12 +255,12 @@ func (rm *recordingModel) updateRoomRTMPStatus(r *RecorderResp, isActiveRtmp int
 		return err
 	}
 	defer tx.Rollback()
-	stmt, err := tx.Prepare("UPDATE " + rm.app.FormatDBTable("room_info") + " SET is_active_rtmp = ?, rtmp_node_id = ? WHERE sid = ?")
+	stmt, err := tx.Prepare("UPDATE " + rm.app.FormatDBTable("room_info") + " SET is_active_rtmp = ?, rtmp_node_id = ? WHERE sid = ? OR sid = CONCAT(?, '-', id)")
 	if err != nil {
 		return err
 	}
 
-	_, err = stmt.Exec(isActiveRtmp, r.RecorderId, r.Sid)
+	_, err = stmt.Exec(isActiveRtmp, r.RecorderId, r.Sid, r.Sid)
 	if err != nil {
 		return err
 	}
