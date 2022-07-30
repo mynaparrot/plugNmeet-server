@@ -210,6 +210,7 @@ func (am *roomAuthModel) CreateRoom(r *RoomCreateReq) (bool, string, *livekit.Ro
 		JoinedParticipants: 0,
 		IsRunning:          1,
 		CreationTime:       room.CreationTime,
+		Created:            time.Now().Format("2006-01-02 15:04:05"),
 		WebhookUrl:         r.RoomMetadata.WebhookUrl,
 		IsBreakoutRoom:     int64(isBreakoutRoom),
 		ParentRoomId:       r.RoomMetadata.ParentRoomId,

@@ -9,7 +9,7 @@ import (
 )
 
 type RoomInfo struct {
-	Id                 int
+	Id                 int64
 	RoomTitle          string `json:"room_title"`
 	RoomId             string `json:"room_id"`
 	Sid                string `json:"sid"`
@@ -23,6 +23,7 @@ type RoomInfo struct {
 	IsBreakoutRoom     int64  `json:"is_breakout_room"`
 	ParentRoomId       string `json:"parent_room_id"`
 	CreationTime       int64  `json:"creation_time"`
+	Created            string
 	Ended              string
 }
 
@@ -51,7 +52,7 @@ func (rm *roomModel) InsertOrUpdateRoomData(r *RoomInfo, update bool) (int64, er
 	}
 	defer tx.Rollback()
 
-	query := "INSERT INTO " + rm.app.FormatDBTable("room_info") + " (room_title, roomId, sid, joined_participants, is_running, webhook_url, is_breakout_room, parent_room_id, creation_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE is_running = ?"
+	query := "INSERT INTO " + rm.app.FormatDBTable("room_info") + " (room_title, roomId, sid, joined_participants, is_running, webhook_url, is_breakout_room, parent_room_id, creation_time, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE is_running = ?"
 
 	if update {
 		query = "UPDATE " + rm.app.FormatDBTable("room_info") + " SET room_title = ?, roomId = ?, sid = ?, joined_participants = ?, is_running = ?, webhook_url = ?, is_breakout_room = ?, parent_room_id = ?, creation_time = ? WHERE id = ?"
@@ -62,12 +63,14 @@ func (rm *roomModel) InsertOrUpdateRoomData(r *RoomInfo, update bool) (int64, er
 		return 0, err
 	}
 
-	lastVal := 1
+	var values []interface{}
 	if update {
-		lastVal = r.Id
+		values = append(values, r.RoomTitle, r.RoomId, r.Sid, r.JoinedParticipants, r.IsRunning, r.WebhookUrl, r.IsBreakoutRoom, r.ParentRoomId, r.CreationTime, r.Id)
+	} else {
+		values = append(values, r.RoomTitle, r.RoomId, r.Sid, r.JoinedParticipants, r.IsRunning, r.WebhookUrl, r.IsBreakoutRoom, r.ParentRoomId, r.CreationTime, r.Created, 1)
 	}
 
-	res, err := stmt.ExecContext(ctx, r.RoomTitle, r.RoomId, r.Sid, r.JoinedParticipants, r.IsRunning, r.WebhookUrl, r.IsBreakoutRoom, r.ParentRoomId, r.CreationTime, lastVal)
+	res, err := stmt.ExecContext(ctx, values...)
 	if err != nil {
 		return 0, err
 	}

@@ -60,6 +60,7 @@ func (w *webhookEvent) roomStarted() int64 {
 		Sid:          event.Room.Sid,
 		IsRunning:    1,
 		CreationTime: event.Room.CreationTime,
+		Created:      time.Now().Format("2006-01-02 15:04:05"),
 	}
 	lastId, err := w.roomModel.InsertOrUpdateRoomData(room, false)
 
