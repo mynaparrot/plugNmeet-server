@@ -93,6 +93,8 @@ func (rm *roomModel) InsertOrUpdateRoomData(r *RoomInfo, update bool) (int64, er
 	return lastId, nil
 }
 
+// UpdateRoomStatus will change the room status based on `is_running` value
+// most of the place this method used to change status to close
 func (rm *roomModel) UpdateRoomStatus(r *RoomInfo) (int64, error) {
 	db := rm.db
 	ctx, cancel := context.WithTimeout(rm.ctx, 3*time.Second)
@@ -109,18 +111,34 @@ func (rm *roomModel) UpdateRoomStatus(r *RoomInfo) (int64, error) {
 
 	switch {
 	case len(r.RoomId) > 0:
-		query = "UPDATE " + rm.app.FormatDBTable("room_info") + " SET is_running = ?, ended = ? WHERE roomId = ?"
+		query = "UPDATE " + rm.app.FormatDBTable("room_info") + " SET is_running = ? WHERE roomId = ?"
 		args = append(args, r.IsRunning)
-		args = append(args, r.Ended)
+
+		if r.IsRunning == 0 {
+			// when the meeting will be ended,
+			// we can change sid to make sure that sid always unique
+			// so, here we'll use sid-id
+			query = "UPDATE " + rm.app.FormatDBTable("room_info") + " SET sid = CONCAT(sid, '-', id), is_running = ?, is_recording = 0, is_active_rtmp = 0, ended = ? WHERE roomId = ? AND is_running <> 0"
+
+			args = append(args, r.Ended)
+		}
 		args = append(args, r.RoomId)
+
 	default:
-		// when the meeting will be ended,
-		// we can change sid to make sure that sid always unique
-		// so, here we'll use sid-id
 		query = "UPDATE " + rm.app.FormatDBTable("room_info") +
-			" SET sid = CONCAT(sid, '-', id), is_running = ?, ended = ? WHERE sid = ?"
+			" SET is_running = ? WHERE sid = ?"
 		args = append(args, r.IsRunning)
-		args = append(args, r.Ended)
+
+		if r.IsRunning == 0 {
+			// when the meeting will be ended,
+			// we can change sid to make sure that sid always unique
+			// so, here we'll use sid-id
+			query = "UPDATE " + rm.app.FormatDBTable("room_info") +
+				" SET sid = CONCAT(sid, '-', id), is_running = ?, is_recording = 0, is_active_rtmp = 0, ended = ? WHERE sid = ? AND is_running <> 0"
+
+			args = append(args, r.Ended)
+		}
+
 		args = append(args, r.Sid)
 	}
 
@@ -164,12 +182,12 @@ func (rm *roomModel) UpdateRoomParticipants(r *RoomInfo, operator string) (int64
 	}
 	defer tx.Rollback()
 	stmt, err := tx.PrepareContext(ctx, "UPDATE "+rm.app.FormatDBTable("room_info")+
-		" SET joined_participants = joined_participants "+operator+" 1 WHERE sid = ?")
+		" SET joined_participants = joined_participants "+operator+" 1 WHERE sid = ? OR sid = CONCAT(?, '-', id)")
 	if err != nil {
 		return 0, err
 	}
 
-	res, err := stmt.ExecContext(ctx, r.Sid)
+	res, err := stmt.ExecContext(ctx, r.Sid, r.Sid)
 	if err != nil {
 		return 0, err
 	}
@@ -204,12 +222,12 @@ func (rm *roomModel) UpdateNumParticipants(roomSid string, num int64) (int64, er
 	}
 	defer tx.Rollback()
 	stmt, err := tx.PrepareContext(ctx, "UPDATE "+rm.app.FormatDBTable("room_info")+
-		" SET joined_participants = ? WHERE sid = ?")
+		" SET joined_participants = ? WHERE sid = ? OR sid = CONCAT(?, '-', id)")
 	if err != nil {
 		return 0, err
 	}
 
-	res, err := stmt.ExecContext(ctx, num, roomSid)
+	res, err := stmt.ExecContext(ctx, num, roomSid, roomSid)
 	if err != nil {
 		return 0, err
 	}
@@ -246,15 +264,15 @@ func (rm *roomModel) GetRoomInfo(roomId string, sid string, isRunning int) (*Roo
 
 	case len(sid) > 0 && isRunning == 1 && len(roomId) == 0:
 		// for sid + isRunning
-		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time FROM "+rm.app.FormatDBTable("room_info")+" WHERE sid = ? AND is_running = 1", sid)
+		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time FROM "+rm.app.FormatDBTable("room_info")+" WHERE (sid = ? OR sid = CONCAT(?, '-', id)) AND is_running = 1", sid, sid)
 
 	case len(roomId) > 0 && len(sid) > 0 && isRunning == 1:
 		// for sid + roomId + isRunning
-		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time FROM "+rm.app.FormatDBTable("room_info")+" WHERE roomId = ? AND sid = ? AND is_running = 1", roomId, sid)
+		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time FROM "+rm.app.FormatDBTable("room_info")+" WHERE roomId = ? AND (sid = ? OR sid = CONCAT(?, '-', id)) AND is_running = 1", roomId, sid, sid)
 
 	default:
 		// for only sid
-		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time FROM "+rm.app.FormatDBTable("room_info")+" WHERE sid = ?", sid)
+		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time FROM "+rm.app.FormatDBTable("room_info")+" WHERE sid = sid = ? OR sid = CONCAT(?, '-', id)", sid, sid)
 	}
 
 	var room RoomInfo
