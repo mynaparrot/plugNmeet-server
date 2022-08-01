@@ -3,8 +3,8 @@ package controllers
 import (
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
-	"github.com/mynaparrot/plugNmeet/pkg/config"
-	"github.com/mynaparrot/plugNmeet/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 )
 
 func HandleLTIV1Landing(c *fiber.Ctx) error {

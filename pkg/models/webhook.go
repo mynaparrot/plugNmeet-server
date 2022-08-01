@@ -5,7 +5,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/livekit"
-	"github.com/mynaparrot/plugNmeet/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
 	"time"
 )

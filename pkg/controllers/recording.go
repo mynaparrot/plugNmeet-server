@@ -2,7 +2,7 @@ package controllers
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/mynaparrot/plugNmeet/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 )
 
 func HandleRecording(c *fiber.Ctx) error {

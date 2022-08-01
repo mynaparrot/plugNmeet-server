@@ -9,8 +9,8 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/template/html"
 	"github.com/gofiber/websocket/v2"
-	"github.com/mynaparrot/plugNmeet/pkg/config"
-	"github.com/mynaparrot/plugNmeet/pkg/controllers"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
 )
 
 func Router() *fiber.App {

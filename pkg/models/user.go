@@ -6,7 +6,7 @@ import (
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/livekit/protocol/livekit"
-	"github.com/mynaparrot/plugNmeet/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
 type userModel struct {

@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"github.com/gofiber/fiber/v2"
 	"github.com/livekit/protocol/livekit"
-	"github.com/mynaparrot/plugNmeet/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 

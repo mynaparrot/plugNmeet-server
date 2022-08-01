@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/mynaparrot/plugNmeet/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"time"
 )
 

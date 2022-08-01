@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/mynaparrot/plugNmeet/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 	"os"

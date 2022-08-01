@@ -3,7 +3,7 @@ package models
 import (
 	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/livekit"
-	"github.com/mynaparrot/plugNmeet/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"time"
 )
 
