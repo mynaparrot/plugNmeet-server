@@ -165,6 +165,14 @@ func (w *webhookEvent) roomFinished() int64 {
 func (w *webhookEvent) participantJoined() int64 {
 	event := w.event
 
+	// webhook notification
+	go w.sendToWebhookNotifier(event)
+
+	// we won't count for recorder
+	if event.Participant.Identity == "RECORDER_BOT" || event.Participant.Identity == "RTMP_BOT" {
+		return 0
+	}
+
 	room := &RoomInfo{
 		Sid: event.Room.Sid,
 	}
@@ -173,15 +181,19 @@ func (w *webhookEvent) participantJoined() int64 {
 		log.Errorln(err)
 	}
 
-	// webhook notification
-	if !event.Participant.Permission.Hidden {
-		w.sendToWebhookNotifier(event)
-	}
 	return affected
 }
 
 func (w *webhookEvent) participantLeft() int64 {
 	event := w.event
+
+	// webhook notification
+	go w.sendToWebhookNotifier(event)
+
+	// we won't count for recorder
+	if event.Participant.Identity == "RECORDER_BOT" || event.Participant.Identity == "RTMP_BOT" {
+		return 0
+	}
 
 	room := &RoomInfo{
 		Sid: event.Room.Sid,
@@ -189,11 +201,6 @@ func (w *webhookEvent) participantLeft() int64 {
 	affected, err := w.roomModel.UpdateRoomParticipants(room, "-")
 	if err != nil {
 		log.Errorln(err)
-	}
-
-	// webhook notification
-	if !event.Participant.Permission.Hidden {
-		w.sendToWebhookNotifier(event)
 	}
 
 	return affected
