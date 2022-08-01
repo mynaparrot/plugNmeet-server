@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/mynaparrot/plugNmeet/pkg/config"
-	"github.com/mynaparrot/plugNmeet/pkg/controllers"
-	"github.com/mynaparrot/plugNmeet/pkg/factory"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
+	"github.com/mynaparrot/plugnmeet-server/pkg/factory"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"

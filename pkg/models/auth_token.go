@@ -4,7 +4,7 @@ import (
 	"errors"
 	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/auth"
-	"github.com/mynaparrot/plugNmeet/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
 type GenTokenReq struct {

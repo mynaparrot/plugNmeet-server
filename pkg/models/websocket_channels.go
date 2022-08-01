@@ -3,7 +3,7 @@ package models
 import (
 	"context"
 	"github.com/goccy/go-json"
-	"github.com/mynaparrot/plugNmeet/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
 )
 

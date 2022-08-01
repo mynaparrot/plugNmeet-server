@@ -5,7 +5,7 @@ import (
 	"github.com/antoniodipinto/ikisocket"
 	"github.com/goccy/go-json"
 	"github.com/google/uuid"
-	"github.com/mynaparrot/plugNmeet/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"time"
 )
 
