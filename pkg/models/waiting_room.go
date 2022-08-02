@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/goccy/go-json"
+	log "github.com/sirupsen/logrus"
 )
 
 type userWaitingRoomModel struct {
@@ -30,7 +31,8 @@ func (u *userWaitingRoomModel) ApproveWaitingUsers(r *ApproveWaitingUsersReq) er
 		}
 
 		for _, p := range participants {
-			_ = u.approveUser(r.RoomId, r.UserId, p.Metadata)
+			err = u.approveUser(r.RoomId, r.UserId, p.Metadata)
+			log.Errorln(err)
 		}
 
 		return nil

@@ -65,6 +65,7 @@ func (s *scheduler) subscribeRedisRoomDurationChecker() {
 		req := new(RedisRoomDurationCheckerReq)
 		err := json.Unmarshal([]byte(msg.Payload), req)
 		if err != nil {
+			log.Errorln(err)
 			continue
 		}
 		if req.Type == "delete" {
@@ -86,7 +87,7 @@ func (s *scheduler) checkRoomWithDuration() {
 		if now > valid {
 			_, err := s.ra.rs.EndRoom(i)
 			if err != nil {
-				log.Error(err)
+				log.Errorln(err)
 			}
 		}
 	}

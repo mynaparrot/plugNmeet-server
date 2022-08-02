@@ -7,6 +7,7 @@ import (
 	"github.com/goccy/go-json"
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -96,7 +97,10 @@ func (m *EtherpadModel) CreateSession(roomId string) (*CreateSessionRes, error) 
 	m.rc.SAdd(m.context, EtherpadKey+m.NodeId, roomId)
 
 	// finally, update to room
-	_ = m.addPadToRoomMetadata(roomId, res)
+	err = m.addPadToRoomMetadata(roomId, res)
+	if err != nil {
+		log.Errorln(err)
+	}
 
 	return res, nil
 }
@@ -118,6 +122,9 @@ func (m *EtherpadModel) addPadToRoomMetadata(roomId string, c *CreateSessionRes)
 	meta.Features.SharedNotePadFeatures = f
 
 	_, err = m.rs.UpdateRoomMetadataByStruct(roomId, meta)
+	if err != nil {
+		log.Errorln(err)
+	}
 
 	return err
 }
@@ -143,7 +150,10 @@ func (m *EtherpadModel) CleanPad(roomId, nodeId, padId string) error {
 	// step 1: delete pad
 	vals := url.Values{}
 	vals.Add("padID", padId)
-	_, _ = m.postToEtherpad("deletePad", vals)
+	_, err := m.postToEtherpad("deletePad", vals)
+	if err != nil {
+		log.Errorln(err)
+	}
 
 	// add roomId to redis for this node
 	_ = m.rc.SRem(m.context, EtherpadKey+nodeId, roomId)
@@ -161,6 +171,9 @@ func (m *EtherpadModel) CleanAfterRoomEnd(roomId, metadata string) error {
 	}
 
 	err := m.CleanPad(roomId, np.NodeId, np.NotePadId)
+	if err != nil {
+		log.Errorln(err)
+	}
 
 	return err
 }
@@ -179,6 +192,9 @@ func (m *EtherpadModel) ChangeEtherpadStatus(r *ChangeEtherpadStatusReq) error {
 	meta.Features.SharedNotePadFeatures.IsActive = r.IsActive
 
 	_, err = m.rs.UpdateRoomMetadataByStruct(r.RoomId, meta)
+	if err != nil {
+		log.Errorln(err)
+	}
 
 	return err
 }
@@ -188,6 +204,9 @@ func (m *EtherpadModel) createPad(sessionId string) (*EtherpadHttpRes, error) {
 	vals.Add("padID", sessionId)
 
 	res, err := m.postToEtherpad("createPad", vals)
+	if err != nil {
+		log.Errorln(err)
+	}
 	return res, err
 }
 
@@ -196,6 +215,9 @@ func (m *EtherpadModel) createReadonlyPad(sessionId string) (*EtherpadHttpRes, e
 	vals.Add("padID", sessionId)
 
 	res, err := m.postToEtherpad("getReadOnlyID", vals)
+	if err != nil {
+		log.Errorln(err)
+	}
 	return res, err
 }
 
@@ -242,6 +264,7 @@ func (m *EtherpadModel) checkStatus(h config.EtherpadInfo) bool {
 	vals := url.Values{}
 	_, err := m.postToEtherpad("getStats", vals)
 	if err != nil {
+		log.Errorln(err)
 		return false
 	}
 
@@ -264,12 +287,14 @@ func (m *EtherpadModel) postToEtherpad(method string, vals url.Values) (*Etherpa
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
+		log.Errorln(err)
 		return nil, err
 	}
 
 	mar := new(EtherpadHttpRes)
 	err = json.Unmarshal(body, mar)
 	if err != nil {
+		log.Errorln(err)
 		return nil, err
 	}
 
