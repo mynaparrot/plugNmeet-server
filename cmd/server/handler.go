@@ -160,7 +160,7 @@ func Router() *fiber.App {
 
 	// last method
 	app.Use(func(c *fiber.Ctx) error {
-		return c.Render("index", nil)
+		return c.Status(fiber.StatusNotFound).SendString("not found")
 	})
 
 	return app
