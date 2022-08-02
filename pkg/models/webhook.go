@@ -55,6 +55,9 @@ func NewWebhookModel(e *livekit.WebhookEvent) {
 func (w *webhookEvent) roomStarted() int64 {
 	event := w.event
 
+	// webhook notification
+	go w.sendToWebhookNotifier(event)
+
 	room := &RoomInfo{
 		RoomId:       event.Room.Name,
 		Sid:          event.Room.Sid,
@@ -92,14 +95,14 @@ func (w *webhookEvent) roomStarted() int64 {
 		}
 	}
 
-	// webhook notification
-	w.sendToWebhookNotifier(event)
-
 	return lastId
 }
 
 func (w *webhookEvent) roomFinished() int64 {
 	event := w.event
+
+	// webhook notification
+	go w.sendToWebhookNotifier(event)
 
 	room := &RoomInfo{
 		Sid:       event.Room.Sid,
@@ -140,9 +143,6 @@ func (w *webhookEvent) roomFinished() int64 {
 	if err == nil {
 		w.rc.Publish(w.ctx, "plug-n-meet-room-duration-checker", marshal)
 	}
-
-	// webhook notification
-	w.sendToWebhookNotifier(event)
 
 	// clean shared note
 	em := NewEtherpadModel()
@@ -208,12 +208,12 @@ func (w *webhookEvent) participantLeft() int64 {
 
 func (w *webhookEvent) trackPublished() {
 	// webhook notification
-	w.sendToWebhookNotifier(w.event)
+	go w.sendToWebhookNotifier(w.event)
 }
 
 func (w *webhookEvent) trackUnpublished() {
 	// webhook notification
-	w.sendToWebhookNotifier(w.event)
+	go w.sendToWebhookNotifier(w.event)
 }
 
 func (w *webhookEvent) sendToWebhookNotifier(event *livekit.WebhookEvent) {

@@ -63,26 +63,26 @@ func (rm *recordingModel) HandleRecorderResp(r *RecorderResp) {
 	switch r.Task {
 	case "recording-started":
 		rm.recordingStarted(r)
-		rm.sendToWebhookNotifier(r)
+		go rm.sendToWebhookNotifier(r)
 
 	case "recording-ended":
 		rm.recordingEnded(r)
-		rm.sendToWebhookNotifier(r)
+		go rm.sendToWebhookNotifier(r)
 
 	case "rtmp-started":
 		rm.rtmpStarted(r)
-		rm.sendToWebhookNotifier(r)
+		go rm.sendToWebhookNotifier(r)
 
 	case "rtmp-ended":
 		rm.rtmpEnded(r)
-		rm.sendToWebhookNotifier(r)
+		go rm.sendToWebhookNotifier(r)
 
 	case "recording-proceeded":
 		err := rm.addRecording(r)
 		if err != nil {
 			log.Errorln(err)
 		}
-		rm.sendToWebhookNotifier(r)
+		go rm.sendToWebhookNotifier(r)
 	}
 }
 
