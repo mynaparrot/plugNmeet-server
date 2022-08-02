@@ -51,6 +51,7 @@ func (r *RoomService) LoadRoomInfoFromRedis(roomId string) (*livekit.Room, error
 	room := livekit.Room{}
 	err = proto.Unmarshal([]byte(data), &room)
 	if err != nil {
+		log.Errorln(err)
 		return nil, err
 	}
 
@@ -71,6 +72,7 @@ func (r *RoomService) LoadParticipantsFromRedis(roomId string) ([]*livekit.Parti
 	for _, item := range items {
 		pi := livekit.ParticipantInfo{}
 		if err := proto.Unmarshal([]byte(item), &pi); err != nil {
+			log.Errorln(err)
 			return nil, err
 		}
 		participants = append(participants, &pi)
@@ -90,6 +92,7 @@ func (r *RoomService) LoadParticipantInfoFromRedis(roomId string, identity strin
 
 	pi := livekit.ParticipantInfo{}
 	if err := proto.Unmarshal([]byte(data), &pi); err != nil {
+		log.Errorln(err)
 		return nil, err
 	}
 	return &pi, nil
@@ -112,6 +115,7 @@ func (r *RoomService) CreateRoom(roomId string, emptyTimeout uint32, maxParticip
 
 	room, err := r.rsc.CreateRoom(r.ctx, &data)
 	if err != nil {
+		log.Errorln(err)
 		return nil, err
 	}
 
@@ -127,6 +131,7 @@ func (r *RoomService) LoadRoomInfo(roomId string) ([]*livekit.Room, error) {
 
 	res, err := r.rsc.ListRooms(r.ctx, &data)
 	if err != nil {
+		log.Errorln(err)
 		return nil, err
 	}
 
@@ -141,6 +146,7 @@ func (r *RoomService) UpdateRoomMetadata(roomId string, metadata string) (*livek
 
 	room, err := r.rsc.UpdateRoomMetadata(r.ctx, &data)
 	if err != nil {
+		log.Errorln(err)
 		return nil, err
 	}
 
@@ -154,6 +160,7 @@ func (r *RoomService) EndRoom(roomId string) (string, error) {
 
 	res, err := r.rsc.DeleteRoom(r.ctx, &data)
 	if err != nil {
+		log.Errorln(err)
 		return "", err
 	}
 
@@ -181,6 +188,7 @@ func (r *RoomService) UpdateParticipantMetadata(roomId string, userId string, me
 
 	participant, err := r.rsc.UpdateParticipant(r.ctx, &data)
 	if err != nil {
+		log.Errorln(err)
 		return nil, err
 	}
 
@@ -196,6 +204,7 @@ func (r *RoomService) UpdateParticipantPermission(roomId string, userId string, 
 
 	participant, err := r.rsc.UpdateParticipant(r.ctx, &data)
 	if err != nil {
+		log.Errorln(err)
 		return nil, err
 	}
 
@@ -210,6 +219,7 @@ func (r *RoomService) RemoveParticipant(roomId string, userId string) (*livekit.
 
 	res, err := r.rsc.RemoveParticipant(r.ctx, &data)
 	if err != nil {
+		log.Errorln(err)
 		return nil, err
 	}
 
@@ -226,6 +236,7 @@ func (r *RoomService) MuteUnMuteTrack(roomId string, userId string, trackSid str
 
 	res, err := r.rsc.MutePublishedTrack(r.ctx, &data)
 	if err != nil {
+		log.Errorln(err)
 		return nil, err
 	}
 
@@ -242,6 +253,7 @@ func (r *RoomService) SendData(roomId string, data []byte, dataPacket_Kind livek
 
 	res, err := r.rsc.SendData(r.ctx, &req)
 	if err != nil {
+		log.Errorln(err)
 		return nil, err
 	}
 
@@ -280,6 +292,7 @@ func (r *RoomService) LoadRoomWithMetadata(roomId string) (*livekit.Room, *RoomM
 	meta := new(RoomMetadata)
 	err = json.Unmarshal([]byte(room.Metadata), meta)
 	if err != nil {
+		log.Errorln(err)
 		return room, nil, err
 	}
 
@@ -289,10 +302,12 @@ func (r *RoomService) LoadRoomWithMetadata(roomId string) (*livekit.Room, *RoomM
 func (r *RoomService) UpdateRoomMetadataByStruct(roomId string, meta *RoomMetadata) (*livekit.Room, error) {
 	marshal, err := json.Marshal(meta)
 	if err != nil {
+		log.Errorln(err)
 		return nil, err
 	}
 	room, err := r.UpdateRoomMetadata(roomId, string(marshal))
 	if err != nil {
+		log.Errorln(err)
 		return nil, err
 	}
 
@@ -308,6 +323,7 @@ func (r *RoomService) LoadParticipantWithMetadata(roomId, userId string) (*livek
 	meta := new(UserMetadata)
 	err = json.Unmarshal([]byte(p.Metadata), meta)
 	if err != nil {
+		log.Errorln(err)
 		return p, nil, err
 	}
 
@@ -317,10 +333,12 @@ func (r *RoomService) LoadParticipantWithMetadata(roomId, userId string) (*livek
 func (r *RoomService) UpdateParticipantMetadataByStruct(roomId, userId string, meta *UserMetadata) (*livekit.ParticipantInfo, error) {
 	marshal, err := json.Marshal(meta)
 	if err != nil {
+		log.Errorln(err)
 		return nil, err
 	}
 	p, err := r.UpdateParticipantMetadata(roomId, userId, string(marshal))
 	if err != nil {
+		log.Errorln(err)
 		return nil, err
 	}
 

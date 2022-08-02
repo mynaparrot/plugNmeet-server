@@ -76,7 +76,7 @@ func (m *ManageFile) ResumableFileUpload(c *fiber.Ctx) (*UploadedFileResponse, e
 	res := new(UploadedFileResponse)
 	err := c.QueryParser(req)
 	if err != nil {
-		fmt.Println(err)
+		log.Errorln(err)
 		return nil, err
 	}
 
@@ -227,13 +227,16 @@ func (m *ManageFile) combineResumableFiles(chunksDir string, fileName string, to
 	uploadDir := fmt.Sprintf("%s/%s", m.uploadFileSettings.Path, m.Sid)
 
 	if _, err := os.Stat(uploadDir); os.IsNotExist(err) {
-		_ = os.MkdirAll(uploadDir, os.ModePerm)
+		err = os.MkdirAll(uploadDir, os.ModePerm)
+		if err != nil {
+			log.Errorln(err)
+		}
 	}
 
 	path := fmt.Sprintf("%s/%s", uploadDir, fileName)
 	f, err := os.Create(path)
 	if err != nil {
-		fmt.Printf("Error: %s", err)
+		log.Errorln("Error: %s", err)
 		return err
 	}
 	defer f.Close()
@@ -249,13 +252,13 @@ func (m *ManageFile) combineResumableFiles(chunksDir string, fileName string, to
 		_, err = f.WriteAt(dat, writeOffset)
 
 		if err != nil {
-			fmt.Printf("Error: %s", err)
+			log.Errorln("Error: %s", err)
 		}
 	}
 
 	err = os.RemoveAll(chunksDir)
 	if err != nil {
-		fmt.Println(err)
+		log.Errorln(err)
 		return err
 	}
 
@@ -264,12 +267,20 @@ func (m *ManageFile) combineResumableFiles(chunksDir string, fileName string, to
 
 func (m *ManageFile) DeleteFile(filePath string) error {
 	path := fmt.Sprintf("%s/%s", m.uploadFileSettings.Path, filePath)
-	return os.Remove(path)
+	err := os.Remove(path)
+	if err != nil {
+		log.Errorln(err)
+	}
+	return err
 }
 
 func (m *ManageFile) DeleteRoomUploadedDir() error {
 	path := fmt.Sprintf("%s/%s", m.uploadFileSettings.Path, m.Sid)
-	return os.RemoveAll(path)
+	err := os.RemoveAll(path)
+	if err != nil {
+		log.Errorln(err)
+	}
+	return err
 }
 
 type convertStatus struct {
@@ -284,14 +295,22 @@ type ConvertWhiteboardFileRes struct {
 }
 
 func (m *ManageFile) ConvertWhiteboardFile() (*ConvertWhiteboardFileRes, error) {
+	// check if mutool installed in correct path
+	if _, err := os.Stat("/usr/bin/mutool"); err != nil {
+		log.Errorln(err)
+		return nil, err
+	}
+
 	file := fmt.Sprintf("%s/%s", m.uploadFileSettings.Path, m.FilePath)
 	info, err := os.Stat(file)
 	if err != nil {
+		log.Errorln(err)
 		return nil, err
 	}
 
 	mtype, err := mimetype.DetectFile(file)
 	if err != nil {
+		log.Errorln(err)
 		return nil, err
 	}
 
@@ -299,6 +318,7 @@ func (m *ManageFile) ConvertWhiteboardFile() (*ConvertWhiteboardFileRes, error) 
 	outputDir := fmt.Sprintf("%s/%s/%s", m.uploadFileSettings.Path, m.Sid, fileId)
 	err = os.MkdirAll(outputDir, os.ModePerm)
 	if err != nil {
+		log.Errorln(err)
 		return nil, err
 	}
 
@@ -322,14 +342,21 @@ func (m *ManageFile) ConvertWhiteboardFile() (*ConvertWhiteboardFileRes, error) 
 	}
 
 	if needConvertToPdf {
-		newFile := strings.Replace(info.Name(), mtype.Extension(), ".pdf", 1)
+		// check if soffice installed in correct path
+		if _, err = os.Stat("/usr/bin/soffice"); err != nil {
+			log.Errorln(err)
+			return nil, err
+		}
 
+		newFile := strings.Replace(info.Name(), mtype.Extension(), ".pdf", 1)
 		status := make(chan convertStatus)
+
 		go func(file, variant, outputDir string) {
 			cmd := exec.Command("/usr/bin/soffice", "--headless", "--invisible", "--nologo", "--nolockcheck", "--convert-to", variant, "--outdir", outputDir, file)
 			_, err = cmd.Output()
 
 			if err != nil {
+				log.Errorln(err)
 				status <- convertStatus{status: false, err: err}
 				return
 			}
@@ -349,6 +376,7 @@ func (m *ManageFile) ConvertWhiteboardFile() (*ConvertWhiteboardFileRes, error) 
 		_, err = cmd.Output()
 
 		if err != nil {
+			log.Errorln(err)
 			status <- convertStatus{status: false, err: err}
 			return
 		}
@@ -371,7 +399,10 @@ func (m *ManageFile) ConvertWhiteboardFile() (*ConvertWhiteboardFileRes, error) 
 	}
 
 	// update metadata with info
-	_ = m.updateRoomMetadataWithOfficeFile(res)
+	err = m.updateRoomMetadataWithOfficeFile(res)
+	if err != nil {
+		log.Errorln(err)
+	}
 
 	return res, nil
 }
@@ -388,6 +419,9 @@ func (m *ManageFile) updateRoomMetadataWithOfficeFile(f *ConvertWhiteboardFileRe
 	roomMeta.Features.WhiteboardFeatures.TotalPages = f.TotalPages
 
 	_, err = m.rs.UpdateRoomMetadataByStruct(m.RoomId, roomMeta)
+	if err != nil {
+		log.Errorln(err)
+	}
 
 	return err
 }

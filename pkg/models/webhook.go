@@ -52,7 +52,7 @@ func NewWebhookModel(e *livekit.WebhookEvent) {
 
 }
 
-func (w *webhookEvent) roomStarted() int64 {
+func (w *webhookEvent) roomStarted() {
 	event := w.event
 
 	// webhook notification
@@ -65,8 +65,7 @@ func (w *webhookEvent) roomStarted() int64 {
 		CreationTime: event.Room.CreationTime,
 		Created:      time.Now().Format("2006-01-02 15:04:05"),
 	}
-	lastId, err := w.roomModel.InsertOrUpdateRoomData(room, false)
-
+	_, err := w.roomModel.InsertOrUpdateRoomData(room, false)
 	if err != nil {
 		log.Errorln(err)
 	}
@@ -94,11 +93,9 @@ func (w *webhookEvent) roomStarted() int64 {
 			}
 		}
 	}
-
-	return lastId
 }
 
-func (w *webhookEvent) roomFinished() int64 {
+func (w *webhookEvent) roomFinished() {
 	event := w.event
 
 	// webhook notification
@@ -109,7 +106,7 @@ func (w *webhookEvent) roomFinished() int64 {
 		IsRunning: 0,
 		Ended:     time.Now().Format("2006-01-02 15:04:05"),
 	}
-	affected, err := w.roomModel.UpdateRoomStatus(room)
+	_, err := w.roomModel.UpdateRoomStatus(room)
 	if err != nil {
 		log.Errorln(err)
 	}
@@ -117,12 +114,14 @@ func (w *webhookEvent) roomFinished() int64 {
 	//we'll send message to recorder to stop
 	_ = w.recordingModel.SendMsgToRecorder("stop", w.event.Room.Name, w.event.Room.Sid, "")
 
-	// finally, delete all the files those may upload during session
+	// Delete all the files those may upload during session
 	if !config.AppCnf.UploadFileSettings.KeepForever {
-		f := NewManageFileModel(&ManageFile{
-			Sid: event.Room.Sid,
-		})
-		_ = f.DeleteRoomUploadedDir()
+		go func() {
+			f := NewManageFileModel(&ManageFile{
+				Sid: event.Room.Sid,
+			})
+			_ = f.DeleteRoomUploadedDir()
+		}()
 	}
 
 	// clear chatroom from memory
@@ -145,8 +144,10 @@ func (w *webhookEvent) roomFinished() int64 {
 	}
 
 	// clean shared note
-	em := NewEtherpadModel()
-	_ = em.CleanAfterRoomEnd(event.Room.Name, event.Room.Metadata)
+	go func() {
+		em := NewEtherpadModel()
+		_ = em.CleanAfterRoomEnd(event.Room.Name, event.Room.Metadata)
+	}()
 
 	// clear users block list
 	_, _ = w.roomService.DeleteRoomBlockList(event.Room.Name)
@@ -156,13 +157,13 @@ func (w *webhookEvent) roomFinished() int64 {
 	_ = pm.CleanUpPolls(event.Room.Name)
 
 	// remove all breakout rooms
-	bm := NewBreakoutRoomModel()
-	_ = bm.PostTaskAfterRoomEndWebhook(event.Room.Name, event.Room.Metadata)
-
-	return affected
+	go func() {
+		bm := NewBreakoutRoomModel()
+		_ = bm.PostTaskAfterRoomEndWebhook(event.Room.Name, event.Room.Metadata)
+	}()
 }
 
-func (w *webhookEvent) participantJoined() int64 {
+func (w *webhookEvent) participantJoined() {
 	event := w.event
 
 	// webhook notification
@@ -170,21 +171,19 @@ func (w *webhookEvent) participantJoined() int64 {
 
 	// we won't count for recorder
 	if event.Participant.Identity == "RECORDER_BOT" || event.Participant.Identity == "RTMP_BOT" {
-		return 0
+		return
 	}
 
 	room := &RoomInfo{
 		Sid: event.Room.Sid,
 	}
-	affected, err := w.roomModel.UpdateRoomParticipants(room, "+")
+	_, err := w.roomModel.UpdateRoomParticipants(room, "+")
 	if err != nil {
 		log.Errorln(err)
 	}
-
-	return affected
 }
 
-func (w *webhookEvent) participantLeft() int64 {
+func (w *webhookEvent) participantLeft() {
 	event := w.event
 
 	// webhook notification
@@ -192,18 +191,17 @@ func (w *webhookEvent) participantLeft() int64 {
 
 	// we won't count for recorder
 	if event.Participant.Identity == "RECORDER_BOT" || event.Participant.Identity == "RTMP_BOT" {
-		return 0
+		return
 	}
 
 	room := &RoomInfo{
 		Sid: event.Room.Sid,
 	}
-	affected, err := w.roomModel.UpdateRoomParticipants(room, "-")
+	_, err := w.roomModel.UpdateRoomParticipants(room, "-")
 	if err != nil {
 		log.Errorln(err)
 	}
 
-	return affected
 }
 
 func (w *webhookEvent) trackPublished() {

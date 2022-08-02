@@ -21,11 +21,17 @@ func Router() *fiber.App {
 		templateEngine.Debug(true)
 	}
 
-	app := fiber.New(fiber.Config{
+	cnf := fiber.Config{
 		JSONEncoder: json.Marshal,
 		JSONDecoder: json.Unmarshal,
 		Views:       templateEngine,
-	})
+	}
+
+	if config.AppCnf.Client.ProxyHeader != "" {
+		cnf.ProxyHeader = config.AppCnf.Client.ProxyHeader
+	}
+
+	app := fiber.New(cnf)
 	app.Static("/assets", config.AppCnf.Client.Path+"/assets")
 	app.Static("/favicon.ico", config.AppCnf.Client.Path+"/assets/imgs/favicon.ico")
 
