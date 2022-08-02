@@ -44,6 +44,7 @@ type ClientInfo struct {
 	Secret         string         `yaml:"secret"`
 	WebhookConf    WebhookConf    `yaml:"webhook_conf"`
 	PrometheusConf PrometheusConf `yaml:"prometheus"`
+	ProxyHeader    string         `yaml:"proxy_header"`
 }
 
 type WebhookConf struct {
