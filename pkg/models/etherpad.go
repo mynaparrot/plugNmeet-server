@@ -171,9 +171,6 @@ func (m *EtherpadModel) CleanAfterRoomEnd(roomId, metadata string) error {
 	}
 
 	err := m.CleanPad(roomId, np.NodeId, np.NotePadId)
-	if err != nil {
-		log.Errorln(err)
-	}
 
 	return err
 }
