@@ -326,7 +326,7 @@ func (rm *recordingModel) addRecording(r *RecorderResp) error {
 		return err
 	}
 
-	_, err = stmt.Exec(r.RecordId, r.RoomId, r.Sid, r.RecorderId, r.FilePath, r.FileSize, time.Now().Unix(), roomInfo.CreationTime)
+	_, err = stmt.Exec(r.RecordId, r.RoomId, roomInfo.Sid, r.RecorderId, r.FilePath, r.FileSize, time.Now().Unix(), roomInfo.CreationTime)
 	if err != nil {
 		return err
 	}
