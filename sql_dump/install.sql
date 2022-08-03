@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS `pnm_recordings` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `record_id` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
   `room_id` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `room_sid` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `room_sid` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `recorder_id` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `file_path` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `size` double NOT NULL,
@@ -40,5 +40,8 @@ CREATE TABLE IF NOT EXISTS `pnm_recordings` (
   `modified` datetime NOT NULL DEFAULT '0000-00-00 00:00:00' ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `record_id` (`record_id`),
-  KEY `room_id` (`room_id`)
+  KEY `room_id` (`room_id`),
+  FOREIGN KEY (room_sid) REFERENCES `pnm_room_info` (sid)
+     ON DELETE SET NULL
+     ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
