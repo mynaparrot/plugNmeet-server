@@ -28,10 +28,10 @@ func NewRecordingAuth() *authRecording {
 }
 
 type FetchRecordingsReq struct {
-	RoomIds []string `json:"room_ids" validate:"required"`
+	RoomIds []string `json:"room_ids"`
 	From    int      `json:"from"`
 	Limit   int      `json:"limit"`
-	OrderBy string   `json:"order_by" validate:"required"`
+	OrderBy string   `json:"order_by"`
 }
 
 type FetchRecordingsResp struct {
