@@ -220,6 +220,8 @@ github.com/gofiber/fiber/v2 v2.34.1 h1:C6saXB7385HvtXX+XMzc5Dqj5S/aEXOfKCW7JNep4
 github.com/gofiber/fiber/v2 v2.34.1/go.mod h1:ozRQfS+D7EL1+hMH+gutku0kfx1wLX4hAxDCtDzpj4U=
 github.com/gofiber/fiber/v2 v2.35.0 h1:ct+jKw8Qb24WEIZx3VV3zz9VXyBZL7mcEjNaqj3g0h0=
 github.com/gofiber/fiber/v2 v2.35.0/go.mod h1:tgCr+lierLwLoVHHO/jn3Niannv34WRkQETU8wiL9fQ=
+github.com/gofiber/fiber/v2 v2.36.0 h1:1qLMe5rhXFLPa2SjK10Wz7WFgLwYi4TYg7XrjztJHqA=
+github.com/gofiber/fiber/v2 v2.36.0/go.mod h1:tgCr+lierLwLoVHHO/jn3Niannv34WRkQETU8wiL9fQ=
 github.com/gofiber/template v1.6.26 h1:wtbXFY1XzniCImYSBX++jVwM2aoShj8Bf7XNHojc5aQ=
 github.com/gofiber/template v1.6.26/go.mod h1:Vf2XJ97b9LhBxfKbIDjk2iTxHGFCSf3TB3LcP0NDsHY=
 github.com/gofiber/template v1.6.27 h1:gjQuNY3zgV1JtOezX0kIffOOlHHj7XWeFMntOVYYTrE=
@@ -239,6 +241,8 @@ github.com/gofiber/websocket/v2 v2.0.22 h1:aR2PomjLYRoQdFLFq5dH4OqJ93NiVfrfQTJqi
 github.com/gofiber/websocket/v2 v2.0.22/go.mod h1:/F8SLCxN9kEfBvwGW0FBQ4/+yF18GA3Q9ckqynuiSZk=
 github.com/gofiber/websocket/v2 v2.0.23 h1:stcj6FE485c85zovkfyhss8ntcAtKo0+8/3N81VH9xw=
 github.com/gofiber/websocket/v2 v2.0.23/go.mod h1:D7XQiauHRqJv4z/Qp0r01g7ltDiUgDdqsp92Xjpwh6A=
+github.com/gofiber/websocket/v2 v2.0.24 h1:K3GjZ27NmnxtURG6KVwygymzDXTv0e4HMWkpbjH2D2s=
+github.com/gofiber/websocket/v2 v2.0.24/go.mod h1:NiQlVL+LGKa8SNdz2uYS6DoQreX20feCPCnFW+hhv9Y=
 github.com/gogo/protobuf v1.1.1/go.mod h1:r8qH/GZQm5c6nD/R0oafs1akxWv10x8SbQlK7atdtwQ=
 github.com/gogo/protobuf v1.3.2/go.mod h1:P1XiOD3dCwIKUDQYPy72D8LYyHL2YPYrpS2s69NZV8Q=
 github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b/go.mod h1:SBH7ygxi8pfUlaOkMMuAQtPIUF8ecWP5IEl/CR7VP2Q=
