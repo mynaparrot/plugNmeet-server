@@ -90,6 +90,7 @@ github.com/bep/debounce v1.2.1 h1:v67fRdBA9UQu2NhLFXrSg0Brw7CexQekrBwDMM8bzeY=
 github.com/bep/debounce v1.2.1/go.mod h1:H8yggRPQKLUhUoqrJC1bO2xNya7vanpDl7xR3ISbCJ0=
 github.com/bgentry/speakeasy v0.1.0/go.mod h1:+zsyZBPWlz7T6j88CTgSN5bM796AkVf0kBD4zp0CCIs=
 github.com/cbroglie/mustache v1.3.1/go.mod h1:SS1FTIghy0sjse4DUVGV1k/40B1qE1XkD9DtDsHo9iM=
+github.com/cbroglie/mustache v1.4.0/go.mod h1:SS1FTIghy0sjse4DUVGV1k/40B1qE1XkD9DtDsHo9iM=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
 github.com/census-instrumentation/opencensus-proto v0.3.0/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
 github.com/cespare/xxhash v1.1.0 h1:a6HrQnmkObjyL+Gs60czilIUGqrzKutQD6XZog3p+ko=
@@ -220,6 +221,8 @@ github.com/gofiber/fiber/v2 v2.34.1 h1:C6saXB7385HvtXX+XMzc5Dqj5S/aEXOfKCW7JNep4
 github.com/gofiber/fiber/v2 v2.34.1/go.mod h1:ozRQfS+D7EL1+hMH+gutku0kfx1wLX4hAxDCtDzpj4U=
 github.com/gofiber/fiber/v2 v2.35.0 h1:ct+jKw8Qb24WEIZx3VV3zz9VXyBZL7mcEjNaqj3g0h0=
 github.com/gofiber/fiber/v2 v2.35.0/go.mod h1:tgCr+lierLwLoVHHO/jn3Niannv34WRkQETU8wiL9fQ=
+github.com/gofiber/fiber/v2 v2.36.0 h1:1qLMe5rhXFLPa2SjK10Wz7WFgLwYi4TYg7XrjztJHqA=
+github.com/gofiber/fiber/v2 v2.36.0/go.mod h1:tgCr+lierLwLoVHHO/jn3Niannv34WRkQETU8wiL9fQ=
 github.com/gofiber/template v1.6.26 h1:wtbXFY1XzniCImYSBX++jVwM2aoShj8Bf7XNHojc5aQ=
 github.com/gofiber/template v1.6.26/go.mod h1:Vf2XJ97b9LhBxfKbIDjk2iTxHGFCSf3TB3LcP0NDsHY=
 github.com/gofiber/template v1.6.27 h1:gjQuNY3zgV1JtOezX0kIffOOlHHj7XWeFMntOVYYTrE=
@@ -228,6 +231,8 @@ github.com/gofiber/template v1.6.28 h1:G7u+MZDkGeWGmQyfOvFm71dzWRLu5YyMwyxHQnGRZ
 github.com/gofiber/template v1.6.28/go.mod h1:nD+Fds2sa7AnXSkDHK+i0ROa+Q8NwW6b9+w4rCHqc1k=
 github.com/gofiber/template v1.6.29 h1:gH0JEweigob8qtECj6DxePjv2cADkZab5oWa2F4coq4=
 github.com/gofiber/template v1.6.29/go.mod h1:AQiLl3JhOT8lV96igpXYY942XtFA2Jsgu4Gt0+hakYo=
+github.com/gofiber/template v1.6.30 h1:CAjfiLdKWpIYOWiERFIZI9iwdKnHgxNeD5jgjp7a9eE=
+github.com/gofiber/template v1.6.30/go.mod h1:m08LbsAqWdJblf92TRExDeCykNRW+x08lvWSrkOMItc=
 github.com/gofiber/utils v0.1.2 h1:1SH2YEz4RlNS0tJlMJ0bGwO0JkqPqvq6TbHK9tXZKtk=
 github.com/gofiber/utils v0.1.2/go.mod h1:pacRFtghAE3UoknMOUiXh2Io/nLWSUHtQCi/3QASsOc=
 github.com/gofiber/websocket/v2 v2.0.10/go.mod h1:naQFzOBD63niLQBMHQQQaD6bARrk90jrJJ/NyFaIals=

@@ -10,8 +10,8 @@ require (
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/goccy/go-json v0.9.10
-	github.com/gofiber/fiber/v2 v2.35.0
-	github.com/gofiber/template v1.6.29
+	github.com/gofiber/fiber/v2 v2.36.0
+	github.com/gofiber/template v1.6.30
 	github.com/gofiber/websocket/v2 v2.0.23
 	github.com/google/uuid v1.3.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
