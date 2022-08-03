@@ -95,11 +95,13 @@ func (a *authRecording) FetchRecordings(r *FetchRecordingsReq) (*FetchRecordings
 
 	for rows.Next() {
 		var recording RecordingInfo
+		var rSid sql.NullString
 
-		err = rows.Scan(&recording.RecordId, &recording.RoomId, &recording.RoomSid, &recording.FilePath, &recording.FileSize, &recording.CreationTime, &recording.RoomCreationTime)
+		err = rows.Scan(&recording.RecordId, &recording.RoomId, &rSid, &recording.FilePath, &recording.FileSize, &recording.CreationTime, &recording.RoomCreationTime)
 		if err != nil {
 			fmt.Println(err)
 		}
+		recording.RoomSid = rSid.String
 		recordings = append(recordings, recording)
 	}
 
@@ -140,7 +142,11 @@ func (a *authRecording) FetchRecording(recordId string) (*RecordingInfo, error) 
 	row := db.QueryRowContext(ctx, "SELECT record_id, room_id, room_sid, file_path, size, creation_time, room_creation_time FROM "+a.app.FormatDBTable("recordings")+" WHERE record_id = ?", recordId)
 
 	recording := new(RecordingInfo)
-	err := row.Scan(&recording.RecordId, &recording.RoomId, &recording.RoomSid, &recording.FilePath, &recording.FileSize, &recording.CreationTime, &recording.RoomCreationTime)
+	var rSid sql.NullString
+
+	err := row.Scan(&recording.RecordId, &recording.RoomId, &rSid, &recording.FilePath, &recording.FileSize, &recording.CreationTime, &recording.RoomCreationTime)
+
+	recording.RoomSid = rSid.String
 
 	switch {
 	case err == sql.ErrNoRows:
