@@ -165,14 +165,13 @@ func (w *webhookEvent) roomFinished() {
 
 func (w *webhookEvent) participantJoined() {
 	event := w.event
-
-	// webhook notification
-	go w.sendToWebhookNotifier(event)
-
 	// we won't count for recorder
 	if event.Participant.Identity == "RECORDER_BOT" || event.Participant.Identity == "RTMP_BOT" {
 		return
 	}
+
+	// webhook notification
+	go w.sendToWebhookNotifier(event)
 
 	room := &RoomInfo{
 		Sid: event.Room.Sid,
@@ -185,14 +184,13 @@ func (w *webhookEvent) participantJoined() {
 
 func (w *webhookEvent) participantLeft() {
 	event := w.event
-
-	// webhook notification
-	go w.sendToWebhookNotifier(event)
-
 	// we won't count for recorder
 	if event.Participant.Identity == "RECORDER_BOT" || event.Participant.Identity == "RTMP_BOT" {
 		return
 	}
+
+	// webhook notification
+	go w.sendToWebhookNotifier(event)
 
 	room := &RoomInfo{
 		Sid: event.Room.Sid,
@@ -201,7 +199,6 @@ func (w *webhookEvent) participantLeft() {
 	if err != nil {
 		log.Errorln(err)
 	}
-
 }
 
 func (w *webhookEvent) trackPublished() {
