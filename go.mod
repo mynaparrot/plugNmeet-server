@@ -10,9 +10,9 @@ require (
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/goccy/go-json v0.9.10
-	github.com/gofiber/fiber/v2 v2.35.0
-	github.com/gofiber/template v1.6.29
-	github.com/gofiber/websocket/v2 v2.0.23
+	github.com/gofiber/fiber/v2 v2.36.0
+	github.com/gofiber/template v1.6.30
+	github.com/gofiber/websocket/v2 v2.0.24
 	github.com/google/uuid v1.3.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v0.13.4
@@ -39,7 +39,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-playground/locales v0.14.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect
-	github.com/gofiber/adaptor/v2 v2.1.24 // indirect
+	github.com/gofiber/adaptor/v2 v2.1.25 // indirect
 	github.com/gofiber/utils v0.1.2 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
@@ -80,10 +80,10 @@ require (
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa // indirect
-	golang.org/x/net v0.0.0-20220728211354-c7608f3a8462 // indirect
-	golang.org/x/sys v0.0.0-20220731174439-a90be440212d // indirect
+	golang.org/x/net v0.0.0-20220802222814-0bcc04d9c69b // indirect
+	golang.org/x/sys v0.0.0-20220803195053-6e608f9ce704 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/xerrors v0.0.0-20220517211312-f3a8303e98df // indirect
-	google.golang.org/genproto v0.0.0-20220728213248-dd149ef739b9 // indirect
+	google.golang.org/genproto v0.0.0-20220803205849-8f55acc8769f // indirect
 	google.golang.org/grpc v1.48.0 // indirect
 )
