@@ -9,6 +9,7 @@ import (
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"time"
 )
@@ -109,12 +110,14 @@ func (d *DataMessageReq) RaiseHand() error {
 
 	data, err := proto.Marshal(msg)
 	if err != nil {
+		log.Errorln(err)
 		return err
 	}
 
 	// send as push message
 	_, err = d.roomService.SendData(d.RoomId, data, livekit.DataPacket_RELIABLE, sids)
 	if err != nil {
+		log.Errorln(err)
 		return err
 	}
 
@@ -193,6 +196,7 @@ func (d *DataMessageReq) SendNotification(sendTo []string) error {
 
 	_, err = d.roomService.SendData(d.RoomId, data, livekit.DataPacket_RELIABLE, sendTo)
 	if err != nil {
+		log.Errorln(err)
 		return err
 	}
 
