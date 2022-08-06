@@ -4,9 +4,10 @@ import (
 	"github.com/antoniodipinto/ikisocket"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
-	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/proto"
 )
 
 type websocketController struct {
@@ -99,26 +100,25 @@ func SetupSocketListeners() {
 	// On message event
 	ikisocket.On(ikisocket.EventMessage, func(ep *ikisocket.EventPayload) {
 		//fmt.Println(fmt.Sprintf("Message event - User: %s - Message: %s", ep.Kws.GetStringAttribute("userId"), string(ep.Data)))
-
-		payload := &models.DataMessageRes{}
-		err := json.Unmarshal(ep.Data, payload)
+		dataMsg := &plugnmeet.DataMessage{}
+		err := proto.Unmarshal(ep.Data, dataMsg)
 		if err != nil {
-			log.Errorln(err)
 			return
 		}
+
 		roomId := ep.Kws.GetStringAttribute("roomId")
-		msg := models.WebsocketRedisMsg{
+		payload := &plugnmeet.WebsocketToRedis{
 			Type:    "sendMsg",
-			Payload: payload,
+			DataMsg: dataMsg,
 			RoomId:  roomId,
 			IsAdmin: false,
 		}
 		isAdmin := ep.Kws.GetAttribute("isAdmin")
 		if isAdmin != nil {
-			msg.IsAdmin = isAdmin.(bool)
+			payload.IsAdmin = isAdmin.(bool)
 		}
 
-		models.DistributeWebsocketMsgToRedisChannel(&msg)
+		models.DistributeWebsocketMsgToRedisChannel(payload)
 	})
 
 	// On disconnect event

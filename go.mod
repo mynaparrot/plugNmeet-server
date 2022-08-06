@@ -23,6 +23,7 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/square/go-jose.v2 v2.6.0
 	gopkg.in/yaml.v3 v3.0.1
+	github.com/mynaparrot/plugnmeet-protocol v0.0.0
 )
 
 require (
@@ -86,4 +87,8 @@ require (
 	golang.org/x/xerrors v0.0.0-20220517211312-f3a8303e98df // indirect
 	google.golang.org/genproto v0.0.0-20220803205849-8f55acc8769f // indirect
 	google.golang.org/grpc v1.48.0 // indirect
+)
+
+replace (
+	github.com/mynaparrot/plugnmeet-protocol => ../d-protocol
 )

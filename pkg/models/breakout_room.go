@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/go-redis/redis/v8"
 	"github.com/goccy/go-json"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
 	"time"
@@ -122,7 +123,7 @@ func (m *breakoutRoom) CreateBreakoutRooms(r *CreateBreakoutRoomsReq) error {
 
 		// now send invitation notification
 		for _, u := range room.Users {
-			err = m.broadcastNotification(r.RoomId, r.RequestedUserId, u.Id, bRoom.RoomId, "SYSTEM", "JOIN_BREAKOUT_ROOM", false)
+			err = m.broadcastNotification(r.RoomId, r.RequestedUserId, u.Id, bRoom.RoomId, plugnmeet.DataMsgType_SYSTEM, plugnmeet.DataMsgBodyType_JOIN_BREAKOUT_ROOM, false)
 			if err != nil {
 				log.Error(err)
 				continue
@@ -268,7 +269,7 @@ func (m *breakoutRoom) SendBreakoutRoomMsg(r *SendBreakoutRoomMsgReq) error {
 	}
 
 	for _, rr := range rooms {
-		err = m.broadcastNotification(rr.Id, "system", "", r.Msg, "USER", "CHAT", true)
+		err = m.broadcastNotification(rr.Id, "system", "", r.Msg, plugnmeet.DataMsgType_USER, plugnmeet.DataMsgBodyType_CHAT, true)
 		if err != nil {
 			continue
 		}
@@ -368,25 +369,25 @@ func (m *breakoutRoom) PostTaskAfterRoomEndWebhook(roomId, metadata string) erro
 	return nil
 }
 
-func (m *breakoutRoom) broadcastNotification(roomId, fromUserId, toUserId, broadcastMsg, typeMsg, mType string, isAdmin bool) error {
-	payload := DataMessageRes{
+func (m *breakoutRoom) broadcastNotification(roomId, fromUserId, toUserId, broadcastMsg string, typeMsg plugnmeet.DataMsgType, mType plugnmeet.DataMsgBodyType, isAdmin bool) error {
+	payload := &plugnmeet.DataMessage{
 		Type:   typeMsg,
 		RoomId: roomId,
-		Body: DataMessageBody{
+		Body: &plugnmeet.DataMsgBody{
 			Type: mType,
-			From: ReqFrom{
+			From: &plugnmeet.DataMsgReqFrom{
 				UserId: fromUserId,
 			},
 			Msg: broadcastMsg,
 		},
 	}
 	if toUserId != "" {
-		payload.To = toUserId
+		payload.To = &toUserId
 	}
 
-	msg := &WebsocketRedisMsg{
+	msg := &plugnmeet.WebsocketToRedis{
 		Type:    "sendMsg",
-		Payload: &payload,
+		DataMsg: payload,
 		RoomId:  roomId,
 		IsAdmin: isAdmin,
 	}

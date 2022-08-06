@@ -7,6 +7,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/goccy/go-json"
 	"github.com/google/uuid"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"strconv"
 	"strings"
@@ -66,7 +67,7 @@ func (m *newPollsModel) CreatePoll(r *CreatePollReq, isAdmin bool) (error, strin
 		return err, ""
 	}
 
-	_ = m.broadcastNotification(r.RoomId, r.UserId, r.PollId, "POLL_CREATED", isAdmin)
+	_ = m.broadcastNotification(r.RoomId, r.UserId, r.PollId, plugnmeet.DataMsgBodyType_POLL_CREATED, isAdmin)
 
 	return nil, r.PollId
 }
@@ -251,27 +252,27 @@ func (m *newPollsModel) UserSubmitResponse(r *UserSubmitResponseReq, isAdmin boo
 		return err
 	}
 
-	_ = m.broadcastNotification(r.RoomId, r.UserId, r.PollId, "NEW_POLL_RESPONSE", isAdmin)
+	_ = m.broadcastNotification(r.RoomId, r.UserId, r.PollId, plugnmeet.DataMsgBodyType_NEW_POLL_RESPONSE, isAdmin)
 
 	return nil
 }
 
-func (m *newPollsModel) broadcastNotification(roomId, userId, pollId, mType string, isAdmin bool) error {
-	payload := DataMessageRes{
-		Type:   "SYSTEM",
+func (m *newPollsModel) broadcastNotification(roomId, userId, pollId string, mType plugnmeet.DataMsgBodyType, isAdmin bool) error {
+	payload := &plugnmeet.DataMessage{
+		Type:   plugnmeet.DataMsgType_SYSTEM,
 		RoomId: roomId,
-		Body: DataMessageBody{
+		Body: &plugnmeet.DataMsgBody{
 			Type: mType,
-			From: ReqFrom{
+			From: &plugnmeet.DataMsgReqFrom{
 				UserId: userId,
 			},
 			Msg: pollId,
 		},
 	}
 
-	msg := &WebsocketRedisMsg{
+	msg := &plugnmeet.WebsocketToRedis{
 		Type:    "sendMsg",
-		Payload: &payload,
+		DataMsg: payload,
 		RoomId:  roomId,
 		IsAdmin: isAdmin,
 	}
@@ -325,7 +326,7 @@ func (m *newPollsModel) ClosePoll(r *ClosePollReq, isAdmin bool) error {
 		return err
 	}
 
-	_ = m.broadcastNotification(r.RoomId, r.UserId, r.PollId, "POLL_CLOSED", isAdmin)
+	_ = m.broadcastNotification(r.RoomId, r.UserId, r.PollId, plugnmeet.DataMsgBodyType_POLL_CLOSED, isAdmin)
 
 	return nil
 }

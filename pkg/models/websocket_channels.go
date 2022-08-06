@@ -2,26 +2,27 @@ package models
 
 import (
 	"context"
-	"github.com/goccy/go-json"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/proto"
 )
 
-func DistributeWebsocketMsgToRedisChannel(msg *WebsocketRedisMsg) {
+func DistributeWebsocketMsgToRedisChannel(payload *plugnmeet.WebsocketToRedis) {
 	ctx := context.Background()
-	marshal, err := json.Marshal(msg)
+	msg, err := proto.Marshal(payload)
 	if err != nil {
 		log.Errorln(err)
 		return
 	}
 
-	switch msg.Payload.Type {
-	case "USER":
-		config.AppCnf.RDS.Publish(ctx, "plug-n-meet-user-websocket", marshal)
-	case "WHITEBOARD":
-		config.AppCnf.RDS.Publish(ctx, "plug-n-meet-whiteboard-websocket", marshal)
-	case "SYSTEM":
-		config.AppCnf.RDS.Publish(ctx, "plug-n-meet-system-websocket", marshal)
+	switch payload.DataMsg.Type {
+	case plugnmeet.DataMsgType_USER:
+		config.AppCnf.RDS.Publish(ctx, "plug-n-meet-user-websocket", msg)
+	case plugnmeet.DataMsgType_WHITEBOARD:
+		config.AppCnf.RDS.Publish(ctx, "plug-n-meet-whiteboard-websocket", msg)
+	case plugnmeet.DataMsgType_SYSTEM:
+		config.AppCnf.RDS.Publish(ctx, "plug-n-meet-system-websocket", msg)
 	}
 }
 
@@ -39,13 +40,13 @@ func SubscribeToUserWebsocketChannel() {
 	m := NewWebsocketService()
 	ch := pubsub.Channel()
 	for msg := range ch {
-		res := new(WebsocketRedisMsg)
-		err = json.Unmarshal([]byte(msg.Payload), res)
+		res := new(plugnmeet.WebsocketToRedis)
+		err = proto.Unmarshal([]byte(msg.Payload), res)
 		if err != nil {
 			log.Errorln(err)
 		}
 		if res.Type == "sendMsg" {
-			m.HandleDataMessages(res.Payload, res.RoomId, res.IsAdmin)
+			m.HandleDataMessages(res.DataMsg, res.RoomId, res.IsAdmin)
 		} else if res.Type == "deleteRoom" {
 			config.AppCnf.DeleteChatRoom(res.RoomId)
 		}
@@ -66,12 +67,12 @@ func SubscribeToWhiteboardWebsocketChannel() {
 	m := NewWebsocketService()
 	ch := pubsub.Channel()
 	for msg := range ch {
-		res := new(WebsocketRedisMsg)
-		err = json.Unmarshal([]byte(msg.Payload), res)
+		res := new(plugnmeet.WebsocketToRedis)
+		err = proto.Unmarshal([]byte(msg.Payload), res)
 		if err != nil {
 			log.Errorln(err)
 		}
-		m.HandleDataMessages(res.Payload, res.RoomId, res.IsAdmin)
+		m.HandleDataMessages(res.DataMsg, res.RoomId, res.IsAdmin)
 	}
 }
 
@@ -89,11 +90,11 @@ func SubscribeToSystemWebsocketChannel() {
 	m := NewWebsocketService()
 	ch := pubsub.Channel()
 	for msg := range ch {
-		res := new(WebsocketRedisMsg)
-		err = json.Unmarshal([]byte(msg.Payload), res)
+		res := new(plugnmeet.WebsocketToRedis)
+		err = proto.Unmarshal([]byte(msg.Payload), res)
 		if err != nil {
 			log.Errorln(err)
 		}
-		m.HandleDataMessages(res.Payload, res.RoomId, res.IsAdmin)
+		m.HandleDataMessages(res.DataMsg, res.RoomId, res.IsAdmin)
 	}
 }
