@@ -1,11 +1,11 @@
 package models
 
 import (
-	"fmt"
 	"github.com/antoniodipinto/ikisocket"
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"time"
 )
@@ -91,7 +91,6 @@ func (w *websocketService) handleWhiteboardMessages() {
 }
 
 func (w *websocketService) handleChat() {
-	fmt.Println(w.pl.Body.Msg)
 	jm, err := proto.Marshal(w.pl)
 	if err != nil {
 		return
@@ -104,7 +103,7 @@ func (w *websocketService) handleChat() {
 		if p.RoomId == w.roomId {
 			// only for specific user
 			if w.pl.To != nil {
-				if w.pl.To == &p.UserId {
+				if *w.pl.To == p.UserId {
 					to = append(to, p.UUID)
 				}
 				// for private messages we should send this message back to sender as well as
@@ -136,7 +135,7 @@ func (w *websocketService) handleSendChatMsgs() {
 	config.AppCnf.RLock()
 	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
 		if p.RoomSid == w.rSid {
-			if w.pl.To == &p.UserSid {
+			if *w.pl.To == p.UserSid {
 				userUUID = p.UUID
 				break
 			}
@@ -147,7 +146,7 @@ func (w *websocketService) handleSendChatMsgs() {
 	if userUUID != "" {
 		err = ikisocket.EmitTo(userUUID, jm, ikisocket.BinaryMessage)
 		if err != nil {
-			fmt.Println(err)
+			log.Errorln(err)
 		}
 	}
 }
@@ -187,7 +186,7 @@ func (w *websocketService) handleRenewToken() {
 			if w.pl.Body.From.UserId == p.UserId {
 				err = ikisocket.EmitTo(p.UUID, jm, ikisocket.BinaryMessage)
 				if err != nil {
-					fmt.Println(err)
+					log.Errorln(err)
 				}
 			}
 		}
@@ -207,7 +206,7 @@ func (w *websocketService) handleSendPushMsg() {
 		if p.RoomSid == w.rSid {
 			// only for specific user
 			if w.pl.To != nil {
-				if w.pl.To == &p.UserSid {
+				if *w.pl.To == p.UserSid {
 					to = append(to, p.UUID)
 				}
 			} else {
@@ -235,7 +234,7 @@ func (w *websocketService) handleWhiteboard() {
 		if p.RoomSid == w.rSid {
 			// this is basically for initial request
 			if w.pl.To != nil {
-				if w.pl.To == &p.UserSid {
+				if *w.pl.To == p.UserSid {
 					to = append(to, p.UUID)
 				}
 			} else if w.pl.Body.From.UserId != p.UserId {
@@ -335,7 +334,7 @@ func (w *websocketService) handleSendBreakoutRoomNotification() {
 		if p.RoomId == w.roomId {
 			// only for specific user
 			if w.pl.To != nil {
-				if w.pl.To == &p.UserId {
+				if *w.pl.To == p.UserId {
 					to = append(to, p.UUID)
 				}
 			} else {
