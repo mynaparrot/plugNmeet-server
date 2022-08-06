@@ -2,15 +2,22 @@ package models
 
 import (
 	"context"
+	"github.com/goccy/go-json"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
-func DistributeWebsocketMsgToRedisChannel(payload *plugnmeet.WebsocketToRedis) {
+type WebsocketToRedis struct {
+	Type    string                 `json:"type,omitempty"`
+	DataMsg *plugnmeet.DataMessage `json:"data_msg,omitempty"`
+	RoomId  string                 `json:"room_id,omitempty"`
+	IsAdmin bool                   `json:"is_admin,omitempty"`
+}
+
+func DistributeWebsocketMsgToRedisChannel(payload *WebsocketToRedis) {
 	ctx := context.Background()
-	msg, err := protojson.Marshal(payload)
+	msg, err := json.Marshal(payload)
 	if err != nil {
 		log.Errorln(err)
 		return
@@ -40,8 +47,8 @@ func SubscribeToUserWebsocketChannel() {
 	m := NewWebsocketService()
 	ch := pubsub.Channel()
 	for msg := range ch {
-		res := new(plugnmeet.WebsocketToRedis)
-		err = protojson.Unmarshal([]byte(msg.Payload), res)
+		res := new(WebsocketToRedis)
+		err = json.Unmarshal([]byte(msg.Payload), res)
 		if err != nil {
 			log.Errorln(err)
 		}
@@ -67,8 +74,8 @@ func SubscribeToWhiteboardWebsocketChannel() {
 	m := NewWebsocketService()
 	ch := pubsub.Channel()
 	for msg := range ch {
-		res := new(plugnmeet.WebsocketToRedis)
-		err = protojson.Unmarshal([]byte(msg.Payload), res)
+		res := new(WebsocketToRedis)
+		err = json.Unmarshal([]byte(msg.Payload), res)
 		if err != nil {
 			log.Errorln(err)
 		}
@@ -90,8 +97,8 @@ func SubscribeToSystemWebsocketChannel() {
 	m := NewWebsocketService()
 	ch := pubsub.Channel()
 	for msg := range ch {
-		res := new(plugnmeet.WebsocketToRedis)
-		err = protojson.Unmarshal([]byte(msg.Payload), res)
+		res := new(WebsocketToRedis)
+		err = json.Unmarshal([]byte(msg.Payload), res)
 		if err != nil {
 			log.Errorln(err)
 		}

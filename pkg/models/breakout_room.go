@@ -385,7 +385,7 @@ func (m *breakoutRoom) broadcastNotification(roomId, fromUserId, toUserId, broad
 		payload.To = &toUserId
 	}
 
-	msg := &plugnmeet.WebsocketToRedis{
+	msg := &WebsocketToRedis{
 		Type:    "sendMsg",
 		DataMsg: payload,
 		RoomId:  roomId,

@@ -5,10 +5,8 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/livekit"
-	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/encoding/protojson"
 	"time"
 )
 
@@ -127,11 +125,11 @@ func (w *webhookEvent) roomFinished() {
 	}
 
 	// clear chatroom from memory
-	msg := &plugnmeet.WebsocketToRedis{
+	msg := &WebsocketToRedis{
 		Type:   "deleteRoom",
 		RoomId: event.Room.Name,
 	}
-	marshal, err := protojson.Marshal(msg)
+	marshal, err := json.Marshal(msg)
 	if err == nil {
 		config.AppCnf.RDS.Publish(context.Background(), "plug-n-meet-user-websocket", marshal)
 	}

@@ -270,7 +270,7 @@ func (m *newPollsModel) broadcastNotification(roomId, userId, pollId string, mTy
 		},
 	}
 
-	msg := &plugnmeet.WebsocketToRedis{
+	msg := &WebsocketToRedis{
 		Type:    "sendMsg",
 		DataMsg: payload,
 		RoomId:  roomId,

@@ -107,7 +107,7 @@ func (w *websocketService) handleChat() {
 					to = append(to, p.UUID)
 				}
 				// for private messages we should send this message back to sender as well as
-				if w.pl.Body.IsPrivate {
+				if w.pl.Body.IsPrivate != nil && *w.pl.Body.IsPrivate == 1 {
 					if w.pl.Body.From.UserId == p.UserId {
 						to = append(to, p.UUID)
 					}
