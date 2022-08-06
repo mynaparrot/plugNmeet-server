@@ -5,12 +5,12 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func DistributeWebsocketMsgToRedisChannel(payload *plugnmeet.WebsocketToRedis) {
 	ctx := context.Background()
-	msg, err := proto.Marshal(payload)
+	msg, err := protojson.Marshal(payload)
 	if err != nil {
 		log.Errorln(err)
 		return
@@ -41,7 +41,7 @@ func SubscribeToUserWebsocketChannel() {
 	ch := pubsub.Channel()
 	for msg := range ch {
 		res := new(plugnmeet.WebsocketToRedis)
-		err = proto.Unmarshal([]byte(msg.Payload), res)
+		err = protojson.Unmarshal([]byte(msg.Payload), res)
 		if err != nil {
 			log.Errorln(err)
 		}
@@ -68,7 +68,7 @@ func SubscribeToWhiteboardWebsocketChannel() {
 	ch := pubsub.Channel()
 	for msg := range ch {
 		res := new(plugnmeet.WebsocketToRedis)
-		err = proto.Unmarshal([]byte(msg.Payload), res)
+		err = protojson.Unmarshal([]byte(msg.Payload), res)
 		if err != nil {
 			log.Errorln(err)
 		}
@@ -91,7 +91,7 @@ func SubscribeToSystemWebsocketChannel() {
 	ch := pubsub.Channel()
 	for msg := range ch {
 		res := new(plugnmeet.WebsocketToRedis)
-		err = proto.Unmarshal([]byte(msg.Payload), res)
+		err = protojson.Unmarshal([]byte(msg.Payload), res)
 		if err != nil {
 			log.Errorln(err)
 		}

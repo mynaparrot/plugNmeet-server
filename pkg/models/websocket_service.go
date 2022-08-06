@@ -3,7 +3,6 @@ package models
 import (
 	"fmt"
 	"github.com/antoniodipinto/ikisocket"
-	"github.com/goccy/go-json"
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -31,6 +30,11 @@ func (w *websocketService) HandleDataMessages(payload *plugnmeet.DataMessage, ro
 		tt := time.Now().Format(time.RFC1123Z)
 		payload.Body.Time = &tt
 	}
+
+	if payload.To != nil && len(*payload.To) == 0 {
+		payload.To = nil
+	}
+
 	w.pl = payload           // payload messages
 	w.rSid = payload.RoomSid // room sid
 	w.isAdmin = isAdmin
@@ -87,7 +91,8 @@ func (w *websocketService) handleWhiteboardMessages() {
 }
 
 func (w *websocketService) handleChat() {
-	jm, err := json.Marshal(w.pl)
+	fmt.Println(w.pl.Body.Msg)
+	jm, err := proto.Marshal(w.pl)
 	if err != nil {
 		return
 	}
@@ -117,12 +122,12 @@ func (w *websocketService) handleChat() {
 	config.AppCnf.RUnlock()
 
 	if len(to) > 0 {
-		ikisocket.EmitToList(to, jm)
+		ikisocket.EmitToList(to, jm, ikisocket.BinaryMessage)
 	}
 }
 
 func (w *websocketService) handleSendChatMsgs() {
-	jm, err := json.Marshal(w.pl)
+	jm, err := proto.Marshal(w.pl)
 	if err != nil {
 		return
 	}
@@ -140,7 +145,7 @@ func (w *websocketService) handleSendChatMsgs() {
 	config.AppCnf.RUnlock()
 
 	if userUUID != "" {
-		err = ikisocket.EmitTo(userUUID, jm)
+		err = ikisocket.EmitTo(userUUID, jm, ikisocket.BinaryMessage)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -180,7 +185,7 @@ func (w *websocketService) handleRenewToken() {
 	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
 		if p.RoomSid == w.rSid {
 			if w.pl.Body.From.UserId == p.UserId {
-				err = ikisocket.EmitTo(p.UUID, jm)
+				err = ikisocket.EmitTo(p.UUID, jm, ikisocket.BinaryMessage)
 				if err != nil {
 					fmt.Println(err)
 				}
@@ -191,7 +196,7 @@ func (w *websocketService) handleRenewToken() {
 }
 
 func (w *websocketService) handleSendPushMsg() {
-	jm, err := json.Marshal(w.pl)
+	jm, err := proto.Marshal(w.pl)
 	if err != nil {
 		return
 	}
@@ -213,12 +218,12 @@ func (w *websocketService) handleSendPushMsg() {
 	}
 	config.AppCnf.RUnlock()
 	if len(to) > 0 {
-		ikisocket.EmitToList(to, jm)
+		ikisocket.EmitToList(to, jm, ikisocket.BinaryMessage)
 	}
 }
 
 func (w *websocketService) handleWhiteboard() {
-	jm, err := json.Marshal(w.pl)
+	jm, err := proto.Marshal(w.pl)
 	if err != nil {
 		return
 	}
@@ -242,12 +247,12 @@ func (w *websocketService) handleWhiteboard() {
 	config.AppCnf.RUnlock()
 
 	if len(to) > 0 {
-		ikisocket.EmitToList(to, jm)
+		ikisocket.EmitToList(to, jm, ikisocket.BinaryMessage)
 	}
 }
 
 func (w *websocketService) handleUserVisibility() {
-	jm, err := json.Marshal(w.pl)
+	jm, err := proto.Marshal(w.pl)
 	if err != nil {
 		return
 	}
@@ -266,12 +271,12 @@ func (w *websocketService) handleUserVisibility() {
 	config.AppCnf.RUnlock()
 
 	if len(to) > 0 {
-		ikisocket.EmitToList(to, jm)
+		ikisocket.EmitToList(to, jm, ikisocket.BinaryMessage)
 	}
 }
 
 func (w *websocketService) handleExternalMediaPlayerEvents() {
-	jm, err := json.Marshal(w.pl)
+	jm, err := proto.Marshal(w.pl)
 	if err != nil {
 		return
 	}
@@ -290,12 +295,12 @@ func (w *websocketService) handleExternalMediaPlayerEvents() {
 	config.AppCnf.RUnlock()
 
 	if len(to) > 0 {
-		ikisocket.EmitToList(to, jm)
+		ikisocket.EmitToList(to, jm, ikisocket.BinaryMessage)
 	}
 }
 
 func (w *websocketService) handlePollsNotifications() {
-	jm, err := json.Marshal(w.pl)
+	jm, err := proto.Marshal(w.pl)
 	if err != nil {
 		return
 	}
@@ -314,12 +319,12 @@ func (w *websocketService) handlePollsNotifications() {
 	config.AppCnf.RUnlock()
 
 	if len(to) > 0 {
-		ikisocket.EmitToList(to, jm)
+		ikisocket.EmitToList(to, jm, ikisocket.BinaryMessage)
 	}
 }
 
 func (w *websocketService) handleSendBreakoutRoomNotification() {
-	jm, err := json.Marshal(w.pl)
+	jm, err := proto.Marshal(w.pl)
 	if err != nil {
 		return
 	}
@@ -341,6 +346,6 @@ func (w *websocketService) handleSendBreakoutRoomNotification() {
 	}
 	config.AppCnf.RUnlock()
 	if len(to) > 0 {
-		ikisocket.EmitToList(to, jm)
+		ikisocket.EmitToList(to, jm, ikisocket.BinaryMessage)
 	}
 }

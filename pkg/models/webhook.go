@@ -8,7 +8,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/encoding/protojson"
 	"time"
 )
 
@@ -131,7 +131,7 @@ func (w *webhookEvent) roomFinished() {
 		Type:   "deleteRoom",
 		RoomId: event.Room.Name,
 	}
-	marshal, err := proto.Marshal(msg)
+	marshal, err := protojson.Marshal(msg)
 	if err == nil {
 		config.AppCnf.RDS.Publish(context.Background(), "plug-n-meet-user-websocket", marshal)
 	}

@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/ansrivas/fiberprometheus/v2 v2.3.0
-	github.com/antoniodipinto/ikisocket v0.0.0-20220426120810-e8049cc9e56b
+	github.com/antoniodipinto/ikisocket v0.0.0
 	github.com/gabriel-vasile/mimetype v1.4.1
 	github.com/go-playground/validator/v10 v10.11.0
 	github.com/go-redis/redis/v8 v8.11.5
@@ -91,4 +91,5 @@ require (
 
 replace (
 	github.com/mynaparrot/plugnmeet-protocol => ../d-protocol
+	github.com/antoniodipinto/ikisocket => ../../ikisocket
 )

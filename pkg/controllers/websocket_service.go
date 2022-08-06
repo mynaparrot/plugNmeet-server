@@ -46,14 +46,14 @@ func (c *websocketController) validation() bool {
 
 	claims, err := m.DoValidateToken(info, false)
 	if err != nil {
-		err = c.kws.EmitTo(c.kws.UUID, []byte("invalid token"))
+		err = c.kws.EmitTo(c.kws.UUID, []byte("invalid token"), ikisocket.TextMessage)
 		if err == nil {
 			return false
 		}
 	}
 
 	if claims.Identity != c.participant.UserId || claims.Video.Room != c.participant.RoomId {
-		err = c.kws.EmitTo(c.kws.UUID, []byte("unauthorized access!"))
+		err = c.kws.EmitTo(c.kws.UUID, []byte("unauthorized access!"), ikisocket.TextMessage)
 		if err == nil {
 			return false
 		}
@@ -66,7 +66,7 @@ func (c *websocketController) validation() bool {
 	metadata := new(models.UserMetadata)
 	err = json.Unmarshal([]byte(claims.Metadata), metadata)
 	if err != nil {
-		_ = c.kws.EmitTo(c.kws.UUID, []byte("can't Unmarshal metadata!"))
+		_ = c.kws.EmitTo(c.kws.UUID, []byte("can't Unmarshal metadata!"), ikisocket.TextMessage)
 		return false
 	}
 
