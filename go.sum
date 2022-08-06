@@ -73,6 +73,8 @@ github.com/antoniodipinto/ikisocket v0.0.0-20210910063045-b2995ab1b378 h1:by/qZd
 github.com/antoniodipinto/ikisocket v0.0.0-20210910063045-b2995ab1b378/go.mod h1:rbXoMj+rQhiUHvTIIbN537ey20JC2eWOe2dDr+39bVw=
 github.com/antoniodipinto/ikisocket v0.0.0-20220426120810-e8049cc9e56b h1:6TGLE6OkduDj4qpujFFMIvPM+YdNcV5yJ+5Qd9pCrFo=
 github.com/antoniodipinto/ikisocket v0.0.0-20220426120810-e8049cc9e56b/go.mod h1:4PlGrJFvkSDC51sWCph7r2R48hgLRgUJ/2KRznqnisc=
+github.com/antoniodipinto/ikisocket v0.0.0-20220806220653-2e4f04aebe6a h1:k9YpinJv+t8SSJOuUFMZ0mACHQYpzazAtIKMSHpQRyM=
+github.com/antoniodipinto/ikisocket v0.0.0-20220806220653-2e4f04aebe6a/go.mod h1:4PlGrJFvkSDC51sWCph7r2R48hgLRgUJ/2KRznqnisc=
 github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e/go.mod h1:3U/XgcO3hCbHZ8TKRvWD2dDTCfh9M9ya+I9JpbB7O8o=
 github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da/go.mod h1:Q73ZrmVTwzkszR9V5SSuryQ31EELlFMUz1kKyl939pY=
 github.com/armon/go-metrics v0.3.10/go.mod h1:4O98XIr/9W0sxpJ8UaYkvjk10Iff7SnFrb4QAOwNTFc=
