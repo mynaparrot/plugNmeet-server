@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"fmt"
 	"github.com/antoniodipinto/ikisocket"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
@@ -106,7 +105,6 @@ func SetupSocketListeners() {
 		if err != nil {
 			return
 		}
-		fmt.Println(dataMsg.Body.IsPrivate)
 
 		roomId := ep.Kws.GetStringAttribute("roomId")
 		payload := &models.WebsocketToRedis{
