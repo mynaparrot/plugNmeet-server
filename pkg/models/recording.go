@@ -6,8 +6,10 @@ import (
 	"errors"
 	"github.com/go-redis/redis/v8"
 	"github.com/goccy/go-json"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/encoding/protojson"
 	"net/url"
 	"sort"
 	"strconv"
@@ -379,39 +381,41 @@ type RecorderReq struct {
 func (rm *recordingModel) SendMsgToRecorder(task string, roomId string, sid string, rtmpUrl string) error {
 	recordId := time.Now().UnixMilli()
 
-	toSend := &RecorderReq{
-		From:     "plugnmeet",
-		Task:     task,
-		RoomId:   roomId,
-		Sid:      sid,
-		RecordId: sid + "-" + strconv.Itoa(int(recordId)),
+	toSend := &plugnmeet.PlugNmeetToRecorder{
+		From:        "plugnmeet",
+		RoomId:      roomId,
+		RoomSid:     sid,
+		RecordingId: sid + "-" + strconv.Itoa(int(recordId)),
 	}
+
 	switch task {
 	case "start-recording":
+		toSend.Task = plugnmeet.RecordingTasks_START_RECORDING
 		err := rm.addTokenAndRecorder(toSend, "RECORDER_BOT")
 		if err != nil {
 			return err
 		}
 	case "stop-recording":
-		toSend.Task = "stop-recording"
+		toSend.Task = plugnmeet.RecordingTasks_STOP_RECORDING
 
 	case "start-rtmp":
-		toSend.RtmpUrl = rtmpUrl
+		toSend.Task = plugnmeet.RecordingTasks_START_RTMP
+		toSend.RtmpUrl = &rtmpUrl
 		err := rm.addTokenAndRecorder(toSend, "RTMP_BOT")
 		if err != nil {
 			return err
 		}
 	case "stop-rtmp":
-		toSend.Task = "stop-rtmp"
+		toSend.Task = plugnmeet.RecordingTasks_STOP_RTMP
 	}
 
-	payload, _ := json.Marshal(toSend)
+	payload, _ := protojson.Marshal(toSend)
 	rm.rds.Publish(rm.ctx, "plug-n-meet-recorder", string(payload))
 
 	return nil
 }
 
-func (rm *recordingModel) addTokenAndRecorder(rq *RecorderReq, userId string) error {
+func (rm *recordingModel) addTokenAndRecorder(rq *plugnmeet.PlugNmeetToRecorder, userId string) error {
 	recorderId, err := rm.selectRecorder()
 	if err != nil {
 		return err
