@@ -3,7 +3,7 @@ module github.com/mynaparrot/plugnmeet-server
 go 1.18
 
 require (
-	github.com/ansrivas/fiberprometheus/v2 v2.3.0
+	github.com/ansrivas/fiberprometheus/v2 v2.4.0
 	github.com/antoniodipinto/ikisocket v0.0.0-20220806220653-2e4f04aebe6a
 	github.com/gabriel-vasile/mimetype v1.4.1
 	github.com/go-playground/validator/v10 v10.11.0
@@ -17,7 +17,7 @@ require (
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.0.0
 	github.com/livekit/server-sdk-go v0.10.4
-	github.com/mynaparrot/plugnmeet-protocol v0.0.0
+	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20220807151720-a1d79f6804cc
 	github.com/sirupsen/logrus v1.9.0
 	github.com/urfave/cli/v2 v2.11.1
 	google.golang.org/protobuf v1.28.1
@@ -85,8 +85,4 @@ require (
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/genproto v0.0.0-20220805133916-01dd62135a58 // indirect
 	google.golang.org/grpc v1.48.0 // indirect
-)
-
-replace (
-	github.com/mynaparrot/plugnmeet-protocol => ../d-protocol
 )
