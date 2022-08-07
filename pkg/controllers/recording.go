@@ -2,7 +2,10 @@ package controllers
 
 import (
 	"github.com/gofiber/fiber/v2"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/proto"
 )
 
 func HandleRecording(c *fiber.Ctx) error {
@@ -180,11 +183,12 @@ func HandleRTMP(c *fiber.Ctx) error {
 }
 
 func HandleRecorderEvents(c *fiber.Ctx) error {
-	req := new(models.RecorderResp)
+	req := new(plugnmeet.RecorderToPlugNmeet)
 	m := models.NewRecordingModel()
 
-	err := c.BodyParser(req)
+	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
+		log.Errorln(err)
 		return c.JSON(fiber.Map{
 			"status": false,
 			"msg":    err.Error(),

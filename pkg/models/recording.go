@@ -6,8 +6,10 @@ import (
 	"errors"
 	"github.com/go-redis/redis/v8"
 	"github.com/goccy/go-json"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/encoding/protojson"
 	"net/url"
 	"sort"
 	"strconv"
@@ -59,25 +61,25 @@ type RecorderResp struct {
 	FileSize float64 `json:"file_size"`
 }
 
-func (rm *recordingModel) HandleRecorderResp(r *RecorderResp) {
+func (rm *recordingModel) HandleRecorderResp(r *plugnmeet.RecorderToPlugNmeet) {
 	switch r.Task {
-	case "recording-started":
+	case plugnmeet.RecordingTasks_START_RECORDING:
 		rm.recordingStarted(r)
 		go rm.sendToWebhookNotifier(r)
 
-	case "recording-ended":
+	case plugnmeet.RecordingTasks_END_RECORDING:
 		rm.recordingEnded(r)
 		go rm.sendToWebhookNotifier(r)
 
-	case "rtmp-started":
+	case plugnmeet.RecordingTasks_START_RTMP:
 		rm.rtmpStarted(r)
 		go rm.sendToWebhookNotifier(r)
 
-	case "rtmp-ended":
+	case plugnmeet.RecordingTasks_END_RTMP:
 		rm.rtmpEnded(r)
 		go rm.sendToWebhookNotifier(r)
 
-	case "recording-proceeded":
+	case plugnmeet.RecordingTasks_RECORDING_PROCEEDED:
 		err := rm.addRecording(r)
 		if err != nil {
 			log.Errorln(err)
@@ -87,7 +89,7 @@ func (rm *recordingModel) HandleRecorderResp(r *RecorderResp) {
 }
 
 // recordingStarted update when recorder will start recording
-func (rm *recordingModel) recordingStarted(r *RecorderResp) {
+func (rm *recordingModel) recordingStarted(r *plugnmeet.RecorderToPlugNmeet) {
 	err := rm.updateRoomRecordingStatus(r, 1)
 	if err != nil {
 		log.Infoln(err)
@@ -115,7 +117,7 @@ func (rm *recordingModel) recordingStarted(r *RecorderResp) {
 }
 
 // recordingEnded will call when recorder will end recording
-func (rm *recordingModel) recordingEnded(r *RecorderResp) {
+func (rm *recordingModel) recordingEnded(r *plugnmeet.RecorderToPlugNmeet) {
 	err := rm.updateRoomRecordingStatus(r, 0)
 	if err != nil {
 		log.Infoln(err)
@@ -149,7 +151,7 @@ func (rm *recordingModel) recordingEnded(r *RecorderResp) {
 }
 
 // updateRoomRecordingStatus to update recording status
-func (rm *recordingModel) updateRoomRecordingStatus(r *RecorderResp, isRecording int) error {
+func (rm *recordingModel) updateRoomRecordingStatus(r *plugnmeet.RecorderToPlugNmeet, isRecording int) error {
 	db := rm.db
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -164,7 +166,7 @@ func (rm *recordingModel) updateRoomRecordingStatus(r *RecorderResp, isRecording
 		return err
 	}
 
-	_, err = stmt.Exec(isRecording, r.RecorderId, r.Sid, r.Sid)
+	_, err = stmt.Exec(isRecording, r.RecorderId, r.RoomSid, r.RoomSid)
 	if err != nil {
 		return err
 	}
@@ -183,7 +185,7 @@ func (rm *recordingModel) updateRoomRecordingStatus(r *RecorderResp, isRecording
 }
 
 // rtmpStarted will call when rtmp has been started
-func (rm *recordingModel) rtmpStarted(r *RecorderResp) {
+func (rm *recordingModel) rtmpStarted(r *plugnmeet.RecorderToPlugNmeet) {
 	err := rm.updateRoomRTMPStatus(r, 1)
 	if err != nil {
 		log.Infoln(err)
@@ -211,7 +213,7 @@ func (rm *recordingModel) rtmpStarted(r *RecorderResp) {
 }
 
 // rtmpEnded will call when recorder will end recording
-func (rm *recordingModel) rtmpEnded(r *RecorderResp) {
+func (rm *recordingModel) rtmpEnded(r *plugnmeet.RecorderToPlugNmeet) {
 	err := rm.updateRoomRTMPStatus(r, 0)
 	if err != nil {
 		log.Infoln(err)
@@ -245,7 +247,7 @@ func (rm *recordingModel) rtmpEnded(r *RecorderResp) {
 }
 
 // updateRoomRTMPStatus to update rtmp status
-func (rm *recordingModel) updateRoomRTMPStatus(r *RecorderResp, isActiveRtmp int) error {
+func (rm *recordingModel) updateRoomRTMPStatus(r *plugnmeet.RecorderToPlugNmeet, isActiveRtmp int) error {
 	db := rm.db
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -260,7 +262,7 @@ func (rm *recordingModel) updateRoomRTMPStatus(r *RecorderResp, isActiveRtmp int
 		return err
 	}
 
-	_, err = stmt.Exec(isActiveRtmp, r.RecorderId, r.Sid, r.Sid)
+	_, err = stmt.Exec(isActiveRtmp, r.RecorderId, r.RoomSid, r.RoomSid)
 	if err != nil {
 		return err
 	}
@@ -307,9 +309,9 @@ func (rm *recordingModel) updateRecorderCurrentProgress(r *RecorderResp) error {
 	return nil
 }
 
-func (rm *recordingModel) addRecording(r *RecorderResp) error {
+func (rm *recordingModel) addRecording(r *plugnmeet.RecorderToPlugNmeet) error {
 	ri := NewRoomModel()
-	roomInfo, _ := ri.GetRoomInfo("", r.Sid, 0)
+	roomInfo, _ := ri.GetRoomInfo("", r.RoomSid, 0)
 
 	db := rm.db
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -326,7 +328,7 @@ func (rm *recordingModel) addRecording(r *RecorderResp) error {
 		return err
 	}
 
-	_, err = stmt.Exec(r.RecordId, r.RoomId, roomInfo.Sid, r.RecorderId, r.FilePath, r.FileSize, time.Now().Unix(), roomInfo.CreationTime)
+	_, err = stmt.Exec(r.RecordingId, r.RoomId, roomInfo.Sid, r.RecorderId, r.FilePath, r.FileSize, time.Now().Unix(), roomInfo.CreationTime)
 	if err != nil {
 		return err
 	}
@@ -342,24 +344,24 @@ func (rm *recordingModel) addRecording(r *RecorderResp) error {
 	return nil
 }
 
-func (rm *recordingModel) sendToWebhookNotifier(r *RecorderResp) {
+func (rm *recordingModel) sendToWebhookNotifier(r *plugnmeet.RecorderToPlugNmeet) {
 	n := NewWebhookNotifier()
 	msg := CommonNotifyEvent{
-		Event: r.Task,
+		Event: r.Task.String(),
 		Room: NotifyEventRoom{
-			Sid:    r.Sid,
+			Sid:    r.RoomSid,
 			RoomId: r.RoomId,
 		},
 		RecordingInfo: RecordingInfoEvent{
-			RecordId:    r.RecordId,
+			RecordId:    r.RecordingId,
 			RecorderId:  r.RecorderId,
 			RecorderMsg: r.Msg,
 			FilePath:    r.FilePath,
-			FileSize:    r.FileSize,
+			FileSize:    float64(r.FileSize),
 		},
 	}
 
-	err := n.Notify(r.Sid, msg)
+	err := n.Notify(r.RoomSid, msg)
 	if err != nil {
 		log.Errorln(err)
 	}
@@ -379,39 +381,41 @@ type RecorderReq struct {
 func (rm *recordingModel) SendMsgToRecorder(task string, roomId string, sid string, rtmpUrl string) error {
 	recordId := time.Now().UnixMilli()
 
-	toSend := &RecorderReq{
-		From:     "plugnmeet",
-		Task:     task,
-		RoomId:   roomId,
-		Sid:      sid,
-		RecordId: sid + "-" + strconv.Itoa(int(recordId)),
+	toSend := &plugnmeet.PlugNmeetToRecorder{
+		From:        "plugnmeet",
+		RoomId:      roomId,
+		RoomSid:     sid,
+		RecordingId: sid + "-" + strconv.Itoa(int(recordId)),
 	}
+
 	switch task {
 	case "start-recording":
+		toSend.Task = plugnmeet.RecordingTasks_START_RECORDING
 		err := rm.addTokenAndRecorder(toSend, "RECORDER_BOT")
 		if err != nil {
 			return err
 		}
 	case "stop-recording":
-		toSend.Task = "stop-recording"
+		toSend.Task = plugnmeet.RecordingTasks_STOP_RECORDING
 
 	case "start-rtmp":
-		toSend.RtmpUrl = rtmpUrl
+		toSend.Task = plugnmeet.RecordingTasks_START_RTMP
+		toSend.RtmpUrl = &rtmpUrl
 		err := rm.addTokenAndRecorder(toSend, "RTMP_BOT")
 		if err != nil {
 			return err
 		}
 	case "stop-rtmp":
-		toSend.Task = "stop-rtmp"
+		toSend.Task = plugnmeet.RecordingTasks_STOP_RTMP
 	}
 
-	payload, _ := json.Marshal(toSend)
+	payload, _ := protojson.Marshal(toSend)
 	rm.rds.Publish(rm.ctx, "plug-n-meet-recorder", string(payload))
 
 	return nil
 }
 
-func (rm *recordingModel) addTokenAndRecorder(rq *RecorderReq, userId string) error {
+func (rm *recordingModel) addTokenAndRecorder(rq *plugnmeet.PlugNmeetToRecorder, userId string) error {
 	recorderId, err := rm.selectRecorder()
 	if err != nil {
 		return err
