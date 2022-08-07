@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"github.com/go-redis/redis/v8"
 	"github.com/goccy/go-json"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -328,7 +329,7 @@ func (rm *recordingModel) addRecording(r *plugnmeet.RecorderToPlugNmeet) error {
 		return err
 	}
 
-	_, err = stmt.Exec(r.RecordingId, r.RoomId, roomInfo.Sid, r.RecorderId, r.FilePath, r.FileSize, time.Now().Unix(), roomInfo.CreationTime)
+	_, err = stmt.Exec(r.RecordingId, r.RoomId, roomInfo.Sid, r.RecorderId, r.FilePath, fmt.Sprintf("%.2f", r.FileSize), time.Now().Unix(), roomInfo.CreationTime)
 	if err != nil {
 		return err
 	}
