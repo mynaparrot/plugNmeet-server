@@ -7,7 +7,10 @@ import (
 	"github.com/goccy/go-json"
 	"github.com/google/uuid"
 	"github.com/livekit/protocol/livekit"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/proto"
 	"time"
 )
 
@@ -21,24 +24,7 @@ type DataMessageReq struct {
 	IsAdmin         bool
 	db              *sql.DB
 	roomService     *RoomService
-}
-
-type DataMessageRes struct {
-	Type      string          `json:"type"` // 'SYSTEM' | 'USER' | 'WHITEBOARD'
-	MessageId string          `json:"message_id"`
-	RoomSid   string          `json:"room_sid"`
-	RoomId    string          `json:"room_id"`
-	To        string          `json:"to"`
-	Body      DataMessageBody `json:"body"`
-}
-
-type DataMessageBody struct {
-	Type      string  `json:"type"` // RAISE_HAND, LOWER_HAND, FILE_UPLOAD, INFO, ALERT, SEND_CHAT_MSGS, RENEW_TOKEN, INIT_WHITEBOARD, SCENE_UPDATE, POINTER_UPDATE
-	MessageId string  `json:"message_id"`
-	Time      string  `json:"time"`
-	From      ReqFrom `json:"from"`
-	Msg       string  `json:"msg"`
-	IsPrivate bool    `json:"isPrivate"`
+	msgBodyType     plugnmeet.DataMsgBodyType
 }
 
 type ReqFrom struct {
@@ -53,12 +39,19 @@ func NewDataMessage(r *DataMessageReq) error {
 
 	switch r.MsgType {
 	case "RAISE_HAND":
+		r.msgBodyType = plugnmeet.DataMsgBodyType_RAISE_HAND
 		return r.RaiseHand()
 	case "LOWER_HAND":
+		r.msgBodyType = plugnmeet.DataMsgBodyType_LOWER_HAND
 		return r.LowerHand()
 	case "OTHER_USER_LOWER_HAND":
+		r.msgBodyType = plugnmeet.DataMsgBodyType_OTHER_USER_LOWER_HAND
 		return r.OtherUserLowerHand()
-	case "INFO", "ALERT":
+	case "INFO":
+		r.msgBodyType = plugnmeet.DataMsgBodyType_INFO
+		return r.SendNotification(r.SendTo)
+	case "ALERT":
+		r.msgBodyType = plugnmeet.DataMsgBodyType_ALERT
 		return r.SendNotification(r.SendTo)
 
 	default:
@@ -99,13 +92,15 @@ func (d *DataMessageReq) RaiseHand() error {
 		return nil
 	}
 
-	msg := DataMessageRes{
-		Type:      "SYSTEM",
-		MessageId: uuid.NewString(),
-		Body: DataMessageBody{
-			Type: "RAISE_HAND",
-			Time: time.Now().Format(time.RFC1123Z),
-			From: ReqFrom{
+	mId := uuid.NewString()
+	tm := time.Now().Format(time.RFC1123Z)
+	msg := &plugnmeet.DataMessage{
+		Type:      plugnmeet.DataMsgType_SYSTEM,
+		MessageId: &mId,
+		Body: &plugnmeet.DataMsgBody{
+			Type: plugnmeet.DataMsgBodyType_RAISE_HAND,
+			Time: &tm,
+			From: &plugnmeet.DataMsgReqFrom{
 				Sid:    d.Sid,
 				UserId: reqPar.Identity,
 			},
@@ -113,14 +108,16 @@ func (d *DataMessageReq) RaiseHand() error {
 		},
 	}
 
-	data, err := json.Marshal(msg)
+	data, err := proto.Marshal(msg)
 	if err != nil {
+		log.Errorln(err)
 		return err
 	}
 
 	// send as push message
 	_, err = d.roomService.SendData(d.RoomId, data, livekit.DataPacket_RELIABLE, sids)
 	if err != nil {
+		log.Errorln(err)
 		return err
 	}
 
@@ -176,26 +173,30 @@ func (d *DataMessageReq) OtherUserLowerHand() error {
 }
 
 func (d *DataMessageReq) SendNotification(sendTo []string) error {
-	msg := DataMessageRes{
-		Type:      "SYSTEM",
-		MessageId: uuid.NewString(),
-		Body: DataMessageBody{
-			Type: d.MsgType,
-			Time: time.Now().Format(time.RFC1123Z),
-			From: ReqFrom{
-				Sid: "system",
+	mId := uuid.NewString()
+	tm := time.Now().Format(time.RFC1123Z)
+
+	msg := &plugnmeet.DataMessage{
+		Type:      plugnmeet.DataMsgType_SYSTEM,
+		MessageId: &mId,
+		Body: &plugnmeet.DataMsgBody{
+			Type: d.msgBodyType,
+			Time: &tm,
+			From: &plugnmeet.DataMsgReqFrom{
+				Sid: d.Sid,
 			},
 			Msg: d.Msg,
 		},
 	}
 
-	data, err := json.Marshal(msg)
+	data, err := proto.Marshal(msg)
 	if err != nil {
 		return err
 	}
 
 	_, err = d.roomService.SendData(d.RoomId, data, livekit.DataPacket_RELIABLE, sendTo)
 	if err != nil {
+		log.Errorln(err)
 		return err
 	}
 

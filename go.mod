@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/ansrivas/fiberprometheus/v2 v2.3.0
-	github.com/antoniodipinto/ikisocket v0.0.0-20220426120810-e8049cc9e56b
+	github.com/antoniodipinto/ikisocket v0.0.0-20220806220653-2e4f04aebe6a
 	github.com/gabriel-vasile/mimetype v1.4.1
 	github.com/go-playground/validator/v10 v10.11.0
 	github.com/go-redis/redis/v8 v8.11.5
@@ -15,8 +15,9 @@ require (
 	github.com/gofiber/websocket/v2 v2.0.24
 	github.com/google/uuid v1.3.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/protocol v0.13.4
+	github.com/livekit/protocol v1.0.0
 	github.com/livekit/server-sdk-go v0.10.4
+	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20220807040638-26b9dd645759
 	github.com/sirupsen/logrus v1.9.0
 	github.com/urfave/cli/v2 v2.11.1
 	google.golang.org/protobuf v1.28.1
@@ -40,7 +41,6 @@ require (
 	github.com/go-playground/locales v0.14.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect
 	github.com/gofiber/adaptor/v2 v2.1.25 // indirect
-	github.com/gofiber/utils v0.1.2 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/jxskiss/base62 v1.1.0 // indirect
@@ -66,7 +66,7 @@ require (
 	github.com/pion/turn/v2 v2.0.8 // indirect
 	github.com/pion/udp v0.1.1 // indirect
 	github.com/pion/webrtc/v3 v3.1.43 // indirect
-	github.com/prometheus/client_golang v1.12.2 // indirect
+	github.com/prometheus/client_golang v1.13.0 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
@@ -80,10 +80,9 @@ require (
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa // indirect
-	golang.org/x/net v0.0.0-20220802222814-0bcc04d9c69b // indirect
-	golang.org/x/sys v0.0.0-20220803195053-6e608f9ce704 // indirect
+	golang.org/x/net v0.0.0-20220805013720-a33c5aa5df48 // indirect
+	golang.org/x/sys v0.0.0-20220804214406-8e32c043e418 // indirect
 	golang.org/x/text v0.3.7 // indirect
-	golang.org/x/xerrors v0.0.0-20220517211312-f3a8303e98df // indirect
-	google.golang.org/genproto v0.0.0-20220803205849-8f55acc8769f // indirect
+	google.golang.org/genproto v0.0.0-20220805133916-01dd62135a58 // indirect
 	google.golang.org/grpc v1.48.0 // indirect
 )

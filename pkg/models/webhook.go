@@ -125,7 +125,7 @@ func (w *webhookEvent) roomFinished() {
 	}
 
 	// clear chatroom from memory
-	msg := WebsocketRedisMsg{
+	msg := &WebsocketToRedis{
 		Type:   "deleteRoom",
 		RoomId: event.Room.Name,
 	}

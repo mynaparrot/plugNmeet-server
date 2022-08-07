@@ -4,9 +4,10 @@ import (
 	"github.com/antoniodipinto/ikisocket"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
-	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/proto"
 )
 
 type websocketController struct {
@@ -45,14 +46,14 @@ func (c *websocketController) validation() bool {
 
 	claims, err := m.DoValidateToken(info, false)
 	if err != nil {
-		err = c.kws.EmitTo(c.kws.UUID, []byte("invalid token"))
+		err = c.kws.EmitTo(c.kws.UUID, []byte("invalid token"), ikisocket.TextMessage)
 		if err == nil {
 			return false
 		}
 	}
 
 	if claims.Identity != c.participant.UserId || claims.Video.Room != c.participant.RoomId {
-		err = c.kws.EmitTo(c.kws.UUID, []byte("unauthorized access!"))
+		err = c.kws.EmitTo(c.kws.UUID, []byte("unauthorized access!"), ikisocket.TextMessage)
 		if err == nil {
 			return false
 		}
@@ -65,7 +66,7 @@ func (c *websocketController) validation() bool {
 	metadata := new(models.UserMetadata)
 	err = json.Unmarshal([]byte(claims.Metadata), metadata)
 	if err != nil {
-		_ = c.kws.EmitTo(c.kws.UUID, []byte("can't Unmarshal metadata!"))
+		_ = c.kws.EmitTo(c.kws.UUID, []byte("can't Unmarshal metadata!"), ikisocket.TextMessage)
 		return false
 	}
 
@@ -99,26 +100,25 @@ func SetupSocketListeners() {
 	// On message event
 	ikisocket.On(ikisocket.EventMessage, func(ep *ikisocket.EventPayload) {
 		//fmt.Println(fmt.Sprintf("Message event - User: %s - Message: %s", ep.Kws.GetStringAttribute("userId"), string(ep.Data)))
-
-		payload := &models.DataMessageRes{}
-		err := json.Unmarshal(ep.Data, payload)
+		dataMsg := &plugnmeet.DataMessage{}
+		err := proto.Unmarshal(ep.Data, dataMsg)
 		if err != nil {
-			log.Errorln(err)
 			return
 		}
+
 		roomId := ep.Kws.GetStringAttribute("roomId")
-		msg := models.WebsocketRedisMsg{
+		payload := &models.WebsocketToRedis{
 			Type:    "sendMsg",
-			Payload: payload,
+			DataMsg: dataMsg,
 			RoomId:  roomId,
 			IsAdmin: false,
 		}
 		isAdmin := ep.Kws.GetAttribute("isAdmin")
 		if isAdmin != nil {
-			msg.IsAdmin = isAdmin.(bool)
+			payload.IsAdmin = isAdmin.(bool)
 		}
 
-		models.DistributeWebsocketMsgToRedisChannel(&msg)
+		models.DistributeWebsocketMsgToRedisChannel(payload)
 	})
 
 	// On disconnect event
