@@ -347,7 +347,7 @@ func (rm *recordingModel) addRecording(r *plugnmeet.RecorderToPlugNmeet) error {
 func (rm *recordingModel) sendToWebhookNotifier(r *plugnmeet.RecorderToPlugNmeet) {
 	n := NewWebhookNotifier()
 	msg := CommonNotifyEvent{
-		Event: string(r.Task),
+		Event: r.Task.String(),
 		Room: NotifyEventRoom{
 			Sid:    r.RoomSid,
 			RoomId: r.RoomId,
