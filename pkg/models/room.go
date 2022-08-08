@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"time"
 )
@@ -291,22 +292,7 @@ func (rm *roomModel) GetRoomInfo(roomId string, sid string, isRunning int) (*Roo
 	return &room, msg
 }
 
-type ActiveRoomInfo struct {
-	RoomTitle          string `json:"room_title"`
-	RoomId             string `json:"room_id"`
-	Sid                string `json:"sid"`
-	JoinedParticipants int64  `json:"joined_participants"`
-	IsRunning          int    `json:"is_running"`
-	IsRecording        int    `json:"is_recording"`
-	IsActiveRTMP       int    `json:"is_active_rtmp"`
-	WebhookUrl         string `json:"webhook_url"`
-	IsBreakoutRoom     int64  `json:"is_breakout_room"`
-	ParentRoomId       string `json:"parent_room_id"`
-	CreationTime       int64  `json:"creation_time"`
-	Metadata           string `json:"metadata"`
-}
-
-func (rm *roomModel) GetActiveRoomsInfo() ([]ActiveRoomInfo, error) {
+func (rm *roomModel) GetActiveRoomsInfo() ([]plugnmeet.ActiveRoomInfo, error) {
 	db := rm.db
 	ctx, cancel := context.WithTimeout(rm.ctx, 3*time.Second)
 	defer cancel()
@@ -317,11 +303,11 @@ func (rm *roomModel) GetActiveRoomsInfo() ([]ActiveRoomInfo, error) {
 	}
 	defer rows.Close()
 
-	var room ActiveRoomInfo
-	var rooms []ActiveRoomInfo
+	var room plugnmeet.ActiveRoomInfo
+	var rooms []plugnmeet.ActiveRoomInfo
 
 	for rows.Next() {
-		err = rows.Scan(&room.RoomTitle, &room.RoomId, &room.Sid, &room.JoinedParticipants, &room.IsRunning, &room.IsRecording, &room.IsActiveRTMP, &room.WebhookUrl, &room.IsBreakoutRoom, &room.ParentRoomId, &room.CreationTime)
+		err = rows.Scan(&room.RoomTitle, &room.RoomId, &room.Sid, &room.JoinedParticipants, &room.IsRunning, &room.IsRecording, &room.IsActiveRtmp, &room.WebhookUrl, &room.IsBreakoutRoom, &room.ParentRoomId, &room.CreationTime)
 		if err != nil {
 			fmt.Println(err)
 		}

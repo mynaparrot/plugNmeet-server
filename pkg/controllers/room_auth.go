@@ -49,7 +49,7 @@ func HandleRoomCreate(c *fiber.Ctx) error {
 }
 
 func HandleIsRoomActive(c *fiber.Ctx) error {
-	req := new(models.IsRoomActiveReq)
+	req := new(plugnmeet.IsRoomActiveReq)
 	err := c.BodyParser(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -57,11 +57,11 @@ func HandleIsRoomActive(c *fiber.Ctx) error {
 			"msg":    err.Error(),
 		})
 	}
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
+	err = req.Validate()
+	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    check,
+			"msg":    err.Error(),
 		})
 	}
 
@@ -75,7 +75,7 @@ func HandleIsRoomActive(c *fiber.Ctx) error {
 }
 
 func HandleGetActiveRoomInfo(c *fiber.Ctx) error {
-	req := new(models.IsRoomActiveReq)
+	req := new(plugnmeet.GetActiveRoomInfoReq)
 	err := c.BodyParser(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -83,11 +83,11 @@ func HandleGetActiveRoomInfo(c *fiber.Ctx) error {
 			"msg":    err.Error(),
 		})
 	}
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
+	err = req.Validate()
+	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    check,
+			"msg":    err.Error(),
 		})
 	}
 	m := models.NewRoomAuthModel()
@@ -112,7 +112,7 @@ func HandleGetActiveRoomsInfo(c *fiber.Ctx) error {
 }
 
 func HandleEndRoom(c *fiber.Ctx) error {
-	req := new(models.RoomEndReq)
+	req := new(plugnmeet.RoomEndReq)
 	err := c.BodyParser(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -120,11 +120,11 @@ func HandleEndRoom(c *fiber.Ctx) error {
 			"msg":    err.Error(),
 		})
 	}
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
+	err = req.Validate()
+	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    check,
+			"msg":    err.Error(),
 		})
 	}
 
@@ -148,7 +148,7 @@ func HandleEndRoomForAPI(c *fiber.Ctx) error {
 		})
 	}
 
-	req := new(models.RoomEndReq)
+	req := new(plugnmeet.RoomEndReq)
 	err := c.BodyParser(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -157,11 +157,11 @@ func HandleEndRoomForAPI(c *fiber.Ctx) error {
 		})
 	}
 
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
+	err = req.Validate()
+	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    check,
+			"msg":    err.Error(),
 		})
 	}
 

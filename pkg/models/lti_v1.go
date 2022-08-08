@@ -55,8 +55,8 @@ type LtiCustomDesign struct {
 }
 
 type LTIV1FetchRecordingsReq struct {
-	From    int    `json:"from"`
-	Limit   int    `json:"limit"`
+	From    uint32 `json:"from"`
+	Limit   uint32 `json:"limit"`
 	OrderBy string `json:"order_by"`
 }
 
@@ -202,7 +202,7 @@ func (m *LTIV1) LTIV1VerifyHeaderToken(token string) (*LtiClaims, error) {
 }
 
 func (m *LTIV1) LTIV1JoinRoom(c *LtiClaims) (string, error) {
-	active, _ := m.authModel.IsRoomActive(&IsRoomActiveReq{
+	active, _ := m.authModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: c.RoomId,
 	})
 

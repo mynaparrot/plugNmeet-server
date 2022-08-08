@@ -143,7 +143,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	// if not active then we don't allow to join user
 	// livekit also don't allow but throw 500 error which make confused to user.
 	m := models.NewRoomAuthModel()
-	status, msg := m.IsRoomActive(&models.IsRoomActiveReq{
+	status, msg := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: roomId.(string),
 	})
 
