@@ -177,12 +177,15 @@ func (m *breakoutRoom) JoinBreakoutRoom(r *JoinBreakoutRoomReq) (string, error) 
 		return "", err
 	}
 
-	req := new(plugnmeet.GenerateTokenReq)
-	req.RoomId = r.BreakoutRoomId
-	req.UserInfo.UserId = r.UserId
-	req.UserInfo.Name = p.Name
-	req.UserInfo.IsAdmin = meta.IsAdmin
-	req.UserInfo.UserMetadata = meta
+	req := &plugnmeet.GenerateTokenReq{
+		RoomId: r.BreakoutRoomId,
+		UserInfo: &plugnmeet.UserInfo{
+			UserId:       r.UserId,
+			Name:         p.Name,
+			IsAdmin:      meta.IsAdmin,
+			UserMetadata: meta,
+		},
+	}
 
 	token, err := m.authTokenModel.DoGenerateToken(req)
 	if err != nil {

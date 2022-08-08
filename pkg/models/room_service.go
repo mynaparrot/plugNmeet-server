@@ -10,7 +10,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -292,7 +291,7 @@ func (r *RoomService) LoadRoomWithMetadata(roomId string) (*livekit.Room, *plugn
 	}
 
 	meta := new(plugnmeet.RoomMetadata)
-	err = protojson.Unmarshal([]byte(room.Metadata), meta)
+	err = json.Unmarshal([]byte(room.Metadata), meta)
 	if err != nil {
 		log.Errorln(err)
 		return room, nil, err
@@ -302,7 +301,7 @@ func (r *RoomService) LoadRoomWithMetadata(roomId string) (*livekit.Room, *plugn
 }
 
 func (r *RoomService) UpdateRoomMetadataByStruct(roomId string, meta *plugnmeet.RoomMetadata) (*livekit.Room, error) {
-	marshal, err := protojson.Marshal(meta)
+	marshal, err := json.Marshal(meta)
 	if err != nil {
 		log.Errorln(err)
 		return nil, err
@@ -323,7 +322,7 @@ func (r *RoomService) LoadParticipantWithMetadata(roomId, userId string) (*livek
 	}
 
 	meta := new(plugnmeet.UserMetadata)
-	err = protojson.Unmarshal([]byte(p.Metadata), meta)
+	err = json.Unmarshal([]byte(p.Metadata), meta)
 	if err != nil {
 		log.Errorln(err)
 		return p, nil, err

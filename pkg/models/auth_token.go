@@ -112,6 +112,9 @@ func (a *authTokenModel) GenerateLivekitToken(claims *auth.ClaimGrants) (string,
 }
 
 func (a *authTokenModel) assignLockSettings(g *plugnmeet.GenerateTokenReq) {
+	if g.UserInfo.UserMetadata.LockSettings == nil {
+		g.UserInfo.UserMetadata.LockSettings = new(plugnmeet.LockSettings)
+	}
 	l := new(plugnmeet.LockSettings)
 	ul := g.UserInfo.UserMetadata.LockSettings
 

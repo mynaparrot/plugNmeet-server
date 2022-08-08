@@ -1,17 +1,15 @@
 package controllers
 
 import (
-	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func HandleRoomCreate(c *fiber.Ctx) error {
 	req := new(plugnmeet.CreateRoomReq)
-	err := protojson.Unmarshal(c.Body(), req)
+	err := c.BodyParser(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
@@ -25,7 +23,6 @@ func HandleRoomCreate(c *fiber.Ctx) error {
 			"msg":    err.Error(),
 		})
 	}
-	fmt.Println(req)
 
 	if req.Metadata == nil {
 		return c.JSON(fiber.Map{

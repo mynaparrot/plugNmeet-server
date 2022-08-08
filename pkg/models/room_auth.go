@@ -1,10 +1,11 @@
 package models
 
 import (
+	"fmt"
+	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"google.golang.org/protobuf/encoding/protojson"
 	"time"
 )
 
@@ -196,10 +197,11 @@ func (am *roomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 
 	r.Metadata.StartedAt = uint64(time.Now().Unix())
 
-	meta, err := protojson.Marshal(r.Metadata)
+	meta, err := json.Marshal(r.Metadata)
 	if err != nil {
 		return false, "Error: " + err.Error(), nil
 	}
+	fmt.Println(string(meta))
 
 	room, err := am.rs.CreateRoom(r.RoomId, r.EmptyTimeout, r.MaxParticipants, string(meta))
 	if err != nil {
