@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	log "github.com/sirupsen/logrus"
 	"strconv"
 	"strings"
 	"time"
@@ -348,6 +349,7 @@ func (m *newPollsModel) CleanUpPolls(roomId string) error {
 
 	_, err = pp.Exec(m.ctx)
 	if err != nil {
+		log.Errorln(err)
 		return err
 	}
 

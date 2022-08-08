@@ -1,7 +1,6 @@
 package models
 
 import (
-	"fmt"
 	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -201,7 +200,6 @@ func (am *roomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 	if err != nil {
 		return false, "Error: " + err.Error(), nil
 	}
-	fmt.Println(string(meta))
 
 	room, err := am.rs.CreateRoom(r.RoomId, r.EmptyTimeout, r.MaxParticipants, string(meta))
 	if err != nil {
