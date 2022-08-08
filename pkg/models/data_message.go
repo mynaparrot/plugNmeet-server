@@ -64,7 +64,7 @@ func (d *DataMessageReq) RaiseHand() error {
 
 	var sids []string
 	for _, participant := range participants {
-		meta := new(UserMetadata)
+		meta := new(plugnmeet.UserMetadata)
 		err := json.Unmarshal([]byte(participant.Metadata), meta)
 		if err != nil {
 			continue
@@ -77,7 +77,7 @@ func (d *DataMessageReq) RaiseHand() error {
 	reqPar, _ := d.roomService.LoadParticipantInfoFromRedis(d.RoomId, d.RequestedUserId)
 
 	// now update user's metadata
-	metadata := new(UserMetadata)
+	metadata := new(plugnmeet.UserMetadata)
 	_ = json.Unmarshal([]byte(reqPar.Metadata), metadata)
 
 	metadata.RaisedHand = true
@@ -131,7 +131,7 @@ func (d *DataMessageReq) LowerHand() error {
 	}
 
 	// now update user's metadata
-	metadata := new(UserMetadata)
+	metadata := new(plugnmeet.UserMetadata)
 	_ = json.Unmarshal([]byte(reqPar.Metadata), metadata)
 
 	metadata.RaisedHand = false
@@ -158,7 +158,7 @@ func (d *DataMessageReq) OtherUserLowerHand() error {
 	}
 
 	// now update user's metadata
-	metadata := new(UserMetadata)
+	metadata := new(plugnmeet.UserMetadata)
 	_ = json.Unmarshal([]byte(reqPar.Metadata), metadata)
 
 	metadata.RaisedHand = false

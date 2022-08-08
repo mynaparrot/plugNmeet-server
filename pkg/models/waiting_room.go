@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/goccy/go-json"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -50,7 +51,7 @@ func (u *userWaitingRoomModel) approveUser(roomId, userId, metadata string) erro
 	meta := make([]byte, len(metadata))
 	copy(meta, metadata)
 
-	m := new(UserMetadata)
+	m := new(plugnmeet.UserMetadata)
 	_ = json.Unmarshal(meta, m)
 	m.WaitForApproval = false // this mean doesn't need to wait anymore
 

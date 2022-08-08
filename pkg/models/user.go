@@ -289,7 +289,7 @@ func (u *userModel) SwitchPresenter(r *SwitchPresenterReq) error {
 		meta := make([]byte, len(p.Metadata))
 		copy(meta, p.Metadata)
 
-		m := new(UserMetadata)
+		m := new(plugnmeet.UserMetadata)
 		_ = json.Unmarshal(meta, m)
 
 		if r.Task == "promote" {
@@ -322,7 +322,7 @@ func (u *userModel) SwitchPresenter(r *SwitchPresenterReq) error {
 	meta := make([]byte, len(p.Metadata))
 	copy(meta, p.Metadata)
 
-	m := new(UserMetadata)
+	m := new(plugnmeet.UserMetadata)
 	_ = json.Unmarshal(meta, m)
 
 	if r.Task == "promote" {
@@ -342,7 +342,7 @@ func (u *userModel) SwitchPresenter(r *SwitchPresenterReq) error {
 	return nil
 }
 
-func (u *userModel) updateUserMetadata(meta *UserMetadata, roomId, userId string) error {
+func (u *userModel) updateUserMetadata(meta *plugnmeet.UserMetadata, roomId, userId string) error {
 	newMeta, err := json.Marshal(meta)
 	if err != nil {
 		return err

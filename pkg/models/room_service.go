@@ -331,7 +331,7 @@ func (r *RoomService) LoadParticipantWithMetadata(roomId, userId string) (*livek
 	return p, meta, nil
 }
 
-func (r *RoomService) UpdateParticipantMetadataByStruct(roomId, userId string, meta *UserMetadata) (*livekit.ParticipantInfo, error) {
+func (r *RoomService) UpdateParticipantMetadataByStruct(roomId, userId string, meta *plugnmeet.UserMetadata) (*livekit.ParticipantInfo, error) {
 	marshal, err := json.Marshal(meta)
 	if err != nil {
 		log.Errorln(err)

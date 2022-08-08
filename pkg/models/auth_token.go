@@ -8,39 +8,39 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
-type GenTokenReq struct {
-	RoomId   string   `json:"room_id" validate:"required,require-valid-Id"`
-	UserInfo UserInfo `json:"user_info" validate:"required"`
-}
-
-type UserInfo struct {
-	Name         string       `json:"name" validate:"required"`
-	UserId       string       `json:"user_id" validate:"required,require-valid-Id"`
-	IsAdmin      bool         `json:"is_admin"`
-	IsHidden     bool         `json:"is_hidden"`
-	UserMetadata UserMetadata `json:"user_metadata" validate:"required"`
-}
-
-type UserMetadata struct {
-	ProfilePic      string       `json:"profile_pic"`
-	IsAdmin         bool         `json:"is_admin"`
-	IsPresenter     bool         `json:"is_presenter"`
-	RaisedHand      bool         `json:"raised_hand"`
-	WaitForApproval bool         `json:"wait_for_approval"`
-	LockSettings    LockSettings `json:"lock_settings"`
-}
-
-type LockSettings struct {
-	LockMicrophone      *bool `json:"lock_microphone,omitempty"`
-	LockWebcam          *bool `json:"lock_webcam,omitempty"`
-	LockScreenSharing   *bool `json:"lock_screen_sharing,omitempty"`
-	LockChat            *bool `json:"lock_chat,omitempty"`
-	LockChatSendMessage *bool `json:"lock_chat_send_message,omitempty"`
-	LockChatFileShare   *bool `json:"lock_chat_file_share,omitempty"`
-	LockPrivateChat     *bool `json:"lock_private_chat,omitempty"`
-	LockWhiteboard      *bool `json:"lock_whiteboard,omitempty"`
-	LockSharedNotepad   *bool `json:"lock_shared_notepad,omitempty"`
-}
+//type GenTokenReq struct {
+//	RoomId   string   `json:"room_id" validate:"required,require-valid-Id"`
+//	UserInfo UserInfo `json:"user_info" validate:"required"`
+//}
+//
+//type UserInfo struct {
+//	Name         string       `json:"name" validate:"required"`
+//	UserId       string       `json:"user_id" validate:"required,require-valid-Id"`
+//	IsAdmin      bool         `json:"is_admin"`
+//	IsHidden     bool         `json:"is_hidden"`
+//	UserMetadata UserMetadata `json:"user_metadata" validate:"required"`
+//}
+//
+//type UserMetadata struct {
+//	ProfilePic      string       `json:"profile_pic"`
+//	IsAdmin         bool         `json:"is_admin"`
+//	IsPresenter     bool         `json:"is_presenter"`
+//	RaisedHand      bool         `json:"raised_hand"`
+//	WaitForApproval bool         `json:"wait_for_approval"`
+//	LockSettings    LockSettings `json:"lock_settings"`
+//}
+//
+//type LockSettings struct {
+//	LockMicrophone      *bool `json:"lock_microphone,omitempty"`
+//	LockWebcam          *bool `json:"lock_webcam,omitempty"`
+//	LockScreenSharing   *bool `json:"lock_screen_sharing,omitempty"`
+//	LockChat            *bool `json:"lock_chat,omitempty"`
+//	LockChatSendMessage *bool `json:"lock_chat_send_message,omitempty"`
+//	LockChatFileShare   *bool `json:"lock_chat_file_share,omitempty"`
+//	LockPrivateChat     *bool `json:"lock_private_chat,omitempty"`
+//	LockWhiteboard      *bool `json:"lock_whiteboard,omitempty"`
+//	LockSharedNotepad   *bool `json:"lock_shared_notepad,omitempty"`
+//}
 
 type authTokenModel struct {
 	app *config.AppConfig
@@ -196,7 +196,7 @@ func (a *authTokenModel) makePresenter(g *plugnmeet.GenerateTokenReq) {
 			meta := make([]byte, len(p.Metadata))
 			copy(meta, p.Metadata)
 
-			m := new(UserMetadata)
+			m := new(plugnmeet.UserMetadata)
 			_ = json.Unmarshal(meta, m)
 
 			if m.IsAdmin && m.IsPresenter {
@@ -214,7 +214,7 @@ func (a *authTokenModel) makePresenter(g *plugnmeet.GenerateTokenReq) {
 // GenTokenForRecorder only for either recorder or RTMP bot
 // Because we don't want to add any service settings which may
 // prevent to work recorder/rtmp bot as expected.
-func (a *authTokenModel) GenTokenForRecorder(g *GenTokenReq) (string, error) {
+func (a *authTokenModel) GenTokenForRecorder(g *plugnmeet.GenerateTokenReq) (string, error) {
 	at := auth.NewAccessToken(a.app.Client.ApiKey, a.app.Client.Secret)
 	// basic permission
 	grant := &auth.VideoGrant{
@@ -229,10 +229,6 @@ func (a *authTokenModel) GenTokenForRecorder(g *GenTokenReq) (string, error) {
 		SetValidFor(a.app.LivekitInfo.TokenValidity)
 
 	return at.ToJWT()
-}
-
-func (a *authTokenModel) Validation(g *GenTokenReq) []*config.ErrorResponse {
-	return a.app.DoValidateReq(g)
 }
 
 type ValidateTokenReq struct {
