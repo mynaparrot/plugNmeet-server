@@ -198,7 +198,7 @@ func (rm *recordingModel) rtmpStarted(r *plugnmeet.RecorderToPlugNmeet) {
 		return
 	}
 
-	roomMeta.IsActiveRTMP = true
+	roomMeta.IsActiveRtmp = true
 	_, _ = rm.roomService.UpdateRoomMetadataByStruct(r.RoomId, roomMeta)
 
 	// send message to room
@@ -226,7 +226,7 @@ func (rm *recordingModel) rtmpEnded(r *plugnmeet.RecorderToPlugNmeet) {
 		return
 	}
 
-	roomMeta.IsActiveRTMP = false
+	roomMeta.IsActiveRtmp = false
 	_, _ = rm.roomService.UpdateRoomMetadataByStruct(r.RoomId, roomMeta)
 
 	msg := "notifications.rtmp-ended"
@@ -426,9 +426,9 @@ func (rm *recordingModel) addTokenAndRecorder(rq *plugnmeet.PlugNmeetToRecorder,
 	}
 
 	m := NewAuthTokenModel()
-	gt := &GenTokenReq{
-		rq.RoomId,
-		UserInfo{
+	gt := &plugnmeet.GenerateTokenReq{
+		RoomId: rq.RoomId,
+		UserInfo: &plugnmeet.UserInfo{
 			UserId:   userId,
 			IsHidden: true,
 			IsAdmin:  true,

@@ -1,25 +1,43 @@
 package controllers
 
 import (
+	"fmt"
 	"github.com/gofiber/fiber/v2"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func HandleRoomCreate(c *fiber.Ctx) error {
-	req := new(models.RoomCreateReq)
-	err := c.BodyParser(req)
+	req := new(plugnmeet.CreateRoomReq)
+	err := protojson.Unmarshal(c.Body(), req)
 	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
 			"msg":    err.Error(),
 		})
 	}
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
+	err = req.Validate()
+	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    check,
+			"msg":    err.Error(),
+		})
+	}
+	fmt.Println(req)
+
+	if req.Metadata == nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    "metadata information required",
+		})
+	}
+
+	if req.Metadata.RoomFeatures == nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    "room features information required",
 		})
 	}
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/auth"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
@@ -53,9 +54,12 @@ func NewAuthTokenModel() *authTokenModel {
 	}
 }
 
-func (a *authTokenModel) DoGenerateToken(g *GenTokenReq) (string, error) {
-	a.assignLockSettings(g)
+func (a *authTokenModel) DoGenerateToken(g *plugnmeet.GenerateTokenReq) (string, error) {
+	if g.UserInfo.UserMetadata == nil {
+		g.UserInfo.UserMetadata = new(plugnmeet.UserMetadata)
+	}
 
+	a.assignLockSettings(g)
 	if g.UserInfo.IsAdmin {
 		a.makePresenter(g)
 	}
@@ -107,8 +111,8 @@ func (a *authTokenModel) GenerateLivekitToken(claims *auth.ClaimGrants) (string,
 	return at.ToJWT()
 }
 
-func (a *authTokenModel) assignLockSettings(g *GenTokenReq) {
-	l := new(LockSettings)
+func (a *authTokenModel) assignLockSettings(g *plugnmeet.GenerateTokenReq) {
+	l := new(plugnmeet.LockSettings)
 	ul := g.UserInfo.UserMetadata.LockSettings
 
 	if g.UserInfo.IsAdmin {
@@ -128,13 +132,13 @@ func (a *authTokenModel) assignLockSettings(g *GenTokenReq) {
 		l.LockSharedNotepad = lock
 		l.LockPrivateChat = lock
 
-		g.UserInfo.UserMetadata.LockSettings = *l
+		g.UserInfo.UserMetadata.LockSettings = l
 		return
 	}
 
 	_, meta, err := a.rs.LoadRoomWithMetadata(g.RoomId)
 	if err != nil {
-		g.UserInfo.UserMetadata.LockSettings = *l
+		g.UserInfo.UserMetadata.LockSettings = l
 	}
 
 	// if no lock settings were for this user
@@ -170,14 +174,14 @@ func (a *authTokenModel) assignLockSettings(g *GenTokenReq) {
 	}
 
 	// if waiting room feature active then we won't allow direct access
-	if meta.Features.WaitingRoomFeatures.IsActive {
+	if meta.RoomFeatures.WaitingRoomFeatures.IsActive {
 		g.UserInfo.UserMetadata.WaitForApproval = true
 	}
 
-	g.UserInfo.UserMetadata.LockSettings = *l
+	g.UserInfo.UserMetadata.LockSettings = l
 }
 
-func (a *authTokenModel) makePresenter(g *GenTokenReq) {
+func (a *authTokenModel) makePresenter(g *plugnmeet.GenerateTokenReq) {
 	if g.UserInfo.IsAdmin && !g.UserInfo.IsHidden {
 		participants, err := a.rs.LoadParticipantsFromRedis(g.RoomId)
 		if err != nil {

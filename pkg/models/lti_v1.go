@@ -9,6 +9,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/jordic/lti"
 	"github.com/livekit/protocol/livekit"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/square/go-jose.v2"
@@ -34,7 +35,7 @@ type LtiClaims struct {
 }
 
 type LtiCustomParameters struct {
-	RoomDuration               int64            `json:"room_duration,omitempty"`
+	RoomDuration               uint64           `json:"room_duration,omitempty"`
 	AllowPolls                 *bool            `json:"allow_polls,omitempty"`
 	AllowSharedNotePad         *bool            `json:"allow_shared_note_pad,omitempty"`
 	AllowBreakoutRoom          *bool            `json:"allow_breakout_room,omitempty"`
@@ -226,13 +227,13 @@ func (m *LTIV1) createRoomSession(c *LtiClaims) (bool, string, *livekit.Room) {
 }
 
 func (m *LTIV1) joinRoom(c *LtiClaims) (string, error) {
-	token, err := m.authTokenModel.DoGenerateToken(&GenTokenReq{
+	token, err := m.authTokenModel.DoGenerateToken(&plugnmeet.GenerateTokenReq{
 		RoomId: c.RoomId,
-		UserInfo: UserInfo{
+		UserInfo: &plugnmeet.UserInfo{
 			UserId:  c.UserId,
 			Name:    c.Name,
 			IsAdmin: c.IsAdmin,
-			UserMetadata: UserMetadata{
+			UserMetadata: &plugnmeet.UserMetadata{
 				IsAdmin: c.IsAdmin,
 			},
 		},
@@ -250,7 +251,7 @@ func AssignLTIV1CustomParams(params *url.Values, claims *LtiClaims) {
 
 	if params.Get("custom_room_duration") != "" {
 		duration, _ := strconv.Atoi(params.Get("custom_room_duration"))
-		customPara.RoomDuration = int64(duration)
+		customPara.RoomDuration = uint64(duration)
 	}
 	if params.Get("custom_allow_polls") == "false" {
 		customPara.AllowPolls = b
@@ -298,36 +299,36 @@ func AssignLTIV1CustomParams(params *url.Values, claims *LtiClaims) {
 	claims.LtiCustomParameters.LtiCustomDesign = customDesign
 }
 
-func PrepareLTIV1RoomCreateReq(c *LtiClaims) *RoomCreateReq {
-	req := &RoomCreateReq{
+func PrepareLTIV1RoomCreateReq(c *LtiClaims) *plugnmeet.CreateRoomReq {
+	req := &plugnmeet.CreateRoomReq{
 		RoomId: c.RoomId,
-		RoomMetadata: RoomMetadata{
+		Metadata: &plugnmeet.RoomMetadata{
 			RoomTitle: c.RoomTitle,
-			Features: RoomCreateFeatures{
-				AllowWebcams:               true,
-				AllowScreenShare:           true,
-				AllowRecording:             true,
-				AllowRTMP:                  true,
-				AllowViewOtherWebcams:      true,
-				AllowViewOtherParticipants: true,
-				AllowPolls:                 true,
-				ChatFeatures: ChatFeatures{
+			RoomFeatures: &plugnmeet.RoomCreateFeatures{
+				AllowWebcams:            true,
+				AllowScreenShare:        true,
+				AllowRecording:          true,
+				AllowRtmp:               true,
+				AllowViewOtherWebcams:   true,
+				AllowViewOtherUsersList: true,
+				AllowPolls:              true,
+				ChatFeatures: &plugnmeet.ChatFeatures{
 					AllowChat:       true,
 					AllowFileUpload: true,
 				},
-				SharedNotePadFeatures: SharedNotePadFeatures{
+				SharedNotePadFeatures: &plugnmeet.SharedNotePadFeatures{
 					AllowedSharedNotePad: true,
 				},
-				WhiteboardFeatures: WhiteboardFeatures{
+				WhiteboardFeatures: &plugnmeet.WhiteboardFeatures{
 					AllowedWhiteboard: true,
 				},
-				ExternalMediaPlayerFeatures: ExternalMediaPlayerFeatures{
+				ExternalMediaPlayerFeatures: &plugnmeet.ExternalMediaPlayerFeatures{
 					AllowedExternalMediaPlayer: true,
 				},
-				BreakoutRoomFeatures: BreakoutRoomFeatures{
+				BreakoutRoomFeatures: &plugnmeet.BreakoutRoomFeatures{
 					IsAllow: true,
 				},
-				DisplayExternalLinkFeatures: DisplayExternalLinkFeatures{
+				DisplayExternalLinkFeatures: &plugnmeet.DisplayExternalLinkFeatures{
 					IsAllow: true,
 				},
 			},
@@ -336,10 +337,10 @@ func PrepareLTIV1RoomCreateReq(c *LtiClaims) *RoomCreateReq {
 
 	if c.LtiCustomParameters != nil {
 		p := c.LtiCustomParameters
-		f := req.RoomMetadata.Features
+		f := req.Metadata.RoomFeatures
 
 		if p.RoomDuration > 0 {
-			f.RoomDuration = p.RoomDuration
+			f.RoomDuration = &p.RoomDuration
 		}
 		if p.MuteOnStart != nil {
 			f.MuteOnStart = *p.MuteOnStart
@@ -357,16 +358,16 @@ func PrepareLTIV1RoomCreateReq(c *LtiClaims) *RoomCreateReq {
 			f.AllowRecording = *p.AllowRecording
 		}
 		if p.AllowRTMP != nil {
-			f.AllowRTMP = *p.AllowRTMP
+			f.AllowRtmp = *p.AllowRTMP
 		}
 		if p.AllowViewOtherWebcams != nil {
 			f.AllowViewOtherWebcams = *p.AllowViewOtherWebcams
 		}
 		if p.AllowViewOtherParticipants != nil {
-			f.AllowViewOtherParticipants = *p.AllowViewOtherParticipants
+			f.AllowViewOtherUsersList = *p.AllowViewOtherParticipants
 		}
 
-		req.RoomMetadata.Features = f
+		req.Metadata.RoomFeatures = f
 	}
 
 	return req

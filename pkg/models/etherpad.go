@@ -6,6 +6,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/goccy/go-json"
 	"github.com/google/uuid"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
@@ -111,15 +112,15 @@ func (m *EtherpadModel) addPadToRoomMetadata(roomId string, c *CreateSessionRes)
 		return err
 	}
 
-	f := SharedNotePadFeatures{
-		AllowedSharedNotePad: meta.Features.SharedNotePadFeatures.AllowedSharedNotePad,
+	f := &plugnmeet.SharedNotePadFeatures{
+		AllowedSharedNotePad: meta.RoomFeatures.SharedNotePadFeatures.AllowedSharedNotePad,
 		IsActive:             true,
 		NodeId:               m.NodeId,
 		Host:                 m.Host,
 		NotePadId:            c.PadId,
 		ReadOnlyPadId:        c.ReadOnlyPadId,
 	}
-	meta.Features.SharedNotePadFeatures = f
+	meta.RoomFeatures.SharedNotePadFeatures = f
 
 	_, err = m.rs.UpdateRoomMetadataByStruct(roomId, meta)
 	if err != nil {
@@ -162,10 +163,10 @@ func (m *EtherpadModel) CleanPad(roomId, nodeId, padId string) error {
 }
 
 func (m *EtherpadModel) CleanAfterRoomEnd(roomId, metadata string) error {
-	roomMeta := new(RoomMetadata)
+	roomMeta := new(plugnmeet.RoomMetadata)
 	_ = json.Unmarshal([]byte(metadata), roomMeta)
 
-	np := roomMeta.Features.SharedNotePadFeatures
+	np := roomMeta.RoomFeatures.SharedNotePadFeatures
 	if !np.AllowedSharedNotePad {
 		return nil
 	}
@@ -186,7 +187,7 @@ func (m *EtherpadModel) ChangeEtherpadStatus(r *ChangeEtherpadStatusReq) error {
 		return err
 	}
 
-	meta.Features.SharedNotePadFeatures.IsActive = r.IsActive
+	meta.RoomFeatures.SharedNotePadFeatures.IsActive = r.IsActive
 
 	_, err = m.rs.UpdateRoomMetadataByStruct(r.RoomId, meta)
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/livekit"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
 	"time"
@@ -71,15 +72,15 @@ func (w *webhookEvent) roomStarted() {
 	}
 
 	if event.Room.Metadata != "" {
-		info := new(RoomMetadata)
+		info := new(plugnmeet.RoomMetadata)
 		err = json.Unmarshal([]byte(event.Room.Metadata), info)
 		if err == nil {
-			info.StartedAt = time.Now().Unix()
-			if info.Features.RoomDuration > 0 {
+			info.StartedAt = uint64(time.Now().Unix())
+			if *info.RoomFeatures.RoomDuration > 0 {
 				// we'll add room info in map
 				config.AppCnf.AddRoomWithDurationMap(room.RoomId, config.RoomWithDuration{
 					RoomSid:   room.Sid,
-					Duration:  info.Features.RoomDuration,
+					Duration:  *info.RoomFeatures.RoomDuration,
 					StartedAt: info.StartedAt, // we can use from livekit
 				})
 			}

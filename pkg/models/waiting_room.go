@@ -78,7 +78,7 @@ func (u *userWaitingRoomModel) UpdateWaitingRoomMessage(r *UpdateWaitingRoomMess
 		return err
 	}
 
-	roomMeta.Features.WaitingRoomFeatures.WaitingRoomMsg = r.Msg
+	roomMeta.RoomFeatures.WaitingRoomFeatures.WaitingRoomMsg = r.Msg
 	_, err = u.roomService.UpdateRoomMetadataByStruct(r.RoomId, roomMeta)
 
 	return err
