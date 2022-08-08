@@ -46,7 +46,7 @@ func (am *roomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 		if len(r.Metadata.RoomFeatures.ChatFeatures.AllowedFileTypes) == 0 {
 			r.Metadata.RoomFeatures.ChatFeatures.AllowedFileTypes = config.AppCnf.UploadFileSettings.AllowedTypes
 		}
-		if r.Metadata.RoomFeatures.ChatFeatures.MaxFileSize == nil && *r.Metadata.RoomFeatures.ChatFeatures.MaxFileSize == 0 {
+		if r.Metadata.RoomFeatures.ChatFeatures.MaxFileSize != nil && *r.Metadata.RoomFeatures.ChatFeatures.MaxFileSize == 0 {
 			r.Metadata.RoomFeatures.ChatFeatures.MaxFileSize = &config.AppCnf.UploadFileSettings.MaxSize
 		}
 	}
