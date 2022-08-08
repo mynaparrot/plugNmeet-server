@@ -35,7 +35,7 @@ func NewBreakoutRoomModel() *breakoutRoom {
 type CreateBreakoutRoomsReq struct {
 	RoomId          string
 	RequestedUserId string
-	Duration        int64           `json:"duration" validate:"required"`
+	Duration        uint64          `json:"duration" validate:"required"`
 	WelcomeMsg      string          `json:"welcome_msg"`
 	Rooms           []*BreakoutRoom `json:"rooms" validate:"required"`
 }
@@ -43,7 +43,7 @@ type CreateBreakoutRoomsReq struct {
 type BreakoutRoom struct {
 	Id       string              `json:"id"`
 	Title    string              `json:"title"`
-	Duration int64               `json:"duration"`
+	Duration uint64              `json:"duration"`
 	Started  bool                `json:"started"`
 	Created  int64               `json:"created"`
 	Users    []*BreakoutRoomUser `json:"users"`
@@ -60,36 +60,36 @@ func (m *breakoutRoom) CreateBreakoutRooms(r *CreateBreakoutRoomsReq) error {
 	if err != nil {
 		return err
 	}
-	meta := new(RoomMetadata)
+	meta := new(plugnmeet.RoomMetadata)
 	err = json.Unmarshal([]byte(mainRoom.Metadata), meta)
 	if err != nil {
 		return err
 	}
 	// set room duration
-	meta.Features.RoomDuration = r.Duration
+	meta.RoomFeatures.RoomDuration = &r.Duration
 	meta.IsBreakoutRoom = true
-	meta.WelcomeMessage = r.WelcomeMsg
+	meta.WelcomeMessage = &r.WelcomeMsg
 	meta.ParentRoomId = r.RoomId
 
 	// disable few features
-	meta.Features.BreakoutRoomFeatures.IsAllow = false
-	meta.Features.WaitingRoomFeatures.IsActive = false
+	meta.RoomFeatures.BreakoutRoomFeatures.IsAllow = false
+	meta.RoomFeatures.WaitingRoomFeatures.IsActive = false
 
 	// we'll disable now. in the future, we can think about those
-	meta.Features.AllowRecording = false
-	meta.Features.AllowRTMP = false
+	meta.RoomFeatures.AllowRecording = false
+	meta.RoomFeatures.AllowRtmp = false
 
 	// clear few main room data
-	meta.Features.DisplayExternalLinkFeatures.IsActive = false
-	meta.Features.ExternalMediaPlayerFeatures.IsActive = false
+	meta.RoomFeatures.DisplayExternalLinkFeatures.IsActive = false
+	meta.RoomFeatures.ExternalMediaPlayerFeatures.IsActive = false
 
 	e := make(map[string]bool)
 
 	for _, room := range r.Rooms {
-		bRoom := new(RoomCreateReq)
+		bRoom := new(plugnmeet.CreateRoomReq)
 		bRoom.RoomId = fmt.Sprintf("%s:%s", r.RoomId, room.Id)
 		meta.RoomTitle = room.Title
-		bRoom.RoomMetadata = *meta
+		bRoom.Metadata = meta
 		status, msg, _ := m.roomAuthModel.CreateRoom(bRoom)
 
 		if !status {
@@ -136,12 +136,12 @@ func (m *breakoutRoom) CreateBreakoutRooms(r *CreateBreakoutRoomsReq) error {
 	}
 
 	// again here for update
-	origMeta := new(RoomMetadata)
+	origMeta := new(plugnmeet.RoomMetadata)
 	err = json.Unmarshal([]byte(mainRoom.Metadata), origMeta)
 	if err != nil {
 		return err
 	}
-	origMeta.Features.BreakoutRoomFeatures.IsActive = true
+	origMeta.RoomFeatures.BreakoutRoomFeatures.IsActive = true
 	_, err = m.roomService.UpdateRoomMetadataByStruct(r.RoomId, origMeta)
 
 	return err
@@ -177,12 +177,15 @@ func (m *breakoutRoom) JoinBreakoutRoom(r *JoinBreakoutRoomReq) (string, error) 
 		return "", err
 	}
 
-	req := new(GenTokenReq)
-	req.RoomId = r.BreakoutRoomId
-	req.UserInfo.UserId = r.UserId
-	req.UserInfo.Name = p.Name
-	req.UserInfo.IsAdmin = meta.IsAdmin
-	req.UserInfo.UserMetadata = *meta
+	req := &plugnmeet.GenerateTokenReq{
+		RoomId: r.BreakoutRoomId,
+		UserInfo: &plugnmeet.UserInfo{
+			UserId:       r.UserId,
+			Name:         p.Name,
+			IsAdmin:      meta.IsAdmin,
+			UserMetadata: meta,
+		},
+	}
 
 	token, err := m.authTokenModel.DoGenerateToken(req)
 	if err != nil {
@@ -221,7 +224,7 @@ func (m *breakoutRoom) GetMyBreakoutRooms(roomId, userId string) (*BreakoutRoom,
 type IncreaseBreakoutRoomDurationReq struct {
 	RoomId         string
 	BreakoutRoomId string `json:"breakout_room_id" validate:"required"`
-	Duration       int64  `json:"duration" validate:"required"`
+	Duration       uint64 `json:"duration" validate:"required"`
 }
 
 func (m *breakoutRoom) IncreaseBreakoutRoomDuration(r *IncreaseBreakoutRoomDurationReq) error {
@@ -322,13 +325,13 @@ func (m *breakoutRoom) EndBreakoutRooms(roomId string) error {
 	return nil
 }
 
-func (m *breakoutRoom) PostTaskAfterRoomStartWebhook(roomId string, metadata *RoomMetadata) error {
+func (m *breakoutRoom) PostTaskAfterRoomStartWebhook(roomId string, metadata *plugnmeet.RoomMetadata) error {
 	if metadata.IsBreakoutRoom {
 		room, err := m.fetchBreakoutRoom(metadata.ParentRoomId, roomId)
 		if err != nil {
 			return err
 		}
-		room.Created = metadata.StartedAt
+		room.Created = int64(metadata.StartedAt)
 		room.Started = true
 
 		marshal, err := json.Marshal(room)
@@ -350,7 +353,7 @@ func (m *breakoutRoom) PostTaskAfterRoomEndWebhook(roomId, metadata string) erro
 	if metadata == "" {
 		return nil
 	}
-	meta := new(RoomMetadata)
+	meta := new(plugnmeet.RoomMetadata)
 	err := json.Unmarshal([]byte(metadata), meta)
 	if err != nil {
 		return err
@@ -469,7 +472,7 @@ func (m *breakoutRoom) performPostHookTask(roomId string) error {
 	if err != nil {
 		return err
 	}
-	meta.Features.BreakoutRoomFeatures.IsActive = false
+	meta.RoomFeatures.BreakoutRoomFeatures.IsActive = false
 	_, err = m.roomService.UpdateRoomMetadataByStruct(roomId, meta)
 	if err != nil {
 		return err

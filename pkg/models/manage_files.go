@@ -98,7 +98,7 @@ func (m *ManageFile) ResumableFileUpload(c *fiber.Ctx) (*UploadedFileResponse, e
 				_ = c.SendStatus(fiber.StatusCreated)
 			} else {
 				// so, we'll delete that file.
-				_ = os.Remove(relativeChunk)
+				_ = os.RemoveAll(relativeChunk)
 				_ = c.SendStatus(fiber.StatusNoContent)
 			}
 		}
@@ -267,7 +267,7 @@ func (m *ManageFile) combineResumableFiles(chunksDir string, fileName string, to
 
 func (m *ManageFile) DeleteFile(filePath string) error {
 	path := fmt.Sprintf("%s/%s", m.uploadFileSettings.Path, filePath)
-	err := os.Remove(path)
+	err := os.RemoveAll(path)
 	if err != nil {
 		log.Errorln(err)
 	}
@@ -413,10 +413,10 @@ func (m *ManageFile) updateRoomMetadataWithOfficeFile(f *ConvertWhiteboardFileRe
 		return err
 	}
 
-	roomMeta.Features.WhiteboardFeatures.WhiteboardFileId = f.FileId
-	roomMeta.Features.WhiteboardFeatures.FileName = f.FileName
-	roomMeta.Features.WhiteboardFeatures.FilePath = f.FilePath
-	roomMeta.Features.WhiteboardFeatures.TotalPages = f.TotalPages
+	roomMeta.RoomFeatures.WhiteboardFeatures.WhiteboardFileId = f.FileId
+	roomMeta.RoomFeatures.WhiteboardFeatures.FileName = f.FileName
+	roomMeta.RoomFeatures.WhiteboardFeatures.FilePath = f.FilePath
+	roomMeta.RoomFeatures.WhiteboardFeatures.TotalPages = uint32(f.TotalPages)
 
 	_, err = m.rs.UpdateRoomMetadataByStruct(m.RoomId, roomMeta)
 	if err != nil {

@@ -2,12 +2,13 @@ package controllers
 
 import (
 	"github.com/gofiber/fiber/v2"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 )
 
 func HandleRoomCreate(c *fiber.Ctx) error {
-	req := new(models.RoomCreateReq)
+	req := new(plugnmeet.CreateRoomReq)
 	err := c.BodyParser(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -15,11 +16,25 @@ func HandleRoomCreate(c *fiber.Ctx) error {
 			"msg":    err.Error(),
 		})
 	}
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
+	err = req.Validate()
+	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    check,
+			"msg":    err.Error(),
+		})
+	}
+
+	if req.Metadata == nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    "metadata information required",
+		})
+	}
+
+	if req.Metadata.RoomFeatures == nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    "room features information required",
 		})
 	}
 
@@ -27,14 +42,14 @@ func HandleRoomCreate(c *fiber.Ctx) error {
 	status, msg, room := m.CreateRoom(req)
 
 	return c.JSON(fiber.Map{
-		"status":   status,
-		"msg":      msg,
-		"roomInfo": room,
+		"status":    status,
+		"msg":       msg,
+		"room_info": room,
 	})
 }
 
 func HandleIsRoomActive(c *fiber.Ctx) error {
-	req := new(models.IsRoomActiveReq)
+	req := new(plugnmeet.IsRoomActiveReq)
 	err := c.BodyParser(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -42,11 +57,11 @@ func HandleIsRoomActive(c *fiber.Ctx) error {
 			"msg":    err.Error(),
 		})
 	}
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
+	err = req.Validate()
+	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    check,
+			"msg":    err.Error(),
 		})
 	}
 
@@ -60,7 +75,7 @@ func HandleIsRoomActive(c *fiber.Ctx) error {
 }
 
 func HandleGetActiveRoomInfo(c *fiber.Ctx) error {
-	req := new(models.IsRoomActiveReq)
+	req := new(plugnmeet.GetActiveRoomInfoReq)
 	err := c.BodyParser(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -68,11 +83,11 @@ func HandleGetActiveRoomInfo(c *fiber.Ctx) error {
 			"msg":    err.Error(),
 		})
 	}
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
+	err = req.Validate()
+	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    check,
+			"msg":    err.Error(),
 		})
 	}
 	m := models.NewRoomAuthModel()
@@ -97,7 +112,7 @@ func HandleGetActiveRoomsInfo(c *fiber.Ctx) error {
 }
 
 func HandleEndRoom(c *fiber.Ctx) error {
-	req := new(models.RoomEndReq)
+	req := new(plugnmeet.RoomEndReq)
 	err := c.BodyParser(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -105,11 +120,11 @@ func HandleEndRoom(c *fiber.Ctx) error {
 			"msg":    err.Error(),
 		})
 	}
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
+	err = req.Validate()
+	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    check,
+			"msg":    err.Error(),
 		})
 	}
 
@@ -133,7 +148,7 @@ func HandleEndRoomForAPI(c *fiber.Ctx) error {
 		})
 	}
 
-	req := new(models.RoomEndReq)
+	req := new(plugnmeet.RoomEndReq)
 	err := c.BodyParser(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -142,11 +157,11 @@ func HandleEndRoomForAPI(c *fiber.Ctx) error {
 		})
 	}
 
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
+	err = req.Validate()
+	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    check,
+			"msg":    err.Error(),
 		})
 	}
 

@@ -63,13 +63,13 @@ func (e *externalDisplayLink) updateRoomMetadata(opts *updateRoomMetadataOpts) e
 	}
 
 	if opts.isActive != nil {
-		roomMeta.Features.DisplayExternalLinkFeatures.IsActive = *opts.isActive
+		roomMeta.RoomFeatures.DisplayExternalLinkFeatures.IsActive = *opts.isActive
 	}
 	if opts.url != nil {
-		roomMeta.Features.DisplayExternalLinkFeatures.Link = *opts.url
+		roomMeta.RoomFeatures.DisplayExternalLinkFeatures.Link = opts.url
 	}
 	if opts.sharedBy != nil {
-		roomMeta.Features.DisplayExternalLinkFeatures.SharedBy = *opts.sharedBy
+		roomMeta.RoomFeatures.DisplayExternalLinkFeatures.SharedBy = opts.sharedBy
 	}
 
 	_, err = e.rs.UpdateRoomMetadataByStruct(e.req.RoomId, roomMeta)

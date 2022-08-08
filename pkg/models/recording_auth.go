@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
@@ -27,32 +28,7 @@ func NewRecordingAuth() *authRecording {
 	}
 }
 
-type FetchRecordingsReq struct {
-	RoomIds []string `json:"room_ids"`
-	From    int      `json:"from"`
-	Limit   int      `json:"limit"`
-	OrderBy string   `json:"order_by"`
-}
-
-type FetchRecordingsResp struct {
-	TotalRecordings int64           `json:"total_recordings"`
-	From            int             `json:"from"`
-	Limit           int             `json:"limit"`
-	OrderBy         string          `json:"order_by"`
-	RecordingsList  []RecordingInfo `json:"recordings_list"`
-}
-
-type RecordingInfo struct {
-	RecordId         string  `json:"record_id"`
-	RoomId           string  `json:"room_id"`
-	RoomSid          string  `json:"room_sid"`
-	FilePath         string  `json:"file_path"`
-	FileSize         float64 `json:"file_size"`
-	CreationTime     int64   `json:"creation_time"`
-	RoomCreationTime int64   `json:"room_creation_time"`
-}
-
-func (a *authRecording) FetchRecordings(r *FetchRecordingsReq) (*FetchRecordingsResp, error) {
+func (a *authRecording) FetchRecordings(r *plugnmeet.FetchRecordingsReq) (*plugnmeet.FetchRecordingsRes, error) {
 	db := a.db
 	ctx, cancel := context.WithTimeout(a.ctx, 3*time.Second)
 	defer cancel()
@@ -91,10 +67,10 @@ func (a *authRecording) FetchRecordings(r *FetchRecordingsReq) (*FetchRecordings
 	}
 
 	defer rows.Close()
-	var recordings []RecordingInfo
+	var recordings []*plugnmeet.RecordingInfo
 
 	for rows.Next() {
-		var recording RecordingInfo
+		var recording plugnmeet.RecordingInfo
 		var rSid sql.NullString
 
 		err = rows.Scan(&recording.RecordId, &recording.RoomId, &rSid, &recording.FilePath, &recording.FileSize, &recording.CreationTime, &recording.RoomCreationTime)
@@ -102,7 +78,7 @@ func (a *authRecording) FetchRecordings(r *FetchRecordingsReq) (*FetchRecordings
 			fmt.Println(err)
 		}
 		recording.RoomSid = rSid.String
-		recordings = append(recordings, recording)
+		recordings = append(recordings, &recording)
 	}
 
 	// get total number of recordings
@@ -122,7 +98,7 @@ func (a *authRecording) FetchRecordings(r *FetchRecordingsReq) (*FetchRecordings
 	var total int64
 	_ = row.Scan(&total)
 
-	result := &FetchRecordingsResp{
+	result := &plugnmeet.FetchRecordingsRes{
 		TotalRecordings: total,
 		From:            r.From,
 		Limit:           limit,
@@ -130,18 +106,22 @@ func (a *authRecording) FetchRecordings(r *FetchRecordingsReq) (*FetchRecordings
 		RecordingsList:  recordings,
 	}
 
+	if result.GetTotalRecordings() == 0 {
+		result.TotalRecordings = 0
+	}
+
 	return result, nil
 }
 
 // FetchRecording to get single recording information from DB
-func (a *authRecording) FetchRecording(recordId string) (*RecordingInfo, error) {
+func (a *authRecording) FetchRecording(recordId string) (*plugnmeet.RecordingInfo, error) {
 	db := a.db
 	ctx, cancel := context.WithTimeout(a.ctx, 3*time.Second)
 	defer cancel()
 
 	row := db.QueryRowContext(ctx, "SELECT record_id, room_id, room_sid, file_path, size, creation_time, room_creation_time FROM "+a.app.FormatDBTable("recordings")+" WHERE record_id = ?", recordId)
 
-	recording := new(RecordingInfo)
+	recording := new(plugnmeet.RecordingInfo)
 	var rSid sql.NullString
 
 	err := row.Scan(&recording.RecordId, &recording.RoomId, &rSid, &recording.FilePath, &recording.FileSize, &recording.CreationTime, &recording.RoomCreationTime)
@@ -166,7 +146,7 @@ type DeleteRecordingReq struct {
 	RecordId string `json:"record_id" validate:"required"`
 }
 
-func (a *authRecording) DeleteRecording(r *DeleteRecordingReq) error {
+func (a *authRecording) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
 	recording, err := a.FetchRecording(r.RecordId)
 	if err != nil {
 		return err
@@ -221,7 +201,7 @@ type GetDownloadTokenReq struct {
 }
 
 // GetDownloadToken will use same JWT token generator as Livekit is using
-func (a *authRecording) GetDownloadToken(r *GetDownloadTokenReq) (string, error) {
+func (a *authRecording) GetDownloadToken(r *plugnmeet.GetDownloadTokenReq) (string, error) {
 	recording, err := a.FetchRecording(r.RecordId)
 	if err != nil {
 		return "", err

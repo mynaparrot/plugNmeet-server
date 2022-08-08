@@ -3,6 +3,7 @@ package controllers
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/livekit/protocol/auth"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"strings"
@@ -32,9 +33,7 @@ func HandleAuthHeaderCheck(c *fiber.Ctx) error {
 }
 
 func HandleGenerateJoinToken(c *fiber.Ctx) error {
-	req := new(models.GenTokenReq)
-	m := models.NewAuthTokenModel()
-
+	req := new(plugnmeet.GenerateTokenReq)
 	err := c.BodyParser(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -42,11 +41,19 @@ func HandleGenerateJoinToken(c *fiber.Ctx) error {
 			"msg":    err.Error(),
 		})
 	}
-	check := m.Validation(req)
-	if len(check) > 0 {
+
+	err = req.Validate()
+	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    check,
+			"msg":    err.Error(),
+		})
+	}
+
+	if req.UserInfo == nil {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    "UserInfo required",
 		})
 	}
 
@@ -59,6 +66,7 @@ func HandleGenerateJoinToken(c *fiber.Ctx) error {
 		})
 	}
 
+	m := models.NewAuthTokenModel()
 	token, err := m.DoGenerateToken(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -135,7 +143,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	// if not active then we don't allow to join user
 	// livekit also don't allow but throw 500 error which make confused to user.
 	m := models.NewRoomAuthModel()
-	status, msg := m.IsRoomActive(&models.IsRoomActiveReq{
+	status, msg := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: roomId.(string),
 	})
 

@@ -2,12 +2,12 @@ package controllers
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 )
 
 func HandleFetchRecordings(c *fiber.Ctx) error {
-	req := new(models.FetchRecordingsReq)
+	req := new(plugnmeet.FetchRecordingsReq)
 	err := c.BodyParser(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -15,11 +15,11 @@ func HandleFetchRecordings(c *fiber.Ctx) error {
 			"msg":    err.Error(),
 		})
 	}
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
+	err = req.Validate()
+	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    check,
+			"msg":    err.Error(),
 		})
 	}
 
@@ -32,6 +32,12 @@ func HandleFetchRecordings(c *fiber.Ctx) error {
 			"msg":    err.Error(),
 		})
 	}
+	if result.GetTotalRecordings() == 0 {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    "no recordings found",
+		})
+	}
 
 	return c.JSON(fiber.Map{
 		"status": true,
@@ -41,7 +47,7 @@ func HandleFetchRecordings(c *fiber.Ctx) error {
 }
 
 func HandleDeleteRecording(c *fiber.Ctx) error {
-	req := new(models.DeleteRecordingReq)
+	req := new(plugnmeet.DeleteRecordingReq)
 	err := c.BodyParser(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -49,11 +55,11 @@ func HandleDeleteRecording(c *fiber.Ctx) error {
 			"msg":    err.Error(),
 		})
 	}
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
+	err = req.Validate()
+	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    check,
+			"msg":    err.Error(),
 		})
 	}
 
@@ -73,7 +79,7 @@ func HandleDeleteRecording(c *fiber.Ctx) error {
 }
 
 func HandleGetDownloadToken(c *fiber.Ctx) error {
-	req := new(models.GetDownloadTokenReq)
+	req := new(plugnmeet.GetDownloadTokenReq)
 	err := c.BodyParser(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -81,11 +87,11 @@ func HandleGetDownloadToken(c *fiber.Ctx) error {
 			"msg":    err.Error(),
 		})
 	}
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
+	err = req.Validate()
+	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    check,
+			"msg":    err.Error(),
 		})
 	}
 

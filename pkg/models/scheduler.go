@@ -49,7 +49,7 @@ func (s *scheduler) StartScheduler() {
 type RedisRoomDurationCheckerReq struct {
 	Type     string `json:"type"`
 	RoomId   string `json:"room_id"`
-	Duration int64  `json:"duration"`
+	Duration uint64 `json:"duration"`
 }
 
 func (s *scheduler) subscribeRedisRoomDurationChecker() {
@@ -82,7 +82,7 @@ func (s *scheduler) checkRoomWithDuration() {
 
 	rooms := config.AppCnf.GetRoomsWithDurationMap()
 	for i, r := range rooms {
-		now := time.Now().Unix()
+		now := uint64(time.Now().Unix())
 		valid := r.StartedAt + (r.Duration * 60)
 		if now > valid {
 			_, err := s.ra.rs.EndRoom(i)
@@ -93,7 +93,7 @@ func (s *scheduler) checkRoomWithDuration() {
 	}
 }
 
-func (s *scheduler) increaseRoomDuration(roomId string, duration int64) {
+func (s *scheduler) increaseRoomDuration(roomId string, duration uint64) {
 	newDuration := config.AppCnf.IncreaseRoomDuration(roomId, duration)
 	if newDuration == 0 {
 		// so record not found in this server
@@ -107,7 +107,7 @@ func (s *scheduler) increaseRoomDuration(roomId string, duration int64) {
 		return
 	}
 
-	meta.Features.RoomDuration = newDuration
+	meta.RoomFeatures.RoomDuration = &newDuration
 	_, err = roomService.UpdateRoomMetadataByStruct(roomId, meta)
 
 	if err != nil {

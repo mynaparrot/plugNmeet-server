@@ -95,7 +95,7 @@ type MySqlInfo struct {
 
 type UploadFileSettings struct {
 	Path         string   `yaml:"path"`
-	MaxSize      int      `yaml:"max_size"`
+	MaxSize      uint64   `yaml:"max_size"`
 	KeepForever  bool     `yaml:"keep_forever"`
 	AllowedTypes []string `yaml:"allowed_types"`
 }
@@ -132,8 +132,8 @@ type ChatParticipant struct {
 
 type RoomWithDuration struct {
 	RoomSid   string
-	Duration  int64
-	StartedAt int64
+	Duration  uint64
+	StartedAt uint64
 }
 
 func SetAppConfig(a *AppConfig) {
@@ -263,7 +263,7 @@ func (a *AppConfig) GetRoomsWithDurationMap() map[string]RoomWithDuration {
 	return a.roomWithDuration
 }
 
-func (a *AppConfig) IncreaseRoomDuration(roomId string, duration int64) int64 {
+func (a *AppConfig) IncreaseRoomDuration(roomId string, duration uint64) uint64 {
 	a.Lock()
 	defer a.Unlock()
 	if r, ok := a.roomWithDuration[roomId]; ok {

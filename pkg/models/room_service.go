@@ -7,6 +7,7 @@ import (
 	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/livekit"
 	lksdk "github.com/livekit/server-sdk-go"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
@@ -98,16 +99,16 @@ func (r *RoomService) LoadParticipantInfoFromRedis(roomId string, identity strin
 	return &pi, nil
 }
 
-func (r *RoomService) CreateRoom(roomId string, emptyTimeout uint32, maxParticipants uint32, metadata string) (*livekit.Room, error) {
+func (r *RoomService) CreateRoom(roomId string, emptyTimeout *uint32, maxParticipants *uint32, metadata string) (*livekit.Room, error) {
 
 	data := livekit.CreateRoomRequest{
 		Name: roomId,
 	}
-	if emptyTimeout > 0 {
-		data.EmptyTimeout = emptyTimeout
+	if emptyTimeout != nil && *emptyTimeout > 0 {
+		data.EmptyTimeout = *emptyTimeout
 	}
-	if maxParticipants > 0 {
-		data.MaxParticipants = maxParticipants
+	if maxParticipants != nil && *maxParticipants > 0 {
+		data.MaxParticipants = *maxParticipants
 	}
 	if metadata != "" {
 		data.Metadata = metadata
@@ -279,7 +280,7 @@ func (r *RoomService) DeleteRoomBlockList(roomId string) (int64, error) {
 	return r.rc.Del(r.ctx, key).Result()
 }
 
-func (r *RoomService) LoadRoomWithMetadata(roomId string) (*livekit.Room, *RoomMetadata, error) {
+func (r *RoomService) LoadRoomWithMetadata(roomId string) (*livekit.Room, *plugnmeet.RoomMetadata, error) {
 	room, err := r.LoadRoomInfoFromRedis(roomId)
 	if err != nil {
 		return nil, nil, err
@@ -289,7 +290,7 @@ func (r *RoomService) LoadRoomWithMetadata(roomId string) (*livekit.Room, *RoomM
 		return room, nil, errors.New("empty metadata")
 	}
 
-	meta := new(RoomMetadata)
+	meta := new(plugnmeet.RoomMetadata)
 	err = json.Unmarshal([]byte(room.Metadata), meta)
 	if err != nil {
 		log.Errorln(err)
@@ -299,7 +300,7 @@ func (r *RoomService) LoadRoomWithMetadata(roomId string) (*livekit.Room, *RoomM
 	return room, meta, nil
 }
 
-func (r *RoomService) UpdateRoomMetadataByStruct(roomId string, meta *RoomMetadata) (*livekit.Room, error) {
+func (r *RoomService) UpdateRoomMetadataByStruct(roomId string, meta *plugnmeet.RoomMetadata) (*livekit.Room, error) {
 	marshal, err := json.Marshal(meta)
 	if err != nil {
 		log.Errorln(err)
@@ -314,13 +315,13 @@ func (r *RoomService) UpdateRoomMetadataByStruct(roomId string, meta *RoomMetada
 	return room, nil
 }
 
-func (r *RoomService) LoadParticipantWithMetadata(roomId, userId string) (*livekit.ParticipantInfo, *UserMetadata, error) {
+func (r *RoomService) LoadParticipantWithMetadata(roomId, userId string) (*livekit.ParticipantInfo, *plugnmeet.UserMetadata, error) {
 	p, err := r.LoadParticipantInfoFromRedis(roomId, userId)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	meta := new(UserMetadata)
+	meta := new(plugnmeet.UserMetadata)
 	err = json.Unmarshal([]byte(p.Metadata), meta)
 	if err != nil {
 		log.Errorln(err)
@@ -330,7 +331,7 @@ func (r *RoomService) LoadParticipantWithMetadata(roomId, userId string) (*livek
 	return p, meta, nil
 }
 
-func (r *RoomService) UpdateParticipantMetadataByStruct(roomId, userId string, meta *UserMetadata) (*livekit.ParticipantInfo, error) {
+func (r *RoomService) UpdateParticipantMetadataByStruct(roomId, userId string, meta *plugnmeet.UserMetadata) (*livekit.ParticipantInfo, error) {
 	marshal, err := json.Marshal(meta)
 	if err != nil {
 		log.Errorln(err)

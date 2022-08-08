@@ -71,13 +71,13 @@ func (e *ExternalMediaPlayer) updateRoomMetadata(opts *updateRoomMetadataOpts) e
 	}
 
 	if opts.isActive != nil {
-		roomMeta.Features.ExternalMediaPlayerFeatures.IsActive = *opts.isActive
+		roomMeta.RoomFeatures.ExternalMediaPlayerFeatures.IsActive = *opts.isActive
 	}
 	if opts.url != nil {
-		roomMeta.Features.ExternalMediaPlayerFeatures.Url = *opts.url
+		roomMeta.RoomFeatures.ExternalMediaPlayerFeatures.Url = opts.url
 	}
 	if opts.sharedBy != nil {
-		roomMeta.Features.ExternalMediaPlayerFeatures.SharedBy = *opts.sharedBy
+		roomMeta.RoomFeatures.ExternalMediaPlayerFeatures.SharedBy = opts.sharedBy
 	}
 
 	_, err = e.rs.UpdateRoomMetadataByStruct(e.req.RoomId, roomMeta)

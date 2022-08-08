@@ -63,7 +63,7 @@ func (c *websocketController) validation() bool {
 	// default set false
 	c.kws.SetAttribute("isAdmin", false)
 
-	metadata := new(models.UserMetadata)
+	metadata := new(plugnmeet.UserMetadata)
 	err = json.Unmarshal([]byte(claims.Metadata), metadata)
 	if err != nil {
 		_ = c.kws.EmitTo(c.kws.UUID, []byte("can't Unmarshal metadata!"), ikisocket.TextMessage)

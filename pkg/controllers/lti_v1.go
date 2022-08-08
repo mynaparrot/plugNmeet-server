@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"strings"
@@ -80,7 +81,7 @@ func HandleLTIV1IsRoomActive(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 
 	m := models.NewRoomAuthModel()
-	status, msg := m.IsRoomActive(&models.IsRoomActiveReq{
+	status, msg := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: roomId.(string),
 	})
 
@@ -137,7 +138,7 @@ func HandleLTIV1EndRoom(c *fiber.Ctx) error {
 	}
 
 	m := models.NewRoomAuthModel()
-	status, msg := m.EndRoom(&models.RoomEndReq{
+	status, msg := m.EndRoom(&plugnmeet.RoomEndReq{
 		RoomId: roomId.(string),
 	})
 
@@ -160,7 +161,7 @@ func HandleLTIV1FetchRecordings(c *fiber.Ctx) error {
 	}
 
 	m := models.NewRecordingAuth()
-	result, err := m.FetchRecordings(&models.FetchRecordingsReq{
+	result, err := m.FetchRecordings(&plugnmeet.FetchRecordingsReq{
 		RoomIds: []string{roomId.(string)},
 		From:    req.From,
 		Limit:   req.Limit,
@@ -182,7 +183,7 @@ func HandleLTIV1FetchRecordings(c *fiber.Ctx) error {
 }
 
 func HandleLTIV1GetRecordingDownloadToken(c *fiber.Ctx) error {
-	req := new(models.GetDownloadTokenReq)
+	req := new(plugnmeet.GetDownloadTokenReq)
 	err := c.BodyParser(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -217,7 +218,7 @@ func HandleLTIV1DeleteRecordings(c *fiber.Ctx) error {
 		})
 	}
 
-	req := new(models.DeleteRecordingReq)
+	req := new(plugnmeet.DeleteRecordingReq)
 	err := c.BodyParser(req)
 	if err != nil {
 		return c.JSON(fiber.Map{

@@ -6,6 +6,7 @@ import (
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/livekit/protocol/livekit"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
@@ -92,11 +93,11 @@ func (u *userModel) updateLockSettingsAllUsers(r *UpdateUserLockSettingsReq) err
 	meta := make([]byte, len(info.Metadata))
 	copy(meta, info.Metadata)
 
-	m := new(RoomMetadata)
+	m := new(plugnmeet.RoomMetadata)
 	_ = json.Unmarshal(meta, m)
 
-	l := u.changeLockSettingsMetadata(r.Service, r.Direction, &m.DefaultLockSettings)
-	m.DefaultLockSettings = *l
+	l := u.changeLockSettingsMetadata(r.Service, r.Direction, m.DefaultLockSettings)
+	m.DefaultLockSettings = l
 
 	newMeta, _ := json.Marshal(m)
 	_, err = u.roomService.UpdateRoomMetadata(r.RoomId, string(newMeta))
@@ -116,10 +117,10 @@ func (u *userModel) updateParticipantLockMetadata(um updateParticipantLockMetada
 		meta := make([]byte, len(um.participantInfo.Metadata))
 		copy(meta, um.participantInfo.Metadata)
 
-		m := new(UserMetadata)
+		m := new(plugnmeet.UserMetadata)
 		_ = json.Unmarshal(meta, m)
-		l := u.changeLockSettingsMetadata(um.service, um.direction, &m.LockSettings)
-		m.LockSettings = *l
+		l := u.changeLockSettingsMetadata(um.service, um.direction, m.LockSettings)
+		m.LockSettings = l
 
 		newMeta, _ := json.Marshal(m)
 		_, err := u.roomService.UpdateParticipantMetadata(um.roomId, um.participantInfo.Identity, string(newMeta))
@@ -130,7 +131,7 @@ func (u *userModel) updateParticipantLockMetadata(um updateParticipantLockMetada
 	return errors.New("user isn't active now")
 }
 
-func (u *userModel) changeLockSettingsMetadata(service string, direction string, l *LockSettings) *LockSettings {
+func (u *userModel) changeLockSettingsMetadata(service string, direction string, l *plugnmeet.LockSettings) *plugnmeet.LockSettings {
 	lock := new(bool)
 	if direction == "lock" {
 		*lock = true
@@ -288,7 +289,7 @@ func (u *userModel) SwitchPresenter(r *SwitchPresenterReq) error {
 		meta := make([]byte, len(p.Metadata))
 		copy(meta, p.Metadata)
 
-		m := new(UserMetadata)
+		m := new(plugnmeet.UserMetadata)
 		_ = json.Unmarshal(meta, m)
 
 		if r.Task == "promote" {
@@ -321,7 +322,7 @@ func (u *userModel) SwitchPresenter(r *SwitchPresenterReq) error {
 	meta := make([]byte, len(p.Metadata))
 	copy(meta, p.Metadata)
 
-	m := new(UserMetadata)
+	m := new(plugnmeet.UserMetadata)
 	_ = json.Unmarshal(meta, m)
 
 	if r.Task == "promote" {
@@ -341,7 +342,7 @@ func (u *userModel) SwitchPresenter(r *SwitchPresenterReq) error {
 	return nil
 }
 
-func (u *userModel) updateUserMetadata(meta *UserMetadata, roomId, userId string) error {
+func (u *userModel) updateUserMetadata(meta *plugnmeet.UserMetadata, roomId, userId string) error {
 	newMeta, err := json.Marshal(meta)
 	if err != nil {
 		return err
