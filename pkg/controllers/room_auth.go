@@ -42,9 +42,9 @@ func HandleRoomCreate(c *fiber.Ctx) error {
 	status, msg, room := m.CreateRoom(req)
 
 	return c.JSON(fiber.Map{
-		"status":   status,
-		"msg":      msg,
-		"roomInfo": room,
+		"status":    status,
+		"msg":       msg,
+		"room_info": room,
 	})
 }
 
