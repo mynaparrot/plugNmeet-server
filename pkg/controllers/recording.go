@@ -26,7 +26,7 @@ func HandleRecording(c *fiber.Ctx) error {
 		})
 	}
 
-	req := new(models.RecordingReq)
+	req := new(plugnmeet.RecordingReq)
 	m := models.NewRecordingModel()
 
 	err := c.BodyParser(req)
@@ -37,11 +37,11 @@ func HandleRecording(c *fiber.Ctx) error {
 		})
 	}
 
-	check := m.Validation(req)
-	if len(check) > 0 {
+	err = req.Validate()
+	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    check,
+			"msg":    err.Error(),
 		})
 	}
 
@@ -63,12 +63,12 @@ func HandleRecording(c *fiber.Ctx) error {
 		})
 	}
 
-	if room.IsRecording == 1 && req.Task == "start-recording" {
+	if room.IsRecording == 1 && req.Task == plugnmeet.RecordingTasks_START_RECORDING {
 		return c.JSON(fiber.Map{
 			"status": false,
 			"msg":    "notifications.recording-already-running",
 		})
-	} else if room.IsRecording == 0 && req.Task == "stop-recording" {
+	} else if room.IsRecording == 0 && req.Task == plugnmeet.RecordingTasks_STOP_RECORDING {
 		return c.JSON(fiber.Map{
 			"status": false,
 			"msg":    "notifications.recording-not-running",
@@ -77,7 +77,7 @@ func HandleRecording(c *fiber.Ctx) error {
 
 	// we need to get custom design value
 	m.RecordingReq = req
-	err = m.SendMsgToRecorder(req.Task, room.RoomId, room.Sid, "")
+	err = m.SendMsgToRecorder(req.Task, room.RoomId, room.Sid, nil)
 	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
@@ -110,7 +110,7 @@ func HandleRTMP(c *fiber.Ctx) error {
 	}
 
 	// we can use same as RecordingReq
-	req := new(models.RecordingReq)
+	req := new(plugnmeet.RecordingReq)
 	m := models.NewRecordingModel()
 
 	err := c.BodyParser(req)
@@ -121,19 +121,26 @@ func HandleRTMP(c *fiber.Ctx) error {
 		})
 	}
 
-	check := m.Validation(req)
-	if len(check) > 0 {
+	err = req.Validate()
+	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    check,
+			"msg":    err.Error(),
 		})
 	}
 
-	if req.RtmpUrl == "" && req.Task == "start-rtmp" {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "rtmp url require",
-		})
+	if req.Task == plugnmeet.RecordingTasks_START_RTMP {
+		if req.RtmpUrl == nil {
+			return c.JSON(fiber.Map{
+				"status": false,
+				"msg":    "rtmp url require",
+			})
+		} else if *req.RtmpUrl == "" {
+			return c.JSON(fiber.Map{
+				"status": false,
+				"msg":    "rtmp url require",
+			})
+		}
 	}
 
 	// now need to check if meeting is running or not
@@ -154,12 +161,12 @@ func HandleRTMP(c *fiber.Ctx) error {
 		})
 	}
 
-	if room.IsActiveRTMP == 1 && req.Task == "start-rtmp" {
+	if room.IsActiveRTMP == 1 && req.Task == plugnmeet.RecordingTasks_START_RTMP {
 		return c.JSON(fiber.Map{
 			"status": false,
 			"msg":    "RTMP broadcasting already running",
 		})
-	} else if room.IsActiveRTMP == 0 && req.Task == "stop-rtmp" {
+	} else if room.IsActiveRTMP == 0 && req.Task == plugnmeet.RecordingTasks_STOP_RTMP {
 		return c.JSON(fiber.Map{
 			"status": false,
 			"msg":    "RTMP broadcasting not running",

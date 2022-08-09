@@ -23,7 +23,7 @@ type recordingModel struct {
 	roomService  *RoomService
 	rds          *redis.Client
 	ctx          context.Context
-	RecordingReq *RecordingReq // we need to get custom design value
+	RecordingReq *plugnmeet.RecordingReq // we need to get custom design value
 }
 
 func NewRecordingModel() *recordingModel {
@@ -36,16 +36,16 @@ func NewRecordingModel() *recordingModel {
 	}
 }
 
-type RecordingReq struct {
-	Task         string  `json:"task" validate:"required"`
-	Sid          string  `json:"sid" validate:"required"`
-	RtmpUrl      string  `json:"rtmp_url"`
-	CustomDesign *string `json:"custom_design,omitempty"`
-}
+//type RecordingReq struct {
+//	Task         string  `json:"task" validate:"required"`
+//	Sid          string  `json:"sid" validate:"required"`
+//	RtmpUrl      string  `json:"rtmp_url"`
+//	CustomDesign *string `json:"custom_design,omitempty"`
+//}
 
-func (rm *recordingModel) Validation(r *RecordingReq) []*config.ErrorResponse {
-	return rm.app.DoValidateReq(r)
-}
+//func (rm *recordingModel) Validation(r *RecordingReq) []*config.ErrorResponse {
+//	return rm.app.DoValidateReq(r)
+//}
 
 type RecorderResp struct {
 	RecorderId string `json:"recorder_id"` //
@@ -379,34 +379,33 @@ type RecorderReq struct {
 	RtmpUrl     string `json:"rtmp_url"`
 }
 
-func (rm *recordingModel) SendMsgToRecorder(task string, roomId string, sid string, rtmpUrl string) error {
+func (rm *recordingModel) SendMsgToRecorder(task plugnmeet.RecordingTasks, roomId string, sid string, rtmpUrl *string) error {
 	recordId := time.Now().UnixMilli()
 
 	toSend := &plugnmeet.PlugNmeetToRecorder{
 		From:        "plugnmeet",
 		RoomId:      roomId,
 		RoomSid:     sid,
+		Task:        task,
 		RecordingId: sid + "-" + strconv.Itoa(int(recordId)),
 	}
 
 	switch task {
-	case "start-recording":
-		toSend.Task = plugnmeet.RecordingTasks_START_RECORDING
+	case plugnmeet.RecordingTasks_START_RECORDING:
 		err := rm.addTokenAndRecorder(toSend, "RECORDER_BOT")
 		if err != nil {
 			return err
 		}
-	case "stop-recording":
+	case plugnmeet.RecordingTasks_STOP_RECORDING:
 		toSend.Task = plugnmeet.RecordingTasks_STOP_RECORDING
 
-	case "start-rtmp":
-		toSend.Task = plugnmeet.RecordingTasks_START_RTMP
-		toSend.RtmpUrl = &rtmpUrl
+	case plugnmeet.RecordingTasks_START_RTMP:
+		toSend.RtmpUrl = rtmpUrl
 		err := rm.addTokenAndRecorder(toSend, "RTMP_BOT")
 		if err != nil {
 			return err
 		}
-	case "stop-rtmp":
+	case plugnmeet.RecordingTasks_STOP_RTMP:
 		toSend.Task = plugnmeet.RecordingTasks_STOP_RTMP
 	}
 

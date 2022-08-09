@@ -57,11 +57,10 @@ func HandleIsRoomActive(c *fiber.Ctx) error {
 			"msg":    err.Error(),
 		})
 	}
-	err = req.Validate()
-	if err != nil {
+	if req.RoomId == "" {
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    err.Error(),
+			"msg":    "room_id required",
 		})
 	}
 
@@ -83,11 +82,10 @@ func HandleGetActiveRoomInfo(c *fiber.Ctx) error {
 			"msg":    err.Error(),
 		})
 	}
-	err = req.Validate()
-	if err != nil {
+	if req.RoomId == "" {
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    err.Error(),
+			"msg":    "room_id required",
 		})
 	}
 	m := models.NewRoomAuthModel()
@@ -120,11 +118,10 @@ func HandleEndRoom(c *fiber.Ctx) error {
 			"msg":    err.Error(),
 		})
 	}
-	err = req.Validate()
-	if err != nil {
+	if req.RoomId == "" {
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    err.Error(),
+			"msg":    "room_id required",
 		})
 	}
 
@@ -150,14 +147,6 @@ func HandleEndRoomForAPI(c *fiber.Ctx) error {
 
 	req := new(plugnmeet.RoomEndReq)
 	err := c.BodyParser(req)
-	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
-	}
-
-	err = req.Validate()
 	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,

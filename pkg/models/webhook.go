@@ -6,6 +6,7 @@ import (
 	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
 	"time"
@@ -113,7 +114,7 @@ func (w *webhookEvent) roomFinished() {
 	}
 
 	//we'll send message to recorder to stop
-	_ = w.recordingModel.SendMsgToRecorder("stop", w.event.Room.Name, w.event.Room.Sid, "")
+	_ = w.recordingModel.SendMsgToRecorder(plugnmeet.RecordingTasks_STOP, w.event.Room.Name, w.event.Room.Sid, nil)
 
 	// Delete all the files those may upload during session
 	if !config.AppCnf.UploadFileSettings.KeepForever {
@@ -213,31 +214,10 @@ func (w *webhookEvent) trackUnpublished() {
 }
 
 func (w *webhookEvent) sendToWebhookNotifier(event *livekit.WebhookEvent) {
-	msg := PrepareCommonWebhookNotifyEvent(event)
+	msg := utils.PrepareCommonWebhookNotifyEvent(event)
 
 	err := w.notifier.Notify(event.Room.Sid, msg)
 	if err != nil {
 		log.Errorln(err)
-	}
-}
-
-func PrepareCommonWebhookNotifyEvent(event *livekit.WebhookEvent) *CommonNotifyEvent {
-	return &CommonNotifyEvent{
-		Event: event.Event,
-		Room: NotifyEventRoom{
-			Sid:             event.Room.Sid,
-			RoomId:          event.Room.Name,
-			EmptyTimeout:    event.Room.EmptyTimeout,
-			MaxParticipants: event.Room.MaxParticipants,
-			CreationTime:    event.Room.CreationTime,
-			EnabledCodecs:   event.Room.EnabledCodecs,
-			Metadata:        event.Room.Metadata,
-			NumParticipants: event.Room.NumParticipants,
-		},
-		Participant: event.Participant,
-		EgressInfo:  event.EgressInfo,
-		Track:       event.Track,
-		Id:          event.Id,
-		CreatedAt:   event.CreatedAt,
 	}
 }

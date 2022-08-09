@@ -32,30 +32,30 @@ func NewBreakoutRoomModel() *breakoutRoom {
 	}
 }
 
-type CreateBreakoutRoomsReq struct {
-	RoomId          string
-	RequestedUserId string
-	Duration        uint64          `json:"duration" validate:"required"`
-	WelcomeMsg      string          `json:"welcome_msg"`
-	Rooms           []*BreakoutRoom `json:"rooms" validate:"required"`
-}
+//type CreateBreakoutRoomsReq struct {
+//	RoomId          string
+//	RequestedUserId string
+//	Duration        uint64          `json:"duration" validate:"required"`
+//	WelcomeMsg      string          `json:"welcome_msg"`
+//	Rooms           []*BreakoutRoom `json:"rooms" validate:"required"`
+//}
+//
+//type BreakoutRoom struct {
+//	Id       string              `json:"id"`
+//	Title    string              `json:"title"`
+//	Duration uint64              `json:"duration"`
+//	Started  bool                `json:"started"`
+//	Created  int64               `json:"created"`
+//	Users    []*BreakoutRoomUser `json:"users"`
+//}
+//
+//type BreakoutRoomUser struct {
+//	Id     string `json:"id"`
+//	Name   string `json:"name"`
+//	Joined bool   `json:"joined"`
+//}
 
-type BreakoutRoom struct {
-	Id       string              `json:"id"`
-	Title    string              `json:"title"`
-	Duration uint64              `json:"duration"`
-	Started  bool                `json:"started"`
-	Created  int64               `json:"created"`
-	Users    []*BreakoutRoomUser `json:"users"`
-}
-
-type BreakoutRoomUser struct {
-	Id     string `json:"id"`
-	Name   string `json:"name"`
-	Joined bool   `json:"joined"`
-}
-
-func (m *breakoutRoom) CreateBreakoutRooms(r *CreateBreakoutRoomsReq) error {
+func (m *breakoutRoom) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRoomsReq) error {
 	mainRoom, err := m.roomService.LoadRoomInfoFromRedis(r.RoomId)
 	if err != nil {
 		return err
@@ -68,7 +68,7 @@ func (m *breakoutRoom) CreateBreakoutRooms(r *CreateBreakoutRoomsReq) error {
 	// set room duration
 	meta.RoomFeatures.RoomDuration = &r.Duration
 	meta.IsBreakoutRoom = true
-	meta.WelcomeMessage = &r.WelcomeMsg
+	meta.WelcomeMessage = r.WelcomeMsg
 	meta.ParentRoomId = r.RoomId
 
 	// disable few features
@@ -99,7 +99,7 @@ func (m *breakoutRoom) CreateBreakoutRooms(r *CreateBreakoutRoomsReq) error {
 		}
 
 		room.Duration = r.Duration
-		room.Created = time.Now().Unix()
+		room.Created = uint64(time.Now().Unix())
 		marshal, err := json.Marshal(room)
 
 		if err != nil {
@@ -195,7 +195,7 @@ func (m *breakoutRoom) JoinBreakoutRoom(r *JoinBreakoutRoomReq) (string, error) 
 	return token, nil
 }
 
-func (m *breakoutRoom) GetBreakoutRooms(roomId string) ([]*BreakoutRoom, error) {
+func (m *breakoutRoom) GetBreakoutRooms(roomId string) ([]*plugnmeet.BreakoutRoom, error) {
 	breakoutRooms, err := m.fetchBreakoutRooms(roomId)
 	if err != nil {
 		return nil, err
@@ -204,7 +204,7 @@ func (m *breakoutRoom) GetBreakoutRooms(roomId string) ([]*BreakoutRoom, error) 
 	return breakoutRooms, nil
 }
 
-func (m *breakoutRoom) GetMyBreakoutRooms(roomId, userId string) (*BreakoutRoom, error) {
+func (m *breakoutRoom) GetMyBreakoutRooms(roomId, userId string) (*plugnmeet.BreakoutRoom, error) {
 	breakoutRooms, err := m.fetchBreakoutRooms(roomId)
 	if err != nil {
 		return nil, err
@@ -331,7 +331,7 @@ func (m *breakoutRoom) PostTaskAfterRoomStartWebhook(roomId string, metadata *pl
 		if err != nil {
 			return err
 		}
-		room.Created = int64(metadata.StartedAt)
+		room.Created = metadata.StartedAt
 		room.Started = true
 
 		marshal, err := json.Marshal(room)
@@ -399,7 +399,7 @@ func (m *breakoutRoom) broadcastNotification(roomId, fromUserId, toUserId, broad
 	return nil
 }
 
-func (m *breakoutRoom) fetchBreakoutRoom(roomId, breakoutRoomId string) (*BreakoutRoom, error) {
+func (m *breakoutRoom) fetchBreakoutRoom(roomId, breakoutRoomId string) (*plugnmeet.BreakoutRoom, error) {
 	cmd := m.rc.HGet(m.ctx, breakoutRoomKey+roomId, breakoutRoomId)
 	result, err := cmd.Result()
 	if err != nil {
@@ -409,7 +409,7 @@ func (m *breakoutRoom) fetchBreakoutRoom(roomId, breakoutRoomId string) (*Breako
 		return nil, errors.New("not found")
 	}
 
-	room := new(BreakoutRoom)
+	room := new(plugnmeet.BreakoutRoom)
 	err = json.Unmarshal([]byte(result), room)
 	if err != nil {
 		return nil, err
@@ -418,7 +418,7 @@ func (m *breakoutRoom) fetchBreakoutRoom(roomId, breakoutRoomId string) (*Breako
 	return room, nil
 }
 
-func (m *breakoutRoom) fetchBreakoutRooms(roomId string) ([]*BreakoutRoom, error) {
+func (m *breakoutRoom) fetchBreakoutRooms(roomId string) ([]*plugnmeet.BreakoutRoom, error) {
 	cmd := m.rc.HGetAll(m.ctx, breakoutRoomKey+roomId)
 	rooms, err := cmd.Result()
 	if err != nil {
@@ -428,9 +428,9 @@ func (m *breakoutRoom) fetchBreakoutRooms(roomId string) ([]*BreakoutRoom, error
 		return nil, errors.New("no breakout room found")
 	}
 
-	var breakoutRooms []*BreakoutRoom
+	var breakoutRooms []*plugnmeet.BreakoutRoom
 	for i, r := range rooms {
-		room := new(BreakoutRoom)
+		room := new(plugnmeet.BreakoutRoom)
 		err := json.Unmarshal([]byte(r), room)
 		if err != nil {
 			continue

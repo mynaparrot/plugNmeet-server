@@ -151,7 +151,7 @@ func HandleLTIV1EndRoom(c *fiber.Ctx) error {
 func HandleLTIV1FetchRecordings(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 
-	req := new(models.LTIV1FetchRecordingsReq)
+	req := new(plugnmeet.FetchRecordingsReq)
 	err := c.BodyParser(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -161,12 +161,8 @@ func HandleLTIV1FetchRecordings(c *fiber.Ctx) error {
 	}
 
 	m := models.NewRecordingAuth()
-	result, err := m.FetchRecordings(&plugnmeet.FetchRecordingsReq{
-		RoomIds: []string{roomId.(string)},
-		From:    req.From,
-		Limit:   req.Limit,
-		OrderBy: req.OrderBy,
-	})
+	req.RoomIds = []string{roomId.(string)}
+	result, err := m.FetchRecordings(req)
 
 	if err != nil {
 		return c.JSON(fiber.Map{

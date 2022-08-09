@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"github.com/gofiber/fiber/v2"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 )
@@ -18,7 +19,7 @@ func HandleCreateBreakoutRooms(c *fiber.Ctx) error {
 		})
 	}
 
-	req := new(models.CreateBreakoutRoomsReq)
+	req := new(plugnmeet.CreateBreakoutRoomsReq)
 	err := c.BodyParser(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -27,11 +28,11 @@ func HandleCreateBreakoutRooms(c *fiber.Ctx) error {
 		})
 	}
 
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
+	err = req.Validate()
+	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    check,
+			"msg":    err.Error(),
 		})
 	}
 
