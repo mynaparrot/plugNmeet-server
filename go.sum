@@ -391,6 +391,8 @@ github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223/go.mod h1:qRW
 github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=
 github.com/mynaparrot/plugnmeet-protocol v0.0.0-20220809091253-5dc2c9ea7819 h1:h6BHpbzl9fLXAakRXIRpnZx+v7TWuT7t3E+rmbuA6nM=
 github.com/mynaparrot/plugnmeet-protocol v0.0.0-20220809091253-5dc2c9ea7819/go.mod h1:nHvegT0p4w9DLkEgUkAyj/y3tbjqW3FxGzSOmBR0G80=
+github.com/mynaparrot/plugnmeet-protocol v0.0.0-20220809173519-b2e345be8225 h1:7B4ko8SBniUpdonp4lYETwEgZ2oyh74s/CnTQ7z3KRw=
+github.com/mynaparrot/plugnmeet-protocol v0.0.0-20220809173519-b2e345be8225/go.mod h1:nHvegT0p4w9DLkEgUkAyj/y3tbjqW3FxGzSOmBR0G80=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
 github.com/nxadm/tail v1.4.4/go.mod h1:kenIhsEOeOJmVchQTgglprH7qJGnHDVpk1VPCcaMI8A=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=
