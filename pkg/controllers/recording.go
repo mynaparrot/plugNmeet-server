@@ -29,7 +29,7 @@ func HandleRecording(c *fiber.Ctx) error {
 	req := new(plugnmeet.RecordingReq)
 	m := models.NewRecordingModel()
 
-	err := c.BodyParser(req)
+	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
@@ -113,7 +113,7 @@ func HandleRTMP(c *fiber.Ctx) error {
 	req := new(plugnmeet.RecordingReq)
 	m := models.NewRecordingModel()
 
-	err := c.BodyParser(req)
+	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
