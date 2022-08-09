@@ -27,7 +27,7 @@ func HandleRoomCreate(c *fiber.Ctx) error {
 	if req.Metadata == nil {
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    "metadata information required",
+			"msg":    "room metadata information required",
 		})
 	}
 

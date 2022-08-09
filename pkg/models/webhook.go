@@ -76,7 +76,7 @@ func (w *webhookEvent) roomStarted() {
 		err = json.Unmarshal([]byte(event.Room.Metadata), info)
 		if err == nil {
 			info.StartedAt = uint64(time.Now().Unix())
-			if *info.RoomFeatures.RoomDuration > 0 {
+			if info.RoomFeatures.RoomDuration != nil && *info.RoomFeatures.RoomDuration > 0 {
 				// we'll add room info in map
 				config.AppCnf.AddRoomWithDurationMap(room.RoomId, config.RoomWithDuration{
 					RoomSid:   room.Sid,

@@ -4,6 +4,7 @@ import (
 	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"time"
 )
@@ -37,55 +38,10 @@ func (am *roomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 		// we can just update the DB row. No need to create new one
 	}
 
-	// we'll disable if SharedNotePad isn't enable in config
-	if !config.AppCnf.SharedNotePad.Enabled && r.Metadata.RoomFeatures.SharedNotePadFeatures != nil {
-		r.Metadata.RoomFeatures.SharedNotePadFeatures.AllowedSharedNotePad = false
-	}
-
-	if r.Metadata.RoomFeatures.ChatFeatures != nil {
-		if len(r.Metadata.RoomFeatures.ChatFeatures.AllowedFileTypes) == 0 {
-			r.Metadata.RoomFeatures.ChatFeatures.AllowedFileTypes = config.AppCnf.UploadFileSettings.AllowedTypes
-		}
-		if r.Metadata.RoomFeatures.ChatFeatures.MaxFileSize != nil && *r.Metadata.RoomFeatures.ChatFeatures.MaxFileSize == 0 {
-			r.Metadata.RoomFeatures.ChatFeatures.MaxFileSize = &config.AppCnf.UploadFileSettings.MaxSize
-		}
-	}
-
-	if r.Metadata.RoomFeatures.WhiteboardFeatures != nil && r.Metadata.RoomFeatures.WhiteboardFeatures.AllowedWhiteboard {
-		r.Metadata.RoomFeatures.WhiteboardFeatures.FileName = "default"
-		r.Metadata.RoomFeatures.WhiteboardFeatures.FileName = "default"
-		r.Metadata.RoomFeatures.WhiteboardFeatures.WhiteboardFileId = "default"
-		r.Metadata.RoomFeatures.WhiteboardFeatures.TotalPages = 10
-	}
-
-	if r.Metadata.RoomFeatures.BreakoutRoomFeatures != nil && r.Metadata.RoomFeatures.BreakoutRoomFeatures.IsAllow {
-		r.Metadata.RoomFeatures.BreakoutRoomFeatures.IsActive = false
-		if r.Metadata.RoomFeatures.BreakoutRoomFeatures.AllowedNumberRooms == 0 {
-			r.Metadata.RoomFeatures.BreakoutRoomFeatures.AllowedNumberRooms = 6
-		}
-	}
-
-	if r.Metadata.DefaultLockSettings == nil {
-		r.Metadata.DefaultLockSettings = new(plugnmeet.LockSettings)
-	}
-
-	// by default, we'll lock screen share, whiteboard & shared notepad
-	// so that only admin can use those features.
-	lock := new(bool)
-	if r.Metadata.DefaultLockSettings.LockScreenSharing == nil {
-		*lock = true
-		r.Metadata.DefaultLockSettings.LockScreenSharing = lock
-	}
-	if r.Metadata.DefaultLockSettings.LockWhiteboard == nil {
-		*lock = true
-		r.Metadata.DefaultLockSettings.LockWhiteboard = lock
-	}
-	if r.Metadata.DefaultLockSettings.LockSharedNotepad == nil {
-		*lock = true
-		r.Metadata.DefaultLockSettings.LockSharedNotepad = lock
-	}
-
-	r.Metadata.StartedAt = uint64(time.Now().Unix())
+	// we'll set default values otherwise client got confused if data is missing
+	utils.PrepareDefaultRoomFeatures(r)
+	utils.SetCreateRoomDefaultValues(r, config.AppCnf.UploadFileSettings.MaxSize, config.AppCnf.UploadFileSettings.AllowedTypes, config.AppCnf.SharedNotePad.Enabled)
+	utils.SetRoomDefaultLockSettings(r)
 
 	meta, err := json.Marshal(r.Metadata)
 	if err != nil {

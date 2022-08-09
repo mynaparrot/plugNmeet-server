@@ -10,12 +10,12 @@ import (
 	"github.com/jordic/lti"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -89,7 +89,7 @@ func (m *LTIV1) LTIV1Landing(c *fiber.Ctx, requests, signingURL string) error {
 		name = fmt.Sprintf("%s_%s", "User", userId)
 	}
 
-	claims := &LtiClaims{
+	claims := &plugnmeet.LtiClaims{
 		UserId:    userId,
 		Name:      name,
 		IsAdmin:   false,
@@ -100,7 +100,7 @@ func (m *LTIV1) LTIV1Landing(c *fiber.Ctx, requests, signingURL string) error {
 	if strings.Contains(params.Get("roles"), "Instructor") {
 		claims.IsAdmin = true
 	}
-	AssignLTIV1CustomParams(params, claims)
+	utils.AssignLTIV1CustomParams(params, claims)
 
 	j, err := m.ToJWT(claims)
 	if err != nil {
@@ -166,7 +166,7 @@ func (m *LTIV1) genHashId(id string) string {
 	return hash
 }
 
-func (m *LTIV1) ToJWT(c *LtiClaims) (string, error) {
+func (m *LTIV1) ToJWT(c *plugnmeet.LtiClaims) (string, error) {
 	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.HS256, Key: []byte(config.AppCnf.Client.Secret)},
 		(&jose.SignerOptions{}).WithType("JWT"))
 	if err != nil {
@@ -201,7 +201,7 @@ func (m *LTIV1) LTIV1VerifyHeaderToken(token string) (*LtiClaims, error) {
 	return claims, nil
 }
 
-func (m *LTIV1) LTIV1JoinRoom(c *LtiClaims) (string, error) {
+func (m *LTIV1) LTIV1JoinRoom(c *plugnmeet.LtiClaims) (string, error) {
 	active, _ := m.authModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: c.RoomId,
 	})
@@ -221,12 +221,12 @@ func (m *LTIV1) LTIV1JoinRoom(c *LtiClaims) (string, error) {
 	return token, nil
 }
 
-func (m *LTIV1) createRoomSession(c *LtiClaims) (bool, string, *livekit.Room) {
-	req := PrepareLTIV1RoomCreateReq(c)
+func (m *LTIV1) createRoomSession(c *plugnmeet.LtiClaims) (bool, string, *livekit.Room) {
+	req := utils.PrepareLTIV1RoomCreateReq(c)
 	return m.authModel.CreateRoom(req)
 }
 
-func (m *LTIV1) joinRoom(c *LtiClaims) (string, error) {
+func (m *LTIV1) joinRoom(c *plugnmeet.LtiClaims) (string, error) {
 	token, err := m.authTokenModel.DoGenerateToken(&plugnmeet.GenerateTokenReq{
 		RoomId: c.RoomId,
 		UserInfo: &plugnmeet.UserInfo{
@@ -243,132 +243,4 @@ func (m *LTIV1) joinRoom(c *LtiClaims) (string, error) {
 	}
 
 	return token, nil
-}
-
-func AssignLTIV1CustomParams(params *url.Values, claims *LtiClaims) {
-	b := new(bool)
-	customPara := new(LtiCustomParameters)
-
-	if params.Get("custom_room_duration") != "" {
-		duration, _ := strconv.Atoi(params.Get("custom_room_duration"))
-		customPara.RoomDuration = uint64(duration)
-	}
-	if params.Get("custom_allow_polls") == "false" {
-		customPara.AllowPolls = b
-	}
-	if params.Get("custom_allow_shared_note_pad") == "false" {
-		customPara.AllowSharedNotePad = b
-	}
-	if params.Get("custom_allow_breakout_room") == "false" {
-		customPara.AllowBreakoutRoom = b
-	}
-	if params.Get("custom_allow_recording") == "false" {
-		customPara.AllowRecording = b
-	}
-	if params.Get("custom_allow_rtmp") == "false" {
-		customPara.AllowRTMP = b
-	}
-	if params.Get("custom_allow_view_other_webcams") == "false" {
-		customPara.AllowViewOtherWebcams = b
-	}
-	if params.Get("custom_allow_view_other_users_list") == "false" {
-		customPara.AllowViewOtherParticipants = b
-	}
-	// this should be last bool
-	if params.Get("custom_mute_on_start") == "true" {
-		*b = true
-		customPara.MuteOnStart = b
-	}
-
-	// custom design
-	customDesign := new(LtiCustomDesign)
-	if params.Get("custom_primary_color") != "" {
-		customDesign.PrimaryColor = params.Get("custom_primary_color")
-	}
-	if params.Get("custom_secondary_color") != "" {
-		customDesign.SecondaryColor = params.Get("custom_secondary_color")
-	}
-	if params.Get("custom_background_color") != "" {
-		customDesign.BackgroundColor = params.Get("custom_background_color")
-	}
-	if params.Get("custom_custom_logo") != "" {
-		customDesign.CustomLogo = params.Get("custom_custom_logo")
-	}
-
-	claims.LtiCustomParameters = customPara
-	claims.LtiCustomParameters.LtiCustomDesign = customDesign
-}
-
-func PrepareLTIV1RoomCreateReq(c *LtiClaims) *plugnmeet.CreateRoomReq {
-	req := &plugnmeet.CreateRoomReq{
-		RoomId: c.RoomId,
-		Metadata: &plugnmeet.RoomMetadata{
-			RoomTitle: c.RoomTitle,
-			RoomFeatures: &plugnmeet.RoomCreateFeatures{
-				AllowWebcams:            true,
-				AllowScreenShare:        true,
-				AllowRecording:          true,
-				AllowRtmp:               true,
-				AllowViewOtherWebcams:   true,
-				AllowViewOtherUsersList: true,
-				AllowPolls:              true,
-				ChatFeatures: &plugnmeet.ChatFeatures{
-					AllowChat:       true,
-					AllowFileUpload: true,
-				},
-				SharedNotePadFeatures: &plugnmeet.SharedNotePadFeatures{
-					AllowedSharedNotePad: true,
-				},
-				WhiteboardFeatures: &plugnmeet.WhiteboardFeatures{
-					AllowedWhiteboard: true,
-				},
-				ExternalMediaPlayerFeatures: &plugnmeet.ExternalMediaPlayerFeatures{
-					AllowedExternalMediaPlayer: true,
-				},
-				BreakoutRoomFeatures: &plugnmeet.BreakoutRoomFeatures{
-					IsAllow: true,
-				},
-				DisplayExternalLinkFeatures: &plugnmeet.DisplayExternalLinkFeatures{
-					IsAllow: true,
-				},
-			},
-		},
-	}
-
-	if c.LtiCustomParameters != nil {
-		p := c.LtiCustomParameters
-		f := req.Metadata.RoomFeatures
-
-		if p.RoomDuration > 0 {
-			f.RoomDuration = &p.RoomDuration
-		}
-		if p.MuteOnStart != nil {
-			f.MuteOnStart = *p.MuteOnStart
-		}
-		if p.AllowSharedNotePad != nil {
-			f.SharedNotePadFeatures.AllowedSharedNotePad = *p.AllowSharedNotePad
-		}
-		if p.AllowBreakoutRoom != nil {
-			f.BreakoutRoomFeatures.IsAllow = *p.AllowBreakoutRoom
-		}
-		if p.AllowPolls != nil {
-			f.AllowPolls = *p.AllowPolls
-		}
-		if p.AllowRecording != nil {
-			f.AllowRecording = *p.AllowRecording
-		}
-		if p.AllowRTMP != nil {
-			f.AllowRtmp = *p.AllowRTMP
-		}
-		if p.AllowViewOtherWebcams != nil {
-			f.AllowViewOtherWebcams = *p.AllowViewOtherWebcams
-		}
-		if p.AllowViewOtherParticipants != nil {
-			f.AllowViewOtherUsersList = *p.AllowViewOtherParticipants
-		}
-
-		req.Metadata.RoomFeatures = f
-	}
-
-	return req
 }

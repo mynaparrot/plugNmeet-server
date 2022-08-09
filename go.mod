@@ -17,7 +17,6 @@ require (
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.0.0
 	github.com/livekit/server-sdk-go v0.10.4
-	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20220808100940-27ba3928606f
 	github.com/sirupsen/logrus v1.9.0
 	github.com/urfave/cli/v2 v2.11.1
 	google.golang.org/protobuf v1.28.1
@@ -50,6 +49,7 @@ require (
 	github.com/lithammer/shortuuid/v3 v3.0.7 // indirect
 	github.com/magefile/mage v1.13.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
+	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20220809050125-7cd8a08ae836 // indirect
 	github.com/pion/datachannel v1.5.2 // indirect
 	github.com/pion/dtls/v2 v2.1.5 // indirect
 	github.com/pion/ice/v2 v2.2.7 // indirect

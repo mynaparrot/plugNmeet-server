@@ -95,7 +95,7 @@ func HandleLTIV1JoinRoom(c *fiber.Ctx) error {
 	m := models.NewLTIV1Model()
 	customParams := c.Locals("customParams").([]byte)
 
-	claim := &models.LtiClaims{
+	claim := &plugnmeet.LtiClaims{
 		UserId:    c.Locals("userId").(string),
 		Name:      c.Locals("name").(string),
 		IsAdmin:   c.Locals("isAdmin").(bool),
@@ -104,7 +104,7 @@ func HandleLTIV1JoinRoom(c *fiber.Ctx) error {
 	}
 
 	if len(customParams) > 0 {
-		p := new(models.LtiCustomParameters)
+		p := new(plugnmeet.LtiCustomParameters)
 		err := json.Unmarshal(customParams, p)
 		if err == nil {
 			claim.LtiCustomParameters = p
