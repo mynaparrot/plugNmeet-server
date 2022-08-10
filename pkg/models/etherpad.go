@@ -163,8 +163,16 @@ func (m *EtherpadModel) CleanPad(roomId, nodeId, padId string) error {
 }
 
 func (m *EtherpadModel) CleanAfterRoomEnd(roomId, metadata string) error {
+	if metadata == "" {
+		return nil
+	}
+
 	roomMeta := new(plugnmeet.RoomMetadata)
 	_ = json.Unmarshal([]byte(metadata), roomMeta)
+
+	if roomMeta.RoomFeatures.SharedNotePadFeatures == nil {
+		return nil
+	}
 
 	np := roomMeta.RoomFeatures.SharedNotePadFeatures
 	if !np.AllowedSharedNotePad {
