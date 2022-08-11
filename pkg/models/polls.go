@@ -17,17 +17,6 @@ import (
 
 const pollsKey = "pnm:polls:"
 
-type PollInfo struct {
-	Id        string              `json:"id"`
-	RoomId    string              `json:"roomId"`
-	Question  string              `json:"question"`
-	Options   []CreatePollOptions `json:"options"`
-	IsRunning bool                `json:"is_running"`
-	Created   int64               `json:"created"`
-	CreatedBy string              `json:"created_by"`
-	ClosedBy  string              `json:"closed_by"`
-}
-
 type newPollsModel struct {
 	rc  *redis.Client
 	ctx context.Context
@@ -40,20 +29,7 @@ func NewPollsModel() *newPollsModel {
 	}
 }
 
-type CreatePollReq struct {
-	RoomId   string
-	UserId   string
-	PollId   string
-	Question string              `json:"question" validate:"required"`
-	Options  []CreatePollOptions `json:"options" validate:"required"`
-}
-
-type CreatePollOptions struct {
-	Id   int    `json:"id" validate:"required"`
-	Text string `json:"text" validate:"required"`
-}
-
-func (m *newPollsModel) CreatePoll(r *CreatePollReq, isAdmin bool) (error, string) {
+func (m *newPollsModel) CreatePoll(r *plugnmeet.CreatePollReq, isAdmin bool) (error, string) {
 	r.PollId = uuid.NewString()
 
 	// first add to room
@@ -74,8 +50,8 @@ func (m *newPollsModel) CreatePoll(r *CreatePollReq, isAdmin bool) (error, strin
 }
 
 // addPollToRoom will insert poll to room hash
-func (m *newPollsModel) addPollToRoom(r *CreatePollReq) error {
-	p := PollInfo{
+func (m *newPollsModel) addPollToRoom(r *plugnmeet.CreatePollReq) error {
+	p := &plugnmeet.PollInfo{
 		Id:        r.PollId,
 		RoomId:    r.RoomId,
 		Question:  r.Question,
@@ -103,7 +79,7 @@ func (m *newPollsModel) addPollToRoom(r *CreatePollReq) error {
 
 // createRespondentHash will create initial hash
 // format for all_respondents array value = userId:option_id
-func (m *newPollsModel) createRespondentHash(r *CreatePollReq) error {
+func (m *newPollsModel) createRespondentHash(r *plugnmeet.CreatePollReq) error {
 	key := fmt.Sprintf("%s%s:respondents:%s", pollsKey, r.RoomId, r.PollId)
 
 	v := make(map[string]interface{})
@@ -122,8 +98,8 @@ func (m *newPollsModel) createRespondentHash(r *CreatePollReq) error {
 	return err
 }
 
-func (m *newPollsModel) ListPolls(roomId string) (error, []*PollInfo) {
-	var polls []*PollInfo
+func (m *newPollsModel) ListPolls(roomId string) (error, []*plugnmeet.PollInfo) {
+	var polls []*plugnmeet.PollInfo
 
 	p := m.rc.HGetAll(m.ctx, pollsKey+roomId)
 	result, err := p.Result()
@@ -137,7 +113,7 @@ func (m *newPollsModel) ListPolls(roomId string) (error, []*PollInfo) {
 	}
 
 	for _, pi := range result {
-		info := new(PollInfo)
+		info := new(plugnmeet.PollInfo)
 		err = json.Unmarshal([]byte(pi), info)
 		if err != nil {
 			continue
@@ -189,20 +165,12 @@ func (m *newPollsModel) UserSelectedOption(roomId, pollId, userId string) (error
 	return nil, 0
 }
 
-type UserSubmitResponseReq struct {
-	RoomId         string
-	PollId         string `json:"poll_id" validate:"required"`
-	UserId         string `json:"user_id" validate:"required"`
-	Name           string `json:"name" validate:"required"`
-	SelectedOption int    `json:"selected_option" validate:"required"`
-}
-
 type userResponseCommonFields struct {
 	TotalRes       int    `redis:"total_resp"`
 	AllRespondents string `redis:"all_respondents"`
 }
 
-func (m *newPollsModel) UserSubmitResponse(r *UserSubmitResponseReq, isAdmin bool) error {
+func (m *newPollsModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq, isAdmin bool) error {
 	key := fmt.Sprintf("%s%s:respondents:%s", pollsKey, r.RoomId, r.PollId)
 
 	err := m.rc.Watch(m.ctx, func(tx *redis.Tx) error {
@@ -282,13 +250,7 @@ func (m *newPollsModel) broadcastNotification(roomId, userId, pollId string, mTy
 	return nil
 }
 
-type ClosePollReq struct {
-	RoomId string
-	UserId string
-	PollId string `json:"poll_id" validate:"required"`
-}
-
-func (m *newPollsModel) ClosePoll(r *ClosePollReq, isAdmin bool) error {
+func (m *newPollsModel) ClosePoll(r *plugnmeet.ClosePollReq, isAdmin bool) error {
 	key := pollsKey + r.RoomId
 
 	err := m.rc.Watch(m.ctx, func(tx *redis.Tx) error {
@@ -302,7 +264,7 @@ func (m *newPollsModel) ClosePoll(r *ClosePollReq, isAdmin bool) error {
 			return errors.New("not found")
 		}
 
-		info := new(PollInfo)
+		info := new(plugnmeet.PollInfo)
 		err = json.Unmarshal([]byte(result), info)
 		if err != nil {
 			return err
@@ -374,20 +336,8 @@ func (m *newPollsModel) GetPollResponsesDetails(roomId, pollId string) (error, m
 	return err, result
 }
 
-type ResponsesResultRes struct {
-	Question       string                   `json:"question"`
-	TotalResponses int                      `json:"total_responses"`
-	Options        []ResponsesResultOptions `json:"options"`
-}
-
-type ResponsesResultOptions struct {
-	Id        int    `json:"id"`
-	Text      string `json:"text"`
-	VoteCount int    `json:"vote_count"`
-}
-
-func (m *newPollsModel) GetResponsesResult(roomId, pollId string) (*ResponsesResultRes, error) {
-	res := new(ResponsesResultRes)
+func (m *newPollsModel) GetResponsesResult(roomId, pollId string) (*plugnmeet.PollResponsesResult, error) {
+	res := new(plugnmeet.PollResponsesResult)
 
 	p := m.rc.HGet(m.ctx, pollsKey+roomId, pollId)
 	pi, err := p.Result()
@@ -395,7 +345,7 @@ func (m *newPollsModel) GetResponsesResult(roomId, pollId string) (*ResponsesRes
 		return nil, err
 	}
 
-	info := new(PollInfo)
+	info := new(plugnmeet.PollInfo)
 	err = json.Unmarshal([]byte(pi), info)
 	if err != nil {
 		return nil, err
@@ -412,32 +362,31 @@ func (m *newPollsModel) GetResponsesResult(roomId, pollId string) (*ResponsesRes
 		return nil, err
 	}
 
-	var options []ResponsesResultOptions
+	var options []*plugnmeet.PollResponsesResultOptions
 	for _, opt := range info.Options {
 		f := fmt.Sprintf("%d_count", opt.Id)
 		i, _ := strconv.Atoi(result[f])
-		rr := ResponsesResultOptions{
-			Id:        opt.Id,
+		rr := &plugnmeet.PollResponsesResultOptions{
+			Id:        uint64(opt.Id),
 			Text:      opt.Text,
-			VoteCount: i,
+			VoteCount: uint64(i),
 		}
 		options = append(options, rr)
 	}
 
 	res.Options = options
 	i, _ := strconv.Atoi(result["total_resp"])
-	res.TotalResponses = i
+	res.TotalResponses = uint64(i)
 
 	return res, nil
 }
 
-type PollsStatsRes struct {
-	TotalPolls   int `json:"total_polls"`
-	TotalRunning int `json:"total_running"`
-}
-
-func (m *newPollsModel) GetPollsStats(roomId string) (*PollsStatsRes, error) {
-	res := new(PollsStatsRes)
+func (m *newPollsModel) GetPollsStats(roomId string) (*plugnmeet.PollResponse, error) {
+	var init uint64 = 0
+	res := &plugnmeet.PollResponse{
+		TotalPolls:   &init,
+		TotalRunning: &init,
+	}
 
 	p := m.rc.HGetAll(m.ctx, pollsKey+roomId)
 	result, err := p.Result()
@@ -447,19 +396,21 @@ func (m *newPollsModel) GetPollsStats(roomId string) (*PollsStatsRes, error) {
 
 	if len(result) == 0 {
 		// no polls
-		return res, nil
+		return nil, nil
 	}
-	res.TotalPolls = len(result)
+
+	tp := uint64(len(result))
+	res.TotalPolls = &tp
 
 	for _, pi := range result {
-		info := new(PollInfo)
+		info := new(plugnmeet.PollInfo)
 		err = json.Unmarshal([]byte(pi), info)
 		if err != nil {
 			continue
 		}
 
 		if info.IsRunning {
-			res.TotalRunning += 1
+			*res.TotalRunning += 1
 		}
 	}
 

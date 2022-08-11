@@ -2,8 +2,11 @@ package controllers
 
 import (
 	"github.com/gofiber/fiber/v2"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"google.golang.org/protobuf/proto"
+	"strconv"
 )
 
 func HandleCreatePoll(c *fiber.Ctx) error {
@@ -19,7 +22,7 @@ func HandleCreatePoll(c *fiber.Ctx) error {
 	}
 
 	m := models.NewPollsModel()
-	req := new(models.CreatePollReq)
+	req := new(plugnmeet.CreatePollReq)
 
 	err := c.BodyParser(req)
 	if err != nil {
@@ -56,50 +59,52 @@ func HandleCreatePoll(c *fiber.Ctx) error {
 
 func HandleListPolls(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
+	res := new(plugnmeet.PollResponse)
+	res.Status = false
 
 	m := models.NewPollsModel()
 	err, polls := m.ListPolls(roomId.(string))
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		res.Msg = err.Error()
+		return SendPollResponse(c, res)
 	}
 
-	return c.JSON(fiber.Map{
-		"status": true,
-		"msg":    "success",
-		"polls":  polls,
-	})
+	res.Status = true
+	res.Msg = "success"
+	res.Polls = polls
+	return SendPollResponse(c, res)
 }
 
 func HandleCountPollTotalResponses(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	pollId := c.Params("pollId")
+	res := new(plugnmeet.PollResponse)
+	res.Status = false
 
 	if pollId == "" {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "pollId required",
-		})
+		res.Msg = "pollId required"
+		return SendPollResponse(c, res)
 	}
 
 	m := models.NewPollsModel()
 	err, responses := m.GetPollResponsesByField(roomId.(string), pollId, "total_resp")
 
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		res.Msg = err.Error()
+		return SendPollResponse(c, res)
 	}
 
-	return c.JSON(fiber.Map{
-		"status":          true,
-		"msg":             "success",
-		"poll_id":         pollId,
-		"total_responses": responses,
-	})
+	rps, err := strconv.ParseUint(responses, 10, 64)
+	if err != nil {
+		res.Msg = err.Error()
+		return SendPollResponse(c, res)
+	}
+
+	res.Status = true
+	res.Msg = "success"
+	res.PollId = &pollId
+	res.TotalResponses = &rps
+	return SendPollResponse(c, res)
 }
 
 func HandleUserSelectedOption(c *fiber.Ctx) error {
@@ -137,7 +142,7 @@ func HandleUserSubmitResponse(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	isAdmin := c.Locals("isAdmin")
 	m := models.NewPollsModel()
-	req := new(models.UserSubmitResponseReq)
+	req := new(plugnmeet.SubmitPollResponseReq)
 
 	err := c.BodyParser(req)
 	if err != nil {
@@ -184,7 +189,7 @@ func HandleClosePoll(c *fiber.Ctx) error {
 	}
 
 	m := models.NewPollsModel()
-	req := new(models.ClosePollReq)
+	req := new(plugnmeet.ClosePollReq)
 
 	err := c.BodyParser(req)
 	if err != nil {
@@ -294,4 +299,14 @@ func HandleGetPollsStats(c *fiber.Ctx) error {
 		"msg":    "success",
 		"stats":  stats,
 	})
+}
+
+func SendPollResponse(c *fiber.Ctx, res *plugnmeet.PollResponse) error {
+	marshal, err := proto.Marshal(res)
+	if err != nil {
+		return err
+	}
+	c.Set("Content-Type", "application/protobuf")
+	return c.Send(marshal)
+	//return c.JSON(res)
 }
