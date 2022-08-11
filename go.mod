@@ -17,7 +17,7 @@ require (
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.0.0
 	github.com/livekit/server-sdk-go v0.10.4
-	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20220809173519-b2e345be8225
+	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20220811063639-e1a5583bb316
 	github.com/sirupsen/logrus v1.9.0
 	github.com/urfave/cli/v2 v2.11.1
 	google.golang.org/protobuf v1.28.1
@@ -81,9 +81,9 @@ require (
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa // indirect
-	golang.org/x/net v0.0.0-20220805013720-a33c5aa5df48 // indirect
-	golang.org/x/sys v0.0.0-20220804214406-8e32c043e418 // indirect
+	golang.org/x/net v0.0.0-20220809184613-07c6da5e1ced // indirect
+	golang.org/x/sys v0.0.0-20220808155132-1c4a2a72c664 // indirect
 	golang.org/x/text v0.3.7 // indirect
-	google.golang.org/genproto v0.0.0-20220805133916-01dd62135a58 // indirect
+	google.golang.org/genproto v0.0.0-20220810155839-1856144b1d9c // indirect
 	google.golang.org/grpc v1.48.0 // indirect
 )

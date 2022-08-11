@@ -3,8 +3,8 @@ package controllers
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"google.golang.org/protobuf/proto"
 )
 
 func HandleCreateBreakoutRooms(c *fiber.Ctx) error {
@@ -20,7 +20,7 @@ func HandleCreateBreakoutRooms(c *fiber.Ctx) error {
 	}
 
 	req := new(plugnmeet.CreateBreakoutRoomsReq)
-	err := c.BodyParser(req)
+	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
@@ -57,21 +57,13 @@ func HandleCreateBreakoutRooms(c *fiber.Ctx) error {
 func HandleJoinBreakoutRoom(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	isAdmin := c.Locals("isAdmin")
-	req := new(models.JoinBreakoutRoomReq)
+	req := new(plugnmeet.JoinBreakoutRoomReq)
 
-	err := c.BodyParser(req)
+	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
 			"msg":    err.Error(),
-		})
-	}
-
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    check,
 		})
 	}
 
@@ -133,21 +125,13 @@ func HandleGetMyBreakoutRooms(c *fiber.Ctx) error {
 
 func HandleIncreaseBreakoutRoomDuration(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
-	req := new(models.IncreaseBreakoutRoomDurationReq)
+	req := new(plugnmeet.IncreaseBreakoutRoomDurationReq)
 
-	err := c.BodyParser(req)
+	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
 			"msg":    err.Error(),
-		})
-	}
-
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    check,
 		})
 	}
 
@@ -169,21 +153,13 @@ func HandleIncreaseBreakoutRoomDuration(c *fiber.Ctx) error {
 
 func HandleSendBreakoutRoomMsg(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
-	req := new(models.SendBreakoutRoomMsgReq)
+	req := new(plugnmeet.BroadcastBreakoutRoomMsgReq)
 
-	err := c.BodyParser(req)
+	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
 			"msg":    err.Error(),
-		})
-	}
-
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    check,
 		})
 	}
 
@@ -205,21 +181,13 @@ func HandleSendBreakoutRoomMsg(c *fiber.Ctx) error {
 
 func HandleEndBreakoutRoom(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
-	req := new(models.EndBreakoutRoomReq)
+	req := new(plugnmeet.EndBreakoutRoomReq)
 
-	err := c.BodyParser(req)
+	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
 			"msg":    err.Error(),
-		})
-	}
-
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    check,
 		})
 	}
 
@@ -241,6 +209,15 @@ func HandleEndBreakoutRoom(c *fiber.Ctx) error {
 
 func HandleEndBreakoutRooms(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
+	isAdmin := c.Locals("isAdmin")
+
+	if isAdmin != true {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    "only admin can perform this task",
+		})
+	}
+
 	m := models.NewBreakoutRoomModel()
 	err := m.EndBreakoutRooms(roomId.(string))
 

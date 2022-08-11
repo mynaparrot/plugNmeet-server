@@ -147,14 +147,7 @@ func (m *breakoutRoom) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRoomsReq) 
 	return err
 }
 
-type JoinBreakoutRoomReq struct {
-	RoomId         string
-	BreakoutRoomId string `json:"breakout_room_id" validate:"required"`
-	UserId         string `json:"user_id" validate:"required"`
-	IsAdmin        bool   `json:"-"`
-}
-
-func (m *breakoutRoom) JoinBreakoutRoom(r *JoinBreakoutRoomReq) (string, error) {
+func (m *breakoutRoom) JoinBreakoutRoom(r *plugnmeet.JoinBreakoutRoomReq) (string, error) {
 	room, err := m.fetchBreakoutRoom(r.RoomId, r.BreakoutRoomId)
 	if err != nil {
 		return "", err
@@ -221,13 +214,7 @@ func (m *breakoutRoom) GetMyBreakoutRooms(roomId, userId string) (*plugnmeet.Bre
 	return nil, errors.New("not found")
 }
 
-type IncreaseBreakoutRoomDurationReq struct {
-	RoomId         string
-	BreakoutRoomId string `json:"breakout_room_id" validate:"required"`
-	Duration       uint64 `json:"duration" validate:"required"`
-}
-
-func (m *breakoutRoom) IncreaseBreakoutRoomDuration(r *IncreaseBreakoutRoomDurationReq) error {
+func (m *breakoutRoom) IncreaseBreakoutRoomDuration(r *plugnmeet.IncreaseBreakoutRoomDurationReq) error {
 	room, err := m.fetchBreakoutRoom(r.RoomId, r.BreakoutRoomId)
 	if err != nil {
 		return err
@@ -265,7 +252,7 @@ type SendBreakoutRoomMsgReq struct {
 	Msg    string `json:"msg" validate:"required"`
 }
 
-func (m *breakoutRoom) SendBreakoutRoomMsg(r *SendBreakoutRoomMsgReq) error {
+func (m *breakoutRoom) SendBreakoutRoomMsg(r *plugnmeet.BroadcastBreakoutRoomMsgReq) error {
 	rooms, err := m.fetchBreakoutRooms(r.RoomId)
 	if err != nil {
 		return err
@@ -281,12 +268,7 @@ func (m *breakoutRoom) SendBreakoutRoomMsg(r *SendBreakoutRoomMsgReq) error {
 	return nil
 }
 
-type EndBreakoutRoomReq struct {
-	RoomId         string
-	BreakoutRoomId string `json:"breakout_room_id" validate:"required"`
-}
-
-func (m *breakoutRoom) EndBreakoutRoom(r *EndBreakoutRoomReq) error {
+func (m *breakoutRoom) EndBreakoutRoom(r *plugnmeet.EndBreakoutRoomReq) error {
 	_, err := m.fetchBreakoutRoom(r.RoomId, r.BreakoutRoomId)
 	if err != nil {
 		return err
@@ -317,7 +299,7 @@ func (m *breakoutRoom) EndBreakoutRooms(roomId string) error {
 	}
 
 	for _, r := range rooms {
-		_ = m.EndBreakoutRoom(&EndBreakoutRoomReq{
+		_ = m.EndBreakoutRoom(&plugnmeet.EndBreakoutRoomReq{
 			BreakoutRoomId: r.Id,
 			RoomId:         roomId,
 		})
