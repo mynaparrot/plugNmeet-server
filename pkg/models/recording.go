@@ -396,17 +396,12 @@ func (rm *recordingModel) SendMsgToRecorder(task plugnmeet.RecordingTasks, roomI
 		if err != nil {
 			return err
 		}
-	case plugnmeet.RecordingTasks_STOP_RECORDING:
-		toSend.Task = plugnmeet.RecordingTasks_STOP_RECORDING
-
 	case plugnmeet.RecordingTasks_START_RTMP:
 		toSend.RtmpUrl = rtmpUrl
 		err := rm.addTokenAndRecorder(toSend, "RTMP_BOT")
 		if err != nil {
 			return err
 		}
-	case plugnmeet.RecordingTasks_STOP_RTMP:
-		toSend.Task = plugnmeet.RecordingTasks_STOP_RTMP
 	}
 
 	payload, _ := protojson.Marshal(toSend)

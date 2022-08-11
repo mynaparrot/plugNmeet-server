@@ -3,9 +3,11 @@ package models
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	log "github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -292,7 +294,7 @@ func (rm *roomModel) GetRoomInfo(roomId string, sid string, isRunning int) (*Roo
 	return &room, msg
 }
 
-func (rm *roomModel) GetActiveRoomsInfo() ([]plugnmeet.ActiveRoomInfo, error) {
+func (rm *roomModel) GetActiveRoomsInfo() ([]*plugnmeet.ActiveRoomInfo, error) {
 	db := rm.db
 	ctx, cancel := context.WithTimeout(rm.ctx, 3*time.Second)
 	defer cancel()
@@ -303,15 +305,19 @@ func (rm *roomModel) GetActiveRoomsInfo() ([]plugnmeet.ActiveRoomInfo, error) {
 	}
 	defer rows.Close()
 
-	var room plugnmeet.ActiveRoomInfo
-	var rooms []plugnmeet.ActiveRoomInfo
+	var rooms []*plugnmeet.ActiveRoomInfo
 
 	for rows.Next() {
+		var room *plugnmeet.ActiveRoomInfo
 		err = rows.Scan(&room.RoomTitle, &room.RoomId, &room.Sid, &room.JoinedParticipants, &room.IsRunning, &room.IsRecording, &room.IsActiveRtmp, &room.WebhookUrl, &room.IsBreakoutRoom, &room.ParentRoomId, &room.CreationTime)
 		if err != nil {
-			fmt.Println(err)
+			log.Errorln(err)
 		}
 		rooms = append(rooms, room)
+	}
+
+	if len(rooms) == 0 {
+		return nil, errors.New("no active room found")
 	}
 
 	return rooms, nil

@@ -154,7 +154,7 @@ func (am *roomAuthModel) GetActiveRoomsInfo() (bool, string, []*plugnmeet.Active
 	for _, r := range roomsInfo {
 		roomInfo := r
 		i := new(plugnmeet.ActiveRoomInfoRes)
-		i.RoomInfo = &roomInfo
+		i.RoomInfo = roomInfo
 
 		participants, err := am.rs.LoadParticipantsFromRedis(r.RoomId)
 		if err == nil {
