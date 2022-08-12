@@ -193,13 +193,7 @@ func (am *roomAuthModel) EndRoom(r *plugnmeet.RoomEndReq) (bool, string) {
 	return true, "success"
 }
 
-type ChangeVisibilityRes struct {
-	RoomId            string `json:"room_id"`
-	VisibleNotepad    *bool  `json:"visible_notepad,omitempty"`
-	VisibleWhiteBoard *bool  `json:"visible_white_board,omitempty"`
-}
-
-func (am *roomAuthModel) ChangeVisibility(r *ChangeVisibilityRes) (bool, string) {
+func (am *roomAuthModel) ChangeVisibility(r *plugnmeet.ChangeVisibilityRes) (bool, string) {
 	_, roomMeta, err := am.rs.LoadRoomWithMetadata(r.RoomId)
 	if err != nil {
 		return false, err.Error()

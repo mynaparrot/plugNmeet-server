@@ -4,7 +4,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -164,41 +163,20 @@ func HandleChangeVisibilityForAPI(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 
 	if !isAdmin.(bool) {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "only admin can perform this task",
-		})
+		return utils.SendCommonResponse(c, false, "only admin can perform this task")
 	}
 
-	req := new(models.ChangeVisibilityRes)
-	err := c.BodyParser(req)
+	req := new(plugnmeet.ChangeVisibilityRes)
+	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
-	}
-
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    check,
-		})
+		return utils.SendCommonResponse(c, false, err.Error())
 	}
 
 	if roomId != req.RoomId {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "requested roomId & token roomId mismatched",
-		})
+		return utils.SendCommonResponse(c, false, "requested roomId & token roomId mismatched")
 	}
 
 	m := models.NewRoomAuthModel()
 	status, msg := m.ChangeVisibility(req)
-
-	return c.JSON(fiber.Map{
-		"status": status,
-		"msg":    msg,
-	})
+	return utils.SendCommonResponse(c, status, msg)
 }
