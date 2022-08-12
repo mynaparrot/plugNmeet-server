@@ -1,10 +1,11 @@
 package controllers
 
 import (
-	"fmt"
 	"github.com/gofiber/fiber/v2"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"google.golang.org/protobuf/proto"
 )
 
 func HandleDataMessage(c *fiber.Ctx) error {
@@ -13,62 +14,34 @@ func HandleDataMessage(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 
 	if roomId == "" {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "no roomId in token",
-		})
+		return utils.SendCommonResponse(c, false, "no roomId in token")
 	}
 
-	req := new(models.DataMessageReq)
-	err := c.BodyParser(req)
+	req := new(plugnmeet.DataMessageReq)
+	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
-	}
-
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    check,
-		})
+		return utils.SendCommonResponse(c, false, err.Error())
 	}
 
 	// now need to check if meeting is running or not
 	rm := models.NewRoomModel()
-	room, _ := rm.GetRoomInfo(req.RoomId, req.Sid, 1)
+	room, _ := rm.GetRoomInfo(req.RoomId, req.RoomSid, 1)
 
 	if room.Id == 0 {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "room isn't running",
-		})
+		return utils.SendCommonResponse(c, false, "room isn't running")
 	}
 
 	if room.RoomId != roomId {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "roomId in token mismatched",
-		})
+		return utils.SendCommonResponse(c, false, "roomId in token mismatched")
 	}
 
-	req.RequestedUserId = fmt.Sprintf("%s", requestedUserId)
-	if isAdmin != "" {
-		req.IsAdmin = isAdmin.(bool)
-	}
-
-	err = models.NewDataMessage(req)
+	req.RequestedUserId = requestedUserId.(string)
+	req.IsAdmin = isAdmin.(bool)
+	m := models.NewDataMessageModel()
+	err = m.SendDataMessage(req)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": true,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonResponse(c, false, err.Error())
 	}
 
-	return c.JSON(fiber.Map{
-		"status": true,
-		"msg":    "success",
-	})
+	return utils.SendCommonResponse(c, true, "success")
 }

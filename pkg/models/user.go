@@ -243,11 +243,12 @@ func (u *userModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 	}
 
 	// send message to user first
-	_ = NewDataMessage(&DataMessageReq{
-		MsgType: "ALERT",
-		Msg:     r.Msg,
-		RoomId:  r.RoomId,
-		SendTo:  []string{p.Sid},
+	dm := NewDataMessageModel()
+	_ = dm.SendDataMessage(&plugnmeet.DataMessageReq{
+		MsgBodyType: plugnmeet.DataMsgBodyType_ALERT,
+		Msg:         r.Msg,
+		RoomId:      r.RoomId,
+		SendTo:      []string{p.Sid},
 	})
 
 	// now remove

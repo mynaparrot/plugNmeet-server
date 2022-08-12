@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/auth"
-	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
 	"net/http"
@@ -14,35 +13,35 @@ import (
 )
 
 // here just modified *livekit.WebhookEvent for our case
-type CommonNotifyEvent struct {
-	Event         string                   `json:"event,omitempty"`
-	Room          NotifyEventRoom          `json:"room,omitempty"`
-	Participant   *livekit.ParticipantInfo `json:"participant,omitempty"`
-	RecordingInfo RecordingInfoEvent       `json:"recordingInfo,omitempty"`
-	EgressInfo    *livekit.EgressInfo      `json:"egress_info,omitempty"`
-	Track         *livekit.TrackInfo       `json:"track,omitempty"`
-	Id            string                   `json:"id,omitempty"`
-	CreatedAt     int64                    `json:"created_at,omitempty"`
-}
-
-type NotifyEventRoom struct {
-	Sid             string           `json:"sid,omitempty"`
-	RoomId          string           `json:"room_id,omitempty"`
-	EmptyTimeout    uint32           `json:"empty_timeout,omitempty"`
-	MaxParticipants uint32           `json:"max_participants,omitempty"`
-	CreationTime    int64            `json:"creation_time,omitempty"`
-	EnabledCodecs   []*livekit.Codec `json:"enabled_codecs,omitempty"`
-	Metadata        string           `json:"metadata,omitempty"`
-	NumParticipants uint32           `json:"num_participants,omitempty"`
-}
-
-type RecordingInfoEvent struct {
-	RecordId    string  `json:"record_id"`
-	RecorderId  string  `json:"recorder_id"`
-	RecorderMsg string  `json:"recorder_msg"`
-	FilePath    string  `json:"file_path,omitempty"`
-	FileSize    float64 `json:"file_size,omitempty"`
-}
+//type CommonNotifyEvent struct {
+//	Event         string                   `json:"event,omitempty"`
+//	Room          NotifyEventRoom          `json:"room,omitempty"`
+//	Participant   *livekit.ParticipantInfo `json:"participant,omitempty"`
+//	RecordingInfo RecordingInfoEvent       `json:"recordingInfo,omitempty"`
+//	EgressInfo    *livekit.EgressInfo      `json:"egress_info,omitempty"`
+//	Track         *livekit.TrackInfo       `json:"track,omitempty"`
+//	Id            string                   `json:"id,omitempty"`
+//	CreatedAt     int64                    `json:"created_at,omitempty"`
+//}
+//
+//type NotifyEventRoom struct {
+//	Sid             string           `json:"sid,omitempty"`
+//	RoomId          string           `json:"room_id,omitempty"`
+//	EmptyTimeout    uint32           `json:"empty_timeout,omitempty"`
+//	MaxParticipants uint32           `json:"max_participants,omitempty"`
+//	CreationTime    int64            `json:"creation_time,omitempty"`
+//	EnabledCodecs   []*livekit.Codec `json:"enabled_codecs,omitempty"`
+//	Metadata        string           `json:"metadata,omitempty"`
+//	NumParticipants uint32           `json:"num_participants,omitempty"`
+//}
+//
+//type RecordingInfoEvent struct {
+//	RecordId    string  `json:"record_id"`
+//	RecorderId  string  `json:"recorder_id"`
+//	RecorderMsg string  `json:"recorder_msg"`
+//	FilePath    string  `json:"file_path,omitempty"`
+//	FileSize    float64 `json:"file_size,omitempty"`
+//}
 
 type notifier struct {
 	apiKey      string
