@@ -265,14 +265,7 @@ func (u *userModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 	return nil
 }
 
-type SwitchPresenterReq struct {
-	Task            string `json:"task" validate:"required"`
-	UserId          string `json:"user_id" validate:"required"`
-	RoomId          string
-	RequestedUserId string
-}
-
-func (u *userModel) SwitchPresenter(r *SwitchPresenterReq) error {
+func (u *userModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
 	participants, err := u.roomService.LoadParticipantsFromRedis(r.RoomId)
 	if err != nil {
 		return err
@@ -285,7 +278,7 @@ func (u *userModel) SwitchPresenter(r *SwitchPresenterReq) error {
 		m := new(plugnmeet.UserMetadata)
 		_ = json.Unmarshal(meta, m)
 
-		if r.Task == "promote" {
+		if r.Task == plugnmeet.SwitchPresenterTask_PROMOTE {
 			if m.IsPresenter {
 				// demote current presenter from presenter
 				m.IsPresenter = false
@@ -294,7 +287,7 @@ func (u *userModel) SwitchPresenter(r *SwitchPresenterReq) error {
 					return errors.New("can't demote current presenter")
 				}
 			}
-		} else if r.Task == "demote" {
+		} else if r.Task == plugnmeet.SwitchPresenterTask_DEMOTE {
 			if p.Identity == r.RequestedUserId {
 				// we'll update requested user as presenter
 				// otherwise in the session there won't have any presenter
@@ -318,13 +311,13 @@ func (u *userModel) SwitchPresenter(r *SwitchPresenterReq) error {
 	m := new(plugnmeet.UserMetadata)
 	_ = json.Unmarshal(meta, m)
 
-	if r.Task == "promote" {
+	if r.Task == plugnmeet.SwitchPresenterTask_PROMOTE {
 		m.IsPresenter = true
 		err = u.updateUserMetadata(m, r.RoomId, p.Identity)
 		if err != nil {
 			return errors.New("can't promote to presenter")
 		}
-	} else if r.Task == "demote" {
+	} else if r.Task == plugnmeet.SwitchPresenterTask_DEMOTE {
 		m.IsPresenter = false
 		err = u.updateUserMetadata(m, r.RoomId, p.Identity)
 		if err != nil {

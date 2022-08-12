@@ -173,43 +173,22 @@ func HandleSwitchPresenter(c *fiber.Ctx) error {
 	requestedUserId := c.Locals("requestedUserId")
 
 	if !isAdmin.(bool) {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "only admin can perform this task",
-		})
+		return utils.SendCommonResponse(c, false, "only admin can perform this task")
 	}
 
-	req := new(models.SwitchPresenterReq)
-	err := c.BodyParser(req)
+	req := new(plugnmeet.SwitchPresenterReq)
+	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
-	}
-
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    check,
-		})
+		return utils.SendCommonResponse(c, false, err.Error())
 	}
 
 	m := models.NewUserModel()
 	req.RoomId = roomId.(string)
 	req.RequestedUserId = requestedUserId.(string)
 	err = m.SwitchPresenter(req)
-
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonResponse(c, false, err.Error())
 	}
 
-	return c.JSON(fiber.Map{
-		"status": true,
-		"msg":    "success",
-	})
+	return utils.SendCommonResponse(c, true, "success")
 }
