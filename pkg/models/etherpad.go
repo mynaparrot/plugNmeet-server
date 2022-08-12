@@ -63,7 +63,7 @@ type CreateSessionRes struct {
 
 // CreateSession will create group, pad, session
 // return padId, readonlyPadId
-func (m *EtherpadModel) CreateSession(roomId string) (*CreateSessionRes, error) {
+func (m *EtherpadModel) CreateSession(roomId string) (*plugnmeet.CreateEtherpadSessionRes, error) {
 	if len(m.SharedNotePad.EtherpadHosts) < 1 {
 		return nil, errors.New("need at least one etherpad host")
 	}
@@ -72,11 +72,12 @@ func (m *EtherpadModel) CreateSession(roomId string) (*CreateSessionRes, error) 
 		return nil, err
 	}
 
-	res := new(CreateSessionRes)
-	res.PadId = uuid.NewString()
+	res := new(plugnmeet.CreateEtherpadSessionRes)
+	pid := uuid.NewString()
+	res.PadId = &pid
 
 	// step 1: create pad using session id
-	r, err := m.createPad(res.PadId)
+	r, err := m.createPad(pid)
 	if err != nil {
 		return nil, err
 	}
@@ -85,14 +86,14 @@ func (m *EtherpadModel) CreateSession(roomId string) (*CreateSessionRes, error) 
 	}
 
 	// step 2: create readonly pad
-	r, err = m.createReadonlyPad(res.PadId)
+	r, err = m.createReadonlyPad(pid)
 	if err != nil {
 		return nil, err
 	}
 	if r.Code > 0 {
 		return nil, errors.New(r.Message)
 	}
-	res.ReadOnlyPadId = r.Data.ReadOnlyID
+	res.ReadonlyPadId = &r.Data.ReadOnlyID
 
 	// add roomId to redis for this node
 	m.rc.SAdd(m.context, EtherpadKey+m.NodeId, roomId)
@@ -103,10 +104,12 @@ func (m *EtherpadModel) CreateSession(roomId string) (*CreateSessionRes, error) 
 		log.Errorln(err)
 	}
 
+	res.Status = true
+	res.Msg = "success"
 	return res, nil
 }
 
-func (m *EtherpadModel) addPadToRoomMetadata(roomId string, c *CreateSessionRes) error {
+func (m *EtherpadModel) addPadToRoomMetadata(roomId string, c *plugnmeet.CreateEtherpadSessionRes) error {
 	_, meta, err := m.rs.LoadRoomWithMetadata(roomId)
 	if err != nil {
 		return err
@@ -117,8 +120,8 @@ func (m *EtherpadModel) addPadToRoomMetadata(roomId string, c *CreateSessionRes)
 		IsActive:             true,
 		NodeId:               m.NodeId,
 		Host:                 m.Host,
-		NotePadId:            c.PadId,
-		ReadOnlyPadId:        c.ReadOnlyPadId,
+		NotePadId:            *c.PadId,
+		ReadOnlyPadId:        *c.ReadonlyPadId,
 	}
 	meta.RoomFeatures.SharedNotePadFeatures = f
 
@@ -128,12 +131,6 @@ func (m *EtherpadModel) addPadToRoomMetadata(roomId string, c *CreateSessionRes)
 	}
 
 	return err
-}
-
-type CleanPadReq struct {
-	RoomId string `json:"room_id" validate:"required"`
-	NodeId string `json:"node_id" validate:"required"`
-	PadId  string `json:"pad_id" validate:"required"`
 }
 
 // CleanPad will delete group, session & pad
@@ -180,23 +177,16 @@ func (m *EtherpadModel) CleanAfterRoomEnd(roomId, metadata string) error {
 	}
 
 	err := m.CleanPad(roomId, np.NodeId, np.NotePadId)
-
 	return err
 }
 
-type ChangeEtherpadStatusReq struct {
-	RoomId   string `json:"room_id" validate:"required"`
-	IsActive bool   `json:"is_active"`
-}
-
-func (m *EtherpadModel) ChangeEtherpadStatus(r *ChangeEtherpadStatusReq) error {
+func (m *EtherpadModel) ChangeEtherpadStatus(r *plugnmeet.ChangeEtherpadStatusReq) error {
 	_, meta, err := m.rs.LoadRoomWithMetadata(r.RoomId)
 	if err != nil {
 		return err
 	}
 
 	meta.RoomFeatures.SharedNotePadFeatures.IsActive = r.IsActive
-
 	_, err = m.rs.UpdateRoomMetadataByStruct(r.RoomId, meta)
 	if err != nil {
 		log.Errorln(err)

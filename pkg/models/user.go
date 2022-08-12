@@ -35,16 +35,7 @@ func (u *userModel) CommonValidation(c *fiber.Ctx) error {
 	return nil
 }
 
-type UpdateUserLockSettingsReq struct {
-	Sid             string `json:"sid" validate:"required"`
-	RoomId          string `json:"room_id" validate:"required"`
-	UserId          string `json:"user_id" validate:"required"`
-	Service         string `json:"service" validate:"required"`
-	Direction       string `json:"direction" validate:"required"`
-	RequestedUserId string `json:"-"`
-}
-
-func (u *userModel) UpdateUserLockSettings(r *UpdateUserLockSettingsReq) error {
+func (u *userModel) UpdateUserLockSettings(r *plugnmeet.UpdateUserLockSettingsReq) error {
 	if r.UserId == "all" {
 		err := u.updateLockSettingsAllUsers(r)
 		return err
@@ -66,7 +57,7 @@ func (u *userModel) UpdateUserLockSettings(r *UpdateUserLockSettingsReq) error {
 	return err
 }
 
-func (u *userModel) updateLockSettingsAllUsers(r *UpdateUserLockSettingsReq) error {
+func (u *userModel) updateLockSettingsAllUsers(r *plugnmeet.UpdateUserLockSettingsReq) error {
 	participants, err := u.roomService.LoadParticipantsFromRedis(r.RoomId)
 	if err != nil {
 		return err
@@ -174,7 +165,7 @@ type MuteUnMuteTrackReq struct {
 // if track_sid wasn't send then it will find the microphone track & mute it
 // for unmute you'll require enabling "enable_remote_unmute: true" in livekit
 // under room settings. For privacy reason we aren't using it.
-func (u *userModel) MuteUnMuteTrack(r *MuteUnMuteTrackReq) error {
+func (u *userModel) MuteUnMuteTrack(r *plugnmeet.MuteUnMuteTrackReq) error {
 	if r.UserId == "all" {
 		err := u.muteUnmuteAllMic(r)
 		return err
@@ -207,7 +198,7 @@ func (u *userModel) MuteUnMuteTrack(r *MuteUnMuteTrackReq) error {
 	return nil
 }
 
-func (u *userModel) muteUnmuteAllMic(r *MuteUnMuteTrackReq) error {
+func (u *userModel) muteUnmuteAllMic(r *plugnmeet.MuteUnMuteTrackReq) error {
 	participants, err := u.roomService.LoadParticipantsFromRedis(r.RoomId)
 	if err != nil {
 		return err
@@ -232,15 +223,7 @@ func (u *userModel) muteUnmuteAllMic(r *MuteUnMuteTrackReq) error {
 	return nil
 }
 
-type RemoveParticipantReq struct {
-	Sid       string `json:"sid" validate:"required"`
-	RoomId    string `json:"room_id" validate:"required"`
-	UserId    string `json:"user_id" validate:"required"`
-	Msg       string `json:"msg" validate:"required"`
-	BlockUser bool   `json:"block_user"`
-}
-
-func (u *userModel) RemoveParticipant(r *RemoveParticipantReq) error {
+func (u *userModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 	p, err := u.roomService.LoadParticipantInfoFromRedis(r.RoomId, r.UserId)
 	if err != nil {
 		return err
@@ -251,11 +234,12 @@ func (u *userModel) RemoveParticipant(r *RemoveParticipantReq) error {
 	}
 
 	// send message to user first
-	_ = NewDataMessage(&DataMessageReq{
-		MsgType: "ALERT",
-		Msg:     r.Msg,
-		RoomId:  r.RoomId,
-		SendTo:  []string{p.Sid},
+	dm := NewDataMessageModel()
+	_ = dm.SendDataMessage(&plugnmeet.DataMessageReq{
+		MsgBodyType: plugnmeet.DataMsgBodyType_ALERT,
+		Msg:         r.Msg,
+		RoomId:      r.RoomId,
+		SendTo:      []string{p.Sid},
 	})
 
 	// now remove
@@ -272,14 +256,7 @@ func (u *userModel) RemoveParticipant(r *RemoveParticipantReq) error {
 	return nil
 }
 
-type SwitchPresenterReq struct {
-	Task            string `json:"task" validate:"required"`
-	UserId          string `json:"user_id" validate:"required"`
-	RoomId          string
-	RequestedUserId string
-}
-
-func (u *userModel) SwitchPresenter(r *SwitchPresenterReq) error {
+func (u *userModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
 	participants, err := u.roomService.LoadParticipantsFromRedis(r.RoomId)
 	if err != nil {
 		return err
@@ -292,7 +269,7 @@ func (u *userModel) SwitchPresenter(r *SwitchPresenterReq) error {
 		m := new(plugnmeet.UserMetadata)
 		_ = json.Unmarshal(meta, m)
 
-		if r.Task == "promote" {
+		if r.Task == plugnmeet.SwitchPresenterTask_PROMOTE {
 			if m.IsPresenter {
 				// demote current presenter from presenter
 				m.IsPresenter = false
@@ -301,7 +278,7 @@ func (u *userModel) SwitchPresenter(r *SwitchPresenterReq) error {
 					return errors.New("can't demote current presenter")
 				}
 			}
-		} else if r.Task == "demote" {
+		} else if r.Task == plugnmeet.SwitchPresenterTask_DEMOTE {
 			if p.Identity == r.RequestedUserId {
 				// we'll update requested user as presenter
 				// otherwise in the session there won't have any presenter
@@ -325,13 +302,13 @@ func (u *userModel) SwitchPresenter(r *SwitchPresenterReq) error {
 	m := new(plugnmeet.UserMetadata)
 	_ = json.Unmarshal(meta, m)
 
-	if r.Task == "promote" {
+	if r.Task == plugnmeet.SwitchPresenterTask_PROMOTE {
 		m.IsPresenter = true
 		err = u.updateUserMetadata(m, r.RoomId, p.Identity)
 		if err != nil {
 			return errors.New("can't promote to presenter")
 		}
-	} else if r.Task == "demote" {
+	} else if r.Task == plugnmeet.SwitchPresenterTask_DEMOTE {
 		m.IsPresenter = false
 		err = u.updateUserMetadata(m, r.RoomId, p.Identity)
 		if err != nil {

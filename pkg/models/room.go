@@ -308,11 +308,14 @@ func (rm *roomModel) GetActiveRoomsInfo() ([]*plugnmeet.ActiveRoomInfo, error) {
 	var rooms []*plugnmeet.ActiveRoomInfo
 
 	for rows.Next() {
-		var room *plugnmeet.ActiveRoomInfo
-		err = rows.Scan(&room.RoomTitle, &room.RoomId, &room.Sid, &room.JoinedParticipants, &room.IsRunning, &room.IsRecording, &room.IsActiveRtmp, &room.WebhookUrl, &room.IsBreakoutRoom, &room.ParentRoomId, &room.CreationTime)
+		room := new(plugnmeet.ActiveRoomInfo)
+		err := rows.Scan(&room.RoomTitle, &room.RoomId, &room.Sid, &room.JoinedParticipants, &room.IsRunning, &room.IsRecording, &room.IsActiveRtmp, &room.WebhookUrl, &room.IsBreakoutRoom, &room.ParentRoomId, &room.CreationTime)
+
 		if err != nil {
 			log.Errorln(err)
+			continue
 		}
+
 		rooms = append(rooms, room)
 	}
 

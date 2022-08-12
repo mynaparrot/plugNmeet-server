@@ -11,9 +11,9 @@ import (
 	"strings"
 )
 
-// HandleChatFileUpload method can only be use if you are using resumable.js as your frontend.
+// HandleFileUpload method can only be use if you are using resumable.js as your frontend.
 // Library link: https://github.com/23/resumable.js
-func HandleChatFileUpload(c *fiber.Ctx) error {
+func HandleFileUpload(c *fiber.Ctx) error {
 	req := new(models.ManageFile)
 	err := c.QueryParser(req)
 	if err != nil {

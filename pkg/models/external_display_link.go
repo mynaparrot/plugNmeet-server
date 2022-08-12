@@ -1,10 +1,13 @@
 package models
 
-import "errors"
+import (
+	"errors"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+)
 
 type externalDisplayLink struct {
 	rs  *RoomService
-	req *ExternalDisplayLinkReq
+	req *plugnmeet.ExternalDisplayLinkReq
 }
 
 func NewExternalDisplayLinkModel() *externalDisplayLink {
@@ -13,19 +16,12 @@ func NewExternalDisplayLinkModel() *externalDisplayLink {
 	}
 }
 
-type ExternalDisplayLinkReq struct {
-	Task   string `json:"task" validate:"required"`
-	Url    string `json:"url,omitempty"`
-	RoomId string
-	UserId string
-}
-
-func (e *externalDisplayLink) PerformTask(req *ExternalDisplayLinkReq) error {
+func (e *externalDisplayLink) PerformTask(req *plugnmeet.ExternalDisplayLinkReq) error {
 	e.req = req
 	switch req.Task {
-	case "start":
+	case plugnmeet.ExternalDisplayLinkTask_START_EXTERNAL_LINK:
 		return e.start()
-	case "end":
+	case plugnmeet.ExternalDisplayLinkTask_STOP_EXTERNAL_LINK:
 		return e.end()
 	}
 
@@ -33,7 +29,7 @@ func (e *externalDisplayLink) PerformTask(req *ExternalDisplayLinkReq) error {
 }
 
 func (e *externalDisplayLink) start() error {
-	if e.req.Url == "" {
+	if e.req.Url != nil && *e.req.Url == "" {
 		return errors.New("valid url required")
 	}
 	active := new(bool)
@@ -41,7 +37,7 @@ func (e *externalDisplayLink) start() error {
 
 	opts := &updateRoomMetadataOpts{
 		isActive: active,
-		url:      &e.req.Url,
+		url:      e.req.Url,
 		sharedBy: &e.req.UserId,
 	}
 	return e.updateRoomMetadata(opts)

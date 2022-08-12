@@ -3,7 +3,6 @@ package models
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 	"github.com/goccy/go-json"
 	"github.com/google/uuid"
 	"github.com/livekit/protocol/livekit"
@@ -33,34 +32,36 @@ type ReqFrom struct {
 	Name   string `json:"name"`
 }
 
-func NewDataMessage(r *DataMessageReq) error {
-	r.db = config.AppCnf.DB
-	r.roomService = NewRoomService()
+type dataMessageModel struct {
+	db          *sql.DB
+	roomService *RoomService
+}
 
-	switch r.MsgType {
-	case "RAISE_HAND":
-		r.msgBodyType = plugnmeet.DataMsgBodyType_RAISE_HAND
-		return r.RaiseHand()
-	case "LOWER_HAND":
-		r.msgBodyType = plugnmeet.DataMsgBodyType_LOWER_HAND
-		return r.LowerHand()
-	case "OTHER_USER_LOWER_HAND":
-		r.msgBodyType = plugnmeet.DataMsgBodyType_OTHER_USER_LOWER_HAND
-		return r.OtherUserLowerHand()
-	case "INFO":
-		r.msgBodyType = plugnmeet.DataMsgBodyType_INFO
-		return r.SendNotification(r.SendTo)
-	case "ALERT":
-		r.msgBodyType = plugnmeet.DataMsgBodyType_ALERT
-		return r.SendNotification(r.SendTo)
-
-	default:
-		return errors.New(r.MsgType + " yet not ready")
+func NewDataMessageModel() *dataMessageModel {
+	return &dataMessageModel{
+		db:          config.AppCnf.DB,
+		roomService: NewRoomService(),
 	}
 }
 
-func (d *DataMessageReq) RaiseHand() error {
-	participants, _ := d.roomService.LoadParticipantsFromRedis(d.RoomId)
+func (m *dataMessageModel) SendDataMessage(r *plugnmeet.DataMessageReq) error {
+	switch r.MsgBodyType {
+	case plugnmeet.DataMsgBodyType_RAISE_HAND:
+		return m.raiseHand(r)
+	case plugnmeet.DataMsgBodyType_LOWER_HAND:
+		return m.lowerHand(r)
+	case plugnmeet.DataMsgBodyType_OTHER_USER_LOWER_HAND:
+		return m.otherUserLowerHand(r)
+	case plugnmeet.DataMsgBodyType_INFO,
+		plugnmeet.DataMsgBodyType_ALERT:
+		return m.sendNotification(r)
+	default:
+		return errors.New(r.MsgBodyType.String() + " yet not ready")
+	}
+}
+
+func (m *dataMessageModel) raiseHand(r *plugnmeet.DataMessageReq) error {
+	participants, _ := m.roomService.LoadParticipantsFromRedis(r.RoomId)
 
 	var sids []string
 	for _, participant := range participants {
@@ -69,12 +70,12 @@ func (d *DataMessageReq) RaiseHand() error {
 		if err != nil {
 			continue
 		}
-		if meta.IsAdmin && (d.RequestedUserId != participant.Identity) {
+		if meta.IsAdmin && (r.RequestedUserId != participant.Identity) {
 			sids = append(sids, participant.Sid)
 		}
 	}
 
-	reqPar, _ := d.roomService.LoadParticipantInfoFromRedis(d.RoomId, d.RequestedUserId)
+	reqPar, _ := m.roomService.LoadParticipantInfoFromRedis(r.RoomId, r.RequestedUserId)
 
 	// now update user's metadata
 	metadata := new(plugnmeet.UserMetadata)
@@ -83,7 +84,7 @@ func (d *DataMessageReq) RaiseHand() error {
 	metadata.RaisedHand = true
 	newMeta, err := json.Marshal(metadata)
 
-	_, err = d.roomService.UpdateParticipantMetadata(d.RoomId, d.RequestedUserId, string(newMeta))
+	_, err = m.roomService.UpdateParticipantMetadata(r.RoomId, r.RequestedUserId, string(newMeta))
 	if err != nil {
 		return err
 	}
@@ -101,10 +102,10 @@ func (d *DataMessageReq) RaiseHand() error {
 			Type: plugnmeet.DataMsgBodyType_RAISE_HAND,
 			Time: &tm,
 			From: &plugnmeet.DataMsgReqFrom{
-				Sid:    d.Sid,
+				Sid:    r.UserId,
 				UserId: reqPar.Identity,
 			},
-			Msg: d.Msg,
+			Msg: r.Msg,
 		},
 	}
 
@@ -115,7 +116,7 @@ func (d *DataMessageReq) RaiseHand() error {
 	}
 
 	// send as push message
-	_, err = d.roomService.SendData(d.RoomId, data, livekit.DataPacket_RELIABLE, sids)
+	_, err = m.roomService.SendData(r.RoomId, data, livekit.DataPacket_RELIABLE, sids)
 	if err != nil {
 		log.Errorln(err)
 		return err
@@ -124,8 +125,8 @@ func (d *DataMessageReq) RaiseHand() error {
 	return nil
 }
 
-func (d *DataMessageReq) LowerHand() error {
-	reqPar, err := d.roomService.LoadParticipantInfoFromRedis(d.RoomId, d.RequestedUserId)
+func (m *dataMessageModel) lowerHand(r *plugnmeet.DataMessageReq) error {
+	reqPar, err := m.roomService.LoadParticipantInfoFromRedis(r.RoomId, r.RequestedUserId)
 	if err != nil {
 		return err
 	}
@@ -137,7 +138,7 @@ func (d *DataMessageReq) LowerHand() error {
 	metadata.RaisedHand = false
 	newMeta, err := json.Marshal(metadata)
 
-	_, err = d.roomService.UpdateParticipantMetadata(d.RoomId, d.RequestedUserId, string(newMeta))
+	_, err = m.roomService.UpdateParticipantMetadata(r.RoomId, r.RequestedUserId, string(newMeta))
 	if err != nil {
 		return err
 	}
@@ -145,14 +146,13 @@ func (d *DataMessageReq) LowerHand() error {
 	return nil
 }
 
-func (d *DataMessageReq) OtherUserLowerHand() error {
-	fmt.Println(d.IsAdmin)
-	if !d.IsAdmin {
+func (m *dataMessageModel) otherUserLowerHand(r *plugnmeet.DataMessageReq) error {
+	if !r.IsAdmin {
 		return errors.New("only allow for admin")
 	}
-	userId := d.Msg
+	userId := r.Msg
 
-	reqPar, err := d.roomService.LoadParticipantInfoFromRedis(d.RoomId, userId)
+	reqPar, err := m.roomService.LoadParticipantInfoFromRedis(r.RoomId, userId)
 	if err != nil {
 		return err
 	}
@@ -164,7 +164,7 @@ func (d *DataMessageReq) OtherUserLowerHand() error {
 	metadata.RaisedHand = false
 	newMeta, err := json.Marshal(metadata)
 
-	_, err = d.roomService.UpdateParticipantMetadata(d.RoomId, userId, string(newMeta))
+	_, err = m.roomService.UpdateParticipantMetadata(r.RoomId, userId, string(newMeta))
 	if err != nil {
 		return err
 	}
@@ -172,7 +172,7 @@ func (d *DataMessageReq) OtherUserLowerHand() error {
 	return nil
 }
 
-func (d *DataMessageReq) SendNotification(sendTo []string) error {
+func (m *dataMessageModel) sendNotification(r *plugnmeet.DataMessageReq) error {
 	mId := uuid.NewString()
 	tm := time.Now().Format(time.RFC1123Z)
 
@@ -180,12 +180,12 @@ func (d *DataMessageReq) SendNotification(sendTo []string) error {
 		Type:      plugnmeet.DataMsgType_SYSTEM,
 		MessageId: &mId,
 		Body: &plugnmeet.DataMsgBody{
-			Type: d.msgBodyType,
+			Type: r.MsgBodyType,
 			Time: &tm,
 			From: &plugnmeet.DataMsgReqFrom{
-				Sid: d.Sid,
+				Sid: r.UserSid,
 			},
-			Msg: d.Msg,
+			Msg: r.Msg,
 		},
 	}
 
@@ -194,7 +194,7 @@ func (d *DataMessageReq) SendNotification(sendTo []string) error {
 		return err
 	}
 
-	_, err = d.roomService.SendData(d.RoomId, data, livekit.DataPacket_RELIABLE, sendTo)
+	_, err = m.roomService.SendData(r.RoomId, data, livekit.DataPacket_RELIABLE, r.SendTo)
 	if err != nil {
 		log.Errorln(err)
 		return err

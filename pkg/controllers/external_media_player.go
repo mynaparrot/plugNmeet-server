@@ -2,8 +2,10 @@ package controllers
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"google.golang.org/protobuf/proto"
 )
 
 func HandleExternalMediaPlayer(c *fiber.Ctx) error {
@@ -12,50 +14,27 @@ func HandleExternalMediaPlayer(c *fiber.Ctx) error {
 	requestedUserId := c.Locals("requestedUserId")
 
 	if !isAdmin.(bool) {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "only admin can perform this task",
-		})
+		return utils.SendCommonResponse(c, false, "only admin can perform this task")
 	}
 
 	rid := roomId.(string)
 	if rid == "" {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "roomId required",
-		})
+		return utils.SendCommonResponse(c, true, "roomId required")
 	}
 
-	req := new(models.ExternalMediaPlayerReq)
-	err := c.BodyParser(req)
+	req := new(plugnmeet.ExternalMediaPlayerReq)
+	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
-	}
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    check,
-		})
+		return utils.SendCommonResponse(c, true, err.Error())
 	}
 
 	m := models.NewExternalMediaPlayerModel()
 	req.RoomId = rid
 	req.UserId = requestedUserId.(string)
 	err = m.PerformTask(req)
-
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonResponse(c, true, err.Error())
 	}
 
-	return c.JSON(fiber.Map{
-		"status": true,
-		"msg":    "success",
-	})
+	return utils.SendCommonResponse(c, true, "success")
 }

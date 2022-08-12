@@ -2,8 +2,11 @@ package controllers
 
 import (
 	"github.com/gofiber/fiber/v2"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"google.golang.org/protobuf/proto"
 )
 
 func HandleCreateEtherpad(c *fiber.Ctx) error {
@@ -11,130 +14,72 @@ func HandleCreateEtherpad(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 
 	if !isAdmin.(bool) {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "only admin can perform this task",
-		})
+		return utils.SendCommonResponse(c, false, "only admin can perform this task")
 	}
 
 	if !config.AppCnf.SharedNotePad.Enabled {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "feature disabled",
-		})
+		return utils.SendCommonResponse(c, false, "feature disabled")
 	}
 
 	rid := roomId.(string)
 	if rid == "" {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "roomId required",
-		})
+		return utils.SendCommonResponse(c, false, "roomId required")
 	}
 
 	// now need to check if meeting is running or not
 	rm := models.NewRoomModel()
 	room, _ := rm.GetRoomInfo(rid, "", 1)
-
 	if room.Id == 0 {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "room isn't active",
-		})
+		return utils.SendCommonResponse(c, false, "room isn't active")
 	}
 
 	m := models.NewEtherpadModel()
 	res, err := m.CreateSession(rid)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonResponse(c, false, err.Error())
 	}
 
-	return c.JSON(fiber.Map{
-		"status": true,
-		"msg":    "success",
-		"data":   res,
-	})
+	return utils.SendProtoResponse(c, res)
 }
 
 func HandleCleanPad(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	if !isAdmin.(bool) {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "only admin can perform this task",
-		})
+		return utils.SendCommonResponse(c, false, "only admin can perform this task")
 	}
 
-	req := new(models.CleanPadReq)
-	err := c.BodyParser(req)
+	req := new(plugnmeet.CleanEtherpadReq)
+	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
-	}
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    check,
-		})
+		return utils.SendCommonResponse(c, false, err.Error())
 	}
 
 	m := models.NewEtherpadModel()
 	err = m.CleanPad(req.RoomId, req.NodeId, req.PadId)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonResponse(c, false, err.Error())
 	}
 
-	return c.JSON(fiber.Map{
-		"status": true,
-		"msg":    "success",
-	})
+	return utils.SendCommonResponse(c, true, "success")
 }
 
 func HandleChangeEtherpadStatus(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	if !isAdmin.(bool) {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "only admin can perform this task",
-		})
+		return utils.SendCommonResponse(c, false, "only admin can perform this task")
 	}
 
-	req := new(models.ChangeEtherpadStatusReq)
-	err := c.BodyParser(req)
+	req := new(plugnmeet.ChangeEtherpadStatusReq)
+	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
-	}
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    check,
-		})
+		return utils.SendCommonResponse(c, false, err.Error())
 	}
 
 	m := models.NewEtherpadModel()
 	err = m.ChangeEtherpadStatus(req)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonResponse(c, false, err.Error())
 	}
 
-	return c.JSON(fiber.Map{
-		"status": true,
-		"msg":    "success",
-	})
+	return utils.SendCommonResponse(c, true, "success")
 }

@@ -36,17 +36,6 @@ func NewRecordingModel() *recordingModel {
 	}
 }
 
-//type RecordingReq struct {
-//	Task         string  `json:"task" validate:"required"`
-//	Sid          string  `json:"sid" validate:"required"`
-//	RtmpUrl      string  `json:"rtmp_url"`
-//	CustomDesign *string `json:"custom_design,omitempty"`
-//}
-
-//func (rm *recordingModel) Validation(r *RecordingReq) []*config.ErrorResponse {
-//	return rm.app.DoValidateReq(r)
-//}
-
 type RecorderResp struct {
 	RecorderId string `json:"recorder_id"` //
 	MaxLimit   int    `json:"max_limit"`
@@ -106,10 +95,11 @@ func (rm *recordingModel) recordingStarted(r *plugnmeet.RecorderToPlugNmeet) {
 	_, _ = rm.roomService.UpdateRoomMetadataByStruct(r.RoomId, roomMeta)
 
 	// send message to room
-	err = NewDataMessage(&DataMessageReq{
-		MsgType: "INFO",
-		Msg:     "notifications.recording-started",
-		RoomId:  r.RoomId,
+	dm := NewDataMessageModel()
+	err = dm.SendDataMessage(&plugnmeet.DataMessageReq{
+		MsgBodyType: plugnmeet.DataMsgBodyType_INFO,
+		Msg:         "notifications.recording-started",
+		RoomId:      r.RoomId,
 	})
 
 	if err != nil {
@@ -134,16 +124,17 @@ func (rm *recordingModel) recordingEnded(r *plugnmeet.RecorderToPlugNmeet) {
 	_, _ = rm.roomService.UpdateRoomMetadataByStruct(r.RoomId, roomMeta)
 
 	msg := "notifications.recording-ended"
-	msgType := "INFO"
+	msgType := plugnmeet.DataMsgBodyType_INFO
 	if !r.Status {
-		msgType = "ALERT"
+		msgType = plugnmeet.DataMsgBodyType_ALERT
 		msg = "notifications.recording-ended-with-error"
 	}
 	// send message to room
-	err = NewDataMessage(&DataMessageReq{
-		MsgType: msgType,
-		Msg:     msg,
-		RoomId:  r.RoomId,
+	dm := NewDataMessageModel()
+	err = dm.SendDataMessage(&plugnmeet.DataMessageReq{
+		MsgBodyType: msgType,
+		Msg:         msg,
+		RoomId:      r.RoomId,
 	})
 
 	if err != nil {
@@ -202,10 +193,11 @@ func (rm *recordingModel) rtmpStarted(r *plugnmeet.RecorderToPlugNmeet) {
 	_, _ = rm.roomService.UpdateRoomMetadataByStruct(r.RoomId, roomMeta)
 
 	// send message to room
-	err = NewDataMessage(&DataMessageReq{
-		MsgType: "INFO",
-		Msg:     "notifications.rtmp-started",
-		RoomId:  r.RoomId,
+	dm := NewDataMessageModel()
+	err = dm.SendDataMessage(&plugnmeet.DataMessageReq{
+		MsgBodyType: plugnmeet.DataMsgBodyType_INFO,
+		Msg:         "notifications.rtmp-started",
+		RoomId:      r.RoomId,
 	})
 
 	if err != nil {
@@ -230,16 +222,17 @@ func (rm *recordingModel) rtmpEnded(r *plugnmeet.RecorderToPlugNmeet) {
 	_, _ = rm.roomService.UpdateRoomMetadataByStruct(r.RoomId, roomMeta)
 
 	msg := "notifications.rtmp-ended"
-	msgType := "INFO"
+	msgType := plugnmeet.DataMsgBodyType_INFO
 	if !r.Status {
-		msgType = "ALERT"
+		msgType = plugnmeet.DataMsgBodyType_ALERT
 		msg = "notifications.rtmp-ended-with-error"
 	}
 	// send message to room
-	err = NewDataMessage(&DataMessageReq{
-		MsgType: msgType,
-		Msg:     msg,
-		RoomId:  r.RoomId,
+	dm := NewDataMessageModel()
+	err = dm.SendDataMessage(&plugnmeet.DataMessageReq{
+		MsgBodyType: msgType,
+		Msg:         msg,
+		RoomId:      r.RoomId,
 	})
 
 	if err != nil {
@@ -346,22 +339,22 @@ func (rm *recordingModel) addRecording(r *plugnmeet.RecorderToPlugNmeet) error {
 }
 
 func (rm *recordingModel) sendToWebhookNotifier(r *plugnmeet.RecorderToPlugNmeet) {
+	tk := r.Task.String()
 	n := NewWebhookNotifier()
-	msg := CommonNotifyEvent{
-		Event: r.Task.String(),
-		Room: NotifyEventRoom{
-			Sid:    r.RoomSid,
-			RoomId: r.RoomId,
+	msg := &plugnmeet.CommonNotifyEvent{
+		Event: &tk,
+		Room: &plugnmeet.NotifyEventRoom{
+			Sid:    &r.RoomSid,
+			RoomId: &r.RoomId,
 		},
-		RecordingInfo: RecordingInfoEvent{
+		RecordingInfo: &plugnmeet.RecordingInfoEvent{
 			RecordId:    r.RecordingId,
 			RecorderId:  r.RecorderId,
 			RecorderMsg: r.Msg,
-			FilePath:    r.FilePath,
-			FileSize:    float64(r.FileSize),
+			FilePath:    &r.FilePath,
+			FileSize:    &r.FileSize,
 		},
 	}
-
 	err := n.Notify(r.RoomSid, msg)
 	if err != nil {
 		log.Errorln(err)
