@@ -2,11 +2,12 @@ package models
 
 import (
 	"errors"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 )
 
 type ExternalMediaPlayer struct {
 	rs  *RoomService
-	req *ExternalMediaPlayerReq
+	req *plugnmeet.ExternalMediaPlayerReq
 }
 
 func NewExternalMediaPlayerModel() *ExternalMediaPlayer {
@@ -15,25 +16,18 @@ func NewExternalMediaPlayerModel() *ExternalMediaPlayer {
 	}
 }
 
-type ExternalMediaPlayerReq struct {
-	Task   string   `json:"task" validate:"required"`
-	Url    string   `json:"url,omitempty"`
-	SeekTo *float64 `json:"seek_to,omitempty"`
-	RoomId string
-	UserId string
-}
 type updateRoomMetadataOpts struct {
 	isActive *bool
 	sharedBy *string
 	url      *string
 }
 
-func (e *ExternalMediaPlayer) PerformTask(req *ExternalMediaPlayerReq) error {
+func (e *ExternalMediaPlayer) PerformTask(req *plugnmeet.ExternalMediaPlayerReq) error {
 	e.req = req
 	switch req.Task {
-	case "start-playback":
+	case plugnmeet.ExternalMediaPlayerTask_START_PLAYBACK:
 		return e.startPlayBack()
-	case "end-playback":
+	case plugnmeet.ExternalMediaPlayerTask_END_PLAYBACK:
 		return e.endPlayBack()
 	}
 
@@ -41,7 +35,7 @@ func (e *ExternalMediaPlayer) PerformTask(req *ExternalMediaPlayerReq) error {
 }
 
 func (e *ExternalMediaPlayer) startPlayBack() error {
-	if e.req.Url == "" {
+	if e.req.Url != nil && *e.req.Url == "" {
 		return errors.New("valid url required")
 	}
 	active := new(bool)
@@ -49,7 +43,7 @@ func (e *ExternalMediaPlayer) startPlayBack() error {
 
 	opts := &updateRoomMetadataOpts{
 		isActive: active,
-		url:      &e.req.Url,
+		url:      e.req.Url,
 		sharedBy: &e.req.UserId,
 	}
 	return e.updateRoomMetadata(opts)
