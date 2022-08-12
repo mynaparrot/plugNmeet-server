@@ -4,8 +4,10 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/livekit/protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"google.golang.org/protobuf/proto"
 	"strings"
 )
 
@@ -89,22 +91,13 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	rs := models.NewRoomService()
 	exist := rs.IsUserExistInBlockList(roomId.(string), requestedUserId.(string))
 	if exist {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "notifications.you-are-blocked",
-		})
+		return utils.SendCommonResponse(c, false, "notifications.you-are-blocked")
 	}
 
-	req := new(struct {
-		IsProduction *bool `json:"is_production,omitempty"`
-	})
-
-	err := c.BodyParser(req)
+	req := new(plugnmeet.VerifyTokenReq)
+	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonResponse(c, false, err.Error())
 	}
 
 	cm := c.Locals("claims")
@@ -115,10 +108,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	au := models.NewAuthTokenModel()
 	token, err := au.GenerateLivekitToken(claims)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonResponse(c, false, err.Error())
 	}
 
 	// if nil then assume production
@@ -129,14 +119,15 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	}
 
 	livekitHost := strings.Replace(config.AppCnf.LivekitInfo.Host, "host.docker.internal", "localhost", 1) // without this you won't be able to connect
+	res := &plugnmeet.VerifyTokenRes{
+		Status:      true,
+		Msg:         "token is valid",
+		LivekitHost: &livekitHost,
+		Token:       &token,
+	}
 
 	if !*req.IsProduction {
-		return c.JSON(fiber.Map{
-			"status":       true,
-			"msg":          "token is valid",
-			"livekit_host": livekitHost,
-			"token":        token,
-		})
+		return utils.SendProtoResponse(c, res)
 	}
 
 	// if production then we'll check if room is active or not
@@ -148,18 +139,11 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	})
 
 	if !status {
-		return c.JSON(fiber.Map{
-			"status": status,
-			"msg":    msg,
-		})
+		return utils.SendCommonResponse(c, status, err.Error())
 	}
 
-	return c.JSON(fiber.Map{
-		"status":       status,
-		"msg":          msg,
-		"livekit_host": livekitHost,
-		"token":        token,
-	})
+	res.Msg = msg
+	return utils.SendProtoResponse(c, res)
 }
 
 func HandleVerifyHeaderToken(c *fiber.Ctx) error {
