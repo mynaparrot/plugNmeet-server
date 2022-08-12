@@ -35,16 +35,7 @@ func (u *userModel) CommonValidation(c *fiber.Ctx) error {
 	return nil
 }
 
-type UpdateUserLockSettingsReq struct {
-	Sid             string `json:"sid" validate:"required"`
-	RoomId          string `json:"room_id" validate:"required"`
-	UserId          string `json:"user_id" validate:"required"`
-	Service         string `json:"service" validate:"required"`
-	Direction       string `json:"direction" validate:"required"`
-	RequestedUserId string `json:"-"`
-}
-
-func (u *userModel) UpdateUserLockSettings(r *UpdateUserLockSettingsReq) error {
+func (u *userModel) UpdateUserLockSettings(r *plugnmeet.UpdateUserLockSettingsReq) error {
 	if r.UserId == "all" {
 		err := u.updateLockSettingsAllUsers(r)
 		return err
@@ -66,7 +57,7 @@ func (u *userModel) UpdateUserLockSettings(r *UpdateUserLockSettingsReq) error {
 	return err
 }
 
-func (u *userModel) updateLockSettingsAllUsers(r *UpdateUserLockSettingsReq) error {
+func (u *userModel) updateLockSettingsAllUsers(r *plugnmeet.UpdateUserLockSettingsReq) error {
 	participants, err := u.roomService.LoadParticipantsFromRedis(r.RoomId)
 	if err != nil {
 		return err
