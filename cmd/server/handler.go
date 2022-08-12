@@ -144,8 +144,8 @@ func Router() *fiber.App {
 
 	// for resumable.js need both methods.
 	// https://github.com/23/resumable.js#how-do-i-set-it-up-with-my-server
-	api.Get("/fileUpload", controllers.HandleChatFileUpload)
-	api.Post("/fileUpload", controllers.HandleChatFileUpload)
+	api.Get("/fileUpload", controllers.HandleFileUpload)
+	api.Post("/fileUpload", controllers.HandleFileUpload)
 
 	// websocket for chat
 	app.Use("/ws", func(c *fiber.Ctx) error {
