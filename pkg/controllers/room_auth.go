@@ -3,8 +3,10 @@ package controllers
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"google.golang.org/protobuf/proto"
 )
 
 func HandleRoomCreate(c *fiber.Ctx) error {
@@ -139,35 +141,22 @@ func HandleEndRoomForAPI(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 
 	if !isAdmin.(bool) {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "only admin can perform this task",
-		})
+		return utils.SendCommonResponse(c, false, "only admin can perform this task")
 	}
 
 	req := new(plugnmeet.RoomEndReq)
-	err := c.BodyParser(req)
+	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonResponse(c, false, err.Error())
 	}
 
 	if roomId != req.RoomId {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "requested roomId & token roomId mismatched",
-		})
+		return utils.SendCommonResponse(c, false, "requested roomId & token roomId mismatched")
 	}
 
 	m := models.NewRoomAuthModel()
 	status, msg := m.EndRoom(req)
-
-	return c.JSON(fiber.Map{
-		"status": status,
-		"msg":    msg,
-	})
+	return utils.SendCommonResponse(c, status, msg)
 }
 
 func HandleChangeVisibilityForAPI(c *fiber.Ctx) error {
