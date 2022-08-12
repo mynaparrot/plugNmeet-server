@@ -174,7 +174,7 @@ type MuteUnMuteTrackReq struct {
 // if track_sid wasn't send then it will find the microphone track & mute it
 // for unmute you'll require enabling "enable_remote_unmute: true" in livekit
 // under room settings. For privacy reason we aren't using it.
-func (u *userModel) MuteUnMuteTrack(r *MuteUnMuteTrackReq) error {
+func (u *userModel) MuteUnMuteTrack(r *plugnmeet.MuteUnMuteTrackReq) error {
 	if r.UserId == "all" {
 		err := u.muteUnmuteAllMic(r)
 		return err
@@ -207,7 +207,7 @@ func (u *userModel) MuteUnMuteTrack(r *MuteUnMuteTrackReq) error {
 	return nil
 }
 
-func (u *userModel) muteUnmuteAllMic(r *MuteUnMuteTrackReq) error {
+func (u *userModel) muteUnmuteAllMic(r *plugnmeet.MuteUnMuteTrackReq) error {
 	participants, err := u.roomService.LoadParticipantsFromRedis(r.RoomId)
 	if err != nil {
 		return err

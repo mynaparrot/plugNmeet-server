@@ -2,8 +2,11 @@ package controllers
 
 import (
 	"github.com/gofiber/fiber/v2"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"google.golang.org/protobuf/proto"
 )
 
 func HandleUpdateUserLockSetting(c *fiber.Ctx) error {
@@ -84,44 +87,23 @@ func HandleMuteUnMuteTrack(c *fiber.Ctx) error {
 	requestedUserId := c.Locals("requestedUserId")
 
 	if !isAdmin.(bool) {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "only admin can perform this task",
-		})
+		return utils.SendCommonResponse(c, false, "only admin can perform this task")
 	}
 
 	m := models.NewUserModel()
 	err := m.CommonValidation(c)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonResponse(c, false, err.Error())
 	}
 
-	req := new(models.MuteUnMuteTrackReq)
-
-	err = c.BodyParser(req)
+	req := new(plugnmeet.MuteUnMuteTrackReq)
+	err = proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
-	}
-
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    check,
-		})
+		return utils.SendCommonResponse(c, false, err.Error())
 	}
 
 	if roomId != req.RoomId {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "requested roomId & token roomId mismatched",
-		})
+		return utils.SendCommonResponse(c, false, "requested roomId & token roomId mismatched")
 	}
 
 	// now need to check if meeting is running or not
@@ -129,25 +111,16 @@ func HandleMuteUnMuteTrack(c *fiber.Ctx) error {
 	room, _ := rm.GetRoomInfo(req.RoomId, req.Sid, 1)
 
 	if room.Id == 0 {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "room isn't running",
-		})
+		return utils.SendCommonResponse(c, false, "room isn't running")
 	}
 
 	req.RequestedUserId = requestedUserId.(string)
 	err = m.MuteUnMuteTrack(req)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonResponse(c, false, err.Error())
 	}
 
-	return c.JSON(fiber.Map{
-		"status": true,
-		"msg":    "success",
-	})
+	return utils.SendCommonResponse(c, true, "success")
 }
 
 func HandleRemoveParticipant(c *fiber.Ctx) error {
