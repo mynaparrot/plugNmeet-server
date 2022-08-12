@@ -134,35 +134,35 @@ func (m *newPollsModel) GetPollResponsesByField(roomId, pollId, field string) (e
 	return err, result
 }
 
-func (m *newPollsModel) UserSelectedOption(roomId, pollId, userId string) (error, int) {
+func (m *newPollsModel) UserSelectedOption(roomId, pollId, userId string) (uint64, error) {
 	err, allRespondents := m.GetPollResponsesByField(roomId, pollId, "all_respondents")
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 
 	if allRespondents == "" {
-		return err, 0
+		return 0, err
 	}
 
 	var respondents []string
 	err = json.Unmarshal([]byte(allRespondents), &respondents)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 
 	for i := 0; i < len(respondents); i++ {
 		// format userId:option_id:name
 		p := strings.Split(respondents[i], ":")
 		if p[0] == userId {
-			voted, err := strconv.Atoi(p[1])
+			voted, err := strconv.ParseUint(p[1], 10, 64)
 			if err != nil {
-				return err, 0
+				return 0, err
 			}
-			return err, voted
+			return voted, err
 		}
 	}
 
-	return nil, 0
+	return 0, nil
 }
 
 type userResponseCommonFields struct {
@@ -381,11 +381,10 @@ func (m *newPollsModel) GetResponsesResult(roomId, pollId string) (*plugnmeet.Po
 	return res, nil
 }
 
-func (m *newPollsModel) GetPollsStats(roomId string) (*plugnmeet.PollResponse, error) {
-	var init uint64 = 0
-	res := &plugnmeet.PollResponse{
-		TotalPolls:   &init,
-		TotalRunning: &init,
+func (m *newPollsModel) GetPollsStats(roomId string) (*plugnmeet.PollsStats, error) {
+	res := &plugnmeet.PollsStats{
+		TotalPolls:   0,
+		TotalRunning: 0,
 	}
 
 	p := m.rc.HGetAll(m.ctx, pollsKey+roomId)
@@ -398,9 +397,7 @@ func (m *newPollsModel) GetPollsStats(roomId string) (*plugnmeet.PollResponse, e
 		// no polls
 		return nil, nil
 	}
-
-	tp := uint64(len(result))
-	res.TotalPolls = &tp
+	res.TotalPolls = uint64(len(result))
 
 	for _, pi := range result {
 		info := new(plugnmeet.PollInfo)
@@ -410,7 +407,7 @@ func (m *newPollsModel) GetPollsStats(roomId string) (*plugnmeet.PollResponse, e
 		}
 
 		if info.IsRunning {
-			*res.TotalRunning += 1
+			res.TotalRunning += 1
 		}
 	}
 
