@@ -19,12 +19,7 @@ func NewWaitingRoomModel() *userWaitingRoomModel {
 	}
 }
 
-type ApproveWaitingUsersReq struct {
-	RoomId string
-	UserId string `json:"user_id" validate:"required"`
-}
-
-func (u *userWaitingRoomModel) ApproveWaitingUsers(r *ApproveWaitingUsersReq) error {
+func (u *userWaitingRoomModel) ApproveWaitingUsers(r *plugnmeet.ApproveWaitingUsersReq) error {
 	if r.UserId == "all" {
 		participants, err := u.roomService.LoadParticipantsFromRedis(r.RoomId)
 		if err != nil {
@@ -68,12 +63,7 @@ func (u *userWaitingRoomModel) approveUser(roomId, userId, metadata string) erro
 	return nil
 }
 
-type UpdateWaitingRoomMessageReq struct {
-	RoomId string
-	Msg    string `json:"msg" validate:"required"`
-}
-
-func (u *userWaitingRoomModel) UpdateWaitingRoomMessage(r *UpdateWaitingRoomMessageReq) error {
+func (u *userWaitingRoomModel) UpdateWaitingRoomMessage(r *plugnmeet.UpdateWaitingRoomMessageReq) error {
 	_, roomMeta, err := u.roomService.LoadRoomWithMetadata(r.RoomId)
 	if err != nil {
 		return err

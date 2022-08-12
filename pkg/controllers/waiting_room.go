@@ -2,8 +2,10 @@ package controllers
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"google.golang.org/protobuf/proto"
 )
 
 func HandleApproveUsers(c *fiber.Ctx) error {
@@ -11,44 +13,23 @@ func HandleApproveUsers(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 
 	if !isAdmin.(bool) {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "only admin can perform this task",
-		})
+		return utils.SendCommonResponse(c, false, "only admin can perform this task")
 	}
 
 	m := models.NewWaitingRoomModel()
-	req := new(models.ApproveWaitingUsersReq)
-
-	err := c.BodyParser(req)
+	req := new(plugnmeet.ApproveWaitingUsersReq)
+	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
-	}
-
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    check,
-		})
+		return utils.SendCommonResponse(c, false, err.Error())
 	}
 
 	req.RoomId = roomId.(string)
 	err = m.ApproveWaitingUsers(req)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonResponse(c, false, err.Error())
 	}
 
-	return c.JSON(fiber.Map{
-		"status": true,
-		"msg":    "success",
-	})
+	return utils.SendCommonResponse(c, true, "success")
 }
 
 func HandleUpdateWaitingRoomMessage(c *fiber.Ctx) error {
@@ -56,42 +37,21 @@ func HandleUpdateWaitingRoomMessage(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 
 	if !isAdmin.(bool) {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "only admin can perform this task",
-		})
+		return utils.SendCommonResponse(c, false, "only admin can perform this task")
 	}
 
 	m := models.NewWaitingRoomModel()
-	req := new(models.UpdateWaitingRoomMessageReq)
-
-	err := c.BodyParser(req)
+	req := new(plugnmeet.UpdateWaitingRoomMessageReq)
+	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
-	}
-
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    check,
-		})
+		return utils.SendCommonResponse(c, false, err.Error())
 	}
 
 	req.RoomId = roomId.(string)
 	err = m.UpdateWaitingRoomMessage(req)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonResponse(c, false, err.Error())
 	}
 
-	return c.JSON(fiber.Map{
-		"status": true,
-		"msg":    "success",
-	})
+	return utils.SendCommonResponse(c, true, "success")
 }
