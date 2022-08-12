@@ -232,15 +232,7 @@ func (u *userModel) muteUnmuteAllMic(r *plugnmeet.MuteUnMuteTrackReq) error {
 	return nil
 }
 
-type RemoveParticipantReq struct {
-	Sid       string `json:"sid" validate:"required"`
-	RoomId    string `json:"room_id" validate:"required"`
-	UserId    string `json:"user_id" validate:"required"`
-	Msg       string `json:"msg" validate:"required"`
-	BlockUser bool   `json:"block_user"`
-}
-
-func (u *userModel) RemoveParticipant(r *RemoveParticipantReq) error {
+func (u *userModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 	p, err := u.roomService.LoadParticipantInfoFromRedis(r.RoomId, r.UserId)
 	if err != nil {
 		return err
