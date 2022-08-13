@@ -32,8 +32,6 @@ func Router() *fiber.App {
 	}
 
 	app := fiber.New(cnf)
-	app.Static("/assets", config.AppCnf.Client.Path+"/assets")
-	app.Static("/favicon.ico", config.AppCnf.Client.Path+"/assets/imgs/favicon.ico")
 
 	if config.AppCnf.Client.Debug {
 		app.Use(logger.New())
@@ -47,6 +45,9 @@ func Router() *fiber.App {
 	app.Use(cors.New(cors.Config{
 		AllowMethods: "POST,GET,OPTIONS",
 	}))
+
+	app.Static("/assets", config.AppCnf.Client.Path+"/assets")
+	app.Static("/favicon.ico", config.AppCnf.Client.Path+"/assets/imgs/favicon.ico")
 
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.Render("index", nil)
@@ -72,6 +73,8 @@ func Router() *fiber.App {
 
 	// auth group, will require API-KEY & API-SECRET as header value
 	auth := app.Group("/auth", controllers.HandleAuthHeaderCheck)
+	auth.Post("/getClientFiles", controllers.HandleGetClientFiles)
+
 	// for room
 	room := auth.Group("/room")
 	room.Post("/create", controllers.HandleRoomCreate)

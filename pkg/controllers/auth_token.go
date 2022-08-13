@@ -101,9 +101,12 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	}
 
 	cm := c.Locals("claims")
+	if cm == nil {
+		return utils.SendCommonResponse(c, false, "invalid request")
+	}
+	claims := cm.(*auth.ClaimGrants)
 	// after usage, we can make it null as we don't need this value again.
 	c.Locals("claims", nil)
-	claims := cm.(*auth.ClaimGrants)
 
 	au := models.NewAuthTokenModel()
 	token, err := au.GenerateLivekitToken(claims)
@@ -139,7 +142,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	})
 
 	if !status {
-		return utils.SendCommonResponse(c, status, err.Error())
+		return utils.SendCommonResponse(c, status, msg)
 	}
 
 	res.Msg = msg

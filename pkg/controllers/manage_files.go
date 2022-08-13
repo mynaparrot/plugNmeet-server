@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/gofiber/fiber/v2"
+	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	log "github.com/sirupsen/logrus"
 	"net/url"
 	"strconv"
 	"strings"
@@ -132,5 +134,24 @@ func HandleConvertWhiteboardFile(c *fiber.Ctx) error {
 		"file_name":   res.FileName,
 		"file_path":   res.FilePath,
 		"total_pages": res.TotalPages,
+	})
+}
+
+func HandleGetClientFiles(c *fiber.Ctx) error {
+	css, err := utils.GetFilesFromDir(config.AppCnf.Client.Path+"/assets/css", ".css", true)
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	js, err := utils.GetFilesFromDir(config.AppCnf.Client.Path+"/assets/js", ".js", true)
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	return c.JSON(fiber.Map{
+		"status": true,
+		"msg":    "success",
+		"css":    css,
+		"js":     js,
 	})
 }
