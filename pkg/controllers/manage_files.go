@@ -138,12 +138,12 @@ func HandleConvertWhiteboardFile(c *fiber.Ctx) error {
 }
 
 func HandleGetClientFiles(c *fiber.Ctx) error {
-	css, err := utils.GetFilesFromDir(config.AppCnf.Client.Path+"/assets/css", ".css", true)
+	css, err := utils.GetFilesFromDir(config.AppCnf.Client.Path+"/assets/css", ".css", "des")
 	if err != nil {
 		log.Errorln(err)
 	}
 
-	js, err := utils.GetFilesFromDir(config.AppCnf.Client.Path+"/assets/js", ".js", true)
+	js, err := utils.GetFilesFromDir(config.AppCnf.Client.Path+"/assets/js", ".js", "asc")
 	if err != nil {
 		log.Errorln(err)
 	}
