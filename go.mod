@@ -19,7 +19,7 @@ require (
 	github.com/livekit/server-sdk-go v0.10.4
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20220814042954-90b109bb72c8
 	github.com/sirupsen/logrus v1.9.0
-	github.com/urfave/cli/v2 v2.11.1
+	github.com/urfave/cli/v2 v2.11.2
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/square/go-jose.v2 v2.6.0
