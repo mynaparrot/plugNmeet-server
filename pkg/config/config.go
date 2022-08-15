@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"github.com/go-playground/validator/v10"
 	"github.com/go-redis/redis/v8"
+	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/natefinch/lumberjack.v2"
 	"io"
@@ -24,6 +25,7 @@ type AppConfig struct {
 	sync.RWMutex
 	chatRooms        map[string]map[string]ChatParticipant
 	roomWithDuration map[string]RoomWithDuration
+	ClientFiles      map[string][]string
 
 	Client             ClientInfo         `yaml:"client"`
 	LogSettings        LogSettings        `yaml:"log_settings"`
@@ -141,6 +143,7 @@ func SetAppConfig(a *AppConfig) {
 	AppCnf.chatRooms = make(map[string]map[string]ChatParticipant)
 	AppCnf.roomWithDuration = make(map[string]RoomWithDuration)
 	setLogger()
+	a.readClientFiles()
 }
 
 func setLogger() {
@@ -273,4 +276,26 @@ func (a *AppConfig) IncreaseRoomDuration(roomId string, duration uint64) uint64 
 	}
 
 	return 0
+}
+
+func (a *AppConfig) readClientFiles() {
+	// if enable debug mode then we won't cache files
+	// otherwise changes of files won't be load
+	if a.Client.Debug {
+		return
+	}
+	AppCnf.ClientFiles = make(map[string][]string)
+
+	css, err := utils.GetFilesFromDir(a.Client.Path+"/assets/css", ".css", "des")
+	if err != nil {
+		logrus.Errorln(err)
+	}
+
+	js, err := utils.GetFilesFromDir(a.Client.Path+"/assets/js", ".js", "asc")
+	if err != nil {
+		logrus.Errorln(err)
+	}
+
+	AppCnf.ClientFiles["css"] = css
+	AppCnf.ClientFiles["js"] = js
 }
