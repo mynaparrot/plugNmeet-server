@@ -15,7 +15,7 @@ require (
 	github.com/gofiber/websocket/v2 v2.0.24
 	github.com/google/uuid v1.3.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/protocol v1.0.0
+	github.com/livekit/protocol v1.0.1
 	github.com/livekit/server-sdk-go v0.10.4
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20220814042954-90b109bb72c8
 	github.com/sirupsen/logrus v1.9.0
