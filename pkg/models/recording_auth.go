@@ -153,8 +153,9 @@ func (a *authRecording) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
 	}
 
 	path := fmt.Sprintf("%s/%s", config.AppCnf.RecorderInfo.RecordingFilesPath, recording.FilePath)
-	err = os.Remove(path)
 
+	// delete main file
+	err = os.Remove(path)
 	if err != nil {
 		// if file not exist then we can delete it from record without showing any error
 		if !os.IsNotExist(err) {
@@ -162,6 +163,9 @@ func (a *authRecording) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
 			return errors.New(ms[3])
 		}
 	}
+
+	// delete compressed, if any
+	_ = os.Remove(path + ".fiber.gz")
 
 	// no error, so we'll delete record from DB
 	db := a.db
