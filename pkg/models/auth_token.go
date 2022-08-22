@@ -43,7 +43,7 @@ func (a *authTokenModel) DoGenerateToken(g *plugnmeet.GenerateTokenReq) (string,
 		Hidden:    g.UserInfo.IsHidden,
 	}
 
-	if g.UserInfo.UserId == "RECORDER_BOT" || g.UserInfo.UserId == "RTMP_BOT" {
+	if g.UserInfo.UserId == config.RECORDER_BOT || g.UserInfo.UserId == config.RTMP_BOT {
 		grant.Recorder = true
 	}
 

@@ -140,8 +140,19 @@ func (s *scheduler) activeRoomChecker() {
 			continue
 		}
 
-		if room.JoinedParticipants != int64(fromRedis.NumParticipants) {
-			_, _ = s.ra.rm.UpdateNumParticipants(room.Sid, int64(fromRedis.NumParticipants))
+		pp, err := s.ra.rs.LoadParticipantsFromRedis(room.RoomId)
+		if err != nil {
+			continue
+		}
+		var count int64 = 0
+		for _, p := range pp {
+			if p.Identity == config.RECORDER_BOT || p.Identity == config.RTMP_BOT {
+				continue
+			}
+			count++
+		}
+		if room.JoinedParticipants != count {
+			_, _ = s.ra.rm.UpdateNumParticipants(room.Sid, count)
 		}
 	}
 }

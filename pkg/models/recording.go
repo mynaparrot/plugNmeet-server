@@ -385,13 +385,13 @@ func (rm *recordingModel) SendMsgToRecorder(task plugnmeet.RecordingTasks, roomI
 
 	switch task {
 	case plugnmeet.RecordingTasks_START_RECORDING:
-		err := rm.addTokenAndRecorder(toSend, "RECORDER_BOT")
+		err := rm.addTokenAndRecorder(toSend, config.RECORDER_BOT)
 		if err != nil {
 			return err
 		}
 	case plugnmeet.RecordingTasks_START_RTMP:
 		toSend.RtmpUrl = rtmpUrl
-		err := rm.addTokenAndRecorder(toSend, "RTMP_BOT")
+		err := rm.addTokenAndRecorder(toSend, config.RTMP_BOT)
 		if err != nil {
 			return err
 		}
