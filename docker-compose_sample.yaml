@@ -20,8 +20,6 @@ services:
       - "7882:7882/udp"
     volumes:
       - .:/app
-      - ../client:/app/client
-      - ../recording_files:/app/recording_files
     command: --config "/app/livekit.yaml" --dev
     depends_on:
       - redis
@@ -47,6 +45,8 @@ services:
       - "8080:8080/tcp"
     volumes:
       - .:/app
+      - ../client:/app/client
+      - ../recording_files:/app/recording_files
       # mount fonts as read only mood
 #      - /usr/share/fonts/:/usr/share/fonts/:ro
 #      - /etc/fonts/:/etc/fonts/:ro
