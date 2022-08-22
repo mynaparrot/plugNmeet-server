@@ -39,8 +39,8 @@ func main() {
 	}
 }
 
-func startServer(c *cli.Context) error {
-	err := readYaml(c.String("config"))
+func prepareServer(c string) error {
+	err := readYaml(c)
 	if err != nil {
 		return err
 	}
@@ -48,19 +48,29 @@ func startServer(c *cli.Context) error {
 	// set mysql factory connection
 	factory.NewDbConnection()
 	factory.SetDBConnection(config.AppCnf.DB)
-	defer config.AppCnf.DB.Close()
 
 	// set redis connection
 	factory.NewRedisConnection()
 	factory.SetRedisConnection(config.AppCnf.RDS)
-	defer config.AppCnf.RDS.Close()
 
 	// we'll subscribe to redis channels now
 	go controllers.SubscribeToWebsocketChannel()
 	go controllers.StartScheduler()
 
-	router := Router()
+	return nil
+}
 
+func startServer(c *cli.Context) error {
+	err := prepareServer(c.String("config"))
+	if err != nil {
+		return err
+	}
+
+	// defer close connections
+	defer config.AppCnf.DB.Close()
+	defer config.AppCnf.RDS.Close()
+
+	router := Router()
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
