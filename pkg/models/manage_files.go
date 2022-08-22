@@ -236,7 +236,7 @@ func (m *ManageFile) combineResumableFiles(chunksDir string, fileName string, to
 	path := fmt.Sprintf("%s/%s", uploadDir, fileName)
 	f, err := os.Create(path)
 	if err != nil {
-		log.Errorln("Error: %s", err)
+		log.Errorf("Error: %s", err)
 		return err
 	}
 	defer f.Close()
@@ -252,7 +252,7 @@ func (m *ManageFile) combineResumableFiles(chunksDir string, fileName string, to
 		_, err = f.WriteAt(dat, writeOffset)
 
 		if err != nil {
-			log.Errorln("Error: %s", err)
+			log.Errorf("Error: %s", err)
 		}
 	}
 

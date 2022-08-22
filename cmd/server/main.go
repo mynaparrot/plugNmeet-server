@@ -8,7 +8,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"syscall"
@@ -77,7 +76,7 @@ func startServer(c *cli.Context) error {
 
 func readYaml(filename string) error {
 	var appConfig config.AppConfig
-	yamlFile, err := ioutil.ReadFile(filename)
+	yamlFile, err := os.ReadFile(filename)
 
 	if err != nil {
 		return err
