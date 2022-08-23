@@ -2,8 +2,11 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"github.com/goccy/go-json"
+	"github.com/livekit/protocol/auth"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -16,14 +19,35 @@ import (
 	"time"
 )
 
-func Test_Auth(t *testing.T) {
-	test_prepareServer(t)
+func Test_prepareServer(t *testing.T) {
+	tests := []struct {
+		name       string
+		configPath string
+		wantErr    bool
+	}{
+		{
+			name:       "prepareServer",
+			configPath: "../../test/config.yaml",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := prepareServer(tt.configPath); (err != nil) != tt.wantErr {
+				t.Errorf("prepareServer() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
 
+func Test_Auth(t *testing.T) {
 	// create room first
 	rInfo := createRoom(t)
 
 	// now perform different recorder tasks
 	rId := test_recorderTasks(t, rInfo)
+
+	// webhook test
+	test_webhooks(t, rInfo)
 
 	// different room auth tasks
 	test_roomAuth(t)
@@ -42,6 +66,13 @@ type commonTest struct {
 
 func test_roomAuth(t *testing.T) {
 	tests := []commonTest{
+		{
+			name:           "create",
+			method:         http.MethodPost,
+			route:          "/auth/room/create",
+			body:           `{"room_id":"room01","metadata":{"room_title":"Test room","welcome_message":"Welcome to room","room_features":{"allow_webcams":true,"mute_on_start":false,"allow_screen_share":true,"allow_recording":true,"allow_rtmp":true,"admin_only_webcams":false,"allow_view_other_webcams":true,"allow_view_other_users_list":true,"allow_polls":true,"room_duration":0,"chat_features":{"allow_chat":true,"allow_file_upload":true},"shared_note_pad_features":{"allowed_shared_note_pad":true},"whiteboard_features":{"allowed_whiteboard":true},"external_media_player_features":{"allowed_external_media_player":true},"waiting_room_features":{"is_active":false},"breakout_room_features":{"is_allow":true,"allowed_number_rooms":2},"display_external_link_features":{"is_allow":true}},"default_lock_settings":{"lock_microphone":false,"lock_webcam":false,"lock_screen_sharing":true,"lock_whiteboard":true,"lock_shared_notepad":true,"lock_chat":false,"lock_chat_send_message":false,"lock_chat_file_share":false,"lock_private_chat":false}}}`,
+			expectedStatus: true,
+		},
 		{
 			name:           "getJoinToken",
 			method:         http.MethodPost,
@@ -169,23 +200,70 @@ func test_recorderTasks(t *testing.T, rInfo *livekit.Room) string {
 	return rid
 }
 
-func test_prepareServer(t *testing.T) {
-	tests := []struct {
-		name       string
-		configPath string
-		wantErr    bool
-	}{
-		{
-			name:       "prepareServer",
-			configPath: "../../test/config.yaml",
+func test_webhooks(t *testing.T, rInfo *livekit.Room) {
+	body := &livekit.WebhookEvent{
+		Room: rInfo,
+		Participant: &livekit.ParticipantInfo{
+			Name:     "Test",
+			Identity: "test001",
 		},
 	}
+
+	tests := []struct {
+		event string
+	}{
+		{
+			event: "room_started",
+		},
+		{
+			event: "participant_joined",
+		},
+		{
+			event: "participant_left",
+		},
+		{
+			event: "room_finished",
+		},
+	}
+
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := prepareServer(tt.configPath); (err != nil) != tt.wantErr {
-				t.Errorf("prepareServer() error = %v, wantErr %v", err, tt.wantErr)
+		body.Event = tt.event
+
+		var encoded []byte
+		var err error
+
+		encoded, err = json.Marshal(body)
+		if err != nil {
+			t.Error(err)
+		}
+		// sign payload
+		sum := sha256.Sum256(encoded)
+		b64 := base64.StdEncoding.EncodeToString(sum[:])
+
+		at := auth.NewAccessToken(config.AppCnf.LivekitInfo.ApiKey, config.AppCnf.LivekitInfo.Secret).
+			SetValidFor(5 * time.Minute).
+			SetSha256(b64)
+		token, err := at.ToJWT()
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		t.Run(body.Event, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader(encoded))
+			req.Header.Set("Authorization", token)
+			req.Header.Set("Content-Type", "application/json")
+
+			router := Router()
+			res, err := router.Test(req)
+			if err != nil {
+				t.Error(err)
+			}
+			if res.StatusCode != 200 {
+				t.Errorf("Error in router: %s, Error code: %d", "/webhook", res.StatusCode)
 			}
 		})
+
 	}
 }
 
