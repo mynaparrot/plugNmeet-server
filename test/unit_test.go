@@ -15,7 +15,7 @@ type UnitTestSuite struct {
 	recordingId string
 }
 
-func (s *UnitTestSuite) SetupTest() {
+func (s *UnitTestSuite) Test_00_PrepareServer() {
 	const configPath = "./config.yaml"
 
 	if err := utils.PrepareServer(configPath); err != nil {

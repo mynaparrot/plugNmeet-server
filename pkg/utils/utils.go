@@ -9,9 +9,11 @@ import (
 )
 
 func PrepareServer(c string) error {
-	err := readYaml(c)
-	if err != nil {
-		return err
+	if config.AppCnf == nil {
+		err := readYaml(c)
+		if err != nil {
+			return err
+		}
 	}
 
 	// set mysql factory connection
