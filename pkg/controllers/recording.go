@@ -52,6 +52,12 @@ func HandleRecording(c *fiber.Ctx) error {
 		return utils.SendCommonResponse(c, false, "notifications.recording-not-running")
 	}
 
+	if room.IsActiveRTMP == 1 && req.Task == plugnmeet.RecordingTasks_START_RTMP {
+		return utils.SendCommonResponse(c, false, "notifications.rtmp-already-running")
+	} else if room.IsActiveRTMP == 0 && req.Task == plugnmeet.RecordingTasks_STOP_RTMP {
+		return utils.SendCommonResponse(c, false, "notifications.rtmp-not-running")
+	}
+
 	// we need to get custom design value
 	m.RecordingReq = req
 	err = m.SendMsgToRecorder(req.Task, room.RoomId, room.Sid, nil)

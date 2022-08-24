@@ -83,7 +83,7 @@ func test_HandleJoinToken(t *testing.T) string {
 }
 
 func test_verifyToken(t *testing.T, token string) *plugnmeet.VerifyTokenRes {
-	req := prepareStringWithTokenReq(token, http.MethodPost, "/api/verifyToken", "")
+	req := prepareStringWithTokenReq(token, http.MethodPost, "/api/verifyToken", nil)
 
 	router := handler.Router()
 	res, err := router.Test(req)

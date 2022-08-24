@@ -8,6 +8,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/handler"
+	"google.golang.org/protobuf/proto"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -23,8 +24,9 @@ func prepareStringReq(method, router, b string) *http.Request {
 	return req
 }
 
-func prepareStringWithTokenReq(token, method, router, b string) *http.Request {
-	req := httptest.NewRequest(method, router, strings.NewReader(b))
+func prepareStringWithTokenReq(token, method, router string, m proto.Message) *http.Request {
+	b, _ := proto.Marshal(m)
+	req := httptest.NewRequest(method, router, bytes.NewReader(b))
 	req.Header.Set("Authorization", token)
 	req.Header.Set("Content-Type", "application/json")
 	return req
@@ -57,6 +59,34 @@ func performCommonReq(t *testing.T, req *http.Request, expectedStatus bool) {
 
 	rr := new(plugnmeet.CommonResponse)
 	err = json.Unmarshal(body, rr)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if rr.Status != expectedStatus {
+		t.Errorf("Expected: %t, Got: %t, Msg: %s", expectedStatus, rr.Status, rr.Msg)
+	}
+}
+
+func performCommonProtoReq(t *testing.T, req *http.Request, expectedStatus bool) {
+	router := handler.Router()
+
+	res, err := router.Test(req)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if res.StatusCode != 200 {
+		t.Errorf("Error code: %d", res.StatusCode)
+	}
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Error(err)
+	}
+
+	rr := new(plugnmeet.CommonResponse)
+	err = proto.Unmarshal(body, rr)
 	if err != nil {
 		t.Error(err)
 	}

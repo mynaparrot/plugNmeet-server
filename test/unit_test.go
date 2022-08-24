@@ -40,41 +40,47 @@ func (s *UnitTestSuite) Test_03_verifyToken() {
 	}
 }
 
-func (s *UnitTestSuite) Test_04_isRoomActive() {
+func (s *UnitTestSuite) Test_04_commonAPI() {
+	test_recording(s.T(), s.token, s.roomInfo)
+	test_rtmp(s.T(), s.token, s.roomInfo)
+	test_updateLockSettings(s.T(), s.token, s.roomInfo)
+}
+
+func (s *UnitTestSuite) Test_05_isRoomActive() {
 	res := prepareStringReq(http.MethodPost, "/auth/room/isRoomActive", `{"room_id":"room01"}`)
 	performCommonReq(s.T(), res, true)
 }
 
-func (s *UnitTestSuite) Test_05_getActiveRoomsInfo() {
+func (s *UnitTestSuite) Test_06_getActiveRoomsInfo() {
 	res := prepareStringReq(http.MethodPost, "/auth/room/getActiveRoomsInfo", "")
 	performCommonReq(s.T(), res, true)
 }
 
-func (s *UnitTestSuite) Test_06_getActiveRoomInfo() {
+func (s *UnitTestSuite) Test_07_getActiveRoomInfo() {
 	res := prepareStringReq(http.MethodPost, "/auth/room/getActiveRoomInfo", `{"room_id":"room01"}`)
 	performCommonReq(s.T(), res, true)
 }
 
-func (s *UnitTestSuite) Test_07_recorderTasks() {
+func (s *UnitTestSuite) Test_08_recorderTasks() {
 	s.recordingId = test_recorderTasks(s.T(), s.roomInfo)
 }
 
-func (s *UnitTestSuite) Test_08_fetchRecordings() {
+func (s *UnitTestSuite) Test_09_fetchRecordings() {
 	res := prepareStringReq(http.MethodPost, "/auth/recording/fetch", `{"room_ids":["room01"],"from":0,"limit":20,"order_by":"DESC"}`)
 	performCommonReq(s.T(), res, true)
 }
 
-func (s *UnitTestSuite) Test_09_getDownloadToken() {
+func (s *UnitTestSuite) Test_10_getDownloadToken() {
 	res := prepareStringReq(http.MethodPost, "/auth/recording/fetch", `{"record_id":"`+s.recordingId+`"}`)
 	performCommonReq(s.T(), res, true)
 }
 
-func (s *UnitTestSuite) Test_10_deleteRecording() {
+func (s *UnitTestSuite) Test_11_deleteRecording() {
 	res := prepareStringReq(http.MethodPost, "/auth/recording/delete", `{"record_id":"`+s.recordingId+`"}`)
 	performCommonReq(s.T(), res, true)
 }
 
-func (s *UnitTestSuite) Test_11_webhooks() {
+func (s *UnitTestSuite) Test_12_webhooks() {
 	test_webhooks(s.T(), s.roomInfo, false)
 }
 
