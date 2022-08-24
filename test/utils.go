@@ -2,7 +2,9 @@ package test
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/goccy/go-json"
+	lksdk "github.com/livekit/server-sdk-go"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/handler"
@@ -13,11 +15,17 @@ import (
 	"testing"
 )
 
-// utils
 func prepareStringReq(method, router, b string) *http.Request {
 	req := httptest.NewRequest(method, router, strings.NewReader(b))
 	req.Header.Set("API-KEY", config.AppCnf.Client.ApiKey)
 	req.Header.Set("API-SECRET", config.AppCnf.Client.Secret)
+	req.Header.Set("Content-Type", "application/json")
+	return req
+}
+
+func prepareStringWithTokenReq(token, method, router, b string) *http.Request {
+	req := httptest.NewRequest(method, router, strings.NewReader(b))
+	req.Header.Set("Authorization", token)
 	req.Header.Set("Content-Type", "application/json")
 	return req
 }
@@ -67,4 +75,31 @@ func performCommonStatusReq(t *testing.T, req *http.Request) {
 	if res.StatusCode != 200 {
 		t.Errorf("Error in router: %s, Error code: %d", "/auth/room/create", res.StatusCode)
 	}
+}
+
+func connectLivekit(t *testing.T, token, livekitUrl string) *lksdk.Room {
+	room := new(lksdk.Room)
+
+	t.Run("connectLivekit", func(t *testing.T) {
+		roomCB := &lksdk.RoomCallback{
+			OnRoomMetadataChanged: func(m string) {
+				fmt.Println("OnRoomMetadataChanged")
+			},
+			OnParticipantConnected: func(p *lksdk.RemoteParticipant) {
+				fmt.Printf("%s Joined \n", p.Name())
+			},
+			OnDisconnected: func() {
+				fmt.Println("Room disconnected")
+			},
+		}
+
+		r, err := lksdk.ConnectToRoomWithToken(livekitUrl, token, roomCB)
+		if err != nil {
+			t.Errorf("Can't connect to room. Error: %s", err.Error())
+		}
+
+		room = r
+	})
+
+	return room
 }

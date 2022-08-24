@@ -5,6 +5,7 @@ import (
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/handler"
+	"google.golang.org/protobuf/proto"
 	"io"
 	"net/http"
 	"testing"
@@ -79,4 +80,38 @@ func test_HandleJoinToken(t *testing.T) string {
 	}
 
 	return *rr.Token
+}
+
+func test_verifyToken(t *testing.T, token string) *plugnmeet.VerifyTokenRes {
+	req := prepareStringWithTokenReq(token, http.MethodPost, "/api/verifyToken", "")
+
+	router := handler.Router()
+	res, err := router.Test(req)
+	if err != nil {
+		t.Error(err)
+	}
+	if res.StatusCode != 200 {
+		t.Errorf("Error in router: %s, Error code: %d", "/api/verifyToken", res.StatusCode)
+	}
+
+	b, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Error(err)
+	}
+	if err != nil {
+		t.Error(err)
+	}
+
+	rr := new(plugnmeet.VerifyTokenRes)
+	err = proto.Unmarshal(b, rr)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if rr.Status != true {
+		t.Error(rr.Status)
+		return nil
+	}
+
+	return rr
 }

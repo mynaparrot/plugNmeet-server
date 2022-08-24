@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-func test_webhooks(t *testing.T, rInfo *livekit.Room) {
+func test_webhooks(t *testing.T, rInfo *livekit.Room, roomFinished bool) {
 	body := &livekit.WebhookEvent{
 		Room: rInfo,
 		Participant: &livekit.ParticipantInfo{
@@ -36,9 +36,16 @@ func test_webhooks(t *testing.T, rInfo *livekit.Room) {
 		{
 			event: "participant_left",
 		},
-		{
-			event: "room_finished",
-		},
+	}
+
+	if roomFinished {
+		tests = []struct {
+			event string
+		}{
+			{
+				event: "room_finished",
+			},
+		}
 	}
 
 	for _, tt := range tests {
@@ -64,7 +71,7 @@ func test_webhooks(t *testing.T, rInfo *livekit.Room) {
 			t.Error(err)
 		}
 
-		t.Run(body.Event, func(t *testing.T) {
+		t.Run("Webhook_"+body.Event, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader(encoded))
 			req.Header.Set("Authorization", token)
 			req.Header.Set("Content-Type", "application/json")
