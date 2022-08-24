@@ -1,4 +1,4 @@
-name: Relase to DockerHub as Dev
+name: Release to DockerHub as Dev
 on:
   push:
     branches:

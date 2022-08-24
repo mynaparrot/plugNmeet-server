@@ -3,11 +3,10 @@ package main
 import (
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
-	"github.com/mynaparrot/plugnmeet-server/pkg/factory"
+	"github.com/mynaparrot/plugnmeet-server/pkg/handler"
+	"github.com/mynaparrot/plugnmeet-server/pkg/utils"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
-	"gopkg.in/yaml.v3"
 	"os"
 	"os/signal"
 	"syscall"
@@ -39,29 +38,8 @@ func main() {
 	}
 }
 
-func prepareServer(c string) error {
-	err := readYaml(c)
-	if err != nil {
-		return err
-	}
-
-	// set mysql factory connection
-	factory.NewDbConnection()
-	factory.SetDBConnection(config.AppCnf.DB)
-
-	// set redis connection
-	factory.NewRedisConnection()
-	factory.SetRedisConnection(config.AppCnf.RDS)
-
-	// we'll subscribe to redis channels now
-	go controllers.SubscribeToWebsocketChannel()
-	go controllers.StartScheduler()
-
-	return nil
-}
-
 func startServer(c *cli.Context) error {
-	err := prepareServer(c.String("config"))
+	err := utils.PrepareServer(c.String("config"))
 	if err != nil {
 		return err
 	}
@@ -70,7 +48,7 @@ func startServer(c *cli.Context) error {
 	defer config.AppCnf.DB.Close()
 	defer config.AppCnf.RDS.Close()
 
-	router := Router()
+	router := handler.Router()
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
@@ -82,21 +60,4 @@ func startServer(c *cli.Context) error {
 	}()
 
 	return router.Listen(fmt.Sprintf(":%d", config.AppCnf.Client.Port))
-}
-
-func readYaml(filename string) error {
-	var appConfig config.AppConfig
-	yamlFile, err := os.ReadFile(filename)
-
-	if err != nil {
-		return err
-	}
-
-	err = yaml.Unmarshal(yamlFile, &appConfig)
-	if err != nil {
-		return err
-	}
-	config.SetAppConfig(&appConfig)
-
-	return nil
 }

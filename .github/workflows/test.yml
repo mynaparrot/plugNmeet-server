@@ -1,0 +1,53 @@
+name: Test CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:6
+        ports:
+          - 6379:6379
+        options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=3
+      mariadb:
+        image: mariadb:10.8
+        env:
+          MYSQL_USER: root
+          MYSQL_DATABASE: plugnmeet
+          MYSQL_ALLOW_EMPTY_PASSWORD: true
+          MYSQL_CHARACTER_SET_SERVER: utf8mb4
+          MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval 10s --health-timeout 5s --health-retries 3
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Prepare for test
+        run: |
+          mysql -u root -h 127.0.0.1 -P 3306 -D plugnmeet < sql_dump/install.sql
+      - name: Run docker-compose
+        uses: isbang/compose-action@v1.1.0
+        with:
+          compose-file: "./test/docker-compose.yaml"
+          down-flags: "--volumes"
+      - name: Sleep for 20s
+        uses: juliangruber/sleep-action@v1
+        with:
+          time: 20s
+      - name: Check logs
+        run: |
+          cd ./test
+          docker ps
+          docker-compose logs
+      - name: Run test
+        run: go test -cover -race -v ./...

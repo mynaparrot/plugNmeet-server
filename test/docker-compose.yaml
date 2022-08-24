@@ -1,0 +1,34 @@
+version: "3"
+services:
+  livekit:
+    image: livekit/livekit-server
+    restart: always
+    ports:
+      - "7880:7880/tcp"
+      - "7881:7881/tcp"
+      - "7882:7882/udp"
+    volumes:
+      - ./livekit.yaml:/app/livekit.yaml
+    command: --config "/app/livekit.yaml"
+    healthcheck:
+      test: wget --no-verbose --tries=5 --spider http://localhost:7880 || kill 1
+      interval: 20s
+      timeout: 1s
+      retries: 5
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  etherpad:
+    image: mynaparrot/plugnmeet-etherpad
+    restart: always
+    ports:
+      - "9001:9001/tcp"
+    volumes:
+      - ../etc/etherpad/APIKEY.txt:/opt/etherpad-lite/APIKEY.txt
+      - ../etc/etherpad/settings.json:/opt/etherpad-lite/settings.json
+    healthcheck:
+      test: curl -f --retry 5 --retry-delay 3 "http://localhost:9001/api" || kill 1
+      interval: 20s
+      timeout: 1s
+      retries: 5
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

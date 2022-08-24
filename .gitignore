@@ -20,3 +20,5 @@ client/
 recorder/
 etc/tmp/
 tmp/
+
+!test/*
