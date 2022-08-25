@@ -1,7 +1,7 @@
 client:
   port: 8080
   debug: true
-  path: "./client/dist"
+  path: "../client/dist"
   ## this will require during authentication. Use random secret.
   # openssl rand -hex 32
   # OR
@@ -23,7 +23,7 @@ client:
     metrics_path: "/metrics"
   proxy_header: ""
 log_settings:
-  log_file: "../../log/plugNmeet.log"
+  log_file: "../log/plugNmeet.log"
   # maxsize of log file in MB
   maxsize: 20
   maxbackups: 4
@@ -70,7 +70,7 @@ upload_file_settings:
     - "mp3"
 recorder_info:
   # this value should be same as recorder's copy_to_dir path
-  recording_files_path: "./recording_files"
+  recording_files_path: "../recording_files"
   token_validity: 30m
 shared_notepad:
   enabled: true
