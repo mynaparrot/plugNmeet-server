@@ -59,6 +59,16 @@ func HandleGenerateJoinToken(c *fiber.Ctx) error {
 		})
 	}
 
+	// don't generate token if user is blocked
+	rs := models.NewRoomService()
+	exist := rs.IsUserExistInBlockList(req.RoomId, req.UserInfo.UserId)
+	if exist {
+		return c.JSON(fiber.Map{
+			"status": false,
+			"msg":    "this user is blocked to join this session",
+		})
+	}
+
 	rm := models.NewRoomModel()
 	ri, _ := rm.GetRoomInfo(req.RoomId, "", 1)
 	if ri.Id == 0 {

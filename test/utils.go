@@ -46,21 +46,25 @@ func performCommonReq(t *testing.T, req *http.Request, expectedStatus bool) {
 	res, err := router.Test(req)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	if res.StatusCode != 200 {
 		t.Errorf("Error code: %d", res.StatusCode)
+		return
 	}
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	rr := new(plugnmeet.CommonResponse)
 	err = json.Unmarshal(body, rr)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	if rr.Status != expectedStatus {
@@ -74,21 +78,25 @@ func performCommonProtoReq(t *testing.T, req *http.Request, expectedStatus bool)
 	res, err := router.Test(req)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	if res.StatusCode != 200 {
 		t.Errorf("Error code: %d", res.StatusCode)
+		return
 	}
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	rr := new(plugnmeet.CommonResponse)
 	err = proto.Unmarshal(body, rr)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	if rr.Status != expectedStatus {
@@ -101,6 +109,7 @@ func performCommonStatusReq(t *testing.T, req *http.Request) {
 	res, err := router.Test(req)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 	if res.StatusCode != 200 {
 		t.Errorf("Error in router: %s, Error code: %d", "/auth/room/create", res.StatusCode)
