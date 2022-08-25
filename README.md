@@ -1,7 +1,7 @@
 # Plug-N-Meet - Scalable, Open source web conferencing system.
 
 Plug-N-Meet is an open source web conferencing system based on high performance WebRTC
-infrastructure [livekit](https://github.com/livekit/livekit-server).
+infrastructure [livekit](https://github.com/livekit/livekit-server). Please join us [on Slack](https://join.slack.com/t/plugnmeet/shared_invite/zt-1ex9xaydu-RiN6VunWBHo8UDn2P1XQRg) to discuss your suggestions and/or any issues you may be experiencing.
 
 ![banner](./github_files/banner.jpg)
 
@@ -97,3 +97,7 @@ You can manually download server from [release](https://github.com/mynaparrot/pl
 ## Development
 
 Please follow [this article](https://www.plugnmeet.org/docs/developer-guide/setup-development) for details.
+
+## Contributing
+
+We welcome your suggestions for improving plugNmeet! Let's chat [on Slack](https://join.slack.com/t/plugnmeet/shared_invite/zt-1ex9xaydu-RiN6VunWBHo8UDn2P1XQRg) to discuss your suggestions and/or PRs. 
