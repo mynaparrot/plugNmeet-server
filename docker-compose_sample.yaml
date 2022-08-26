@@ -56,4 +56,3 @@ services:
       - redis
       - db
       - livekit
-    #command: --config "./config.yaml"
