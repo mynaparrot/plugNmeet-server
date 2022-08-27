@@ -43,7 +43,7 @@ jobs:
           cd client
           npm install --force && npm run build
       - name: Run docker-compose
-        uses: isbang/compose-action@v1.1.0
+        uses: isbang/compose-action@v1.2.0
         with:
           compose-file: "./test/docker-compose.yaml"
           down-flags: "--volumes"
