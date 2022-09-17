@@ -2,6 +2,9 @@ package test
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"github.com/goccy/go-json"
 	lksdk "github.com/livekit/server-sdk-go"
@@ -16,10 +19,14 @@ import (
 	"testing"
 )
 
-func prepareStringReq(method, router, b string) *http.Request {
-	req := httptest.NewRequest(method, router, strings.NewReader(b))
+func prepareStringReq(method, router, body string) *http.Request {
+	mac := hmac.New(sha256.New, []byte(config.AppCnf.Client.Secret))
+	mac.Write([]byte(body))
+	signature := hex.EncodeToString(mac.Sum(nil))
+
+	req := httptest.NewRequest(method, router, strings.NewReader(body))
 	req.Header.Set("API-KEY", config.AppCnf.Client.ApiKey)
-	req.Header.Set("API-SECRET", config.AppCnf.Client.Secret)
+	req.Header.Set("HASH-SIGNATURE", signature)
 	req.Header.Set("Content-Type", "application/json")
 	return req
 }
