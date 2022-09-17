@@ -1,6 +1,10 @@
 package controllers
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
 	"github.com/gofiber/fiber/v2"
 	"github.com/livekit/protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -11,23 +15,44 @@ import (
 	"strings"
 )
 
+// HandleAuthHeaderCheck will check auth values
+// It will accept 2 header values: API-KEY & HASH-SIGNATURE
+// HASH-SIGNATURE will require to calculated hmac sha256 using
+// body + Secret key
+// Deprecated API-SECRET will be removed in next release
 func HandleAuthHeaderCheck(c *fiber.Ctx) error {
-	apiKey := c.Get("API-KEY")
+	apiKey := c.Get("API-KEY", "")
+	signature := c.Get("HASH-SIGNATURE", "")
+	body := c.Body()
+	// To-Do: Deprecated, will be remove in next version
 	secret := c.Get("API-SECRET")
 
-	if apiKey == "" || secret == "" {
-		_ = c.SendStatus(fiber.StatusUnauthorized)
-		return c.JSON(fiber.Map{
+	if apiKey != config.AppCnf.Client.ApiKey {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"status": false,
-			"msg":    "Auth header information are missing",
+			"msg":    "invalid API key",
 		})
 	}
 
-	if apiKey != config.AppCnf.Client.ApiKey || secret != config.AppCnf.Client.Secret {
-		_ = c.SendStatus(fiber.StatusUnauthorized)
-		return c.JSON(fiber.Map{
+	status := false
+	if signature != "" {
+		mac := hmac.New(sha256.New, []byte(config.AppCnf.Client.Secret))
+		mac.Write(body)
+		expectedSignature := hex.EncodeToString(mac.Sum(nil))
+		if subtle.ConstantTimeCompare([]byte(expectedSignature), []byte(signature)) == 1 {
+			status = true
+		}
+	} else {
+		// To-Do: Deprecated, will be remove in next version
+		if secret == config.AppCnf.Client.Secret {
+			status = true
+		}
+	}
+
+	if !status {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"status": false,
-			"msg":    "Auth header information didn't match",
+			"msg":    "can't verify provided information",
 		})
 	}
 
