@@ -36,6 +36,10 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: "16.x"
+      - name: setup go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
       - name: Prepare for test
         run: |
           mysql -u root -h 127.0.0.1 -P 3306 -D plugnmeet < sql_dump/install.sql
