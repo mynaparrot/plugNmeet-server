@@ -379,6 +379,8 @@ github.com/livekit/protocol v1.0.2-0.20220817073830-613285ea6f32 h1:S0qziW4Bh8k2
 github.com/livekit/protocol v1.0.2-0.20220817073830-613285ea6f32/go.mod h1:qTrokXCWMngkI7tszAlNXaSsNjkVrKmSuBz2AXABt8s=
 github.com/livekit/protocol v1.0.2-0.20220909090645-6ec04e9ca47e h1:9vfn+sBf1RQDNrBT21YJTcaXB70UI73W7it3S8pQOGU=
 github.com/livekit/protocol v1.0.2-0.20220909090645-6ec04e9ca47e/go.mod h1:ykRtMmaq4blqGyLWWPtYkB/74JYsyK7N2DAXLGnfSa4=
+github.com/livekit/protocol v1.1.2 h1:LDEFKK16T57pwDwxlJkkWMpbgvR0DJ3PozjOnvq29CI=
+github.com/livekit/protocol v1.1.2/go.mod h1:eburCdz6ZtbgKSKYkAeCdWP1z33DB9clTphz7uNaxp0=
 github.com/livekit/server-sdk-go v0.10.4 h1:g2zKEVvn1XsVdmUw4+mCAv3Frf9H9dPdZY+NSWWrL5w=
 github.com/livekit/server-sdk-go v0.10.4/go.mod h1:hcM4YgHm96fNGSkFQRjfbExDmbBGYPGDr7bj/zC837g=
 github.com/livekit/server-sdk-go v0.10.5 h1:Qlh/+ZogcKAGxAqy7NaBZQ5a+F8U4JV8QaFvOpbrKGU=
