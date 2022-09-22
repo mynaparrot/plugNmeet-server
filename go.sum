@@ -379,6 +379,8 @@ github.com/livekit/protocol v1.0.2-0.20220817073830-613285ea6f32 h1:S0qziW4Bh8k2
 github.com/livekit/protocol v1.0.2-0.20220817073830-613285ea6f32/go.mod h1:qTrokXCWMngkI7tszAlNXaSsNjkVrKmSuBz2AXABt8s=
 github.com/livekit/protocol v1.0.2-0.20220909090645-6ec04e9ca47e h1:9vfn+sBf1RQDNrBT21YJTcaXB70UI73W7it3S8pQOGU=
 github.com/livekit/protocol v1.0.2-0.20220909090645-6ec04e9ca47e/go.mod h1:ykRtMmaq4blqGyLWWPtYkB/74JYsyK7N2DAXLGnfSa4=
+github.com/livekit/protocol v1.1.2 h1:LDEFKK16T57pwDwxlJkkWMpbgvR0DJ3PozjOnvq29CI=
+github.com/livekit/protocol v1.1.2/go.mod h1:eburCdz6ZtbgKSKYkAeCdWP1z33DB9clTphz7uNaxp0=
 github.com/livekit/server-sdk-go v0.10.4 h1:g2zKEVvn1XsVdmUw4+mCAv3Frf9H9dPdZY+NSWWrL5w=
 github.com/livekit/server-sdk-go v0.10.4/go.mod h1:hcM4YgHm96fNGSkFQRjfbExDmbBGYPGDr7bj/zC837g=
 github.com/livekit/server-sdk-go v0.10.5 h1:Qlh/+ZogcKAGxAqy7NaBZQ5a+F8U4JV8QaFvOpbrKGU=
@@ -427,6 +429,8 @@ github.com/mynaparrot/plugnmeet-protocol v0.0.0-20220914081918-abcbcce37b3a h1:W
 github.com/mynaparrot/plugnmeet-protocol v0.0.0-20220914081918-abcbcce37b3a/go.mod h1:vcpLPjY+mYVVge7zPS27jpyAQmUnOSicFWiz8lirZ90=
 github.com/mynaparrot/plugnmeet-protocol v0.0.0-20220914191221-d862173d5903 h1:UO1yTtQHMg2gB1E4BZqvx02PIvRTeVHnpLYjTRIt0io=
 github.com/mynaparrot/plugnmeet-protocol v0.0.0-20220914191221-d862173d5903/go.mod h1:QzgBCTx6g2Lmd7CnLv+MDWTqypyFYdZ0e6+5B+uwVNc=
+github.com/mynaparrot/plugnmeet-protocol v0.0.0-20220922073705-c89b713dc59e h1:dgzLuOVWZJoSBRfY6OJQKd/LEyuOFO/PjsSDmQpjOQk=
+github.com/mynaparrot/plugnmeet-protocol v0.0.0-20220922073705-c89b713dc59e/go.mod h1:RAE7CPwSobSQmQnkI5NA85ACKxUuJ051sCwytw/b1LY=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
 github.com/nxadm/tail v1.4.4/go.mod h1:kenIhsEOeOJmVchQTgglprH7qJGnHDVpk1VPCcaMI8A=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=
