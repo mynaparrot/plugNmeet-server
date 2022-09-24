@@ -85,7 +85,8 @@ func (w *websocketService) handleWhiteboardMessages() {
 		plugnmeet.DataMsgBodyType_POINTER_UPDATE,
 		plugnmeet.DataMsgBodyType_ADD_WHITEBOARD_FILE,
 		plugnmeet.DataMsgBodyType_ADD_WHITEBOARD_OFFICE_FILE,
-		plugnmeet.DataMsgBodyType_PAGE_CHANGE:
+		plugnmeet.DataMsgBodyType_PAGE_CHANGE,
+		plugnmeet.DataMsgBodyType_WHITEBOARD_APP_STATE_CHANGE:
 		w.handleWhiteboard()
 	}
 }
