@@ -431,6 +431,8 @@ github.com/mynaparrot/plugnmeet-protocol v0.0.0-20220914191221-d862173d5903 h1:U
 github.com/mynaparrot/plugnmeet-protocol v0.0.0-20220914191221-d862173d5903/go.mod h1:QzgBCTx6g2Lmd7CnLv+MDWTqypyFYdZ0e6+5B+uwVNc=
 github.com/mynaparrot/plugnmeet-protocol v0.0.0-20220922073705-c89b713dc59e h1:dgzLuOVWZJoSBRfY6OJQKd/LEyuOFO/PjsSDmQpjOQk=
 github.com/mynaparrot/plugnmeet-protocol v0.0.0-20220922073705-c89b713dc59e/go.mod h1:RAE7CPwSobSQmQnkI5NA85ACKxUuJ051sCwytw/b1LY=
+github.com/mynaparrot/plugnmeet-protocol v0.0.0-20220924060111-3783e5384959 h1:jwnzGQL+mSo7GoNBE6iJ/XC6HBJQGDGswD0PI6X7SbI=
+github.com/mynaparrot/plugnmeet-protocol v0.0.0-20220924060111-3783e5384959/go.mod h1:RAE7CPwSobSQmQnkI5NA85ACKxUuJ051sCwytw/b1LY=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
 github.com/nxadm/tail v1.4.4/go.mod h1:kenIhsEOeOJmVchQTgglprH7qJGnHDVpk1VPCcaMI8A=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=
