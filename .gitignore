@@ -2,7 +2,6 @@ log
 *.log
 npm-debug.log*
 .DS_Store
-.air.toml
 start_air.sh
 
 run_livekit.sh

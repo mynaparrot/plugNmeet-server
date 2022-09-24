@@ -11,9 +11,11 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
     apt clean && \
     rm -rf /var/lib/apt/lists/*
     
+RUN go install github.com/cosmtrek/air@latest
+
 #COPY . .
 COPY go.mod go.mod
 COPY go.sum go.sum
 RUN go mod download
 
-CMD ["sh", "start.sh"]
+CMD air
