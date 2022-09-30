@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/go-redis/redis/v8"
 	"github.com/goccy/go-json"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
 	"time"
@@ -153,6 +154,17 @@ func (s *scheduler) activeRoomChecker() {
 		}
 		if room.JoinedParticipants != count {
 			_, _ = s.ra.rm.UpdateNumParticipants(room.Sid, count)
+		} else if room.JoinedParticipants == 0 {
+			// this room doesn't have any user
+			// we'll check if room was created long before then we can end it
+			// here we can check if room was created more than 24 hours ago
+			expire := time.Unix(room.CreationTime, 0).Add(time.Hour * 24)
+			if time.Now().After(expire) {
+				// we can close the room
+				s.ra.EndRoom(&plugnmeet.RoomEndReq{
+					RoomId: room.RoomId,
+				})
+			}
 		}
 	}
 }
