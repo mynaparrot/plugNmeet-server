@@ -5,7 +5,6 @@ import (
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"strings"
 )
@@ -18,13 +17,11 @@ func HandleLTIV1Landing(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).SendString("empty body")
 	}
 
-	proto := c.Get("X-Forwarded-Proto", "https")
-	signingURL := fmt.Sprintf("%s://%s%s", proto, c.Hostname(), c.Path())
-
+	proto := "https"
 	if strings.Contains(c.Hostname(), "localhost") {
-		// fallback to default, if localhost
-		signingURL = config.AppCnf.LtiInfo.V1ToolUrl
+		proto = "http"
 	}
+	signingURL := fmt.Sprintf("%s://%s%s", proto, c.Hostname(), c.Path())
 
 	m := models.NewLTIV1Model()
 	err := m.LTIV1Landing(c, string(b), signingURL)

@@ -86,5 +86,3 @@ shared_notepad:
       id: "node_01"
       host: "http://host.docker.internal:9001"
       api_key: "eb2fb3fb78ca29eb6896852517d34a1be5f320664e3cce3a522a06dfa278f169"
-lti_info:
-  v1_tool_url: http://localhost:8080/lti/v1
