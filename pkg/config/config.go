@@ -35,7 +35,6 @@ type AppConfig struct {
 	UploadFileSettings UploadFileSettings `yaml:"upload_file_settings"`
 	RecorderInfo       RecorderInfo       `yaml:"recorder_info"`
 	SharedNotePad      SharedNotePad      `yaml:"shared_notepad"`
-	LtiInfo            LtiInfo            `yaml:"lti_info"`
 }
 
 type ClientInfo struct {
@@ -116,10 +115,6 @@ type EtherpadInfo struct {
 	Id     string `yaml:"id"`
 	Host   string `yaml:"host"`
 	ApiKey string `yaml:"api_key"`
-}
-
-type LtiInfo struct {
-	V1ToolUrl string `yaml:"v1_tool_url"`
 }
 
 type ChatParticipant struct {
