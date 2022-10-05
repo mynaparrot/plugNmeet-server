@@ -12,7 +12,7 @@ require (
 	github.com/goccy/go-json v0.9.11
 	github.com/gofiber/fiber/v2 v2.38.1
 	github.com/gofiber/template v1.7.1
-	github.com/gofiber/websocket/v2 v2.0.25
+	github.com/gofiber/websocket/v2 v2.1.0
 	github.com/google/uuid v1.3.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.1.2
