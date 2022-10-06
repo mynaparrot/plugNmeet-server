@@ -3,11 +3,5 @@
   "extends": [
     "config:base"
   ],
-  "packageRules": [
-    {
-      "matchDepTypes": ["peerDependencies","devDependencies"],
-      "matchUpdateTypes": ["minor", "patch"],
-      "schedule": ["every weekend"]
-    }
-  ]
+  "schedule": ["every weekend"]
 }
