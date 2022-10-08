@@ -15,8 +15,8 @@ require (
 	github.com/gofiber/websocket/v2 v2.1.0
 	github.com/google/uuid v1.3.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/protocol v1.1.2
-	github.com/livekit/server-sdk-go v1.0.1
+	github.com/livekit/protocol v1.1.3-0.20220926180122-bafacf7041a5
+	github.com/livekit/server-sdk-go v1.0.2
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20221008035955-dc852fab3d6a
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.0
@@ -50,7 +50,8 @@ require (
 	github.com/klauspost/compress v1.15.11 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/lithammer/shortuuid/v3 v3.0.7 // indirect
-	github.com/magefile/mage v1.13.0 // indirect
+	github.com/livekit/mediatransportutil v0.0.0-20221006082217-6780348e24ae // indirect
+	github.com/magefile/mage v1.14.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/pion/datachannel v1.5.2 // indirect
 	github.com/pion/dtls/v2 v2.1.5 // indirect
