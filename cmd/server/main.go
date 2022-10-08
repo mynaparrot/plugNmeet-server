@@ -5,6 +5,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/handler"
 	"github.com/mynaparrot/plugnmeet-server/pkg/utils"
+	"github.com/mynaparrot/plugnmeet-server/version"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"os"
@@ -30,7 +31,7 @@ func main() {
 			},
 		},
 		Action:  startServer,
-		Version: Version,
+		Version: version.Version,
 	}
 	err := app.Run(os.Args)
 	if err != nil {

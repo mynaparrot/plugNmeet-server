@@ -11,6 +11,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/version"
 	"google.golang.org/protobuf/proto"
 	"strings"
 )
@@ -157,11 +158,13 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	}
 
 	livekitHost := strings.Replace(config.AppCnf.LivekitInfo.Host, "host.docker.internal", "localhost", 1) // without this you won't be able to connect
+	v := version.Version
 	res := &plugnmeet.VerifyTokenRes{
-		Status:      true,
-		Msg:         "token is valid",
-		LivekitHost: &livekitHost,
-		Token:       &token,
+		Status:        true,
+		Msg:           "token is valid",
+		LivekitHost:   &livekitHost,
+		Token:         &token,
+		ServerVersion: &v,
 	}
 
 	if !*req.IsProduction {
