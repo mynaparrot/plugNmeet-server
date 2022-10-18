@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"github.com/go-playground/validator/v10"
 	"github.com/go-redis/redis/v8"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -38,14 +39,15 @@ type AppConfig struct {
 }
 
 type ClientInfo struct {
-	Port           int            `yaml:"port"`
-	Debug          bool           `yaml:"debug"`
-	Path           string         `yaml:"path"`
-	ApiKey         string         `yaml:"api_key"`
-	Secret         string         `yaml:"secret"`
-	WebhookConf    WebhookConf    `yaml:"webhook_conf"`
-	PrometheusConf PrometheusConf `yaml:"prometheus"`
-	ProxyHeader    string         `yaml:"proxy_header"`
+	Port           int                      `yaml:"port"`
+	Debug          bool                     `yaml:"debug"`
+	Path           string                   `yaml:"path"`
+	ApiKey         string                   `yaml:"api_key"`
+	Secret         string                   `yaml:"secret"`
+	WebhookConf    WebhookConf              `yaml:"webhook_conf"`
+	PrometheusConf PrometheusConf           `yaml:"prometheus"`
+	ProxyHeader    string                   `yaml:"proxy_header"`
+	CopyrightConf  *plugnmeet.CopyrightConf `yaml:"copyright_conf"`
 }
 
 type WebhookConf struct {
