@@ -22,6 +22,9 @@ client:
     enable: false
     metrics_path: "/metrics"
   proxy_header: "" ## you can set X-Forwarded-For
+  copyright_conf:
+    display: true
+    text: 'Powered by <a href="https://www.plugnmeet.org" target="_blank">plugNmeet</a>'
 log_settings:
   log_file: "./log/plugNmeet.log"
   # maxsize of log file in MB

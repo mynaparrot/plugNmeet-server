@@ -43,6 +43,16 @@ func (am *roomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 	utils.SetCreateRoomDefaultValues(r, config.AppCnf.UploadFileSettings.MaxSize, config.AppCnf.UploadFileSettings.AllowedTypes, config.AppCnf.SharedNotePad.Enabled)
 	utils.SetRoomDefaultLockSettings(r)
 
+	// copyright
+	if config.AppCnf.Client.CopyrightConf == nil {
+		r.Metadata.CopyrightConf = &plugnmeet.CopyrightConf{
+			Display: true,
+			Text:    "Powered by <a href=\"https://www.plugnmeet.org\" target=\"_blank\">plugNmeet</a>",
+		}
+	} else {
+		r.Metadata.CopyrightConf = config.AppCnf.Client.CopyrightConf
+	}
+
 	meta, err := json.Marshal(r.Metadata)
 	if err != nil {
 		return false, "Error: " + err.Error(), nil
