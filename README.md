@@ -12,7 +12,7 @@ infrastructure [livekit](https://github.com/livekit/livekit-server). Please join
 3) Scalable and high performance system written in Go programming language which made it possible to distributed as a
    [single binary](https://github.com/mynaparrot/plugNmeet-server/releases) file!
 4) **Simulcast** and **Dynacast** features will allow you to continue online conferencing even if your internet
-   connection is slow! Supported video codecs: `H264`, `VP8`, `VP9` and `AV1`.
+   connection is slow! Supported video codecs: `H264`, `VP8` and `AV1`.
 5) Easy integration with any existing website or system.
 6) Easy customization with functionality, URL, logo, and branding colors.
 7) HD audio, video call and Screen sharing. **Virtual background** for webcams.
@@ -24,7 +24,7 @@ infrastructure [livekit](https://github.com/livekit/livekit-server). Please join
 13) Raise hand.
 14) Public & private chatting with File sharing.
 15) MP4 Recordings.
-16) RTMP Broadcasting
+16) RTMP Broadcasting.
 
 And many more!
 
