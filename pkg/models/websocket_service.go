@@ -136,7 +136,7 @@ func (w *websocketService) handleSendChatMsgs() {
 	config.AppCnf.RLock()
 	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
 		if p.RoomSid == w.rSid {
-			if *w.pl.To == p.UserSid {
+			if *w.pl.To == p.UserSid || *w.pl.To == p.UserId {
 				userUUID = p.UUID
 				break
 			}
@@ -207,7 +207,7 @@ func (w *websocketService) handleSendPushMsg() {
 		if p.RoomSid == w.rSid {
 			// only for specific user
 			if w.pl.To != nil {
-				if *w.pl.To == p.UserSid {
+				if *w.pl.To == p.UserSid || *w.pl.To == p.UserId {
 					to = append(to, p.UUID)
 				}
 			} else {
@@ -235,7 +235,7 @@ func (w *websocketService) handleWhiteboard() {
 		if p.RoomSid == w.rSid {
 			// this is basically for initial request
 			if w.pl.To != nil {
-				if *w.pl.To == p.UserSid {
+				if *w.pl.To == p.UserSid || *w.pl.To == p.UserId {
 					to = append(to, p.UUID)
 				}
 			} else if w.pl.Body.From.UserId != p.UserId {
