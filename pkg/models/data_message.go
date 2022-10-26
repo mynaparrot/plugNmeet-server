@@ -61,7 +61,7 @@ func (m *dataMessageModel) SendDataMessage(r *plugnmeet.DataMessageReq) error {
 }
 
 func (m *dataMessageModel) raiseHand(r *plugnmeet.DataMessageReq) error {
-	participants, _ := m.roomService.LoadParticipantsFromRedis(r.RoomId)
+	participants, _ := m.roomService.LoadParticipants(r.RoomId)
 
 	var sids []string
 	for _, participant := range participants {
@@ -75,7 +75,7 @@ func (m *dataMessageModel) raiseHand(r *plugnmeet.DataMessageReq) error {
 		}
 	}
 
-	reqPar, _ := m.roomService.LoadParticipantInfoFromRedis(r.RoomId, r.RequestedUserId)
+	reqPar, _ := m.roomService.LoadParticipantInfo(r.RoomId, r.RequestedUserId)
 
 	// now update user's metadata
 	metadata := new(plugnmeet.UserMetadata)
@@ -126,7 +126,7 @@ func (m *dataMessageModel) raiseHand(r *plugnmeet.DataMessageReq) error {
 }
 
 func (m *dataMessageModel) lowerHand(r *plugnmeet.DataMessageReq) error {
-	reqPar, err := m.roomService.LoadParticipantInfoFromRedis(r.RoomId, r.RequestedUserId)
+	reqPar, err := m.roomService.LoadParticipantInfo(r.RoomId, r.RequestedUserId)
 	if err != nil {
 		return err
 	}
@@ -152,7 +152,7 @@ func (m *dataMessageModel) otherUserLowerHand(r *plugnmeet.DataMessageReq) error
 	}
 	userId := r.Msg
 
-	reqPar, err := m.roomService.LoadParticipantInfoFromRedis(r.RoomId, userId)
+	reqPar, err := m.roomService.LoadParticipantInfo(r.RoomId, userId)
 	if err != nil {
 		return err
 	}

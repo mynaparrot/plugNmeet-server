@@ -152,7 +152,7 @@ func (a *authTokenModel) assignLockSettings(g *plugnmeet.GenerateTokenReq) {
 
 func (a *authTokenModel) makePresenter(g *plugnmeet.GenerateTokenReq) {
 	if g.UserInfo.IsAdmin && !g.UserInfo.IsHidden {
-		participants, err := a.rs.LoadParticipantsFromRedis(g.RoomId)
+		participants, err := a.rs.LoadParticipants(g.RoomId)
 		if err != nil {
 			return
 		}
@@ -253,7 +253,7 @@ func (a *authTokenModel) DoRenewToken(v *ValidateTokenReq) (string, error) {
 
 	m := NewRoomService()
 	// load current information
-	p, err := m.LoadParticipantInfoFromRedis(claims.Video.Room, claims.Identity)
+	p, err := m.LoadParticipantInfo(claims.Video.Room, claims.Identity)
 	if err != nil {
 		return "", err
 	}

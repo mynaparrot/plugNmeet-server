@@ -10,111 +10,97 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/proto"
 )
 
 const (
-	RoomsKey               = "rooms"
-	RoomParticipantsPrefix = "room_participants:"
-	BlockedUsersList       = "pnm:block_users_list:"
-	NodeRoomKey            = "room_node_map"
+	BlockedUsersList = "pnm:block_users_list:"
 )
 
 type RoomService struct {
-	rc  *redis.Client
-	ctx context.Context
-	rsc *lksdk.RoomServiceClient
+	rc            *redis.Client
+	ctx           context.Context
+	livekitClient *lksdk.RoomServiceClient
 }
 
 func NewRoomService() *RoomService {
-	roomClient := lksdk.NewRoomServiceClient(config.AppCnf.LivekitInfo.Host, config.AppCnf.LivekitInfo.ApiKey, config.AppCnf.LivekitInfo.Secret)
+	livekitClient := lksdk.NewRoomServiceClient(config.AppCnf.LivekitInfo.Host, config.AppCnf.LivekitInfo.ApiKey, config.AppCnf.LivekitInfo.Secret)
 
 	return &RoomService{
-		rc:  config.AppCnf.RDS,
-		ctx: context.Background(),
-		rsc: roomClient,
+		rc:            config.AppCnf.RDS,
+		ctx:           context.Background(),
+		livekitClient: livekitClient,
 	}
 }
 
-func (r *RoomService) LoadRoomInfoFromRedis(roomId string) (*livekit.Room, error) {
-	data, err := r.rc.HGet(r.ctx, RoomsKey, roomId).Result()
-
-	if err != nil {
-		if err == redis.Nil {
-			// if you change this text then make sure
-			// you also update: scheduler.go activeRoomChecker()
-			// also room_auth.go CreateRoom()
-			err = errors.New("requested room does not exist")
-		}
-		return nil, err
+func (r *RoomService) LoadRoomInfo(roomId string) (*livekit.Room, error) {
+	req := livekit.ListRoomsRequest{
+		Names: []string{
+			roomId,
+		},
 	}
 
-	room := livekit.Room{}
-	err = proto.Unmarshal([]byte(data), &room)
+	res, err := r.livekitClient.ListRooms(r.ctx, &req)
 	if err != nil {
 		log.Errorln(err)
 		return nil, err
 	}
 
-	return &room, nil
+	if len(res.Rooms) == 0 {
+		// if you change this text then make sure
+		// you also update: scheduler.go activeRoomChecker()
+		// also room_auth.go CreateRoom()
+		return nil, errors.New("requested room does not exist")
+	}
+
+	room := res.Rooms[0]
+	return room, nil
 }
 
-func (r *RoomService) LoadParticipantsFromRedis(roomId string) ([]*livekit.ParticipantInfo, error) {
-	key := RoomParticipantsPrefix + roomId
-
-	items, err := r.rc.HVals(r.ctx, key).Result()
-	if err == redis.Nil {
-		return nil, nil
-	} else if err != nil {
+func (r *RoomService) LoadParticipants(roomId string) ([]*livekit.ParticipantInfo, error) {
+	req := livekit.ListParticipantsRequest{
+		Room: roomId,
+	}
+	res, err := r.livekitClient.ListParticipants(r.ctx, &req)
+	if err != nil {
+		log.Errorln(err)
 		return nil, err
 	}
-
-	participants := make([]*livekit.ParticipantInfo, 0, len(items))
-	for _, item := range items {
-		pi := livekit.ParticipantInfo{}
-		if err := proto.Unmarshal([]byte(item), &pi); err != nil {
-			log.Errorln(err)
-			return nil, err
-		}
-		participants = append(participants, &pi)
-	}
-	return participants, nil
+	return res.Participants, nil
 }
 
-func (r *RoomService) LoadParticipantInfoFromRedis(roomId string, identity string) (*livekit.ParticipantInfo, error) {
-	key := RoomParticipantsPrefix + roomId
+func (r *RoomService) LoadParticipantInfo(roomId string, identity string) (*livekit.ParticipantInfo, error) {
+	req := livekit.RoomParticipantIdentity{
+		Room:     roomId,
+		Identity: identity,
+	}
 
-	data, err := r.rc.HGet(r.ctx, key, identity).Result()
-	if err == redis.Nil {
+	participant, err := r.livekitClient.GetParticipant(r.ctx, &req)
+	if err != nil {
+		log.Errorln(err)
+		return nil, err
+	}
+	if participant == nil {
 		return nil, errors.New("participant not found")
-	} else if err != nil {
-		return nil, err
 	}
 
-	pi := livekit.ParticipantInfo{}
-	if err := proto.Unmarshal([]byte(data), &pi); err != nil {
-		log.Errorln(err)
-		return nil, err
-	}
-	return &pi, nil
+	return participant, nil
 }
 
 func (r *RoomService) CreateRoom(roomId string, emptyTimeout *uint32, maxParticipants *uint32, metadata string) (*livekit.Room, error) {
-
-	data := livekit.CreateRoomRequest{
+	req := &livekit.CreateRoomRequest{
 		Name: roomId,
 	}
 	if emptyTimeout != nil && *emptyTimeout > 0 {
-		data.EmptyTimeout = *emptyTimeout
+		req.EmptyTimeout = *emptyTimeout
 	}
 	if maxParticipants != nil && *maxParticipants > 0 {
-		data.MaxParticipants = *maxParticipants
+		req.MaxParticipants = *maxParticipants
 	}
 	if metadata != "" {
-		data.Metadata = metadata
+		req.Metadata = metadata
 	}
 
-	room, err := r.rsc.CreateRoom(r.ctx, &data)
+	room, err := r.livekitClient.CreateRoom(r.ctx, req)
 	if err != nil {
 		log.Errorln(err)
 		return nil, err
@@ -123,29 +109,13 @@ func (r *RoomService) CreateRoom(roomId string, emptyTimeout *uint32, maxPartici
 	return room, nil
 }
 
-func (r *RoomService) LoadRoomInfo(roomId string) ([]*livekit.Room, error) {
-	data := livekit.ListRoomsRequest{
-		Names: []string{
-			roomId,
-		},
-	}
-
-	res, err := r.rsc.ListRooms(r.ctx, &data)
-	if err != nil {
-		log.Errorln(err)
-		return nil, err
-	}
-
-	return res.Rooms, nil
-}
-
 func (r *RoomService) UpdateRoomMetadata(roomId string, metadata string) (*livekit.Room, error) {
 	data := livekit.UpdateRoomMetadataRequest{
 		Room:     roomId,
 		Metadata: metadata,
 	}
 
-	room, err := r.rsc.UpdateRoomMetadata(r.ctx, &data)
+	room, err := r.livekitClient.UpdateRoomMetadata(r.ctx, &data)
 	if err != nil {
 		log.Errorln(err)
 		return nil, err
@@ -159,25 +129,13 @@ func (r *RoomService) EndRoom(roomId string) (string, error) {
 		Room: roomId,
 	}
 
-	res, err := r.rsc.DeleteRoom(r.ctx, &data)
+	res, err := r.livekitClient.DeleteRoom(r.ctx, &data)
 	if err != nil {
 		log.Errorln(err)
 		return "", err
 	}
 
 	return res.String(), nil
-}
-
-func (r *RoomService) DeleteRoomFromRedis(roomId string) error {
-	pp := r.rc.Pipeline()
-	pp.HDel(r.ctx, RoomsKey, roomId)
-	pp.HDel(r.ctx, NodeRoomKey, roomId)
-	_, err := pp.Exec(r.ctx)
-	if err != nil {
-		log.Error(err)
-		return err
-	}
-	return nil
 }
 
 func (r *RoomService) UpdateParticipantMetadata(roomId string, userId string, metadata string) (*livekit.ParticipantInfo, error) {
@@ -187,7 +145,7 @@ func (r *RoomService) UpdateParticipantMetadata(roomId string, userId string, me
 		Metadata: metadata,
 	}
 
-	participant, err := r.rsc.UpdateParticipant(r.ctx, &data)
+	participant, err := r.livekitClient.UpdateParticipant(r.ctx, &data)
 	if err != nil {
 		log.Errorln(err)
 		return nil, err
@@ -203,7 +161,7 @@ func (r *RoomService) UpdateParticipantPermission(roomId string, userId string, 
 		Permission: permission,
 	}
 
-	participant, err := r.rsc.UpdateParticipant(r.ctx, &data)
+	participant, err := r.livekitClient.UpdateParticipant(r.ctx, &data)
 	if err != nil {
 		log.Errorln(err)
 		return nil, err
@@ -218,7 +176,7 @@ func (r *RoomService) RemoveParticipant(roomId string, userId string) (*livekit.
 		Identity: userId,
 	}
 
-	res, err := r.rsc.RemoveParticipant(r.ctx, &data)
+	res, err := r.livekitClient.RemoveParticipant(r.ctx, &data)
 	if err != nil {
 		log.Errorln(err)
 		return nil, err
@@ -235,7 +193,7 @@ func (r *RoomService) MuteUnMuteTrack(roomId string, userId string, trackSid str
 		Muted:    muted,
 	}
 
-	res, err := r.rsc.MutePublishedTrack(r.ctx, &data)
+	res, err := r.livekitClient.MutePublishedTrack(r.ctx, &data)
 	if err != nil {
 		log.Errorln(err)
 		return nil, err
@@ -252,7 +210,7 @@ func (r *RoomService) SendData(roomId string, data []byte, dataPacket_Kind livek
 		DestinationSids: destinationSids,
 	}
 
-	res, err := r.rsc.SendData(r.ctx, &req)
+	res, err := r.livekitClient.SendData(r.ctx, &req)
 	if err != nil {
 		log.Errorln(err)
 		return nil, err
@@ -281,7 +239,7 @@ func (r *RoomService) DeleteRoomBlockList(roomId string) (int64, error) {
 }
 
 func (r *RoomService) LoadRoomWithMetadata(roomId string) (*livekit.Room, *plugnmeet.RoomMetadata, error) {
-	room, err := r.LoadRoomInfoFromRedis(roomId)
+	room, err := r.LoadRoomInfo(roomId)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -316,7 +274,7 @@ func (r *RoomService) UpdateRoomMetadataByStruct(roomId string, meta *plugnmeet.
 }
 
 func (r *RoomService) LoadParticipantWithMetadata(roomId, userId string) (*livekit.ParticipantInfo, *plugnmeet.UserMetadata, error) {
-	p, err := r.LoadParticipantInfoFromRedis(roomId, userId)
+	p, err := r.LoadParticipantInfo(roomId, userId)
 	if err != nil {
 		return nil, nil, err
 	}

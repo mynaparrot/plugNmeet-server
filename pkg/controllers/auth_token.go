@@ -25,13 +25,17 @@ func HandleAuthHeaderCheck(c *fiber.Ctx) error {
 	apiKey := c.Get("API-KEY", "")
 	signature := c.Get("HASH-SIGNATURE", "")
 	body := c.Body()
-	// To-Do: Deprecated, will be remove in next version
-	secret := c.Get("API-SECRET")
 
 	if apiKey != config.AppCnf.Client.ApiKey {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"status": false,
 			"msg":    "invalid API key",
+		})
+	}
+	if signature == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"status": false,
+			"msg":    "hash signature value required",
 		})
 	}
 
@@ -41,11 +45,6 @@ func HandleAuthHeaderCheck(c *fiber.Ctx) error {
 		mac.Write(body)
 		expectedSignature := hex.EncodeToString(mac.Sum(nil))
 		if subtle.ConstantTimeCompare([]byte(expectedSignature), []byte(signature)) == 1 {
-			status = true
-		}
-	} else {
-		// To-Do: Deprecated, will be remove in next version
-		if secret == config.AppCnf.Client.Secret {
 			status = true
 		}
 	}

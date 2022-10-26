@@ -70,10 +70,10 @@ Server API information can be found in [API doc](https://www.plugnmeet.org/docs/
 ## Manually installation
 
 **Requirements:**
-1) Livekit configured with Redis.
-2) `plugNmeet-server` configured with same Redis instance using for livekit.
+1) Livekit configured properly.
+2) `plugNmeet-server` configured with Redis.
 3) Mariadb server for data storage.
-4) Install `libreoffice` & `mupdf-tools` for office files support in whiteboard.
+4) (optional) Install `libreoffice` & `mupdf-tools` for office files support in whiteboard.
 
 Create `config.yaml`
 from [config_sample.yaml](https://raw.githubusercontent.com/mynaparrot/plugNmeet-server/main/config_sample.yaml) &
