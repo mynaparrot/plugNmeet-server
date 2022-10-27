@@ -25,7 +25,7 @@ func (am *roomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 	roomDbInfo, _ := am.rm.GetRoomInfo(r.RoomId, "", 1)
 
 	if roomDbInfo.Id > 0 {
-		rf, err := am.rs.LoadRoomInfoFromRedis(r.RoomId)
+		rf, err := am.rs.LoadRoomInfo(r.RoomId)
 		if err != nil && err.Error() != "requested room does not exist" {
 			return false, "can't create room. try again", nil
 		}
@@ -103,7 +103,7 @@ func (am *roomAuthModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (bool, strin
 	}
 
 	// let's make sure room actually active
-	_, err := am.rs.LoadRoomInfoFromRedis(r.RoomId)
+	_, err := am.rs.LoadRoomInfo(r.RoomId)
 	if err != nil {
 		// room isn't active. Change status
 		_, _ = am.rm.UpdateRoomStatus(&RoomInfo{
@@ -124,7 +124,7 @@ func (am *roomAuthModel) GetActiveRoomInfo(r *plugnmeet.GetActiveRoomInfoReq) (b
 		return false, "no room found", nil
 	}
 
-	rrr, err := am.rs.LoadRoomInfoFromRedis(r.RoomId)
+	rrr, err := am.rs.LoadRoomInfo(r.RoomId)
 	if err != nil {
 		return false, err.Error(), nil
 	}
@@ -144,7 +144,7 @@ func (am *roomAuthModel) GetActiveRoomInfo(r *plugnmeet.GetActiveRoomInfoReq) (b
 		CreationTime:       roomDbInfo.CreationTime,
 		Metadata:           rrr.Metadata,
 	}
-	res.ParticipantsInfo, _ = am.rs.LoadParticipantsFromRedis(roomDbInfo.RoomId)
+	res.ParticipantsInfo, _ = am.rs.LoadParticipants(roomDbInfo.RoomId)
 
 	return true, "success", res
 }
@@ -166,12 +166,12 @@ func (am *roomAuthModel) GetActiveRoomsInfo() (bool, string, []*plugnmeet.Active
 		i := new(plugnmeet.ActiveRoomInfoRes)
 		i.RoomInfo = roomInfo
 
-		participants, err := am.rs.LoadParticipantsFromRedis(r.RoomId)
+		participants, err := am.rs.LoadParticipants(r.RoomId)
 		if err == nil {
 			i.ParticipantsInfo = participants
 		}
 
-		rri, err := am.rs.LoadRoomInfoFromRedis(r.RoomId)
+		rri, err := am.rs.LoadRoomInfo(r.RoomId)
 		if err == nil {
 			i.RoomInfo.Metadata = rri.Metadata
 		}

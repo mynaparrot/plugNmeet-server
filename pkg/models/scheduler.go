@@ -128,7 +128,7 @@ func (s *scheduler) activeRoomChecker() {
 	}
 
 	for _, room := range activeRooms {
-		fromRedis, err := s.ra.rs.LoadRoomInfoFromRedis(room.RoomId)
+		fromRedis, err := s.ra.rs.LoadRoomInfo(room.RoomId)
 
 		if fromRedis == nil && err.Error() == "requested room does not exist" {
 			_, _ = s.ra.rm.UpdateRoomStatus(&RoomInfo{
@@ -141,7 +141,7 @@ func (s *scheduler) activeRoomChecker() {
 			continue
 		}
 
-		pp, err := s.ra.rs.LoadParticipantsFromRedis(room.RoomId)
+		pp, err := s.ra.rs.LoadParticipants(room.RoomId)
 		if err != nil {
 			continue
 		}

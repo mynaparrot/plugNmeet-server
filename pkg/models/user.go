@@ -41,7 +41,7 @@ func (u *userModel) UpdateUserLockSettings(r *plugnmeet.UpdateUserLockSettingsRe
 		return err
 	}
 
-	p, err := u.roomService.LoadParticipantInfoFromRedis(r.RoomId, r.UserId)
+	p, err := u.roomService.LoadParticipantInfo(r.RoomId, r.UserId)
 	if err != nil {
 		return err
 	}
@@ -58,7 +58,7 @@ func (u *userModel) UpdateUserLockSettings(r *plugnmeet.UpdateUserLockSettingsRe
 }
 
 func (u *userModel) updateLockSettingsAllUsers(r *plugnmeet.UpdateUserLockSettingsReq) error {
-	participants, err := u.roomService.LoadParticipantsFromRedis(r.RoomId)
+	participants, err := u.roomService.LoadParticipants(r.RoomId)
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func (u *userModel) updateLockSettingsAllUsers(r *plugnmeet.UpdateUserLockSettin
 
 	// now we'll require updating room settings
 	// so that future users can be applied same lock settings
-	info, err := u.roomService.LoadRoomInfoFromRedis(r.RoomId)
+	info, err := u.roomService.LoadRoomInfo(r.RoomId)
 	if err != nil {
 		return err
 	}
@@ -171,7 +171,7 @@ func (u *userModel) MuteUnMuteTrack(r *plugnmeet.MuteUnMuteTrackReq) error {
 		return err
 	}
 
-	p, err := u.roomService.LoadParticipantInfoFromRedis(r.RoomId, r.UserId)
+	p, err := u.roomService.LoadParticipantInfo(r.RoomId, r.UserId)
 	if err != nil {
 		return err
 	}
@@ -199,7 +199,7 @@ func (u *userModel) MuteUnMuteTrack(r *plugnmeet.MuteUnMuteTrackReq) error {
 }
 
 func (u *userModel) muteUnmuteAllMic(r *plugnmeet.MuteUnMuteTrackReq) error {
-	participants, err := u.roomService.LoadParticipantsFromRedis(r.RoomId)
+	participants, err := u.roomService.LoadParticipants(r.RoomId)
 	if err != nil {
 		return err
 	}
@@ -224,7 +224,7 @@ func (u *userModel) muteUnmuteAllMic(r *plugnmeet.MuteUnMuteTrackReq) error {
 }
 
 func (u *userModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
-	p, err := u.roomService.LoadParticipantInfoFromRedis(r.RoomId, r.UserId)
+	p, err := u.roomService.LoadParticipantInfo(r.RoomId, r.UserId)
 	if err != nil {
 		return err
 	}
@@ -257,7 +257,7 @@ func (u *userModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 }
 
 func (u *userModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
-	participants, err := u.roomService.LoadParticipantsFromRedis(r.RoomId)
+	participants, err := u.roomService.LoadParticipants(r.RoomId)
 	if err != nil {
 		return err
 	}
@@ -292,7 +292,7 @@ func (u *userModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
 	}
 
 	// if everything goes well in top then we'll go ahead
-	p, err := u.roomService.LoadParticipantInfoFromRedis(r.RoomId, r.UserId)
+	p, err := u.roomService.LoadParticipantInfo(r.RoomId, r.UserId)
 	if err != nil {
 		return err
 	}

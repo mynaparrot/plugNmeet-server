@@ -56,7 +56,7 @@ func NewBreakoutRoomModel() *breakoutRoom {
 //}
 
 func (m *breakoutRoom) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRoomsReq) error {
-	mainRoom, err := m.roomService.LoadRoomInfoFromRedis(r.RoomId)
+	mainRoom, err := m.roomService.LoadRoomInfo(r.RoomId)
 	if err != nil {
 		return err
 	}
@@ -278,8 +278,6 @@ func (m *breakoutRoom) EndBreakoutRoom(r *plugnmeet.EndBreakoutRoomReq) error {
 		log.Error(err)
 	}
 
-	// for safety we'll delete rooms
-	_ = m.roomService.DeleteRoomFromRedis(r.BreakoutRoomId)
 	model := NewRoomModel()
 	_, _ = model.UpdateRoomStatus(&RoomInfo{
 		RoomId:    r.BreakoutRoomId,
@@ -420,7 +418,7 @@ func (m *breakoutRoom) fetchBreakoutRooms(roomId string) ([]*plugnmeet.BreakoutR
 		room.Id = i
 		for _, u := range room.Users {
 			if room.Started {
-				joined, err := m.roomService.LoadParticipantInfoFromRedis(room.Id, u.Id)
+				joined, err := m.roomService.LoadParticipantInfo(room.Id, u.Id)
 				if err == nil {
 					if joined.Identity == u.Id {
 						u.Joined = true

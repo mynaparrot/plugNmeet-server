@@ -40,9 +40,13 @@ func prepareStringWithTokenReq(token, method, router string, m proto.Message) *h
 }
 
 func prepareByteReq(method, router string, b []byte) *http.Request {
+	mac := hmac.New(sha256.New, []byte(config.AppCnf.Client.Secret))
+	mac.Write(b)
+	signature := hex.EncodeToString(mac.Sum(nil))
+
 	req := httptest.NewRequest(method, router, bytes.NewReader(b))
 	req.Header.Set("API-KEY", config.AppCnf.Client.ApiKey)
-	req.Header.Set("API-SECRET", config.AppCnf.Client.Secret)
+	req.Header.Set("HASH-SIGNATURE", signature)
 	req.Header.Set("Content-Type", "application/protobuf")
 	return req
 }

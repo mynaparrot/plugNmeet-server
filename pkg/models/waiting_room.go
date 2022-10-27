@@ -21,7 +21,7 @@ func NewWaitingRoomModel() *userWaitingRoomModel {
 
 func (u *userWaitingRoomModel) ApproveWaitingUsers(r *plugnmeet.ApproveWaitingUsersReq) error {
 	if r.UserId == "all" {
-		participants, err := u.roomService.LoadParticipantsFromRedis(r.RoomId)
+		participants, err := u.roomService.LoadParticipants(r.RoomId)
 		if err != nil {
 			return err
 		}
@@ -34,7 +34,7 @@ func (u *userWaitingRoomModel) ApproveWaitingUsers(r *plugnmeet.ApproveWaitingUs
 		return nil
 	}
 
-	p, err := u.roomService.LoadParticipantInfoFromRedis(r.RoomId, r.UserId)
+	p, err := u.roomService.LoadParticipantInfo(r.RoomId, r.UserId)
 	if err != nil {
 		return err
 	}
