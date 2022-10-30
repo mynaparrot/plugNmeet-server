@@ -259,7 +259,6 @@ func (a *authTokenModel) DoRenewToken(v *ValidateTokenReq) (string, error) {
 	}
 
 	at := auth.NewAccessToken(a.app.Client.ApiKey, a.app.Client.Secret)
-
 	at.AddGrant(claims.Video).
 		SetIdentity(claims.Identity).
 		SetName(p.Name).

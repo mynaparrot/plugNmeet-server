@@ -183,12 +183,10 @@ func (w *websocketService) handleRenewToken() {
 
 	config.AppCnf.RLock()
 	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
-		if p.RoomSid == w.rSid {
-			if w.pl.Body.From.UserId == p.UserId {
-				err = ikisocket.EmitTo(p.UUID, jm, ikisocket.BinaryMessage)
-				if err != nil {
-					log.Errorln(err)
-				}
+		if p.RoomId == w.roomId && w.pl.Body.From.UserId == p.UserId {
+			err = ikisocket.EmitTo(p.UUID, jm, ikisocket.BinaryMessage)
+			if err != nil {
+				log.Errorln(err)
 			}
 		}
 	}
