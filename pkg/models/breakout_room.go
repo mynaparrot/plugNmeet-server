@@ -32,29 +32,6 @@ func NewBreakoutRoomModel() *breakoutRoom {
 	}
 }
 
-//type CreateBreakoutRoomsReq struct {
-//	RoomId          string
-//	RequestedUserId string
-//	Duration        uint64          `json:"duration" validate:"required"`
-//	WelcomeMsg      string          `json:"welcome_msg"`
-//	Rooms           []*BreakoutRoom `json:"rooms" validate:"required"`
-//}
-//
-//type BreakoutRoom struct {
-//	Id       string              `json:"id"`
-//	Title    string              `json:"title"`
-//	Duration uint64              `json:"duration"`
-//	Started  bool                `json:"started"`
-//	Created  int64               `json:"created"`
-//	Users    []*BreakoutRoomUser `json:"users"`
-//}
-//
-//type BreakoutRoomUser struct {
-//	Id     string `json:"id"`
-//	Name   string `json:"name"`
-//	Joined bool   `json:"joined"`
-//}
-
 func (m *breakoutRoom) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRoomsReq) error {
 	mainRoom, err := m.roomService.LoadRoomInfo(r.RoomId)
 	if err != nil {
@@ -76,7 +53,7 @@ func (m *breakoutRoom) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRoomsReq) 
 	meta.RoomFeatures.WaitingRoomFeatures.IsActive = false
 
 	// we'll disable now. in the future, we can think about those
-	meta.RoomFeatures.AllowRecording = false
+	meta.RoomFeatures.RecordingFeatures.IsAllow = false
 	meta.RoomFeatures.AllowRtmp = false
 
 	// clear few main room data
