@@ -15,7 +15,7 @@ require (
 	github.com/gofiber/websocket/v2 v2.1.1
 	github.com/google/uuid v1.3.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/protocol v1.1.3-0.20221026203734-d3635b12268c
+	github.com/livekit/protocol v1.2.2
 	github.com/livekit/server-sdk-go v1.0.5
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20221110060740-91a9e27a8e46
 	github.com/sirupsen/logrus v1.9.0
@@ -77,8 +77,8 @@ require (
 	github.com/pion/udp v0.1.1 // indirect
 	github.com/pion/webrtc/v3 v3.1.47 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/prometheus/client_golang v1.13.0 // indirect
-	github.com/prometheus/client_model v0.2.0 // indirect
+	github.com/prometheus/client_golang v1.14.0 // indirect
+	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
