@@ -15,8 +15,8 @@ require (
 	github.com/gofiber/websocket/v2 v2.1.1
 	github.com/google/uuid v1.3.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/protocol v1.1.3-0.20221013203258-19dd0a128e43
-	github.com/livekit/server-sdk-go v1.0.4
+	github.com/livekit/protocol v1.1.3-0.20221026203734-d3635b12268c
+	github.com/livekit/server-sdk-go v1.0.5
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20221110060740-91a9e27a8e46
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.1
@@ -39,8 +39,10 @@ require (
 	github.com/eapache/queue v1.1.0 // indirect
 	github.com/envoyproxy/protoc-gen-validate v0.6.13 // indirect
 	github.com/fasthttp/websocket v1.5.0 // indirect
+	github.com/frostbyte73/go-throttle v0.0.0-20210621200530-8018c891361d // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/go-logr/zapr v1.2.3 // indirect
 	github.com/go-playground/locales v0.14.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect
 	github.com/gofiber/adaptor/v2 v2.1.25 // indirect
@@ -51,6 +53,7 @@ require (
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/lithammer/shortuuid/v3 v3.0.7 // indirect
 	github.com/livekit/mediatransportutil v0.0.0-20221007030528-7440725c362b // indirect
+	github.com/mackerelio/go-osstat v0.2.3 // indirect
 	github.com/magefile/mage v1.14.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.16 // indirect
@@ -88,6 +91,8 @@ require (
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
+	go.uber.org/multierr v1.6.0 // indirect
+	go.uber.org/zap v1.23.0 // indirect
 	golang.org/x/crypto v0.0.0-20221010152910-d6f0a8c073c2 // indirect
 	golang.org/x/net v0.0.0-20221004154528-8021a29435af // indirect
 	golang.org/x/sys v0.0.0-20221010170243-090e33056c14 // indirect
