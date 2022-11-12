@@ -396,6 +396,8 @@ github.com/modern-go/reflect2 v1.0.1/go.mod h1:bx2lNnkwVCuqBIxFjflWJWanXIb3Rllmb
 github.com/modern-go/reflect2 v1.0.2/go.mod h1:yWuevngMOJpCy52FWWMvUC8ws7m/LJsjYzDa0/r8luk=
 github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=
 github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=
+github.com/mynaparrot/plugnmeet-protocol v0.0.0-20221110060740-91a9e27a8e46 h1:iDp6d8aXluboT5tdgRS4iggiF7+eypt7bHfRz7j5Q0s=
+github.com/mynaparrot/plugnmeet-protocol v0.0.0-20221110060740-91a9e27a8e46/go.mod h1:Q/HsHxXxEa4FPFvYPbP2wDHNS+/aQbet+XqVggGbR5Y=
 github.com/mynaparrot/plugnmeet-protocol v0.0.0-20221112034850-2d6a0804c3de h1:1jy8bH/+M7fDoNlQjIRxSExkGOees4MK/UCUrPurkpw=
 github.com/mynaparrot/plugnmeet-protocol v0.0.0-20221112034850-2d6a0804c3de/go.mod h1:kidFKmQsfTQL213D81oYBBfEu1IFqlk9p++u3R4XFYs=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
