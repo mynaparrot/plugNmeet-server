@@ -352,6 +352,8 @@ github.com/livekit/mediatransportutil v0.0.0-20221007030528-7440725c362b h1:RBNV
 github.com/livekit/mediatransportutil v0.0.0-20221007030528-7440725c362b/go.mod h1:1Dlx20JPoIKGP45eo+yuj0HjeE25zmyeX/EWHiPCjFw=
 github.com/livekit/protocol v1.2.2 h1:FB/P15QMaofHVpTooxFOr/cEHQhME1yBvGqUVPHgSo0=
 github.com/livekit/protocol v1.2.2/go.mod h1:eveiL9UJGmVsmqVXVVZtCMkkqH83YyHcDt+ryZWbc6E=
+github.com/livekit/protocol v1.2.3 h1:iy0mVixq6u2X+X1Z74OMOZ4R7MVgkb2po6hFCeJ7XNU=
+github.com/livekit/protocol v1.2.3/go.mod h1:eveiL9UJGmVsmqVXVVZtCMkkqH83YyHcDt+ryZWbc6E=
 github.com/livekit/server-sdk-go v1.0.5 h1:BV/MrehCCVi1VxjZxjxqkWDbqpnjhH4a7TWQXGH30/Y=
 github.com/livekit/server-sdk-go v1.0.5/go.mod h1:v/Hk0EY019R5IJOSau5JITNEt1uJLNcFuulu7KEzl0Q=
 github.com/lyft/protoc-gen-star v0.5.3/go.mod h1:V0xaHgaf5oCCqmcxYcWiDfTiKsZsRc87/1qhoTACD8w=
