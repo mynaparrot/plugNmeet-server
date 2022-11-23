@@ -12,16 +12,16 @@ import (
 	"time"
 )
 
-type notifier struct {
+type WebhookNotifierModel struct {
 	apiKey      string
 	apiSecret   string
 	urls        []string
 	webhookConf config.WebhookConf
-	roomModel   *roomModel
+	roomModel   *RoomModel
 }
 
-func NewWebhookNotifier() *notifier {
-	return &notifier{
+func NewWebhookNotifier() *WebhookNotifierModel {
+	return &WebhookNotifierModel{
 		apiKey:      config.AppCnf.Client.ApiKey,
 		apiSecret:   config.AppCnf.Client.Secret,
 		webhookConf: config.AppCnf.Client.WebhookConf,
@@ -29,7 +29,7 @@ func NewWebhookNotifier() *notifier {
 	}
 }
 
-func (n *notifier) Notify(roomSid string, msg interface{}) error {
+func (n *WebhookNotifierModel) Notify(roomSid string, msg interface{}) error {
 	if !n.webhookConf.Enable {
 		return nil
 	}
@@ -57,7 +57,7 @@ func (n *notifier) Notify(roomSid string, msg interface{}) error {
 	return nil
 }
 
-func (n *notifier) _notify(msg interface{}) error {
+func (n *WebhookNotifierModel) _notify(msg interface{}) error {
 	var encoded []byte
 	var err error
 

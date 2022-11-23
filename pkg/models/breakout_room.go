@@ -18,8 +18,8 @@ type breakoutRoom struct {
 	ctx            context.Context
 	rc             *redis.Client
 	roomService    *RoomService
-	roomAuthModel  *roomAuthModel
-	authTokenModel *authTokenModel
+	roomAuthModel  *RoomAuthModel
+	authTokenModel *AuthTokenModel
 }
 
 func NewBreakoutRoomModel() *breakoutRoom {

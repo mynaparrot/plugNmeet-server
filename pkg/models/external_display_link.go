@@ -5,18 +5,18 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 )
 
-type externalDisplayLink struct {
+type ExternalDisplayLink struct {
 	rs  *RoomService
 	req *plugnmeet.ExternalDisplayLinkReq
 }
 
-func NewExternalDisplayLinkModel() *externalDisplayLink {
-	return &externalDisplayLink{
+func NewExternalDisplayLinkModel() *ExternalDisplayLink {
+	return &ExternalDisplayLink{
 		rs: NewRoomService(),
 	}
 }
 
-func (e *externalDisplayLink) PerformTask(req *plugnmeet.ExternalDisplayLinkReq) error {
+func (e *ExternalDisplayLink) PerformTask(req *plugnmeet.ExternalDisplayLinkReq) error {
 	e.req = req
 	switch req.Task {
 	case plugnmeet.ExternalDisplayLinkTask_START_EXTERNAL_LINK:
@@ -28,7 +28,7 @@ func (e *externalDisplayLink) PerformTask(req *plugnmeet.ExternalDisplayLinkReq)
 	return errors.New("not valid request")
 }
 
-func (e *externalDisplayLink) start() error {
+func (e *ExternalDisplayLink) start() error {
 	if e.req.Url != nil && *e.req.Url == "" {
 		return errors.New("valid url required")
 	}
@@ -43,7 +43,7 @@ func (e *externalDisplayLink) start() error {
 	return e.updateRoomMetadata(opts)
 }
 
-func (e *externalDisplayLink) end() error {
+func (e *ExternalDisplayLink) end() error {
 	active := new(bool)
 
 	opts := &updateRoomMetadataOpts{
@@ -52,7 +52,7 @@ func (e *externalDisplayLink) end() error {
 	return e.updateRoomMetadata(opts)
 }
 
-func (e *externalDisplayLink) updateRoomMetadata(opts *updateRoomMetadataOpts) error {
+func (e *ExternalDisplayLink) updateRoomMetadata(opts *updateRoomMetadataOpts) error {
 	_, roomMeta, err := e.rs.LoadRoomWithMetadata(e.req.RoomId)
 	if err != nil {
 		return err

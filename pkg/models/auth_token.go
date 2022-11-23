@@ -8,19 +8,19 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
-type authTokenModel struct {
+type AuthTokenModel struct {
 	app *config.AppConfig
 	rs  *RoomService
 }
 
-func NewAuthTokenModel() *authTokenModel {
-	return &authTokenModel{
+func NewAuthTokenModel() *AuthTokenModel {
+	return &AuthTokenModel{
 		app: config.AppCnf,
 		rs:  NewRoomService(),
 	}
 }
 
-func (a *authTokenModel) DoGenerateToken(g *plugnmeet.GenerateTokenReq) (string, error) {
+func (a *AuthTokenModel) DoGenerateToken(g *plugnmeet.GenerateTokenReq) (string, error) {
 	if g.UserInfo.UserMetadata == nil {
 		g.UserInfo.UserMetadata = new(plugnmeet.UserMetadata)
 	}
@@ -59,7 +59,7 @@ func (a *authTokenModel) DoGenerateToken(g *plugnmeet.GenerateTokenReq) (string,
 // GenerateLivekitToken will generate token to join livekit server
 // It will use info as other validation. We just don't want user simple copy/past token from url
 // instated plugNmeet-server will generate once validation will be completed.
-func (a *authTokenModel) GenerateLivekitToken(claims *auth.ClaimGrants) (string, error) {
+func (a *AuthTokenModel) GenerateLivekitToken(claims *auth.ClaimGrants) (string, error) {
 	at := auth.NewAccessToken(a.app.LivekitInfo.ApiKey, a.app.LivekitInfo.Secret)
 	grant := &auth.VideoGrant{
 		RoomJoin:  true,
@@ -77,7 +77,7 @@ func (a *authTokenModel) GenerateLivekitToken(claims *auth.ClaimGrants) (string,
 	return at.ToJWT()
 }
 
-func (a *authTokenModel) assignLockSettings(g *plugnmeet.GenerateTokenReq) {
+func (a *AuthTokenModel) assignLockSettings(g *plugnmeet.GenerateTokenReq) {
 	if g.UserInfo.UserMetadata.LockSettings == nil {
 		g.UserInfo.UserMetadata.LockSettings = new(plugnmeet.LockSettings)
 	}
@@ -150,7 +150,7 @@ func (a *authTokenModel) assignLockSettings(g *plugnmeet.GenerateTokenReq) {
 	g.UserInfo.UserMetadata.LockSettings = l
 }
 
-func (a *authTokenModel) makePresenter(g *plugnmeet.GenerateTokenReq) {
+func (a *AuthTokenModel) makePresenter(g *plugnmeet.GenerateTokenReq) {
 	if g.UserInfo.IsAdmin && !g.UserInfo.IsHidden {
 		participants, err := a.rs.LoadParticipants(g.RoomId)
 		if err != nil {
@@ -180,7 +180,7 @@ func (a *authTokenModel) makePresenter(g *plugnmeet.GenerateTokenReq) {
 // GenTokenForRecorder only for either recorder or RTMP bot
 // Because we don't want to add any service settings which may
 // prevent to work recorder/rtmp bot as expected.
-func (a *authTokenModel) GenTokenForRecorder(g *plugnmeet.GenerateTokenReq) (string, error) {
+func (a *AuthTokenModel) GenTokenForRecorder(g *plugnmeet.GenerateTokenReq) (string, error) {
 	at := auth.NewAccessToken(a.app.Client.ApiKey, a.app.Client.Secret)
 	// basic permission
 	grant := &auth.VideoGrant{
@@ -205,7 +205,7 @@ type ValidateTokenReq struct {
 }
 
 // DoValidateToken can be use to validate both livekit & plugnmeet token
-func (a *authTokenModel) DoValidateToken(v *ValidateTokenReq, livekit bool) (*auth.ClaimGrants, error) {
+func (a *AuthTokenModel) DoValidateToken(v *ValidateTokenReq, livekit bool) (*auth.ClaimGrants, error) {
 	grant, err := auth.ParseAPIToken(v.Token)
 	if err != nil {
 		return nil, err
@@ -225,7 +225,7 @@ func (a *authTokenModel) DoValidateToken(v *ValidateTokenReq, livekit bool) (*au
 	return claims, nil
 }
 
-func (a *authTokenModel) verifyTokenWithRoomInfo(v *ValidateTokenReq) (*auth.ClaimGrants, *RoomInfo, error) {
+func (a *AuthTokenModel) verifyTokenWithRoomInfo(v *ValidateTokenReq) (*auth.ClaimGrants, *RoomInfo, error) {
 	claims, err := a.DoValidateToken(v, false)
 	if err != nil {
 		return nil, nil, err
@@ -245,7 +245,7 @@ func (a *authTokenModel) verifyTokenWithRoomInfo(v *ValidateTokenReq) (*auth.Cla
 }
 
 // DoRenewToken we'll renew token
-func (a *authTokenModel) DoRenewToken(v *ValidateTokenReq) (string, error) {
+func (a *AuthTokenModel) DoRenewToken(v *ValidateTokenReq) (string, error) {
 	claims, _, err := a.verifyTokenWithRoomInfo(v)
 	if err != nil {
 		return "", err

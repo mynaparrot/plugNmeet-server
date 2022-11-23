@@ -16,11 +16,11 @@ type webhookEvent struct {
 	rc             *redis.Client
 	ctx            context.Context
 	event          *livekit.WebhookEvent
-	roomModel      *roomModel
+	roomModel      *RoomModel
 	roomService    *RoomService
-	recordingModel *recordingModel
-	userModel      *userModel
-	notifier       *notifier
+	recordingModel *RecordingModel
+	userModel      *UserModel
+	notifier       *WebhookNotifierModel
 }
 
 func NewWebhookModel(e *livekit.WebhookEvent) {
