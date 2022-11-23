@@ -17,25 +17,25 @@ func HandleRoomCreate(c *fiber.Ctx) error {
 			"msg":    err.Error(),
 		})
 	}
-	err = req.Validate()
-	if err != nil {
+
+	if err = req.Validate(); err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
 			"msg":    err.Error(),
 		})
 	}
 
-	if req.Metadata == nil {
+	if err = req.Metadata.Validate(); err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    "room metadata information required",
+			"msg":    err.Error(),
 		})
 	}
 
-	if req.Metadata.RoomFeatures == nil {
+	if err = req.Metadata.RoomFeatures.Validate(); err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    "room features information required",
+			"msg":    err.Error(),
 		})
 	}
 
