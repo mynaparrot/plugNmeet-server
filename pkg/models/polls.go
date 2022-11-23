@@ -17,19 +17,19 @@ import (
 
 const pollsKey = "pnm:polls:"
 
-type newPollsModel struct {
+type PollsModel struct {
 	rc  *redis.Client
 	ctx context.Context
 }
 
-func NewPollsModel() *newPollsModel {
-	return &newPollsModel{
+func NewPollsModel() *PollsModel {
+	return &PollsModel{
 		rc:  config.AppCnf.RDS,
 		ctx: context.Background(),
 	}
 }
 
-func (m *newPollsModel) CreatePoll(r *plugnmeet.CreatePollReq, isAdmin bool) (error, string) {
+func (m *PollsModel) CreatePoll(r *plugnmeet.CreatePollReq, isAdmin bool) (error, string) {
 	r.PollId = uuid.NewString()
 
 	// first add to room
@@ -50,7 +50,7 @@ func (m *newPollsModel) CreatePoll(r *plugnmeet.CreatePollReq, isAdmin bool) (er
 }
 
 // addPollToRoom will insert poll to room hash
-func (m *newPollsModel) addPollToRoom(r *plugnmeet.CreatePollReq) error {
+func (m *PollsModel) addPollToRoom(r *plugnmeet.CreatePollReq) error {
 	p := &plugnmeet.PollInfo{
 		Id:        r.PollId,
 		RoomId:    r.RoomId,
@@ -79,7 +79,7 @@ func (m *newPollsModel) addPollToRoom(r *plugnmeet.CreatePollReq) error {
 
 // createRespondentHash will create initial hash
 // format for all_respondents array value = userId:option_id
-func (m *newPollsModel) createRespondentHash(r *plugnmeet.CreatePollReq) error {
+func (m *PollsModel) createRespondentHash(r *plugnmeet.CreatePollReq) error {
 	key := fmt.Sprintf("%s%s:respondents:%s", pollsKey, r.RoomId, r.PollId)
 
 	v := make(map[string]interface{})
@@ -98,7 +98,7 @@ func (m *newPollsModel) createRespondentHash(r *plugnmeet.CreatePollReq) error {
 	return err
 }
 
-func (m *newPollsModel) ListPolls(roomId string) (error, []*plugnmeet.PollInfo) {
+func (m *PollsModel) ListPolls(roomId string) (error, []*plugnmeet.PollInfo) {
 	var polls []*plugnmeet.PollInfo
 
 	p := m.rc.HGetAll(m.ctx, pollsKey+roomId)
@@ -125,7 +125,7 @@ func (m *newPollsModel) ListPolls(roomId string) (error, []*plugnmeet.PollInfo) 
 	return nil, polls
 }
 
-func (m *newPollsModel) GetPollResponsesByField(roomId, pollId, field string) (error, string) {
+func (m *PollsModel) GetPollResponsesByField(roomId, pollId, field string) (error, string) {
 	key := fmt.Sprintf("%s%s:respondents:%s", pollsKey, roomId, pollId)
 
 	v := m.rc.HGet(m.ctx, key, field)
@@ -134,7 +134,7 @@ func (m *newPollsModel) GetPollResponsesByField(roomId, pollId, field string) (e
 	return err, result
 }
 
-func (m *newPollsModel) UserSelectedOption(roomId, pollId, userId string) (uint64, error) {
+func (m *PollsModel) UserSelectedOption(roomId, pollId, userId string) (uint64, error) {
 	err, allRespondents := m.GetPollResponsesByField(roomId, pollId, "all_respondents")
 	if err != nil {
 		return 0, err
@@ -170,7 +170,7 @@ type userResponseCommonFields struct {
 	AllRespondents string `redis:"all_respondents"`
 }
 
-func (m *newPollsModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq, isAdmin bool) error {
+func (m *PollsModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq, isAdmin bool) error {
 	key := fmt.Sprintf("%s%s:respondents:%s", pollsKey, r.RoomId, r.PollId)
 
 	err := m.rc.Watch(m.ctx, func(tx *redis.Tx) error {
@@ -226,7 +226,7 @@ func (m *newPollsModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq, i
 	return nil
 }
 
-func (m *newPollsModel) broadcastNotification(roomId, userId, pollId string, mType plugnmeet.DataMsgBodyType, isAdmin bool) error {
+func (m *PollsModel) broadcastNotification(roomId, userId, pollId string, mType plugnmeet.DataMsgBodyType, isAdmin bool) error {
 	payload := &plugnmeet.DataMessage{
 		Type:   plugnmeet.DataMsgType_SYSTEM,
 		RoomId: roomId,
@@ -250,7 +250,7 @@ func (m *newPollsModel) broadcastNotification(roomId, userId, pollId string, mTy
 	return nil
 }
 
-func (m *newPollsModel) ClosePoll(r *plugnmeet.ClosePollReq, isAdmin bool) error {
+func (m *PollsModel) ClosePoll(r *plugnmeet.ClosePollReq, isAdmin bool) error {
 	key := pollsKey + r.RoomId
 
 	err := m.rc.Watch(m.ctx, func(tx *redis.Tx) error {
@@ -294,7 +294,7 @@ func (m *newPollsModel) ClosePoll(r *plugnmeet.ClosePollReq, isAdmin bool) error
 	return nil
 }
 
-func (m *newPollsModel) CleanUpPolls(roomId string) error {
+func (m *PollsModel) CleanUpPolls(roomId string) error {
 	err, polls := m.ListPolls(roomId)
 	if err != nil {
 		return err
@@ -318,7 +318,7 @@ func (m *newPollsModel) CleanUpPolls(roomId string) error {
 	return nil
 }
 
-func (m *newPollsModel) GetPollResponsesDetails(roomId, pollId string) (error, map[string]string) {
+func (m *PollsModel) GetPollResponsesDetails(roomId, pollId string) (error, map[string]string) {
 	key := fmt.Sprintf("%s%s:respondents:%s", pollsKey, roomId, pollId)
 	var result map[string]string
 
@@ -336,7 +336,7 @@ func (m *newPollsModel) GetPollResponsesDetails(roomId, pollId string) (error, m
 	return err, result
 }
 
-func (m *newPollsModel) GetResponsesResult(roomId, pollId string) (*plugnmeet.PollResponsesResult, error) {
+func (m *PollsModel) GetResponsesResult(roomId, pollId string) (*plugnmeet.PollResponsesResult, error) {
 	res := new(plugnmeet.PollResponsesResult)
 
 	p := m.rc.HGet(m.ctx, pollsKey+roomId, pollId)
@@ -381,7 +381,7 @@ func (m *newPollsModel) GetResponsesResult(roomId, pollId string) (*plugnmeet.Po
 	return res, nil
 }
 
-func (m *newPollsModel) GetPollsStats(roomId string) (*plugnmeet.PollsStats, error) {
+func (m *PollsModel) GetPollsStats(roomId string) (*plugnmeet.PollsStats, error) {
 	res := &plugnmeet.PollsStats{
 		TotalPolls:   0,
 		TotalRunning: 0,

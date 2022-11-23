@@ -10,22 +10,22 @@ import (
 	"time"
 )
 
-type scheduler struct {
+type SchedulerModel struct {
 	rc          *redis.Client
 	ctx         context.Context
-	ra          *roomAuthModel
+	ra          *RoomAuthModel
 	closeTicker chan bool
 }
 
-func NewSchedulerModel() *scheduler {
-	return &scheduler{
+func NewSchedulerModel() *SchedulerModel {
+	return &SchedulerModel{
 		rc:  config.AppCnf.RDS,
 		ctx: context.Background(),
 		ra:  NewRoomAuthModel(),
 	}
 }
 
-func (s *scheduler) StartScheduler() {
+func (s *SchedulerModel) StartScheduler() {
 	go s.subscribeRedisRoomDurationChecker()
 
 	s.closeTicker = make(chan bool)
@@ -53,7 +53,7 @@ type RedisRoomDurationCheckerReq struct {
 	Duration uint64 `json:"duration"`
 }
 
-func (s *scheduler) subscribeRedisRoomDurationChecker() {
+func (s *SchedulerModel) subscribeRedisRoomDurationChecker() {
 	pubsub := s.rc.Subscribe(s.ctx, "plug-n-meet-room-duration-checker")
 	defer pubsub.Close()
 
@@ -77,7 +77,7 @@ func (s *scheduler) subscribeRedisRoomDurationChecker() {
 	}
 }
 
-func (s *scheduler) checkRoomWithDuration() {
+func (s *SchedulerModel) checkRoomWithDuration() {
 	config.AppCnf.RLock()
 	defer config.AppCnf.RUnlock()
 
@@ -94,7 +94,7 @@ func (s *scheduler) checkRoomWithDuration() {
 	}
 }
 
-func (s *scheduler) increaseRoomDuration(roomId string, duration uint64) {
+func (s *SchedulerModel) increaseRoomDuration(roomId string, duration uint64) {
 	newDuration := config.AppCnf.IncreaseRoomDuration(roomId, duration)
 	if newDuration == 0 {
 		// so record not found in this server
@@ -117,7 +117,7 @@ func (s *scheduler) increaseRoomDuration(roomId string, duration uint64) {
 }
 
 // activeRoomChecker will check & do reconciliation between DB & livekit
-func (s *scheduler) activeRoomChecker() {
+func (s *SchedulerModel) activeRoomChecker() {
 	activeRooms, err := s.ra.rm.GetActiveRoomsInfo()
 	if err != nil {
 		return

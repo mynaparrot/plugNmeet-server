@@ -10,19 +10,19 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
-type userModel struct {
+type UserModel struct {
 	db          *sql.DB
 	roomService *RoomService
 }
 
-func NewUserModel() *userModel {
-	return &userModel{
+func NewUserModel() *UserModel {
+	return &UserModel{
 		db:          config.AppCnf.DB,
 		roomService: NewRoomService(),
 	}
 }
 
-func (u *userModel) CommonValidation(c *fiber.Ctx) error {
+func (u *UserModel) CommonValidation(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 	if isAdmin != true {
@@ -35,7 +35,7 @@ func (u *userModel) CommonValidation(c *fiber.Ctx) error {
 	return nil
 }
 
-func (u *userModel) UpdateUserLockSettings(r *plugnmeet.UpdateUserLockSettingsReq) error {
+func (u *UserModel) UpdateUserLockSettings(r *plugnmeet.UpdateUserLockSettingsReq) error {
 	if r.UserId == "all" {
 		err := u.updateLockSettingsAllUsers(r)
 		return err
@@ -57,7 +57,7 @@ func (u *userModel) UpdateUserLockSettings(r *plugnmeet.UpdateUserLockSettingsRe
 	return err
 }
 
-func (u *userModel) updateLockSettingsAllUsers(r *plugnmeet.UpdateUserLockSettingsReq) error {
+func (u *UserModel) updateLockSettingsAllUsers(r *plugnmeet.UpdateUserLockSettingsReq) error {
 	participants, err := u.roomService.LoadParticipants(r.RoomId)
 	if err != nil {
 		return err
@@ -103,7 +103,7 @@ type updateParticipantLockMetadata struct {
 	direction       string
 }
 
-func (u *userModel) updateParticipantLockMetadata(um updateParticipantLockMetadata) error {
+func (u *UserModel) updateParticipantLockMetadata(um updateParticipantLockMetadata) error {
 	if um.participantInfo.State.String() == "ACTIVE" {
 		meta := make([]byte, len(um.participantInfo.Metadata))
 		copy(meta, um.participantInfo.Metadata)
@@ -122,7 +122,7 @@ func (u *userModel) updateParticipantLockMetadata(um updateParticipantLockMetada
 	return errors.New("user isn't active now")
 }
 
-func (u *userModel) changeLockSettingsMetadata(service string, direction string, l *plugnmeet.LockSettings) *plugnmeet.LockSettings {
+func (u *UserModel) changeLockSettingsMetadata(service string, direction string, l *plugnmeet.LockSettings) *plugnmeet.LockSettings {
 	lock := new(bool)
 	if direction == "lock" {
 		*lock = true
@@ -165,7 +165,7 @@ type MuteUnMuteTrackReq struct {
 // if track_sid wasn't send then it will find the microphone track & mute it
 // for unmute you'll require enabling "enable_remote_unmute: true" in livekit
 // under room settings. For privacy reason we aren't using it.
-func (u *userModel) MuteUnMuteTrack(r *plugnmeet.MuteUnMuteTrackReq) error {
+func (u *UserModel) MuteUnMuteTrack(r *plugnmeet.MuteUnMuteTrackReq) error {
 	if r.UserId == "all" {
 		err := u.muteUnmuteAllMic(r)
 		return err
@@ -198,7 +198,7 @@ func (u *userModel) MuteUnMuteTrack(r *plugnmeet.MuteUnMuteTrackReq) error {
 	return nil
 }
 
-func (u *userModel) muteUnmuteAllMic(r *plugnmeet.MuteUnMuteTrackReq) error {
+func (u *UserModel) muteUnmuteAllMic(r *plugnmeet.MuteUnMuteTrackReq) error {
 	participants, err := u.roomService.LoadParticipants(r.RoomId)
 	if err != nil {
 		return err
@@ -223,7 +223,7 @@ func (u *userModel) muteUnmuteAllMic(r *plugnmeet.MuteUnMuteTrackReq) error {
 	return nil
 }
 
-func (u *userModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
+func (u *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 	p, err := u.roomService.LoadParticipantInfo(r.RoomId, r.UserId)
 	if err != nil {
 		return err
@@ -256,7 +256,7 @@ func (u *userModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 	return nil
 }
 
-func (u *userModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
+func (u *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
 	participants, err := u.roomService.LoadParticipants(r.RoomId)
 	if err != nil {
 		return err
@@ -319,7 +319,7 @@ func (u *userModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
 	return nil
 }
 
-func (u *userModel) updateUserMetadata(meta *plugnmeet.UserMetadata, roomId, userId string) error {
+func (u *UserModel) updateUserMetadata(meta *plugnmeet.UserMetadata, roomId, userId string) error {
 	newMeta, err := json.Marshal(meta)
 	if err != nil {
 		return err

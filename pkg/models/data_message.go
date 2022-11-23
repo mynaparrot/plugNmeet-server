@@ -32,19 +32,19 @@ type ReqFrom struct {
 	Name   string `json:"name"`
 }
 
-type dataMessageModel struct {
+type DataMessageModel struct {
 	db          *sql.DB
 	roomService *RoomService
 }
 
-func NewDataMessageModel() *dataMessageModel {
-	return &dataMessageModel{
+func NewDataMessageModel() *DataMessageModel {
+	return &DataMessageModel{
 		db:          config.AppCnf.DB,
 		roomService: NewRoomService(),
 	}
 }
 
-func (m *dataMessageModel) SendDataMessage(r *plugnmeet.DataMessageReq) error {
+func (m *DataMessageModel) SendDataMessage(r *plugnmeet.DataMessageReq) error {
 	switch r.MsgBodyType {
 	case plugnmeet.DataMsgBodyType_RAISE_HAND:
 		return m.raiseHand(r)
@@ -60,7 +60,7 @@ func (m *dataMessageModel) SendDataMessage(r *plugnmeet.DataMessageReq) error {
 	}
 }
 
-func (m *dataMessageModel) raiseHand(r *plugnmeet.DataMessageReq) error {
+func (m *DataMessageModel) raiseHand(r *plugnmeet.DataMessageReq) error {
 	participants, _ := m.roomService.LoadParticipants(r.RoomId)
 
 	var sids []string
@@ -125,7 +125,7 @@ func (m *dataMessageModel) raiseHand(r *plugnmeet.DataMessageReq) error {
 	return nil
 }
 
-func (m *dataMessageModel) lowerHand(r *plugnmeet.DataMessageReq) error {
+func (m *DataMessageModel) lowerHand(r *plugnmeet.DataMessageReq) error {
 	reqPar, err := m.roomService.LoadParticipantInfo(r.RoomId, r.RequestedUserId)
 	if err != nil {
 		return err
@@ -146,7 +146,7 @@ func (m *dataMessageModel) lowerHand(r *plugnmeet.DataMessageReq) error {
 	return nil
 }
 
-func (m *dataMessageModel) otherUserLowerHand(r *plugnmeet.DataMessageReq) error {
+func (m *DataMessageModel) otherUserLowerHand(r *plugnmeet.DataMessageReq) error {
 	if !r.IsAdmin {
 		return errors.New("only allow for admin")
 	}
@@ -172,7 +172,7 @@ func (m *dataMessageModel) otherUserLowerHand(r *plugnmeet.DataMessageReq) error
 	return nil
 }
 
-func (m *dataMessageModel) sendNotification(r *plugnmeet.DataMessageReq) error {
+func (m *DataMessageModel) sendNotification(r *plugnmeet.DataMessageReq) error {
 	mId := uuid.NewString()
 	tm := time.Now().Format(time.RFC1123Z)
 

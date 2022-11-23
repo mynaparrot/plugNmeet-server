@@ -14,21 +14,21 @@ import (
 	"time"
 )
 
-type authRecording struct {
+type AuthRecording struct {
 	app *config.AppConfig
 	db  *sql.DB
 	ctx context.Context
 }
 
-func NewRecordingAuth() *authRecording {
-	return &authRecording{
+func NewRecordingAuth() *AuthRecording {
+	return &AuthRecording{
 		app: config.AppCnf,
 		db:  config.AppCnf.DB,
 		ctx: context.Background(),
 	}
 }
 
-func (a *authRecording) FetchRecordings(r *plugnmeet.FetchRecordingsReq) (*plugnmeet.FetchRecordingsRes, error) {
+func (a *AuthRecording) FetchRecordings(r *plugnmeet.FetchRecordingsReq) (*plugnmeet.FetchRecordingsRes, error) {
 	db := a.db
 	ctx, cancel := context.WithTimeout(a.ctx, 3*time.Second)
 	defer cancel()
@@ -114,7 +114,7 @@ func (a *authRecording) FetchRecordings(r *plugnmeet.FetchRecordingsReq) (*plugn
 }
 
 // FetchRecording to get single recording information from DB
-func (a *authRecording) FetchRecording(recordId string) (*plugnmeet.RecordingInfo, error) {
+func (a *AuthRecording) FetchRecording(recordId string) (*plugnmeet.RecordingInfo, error) {
 	db := a.db
 	ctx, cancel := context.WithTimeout(a.ctx, 3*time.Second)
 	defer cancel()
@@ -146,7 +146,7 @@ type DeleteRecordingReq struct {
 	RecordId string `json:"record_id" validate:"required"`
 }
 
-func (a *authRecording) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
+func (a *AuthRecording) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
 	recording, err := a.FetchRecording(r.RecordId)
 	if err != nil {
 		return err
@@ -205,7 +205,7 @@ type GetDownloadTokenReq struct {
 }
 
 // GetDownloadToken will use same JWT token generator as Livekit is using
-func (a *authRecording) GetDownloadToken(r *plugnmeet.GetDownloadTokenReq) (string, error) {
+func (a *AuthRecording) GetDownloadToken(r *plugnmeet.GetDownloadTokenReq) (string, error) {
 	recording, err := a.FetchRecording(r.RecordId)
 	if err != nil {
 		return "", err
@@ -229,7 +229,7 @@ func (a *authRecording) GetDownloadToken(r *plugnmeet.GetDownloadTokenReq) (stri
 }
 
 // VerifyRecordingToken verify token & provide file path
-func (a *authRecording) VerifyRecordingToken(token string) (string, error) {
+func (a *AuthRecording) VerifyRecordingToken(token string) (string, error) {
 	tok, err := jwt.ParseSigned(token)
 	if err != nil {
 		return "", err

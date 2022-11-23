@@ -8,18 +8,18 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type userWaitingRoomModel struct {
+type UserWaitingRoomModel struct {
 	db          *sql.DB
 	roomService *RoomService
 }
 
-func NewWaitingRoomModel() *userWaitingRoomModel {
-	return &userWaitingRoomModel{
+func NewWaitingRoomModel() *UserWaitingRoomModel {
+	return &UserWaitingRoomModel{
 		roomService: NewRoomService(),
 	}
 }
 
-func (u *userWaitingRoomModel) ApproveWaitingUsers(r *plugnmeet.ApproveWaitingUsersReq) error {
+func (u *UserWaitingRoomModel) ApproveWaitingUsers(r *plugnmeet.ApproveWaitingUsersReq) error {
 	if r.UserId == "all" {
 		participants, err := u.roomService.LoadParticipants(r.RoomId)
 		if err != nil {
@@ -42,7 +42,7 @@ func (u *userWaitingRoomModel) ApproveWaitingUsers(r *plugnmeet.ApproveWaitingUs
 	return u.approveUser(r.RoomId, r.UserId, p.Metadata)
 }
 
-func (u *userWaitingRoomModel) approveUser(roomId, userId, metadata string) error {
+func (u *UserWaitingRoomModel) approveUser(roomId, userId, metadata string) error {
 	meta := make([]byte, len(metadata))
 	copy(meta, metadata)
 
@@ -63,7 +63,7 @@ func (u *userWaitingRoomModel) approveUser(roomId, userId, metadata string) erro
 	return nil
 }
 
-func (u *userWaitingRoomModel) UpdateWaitingRoomMessage(r *plugnmeet.UpdateWaitingRoomMessageReq) error {
+func (u *UserWaitingRoomModel) UpdateWaitingRoomMessage(r *plugnmeet.UpdateWaitingRoomMessageReq) error {
 	_, roomMeta, err := u.roomService.LoadRoomWithMetadata(r.RoomId)
 	if err != nil {
 		return err

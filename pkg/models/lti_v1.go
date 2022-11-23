@@ -21,8 +21,8 @@ import (
 )
 
 type LTIV1 struct {
-	authModel      *roomAuthModel
-	authTokenModel *authTokenModel
+	authModel      *RoomAuthModel
+	authTokenModel *AuthTokenModel
 }
 
 type LtiClaims struct {

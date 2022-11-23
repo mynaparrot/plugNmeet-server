@@ -9,19 +9,19 @@ import (
 	"time"
 )
 
-type roomAuthModel struct {
+type RoomAuthModel struct {
 	rs *RoomService
-	rm *roomModel
+	rm *RoomModel
 }
 
-func NewRoomAuthModel() *roomAuthModel {
-	return &roomAuthModel{
+func NewRoomAuthModel() *RoomAuthModel {
+	return &RoomAuthModel{
 		rs: NewRoomService(),
 		rm: NewRoomModel(),
 	}
 }
 
-func (am *roomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *livekit.Room) {
+func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *livekit.Room) {
 	roomDbInfo, _ := am.rm.GetRoomInfo(r.RoomId, "", 1)
 
 	if roomDbInfo.Id > 0 {
@@ -77,9 +77,12 @@ func (am *roomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 		IsRunning:          1,
 		CreationTime:       room.CreationTime,
 		Created:            time.Now().Format("2006-01-02 15:04:05"),
-		WebhookUrl:         r.Metadata.WebhookUrl,
+		WebhookUrl:         "",
 		IsBreakoutRoom:     int64(isBreakoutRoom),
 		ParentRoomId:       r.Metadata.ParentRoomId,
+	}
+	if r.Metadata.WebhookUrl != nil {
+		ri.WebhookUrl = *r.Metadata.WebhookUrl
 	}
 
 	if roomDbInfo.Id > 0 {
@@ -95,7 +98,7 @@ func (am *roomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 	return true, "room created", room
 }
 
-func (am *roomAuthModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (bool, string) {
+func (am *RoomAuthModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (bool, string) {
 	roomDbInfo, _ := am.rm.GetRoomInfo(r.RoomId, "", 1)
 
 	if roomDbInfo.Id == 0 {
@@ -117,7 +120,7 @@ func (am *roomAuthModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (bool, strin
 	return true, "room is active"
 }
 
-func (am *roomAuthModel) GetActiveRoomInfo(r *plugnmeet.GetActiveRoomInfoReq) (bool, string, *plugnmeet.ActiveRoomInfoRes) {
+func (am *RoomAuthModel) GetActiveRoomInfo(r *plugnmeet.GetActiveRoomInfoReq) (bool, string, *plugnmeet.ActiveRoomInfoRes) {
 	roomDbInfo, _ := am.rm.GetRoomInfo(r.RoomId, "", 1)
 
 	if roomDbInfo.Id == 0 {
@@ -149,7 +152,7 @@ func (am *roomAuthModel) GetActiveRoomInfo(r *plugnmeet.GetActiveRoomInfoReq) (b
 	return true, "success", res
 }
 
-func (am *roomAuthModel) GetActiveRoomsInfo() (bool, string, []*plugnmeet.ActiveRoomInfoRes) {
+func (am *RoomAuthModel) GetActiveRoomsInfo() (bool, string, []*plugnmeet.ActiveRoomInfoRes) {
 	roomsInfo, err := am.rm.GetActiveRoomsInfo()
 
 	if err != nil {
@@ -182,7 +185,7 @@ func (am *roomAuthModel) GetActiveRoomsInfo() (bool, string, []*plugnmeet.Active
 	return true, "success", res
 }
 
-func (am *roomAuthModel) EndRoom(r *plugnmeet.RoomEndReq) (bool, string) {
+func (am *RoomAuthModel) EndRoom(r *plugnmeet.RoomEndReq) (bool, string) {
 	roomDbInfo, _ := am.rm.GetRoomInfo(r.RoomId, "", 1)
 
 	if roomDbInfo.Id == 0 {
@@ -203,7 +206,7 @@ func (am *roomAuthModel) EndRoom(r *plugnmeet.RoomEndReq) (bool, string) {
 	return true, "success"
 }
 
-func (am *roomAuthModel) ChangeVisibility(r *plugnmeet.ChangeVisibilityRes) (bool, string) {
+func (am *RoomAuthModel) ChangeVisibility(r *plugnmeet.ChangeVisibilityRes) (bool, string) {
 	_, roomMeta, err := am.rs.LoadRoomWithMetadata(r.RoomId)
 	if err != nil {
 		return false, err.Error()

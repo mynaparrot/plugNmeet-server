@@ -10,18 +10,18 @@ import (
 	"time"
 )
 
-type websocketService struct {
+type WebsocketServiceModel struct {
 	pl      *plugnmeet.DataMessage // payload msg
 	rSid    string                 // room sid
 	isAdmin bool
 	roomId  string
 }
 
-func NewWebsocketService() *websocketService {
-	return &websocketService{}
+func NewWebsocketService() *WebsocketServiceModel {
+	return &WebsocketServiceModel{}
 }
 
-func (w *websocketService) HandleDataMessages(payload *plugnmeet.DataMessage, roomId string, isAdmin bool) {
+func (w *WebsocketServiceModel) HandleDataMessages(payload *plugnmeet.DataMessage, roomId string, isAdmin bool) {
 	if payload.MessageId == nil {
 		uu := uuid.NewString()
 		payload.MessageId = &uu
@@ -50,14 +50,14 @@ func (w *websocketService) HandleDataMessages(payload *plugnmeet.DataMessage, ro
 	}
 }
 
-func (w *websocketService) userMessages() {
+func (w *WebsocketServiceModel) userMessages() {
 	switch w.pl.Body.Type {
 	case plugnmeet.DataMsgBodyType_CHAT:
 		w.handleChat()
 	}
 }
 
-func (w *websocketService) handleSystemMessages() {
+func (w *WebsocketServiceModel) handleSystemMessages() {
 	switch w.pl.Body.Type {
 	case plugnmeet.DataMsgBodyType_SEND_CHAT_MSGS,
 		plugnmeet.DataMsgBodyType_INIT_WHITEBOARD:
@@ -79,7 +79,7 @@ func (w *websocketService) handleSystemMessages() {
 	}
 }
 
-func (w *websocketService) handleWhiteboardMessages() {
+func (w *WebsocketServiceModel) handleWhiteboardMessages() {
 	switch w.pl.Body.Type {
 	case plugnmeet.DataMsgBodyType_SCENE_UPDATE,
 		plugnmeet.DataMsgBodyType_POINTER_UPDATE,
@@ -91,7 +91,7 @@ func (w *websocketService) handleWhiteboardMessages() {
 	}
 }
 
-func (w *websocketService) handleChat() {
+func (w *WebsocketServiceModel) handleChat() {
 	jm, err := proto.Marshal(w.pl)
 	if err != nil {
 		return
@@ -126,7 +126,7 @@ func (w *websocketService) handleChat() {
 	}
 }
 
-func (w *websocketService) handleSendChatMsgs() {
+func (w *WebsocketServiceModel) handleSendChatMsgs() {
 	jm, err := proto.Marshal(w.pl)
 	if err != nil {
 		return
@@ -152,7 +152,7 @@ func (w *websocketService) handleSendChatMsgs() {
 	}
 }
 
-func (w *websocketService) handleRenewToken() {
+func (w *WebsocketServiceModel) handleRenewToken() {
 	req := &ValidateTokenReq{
 		Token:  w.pl.Body.Msg,
 		RoomId: w.pl.RoomId,
@@ -193,7 +193,7 @@ func (w *websocketService) handleRenewToken() {
 	config.AppCnf.RUnlock()
 }
 
-func (w *websocketService) handleSendPushMsg() {
+func (w *WebsocketServiceModel) handleSendPushMsg() {
 	jm, err := proto.Marshal(w.pl)
 	if err != nil {
 		return
@@ -220,7 +220,7 @@ func (w *websocketService) handleSendPushMsg() {
 	}
 }
 
-func (w *websocketService) handleWhiteboard() {
+func (w *WebsocketServiceModel) handleWhiteboard() {
 	jm, err := proto.Marshal(w.pl)
 	if err != nil {
 		return
@@ -249,7 +249,7 @@ func (w *websocketService) handleWhiteboard() {
 	}
 }
 
-func (w *websocketService) handleUserVisibility() {
+func (w *WebsocketServiceModel) handleUserVisibility() {
 	jm, err := proto.Marshal(w.pl)
 	if err != nil {
 		return
@@ -273,7 +273,7 @@ func (w *websocketService) handleUserVisibility() {
 	}
 }
 
-func (w *websocketService) handleExternalMediaPlayerEvents() {
+func (w *WebsocketServiceModel) handleExternalMediaPlayerEvents() {
 	jm, err := proto.Marshal(w.pl)
 	if err != nil {
 		return
@@ -297,7 +297,7 @@ func (w *websocketService) handleExternalMediaPlayerEvents() {
 	}
 }
 
-func (w *websocketService) handlePollsNotifications() {
+func (w *WebsocketServiceModel) handlePollsNotifications() {
 	jm, err := proto.Marshal(w.pl)
 	if err != nil {
 		return
@@ -321,7 +321,7 @@ func (w *websocketService) handlePollsNotifications() {
 	}
 }
 
-func (w *websocketService) handleSendBreakoutRoomNotification() {
+func (w *WebsocketServiceModel) handleSendBreakoutRoomNotification() {
 	jm, err := proto.Marshal(w.pl)
 	if err != nil {
 		return

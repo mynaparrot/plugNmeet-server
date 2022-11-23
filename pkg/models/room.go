@@ -30,21 +30,21 @@ type RoomInfo struct {
 	Ended              string
 }
 
-type roomModel struct {
+type RoomModel struct {
 	app *config.AppConfig
 	db  *sql.DB
 	ctx context.Context
 }
 
-func NewRoomModel() *roomModel {
-	return &roomModel{
+func NewRoomModel() *RoomModel {
+	return &RoomModel{
 		app: config.AppCnf,
 		db:  config.AppCnf.DB,
 		ctx: context.Background(),
 	}
 }
 
-func (rm *roomModel) InsertOrUpdateRoomData(r *RoomInfo, update bool) (int64, error) {
+func (rm *RoomModel) InsertOrUpdateRoomData(r *RoomInfo, update bool) (int64, error) {
 	db := rm.db
 	ctx, cancel := context.WithTimeout(rm.ctx, 3*time.Second)
 	defer cancel()
@@ -98,7 +98,7 @@ func (rm *roomModel) InsertOrUpdateRoomData(r *RoomInfo, update bool) (int64, er
 
 // UpdateRoomStatus will change the room status based on `is_running` value
 // most of the place this method used to change status to close
-func (rm *roomModel) UpdateRoomStatus(r *RoomInfo) (int64, error) {
+func (rm *RoomModel) UpdateRoomStatus(r *RoomInfo) (int64, error) {
 	db := rm.db
 	ctx, cancel := context.WithTimeout(rm.ctx, 3*time.Second)
 	defer cancel()
@@ -174,7 +174,7 @@ func (rm *roomModel) UpdateRoomStatus(r *RoomInfo) (int64, error) {
 }
 
 // UpdateRoomParticipants will increment or decrement number of Participants
-func (rm *roomModel) UpdateRoomParticipants(r *RoomInfo, operator string) (int64, error) {
+func (rm *RoomModel) UpdateRoomParticipants(r *RoomInfo, operator string) (int64, error) {
 	db := rm.db
 	ctx, cancel := context.WithTimeout(rm.ctx, 3*time.Second)
 	defer cancel()
@@ -214,7 +214,7 @@ func (rm *roomModel) UpdateRoomParticipants(r *RoomInfo, operator string) (int64
 }
 
 // UpdateNumParticipants will update total number of Participants
-func (rm *roomModel) UpdateNumParticipants(roomSid string, num int64) (int64, error) {
+func (rm *RoomModel) UpdateNumParticipants(roomSid string, num int64) (int64, error) {
 	db := rm.db
 	ctx, cancel := context.WithTimeout(rm.ctx, 3*time.Second)
 	defer cancel()
@@ -253,7 +253,7 @@ func (rm *roomModel) UpdateNumParticipants(roomSid string, num int64) (int64, er
 	return affectedId, nil
 }
 
-func (rm *roomModel) GetRoomInfo(roomId string, sid string, isRunning int) (*RoomInfo, string) {
+func (rm *RoomModel) GetRoomInfo(roomId string, sid string, isRunning int) (*RoomInfo, string) {
 	db := rm.db
 	ctx, cancel := context.WithTimeout(rm.ctx, 3*time.Second)
 	defer cancel()
@@ -294,7 +294,7 @@ func (rm *roomModel) GetRoomInfo(roomId string, sid string, isRunning int) (*Roo
 	return &room, msg
 }
 
-func (rm *roomModel) GetActiveRoomsInfo() ([]*plugnmeet.ActiveRoomInfo, error) {
+func (rm *RoomModel) GetActiveRoomsInfo() ([]*plugnmeet.ActiveRoomInfo, error) {
 	db := rm.db
 	ctx, cancel := context.WithTimeout(rm.ctx, 3*time.Second)
 	defer cancel()
