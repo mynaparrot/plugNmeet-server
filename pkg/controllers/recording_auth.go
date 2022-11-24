@@ -133,5 +133,5 @@ func HandleDownloadRecording(c *fiber.Ctx) error {
 	}
 
 	c.Attachment(file)
-	return c.SendFile(file, true)
+	return c.SendFile(file, false)
 }

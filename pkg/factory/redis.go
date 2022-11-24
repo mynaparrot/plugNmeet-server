@@ -8,34 +8,33 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var RDB *redis.Client
-
 func NewRedisConnection() {
 	var rdb *redis.Client
 	var tlsConfig *tls.Config
+	rf := config.AppCnf.RedisInfo
 
-	if config.AppCnf.RedisInfo.UseTLS {
+	if rf.UseTLS {
 		tlsConfig = &tls.Config{
 			MinVersion: tls.VersionTLS12,
 		}
 	}
-	if config.AppCnf.RedisInfo.SentinelAddresses != nil {
+	if rf.SentinelAddresses != nil {
 		rdb = redis.NewFailoverClient(&redis.FailoverOptions{
-			SentinelAddrs:    config.AppCnf.RedisInfo.SentinelAddresses,
-			SentinelUsername: config.AppCnf.RedisInfo.SentinelUsername,
-			SentinelPassword: config.AppCnf.RedisInfo.SentinelPassword,
-			MasterName:       config.AppCnf.RedisInfo.MasterName,
-			Username:         config.AppCnf.RedisInfo.Username,
-			Password:         config.AppCnf.RedisInfo.Password,
-			DB:               config.AppCnf.RedisInfo.DBName,
+			SentinelAddrs:    rf.SentinelAddresses,
+			SentinelUsername: rf.SentinelUsername,
+			SentinelPassword: rf.SentinelPassword,
+			MasterName:       rf.MasterName,
+			Username:         rf.Username,
+			Password:         rf.Password,
+			DB:               rf.DBName,
 			TLSConfig:        tlsConfig,
 		})
 	} else {
 		rdb = redis.NewClient(&redis.Options{
-			Addr:      config.AppCnf.RedisInfo.Host,
-			Username:  config.AppCnf.RedisInfo.Username,
-			Password:  config.AppCnf.RedisInfo.Password,
-			DB:        config.AppCnf.RedisInfo.DBName,
+			Addr:      rf.Host,
+			Username:  rf.Username,
+			Password:  rf.Password,
+			DB:        rf.DBName,
 			TLSConfig: tlsConfig,
 		})
 	}
@@ -46,12 +45,4 @@ func NewRedisConnection() {
 	}
 
 	config.AppCnf.RDS = rdb
-}
-
-func SetRedisConnection(r *redis.Client) {
-	_, err := r.Ping(context.Background()).Result()
-	if err != nil {
-		log.Fatalln(err)
-	}
-	RDB = r
 }

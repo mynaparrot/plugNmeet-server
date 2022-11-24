@@ -20,11 +20,8 @@ func PrepareServer(c string) error {
 
 	// set mysql factory connection
 	factory.NewDbConnection()
-	factory.SetDBConnection(config.AppCnf.DB)
-
 	// set redis connection
 	factory.NewRedisConnection()
-	factory.SetRedisConnection(config.AppCnf.RDS)
 
 	// we'll subscribe to redis channels now
 	go controllers.SubscribeToWebsocketChannel()
