@@ -9,13 +9,12 @@ import (
 	"time"
 )
 
-var DB *sql.DB
-
 func NewDbConnection() {
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", config.AppCnf.MySqlInfo.Username, config.AppCnf.MySqlInfo.Password, config.AppCnf.MySqlInfo.Host, config.AppCnf.MySqlInfo.Port, config.AppCnf.MySqlInfo.DBName))
+	mf := config.AppCnf.MySqlInfo
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", mf.Username, mf.Password, mf.Host, mf.Port, mf.DBName))
 
 	if err != nil {
-		log.Panicln(err)
+		log.Fatalln(err)
 	}
 
 	db.SetConnMaxLifetime(time.Minute * 3)
@@ -24,17 +23,8 @@ func NewDbConnection() {
 
 	err = db.Ping()
 	if err != nil {
-		panic(err)
+		log.Fatalln(err)
 	}
 
 	config.AppCnf.DB = db
-}
-
-func SetDBConnection(d *sql.DB) {
-	err := d.Ping()
-	if err != nil {
-		panic(err)
-	}
-
-	DB = d
 }
