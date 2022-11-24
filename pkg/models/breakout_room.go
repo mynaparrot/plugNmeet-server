@@ -14,7 +14,7 @@ import (
 
 const breakoutRoomKey = "pnm:breakoutRoom:"
 
-type breakoutRoom struct {
+type BreakoutRoom struct {
 	ctx            context.Context
 	rc             *redis.Client
 	roomService    *RoomService
@@ -22,8 +22,8 @@ type breakoutRoom struct {
 	authTokenModel *AuthTokenModel
 }
 
-func NewBreakoutRoomModel() *breakoutRoom {
-	return &breakoutRoom{
+func NewBreakoutRoomModel() *BreakoutRoom {
+	return &BreakoutRoom{
 		ctx:            context.Background(),
 		rc:             config.AppCnf.RDS,
 		roomService:    NewRoomService(),
@@ -32,7 +32,7 @@ func NewBreakoutRoomModel() *breakoutRoom {
 	}
 }
 
-func (m *breakoutRoom) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRoomsReq) error {
+func (m *BreakoutRoom) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRoomsReq) error {
 	mainRoom, err := m.roomService.LoadRoomInfo(r.RoomId)
 	if err != nil {
 		return err
@@ -124,7 +124,7 @@ func (m *breakoutRoom) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRoomsReq) 
 	return err
 }
 
-func (m *breakoutRoom) JoinBreakoutRoom(r *plugnmeet.JoinBreakoutRoomReq) (string, error) {
+func (m *BreakoutRoom) JoinBreakoutRoom(r *plugnmeet.JoinBreakoutRoomReq) (string, error) {
 	room, err := m.fetchBreakoutRoom(r.RoomId, r.BreakoutRoomId)
 	if err != nil {
 		return "", err
@@ -165,7 +165,7 @@ func (m *breakoutRoom) JoinBreakoutRoom(r *plugnmeet.JoinBreakoutRoomReq) (strin
 	return token, nil
 }
 
-func (m *breakoutRoom) GetBreakoutRooms(roomId string) ([]*plugnmeet.BreakoutRoom, error) {
+func (m *BreakoutRoom) GetBreakoutRooms(roomId string) ([]*plugnmeet.BreakoutRoom, error) {
 	breakoutRooms, err := m.fetchBreakoutRooms(roomId)
 	if err != nil {
 		return nil, err
@@ -174,7 +174,7 @@ func (m *breakoutRoom) GetBreakoutRooms(roomId string) ([]*plugnmeet.BreakoutRoo
 	return breakoutRooms, nil
 }
 
-func (m *breakoutRoom) GetMyBreakoutRooms(roomId, userId string) (*plugnmeet.BreakoutRoom, error) {
+func (m *BreakoutRoom) GetMyBreakoutRooms(roomId, userId string) (*plugnmeet.BreakoutRoom, error) {
 	breakoutRooms, err := m.fetchBreakoutRooms(roomId)
 	if err != nil {
 		return nil, err
@@ -191,7 +191,7 @@ func (m *breakoutRoom) GetMyBreakoutRooms(roomId, userId string) (*plugnmeet.Bre
 	return nil, errors.New("not found")
 }
 
-func (m *breakoutRoom) IncreaseBreakoutRoomDuration(r *plugnmeet.IncreaseBreakoutRoomDurationReq) error {
+func (m *BreakoutRoom) IncreaseBreakoutRoomDuration(r *plugnmeet.IncreaseBreakoutRoomDurationReq) error {
 	room, err := m.fetchBreakoutRoom(r.RoomId, r.BreakoutRoomId)
 	if err != nil {
 		return err
@@ -229,7 +229,7 @@ type SendBreakoutRoomMsgReq struct {
 	Msg    string `json:"msg" validate:"required"`
 }
 
-func (m *breakoutRoom) SendBreakoutRoomMsg(r *plugnmeet.BroadcastBreakoutRoomMsgReq) error {
+func (m *BreakoutRoom) SendBreakoutRoomMsg(r *plugnmeet.BroadcastBreakoutRoomMsgReq) error {
 	rooms, err := m.fetchBreakoutRooms(r.RoomId)
 	if err != nil {
 		return err
@@ -245,7 +245,7 @@ func (m *breakoutRoom) SendBreakoutRoomMsg(r *plugnmeet.BroadcastBreakoutRoomMsg
 	return nil
 }
 
-func (m *breakoutRoom) EndBreakoutRoom(r *plugnmeet.EndBreakoutRoomReq) error {
+func (m *BreakoutRoom) EndBreakoutRoom(r *plugnmeet.EndBreakoutRoomReq) error {
 	_, err := m.fetchBreakoutRoom(r.RoomId, r.BreakoutRoomId)
 	if err != nil {
 		return err
@@ -267,7 +267,7 @@ func (m *breakoutRoom) EndBreakoutRoom(r *plugnmeet.EndBreakoutRoomReq) error {
 	return nil
 }
 
-func (m *breakoutRoom) EndBreakoutRooms(roomId string) error {
+func (m *BreakoutRoom) EndBreakoutRooms(roomId string) error {
 	rooms, err := m.fetchBreakoutRooms(roomId)
 	if err != nil {
 		return err
@@ -282,7 +282,7 @@ func (m *breakoutRoom) EndBreakoutRooms(roomId string) error {
 	return nil
 }
 
-func (m *breakoutRoom) PostTaskAfterRoomStartWebhook(roomId string, metadata *plugnmeet.RoomMetadata) error {
+func (m *BreakoutRoom) PostTaskAfterRoomStartWebhook(roomId string, metadata *plugnmeet.RoomMetadata) error {
 	if metadata.IsBreakoutRoom {
 		room, err := m.fetchBreakoutRoom(metadata.ParentRoomId, roomId)
 		if err != nil {
@@ -306,7 +306,7 @@ func (m *breakoutRoom) PostTaskAfterRoomStartWebhook(roomId string, metadata *pl
 	return nil
 }
 
-func (m *breakoutRoom) PostTaskAfterRoomEndWebhook(roomId, metadata string) error {
+func (m *BreakoutRoom) PostTaskAfterRoomEndWebhook(roomId, metadata string) error {
 	if metadata == "" {
 		return nil
 	}
@@ -329,7 +329,7 @@ func (m *breakoutRoom) PostTaskAfterRoomEndWebhook(roomId, metadata string) erro
 	return nil
 }
 
-func (m *breakoutRoom) broadcastNotification(roomId, fromUserId, toUserId, broadcastMsg string, typeMsg plugnmeet.DataMsgType, mType plugnmeet.DataMsgBodyType, isAdmin bool) error {
+func (m *BreakoutRoom) broadcastNotification(roomId, fromUserId, toUserId, broadcastMsg string, typeMsg plugnmeet.DataMsgType, mType plugnmeet.DataMsgBodyType, isAdmin bool) error {
 	payload := &plugnmeet.DataMessage{
 		Type:   typeMsg,
 		RoomId: roomId,
@@ -356,7 +356,7 @@ func (m *breakoutRoom) broadcastNotification(roomId, fromUserId, toUserId, broad
 	return nil
 }
 
-func (m *breakoutRoom) fetchBreakoutRoom(roomId, breakoutRoomId string) (*plugnmeet.BreakoutRoom, error) {
+func (m *BreakoutRoom) fetchBreakoutRoom(roomId, breakoutRoomId string) (*plugnmeet.BreakoutRoom, error) {
 	cmd := m.rc.HGet(m.ctx, breakoutRoomKey+roomId, breakoutRoomId)
 	result, err := cmd.Result()
 	if err != nil {
@@ -375,7 +375,7 @@ func (m *breakoutRoom) fetchBreakoutRoom(roomId, breakoutRoomId string) (*plugnm
 	return room, nil
 }
 
-func (m *breakoutRoom) fetchBreakoutRooms(roomId string) ([]*plugnmeet.BreakoutRoom, error) {
+func (m *BreakoutRoom) fetchBreakoutRooms(roomId string) ([]*plugnmeet.BreakoutRoom, error) {
 	cmd := m.rc.HGetAll(m.ctx, breakoutRoomKey+roomId)
 	rooms, err := cmd.Result()
 	if err != nil {
@@ -409,7 +409,7 @@ func (m *breakoutRoom) fetchBreakoutRooms(roomId string) ([]*plugnmeet.BreakoutR
 	return breakoutRooms, nil
 }
 
-func (m *breakoutRoom) performPostHookTask(roomId string) error {
+func (m *BreakoutRoom) performPostHookTask(roomId string) error {
 	cmd := m.rc.HLen(m.ctx, breakoutRoomKey+roomId)
 	c, err := cmd.Result()
 	if err != nil {
