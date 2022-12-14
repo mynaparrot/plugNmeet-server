@@ -368,6 +368,8 @@ github.com/livekit/protocol v1.3.0 h1:9rzcKrLxZQIsL5Us2ZARmAkTw1dZJMF3WJoS6MCZUI
 github.com/livekit/protocol v1.3.0/go.mod h1:87MLIMbKaZs0SbDebMw1b7n/gD5utwEDq3zIRYcHJHA=
 github.com/livekit/server-sdk-go v1.0.5 h1:BV/MrehCCVi1VxjZxjxqkWDbqpnjhH4a7TWQXGH30/Y=
 github.com/livekit/server-sdk-go v1.0.5/go.mod h1:v/Hk0EY019R5IJOSau5JITNEt1uJLNcFuulu7KEzl0Q=
+github.com/livekit/server-sdk-go v1.0.6 h1:V4ACLjLkC7KwjijhoP/XQrM84SMCMpR/9DICWeEuygs=
+github.com/livekit/server-sdk-go v1.0.6/go.mod h1:SmgKlx/oOLy9ryjp/n0lOSaa9Dq0qH4veYzQU/jSS8A=
 github.com/lyft/protoc-gen-star v0.5.3/go.mod h1:V0xaHgaf5oCCqmcxYcWiDfTiKsZsRc87/1qhoTACD8w=
 github.com/mackerelio/go-osstat v0.2.3 h1:jAMXD5erlDE39kdX2CU7YwCGRcxIO33u/p8+Fhe5dJw=
 github.com/mackerelio/go-osstat v0.2.3/go.mod h1:DQbPOnsss9JHIXgBStc/dnhhir3gbd3YH+Dbdi7ptMA=

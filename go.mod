@@ -16,7 +16,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.3.0
-	github.com/livekit/server-sdk-go v1.0.5
+	github.com/livekit/server-sdk-go v1.0.6
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20221123044337-9069061b9f26
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.1
