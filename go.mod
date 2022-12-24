@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/ansrivas/fiberprometheus/v2 v2.4.1
-	github.com/antoniodipinto/ikisocket v0.0.0-20220806220653-2e4f04aebe6a
+	github.com/antoniodipinto/ikisocket v0.0.0-20221222091109-b1455c1b2959
 	github.com/gabriel-vasile/mimetype v1.4.1
 	github.com/go-playground/validator/v10 v10.11.1
 	github.com/go-redis/redis/v8 v8.11.5
