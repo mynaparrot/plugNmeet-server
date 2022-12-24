@@ -67,6 +67,8 @@ github.com/ansrivas/fiberprometheus/v2 v2.4.1/go.mod h1:ATJ3l0sufyoZBz+TEohAyQJq
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/antoniodipinto/ikisocket v0.0.0-20220806220653-2e4f04aebe6a h1:k9YpinJv+t8SSJOuUFMZ0mACHQYpzazAtIKMSHpQRyM=
 github.com/antoniodipinto/ikisocket v0.0.0-20220806220653-2e4f04aebe6a/go.mod h1:4PlGrJFvkSDC51sWCph7r2R48hgLRgUJ/2KRznqnisc=
+github.com/antoniodipinto/ikisocket v0.0.0-20221222091109-b1455c1b2959 h1:iNamozyWPvU98E7xTzql3/L3D+MXTP1lifORgG5HaW8=
+github.com/antoniodipinto/ikisocket v0.0.0-20221222091109-b1455c1b2959/go.mod h1:+778TP5EeWzzZp7NzxWg1l5/S5foN3ltbrsvz8GSV0Y=
 github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e/go.mod h1:3U/XgcO3hCbHZ8TKRvWD2dDTCfh9M9ya+I9JpbB7O8o=
 github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da/go.mod h1:Q73ZrmVTwzkszR9V5SSuryQ31EELlFMUz1kKyl939pY=
 github.com/armon/go-metrics v0.3.10/go.mod h1:4O98XIr/9W0sxpJ8UaYkvjk10Iff7SnFrb4QAOwNTFc=
