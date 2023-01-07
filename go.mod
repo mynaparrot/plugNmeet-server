@@ -10,14 +10,14 @@ require (
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-sql-driver/mysql v1.7.0
 	github.com/goccy/go-json v0.10.0
-	github.com/gofiber/fiber/v2 v2.40.1
+	github.com/gofiber/fiber/v2 v2.41.0
 	github.com/gofiber/template v1.7.3
 	github.com/gofiber/websocket/v2 v2.1.2
 	github.com/google/uuid v1.3.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.3.1
 	github.com/livekit/server-sdk-go v1.0.6
-	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230102094705-7e3c589f404e
+	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230103174559-cc1117cd4656
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.1
 	github.com/urfave/cli/v2 v2.23.7
