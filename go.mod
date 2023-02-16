@@ -3,14 +3,14 @@ module github.com/mynaparrot/plugnmeet-server
 go 1.19
 
 require (
-	github.com/ansrivas/fiberprometheus/v2 v2.4.1
+	github.com/ansrivas/fiberprometheus/v2 v2.6.0
 	github.com/antoniodipinto/ikisocket v0.0.0-20230101140413-824cc1f497f3
 	github.com/gabriel-vasile/mimetype v1.4.1
 	github.com/go-playground/validator/v10 v10.11.1
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-sql-driver/mysql v1.7.0
 	github.com/goccy/go-json v0.10.0
-	github.com/gofiber/fiber/v2 v2.41.0
+	github.com/gofiber/fiber/v2 v2.42.0
 	github.com/gofiber/template v1.7.3
 	github.com/gofiber/websocket/v2 v2.1.2
 	github.com/google/uuid v1.3.0
@@ -44,7 +44,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-playground/locales v0.14.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect
-	github.com/gofiber/adaptor/v2 v2.1.30 // indirect
+	github.com/gofiber/adaptor/v2 v2.1.31 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/jxskiss/base62 v1.1.0 // indirect
@@ -58,6 +58,7 @@ require (
 	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
+	github.com/philhofer/fwd v1.1.1 // indirect
 	github.com/pion/datachannel v1.5.5 // indirect
 	github.com/pion/dtls/v2 v2.2.4 // indirect
 	github.com/pion/ice/v2 v2.2.13 // indirect
@@ -83,11 +84,13 @@ require (
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/rivo/uniseg v0.4.3 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	github.com/savsgio/dictpool v0.0.0-20221023140959-7bf2e61cea94 // indirect
 	github.com/savsgio/gotils v0.0.0-20220530130905-52f3993e8d6d // indirect
 	github.com/thoas/go-funk v0.9.3 // indirect
+	github.com/tinylib/msgp v1.1.6 // indirect
 	github.com/twitchtv/twirp v8.1.3+incompatible // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.43.0 // indirect
+	github.com/valyala/fasthttp v1.44.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
