@@ -2,10 +2,10 @@ package models
 
 import (
 	"context"
-	"github.com/go-redis/redis/v8"
 	"github.com/goccy/go-json"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/redis/go-redis/v9"
 	log "github.com/sirupsen/logrus"
 	"time"
 )
