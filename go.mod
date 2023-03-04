@@ -7,7 +7,6 @@ require (
 	github.com/antoniodipinto/ikisocket v0.0.0-20230224142534-cb796a15fd08
 	github.com/gabriel-vasile/mimetype v1.4.1
 	github.com/go-playground/validator/v10 v10.11.2
-	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-sql-driver/mysql v1.7.0
 	github.com/goccy/go-json v0.10.0
 	github.com/gofiber/fiber/v2 v2.42.0
