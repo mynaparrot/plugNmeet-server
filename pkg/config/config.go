@@ -76,27 +76,6 @@ type LivekitInfo struct {
 	TokenValidity time.Duration `yaml:"token_validity"`
 }
 
-type RedisInfo struct {
-	Host              string   `yaml:"host"`
-	Username          string   `yaml:"username"`
-	Password          string   `yaml:"password"`
-	DBName            int      `yaml:"db"`
-	UseTLS            bool     `yaml:"use_tls"`
-	MasterName        string   `yaml:"sentinel_master_name"`
-	SentinelUsername  string   `yaml:"sentinel_username"`
-	SentinelPassword  string   `yaml:"sentinel_password"`
-	SentinelAddresses []string `yaml:"sentinel_addresses"`
-}
-
-type MySqlInfo struct {
-	Host     string `yaml:"host"`
-	Port     int32  `yaml:"port"`
-	Username string `yaml:"username"`
-	Password string `yaml:"password"`
-	DBName   string `yaml:"db"`
-	Prefix   string `yaml:"prefix"`
-}
-
 type UploadFileSettings struct {
 	Path         string   `yaml:"path"`
 	MaxSize      uint64   `yaml:"max_size"`
