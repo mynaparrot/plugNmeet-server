@@ -3,6 +3,7 @@ package config
 import (
 	"database/sql"
 	"github.com/go-playground/validator/v10"
+	"github.com/mynaparrot/plugnmeet-protocol/factory"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/redis/go-redis/v9"
@@ -31,8 +32,8 @@ type AppConfig struct {
 	Client             ClientInfo         `yaml:"client"`
 	LogSettings        LogSettings        `yaml:"log_settings"`
 	LivekitInfo        LivekitInfo        `yaml:"livekit_info"`
-	RedisInfo          RedisInfo          `yaml:"redis_info"`
-	MySqlInfo          MySqlInfo          `yaml:"mysql_info"`
+	RedisInfo          *factory.RedisInfo `yaml:"redis_info"`
+	MySqlInfo          *factory.MySqlInfo `yaml:"mysql_info"`
 	UploadFileSettings UploadFileSettings `yaml:"upload_file_settings"`
 	RecorderInfo       RecorderInfo       `yaml:"recorder_info"`
 	SharedNotePad      SharedNotePad      `yaml:"shared_notepad"`
@@ -73,27 +74,6 @@ type LivekitInfo struct {
 	ApiKey        string        `yaml:"api_key"`
 	Secret        string        `yaml:"secret"`
 	TokenValidity time.Duration `yaml:"token_validity"`
-}
-
-type RedisInfo struct {
-	Host              string   `yaml:"host"`
-	Username          string   `yaml:"username"`
-	Password          string   `yaml:"password"`
-	DBName            int      `yaml:"db"`
-	UseTLS            bool     `yaml:"use_tls"`
-	MasterName        string   `yaml:"sentinel_master_name"`
-	SentinelUsername  string   `yaml:"sentinel_username"`
-	SentinelPassword  string   `yaml:"sentinel_password"`
-	SentinelAddresses []string `yaml:"sentinel_addresses"`
-}
-
-type MySqlInfo struct {
-	Host     string `yaml:"host"`
-	Port     int32  `yaml:"port"`
-	Username string `yaml:"username"`
-	Password string `yaml:"password"`
-	DBName   string `yaml:"db"`
-	Prefix   string `yaml:"prefix"`
 }
 
 type UploadFileSettings struct {
