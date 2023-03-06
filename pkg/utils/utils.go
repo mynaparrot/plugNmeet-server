@@ -1,9 +1,9 @@
 package utils
 
 import (
+	"github.com/mynaparrot/plugnmeet-protocol/factory"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
-	"github.com/mynaparrot/plugnmeet-server/pkg/factory"
 	"gopkg.in/yaml.v3"
 	"os"
 )
@@ -19,9 +19,18 @@ func PrepareServer(c string) error {
 	}
 
 	// set mysql factory connection
-	factory.NewDbConnection()
+	db, err := factory.NewDbConnection(config.AppCnf.MySqlInfo)
+	if err != nil {
+		return err
+	}
+	config.AppCnf.DB = db
+
 	// set redis connection
-	factory.NewRedisConnection()
+	rds, err := factory.NewRedisConnection(config.AppCnf.RedisInfo)
+	if err != nil {
+		return err
+	}
+	config.AppCnf.RDS = rds
 
 	// we'll subscribe to redis channels now
 	go controllers.SubscribeToWebsocketChannel()
