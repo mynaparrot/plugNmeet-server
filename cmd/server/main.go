@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/handler"
-	"github.com/mynaparrot/plugnmeet-server/pkg/utils"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/mynaparrot/plugnmeet-server/version"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
@@ -40,7 +40,7 @@ func main() {
 }
 
 func startServer(c *cli.Context) error {
-	err := utils.PrepareServer(c.String("config"))
+	err := helpers.PrepareServer(c.String("config"))
 	if err != nil {
 		return err
 	}
