@@ -3,7 +3,7 @@ package test
 import (
 	"github.com/livekit/protocol/livekit"
 	lksdk "github.com/livekit/server-sdk-go"
-	"github.com/mynaparrot/plugnmeet-server/pkg/utils"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/stretchr/testify/suite"
 	"net/http"
 	"testing"
@@ -20,7 +20,7 @@ type UnitTestSuite struct {
 func (s *UnitTestSuite) Test_00_PrepareServer() {
 	const configPath = "./config.yaml"
 
-	if err := utils.PrepareServer(configPath); err != nil {
+	if err := helpers.PrepareServer(configPath); err != nil {
 		s.T().Errorf("prepareServer() error = %v", err)
 	}
 }

@@ -42,6 +42,8 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 	utils.PrepareDefaultRoomFeatures(r)
 	utils.SetCreateRoomDefaultValues(r, config.AppCnf.UploadFileSettings.MaxSize, config.AppCnf.UploadFileSettings.AllowedTypes, config.AppCnf.SharedNotePad.Enabled)
 	utils.SetRoomDefaultLockSettings(r)
+	// set default room settings
+	utils.SetDefaultRoomSettings(config.AppCnf.RoomDefaultSettings, r)
 
 	// copyright
 	if config.AppCnf.Client.CopyrightConf == nil {

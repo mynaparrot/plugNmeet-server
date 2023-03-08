@@ -29,14 +29,15 @@ type AppConfig struct {
 	roomWithDuration map[string]RoomWithDuration
 	ClientFiles      map[string][]string
 
-	Client             ClientInfo         `yaml:"client"`
-	LogSettings        LogSettings        `yaml:"log_settings"`
-	LivekitInfo        LivekitInfo        `yaml:"livekit_info"`
-	RedisInfo          *factory.RedisInfo `yaml:"redis_info"`
-	MySqlInfo          *factory.MySqlInfo `yaml:"mysql_info"`
-	UploadFileSettings UploadFileSettings `yaml:"upload_file_settings"`
-	RecorderInfo       RecorderInfo       `yaml:"recorder_info"`
-	SharedNotePad      SharedNotePad      `yaml:"shared_notepad"`
+	Client              ClientInfo                 `yaml:"client"`
+	RoomDefaultSettings *utils.RoomDefaultSettings `yaml:"room_default_settings"`
+	LogSettings         LogSettings                `yaml:"log_settings"`
+	LivekitInfo         LivekitInfo                `yaml:"livekit_info"`
+	RedisInfo           *factory.RedisInfo         `yaml:"redis_info"`
+	MySqlInfo           *factory.MySqlInfo         `yaml:"mysql_info"`
+	UploadFileSettings  UploadFileSettings         `yaml:"upload_file_settings"`
+	RecorderInfo        RecorderInfo               `yaml:"recorder_info"`
+	SharedNotePad       SharedNotePad              `yaml:"shared_notepad"`
 }
 
 type ClientInfo struct {

@@ -25,6 +25,9 @@ client:
   copyright_conf:
     display: true
     text: 'Powered by <a href="https://www.plugnmeet.org" target="_blank">plugNmeet</a>'
+room_default_settings:
+  max_duration: 0 # Duration in minutes. 0 = no limit
+  max_participants: 0 # 0 = no limit
 log_settings:
   log_file: "./log/plugNmeet.log"
   # maxsize of log file in MB
