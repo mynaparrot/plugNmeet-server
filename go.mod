@@ -15,7 +15,7 @@ require (
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.4.2
 	github.com/livekit/server-sdk-go v1.0.8
-	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230308134950-7a8daa6ad30b
+	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230309145425-97b7e7d0d0d7
 	github.com/redis/go-redis/v9 v9.0.2
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.2
@@ -47,7 +47,6 @@ require (
 	github.com/gofiber/adaptor/v2 v2.1.32 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
-	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/jxskiss/base62 v1.1.0 // indirect
 	github.com/klauspost/compress v1.16.0 // indirect
 	github.com/leodido/go-urn v1.2.2 // indirect
@@ -59,8 +58,6 @@ require (
 	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
-	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
-	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/philhofer/fwd v1.1.2 // indirect
 	github.com/pion/datachannel v1.5.5 // indirect
 	github.com/pion/dtls/v2 v2.2.6 // indirect
