@@ -8,6 +8,7 @@ run_livekit.sh
 docker-compose.yaml
 config.yaml
 livekit.yaml
+ingress.yaml
 
 .idea
 build/

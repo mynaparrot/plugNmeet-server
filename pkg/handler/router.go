@@ -145,6 +145,10 @@ func Router() *fiber.App {
 	breakoutRoom.Post("/endRoom", controllers.HandleEndBreakoutRoom)
 	breakoutRoom.Post("/endAllRooms", controllers.HandleEndBreakoutRooms)
 
+	// Ingress
+	ingress := api.Group("/ingress")
+	ingress.Post("/create", controllers.HandleCreateIngress)
+
 	// for resumable.js need both methods.
 	// https://github.com/23/resumable.js#how-do-i-set-it-up-with-my-server
 	api.Get("/fileUpload", controllers.HandleFileUpload)
