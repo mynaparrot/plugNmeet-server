@@ -13,7 +13,7 @@ require (
 	github.com/gofiber/websocket/v2 v2.1.4
 	github.com/google/uuid v1.3.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/protocol v1.4.2
+	github.com/livekit/protocol v1.5.0
 	github.com/livekit/server-sdk-go v1.0.8
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230309145425-97b7e7d0d0d7
 	github.com/redis/go-redis/v9 v9.0.2
@@ -38,6 +38,7 @@ require (
 	github.com/eapache/queue v1.1.0 // indirect
 	github.com/envoyproxy/protoc-gen-validate v0.9.1 // indirect
 	github.com/fasthttp/websocket v1.5.1 // indirect
+	github.com/frostbyte73/core v0.0.4 // indirect
 	github.com/frostbyte73/go-throttle v0.0.0-20210621200530-8018c891361d // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect

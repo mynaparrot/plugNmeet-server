@@ -142,6 +142,8 @@ github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5Kwzbycv
 github.com/fatih/color v1.9.0/go.mod h1:eQcE1qtQxscV5RaZvpXrrb8Drkc3/DdQ+uUYCNjL+zU=
 github.com/fatih/color v1.13.0/go.mod h1:kLAiJbzzSOZDVNGyDpeOxJ47H46qBXwg5ILebYFFOfk=
 github.com/flosch/pongo2/v4 v4.0.2/go.mod h1:B5ObFANs/36VwxxlgKpdchIJHMvHB562PW+BWPhwZD8=
+github.com/frostbyte73/core v0.0.4 h1:CwwoYfKPdNSO/QbOOMWMRSYoNW14ov4XHnt094AuMX8=
+github.com/frostbyte73/core v0.0.4/go.mod h1:mqHHSVFS5DE6kSdhU1/s9Mm0YCnLB8Ou2DD/eX1Zbr4=
 github.com/frostbyte73/go-throttle v0.0.0-20210621200530-8018c891361d h1:rvSueMilKro0jF+VfxoVR42wazKPl+cUBL3rFbiBGso=
 github.com/frostbyte73/go-throttle v0.0.0-20210621200530-8018c891361d/go.mod h1:jhHJXDlUaWA2g15qvWdleCmRe0Z3noWIQQvjbTZOhGY=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
@@ -344,6 +346,8 @@ github.com/livekit/mediatransportutil v0.0.0-20230130133657-96cfb115473a h1:5UkG
 github.com/livekit/mediatransportutil v0.0.0-20230130133657-96cfb115473a/go.mod h1:1Dlx20JPoIKGP45eo+yuj0HjeE25zmyeX/EWHiPCjFw=
 github.com/livekit/protocol v1.4.2 h1:XmobZ9eQmTSThWUmkko48tGf0AWfPMVWzpWzt3uoj+4=
 github.com/livekit/protocol v1.4.2/go.mod h1:mVzmVesPCIgk2gg/jMr6PWtHu8dfRdhaAJ6okFs5nQw=
+github.com/livekit/protocol v1.5.0 h1:jFGSkSEv0PTjUlrW/WnmERejwxyHOSE9If4VU33PYgk=
+github.com/livekit/protocol v1.5.0/go.mod h1:hkK/G0wwFiLUGp9F5kxeQxq2CQuIzkmfBwKhTsc71us=
 github.com/livekit/server-sdk-go v1.0.8 h1:qyB2o69HobaQlXIip1hrQOiykV4Y9pBMu/Fd4hvY7fg=
 github.com/livekit/server-sdk-go v1.0.8/go.mod h1:89OksdP3goYFRB01ysX44xDX9k2Q+U3yL5LA2qoZwNU=
 github.com/lyft/protoc-gen-star v0.5.3/go.mod h1:V0xaHgaf5oCCqmcxYcWiDfTiKsZsRc87/1qhoTACD8w=
