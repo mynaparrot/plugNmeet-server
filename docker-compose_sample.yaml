@@ -23,6 +23,16 @@ services:
     command: --config "/app/livekit.yaml" --dev
     depends_on:
       - redis
+  livekit-ingress:
+    image: livekit/ingress
+    ports:
+      - "1935:1935/tcp"
+    volumes:
+      - .:/app
+    command: --config "/app/ingress.yaml"
+    depends_on:
+      - redis
+      - livekit
   etherpad:
     image: mynaparrot/plugnmeet-etherpad
     ports:
