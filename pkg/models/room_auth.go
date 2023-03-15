@@ -122,7 +122,7 @@ func (am *RoomAuthModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (bool, strin
 	return true, "room is active"
 }
 
-func (am *RoomAuthModel) GetActiveRoomInfo(r *plugnmeet.GetActiveRoomInfoReq) (bool, string, *plugnmeet.ActiveRoomInfoRes) {
+func (am *RoomAuthModel) GetActiveRoomInfo(r *plugnmeet.GetActiveRoomInfoReq) (bool, string, *plugnmeet.ActiveRoomWithParticipant) {
 	roomDbInfo, _ := am.rm.GetRoomInfo(r.RoomId, "", 1)
 
 	if roomDbInfo.Id == 0 {
@@ -134,7 +134,7 @@ func (am *RoomAuthModel) GetActiveRoomInfo(r *plugnmeet.GetActiveRoomInfoReq) (b
 		return false, err.Error(), nil
 	}
 
-	res := new(plugnmeet.ActiveRoomInfoRes)
+	res := new(plugnmeet.ActiveRoomWithParticipant)
 	res.RoomInfo = &plugnmeet.ActiveRoomInfo{
 		RoomTitle:          roomDbInfo.RoomTitle,
 		RoomId:             roomDbInfo.RoomId,
@@ -154,7 +154,7 @@ func (am *RoomAuthModel) GetActiveRoomInfo(r *plugnmeet.GetActiveRoomInfoReq) (b
 	return true, "success", res
 }
 
-func (am *RoomAuthModel) GetActiveRoomsInfo() (bool, string, []*plugnmeet.ActiveRoomInfoRes) {
+func (am *RoomAuthModel) GetActiveRoomsInfo() (bool, string, []*plugnmeet.ActiveRoomWithParticipant) {
 	roomsInfo, err := am.rm.GetActiveRoomsInfo()
 
 	if err != nil {
@@ -165,10 +165,10 @@ func (am *RoomAuthModel) GetActiveRoomsInfo() (bool, string, []*plugnmeet.Active
 		return false, "no active room found", nil
 	}
 
-	var res []*plugnmeet.ActiveRoomInfoRes
+	var res []*plugnmeet.ActiveRoomWithParticipant
 	for _, r := range roomsInfo {
 		roomInfo := r
-		i := new(plugnmeet.ActiveRoomInfoRes)
+		i := new(plugnmeet.ActiveRoomWithParticipant)
 		i.RoomInfo = roomInfo
 
 		participants, err := am.rs.LoadParticipants(r.RoomId)

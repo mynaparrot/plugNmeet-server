@@ -5,6 +5,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -92,22 +93,44 @@ func HandleGetActiveRoomInfo(c *fiber.Ctx) error {
 	m := models.NewRoomAuthModel()
 	status, msg, res := m.GetActiveRoomInfo(req)
 
-	return c.JSON(fiber.Map{
-		"status": status,
-		"msg":    msg,
-		"room":   res,
-	})
+	r := &plugnmeet.GetActiveRoomInfoRes{
+		Status: status,
+		Msg:    msg,
+		Room:   res,
+	}
+
+	op := protojson.MarshalOptions{
+		EmitUnpopulated: true,
+		UseProtoNames:   true,
+	}
+	marshal, err := op.Marshal(r)
+	if err != nil {
+		return err
+	}
+	c.Set("Content-Type", "application/json")
+	return c.Send(marshal)
 }
 
 func HandleGetActiveRoomsInfo(c *fiber.Ctx) error {
 	m := models.NewRoomAuthModel()
 	status, msg, res := m.GetActiveRoomsInfo()
 
-	return c.JSON(fiber.Map{
-		"status": status,
-		"msg":    msg,
-		"rooms":  res,
-	})
+	r := &plugnmeet.GetActiveRoomsInfoRes{
+		Status: status,
+		Msg:    msg,
+		Rooms:  res,
+	}
+
+	op := protojson.MarshalOptions{
+		EmitUnpopulated: true,
+		UseProtoNames:   true,
+	}
+	marshal, err := op.Marshal(r)
+	if err != nil {
+		return err
+	}
+	c.Set("Content-Type", "application/json")
+	return c.Send(marshal)
 }
 
 func HandleEndRoom(c *fiber.Ctx) error {
