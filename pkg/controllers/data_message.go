@@ -14,13 +14,13 @@ func HandleDataMessage(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 
 	if roomId == "" {
-		return utils.SendCommonResponse(c, false, "no roomId in token")
+		return utils.SendCommonProtobufResponse(c, false, "no roomId in token")
 	}
 
 	req := new(plugnmeet.DataMessageReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		return utils.SendCommonResponse(c, false, err.Error())
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
 	// now need to check if meeting is running or not
@@ -28,11 +28,11 @@ func HandleDataMessage(c *fiber.Ctx) error {
 	room, _ := rm.GetRoomInfo(req.RoomId, req.RoomSid, 1)
 
 	if room.Id == 0 {
-		return utils.SendCommonResponse(c, false, "room isn't running")
+		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
 	}
 
 	if room.RoomId != roomId {
-		return utils.SendCommonResponse(c, false, "roomId in token mismatched")
+		return utils.SendCommonProtobufResponse(c, false, "roomId in token mismatched")
 	}
 
 	req.RequestedUserId = requestedUserId.(string)
@@ -40,8 +40,8 @@ func HandleDataMessage(c *fiber.Ctx) error {
 	m := models.NewDataMessageModel()
 	err = m.SendDataMessage(req)
 	if err != nil {
-		return utils.SendCommonResponse(c, false, err.Error())
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	return utils.SendCommonResponse(c, true, "success")
+	return utils.SendCommonProtobufResponse(c, true, "success")
 }

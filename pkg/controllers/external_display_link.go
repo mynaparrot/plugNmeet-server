@@ -14,18 +14,18 @@ func HandleExternalDisplayLink(c *fiber.Ctx) error {
 	requestedUserId := c.Locals("requestedUserId")
 
 	if !isAdmin.(bool) {
-		return utils.SendCommonResponse(c, false, "only admin can perform this task")
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
 	rid := roomId.(string)
 	if rid == "" {
-		return utils.SendCommonResponse(c, false, "roomId required")
+		return utils.SendCommonProtobufResponse(c, false, "roomId required")
 	}
 
 	req := new(plugnmeet.ExternalDisplayLinkReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		return utils.SendCommonResponse(c, false, err.Error())
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
 	m := models.NewExternalDisplayLinkModel()
@@ -34,8 +34,8 @@ func HandleExternalDisplayLink(c *fiber.Ctx) error {
 	err = m.PerformTask(req)
 
 	if err != nil {
-		return utils.SendCommonResponse(c, false, err.Error())
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	return utils.SendCommonResponse(c, true, "success")
+	return utils.SendCommonProtobufResponse(c, true, "success")
 }

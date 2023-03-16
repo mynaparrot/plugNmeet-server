@@ -27,16 +27,12 @@ func HandleAuthHeaderCheck(c *fiber.Ctx) error {
 	body := c.Body()
 
 	if apiKey != config.AppCnf.Client.ApiKey {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"status": false,
-			"msg":    "invalid API key",
-		})
+		c.Status(fiber.StatusUnauthorized)
+		return utils.SendCommonProtoJsonResponse(c, false, "invalid API key")
 	}
 	if signature == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"status": false,
-			"msg":    "hash signature value required",
-		})
+		c.Status(fiber.StatusUnauthorized)
+		return utils.SendCommonProtoJsonResponse(c, false, "hash signature value required")
 	}
 
 	status := false
@@ -50,10 +46,8 @@ func HandleAuthHeaderCheck(c *fiber.Ctx) error {
 	}
 
 	if !status {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"status": false,
-			"msg":    "can't verify provided information",
-		})
+		c.Status(fiber.StatusUnauthorized)
+		return utils.SendCommonProtoJsonResponse(c, false, "can't verify provided information")
 	}
 
 	return c.Next()
@@ -63,60 +57,44 @@ func HandleGenerateJoinToken(c *fiber.Ctx) error {
 	req := new(plugnmeet.GenerateTokenReq)
 	err := c.BodyParser(req)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
 	err = req.Validate()
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
 	if req.UserInfo == nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "UserInfo required",
-		})
+		return utils.SendCommonProtoJsonResponse(c, false, "UserInfo required")
 	}
 
 	// don't generate token if user is blocked
 	rs := models.NewRoomService()
 	exist := rs.IsUserExistInBlockList(req.RoomId, req.UserInfo.UserId)
 	if exist {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "this user is blocked to join this session",
-		})
+		return utils.SendCommonProtoJsonResponse(c, false, "this user is blocked to join this session")
 	}
 
 	rm := models.NewRoomModel()
 	ri, _ := rm.GetRoomInfo(req.RoomId, "", 1)
 	if ri.Id == 0 {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "room is not active. create room first",
-		})
+		return utils.SendCommonProtoJsonResponse(c, false, "room is not active. create room first")
 	}
 
 	m := models.NewAuthTokenModel()
 	token, err := m.DoGenerateToken(req)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	return c.JSON(fiber.Map{
-		"status": true,
-		"msg":    "success",
-		"token":  token,
-	})
+	r := &plugnmeet.GenerateTokenRes{
+		Status: true,
+		Msg:    "success",
+		Token:  &token,
+	}
+
+	return utils.SendProtoJsonResponse(c, r)
 }
 
 func HandleVerifyToken(c *fiber.Ctx) error {
@@ -126,18 +104,18 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	rs := models.NewRoomService()
 	exist := rs.IsUserExistInBlockList(roomId.(string), requestedUserId.(string))
 	if exist {
-		return utils.SendCommonResponse(c, false, "notifications.you-are-blocked")
+		return utils.SendCommonProtobufResponse(c, false, "notifications.you-are-blocked")
 	}
 
 	req := new(plugnmeet.VerifyTokenReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		return utils.SendCommonResponse(c, false, err.Error())
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
 	cm := c.Locals("claims")
 	if cm == nil {
-		return utils.SendCommonResponse(c, false, "invalid request")
+		return utils.SendCommonProtobufResponse(c, false, "invalid request")
 	}
 	claims := cm.(*auth.ClaimGrants)
 	// after usage, we can make it null as we don't need this value again.
@@ -146,7 +124,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	au := models.NewAuthTokenModel()
 	token, err := au.GenerateLivekitToken(claims)
 	if err != nil {
-		return utils.SendCommonResponse(c, false, err.Error())
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
 	// if nil then assume production
@@ -167,7 +145,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	}
 
 	if !*req.IsProduction {
-		return utils.SendProtoResponse(c, res)
+		return utils.SendProtobufResponse(c, res)
 	}
 
 	// if production then we'll check if room is active or not
@@ -179,11 +157,11 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	})
 
 	if !status {
-		return utils.SendCommonResponse(c, status, msg)
+		return utils.SendCommonProtobufResponse(c, status, msg)
 	}
 
 	res.Msg = msg
-	return utils.SendProtoResponse(c, res)
+	return utils.SendProtobufResponse(c, res)
 }
 
 func HandleVerifyHeaderToken(c *fiber.Ctx) error {
@@ -198,10 +176,7 @@ func HandleVerifyHeaderToken(c *fiber.Ctx) error {
 
 	if authToken == "" {
 		_ = c.SendStatus(errStatus)
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "Authorization header is missing",
-		})
+		return utils.SendCommonProtoJsonResponse(c, false, "Authorization header is missing")
 	}
 
 	info := &models.ValidateTokenReq{
@@ -211,10 +186,7 @@ func HandleVerifyHeaderToken(c *fiber.Ctx) error {
 	claims, err := m.DoValidateToken(info, false)
 	if err != nil {
 		_ = c.SendStatus(errStatus)
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
 	// we only need this during verify token
@@ -237,30 +209,23 @@ func HandleRenewToken(c *fiber.Ctx) error {
 
 	err := c.BodyParser(info)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
 	if info.Token == "" || info.Sid == "" || info.RoomId == "" {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "missing required fields",
-		})
+		return utils.SendCommonProtoJsonResponse(c, false, "missing required fields")
 	}
 
 	token, err := m.DoRenewToken(info)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	return c.JSON(fiber.Map{
-		"status": true,
-		"msg":    "token renewed",
-		"token":  token,
-	})
+	r := &plugnmeet.GenerateTokenRes{
+		Status: true,
+		Msg:    "token renewed",
+		Token:  &token,
+	}
+
+	return utils.SendProtoJsonResponse(c, r)
 }

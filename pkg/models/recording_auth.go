@@ -28,7 +28,7 @@ func NewRecordingAuth() *AuthRecording {
 	}
 }
 
-func (a *AuthRecording) FetchRecordings(r *plugnmeet.FetchRecordingsReq) (*plugnmeet.FetchRecordingsRes, error) {
+func (a *AuthRecording) FetchRecordings(r *plugnmeet.FetchRecordingsReq) (*plugnmeet.FetchRecordingsResult, error) {
 	db := a.db
 	ctx, cancel := context.WithTimeout(a.ctx, 3*time.Second)
 	defer cancel()
@@ -98,7 +98,7 @@ func (a *AuthRecording) FetchRecordings(r *plugnmeet.FetchRecordingsReq) (*plugn
 	var total int64
 	_ = row.Scan(&total)
 
-	result := &plugnmeet.FetchRecordingsRes{
+	result := &plugnmeet.FetchRecordingsResult{
 		TotalRecordings: total,
 		From:            r.From,
 		Limit:           limit,
