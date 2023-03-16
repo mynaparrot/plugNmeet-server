@@ -14,17 +14,17 @@ func HandleUpdateUserLockSetting(c *fiber.Ctx) error {
 	requestedUserId := c.Locals("requestedUserId")
 
 	if !isAdmin.(bool) {
-		return utils.SendCommonResponse(c, false, "only admin can perform this task")
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
 	req := new(plugnmeet.UpdateUserLockSettingsReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		return utils.SendCommonResponse(c, false, err.Error())
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
 	if roomId != req.RoomId {
-		return utils.SendCommonResponse(c, false, "requested roomId & token roomId mismatched")
+		return utils.SendCommonProtobufResponse(c, false, "requested roomId & token roomId mismatched")
 	}
 
 	// now need to check if meeting is running or not
@@ -32,17 +32,17 @@ func HandleUpdateUserLockSetting(c *fiber.Ctx) error {
 	room, _ := rm.GetRoomInfo(req.RoomId, req.RoomSid, 1)
 
 	if room.Id == 0 {
-		return utils.SendCommonResponse(c, false, "room isn't running")
+		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
 	}
 
 	req.RequestedUserId = requestedUserId.(string)
 	m := models.NewUserModel()
 	err = m.UpdateUserLockSettings(req)
 	if err != nil {
-		return utils.SendCommonResponse(c, false, err.Error())
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	return utils.SendCommonResponse(c, true, "success")
+	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
 func HandleMuteUnMuteTrack(c *fiber.Ctx) error {
@@ -51,23 +51,23 @@ func HandleMuteUnMuteTrack(c *fiber.Ctx) error {
 	requestedUserId := c.Locals("requestedUserId")
 
 	if !isAdmin.(bool) {
-		return utils.SendCommonResponse(c, false, "only admin can perform this task")
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
 	m := models.NewUserModel()
 	err := m.CommonValidation(c)
 	if err != nil {
-		return utils.SendCommonResponse(c, false, err.Error())
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
 	req := new(plugnmeet.MuteUnMuteTrackReq)
 	err = proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		return utils.SendCommonResponse(c, false, err.Error())
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
 	if roomId != req.RoomId {
-		return utils.SendCommonResponse(c, false, "requested roomId & token roomId mismatched")
+		return utils.SendCommonProtobufResponse(c, false, "requested roomId & token roomId mismatched")
 	}
 
 	// now need to check if meeting is running or not
@@ -75,16 +75,16 @@ func HandleMuteUnMuteTrack(c *fiber.Ctx) error {
 	room, _ := rm.GetRoomInfo(req.RoomId, req.Sid, 1)
 
 	if room.Id == 0 {
-		return utils.SendCommonResponse(c, false, "room isn't running")
+		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
 	}
 
 	req.RequestedUserId = requestedUserId.(string)
 	err = m.MuteUnMuteTrack(req)
 	if err != nil {
-		return utils.SendCommonResponse(c, false, err.Error())
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	return utils.SendCommonResponse(c, true, "success")
+	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
 func HandleRemoveParticipant(c *fiber.Ctx) error {
@@ -93,26 +93,26 @@ func HandleRemoveParticipant(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 
 	if !isAdmin.(bool) {
-		return utils.SendCommonResponse(c, false, "only admin can perform this task")
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
 	m := models.NewUserModel()
 	err := m.CommonValidation(c)
 	if err != nil {
-		return utils.SendCommonResponse(c, false, err.Error())
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
 	req := new(plugnmeet.RemoveParticipantReq)
 	err = proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		return utils.SendCommonResponse(c, false, err.Error())
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
 	if roomId != req.RoomId {
-		return utils.SendCommonResponse(c, false, "requested roomId & token roomId mismatched")
+		return utils.SendCommonProtobufResponse(c, false, "requested roomId & token roomId mismatched")
 	}
 	if requestedUserId == req.UserId {
-		return utils.SendCommonResponse(c, false, "you can't remove yourself\"")
+		return utils.SendCommonProtobufResponse(c, false, "you can't remove yourself\"")
 	}
 
 	// now need to check if meeting is running or not
@@ -120,15 +120,15 @@ func HandleRemoveParticipant(c *fiber.Ctx) error {
 	room, _ := rm.GetRoomInfo(req.RoomId, req.Sid, 1)
 
 	if room.Id == 0 {
-		return utils.SendCommonResponse(c, false, "room isn't running")
+		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
 	}
 
 	err = m.RemoveParticipant(req)
 	if err != nil {
-		return utils.SendCommonResponse(c, false, err.Error())
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	return utils.SendCommonResponse(c, true, "success")
+	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
 func HandleSwitchPresenter(c *fiber.Ctx) error {
@@ -137,13 +137,13 @@ func HandleSwitchPresenter(c *fiber.Ctx) error {
 	requestedUserId := c.Locals("requestedUserId")
 
 	if !isAdmin.(bool) {
-		return utils.SendCommonResponse(c, false, "only admin can perform this task")
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
 	req := new(plugnmeet.SwitchPresenterReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		return utils.SendCommonResponse(c, false, err.Error())
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
 	m := models.NewUserModel()
@@ -151,8 +151,8 @@ func HandleSwitchPresenter(c *fiber.Ctx) error {
 	req.RequestedUserId = requestedUserId.(string)
 	err = m.SwitchPresenter(req)
 	if err != nil {
-		return utils.SendCommonResponse(c, false, err.Error())
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	return utils.SendCommonResponse(c, true, "success")
+	return utils.SendCommonProtobufResponse(c, true, "success")
 }

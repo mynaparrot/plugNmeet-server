@@ -5,7 +5,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -13,66 +12,46 @@ func HandleRoomCreate(c *fiber.Ctx) error {
 	req := new(plugnmeet.CreateRoomReq)
 	err := c.BodyParser(req)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
 	if err = req.Validate(); err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
 	if err = req.Metadata.Validate(); err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
 	if err = req.Metadata.RoomFeatures.Validate(); err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
 	m := models.NewRoomAuthModel()
 	status, msg, room := m.CreateRoom(req)
 
-	return c.JSON(fiber.Map{
-		"status":    status,
-		"msg":       msg,
-		"room_info": room,
-	})
+	r := &plugnmeet.CreateRoomRes{
+		Status:   status,
+		Msg:      msg,
+		RoomInfo: room,
+	}
+
+	return utils.SendProtoJsonResponse(c, r)
 }
 
 func HandleIsRoomActive(c *fiber.Ctx) error {
 	req := new(plugnmeet.IsRoomActiveReq)
 	err := c.BodyParser(req)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 	if req.RoomId == "" {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "room_id required",
-		})
+		return utils.SendCommonProtoJsonResponse(c, false, "room_id required")
 	}
 
 	m := models.NewRoomAuthModel()
 	status, msg := m.IsRoomActive(req)
-
-	return c.JSON(fiber.Map{
-		"status": status,
-		"msg":    msg,
-	})
+	return utils.SendCommonProtoJsonResponse(c, status, msg)
 }
 
 func HandleGetActiveRoomInfo(c *fiber.Ctx) error {
@@ -99,16 +78,7 @@ func HandleGetActiveRoomInfo(c *fiber.Ctx) error {
 		Room:   res,
 	}
 
-	op := protojson.MarshalOptions{
-		EmitUnpopulated: true,
-		UseProtoNames:   true,
-	}
-	marshal, err := op.Marshal(r)
-	if err != nil {
-		return err
-	}
-	c.Set("Content-Type", "application/json")
-	return c.Send(marshal)
+	return utils.SendProtoJsonResponse(c, r)
 }
 
 func HandleGetActiveRoomsInfo(c *fiber.Ctx) error {
@@ -121,41 +91,23 @@ func HandleGetActiveRoomsInfo(c *fiber.Ctx) error {
 		Rooms:  res,
 	}
 
-	op := protojson.MarshalOptions{
-		EmitUnpopulated: true,
-		UseProtoNames:   true,
-	}
-	marshal, err := op.Marshal(r)
-	if err != nil {
-		return err
-	}
-	c.Set("Content-Type", "application/json")
-	return c.Send(marshal)
+	return utils.SendProtoJsonResponse(c, r)
 }
 
 func HandleEndRoom(c *fiber.Ctx) error {
 	req := new(plugnmeet.RoomEndReq)
 	err := c.BodyParser(req)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 	if req.RoomId == "" {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "room_id required",
-		})
+		return utils.SendCommonProtoJsonResponse(c, false, "room_id required")
 	}
 
 	m := models.NewRoomAuthModel()
 	status, msg := m.EndRoom(req)
 
-	return c.JSON(fiber.Map{
-		"status": status,
-		"msg":    msg,
-	})
+	return utils.SendCommonProtoJsonResponse(c, status, msg)
 }
 
 func HandleEndRoomForAPI(c *fiber.Ctx) error {
@@ -163,22 +115,22 @@ func HandleEndRoomForAPI(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 
 	if !isAdmin.(bool) {
-		return utils.SendCommonResponse(c, false, "only admin can perform this task")
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
 	req := new(plugnmeet.RoomEndReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		return utils.SendCommonResponse(c, false, err.Error())
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
 	if roomId != req.RoomId {
-		return utils.SendCommonResponse(c, false, "requested roomId & token roomId mismatched")
+		return utils.SendCommonProtobufResponse(c, false, "requested roomId & token roomId mismatched")
 	}
 
 	m := models.NewRoomAuthModel()
 	status, msg := m.EndRoom(req)
-	return utils.SendCommonResponse(c, status, msg)
+	return utils.SendCommonProtobufResponse(c, status, msg)
 }
 
 func HandleChangeVisibilityForAPI(c *fiber.Ctx) error {
@@ -186,20 +138,20 @@ func HandleChangeVisibilityForAPI(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 
 	if !isAdmin.(bool) {
-		return utils.SendCommonResponse(c, false, "only admin can perform this task")
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
 	req := new(plugnmeet.ChangeVisibilityRes)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		return utils.SendCommonResponse(c, false, err.Error())
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
 	if roomId != req.RoomId {
-		return utils.SendCommonResponse(c, false, "requested roomId & token roomId mismatched")
+		return utils.SendCommonProtobufResponse(c, false, "requested roomId & token roomId mismatched")
 	}
 
 	m := models.NewRoomAuthModel()
 	status, msg := m.ChangeVisibility(req)
-	return utils.SendCommonResponse(c, status, msg)
+	return utils.SendCommonProtobufResponse(c, status, msg)
 }
