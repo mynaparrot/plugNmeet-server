@@ -5,6 +5,7 @@ import (
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/handler"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"io"
 	"net/http"
@@ -34,7 +35,7 @@ func test_HandleRoomCreate(t *testing.T) *livekit.Room {
 	}
 
 	rr := new(plugnmeet.CreateRoomRes)
-	err = json.Unmarshal(b, rr)
+	err = protojson.Unmarshal(b, rr)
 	if err != nil {
 		t.Error(err)
 	}
