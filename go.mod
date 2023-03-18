@@ -15,12 +15,12 @@ require (
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.5.0
 	github.com/livekit/server-sdk-go v1.0.8
-	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230316121914-e9d6f7f051ae
+	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230317154857-4bbac2fe525d
 	github.com/redis/go-redis/v9 v9.0.2
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.2
 	github.com/urfave/cli/v2 v2.25.0
-	google.golang.org/protobuf v1.29.1
+	google.golang.org/protobuf v1.30.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/square/go-jose.v2 v2.6.0
 	gopkg.in/yaml.v3 v3.0.1
