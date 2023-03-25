@@ -8,14 +8,14 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.2
 	github.com/go-playground/validator/v10 v10.11.2
 	github.com/goccy/go-json v0.10.2
-	github.com/gofiber/fiber/v2 v2.42.0
+	github.com/gofiber/fiber/v2 v2.43.0
 	github.com/gofiber/template v1.7.5
 	github.com/gofiber/websocket/v2 v2.1.4
 	github.com/google/uuid v1.3.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/protocol v1.5.0
+	github.com/livekit/protocol v1.5.1
 	github.com/livekit/server-sdk-go v1.0.8
-	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230317154857-4bbac2fe525d
+	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230325180932-4d8092ae245c
 	github.com/redis/go-redis/v9 v9.0.2
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.2
@@ -36,7 +36,7 @@ require (
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/eapache/channels v1.1.0 // indirect
 	github.com/eapache/queue v1.1.0 // indirect
-	github.com/envoyproxy/protoc-gen-validate v0.9.1 // indirect
+	github.com/envoyproxy/protoc-gen-validate v0.10.1 // indirect
 	github.com/fasthttp/websocket v1.5.1 // indirect
 	github.com/frostbyte73/core v0.0.4 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
@@ -52,7 +52,7 @@ require (
 	github.com/leodido/go-urn v1.2.2 // indirect
 	github.com/lithammer/shortuuid/v4 v4.0.0 // indirect
 	github.com/livekit/mediatransportutil v0.0.0-20230130133657-96cfb115473a // indirect
-	github.com/mackerelio/go-osstat v0.2.3 // indirect
+	github.com/mackerelio/go-osstat v0.2.4 // indirect
 	github.com/magefile/mage v1.14.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
