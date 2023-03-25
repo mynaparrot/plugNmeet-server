@@ -8,7 +8,7 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.2
 	github.com/go-playground/validator/v10 v10.11.2
 	github.com/goccy/go-json v0.10.2
-	github.com/gofiber/fiber/v2 v2.42.0
+	github.com/gofiber/fiber/v2 v2.43.0
 	github.com/gofiber/template v1.7.5
 	github.com/gofiber/websocket/v2 v2.1.4
 	github.com/google/uuid v1.3.0
