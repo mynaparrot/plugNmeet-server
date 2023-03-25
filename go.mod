@@ -13,7 +13,7 @@ require (
 	github.com/gofiber/websocket/v2 v2.1.4
 	github.com/google/uuid v1.3.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/protocol v1.5.0
+	github.com/livekit/protocol v1.5.1
 	github.com/livekit/server-sdk-go v1.0.8
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230317154857-4bbac2fe525d
 	github.com/redis/go-redis/v9 v9.0.2
@@ -52,7 +52,7 @@ require (
 	github.com/leodido/go-urn v1.2.2 // indirect
 	github.com/lithammer/shortuuid/v4 v4.0.0 // indirect
 	github.com/livekit/mediatransportutil v0.0.0-20230130133657-96cfb115473a // indirect
-	github.com/mackerelio/go-osstat v0.2.3 // indirect
+	github.com/mackerelio/go-osstat v0.2.4 // indirect
 	github.com/magefile/mage v1.14.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
