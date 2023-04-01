@@ -14,7 +14,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.5.1
-	github.com/livekit/server-sdk-go v1.0.8
+	github.com/livekit/server-sdk-go v1.0.9
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230325180932-4d8092ae245c
 	github.com/redis/go-redis/v9 v9.0.2
 	github.com/sirupsen/logrus v1.9.0
@@ -51,7 +51,7 @@ require (
 	github.com/klauspost/compress v1.16.3 // indirect
 	github.com/leodido/go-urn v1.2.2 // indirect
 	github.com/lithammer/shortuuid/v4 v4.0.0 // indirect
-	github.com/livekit/mediatransportutil v0.0.0-20230130133657-96cfb115473a // indirect
+	github.com/livekit/mediatransportutil v0.0.0-20230326055817-ed569ca13d26 // indirect
 	github.com/mackerelio/go-osstat v0.2.4 // indirect
 	github.com/magefile/mage v1.14.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
@@ -61,7 +61,7 @@ require (
 	github.com/philhofer/fwd v1.1.2 // indirect
 	github.com/pion/datachannel v1.5.5 // indirect
 	github.com/pion/dtls/v2 v2.2.6 // indirect
-	github.com/pion/ice/v2 v2.3.1 // indirect
+	github.com/pion/ice/v2 v2.3.2 // indirect
 	github.com/pion/interceptor v0.1.12 // indirect
 	github.com/pion/logging v0.2.2 // indirect
 	github.com/pion/mdns v0.0.7 // indirect
@@ -75,7 +75,7 @@ require (
 	github.com/pion/transport/v2 v2.0.2 // indirect
 	github.com/pion/turn/v2 v2.1.0 // indirect
 	github.com/pion/udp/v2 v2.0.1 // indirect
-	github.com/pion/webrtc/v3 v3.1.58 // indirect
+	github.com/pion/webrtc/v3 v3.1.59 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.14.0 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
