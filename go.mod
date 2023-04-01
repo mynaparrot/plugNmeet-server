@@ -9,7 +9,7 @@ require (
 	github.com/go-playground/validator/v10 v10.12.0
 	github.com/goccy/go-json v0.10.2
 	github.com/gofiber/fiber/v2 v2.43.0
-	github.com/gofiber/template v1.7.5
+	github.com/gofiber/template v1.8.0
 	github.com/gofiber/websocket/v2 v2.1.5
 	github.com/google/uuid v1.3.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
