@@ -10,7 +10,7 @@ require (
 	github.com/goccy/go-json v0.10.2
 	github.com/gofiber/fiber/v2 v2.43.0
 	github.com/gofiber/template v1.7.5
-	github.com/gofiber/websocket/v2 v2.1.4
+	github.com/gofiber/websocket/v2 v2.1.5
 	github.com/google/uuid v1.3.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.5.1
@@ -37,7 +37,7 @@ require (
 	github.com/eapache/channels v1.1.0 // indirect
 	github.com/eapache/queue v1.1.0 // indirect
 	github.com/envoyproxy/protoc-gen-validate v0.10.1 // indirect
-	github.com/fasthttp/websocket v1.5.1 // indirect
+	github.com/fasthttp/websocket v1.5.2 // indirect
 	github.com/frostbyte73/core v0.0.4 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
