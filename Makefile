@@ -14,7 +14,7 @@ linux-arm64:
 win64:
 	GOARCH=amd64 GOOS=windows $(GOBUILD) -o $(BINDIR)/$(NAME)-$@.exe $(FILE_PATH)
 
-releases: linux-amd64 linux-arm64 macos-amd64 macos-arm64 win64
+releases: linux-amd64 linux-arm64 win64
 	chmod +x $(BINDIR)/$(NAME)-*
 	zip -m -j $(BINDIR)/$(NAME)-linux-amd64.zip $(BINDIR)/$(NAME)-linux-amd64
 	zip -m -j $(BINDIR)/$(NAME)-linux-arm64.zip $(BINDIR)/$(NAME)-linux-arm64
