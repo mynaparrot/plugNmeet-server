@@ -24,7 +24,7 @@ infrastructure [livekit](https://github.com/livekit/livekit-server). Please join
 13) Raise hand.
 14) Public & private chatting with File sharing.
 15) MP4 Recordings.
-16) RTMP Broadcasting.
+16) RTMP Broadcasting & RTMP ingress.
 
 And many more!
 
