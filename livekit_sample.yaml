@@ -22,6 +22,8 @@ room:
   enable_remote_unmute: true
 keys:
   APIiYAA5w37Cfo2: 6aNur7qqupeZhFYNOJVUyeXxXhVw8f4lm13pEDUx8SgB
+signal_relay:
+  enabled: true
 webhook:
   api_key: APIiYAA5w37Cfo2
   urls:
