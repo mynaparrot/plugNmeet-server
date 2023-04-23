@@ -13,7 +13,7 @@ require (
 	github.com/gofiber/websocket/v2 v2.1.5
 	github.com/google/uuid v1.3.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/protocol v1.5.4
+	github.com/livekit/protocol v1.5.5
 	github.com/livekit/server-sdk-go v1.0.10
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230325180932-4d8092ae245c
 	github.com/redis/go-redis/v9 v9.0.3
@@ -76,7 +76,7 @@ require (
 	github.com/pion/transport/v2 v2.0.2 // indirect
 	github.com/pion/turn/v2 v2.1.0 // indirect
 	github.com/pion/udp/v2 v2.0.1 // indirect
-	github.com/pion/webrtc/v3 v3.1.59 // indirect
+	github.com/pion/webrtc/v3 v3.1.60 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.15.0 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
@@ -97,7 +97,7 @@ require (
 	go.uber.org/multierr v1.10.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/crypto v0.8.0 // indirect
-	golang.org/x/exp v0.0.0-20230321023759-10a507213a29 // indirect
+	golang.org/x/exp v0.0.0-20230420155640-133eef4313cb // indirect
 	golang.org/x/net v0.9.0 // indirect
 	golang.org/x/sys v0.7.0 // indirect
 	golang.org/x/text v0.9.0 // indirect

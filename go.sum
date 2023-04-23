@@ -373,6 +373,8 @@ github.com/livekit/protocol v1.5.1 h1:K/p0ByfXuPv6yLeTcoQJn7pHI7bW4IKOSyb2ueG/qq
 github.com/livekit/protocol v1.5.1/go.mod h1:m5PkhcDT0EWdhatB0MpjmMaxyySjfE5NyZQC/LJWfEM=
 github.com/livekit/protocol v1.5.4 h1:lfEUqsE9AV1ZI/w8oZUKSAoi708V8RYwraOjeY83KVo=
 github.com/livekit/protocol v1.5.4/go.mod h1:KJJVGHiNR6abdJIpoxB1kqQH2s902wM3cMt+P4p6jao=
+github.com/livekit/protocol v1.5.5 h1:vuSU3TI/w58WnAWnyC59nMzY/JE+ZznU6W/iRgWw4JQ=
+github.com/livekit/protocol v1.5.5/go.mod h1:iZ289+6H5xn/9kP2iqpRvVWxuc8GXBMqN0qI7LdN9HI=
 github.com/livekit/server-sdk-go v1.0.8 h1:qyB2o69HobaQlXIip1hrQOiykV4Y9pBMu/Fd4hvY7fg=
 github.com/livekit/server-sdk-go v1.0.8/go.mod h1:89OksdP3goYFRB01ysX44xDX9k2Q+U3yL5LA2qoZwNU=
 github.com/livekit/server-sdk-go v1.0.9 h1:3uXTMBUb8TEDcYok0RIAPRqZHTNWpGFrstAQM8p5/3o=
@@ -492,6 +494,8 @@ github.com/pion/webrtc/v3 v3.1.58 h1:husXqiKQuk6gbOqJlPHs185OskAyxUW6iAEgHghgCrc
 github.com/pion/webrtc/v3 v3.1.58/go.mod h1:jJdqoqGBlZiE3y8Z1tg1fjSkyEDCZLL+foypUBn0Lhk=
 github.com/pion/webrtc/v3 v3.1.59 h1:B3YFo8q6dwBYKA2LUjWRChP59Qtt+xvv1Ul7UPDp6Zc=
 github.com/pion/webrtc/v3 v3.1.59/go.mod h1:rJGgStRoFyFOWJULHLayaimsG+jIEoenhJ5MB5gIFqw=
+github.com/pion/webrtc/v3 v3.1.60 h1:FLF6HT3x3CMHtPz5JbdAARfIUpMZu2YeOSzkVxaeF+k=
+github.com/pion/webrtc/v3 v3.1.60/go.mod h1:65gfOgxrmszb6ec7kEiZp32QwnmDNIrJK8hgo/0niWY=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
@@ -668,6 +672,8 @@ golang.org/x/exp v0.0.0-20200207192155-f17229e696bd/go.mod h1:J/WKrq2StrnmMY6+EH
 golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6/go.mod h1:3jZMyOhIsHpP37uCMkUooju7aAi5cS1Q23tOzKc+0MU=
 golang.org/x/exp v0.0.0-20230321023759-10a507213a29 h1:ooxPy7fPvB4kwsA2h+iBNHkAbp/4JxTSwCmvdjEYmug=
 golang.org/x/exp v0.0.0-20230321023759-10a507213a29/go.mod h1:CxIveKay+FTh1D0yPZemJVgC/95VzuuOLq5Qi4xnoYc=
+golang.org/x/exp v0.0.0-20230420155640-133eef4313cb h1:rhjz/8Mbfa8xROFiH+MQphmAmgqRM0bOMnytznhWEXk=
+golang.org/x/exp v0.0.0-20230420155640-133eef4313cb/go.mod h1:V1LtkGg67GoY2N1AnLN78QLrzxkLyJw7RJb1gzOOz9w=
 golang.org/x/image v0.0.0-20190227222117-0694c2d4d067/go.mod h1:kZ7UVZpmo3dzQBMxlp+ypCbDeSB+sBbTgSJuh5dn5js=
 golang.org/x/image v0.0.0-20190802002840-cff245a6509b/go.mod h1:FeLwcggjj3mMvU+oOTbSwawSJRM1uh48EjtB4UJZlP0=
 golang.org/x/lint v0.0.0-20181026193005-c67002cb31c3/go.mod h1:UVdnD1Gm6xHRNCYTkRU2/jEulfH38KcIWyp/GAMgvoE=
