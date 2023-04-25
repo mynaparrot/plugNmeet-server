@@ -212,6 +212,8 @@ github.com/gofiber/websocket/v2 v2.1.4 h1:Ki6L7auleAwgi7iRmtUiWKltlbmtkCJ0COtK1n
 github.com/gofiber/websocket/v2 v2.1.4/go.mod h1:IC4ZUejlk0kJSaphJ1gjqgKfK9fhw8eoAr3/UdbOzEA=
 github.com/gofiber/websocket/v2 v2.1.5 h1:2weAMr0Shb2ubhZ3+P4bkeWL+uCZ/NlgjSa1siEcvFM=
 github.com/gofiber/websocket/v2 v2.1.5/go.mod h1:BZZEk+XsjjF0V6/sAw00iGcB69dFb6Hb85ER9gr/xaU=
+github.com/gofiber/websocket/v2 v2.1.6 h1:k4z+YqzGUwbCQJCIW+mDJF2iCcBfRY7BJGUa2k+VHXo=
+github.com/gofiber/websocket/v2 v2.1.6/go.mod h1:o+oXFwHjavIiM2KWo/MNpcIOruS0am16h3efqnjXLis=
 github.com/gogo/protobuf v1.1.1/go.mod h1:r8qH/GZQm5c6nD/R0oafs1akxWv10x8SbQlK7atdtwQ=
 github.com/gogo/protobuf v1.3.2/go.mod h1:P1XiOD3dCwIKUDQYPy72D8LYyHL2YPYrpS2s69NZV8Q=
 github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b/go.mod h1:SBH7ygxi8pfUlaOkMMuAQtPIUF8ecWP5IEl/CR7VP2Q=
