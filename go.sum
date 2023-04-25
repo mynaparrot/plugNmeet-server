@@ -208,6 +208,8 @@ github.com/gofiber/template v1.7.5 h1:6Yk/lot2RudQp9u+bmIJqFg7kOaFPQ7+LgDE9drYSp
 github.com/gofiber/template v1.7.5/go.mod h1:cBctw0IkZxBrY5NWKZVSa/dOuYzNbu+sJrzX4c7Qxmc=
 github.com/gofiber/template v1.8.0 h1:jOn9RhxYO7rHTHGLNRpYfDoVm8b5GH/dtl15ZT5NifE=
 github.com/gofiber/template v1.8.0/go.mod h1:jf2w+ioGUS5swf5C/VK+FyE+DI19uz+vXHCX/TIAxIk=
+github.com/gofiber/template v1.8.1 h1:KLnNtXqH3LTzquU0NsLMqX3YGd3pD562UhSNaIca5HI=
+github.com/gofiber/template v1.8.1/go.mod h1:+2x8bRo2TAXnqp0RUN2MdyKshUi+BulPoUCOHstFLqE=
 github.com/gofiber/websocket/v2 v2.1.4 h1:Ki6L7auleAwgi7iRmtUiWKltlbmtkCJ0COtK1nt8L3g=
 github.com/gofiber/websocket/v2 v2.1.4/go.mod h1:IC4ZUejlk0kJSaphJ1gjqgKfK9fhw8eoAr3/UdbOzEA=
 github.com/gofiber/websocket/v2 v2.1.5 h1:2weAMr0Shb2ubhZ3+P4bkeWL+uCZ/NlgjSa1siEcvFM=
