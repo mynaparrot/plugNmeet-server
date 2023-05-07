@@ -8,7 +8,7 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.2
 	github.com/go-playground/validator/v10 v10.12.0
 	github.com/goccy/go-json v0.10.2
-	github.com/gofiber/fiber/v2 v2.44.0
+	github.com/gofiber/fiber/v2 v2.45.0
 	github.com/gofiber/template v1.8.1
 	github.com/gofiber/websocket/v2 v2.1.6
 	github.com/google/uuid v1.3.0
@@ -90,7 +90,7 @@ require (
 	github.com/tinylib/msgp v1.1.8 // indirect
 	github.com/twitchtv/twirp v8.1.3+incompatible // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.45.0 // indirect
+	github.com/valyala/fasthttp v1.47.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
@@ -99,7 +99,7 @@ require (
 	golang.org/x/crypto v0.8.0 // indirect
 	golang.org/x/exp v0.0.0-20230420155640-133eef4313cb // indirect
 	golang.org/x/net v0.9.0 // indirect
-	golang.org/x/sys v0.7.0 // indirect
+	golang.org/x/sys v0.8.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
 	google.golang.org/genproto v0.0.0-20230403163135-c38d8f061ccd // indirect
 	google.golang.org/grpc v1.54.0 // indirect
