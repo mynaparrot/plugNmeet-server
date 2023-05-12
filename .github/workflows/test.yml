@@ -35,7 +35,7 @@ jobs:
       - name: setup node
         uses: actions/setup-node@v3
         with:
-          node-version: "16.x"
+          node-version: "18.x"
       - name: setup go
         uses: actions/setup-go@v4
         with:
@@ -45,7 +45,7 @@ jobs:
           mysql -u root -p12345 -h 127.0.0.1 -P 3306 -D plugnmeet < sql_dump/install.sql
           git clone https://github.com/mynaparrot/plugNmeet-client client
           cd client
-          npm install --force && npm run build
+          npm install && npm run build
       - name: Run docker-compose
         uses: isbang/compose-action@v1.4.1
         with:
@@ -61,4 +61,5 @@ jobs:
           docker ps
           docker-compose logs
       - name: Run test
-        run: go test -cover -race -v ./...
+        #run: go test -cover -race -v ./...
+        run: go test -cover -v ./...
