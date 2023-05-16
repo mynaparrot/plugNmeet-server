@@ -149,6 +149,11 @@ func Router() *fiber.App {
 	ingress := api.Group("/ingress")
 	ingress.Post("/create", controllers.HandleCreateIngress)
 
+	// Speech services
+	speech := api.Group("/speechServices")
+	speech.Post("/", controllers.HandleSpeechToTextTranslationReq)
+	speech.Post("/azureToken", controllers.HandleGenerateAzureToken)
+
 	// for resumable.js need both methods.
 	// https://github.com/23/resumable.js#how-do-i-set-it-up-with-my-server
 	api.Get("/fileUpload", controllers.HandleFileUpload)

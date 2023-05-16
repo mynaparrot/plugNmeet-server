@@ -29,15 +29,16 @@ type AppConfig struct {
 	roomWithDuration map[string]RoomWithDuration
 	ClientFiles      map[string][]string
 
-	Client              ClientInfo                 `yaml:"client"`
-	RoomDefaultSettings *utils.RoomDefaultSettings `yaml:"room_default_settings"`
-	LogSettings         LogSettings                `yaml:"log_settings"`
-	LivekitInfo         LivekitInfo                `yaml:"livekit_info"`
-	RedisInfo           *factory.RedisInfo         `yaml:"redis_info"`
-	MySqlInfo           *factory.MySqlInfo         `yaml:"mysql_info"`
-	UploadFileSettings  UploadFileSettings         `yaml:"upload_file_settings"`
-	RecorderInfo        RecorderInfo               `yaml:"recorder_info"`
-	SharedNotePad       SharedNotePad              `yaml:"shared_notepad"`
+	Client                       ClientInfo                   `yaml:"client"`
+	RoomDefaultSettings          *utils.RoomDefaultSettings   `yaml:"room_default_settings"`
+	LogSettings                  LogSettings                  `yaml:"log_settings"`
+	LivekitInfo                  LivekitInfo                  `yaml:"livekit_info"`
+	RedisInfo                    *factory.RedisInfo           `yaml:"redis_info"`
+	MySqlInfo                    *factory.MySqlInfo           `yaml:"mysql_info"`
+	UploadFileSettings           UploadFileSettings           `yaml:"upload_file_settings"`
+	RecorderInfo                 RecorderInfo                 `yaml:"recorder_info"`
+	SharedNotePad                SharedNotePad                `yaml:"shared_notepad"`
+	AzureCognitiveServicesSpeech AzureCognitiveServicesSpeech `yaml:"azure_cognitive_services_speech"`
 }
 
 type ClientInfo struct {
@@ -98,6 +99,18 @@ type EtherpadInfo struct {
 	Id     string `yaml:"id"`
 	Host   string `yaml:"host"`
 	ApiKey string `yaml:"api_key"`
+}
+
+type AzureCognitiveServicesSpeech struct {
+	Enabled          bool                   `yaml:"enabled"`
+	SubscriptionKeys []AzureSubscriptionKey `yaml:"subscription_keys"`
+}
+
+type AzureSubscriptionKey struct {
+	Id              string `yaml:"id"`
+	SubscriptionKey string `yaml:"subscription_key"`
+	ServiceRegion   string `yaml:"service_region"`
+	MaxConnection   int64  `yaml:"max_connection"`
 }
 
 type ChatParticipant struct {
