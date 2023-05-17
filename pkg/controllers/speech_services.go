@@ -37,13 +37,15 @@ func HandleGenerateAzureToken(c *fiber.Ctx) error {
 	req.RoomId = roomId.(string)
 
 	m := models.NewSpeechServices()
-	token, err := m.GenerateAzureToken(req)
+	token, serviceRegion, err := m.GenerateAzureToken(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
-	return utils.SendProtobufResponse(c, &plugnmeet.GenerateTokenRes{
-		Status: true,
-		Msg:    "success",
-		Token:  &token,
+
+	return utils.SendProtobufResponse(c, &plugnmeet.GenerateAzureTokenRes{
+		Status:        true,
+		Msg:           "success",
+		Token:         &token,
+		ServiceRegion: &serviceRegion,
 	})
 }

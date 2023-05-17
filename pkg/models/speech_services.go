@@ -47,28 +47,28 @@ func (s *SpeechServices) SpeechToTextTranslationReq(r *plugnmeet.SpeechToTextTra
 	return nil
 }
 
-func (s *SpeechServices) GenerateAzureToken(r *plugnmeet.GenerateTokenReq) (string, error) {
+func (s *SpeechServices) GenerateAzureToken(r *plugnmeet.GenerateTokenReq) (string, string, error) {
 	_, meta, err := s.roomService.LoadRoomWithMetadata(r.RoomId)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	f := meta.RoomFeatures.SpeechToTextTranslationFeatures
 
 	if !config.AppCnf.AzureCognitiveServicesSpeech.Enabled || !f.IsEnabled {
-		return "", errors.New("speech service disabled")
+		return "", "", errors.New("speech service disabled")
 	}
 
-	token, err := s.sendRequestToAzureForToken()
+	token, serviceRegion, err := s.sendRequestToAzureForToken()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return token, nil
+	return token, serviceRegion, nil
 }
 
-func (s *SpeechServices) sendRequestToAzureForToken() (string, error) {
+func (s *SpeechServices) sendRequestToAzureForToken() (string, string, error) {
 	sub := config.AppCnf.AzureCognitiveServicesSpeech.SubscriptionKeys
 	if len(sub) == 0 {
-		return "", errors.New("no key found")
+		return "", "", errors.New("no key found")
 	}
 	// TODO: think a better way to select key
 	// TODO: At present just use the first one
@@ -76,20 +76,19 @@ func (s *SpeechServices) sendRequestToAzureForToken() (string, error) {
 	url := fmt.Sprintf("https://%s.api.cognitive.microsoft.com/sts/v1.0/issueToken", k.ServiceRegion)
 	r, err := http.NewRequest("POST", url, bytes.NewReader([]byte("{}")))
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	r.Header.Set("Ocp-Apim-Subscription-Key", k.SubscriptionKey)
 	r.Header.Set("content-type", "application/json")
 	resp, err := http.DefaultClient.Do(r)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	fmt.Println(string(body))
-	return string(body), nil
+	return string(body), k.ServiceRegion, nil
 }

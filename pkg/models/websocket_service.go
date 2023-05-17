@@ -76,6 +76,9 @@ func (w *WebsocketServiceModel) handleSystemMessages() {
 		w.handlePollsNotifications()
 	case plugnmeet.DataMsgBodyType_JOIN_BREAKOUT_ROOM:
 		w.handleSendBreakoutRoomNotification()
+	case plugnmeet.DataMsgBodyType_SPEECH_SUBTITLE_TEXT:
+		w.handleSpeechSubtitleText()
+
 	}
 }
 
@@ -343,6 +346,34 @@ func (w *WebsocketServiceModel) handleSendBreakoutRoomNotification() {
 		}
 	}
 	config.AppCnf.RUnlock()
+	if len(to) > 0 {
+		ikisocket.EmitToList(to, jm, ikisocket.BinaryMessage)
+	}
+}
+
+func (w *WebsocketServiceModel) handleSpeechSubtitleText() {
+	jm, err := proto.Marshal(w.pl)
+	if err != nil {
+		return
+	}
+
+	var to []string
+
+	config.AppCnf.RLock()
+	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
+		if p.RoomSid == w.rSid {
+			if w.pl.To != nil {
+				if *w.pl.To == p.UserSid || *w.pl.To == p.UserId {
+					to = append(to, p.UUID)
+				}
+			} else {
+				// for everyone in the room
+				to = append(to, p.UUID)
+			}
+		}
+	}
+	config.AppCnf.RUnlock()
+
 	if len(to) > 0 {
 		ikisocket.EmitToList(to, jm, ikisocket.BinaryMessage)
 	}
