@@ -2,20 +2,30 @@ package models
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/redis/go-redis/v9"
 	"io"
 	"net/http"
+	"strconv"
+	"time"
 )
 
 type SpeechServices struct {
+	rc          *redis.Client
+	ctx         context.Context
 	roomService *RoomService
 }
 
+const SpeechServiceRedisKey = "pnm:speechService:"
+
 func NewSpeechServices() *SpeechServices {
 	return &SpeechServices{
+		rc:          config.AppCnf.RDS,
+		ctx:         context.Background(),
 		roomService: NewRoomService(),
 	}
 }
@@ -47,28 +57,75 @@ func (s *SpeechServices) SpeechToTextTranslationReq(r *plugnmeet.SpeechToTextTra
 	return nil
 }
 
-func (s *SpeechServices) GenerateAzureToken(r *plugnmeet.GenerateTokenReq) (string, string, error) {
+func (s *SpeechServices) GenerateAzureToken(r *plugnmeet.GenerateTokenReq) (*plugnmeet.GenerateAzureTokenRes, error) {
 	_, meta, err := s.roomService.LoadRoomWithMetadata(r.RoomId)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	f := meta.RoomFeatures.SpeechToTextTranslationFeatures
 
 	if !config.AppCnf.AzureCognitiveServicesSpeech.Enabled || !f.IsEnabled {
-		return "", "", errors.New("speech service disabled")
+		return nil, errors.New("speech service disabled")
 	}
 
-	token, serviceRegion, err := s.sendRequestToAzureForToken()
+	res, err := s.sendRequestToAzureForToken()
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
-	return token, serviceRegion, nil
+	return res, nil
 }
 
-func (s *SpeechServices) sendRequestToAzureForToken() (string, string, error) {
+func (s *SpeechServices) SpeechServiceUserStatus(r *plugnmeet.SpeechServiceUserStatusReq) error {
+	keyStatus := fmt.Sprintf("%s:%s:connections", SpeechServiceRedisKey, r.KeyId)
+
+	switch r.Task {
+	case plugnmeet.SpeechServiceUserStatusTasks_SESSION_STARTED:
+		s.rc.Incr(s.ctx, keyStatus)
+	case plugnmeet.SpeechServiceUserStatusTasks_SESSION_ENDED:
+		s.rc.Decr(s.ctx, keyStatus)
+	}
+
+	return s.SpeechServiceUsersUsage(r.RoomId, r.UserId, r.Task)
+}
+
+func (s *SpeechServices) SpeechServiceUsersUsage(roomId, userId string, task plugnmeet.SpeechServiceUserStatusTasks) error {
+	key := fmt.Sprintf("%s:%s:usage", SpeechServiceRedisKey, roomId)
+
+	switch task {
+	case plugnmeet.SpeechServiceUserStatusTasks_SESSION_STARTED:
+		_, err := s.rc.HSet(s.ctx, key, userId, time.Now().UnixMilli()).Result()
+		if err != nil {
+			return err
+		}
+	case plugnmeet.SpeechServiceUserStatusTasks_SESSION_ENDED:
+		ss, err := s.rc.HGet(s.ctx, key, userId).Result()
+		if err != nil {
+			return err
+		}
+		if ss != "" {
+			start, err := strconv.Atoi(ss)
+			if err != nil {
+				return err
+			}
+			now := time.Now().UnixMilli()
+			_, err = s.rc.HIncrBy(s.ctx, key, "total_usage", now-int64(start)).Result()
+			if err != nil {
+				return err
+			}
+		}
+		_, err = s.rc.HDel(s.ctx, key, userId).Result()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *SpeechServices) sendRequestToAzureForToken() (*plugnmeet.GenerateAzureTokenRes, error) {
 	sub := config.AppCnf.AzureCognitiveServicesSpeech.SubscriptionKeys
 	if len(sub) == 0 {
-		return "", "", errors.New("no key found")
+		return nil, errors.New("no key found")
 	}
 	// TODO: think a better way to select key
 	// TODO: At present just use the first one
@@ -76,19 +133,26 @@ func (s *SpeechServices) sendRequestToAzureForToken() (string, string, error) {
 	url := fmt.Sprintf("https://%s.api.cognitive.microsoft.com/sts/v1.0/issueToken", k.ServiceRegion)
 	r, err := http.NewRequest("POST", url, bytes.NewReader([]byte("{}")))
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	r.Header.Set("Ocp-Apim-Subscription-Key", k.SubscriptionKey)
 	r.Header.Set("content-type", "application/json")
 	resp, err := http.DefaultClient.Do(r)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
-	return string(body), k.ServiceRegion, nil
+	token := string(body)
+	return &plugnmeet.GenerateAzureTokenRes{
+		Status:        true,
+		Msg:           "success",
+		Token:         &token,
+		ServiceRegion: &k.ServiceRegion,
+		KeyId:         &k.Id,
+	}, nil
 }

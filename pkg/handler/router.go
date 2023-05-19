@@ -153,6 +153,7 @@ func Router() *fiber.App {
 	speech := api.Group("/speechServices")
 	speech.Post("/", controllers.HandleSpeechToTextTranslationReq)
 	speech.Post("/azureToken", controllers.HandleGenerateAzureToken)
+	speech.Post("/userStatus", controllers.HandleSpeechServiceUserStatus)
 
 	// for resumable.js need both methods.
 	// https://github.com/23/resumable.js#how-do-i-set-it-up-with-my-server

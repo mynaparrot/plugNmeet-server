@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"fmt"
 	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -163,6 +164,10 @@ func (w *webhookEvent) roomFinished() {
 		bm := NewBreakoutRoomModel()
 		_ = bm.PostTaskAfterRoomEndWebhook(event.Room.Name, event.Room.Metadata)
 	}()
+
+	// remove speech service redis key
+	speechKey := fmt.Sprintf("%s:%s:usage", SpeechServiceRedisKey, event.Room.Name)
+	w.rc.Del(w.ctx, speechKey).Result()
 }
 
 func (w *webhookEvent) participantJoined() {
@@ -201,6 +206,11 @@ func (w *webhookEvent) participantLeft() {
 	if err != nil {
 		log.Errorln(err)
 	}
+
+	// if we missed to calculate this user's speech service usage stat
+	// for sudden disconnection
+	sm := NewSpeechServices()
+	sm.SpeechServiceUsersUsage(event.Room.Name, event.Participant.Identity, plugnmeet.SpeechServiceUserStatusTasks_SESSION_ENDED)
 }
 
 func (w *webhookEvent) trackPublished() {
