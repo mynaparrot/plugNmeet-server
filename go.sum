@@ -191,8 +191,8 @@ github.com/gofiber/adaptor/v2 v2.2.1/go.mod h1:AhR16dEqs25W2FY/l8gSj1b51Azg5dtPD
 github.com/gofiber/fiber/v2 v2.41.0/go.mod h1:RdebcCuCRFp4W6hr3968/XxwJVg0K+jr9/Ae0PFzZ0Q=
 github.com/gofiber/fiber/v2 v2.42.0/go.mod h1:3+SGNjqMh5VQH5Vz2Wdi43zTIV16ktlFd3x3R6O1Zlc=
 github.com/gofiber/fiber/v2 v2.44.0/go.mod h1:VTMtb/au8g01iqvHyaCzftuM/xmZgKOZCtFzz6CdV9w=
-github.com/gofiber/fiber/v2 v2.45.0 h1:p4RpkJT9GAW6parBSbcNFH2ApnAuW3OzaQzbOCoDu+s=
-github.com/gofiber/fiber/v2 v2.45.0/go.mod h1:DNl0/c37WLe0g92U6lx1VMQuxGUQY5V7EIaVoEsUffc=
+github.com/gofiber/fiber/v2 v2.46.0 h1:wkkWotblsGVlLjXj2dpgKQAYHtXumsK/HyFugQM68Ns=
+github.com/gofiber/fiber/v2 v2.46.0/go.mod h1:DNl0/c37WLe0g92U6lx1VMQuxGUQY5V7EIaVoEsUffc=
 github.com/gofiber/template v1.8.1 h1:KLnNtXqH3LTzquU0NsLMqX3YGd3pD562UhSNaIca5HI=
 github.com/gofiber/template v1.8.1/go.mod h1:+2x8bRo2TAXnqp0RUN2MdyKshUi+BulPoUCOHstFLqE=
 github.com/gofiber/websocket/v2 v2.1.4/go.mod h1:IC4ZUejlk0kJSaphJ1gjqgKfK9fhw8eoAr3/UdbOzEA=
@@ -406,8 +406,8 @@ github.com/modern-go/reflect2 v1.0.1/go.mod h1:bx2lNnkwVCuqBIxFjflWJWanXIb3Rllmb
 github.com/modern-go/reflect2 v1.0.2/go.mod h1:yWuevngMOJpCy52FWWMvUC8ws7m/LJsjYzDa0/r8luk=
 github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=
 github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=
-github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230517160419-75dc5bebd2c8 h1:LFYKrcFVuB23+2ZmnWgJZOHohfJtXv0fixcqUMl27Lo=
-github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230517160419-75dc5bebd2c8/go.mod h1:+dNGj3nsGcLMyQkAePbTcTcQNkR6wbPWDs/GCBh+BGY=
+github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230519130753-a484f188291e h1:Q0gPkgWsvC4xfUT+kJxE5wws9pXNH7IR1XH8ZmFzPJ4=
+github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230519130753-a484f188291e/go.mod h1:+6V5dLiSAMT0qem1mGp5Mtbbvq0jKhowaKUpg4bT2ZI=
 github.com/nats-io/jwt/v2 v2.3.0 h1:z2mA1a7tIf5ShggOFlR1oBPgd6hGqcDYsISxZByUzdI=
 github.com/nats-io/nats-server/v2 v2.9.8 h1:jgxZsv+A3Reb3MgwxaINcNq/za8xZInKhDg9Q0cGN1o=
 github.com/nats-io/nats.go v1.25.0 h1:t5/wCPGciR7X3Mu8QOi4jiJaXaWM8qtkLu4lzGZvYHE=

@@ -91,17 +91,20 @@ func (s *SpeechServices) SpeechServiceUserStatus(r *plugnmeet.SpeechServiceUserS
 func (s *SpeechServices) SpeechServiceUsersUsage(roomId, userId string, task plugnmeet.SpeechServiceUserStatusTasks) error {
 	key := fmt.Sprintf("%s:%s:usage", SpeechServiceRedisKey, roomId)
 
+	ss, err := s.rc.HGet(s.ctx, key, userId).Result()
+	if err != nil {
+		return err
+	}
+
 	switch task {
 	case plugnmeet.SpeechServiceUserStatusTasks_SESSION_STARTED:
-		_, err := s.rc.HSet(s.ctx, key, userId, time.Now().UnixMilli()).Result()
-		if err != nil {
-			return err
+		if ss == "" {
+			_, err := s.rc.HSet(s.ctx, key, userId, time.Now().UnixMilli()).Result()
+			if err != nil {
+				return err
+			}
 		}
 	case plugnmeet.SpeechServiceUserStatusTasks_SESSION_ENDED:
-		ss, err := s.rc.HGet(s.ctx, key, userId).Result()
-		if err != nil {
-			return err
-		}
 		if ss != "" {
 			start, err := strconv.Atoi(ss)
 			if err != nil {
