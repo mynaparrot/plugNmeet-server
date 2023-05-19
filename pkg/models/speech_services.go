@@ -80,9 +80,15 @@ func (s *SpeechServices) SpeechServiceUserStatus(r *plugnmeet.SpeechServiceUserS
 
 	switch r.Task {
 	case plugnmeet.SpeechServiceUserStatusTasks_SESSION_STARTED:
-		s.rc.Incr(s.ctx, keyStatus)
+		_, err := s.rc.Incr(s.ctx, keyStatus).Result()
+		if err != nil {
+			return err
+		}
 	case plugnmeet.SpeechServiceUserStatusTasks_SESSION_ENDED:
-		s.rc.Decr(s.ctx, keyStatus)
+		_, err := s.rc.Decr(s.ctx, keyStatus).Result()
+		if err != nil {
+			return err
+		}
 	}
 
 	return s.SpeechServiceUsersUsage(r.RoomId, r.UserId, r.Task)
