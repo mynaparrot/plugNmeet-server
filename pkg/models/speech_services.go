@@ -90,9 +90,11 @@ func (s *SpeechServices) SpeechServiceUserStatus(r *plugnmeet.SpeechServiceUserS
 
 func (s *SpeechServices) SpeechServiceUsersUsage(roomId, userId string, task plugnmeet.SpeechServiceUserStatusTasks) error {
 	key := fmt.Sprintf("%s:%s:usage", SpeechServiceRedisKey, roomId)
-
 	ss, err := s.rc.HGet(s.ctx, key, userId).Result()
-	if err != nil {
+	switch {
+	case err == redis.Nil:
+		//
+	case err != nil:
 		return err
 	}
 

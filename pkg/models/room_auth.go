@@ -1,7 +1,6 @@
 package models
 
 import (
-	"fmt"
 	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -56,7 +55,6 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 		r.Metadata.CopyrightConf = config.AppCnf.Client.CopyrightConf
 	}
 
-	fmt.Println(config.AppCnf.AzureCognitiveServicesSpeech)
 	// Azure cognitive services
 	if !config.AppCnf.AzureCognitiveServicesSpeech.Enabled {
 		r.Metadata.RoomFeatures.SpeechToTextTranslationFeatures.IsAllow = false
