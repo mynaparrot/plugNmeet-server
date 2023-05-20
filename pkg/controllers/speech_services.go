@@ -48,6 +48,8 @@ func HandleGenerateAzureToken(c *fiber.Ctx) error {
 
 func HandleSpeechServiceUserStatus(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
+	requestedUserId := c.Locals("requestedUserId")
+
 	req := new(plugnmeet.SpeechServiceUserStatusReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
@@ -58,6 +60,8 @@ func HandleSpeechServiceUserStatus(c *fiber.Ctx) error {
 	}
 
 	req.RoomId = roomId.(string)
+	req.UserId = requestedUserId.(string)
+
 	m := models.NewSpeechServices()
 	err = m.SpeechServiceUserStatus(req)
 	if err != nil {

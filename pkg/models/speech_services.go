@@ -58,13 +58,21 @@ func (s *SpeechServices) SpeechToTextTranslationReq(r *plugnmeet.SpeechToTextTra
 }
 
 func (s *SpeechServices) GenerateAzureToken(r *plugnmeet.GenerateAzureTokenReq, requestedUserId string) (*plugnmeet.GenerateAzureTokenRes, error) {
-	key := fmt.Sprintf("%s:%s:azureKeyRequested", SpeechServiceRedisKey, r.RoomId)
-	e, err := s.rc.SIsMember(s.ctx, key, requestedUserId).Result()
+	e, err := s.azureKeyRequestedTask(r.RoomId, requestedUserId, "check")
 	if err != nil {
 		return nil, err
 	}
-	if e {
+	if e == "exist" {
 		return nil, errors.New("you've already received token")
+	}
+
+	// check if this user already using service or not
+	ss, err := s.checkUserUsage(r.RoomId, requestedUserId)
+	if err != nil {
+		return nil, err
+	}
+	if ss != "" {
+		return nil, errors.New("you're already using this service")
 	}
 
 	_, meta, err := s.roomService.LoadRoomWithMetadata(r.RoomId)
@@ -82,7 +90,7 @@ func (s *SpeechServices) GenerateAzureToken(r *plugnmeet.GenerateAzureTokenReq, 
 		return nil, err
 	}
 	// we'll store this user's info
-	_, err = s.rc.SAdd(s.ctx, key, requestedUserId).Result()
+	_, err = s.azureKeyRequestedTask(r.RoomId, requestedUserId, "add")
 	if err != nil {
 		return nil, err
 	}
@@ -110,13 +118,9 @@ func (s *SpeechServices) SpeechServiceUserStatus(r *plugnmeet.SpeechServiceUserS
 
 func (s *SpeechServices) SpeechServiceUsersUsage(roomId, userId string, task plugnmeet.SpeechServiceUserStatusTasks) error {
 	key := fmt.Sprintf("%s:%s:usage", SpeechServiceRedisKey, roomId)
-	azureKeyReq := fmt.Sprintf("%s:%s:azureKeyRequested", SpeechServiceRedisKey, roomId)
 
-	ss, err := s.rc.HGet(s.ctx, key, userId).Result()
-	switch {
-	case err == redis.Nil:
-		//
-	case err != nil:
+	ss, err := s.checkUserUsage(roomId, userId)
+	if err != nil {
 		return err
 	}
 
@@ -147,7 +151,7 @@ func (s *SpeechServices) SpeechServiceUsersUsage(roomId, userId string, task plu
 	}
 
 	// now remove this user from request list
-	_, _ = s.rc.SRem(s.ctx, azureKeyReq, userId).Result()
+	_, _ = s.azureKeyRequestedTask(roomId, userId, "remove")
 	return nil
 }
 
@@ -184,4 +188,44 @@ func (s *SpeechServices) sendRequestToAzureForToken() (*plugnmeet.GenerateAzureT
 		ServiceRegion: &k.ServiceRegion,
 		KeyId:         &k.Id,
 	}, nil
+}
+
+func (s *SpeechServices) checkUserUsage(roomId, userId string) (string, error) {
+	key := fmt.Sprintf("%s:%s:usage", SpeechServiceRedisKey, roomId)
+
+	ss, err := s.rc.HGet(s.ctx, key, userId).Result()
+	switch {
+	case err == redis.Nil:
+		//
+	case err != nil:
+		return "", err
+	}
+
+	return ss, nil
+}
+
+func (s *SpeechServices) azureKeyRequestedTask(roomId, userId string, task string) (string, error) {
+	key := fmt.Sprintf("%s:%s:azureKeyRequested", SpeechServiceRedisKey, roomId)
+
+	switch task {
+	case "check":
+		e, err := s.rc.SIsMember(s.ctx, key, userId).Result()
+		if err != nil {
+			return "", err
+		}
+		if e {
+			return "exist", nil
+		}
+	case "add":
+		_, err := s.rc.SAdd(s.ctx, key, userId).Result()
+		if err != nil {
+			return "", err
+		}
+	case "remove":
+		_, err := s.rc.SRem(s.ctx, key, userId).Result()
+		if err != nil {
+			return "", err
+		}
+	}
+	return "", nil
 }
