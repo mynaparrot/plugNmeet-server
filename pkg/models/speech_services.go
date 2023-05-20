@@ -107,7 +107,7 @@ func (s *SpeechServices) SpeechServiceUsersUsage(roomId, userId string, task plu
 	switch task {
 	case plugnmeet.SpeechServiceUserStatusTasks_SESSION_STARTED:
 		if ss == "" {
-			_, err := s.rc.HSet(s.ctx, key, userId, time.Now().UnixMilli()).Result()
+			_, err := s.rc.HSet(s.ctx, key, userId, time.Now().Unix()).Result()
 			if err != nil {
 				return err
 			}
@@ -118,7 +118,7 @@ func (s *SpeechServices) SpeechServiceUsersUsage(roomId, userId string, task plu
 			if err != nil {
 				return err
 			}
-			now := time.Now().UnixMilli()
+			now := time.Now().Unix()
 			_, err = s.rc.HIncrBy(s.ctx, key, "total_usage", now-int64(start)).Result()
 			if err != nil {
 				return err
