@@ -5,10 +5,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/goccy/go-json"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/redis/go-redis/v9"
+	"google.golang.org/protobuf/encoding/protojson"
 	"io"
 	"net/http"
 	"strconv"
@@ -97,18 +97,17 @@ func (s *SpeechServices) GenerateAzureToken(r *plugnmeet.GenerateAzureTokenReq, 
 	}
 
 	// send token by data channel
-	marshal, err := json.Marshal(res)
+	marshal, err := protojson.Marshal(res)
 	if err != nil {
 		return err
 	}
-	sendTo := []string{r.UserSid}
 	dm := NewDataMessageModel()
 	err = dm.SendDataMessage(&plugnmeet.DataMessageReq{
 		RoomId:      r.RoomId,
 		UserSid:     "system",
 		MsgBodyType: plugnmeet.DataMsgBodyType_AZURE_COGNITIVE_SERVICE_SPEECH_TOKEN,
 		Msg:         string(marshal),
-		SendTo:      sendTo,
+		SendTo:      []string{r.UserSid},
 	})
 
 	return err
