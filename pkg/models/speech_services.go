@@ -20,7 +20,7 @@ type SpeechServices struct {
 	roomService *RoomService
 }
 
-const SpeechServiceRedisKey = "pnm:speechService:"
+const SpeechServiceRedisKey = "pnm:speechService"
 
 func NewSpeechServices() *SpeechServices {
 	return &SpeechServices{
@@ -63,7 +63,7 @@ func (s *SpeechServices) GenerateAzureToken(r *plugnmeet.GenerateAzureTokenReq, 
 		return nil, err
 	}
 	if e == "exist" {
-		return nil, errors.New("you've already received token")
+		return nil, errors.New("speech-services.already-received-token")
 	}
 
 	// check if this user already using service or not
@@ -72,7 +72,7 @@ func (s *SpeechServices) GenerateAzureToken(r *plugnmeet.GenerateAzureTokenReq, 
 		return nil, err
 	}
 	if ss != "" {
-		return nil, errors.New("you're already using this service")
+		return nil, errors.New("speech-services.already-using-service")
 	}
 
 	_, meta, err := s.roomService.LoadRoomWithMetadata(r.RoomId)
@@ -82,7 +82,7 @@ func (s *SpeechServices) GenerateAzureToken(r *plugnmeet.GenerateAzureTokenReq, 
 	f := meta.RoomFeatures.SpeechToTextTranslationFeatures
 
 	if !config.AppCnf.AzureCognitiveServicesSpeech.Enabled || !f.IsEnabled {
-		return nil, errors.New("speech service disabled")
+		return nil, errors.New("speech-services.service-disabled")
 	}
 
 	res, err := s.sendRequestToAzureForToken()
@@ -205,24 +205,27 @@ func (s *SpeechServices) checkUserUsage(roomId, userId string) (string, error) {
 }
 
 func (s *SpeechServices) azureKeyRequestedTask(roomId, userId string, task string) (string, error) {
-	key := fmt.Sprintf("%s:%s:azureKeyRequested", SpeechServiceRedisKey, roomId)
+	key := fmt.Sprintf("%s:%s:%s:azureKeyRequested", SpeechServiceRedisKey, roomId, userId)
 
 	switch task {
 	case "check":
-		e, err := s.rc.SIsMember(s.ctx, key, userId).Result()
-		if err != nil {
+		e, err := s.rc.Get(s.ctx, key).Result()
+		switch {
+		case err == redis.Nil:
+			return "", nil
+		case err != nil:
 			return "", err
 		}
-		if e {
+		if e != "" {
 			return "exist", nil
 		}
 	case "add":
-		_, err := s.rc.SAdd(s.ctx, key, userId).Result()
+		_, err := s.rc.Set(s.ctx, key, userId, 5*time.Minute).Result()
 		if err != nil {
 			return "", err
 		}
 	case "remove":
-		_, err := s.rc.SRem(s.ctx, key, userId).Result()
+		_, err := s.rc.Del(s.ctx, key).Result()
 		if err != nil {
 			return "", err
 		}
