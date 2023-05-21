@@ -6,7 +6,7 @@ require (
 	github.com/ansrivas/fiberprometheus/v2 v2.6.0
 	github.com/antoniodipinto/ikisocket v0.0.0-20230224142534-cb796a15fd08
 	github.com/gabriel-vasile/mimetype v1.4.2
-	github.com/go-playground/validator/v10 v10.13.0
+	github.com/go-playground/validator/v10 v10.14.0
 	github.com/goccy/go-json v0.10.2
 	github.com/gofiber/fiber/v2 v2.45.0
 	github.com/gofiber/template v1.8.1
