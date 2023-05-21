@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/goccy/go-json"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/redis/go-redis/v9"
@@ -57,44 +58,60 @@ func (s *SpeechServices) SpeechToTextTranslationReq(r *plugnmeet.SpeechToTextTra
 	return nil
 }
 
-func (s *SpeechServices) GenerateAzureToken(r *plugnmeet.GenerateAzureTokenReq, requestedUserId string) (*plugnmeet.GenerateAzureTokenRes, error) {
+func (s *SpeechServices) GenerateAzureToken(r *plugnmeet.GenerateAzureTokenReq, requestedUserId string) error {
 	e, err := s.azureKeyRequestedTask(r.RoomId, requestedUserId, "check")
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if e == "exist" {
-		return nil, errors.New("speech-services.already-received-token")
+		return errors.New("speech-services.already-received-token")
 	}
 
 	// check if this user already using service or not
 	ss, err := s.checkUserUsage(r.RoomId, requestedUserId)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if ss != "" {
-		return nil, errors.New("speech-services.already-using-service")
+		return errors.New("speech-services.already-using-service")
 	}
 
 	_, meta, err := s.roomService.LoadRoomWithMetadata(r.RoomId)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	f := meta.RoomFeatures.SpeechToTextTranslationFeatures
 
 	if !config.AppCnf.AzureCognitiveServicesSpeech.Enabled || !f.IsEnabled {
-		return nil, errors.New("speech-services.service-disabled")
+		return errors.New("speech-services.service-disabled")
 	}
 
 	res, err := s.sendRequestToAzureForToken()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	// we'll store this user's info
 	_, err = s.azureKeyRequestedTask(r.RoomId, requestedUserId, "add")
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return res, nil
+
+	// send token by data channel
+	marshal, err := json.Marshal(res)
+	if err != nil {
+		return err
+	}
+	sendTo := []string{r.UserSid}
+	dm := NewDataMessageModel()
+	err = dm.SendDataMessage(&plugnmeet.DataMessageReq{
+		RoomId:      r.RoomId,
+		UserSid:     "system",
+		MsgBodyType: plugnmeet.DataMsgBodyType_AZURE_COGNITIVE_SERVICE_SPEECH_TOKEN,
+		Msg:         string(marshal),
+		SendTo:      sendTo,
+	})
+
+	return err
 }
 
 func (s *SpeechServices) SpeechServiceUserStatus(r *plugnmeet.SpeechServiceUserStatusReq) error {

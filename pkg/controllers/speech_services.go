@@ -34,16 +34,21 @@ func HandleSpeechToTextTranslationReq(c *fiber.Ctx) error {
 func HandleGenerateAzureToken(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
+
 	req := new(plugnmeet.GenerateAzureTokenReq)
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
 	req.RoomId = roomId.(string)
 
 	m := models.NewSpeechServices()
-	res, err := m.GenerateAzureToken(req, requestedUserId.(string))
+	err = m.GenerateAzureToken(req, requestedUserId.(string))
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	return utils.SendProtobufResponse(c, res)
+	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
 func HandleSpeechServiceUserStatus(c *fiber.Ctx) error {
