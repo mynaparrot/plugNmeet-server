@@ -155,20 +155,44 @@ func (s *SpeechServices) SpeechServiceUsersUsage(roomId, userId string, task plu
 				return err
 			}
 			now := time.Now().Unix()
-			_, err = s.rc.HIncrBy(s.ctx, key, "total_usage", now-int64(start)).Result()
+			err = s.rc.Watch(s.ctx, func(tx *redis.Tx) error {
+				_, err := tx.Pipelined(s.ctx, func(pipeliner redis.Pipeliner) error {
+					pipeliner.HIncrBy(s.ctx, key, "total_usage", now-int64(start)).Result()
+					pipeliner.HDel(s.ctx, key, userId).Result()
+					return nil
+				})
+				return err
+			}, key)
 			if err != nil {
 				return err
 			}
-		}
-		_, err = s.rc.HDel(s.ctx, key, userId).Result()
-		if err != nil {
-			return err
 		}
 	}
 
 	// now remove this user from request list
 	_, _ = s.azureKeyRequestedTask(roomId, userId, "remove")
 	return nil
+}
+
+func (s *SpeechServices) OnAfterRoomEnded(roomId string) {
+	key := fmt.Sprintf("%s:%s:usage", SpeechServiceRedisKey, roomId)
+	hkeys, err := s.rc.HKeys(s.ctx, key).Result()
+	switch {
+	case err == redis.Nil:
+		//
+	case err != nil:
+		return
+	}
+
+	for _, k := range hkeys {
+		if k != "total_usage" {
+			s.SpeechServiceUsersUsage(roomId, k, plugnmeet.SpeechServiceUserStatusTasks_SESSION_ENDED)
+		}
+	}
+
+	// TODO: in future we can implement webhook to send statistics of usage
+	// at present we can just clean
+	s.rc.Del(s.ctx, key).Result()
 }
 
 func (s *SpeechServices) sendRequestToAzureForToken() (*plugnmeet.GenerateAzureTokenRes, error) {

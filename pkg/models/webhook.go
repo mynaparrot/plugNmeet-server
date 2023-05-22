@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"fmt"
 	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -166,8 +165,8 @@ func (w *webhookEvent) roomFinished() {
 	}()
 
 	// remove speech service redis key
-	speechKey := fmt.Sprintf("%s:%s:usage", SpeechServiceRedisKey, event.Room.Name)
-	w.rc.Del(w.ctx, speechKey).Result()
+	sm := NewSpeechServices()
+	sm.OnAfterRoomEnded(event.Room.Name)
 }
 
 func (w *webhookEvent) participantJoined() {
