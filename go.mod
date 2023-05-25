@@ -15,7 +15,7 @@ require (
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.5.7
 	github.com/livekit/server-sdk-go v1.0.10
-	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230521162531-10df427564ed
+	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230525102640-cf307dfcfbe3
 	github.com/redis/go-redis/v9 v9.0.4
 	github.com/sirupsen/logrus v1.9.2
 	github.com/stretchr/testify v1.8.3
@@ -81,7 +81,6 @@ require (
 	github.com/pion/stun v0.6.0 // indirect
 	github.com/pion/transport/v2 v2.2.1 // indirect
 	github.com/pion/turn/v2 v2.1.0 // indirect
-	github.com/pion/udp/v2 v2.0.1 // indirect
 	github.com/pion/webrtc/v3 v3.2.6 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.15.1 // indirect

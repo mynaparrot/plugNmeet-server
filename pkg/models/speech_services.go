@@ -8,9 +8,11 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/redis/go-redis/v9"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -117,22 +119,22 @@ func (s *SpeechServices) SpeechServiceUserStatus(r *plugnmeet.SpeechServiceUserS
 	keyStatus := fmt.Sprintf("%s:%s:connections", SpeechServiceRedisKey, r.KeyId)
 
 	switch r.Task {
-	case plugnmeet.SpeechServiceUserStatusTasks_SESSION_STARTED:
+	case plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_STARTED:
 		_, err := s.rc.Incr(s.ctx, keyStatus).Result()
 		if err != nil {
 			return err
 		}
-	case plugnmeet.SpeechServiceUserStatusTasks_SESSION_ENDED:
+	case plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED:
 		_, err := s.rc.Decr(s.ctx, keyStatus).Result()
 		if err != nil {
 			return err
 		}
 	}
 
-	return s.SpeechServiceUsersUsage(r.RoomId, r.UserId, r.Task)
+	return s.SpeechServiceUsersUsage(r.RoomId, r.RoomSid, r.UserId, r.Task)
 }
 
-func (s *SpeechServices) SpeechServiceUsersUsage(roomId, userId string, task plugnmeet.SpeechServiceUserStatusTasks) error {
+func (s *SpeechServices) SpeechServiceUsersUsage(roomId, rSid, userId string, task plugnmeet.SpeechServiceUserStatusTasks) error {
 	key := fmt.Sprintf("%s:%s:usage", SpeechServiceRedisKey, roomId)
 
 	ss, err := s.checkUserUsage(roomId, userId)
@@ -141,31 +143,38 @@ func (s *SpeechServices) SpeechServiceUsersUsage(roomId, userId string, task plu
 	}
 
 	switch task {
-	case plugnmeet.SpeechServiceUserStatusTasks_SESSION_STARTED:
+	case plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_STARTED:
 		if ss == "" {
 			_, err := s.rc.HSet(s.ctx, key, userId, time.Now().Unix()).Result()
 			if err != nil {
 				return err
 			}
 		}
-	case plugnmeet.SpeechServiceUserStatusTasks_SESSION_ENDED:
+		// webhook
+		s.sendToWebhookNotifier(roomId, rSid, userId, task, 0)
+	case plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED:
 		if ss != "" {
 			start, err := strconv.Atoi(ss)
 			if err != nil {
 				return err
 			}
 			now := time.Now().Unix()
+			var usage int64
 			err = s.rc.Watch(s.ctx, func(tx *redis.Tx) error {
 				_, err := tx.Pipelined(s.ctx, func(pipeliner redis.Pipeliner) error {
-					pipeliner.HIncrBy(s.ctx, key, "total_usage", now-int64(start)).Result()
+					usage = now - int64(start)
+					pipeliner.HIncrBy(s.ctx, key, "total_usage", usage).Result()
 					pipeliner.HDel(s.ctx, key, userId).Result()
 					return nil
 				})
 				return err
 			}, key)
+
 			if err != nil {
 				return err
 			}
+			// send webhook
+			s.sendToWebhookNotifier(roomId, rSid, userId, task, usage)
 		}
 	}
 
@@ -174,7 +183,7 @@ func (s *SpeechServices) SpeechServiceUsersUsage(roomId, userId string, task plu
 	return nil
 }
 
-func (s *SpeechServices) OnAfterRoomEnded(roomId string) {
+func (s *SpeechServices) OnAfterRoomEnded(roomId, sId string) {
 	key := fmt.Sprintf("%s:%s:usage", SpeechServiceRedisKey, roomId)
 	hkeys, err := s.rc.HKeys(s.ctx, key).Result()
 	switch {
@@ -186,23 +195,27 @@ func (s *SpeechServices) OnAfterRoomEnded(roomId string) {
 
 	for _, k := range hkeys {
 		if k != "total_usage" {
-			s.SpeechServiceUsersUsage(roomId, k, plugnmeet.SpeechServiceUserStatusTasks_SESSION_ENDED)
+			s.SpeechServiceUsersUsage(roomId, sId, k, plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED)
 		}
 	}
 
-	// TODO: in future we can implement webhook to send statistics of usage
-	// at present we can just clean
+	// send by webhook
+	usage, _ := s.rc.HGet(s.ctx, key, "total_usage").Result()
+	if usage != "" {
+		c, err := strconv.Atoi(usage)
+		if err == nil {
+			s.sendToWebhookNotifier(roomId, sId, "", plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_TOTAL_USAGE, int64(c))
+		}
+	}
+	// now clean
 	s.rc.Del(s.ctx, key).Result()
 }
 
 func (s *SpeechServices) sendRequestToAzureForToken() (*plugnmeet.GenerateAzureTokenRes, error) {
-	sub := config.AppCnf.AzureCognitiveServicesSpeech.SubscriptionKeys
-	if len(sub) == 0 {
-		return nil, errors.New("no key found")
+	k, err := s.selectAzureKey()
+	if err != nil {
+		return nil, err
 	}
-	// TODO: think a better way to select key
-	// TODO: At present just use the first one
-	k := sub[0]
 	url := fmt.Sprintf("https://%s.api.cognitive.microsoft.com/sts/v1.0/issueToken", k.ServiceRegion)
 	r, err := http.NewRequest("POST", url, bytes.NewReader([]byte("{}")))
 	if err != nil {
@@ -271,4 +284,64 @@ func (s *SpeechServices) azureKeyRequestedTask(roomId, userId string, task strin
 		}
 	}
 	return "", nil
+}
+
+func (s *SpeechServices) selectAzureKey() (*config.AzureSubscriptionKey, error) {
+	sub := config.AppCnf.AzureCognitiveServicesSpeech.SubscriptionKeys
+	if len(sub) == 0 {
+		return nil, errors.New("no key found")
+	} else if len(sub) == 1 {
+		return &sub[0], nil
+	}
+
+	var keys []config.AzureSubscriptionKey
+	for _, k := range sub {
+		keyStatus := fmt.Sprintf("%s:%s:connections", SpeechServiceRedisKey, k.Id)
+
+		conns, err := s.rc.Get(s.ctx, keyStatus).Result()
+		switch {
+		case err == redis.Nil:
+			keys = append(keys, k)
+		case err != nil:
+			continue
+		}
+
+		c, err := strconv.Atoi(conns)
+		if err != nil {
+			continue
+		}
+
+		k.MaxConnection = k.MaxConnection - int64(c)
+		keys = append(keys, k)
+	}
+
+	if len(keys) == 0 {
+		return nil, errors.New("no key found")
+	}
+
+	sort.Slice(keys, func(i int, j int) bool {
+		return keys[i].MaxConnection > keys[j].MaxConnection
+	})
+
+	return &keys[0], nil
+}
+
+func (s *SpeechServices) sendToWebhookNotifier(rId, rSid, userId string, task plugnmeet.SpeechServiceUserStatusTasks, usage int64) {
+	tk := task.String()
+	n := NewWebhookNotifier()
+	msg := &plugnmeet.CommonNotifyEvent{
+		Event: &tk,
+		Room: &plugnmeet.NotifyEventRoom{
+			Sid:    &rId,
+			RoomId: &rSid,
+		},
+		SpeechService: &plugnmeet.SpeechServiceEvent{
+			UserId:     &userId,
+			TotalUsage: usage,
+		},
+	}
+	err := n.Notify(rSid, msg)
+	if err != nil {
+		log.Errorln(err)
+	}
 }

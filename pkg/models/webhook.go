@@ -166,7 +166,7 @@ func (w *webhookEvent) roomFinished() {
 
 	// remove speech service redis key
 	sm := NewSpeechServices()
-	sm.OnAfterRoomEnded(event.Room.Name)
+	sm.OnAfterRoomEnded(event.Room.Name, event.Room.Sid)
 }
 
 func (w *webhookEvent) participantJoined() {
@@ -209,7 +209,7 @@ func (w *webhookEvent) participantLeft() {
 	// if we missed to calculate this user's speech service usage stat
 	// for sudden disconnection
 	sm := NewSpeechServices()
-	sm.SpeechServiceUsersUsage(event.Room.Name, event.Participant.Identity, plugnmeet.SpeechServiceUserStatusTasks_SESSION_ENDED)
+	sm.SpeechServiceUsersUsage(event.Room.Name, event.Room.Sid, event.Participant.Identity, plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED)
 }
 
 func (w *webhookEvent) trackPublished() {
