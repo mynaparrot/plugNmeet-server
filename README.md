@@ -25,6 +25,7 @@ infrastructure [livekit](https://github.com/livekit/livekit-server). Please join
 14) Public & private chatting with File sharing.
 15) MP4 Recordings.
 16) RTMP Broadcasting & RTMP ingress.
+17) Speech to text/translation (Powered by [microsoft azure](https://learn.microsoft.com/en-us/azure/cognitive-services/speech-service/get-started-text-to-speech?pivots=programming-language-go&tabs=linux%2Cterminal#prerequisites))
 
 And many more!
 
