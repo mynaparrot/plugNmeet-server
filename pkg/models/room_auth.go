@@ -55,6 +55,11 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 		r.Metadata.CopyrightConf = config.AppCnf.Client.CopyrightConf
 	}
 
+	// Azure cognitive services
+	if !config.AppCnf.AzureCognitiveServicesSpeech.Enabled {
+		r.Metadata.RoomFeatures.SpeechToTextTranslationFeatures.IsAllow = false
+	}
+
 	meta, err := json.Marshal(r.Metadata)
 	if err != nil {
 		return false, "Error: " + err.Error(), nil

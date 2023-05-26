@@ -103,6 +103,11 @@ func (w *webhookEvent) roomFinished() {
 	// webhook notification
 	go w.sendToWebhookNotifier(event)
 
+	// speech service clean up
+	// it's important to place here. otherwise sId will change
+	sm := NewSpeechServices()
+	sm.OnAfterRoomEnded(event.Room.Name, event.Room.Sid)
+
 	room := &RoomInfo{
 		Sid:       event.Room.Sid,
 		IsRunning: 0,
@@ -201,6 +206,11 @@ func (w *webhookEvent) participantLeft() {
 	if err != nil {
 		log.Errorln(err)
 	}
+
+	// if we missed to calculate this user's speech service usage stat
+	// for sudden disconnection
+	sm := NewSpeechServices()
+	sm.SpeechServiceUsersUsage(event.Room.Name, event.Room.Sid, event.Participant.Identity, plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED)
 }
 
 func (w *webhookEvent) trackPublished() {

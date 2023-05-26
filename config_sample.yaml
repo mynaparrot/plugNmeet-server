@@ -92,3 +92,14 @@ shared_notepad:
       id: "node_01"
       host: "http://host.docker.internal:9001"
       api_key: "eb2fb3fb78ca29eb6896852517d34a1be5f320664e3cce3a522a06dfa278f169"
+azure_cognitive_services_speech:
+  enabled: false
+  subscription_keys:
+    -
+      id: "key_1"
+      # https://learn.microsoft.com/en-us/azure/cognitive-services/speech-service/get-started-text-to-speech?pivots=programming-language-go&tabs=linux%2Cterminal#prerequisites
+      subscription_key: "your_key_here"
+      service_region: westus2
+      # Azure has limit to max concurrent connection for single key.
+      # you should communicate with azure to know your limit. Default 20
+      max_connection: 20
