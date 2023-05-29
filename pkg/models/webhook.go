@@ -19,6 +19,7 @@ type webhookEvent struct {
 	roomModel      *RoomModel
 	roomService    *RoomService
 	recordingModel *RecordingModel
+	recorderModel  *RecorderModel
 	userModel      *UserModel
 	notifier       *WebhookNotifierModel
 }
@@ -31,6 +32,7 @@ func NewWebhookModel(e *livekit.WebhookEvent) {
 		roomModel:      NewRoomModel(),
 		roomService:    NewRoomService(),
 		recordingModel: NewRecordingModel(),
+		recorderModel:  NewRecorderModel(),
 		userModel:      NewUserModel(),
 		notifier:       NewWebhookNotifier(),
 	}
@@ -119,7 +121,11 @@ func (w *webhookEvent) roomFinished() {
 	}
 
 	//we'll send message to recorder to stop
-	_ = w.recordingModel.SendMsgToRecorder(plugnmeet.RecordingTasks_STOP, w.event.Room.Name, w.event.Room.Sid, nil)
+	_ = w.recorderModel.SendMsgToRecorder(&plugnmeet.RecordingReq{
+		Task:   plugnmeet.RecordingTasks_STOP,
+		Sid:    w.event.Room.Name,
+		RoomId: w.event.Room.Name,
+	})
 
 	// Delete all the files those may upload during session
 	if !config.AppCnf.UploadFileSettings.KeepForever {

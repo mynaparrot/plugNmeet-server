@@ -3,27 +3,20 @@ package models
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
-	"github.com/goccy/go-json"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/redis/go-redis/v9"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/encoding/protojson"
-	"net/url"
-	"sort"
-	"strconv"
 	"time"
 )
 
 type RecordingModel struct {
-	app          *config.AppConfig
-	db           *sql.DB
-	roomService  *RoomService
-	rds          *redis.Client
-	ctx          context.Context
-	RecordingReq *plugnmeet.RecordingReq // we need to get custom design value
+	app         *config.AppConfig
+	db          *sql.DB
+	roomService *RoomService
+	rds         *redis.Client
+	ctx         context.Context
 }
 
 func NewRecordingModel() *RecordingModel {
@@ -359,134 +352,4 @@ func (rm *RecordingModel) sendToWebhookNotifier(r *plugnmeet.RecorderToPlugNmeet
 	if err != nil {
 		log.Errorln(err)
 	}
-}
-
-type RecorderReq struct {
-	From        string `json:"from"`
-	Task        string `json:"task"`
-	RoomId      string `json:"room_id"`
-	Sid         string `json:"sid"`
-	RecordId    string `json:"record_id"`
-	AccessToken string `json:"access_token"`
-	RecorderId  string `json:"recorder_id"`
-	RtmpUrl     string `json:"rtmp_url"`
-}
-
-func (rm *RecordingModel) SendMsgToRecorder(task plugnmeet.RecordingTasks, roomId string, sid string, rtmpUrl *string) error {
-	recordId := time.Now().UnixMilli()
-
-	toSend := &plugnmeet.PlugNmeetToRecorder{
-		From:        "plugnmeet",
-		RoomId:      roomId,
-		RoomSid:     sid,
-		Task:        task,
-		RecordingId: sid + "-" + strconv.Itoa(int(recordId)),
-	}
-
-	switch task {
-	case plugnmeet.RecordingTasks_START_RECORDING:
-		err := rm.addTokenAndRecorder(toSend, config.RECORDER_BOT)
-		if err != nil {
-			return err
-		}
-	case plugnmeet.RecordingTasks_START_RTMP:
-		toSend.RtmpUrl = rtmpUrl
-		err := rm.addTokenAndRecorder(toSend, config.RTMP_BOT)
-		if err != nil {
-			return err
-		}
-	}
-
-	payload, _ := protojson.Marshal(toSend)
-	rm.rds.Publish(rm.ctx, "plug-n-meet-recorder", string(payload))
-
-	return nil
-}
-
-func (rm *RecordingModel) addTokenAndRecorder(rq *plugnmeet.PlugNmeetToRecorder, userId string) error {
-	recorderId, err := rm.selectRecorder()
-	if err != nil {
-		return err
-	}
-	if recorderId == "" {
-		return errors.New("notifications.no-recorder-available")
-	}
-
-	m := NewAuthTokenModel()
-	gt := &plugnmeet.GenerateTokenReq{
-		RoomId: rq.RoomId,
-		UserInfo: &plugnmeet.UserInfo{
-			UserId:   userId,
-			IsHidden: true,
-			IsAdmin:  true,
-		},
-	}
-	token, err := m.DoGenerateToken(gt)
-	if err != nil {
-		log.Errorln(err)
-		return err
-	}
-
-	rq.RecorderId = recorderId
-	rq.AccessToken = token
-
-	// if we have custom design then we'll set custom design with token
-	// don't need to change anything in recorder.
-	if rm.RecordingReq.CustomDesign != nil && *rm.RecordingReq.CustomDesign != "" {
-		rq.AccessToken += "&custom_design=" + url.QueryEscape(*rm.RecordingReq.CustomDesign)
-	}
-
-	return nil
-}
-
-type recorderInfo struct {
-	RecorderId      string
-	MaxLimit        int   `json:"maxLimit"`
-	CurrentProgress int   `json:"currentProgress"`
-	LastPing        int64 `json:"lastPing"`
-}
-
-func (rm *RecordingModel) getAllRecorders() ([]*recorderInfo, error) {
-	ctx := context.Background()
-	res := rm.rds.HGetAll(ctx, "pnm:recorders")
-	result, err := res.Result()
-	if err != nil {
-		return nil, err
-	}
-
-	var recorders []*recorderInfo
-	valid := time.Now().Unix() - 8 // we can think maximum 8 seconds delay for valid node
-
-	for id, data := range result {
-		recorder := new(recorderInfo)
-		err = json.Unmarshal([]byte(data), recorder)
-		if err != nil {
-			continue
-		}
-		if recorder.LastPing >= valid {
-			recorder.RecorderId = id
-			recorders = append(recorders, recorder)
-		}
-	}
-
-	return recorders, err
-}
-
-func (rm *RecordingModel) selectRecorder() (string, error) {
-	recorders, err := rm.getAllRecorders()
-	if err != nil {
-		return "", err
-	}
-	if len(recorders) < 1 {
-		return "", nil
-	}
-	// let's sort it based on active processes & max limit.
-	sort.Slice(recorders, func(i int, j int) bool {
-		iA := (recorders[i].CurrentProgress) / recorders[i].MaxLimit
-		jA := (recorders[j].CurrentProgress) / recorders[j].MaxLimit
-		return iA < jA
-	})
-
-	// we'll return the first one
-	return recorders[0].RecorderId, nil
 }

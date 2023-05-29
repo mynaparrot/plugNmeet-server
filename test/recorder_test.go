@@ -5,6 +5,7 @@ import (
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"google.golang.org/protobuf/proto"
 	"net/http"
 	"testing"
@@ -13,11 +14,15 @@ import (
 
 func test_recorderTasks(t *testing.T, rInfo *livekit.Room) string {
 	rid := fmt.Sprintf("%s-%d", rInfo.Sid, time.Now().UnixMilli())
+	rm := models.NewRoomModel()
+	rf, _ := rm.GetRoomInfo(rInfo.Name, rInfo.Sid, 1)
+
 	body := &plugnmeet.RecorderToPlugNmeet{
 		From:        "recorder",
 		Status:      true,
 		Msg:         "success",
 		RecordingId: rid,
+		RoomTableId: rf.Id,
 		RoomId:      rInfo.Name,
 		RoomSid:     rInfo.Sid,
 		RecorderId:  "node_01",
