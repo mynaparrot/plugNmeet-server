@@ -294,6 +294,32 @@ func (rm *RoomModel) GetRoomInfo(roomId string, sid string, isRunning int) (*Roo
 	return &room, msg
 }
 
+// GetRoomInfoByTableId can be used to get room info by table id
+// will be needed when recorder will send response
+func (rm *RoomModel) GetRoomInfoByTableId(tableId int64) (*RoomInfo, string) {
+	db := rm.db
+	ctx, cancel := context.WithTimeout(rm.ctx, 3*time.Second)
+	defer cancel()
+
+	var query *sql.Row
+	query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time FROM "+rm.app.FormatDBTable("room_info")+" WHERE id = ?", tableId)
+
+	var room RoomInfo
+	var msg string
+	err := query.Scan(&room.Id, &room.RoomTitle, &room.RoomId, &room.Sid, &room.JoinedParticipants, &room.IsRunning, &room.IsRecording, &room.IsActiveRTMP, &room.WebhookUrl, &room.IsBreakoutRoom, &room.ParentRoomId, &room.CreationTime)
+
+	switch {
+	case err == sql.ErrNoRows:
+		msg = "no info found"
+	case err != nil:
+		msg = fmt.Sprintf("query error: %s", err.Error())
+	default:
+		msg = "success"
+	}
+
+	return &room, msg
+}
+
 func (rm *RoomModel) GetActiveRoomsInfo() ([]*plugnmeet.ActiveRoomInfo, error) {
 	db := rm.db
 	ctx, cancel := context.WithTimeout(rm.ctx, 3*time.Second)

@@ -22,7 +22,7 @@ func HandleRecording(c *fiber.Ctx) error {
 	}
 
 	req := new(plugnmeet.RecordingReq)
-	m := models.NewRecordingModel()
+	m := models.NewRecorderModel()
 
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
@@ -58,9 +58,9 @@ func HandleRecording(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "notifications.rtmp-not-running")
 	}
 
-	// we need to get custom design value
-	m.RecordingReq = req
-	err = m.SendMsgToRecorder(req.Task, room.RoomId, room.Sid, nil)
+	req.RoomId = room.RoomId
+	req.RoomTableId = room.Id
+	err = m.SendMsgToRecorder(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -82,7 +82,7 @@ func HandleRTMP(c *fiber.Ctx) error {
 
 	// we can use same as RecordingReq
 	req := new(plugnmeet.RecordingReq)
-	m := models.NewRecordingModel()
+	m := models.NewRecorderModel()
 
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
@@ -120,9 +120,9 @@ func HandleRTMP(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "RTMP broadcasting not running")
 	}
 
-	// we need to get custom design value
-	m.RecordingReq = req
-	err = m.SendMsgToRecorder(req.Task, room.RoomId, room.Sid, req.RtmpUrl)
+	req.RoomId = room.RoomId
+	req.RoomTableId = room.Id
+	err = m.SendMsgToRecorder(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -144,6 +144,14 @@ func HandleRecorderEvents(c *fiber.Ctx) error {
 	}
 
 	if req.From == "recorder" {
+		rm := models.NewRoomModel()
+		roomInfo, _ := rm.GetRoomInfoByTableId(req.RoomTableId)
+		if roomInfo == nil {
+			return c.SendStatus(fiber.StatusNotFound)
+		}
+
+		req.RoomId = roomInfo.RoomId
+		req.RoomSid = roomInfo.Sid
 		m.HandleRecorderResp(req)
 	}
 
