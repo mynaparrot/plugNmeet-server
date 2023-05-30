@@ -105,11 +105,6 @@ func (w *webhookEvent) roomFinished() {
 	// webhook notification
 	go w.sendToWebhookNotifier(event)
 
-	// speech service clean up
-	// it's important to place here. otherwise sId will change
-	sm := NewSpeechServices()
-	sm.OnAfterRoomEnded(event.Room.Name, event.Room.Sid)
-
 	room := &RoomInfo{
 		Sid:       event.Room.Sid,
 		IsRunning: 0,
@@ -174,6 +169,11 @@ func (w *webhookEvent) roomFinished() {
 		bm := NewBreakoutRoomModel()
 		_ = bm.PostTaskAfterRoomEndWebhook(event.Room.Name, event.Room.Metadata)
 	}()
+
+	// speech service clean up
+	sm := NewSpeechServices()
+	// don't need to worry about room sid changes, because we'll compare both
+	go sm.OnAfterRoomEnded(event.Room.Name, event.Room.Sid)
 }
 
 func (w *webhookEvent) participantJoined() {
