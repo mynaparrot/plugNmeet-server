@@ -33,7 +33,7 @@ func NewSpeechServices() *SpeechServices {
 	}
 }
 
-func (s *SpeechServices) SpeechToTextTranslationReq(r *plugnmeet.SpeechToTextTranslationReq) error {
+func (s *SpeechServices) SpeechToTextTranslationServiceStatus(r *plugnmeet.SpeechToTextTranslationReq) error {
 	if !config.AppCnf.AzureCognitiveServicesSpeech.Enabled {
 		return errors.New("speech service disabled")
 	}
@@ -184,6 +184,9 @@ func (s *SpeechServices) SpeechServiceUsersUsage(roomId, rSid, userId string, ta
 }
 
 func (s *SpeechServices) OnAfterRoomEnded(roomId, sId string) {
+	// we'll wait little bit to make sure all users' requested has been received
+	time.Sleep(5 * time.Microsecond)
+
 	key := fmt.Sprintf("%s:%s:usage", SpeechServiceRedisKey, roomId)
 	hkeys, err := s.rc.HKeys(s.ctx, key).Result()
 	switch {
