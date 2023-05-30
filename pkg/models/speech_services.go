@@ -33,7 +33,7 @@ func NewSpeechServices() *SpeechServices {
 	}
 }
 
-func (s *SpeechServices) SpeechToTextTranslationReq(r *plugnmeet.SpeechToTextTranslationReq) error {
+func (s *SpeechServices) SpeechToTextTranslationServiceStatus(r *plugnmeet.SpeechToTextTranslationReq) error {
 	if !config.AppCnf.AzureCognitiveServicesSpeech.Enabled {
 		return errors.New("speech service disabled")
 	}

@@ -8,7 +8,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func HandleSpeechToTextTranslationReq(c *fiber.Ctx) error {
+func HandleSpeechToTextTranslationServiceStatus(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 	if isAdmin != true {
@@ -23,7 +23,7 @@ func HandleSpeechToTextTranslationReq(c *fiber.Ctx) error {
 
 	req.RoomId = roomId.(string)
 	m := models.NewSpeechServices()
-	err = m.SpeechToTextTranslationReq(req)
+	err = m.SpeechToTextTranslationServiceStatus(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}

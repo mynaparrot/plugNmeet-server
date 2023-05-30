@@ -151,7 +151,7 @@ func Router() *fiber.App {
 
 	// Speech services
 	speech := api.Group("/speechServices")
-	speech.Post("/", controllers.HandleSpeechToTextTranslationReq)
+	speech.Post("/serviceStatus", controllers.HandleSpeechToTextTranslationServiceStatus)
 	speech.Post("/azureToken", controllers.HandleGenerateAzureToken)
 	speech.Post("/userStatus", controllers.HandleSpeechServiceUserStatus)
 
