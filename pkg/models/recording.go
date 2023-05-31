@@ -44,7 +44,7 @@ type RecorderResp struct {
 	FileSize float64 `json:"file_size"`
 }
 
-func (rm *RecordingModel) HandleRecorderResp(r *plugnmeet.RecorderToPlugNmeet) {
+func (rm *RecordingModel) HandleRecorderResp(r *plugnmeet.RecorderToPlugNmeet, roomInfo *RoomInfo) {
 	switch r.Task {
 	case plugnmeet.RecordingTasks_START_RECORDING:
 		rm.recordingStarted(r)
@@ -63,7 +63,7 @@ func (rm *RecordingModel) HandleRecorderResp(r *plugnmeet.RecorderToPlugNmeet) {
 		go rm.sendToWebhookNotifier(r)
 
 	case plugnmeet.RecordingTasks_RECORDING_PROCEEDED:
-		err := rm.addRecording(r)
+		err := rm.addRecording(r, roomInfo.CreationTime)
 		if err != nil {
 			log.Errorln(err)
 		}
@@ -146,12 +146,12 @@ func (rm *RecordingModel) updateRoomRecordingStatus(r *plugnmeet.RecorderToPlugN
 		return err
 	}
 	defer tx.Rollback()
-	stmt, err := tx.Prepare("UPDATE " + rm.app.FormatDBTable("room_info") + " SET is_recording = ?, recorder_id = ? WHERE sid = ? OR sid = CONCAT(?, '-', id)")
+	stmt, err := tx.Prepare("UPDATE " + rm.app.FormatDBTable("room_info") + " SET is_recording = ?, recorder_id = ? WHERE id = ?")
 	if err != nil {
 		return err
 	}
 
-	_, err = stmt.Exec(isRecording, r.RecorderId, r.RoomSid, r.RoomSid)
+	_, err = stmt.Exec(isRecording, r.RecorderId, r.RoomTableId)
 	if err != nil {
 		return err
 	}
@@ -244,12 +244,12 @@ func (rm *RecordingModel) updateRoomRTMPStatus(r *plugnmeet.RecorderToPlugNmeet,
 		return err
 	}
 	defer tx.Rollback()
-	stmt, err := tx.Prepare("UPDATE " + rm.app.FormatDBTable("room_info") + " SET is_active_rtmp = ?, rtmp_node_id = ? WHERE sid = ? OR sid = CONCAT(?, '-', id)")
+	stmt, err := tx.Prepare("UPDATE " + rm.app.FormatDBTable("room_info") + " SET is_active_rtmp = ?, rtmp_node_id = ? WHERE id = ?")
 	if err != nil {
 		return err
 	}
 
-	_, err = stmt.Exec(isActiveRtmp, r.RecorderId, r.RoomSid, r.RoomSid)
+	_, err = stmt.Exec(isActiveRtmp, r.RecorderId, r.RoomTableId)
 	if err != nil {
 		return err
 	}
@@ -267,39 +267,7 @@ func (rm *RecordingModel) updateRoomRTMPStatus(r *plugnmeet.RecorderToPlugNmeet,
 	return nil
 }
 
-func (rm *RecordingModel) updateRecorderCurrentProgress(r *RecorderResp) error {
-	db := rm.db
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	stmt, err := tx.Prepare("UPDATE " + rm.app.FormatDBTable("recorder") + " SET current_progress = current_progress + 1 WHERE recorder_id = ?")
-	if err != nil {
-		return err
-	}
-	_, err = stmt.Exec(r.RecorderId)
-	if err != nil {
-		return err
-	}
-	err = tx.Commit()
-	if err != nil {
-		return err
-	}
-	err = stmt.Close()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (rm *RecordingModel) addRecording(r *plugnmeet.RecorderToPlugNmeet) error {
-	ri := NewRoomModel()
-	roomInfo, _ := ri.GetRoomInfo("", r.RoomSid, 0)
-
+func (rm *RecordingModel) addRecording(r *plugnmeet.RecorderToPlugNmeet, roomCreation int64) error {
 	db := rm.db
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -315,7 +283,7 @@ func (rm *RecordingModel) addRecording(r *plugnmeet.RecorderToPlugNmeet) error {
 		return err
 	}
 
-	_, err = stmt.Exec(r.RecordingId, r.RoomId, roomInfo.Sid, r.RecorderId, r.FilePath, fmt.Sprintf("%.2f", r.FileSize), time.Now().Unix(), roomInfo.CreationTime)
+	_, err = stmt.Exec(r.RecordingId, r.RoomId, r.RoomSid, r.RecorderId, r.FilePath, fmt.Sprintf("%.2f", r.FileSize), time.Now().Unix(), roomCreation)
 	if err != nil {
 		return err
 	}

@@ -152,7 +152,7 @@ func HandleRecorderEvents(c *fiber.Ctx) error {
 
 		req.RoomId = roomInfo.RoomId
 		req.RoomSid = roomInfo.Sid
-		m.HandleRecorderResp(req)
+		m.HandleRecorderResp(req, roomInfo)
 	}
 
 	return c.SendStatus(fiber.StatusOK)
