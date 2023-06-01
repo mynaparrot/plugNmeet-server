@@ -15,7 +15,7 @@ require (
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.5.7
 	github.com/livekit/server-sdk-go v1.0.10
-	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230529113813-e28be5affabb
+	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230601112759-5c7f8f9f4617
 	github.com/redis/go-redis/v9 v9.0.5
 	github.com/sirupsen/logrus v1.9.2
 	github.com/stretchr/testify v1.8.3
@@ -107,6 +107,6 @@ require (
 	golang.org/x/sync v0.2.0 // indirect
 	golang.org/x/sys v0.8.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20230526203410-71b5a4ffd15e // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20230530153820-e85fd2cbaebc // indirect
 	google.golang.org/grpc v1.55.0 // indirect
 )
