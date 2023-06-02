@@ -2,7 +2,6 @@ package models
 
 import (
 	"errors"
-	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -30,7 +29,7 @@ func (a *AuthTokenModel) DoGenerateToken(g *plugnmeet.GenerateTokenReq) (string,
 		a.makePresenter(g)
 	}
 
-	metadata, err := json.Marshal(g.UserInfo.UserMetadata)
+	metadata, err := a.rs.MarshalParticipantMetadata(g.UserInfo.UserMetadata)
 	if err != nil {
 		return "", err
 	}
@@ -162,9 +161,7 @@ func (a *AuthTokenModel) makePresenter(g *plugnmeet.GenerateTokenReq) {
 			meta := make([]byte, len(p.Metadata))
 			copy(meta, p.Metadata)
 
-			m := new(plugnmeet.UserMetadata)
-			_ = json.Unmarshal(meta, m)
-
+			m, _ := a.rs.UnmarshalParticipantMetadata(string(meta))
 			if m.IsAdmin && m.IsPresenter {
 				hasPresenter = true
 				break

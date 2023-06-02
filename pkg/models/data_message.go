@@ -3,7 +3,6 @@ package models
 import (
 	"database/sql"
 	"errors"
-	"github.com/goccy/go-json"
 	"github.com/google/uuid"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -66,8 +65,7 @@ func (m *DataMessageModel) raiseHand(r *plugnmeet.DataMessageReq) error {
 
 	var sids []string
 	for _, participant := range participants {
-		meta := new(plugnmeet.UserMetadata)
-		err := json.Unmarshal([]byte(participant.Metadata), meta)
+		meta, err := m.roomService.UnmarshalParticipantMetadata(participant.Metadata)
 		if err != nil {
 			continue
 		}
@@ -76,16 +74,12 @@ func (m *DataMessageModel) raiseHand(r *plugnmeet.DataMessageReq) error {
 		}
 	}
 
-	reqPar, _ := m.roomService.LoadParticipantInfo(r.RoomId, r.RequestedUserId)
+	reqPar, metadata, _ := m.roomService.LoadParticipantWithMetadata(r.RoomId, r.RequestedUserId)
 
 	// now update user's metadata
-	metadata := new(plugnmeet.UserMetadata)
-	_ = json.Unmarshal([]byte(reqPar.Metadata), metadata)
-
 	metadata.RaisedHand = true
-	newMeta, err := json.Marshal(metadata)
 
-	_, err = m.roomService.UpdateParticipantMetadata(r.RoomId, r.RequestedUserId, string(newMeta))
+	_, err := m.roomService.UpdateParticipantMetadataByStruct(r.RoomId, r.RequestedUserId, metadata)
 	if err != nil {
 		return err
 	}
@@ -127,19 +121,15 @@ func (m *DataMessageModel) raiseHand(r *plugnmeet.DataMessageReq) error {
 }
 
 func (m *DataMessageModel) lowerHand(r *plugnmeet.DataMessageReq) error {
-	reqPar, err := m.roomService.LoadParticipantInfo(r.RoomId, r.RequestedUserId)
+	_, metadata, err := m.roomService.LoadParticipantWithMetadata(r.RoomId, r.RequestedUserId)
 	if err != nil {
 		return err
 	}
 
 	// now update user's metadata
-	metadata := new(plugnmeet.UserMetadata)
-	_ = json.Unmarshal([]byte(reqPar.Metadata), metadata)
-
 	metadata.RaisedHand = false
-	newMeta, err := json.Marshal(metadata)
 
-	_, err = m.roomService.UpdateParticipantMetadata(r.RoomId, r.RequestedUserId, string(newMeta))
+	_, err = m.roomService.UpdateParticipantMetadataByStruct(r.RoomId, r.RequestedUserId, metadata)
 	if err != nil {
 		return err
 	}
@@ -153,19 +143,15 @@ func (m *DataMessageModel) otherUserLowerHand(r *plugnmeet.DataMessageReq) error
 	}
 	userId := r.Msg
 
-	reqPar, err := m.roomService.LoadParticipantInfo(r.RoomId, userId)
+	_, metadata, err := m.roomService.LoadParticipantWithMetadata(r.RoomId, userId)
 	if err != nil {
 		return err
 	}
 
 	// now update user's metadata
-	metadata := new(plugnmeet.UserMetadata)
-	_ = json.Unmarshal([]byte(reqPar.Metadata), metadata)
-
 	metadata.RaisedHand = false
-	newMeta, err := json.Marshal(metadata)
 
-	_, err = m.roomService.UpdateParticipantMetadata(r.RoomId, userId, string(newMeta))
+	_, err = m.roomService.UpdateParticipantMetadataByStruct(r.RoomId, userId, metadata)
 	if err != nil {
 		return err
 	}

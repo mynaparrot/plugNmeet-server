@@ -164,9 +164,7 @@ func (m *EtherpadModel) CleanAfterRoomEnd(roomId, metadata string) error {
 		return nil
 	}
 
-	roomMeta := new(plugnmeet.RoomMetadata)
-	_ = json.Unmarshal([]byte(metadata), roomMeta)
-
+	roomMeta, _ := m.rs.UnmarshalRoomMetadata(metadata)
 	if roomMeta.RoomFeatures.SharedNotePadFeatures == nil {
 		return nil
 	}

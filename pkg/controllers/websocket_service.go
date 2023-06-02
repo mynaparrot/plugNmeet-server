@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"github.com/antoniodipinto/ikisocket"
-	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -63,8 +62,8 @@ func (c *websocketController) validation() bool {
 	// default set false
 	c.kws.SetAttribute("isAdmin", false)
 
-	metadata := new(plugnmeet.UserMetadata)
-	err = json.Unmarshal([]byte(claims.Metadata), metadata)
+	rs := models.NewRoomService()
+	metadata, err := rs.UnmarshalParticipantMetadata(claims.Metadata)
 	if err != nil {
 		_ = c.kws.EmitTo(c.kws.UUID, []byte("can't Unmarshal metadata!"), ikisocket.TextMessage)
 		return false
