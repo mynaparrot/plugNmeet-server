@@ -45,7 +45,10 @@ func HandleRoomCreate(c *fiber.Ctx) error {
 
 func HandleIsRoomActive(c *fiber.Ctx) error {
 	req := new(plugnmeet.IsRoomActiveReq)
-	err := c.BodyParser(req)
+	op := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
+	err := op.Unmarshal(c.Body(), req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
@@ -60,7 +63,10 @@ func HandleIsRoomActive(c *fiber.Ctx) error {
 
 func HandleGetActiveRoomInfo(c *fiber.Ctx) error {
 	req := new(plugnmeet.GetActiveRoomInfoReq)
-	err := c.BodyParser(req)
+	op := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
+	err := op.Unmarshal(c.Body(), req)
 	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
@@ -100,7 +106,10 @@ func HandleGetActiveRoomsInfo(c *fiber.Ctx) error {
 
 func HandleEndRoom(c *fiber.Ctx) error {
 	req := new(plugnmeet.RoomEndReq)
-	err := c.BodyParser(req)
+	op := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
+	err := op.Unmarshal(c.Body(), req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
