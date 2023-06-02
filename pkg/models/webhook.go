@@ -75,8 +75,7 @@ func (w *webhookEvent) roomStarted() {
 	}
 
 	if event.Room.Metadata != "" {
-		info := new(plugnmeet.RoomMetadata)
-		err = json.Unmarshal([]byte(event.Room.Metadata), info)
+		info, err := w.roomService.UnmarshalRoomMetadata(event.Room.Metadata)
 		if err == nil {
 			info.StartedAt = uint64(time.Now().Unix())
 			if info.RoomFeatures.RoomDuration != nil && *info.RoomFeatures.RoomDuration > 0 {
@@ -91,9 +90,8 @@ func (w *webhookEvent) roomStarted() {
 				bm := NewBreakoutRoomModel()
 				_ = bm.PostTaskAfterRoomStartWebhook(room.RoomId, info)
 			}
-			marshal, err := json.Marshal(info)
 			if err == nil {
-				_, _ = w.roomService.UpdateRoomMetadata(room.RoomId, string(marshal))
+				_, _ = w.roomService.UpdateRoomMetadataByStruct(room.RoomId, info)
 			}
 		}
 	}

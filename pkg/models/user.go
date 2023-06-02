@@ -3,7 +3,6 @@ package models
 import (
 	"database/sql"
 	"errors"
-	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -84,14 +83,12 @@ func (u *UserModel) updateLockSettingsAllUsers(r *plugnmeet.UpdateUserLockSettin
 	meta := make([]byte, len(info.Metadata))
 	copy(meta, info.Metadata)
 
-	m := new(plugnmeet.RoomMetadata)
-	_ = json.Unmarshal(meta, m)
+	m, _ := u.roomService.UnmarshalRoomMetadata(string(meta))
 
 	l := u.changeLockSettingsMetadata(r.Service, r.Direction, m.DefaultLockSettings)
 	m.DefaultLockSettings = l
 
-	newMeta, _ := json.Marshal(m)
-	_, err = u.roomService.UpdateRoomMetadata(r.RoomId, string(newMeta))
+	_, err = u.roomService.UpdateRoomMetadataByStruct(r.RoomId, m)
 
 	return err
 }
@@ -108,14 +105,11 @@ func (u *UserModel) updateParticipantLockMetadata(um updateParticipantLockMetada
 		meta := make([]byte, len(um.participantInfo.Metadata))
 		copy(meta, um.participantInfo.Metadata)
 
-		m := new(plugnmeet.UserMetadata)
-		_ = json.Unmarshal(meta, m)
+		m, _ := u.roomService.UnmarshalParticipantMetadata(string(meta))
 		l := u.changeLockSettingsMetadata(um.service, um.direction, m.LockSettings)
 		m.LockSettings = l
 
-		newMeta, _ := json.Marshal(m)
-		_, err := u.roomService.UpdateParticipantMetadata(um.roomId, um.participantInfo.Identity, string(newMeta))
-
+		_, err := u.roomService.UpdateParticipantMetadataByStruct(um.roomId, um.participantInfo.Identity, m)
 		return err
 	}
 
@@ -266,14 +260,13 @@ func (u *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
 		meta := make([]byte, len(p.Metadata))
 		copy(meta, p.Metadata)
 
-		m := new(plugnmeet.UserMetadata)
-		_ = json.Unmarshal(meta, m)
+		m, _ := u.roomService.UnmarshalParticipantMetadata(string(meta))
 
 		if r.Task == plugnmeet.SwitchPresenterTask_PROMOTE {
 			if m.IsPresenter {
 				// demote current presenter from presenter
 				m.IsPresenter = false
-				err = u.updateUserMetadata(m, r.RoomId, p.Identity)
+				_, err = u.roomService.UpdateParticipantMetadataByStruct(r.RoomId, p.Identity, m)
 				if err != nil {
 					return errors.New("can't demote current presenter")
 				}
@@ -283,7 +276,7 @@ func (u *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
 				// we'll update requested user as presenter
 				// otherwise in the session there won't have any presenter
 				m.IsPresenter = true
-				err = u.updateUserMetadata(m, r.RoomId, p.Identity)
+				_, err = u.roomService.UpdateParticipantMetadataByStruct(r.RoomId, p.Identity, m)
 				if err != nil {
 					return errors.New("can't change alternative presenter")
 				}
@@ -299,31 +292,21 @@ func (u *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
 	meta := make([]byte, len(p.Metadata))
 	copy(meta, p.Metadata)
 
-	m := new(plugnmeet.UserMetadata)
-	_ = json.Unmarshal(meta, m)
+	m, _ := u.roomService.UnmarshalParticipantMetadata(string(meta))
 
 	if r.Task == plugnmeet.SwitchPresenterTask_PROMOTE {
 		m.IsPresenter = true
-		err = u.updateUserMetadata(m, r.RoomId, p.Identity)
+		_, err = u.roomService.UpdateParticipantMetadataByStruct(r.RoomId, p.Identity, m)
 		if err != nil {
 			return errors.New("can't promote to presenter")
 		}
 	} else if r.Task == plugnmeet.SwitchPresenterTask_DEMOTE {
 		m.IsPresenter = false
-		err = u.updateUserMetadata(m, r.RoomId, p.Identity)
+		_, err = u.roomService.UpdateParticipantMetadataByStruct(r.RoomId, p.Identity, m)
 		if err != nil {
 			return errors.New("can't demote to presenter. try again")
 		}
 	}
 
 	return nil
-}
-
-func (u *UserModel) updateUserMetadata(meta *plugnmeet.UserMetadata, roomId, userId string) error {
-	newMeta, err := json.Marshal(meta)
-	if err != nil {
-		return err
-	}
-	_, err = u.roomService.UpdateParticipantMetadata(roomId, userId, string(newMeta))
-	return err
 }

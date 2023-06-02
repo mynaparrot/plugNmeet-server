@@ -3,7 +3,6 @@ package models
 import (
 	"database/sql"
 	"errors"
-	"github.com/goccy/go-json"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	log "github.com/sirupsen/logrus"
 )
@@ -46,16 +45,10 @@ func (u *UserWaitingRoomModel) approveUser(roomId, userId, metadata string) erro
 	meta := make([]byte, len(metadata))
 	copy(meta, metadata)
 
-	m := new(plugnmeet.UserMetadata)
-	_ = json.Unmarshal(meta, m)
+	m, _ := u.roomService.UnmarshalParticipantMetadata(string(meta))
 	m.WaitForApproval = false // this mean doesn't need to wait anymore
 
-	newMeta, err := json.Marshal(m)
-	if err != nil {
-		return err
-	}
-
-	_, err = u.roomService.UpdateParticipantMetadata(roomId, userId, string(newMeta))
+	_, err := u.roomService.UpdateParticipantMetadataByStruct(roomId, userId, m)
 	if err != nil {
 		return errors.New("can't approve user. try again")
 	}

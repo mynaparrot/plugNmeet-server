@@ -238,6 +238,26 @@ func (r *RoomService) DeleteRoomBlockList(roomId string) (int64, error) {
 	return r.rc.Del(r.ctx, key).Result()
 }
 
+func (r *RoomService) UnmarshalRoomMetadata(metadata string) (*plugnmeet.RoomMetadata, error) {
+	meta := new(plugnmeet.RoomMetadata)
+	err := json.Unmarshal([]byte(metadata), meta)
+	if err != nil {
+		log.Errorln(err)
+		return nil, err
+	}
+
+	return meta, nil
+}
+
+func (r *RoomService) MarshalRoomMetadata(meta *plugnmeet.RoomMetadata) (string, error) {
+	marshal, err := json.Marshal(meta)
+	if err != nil {
+		return "", err
+	}
+
+	return string(marshal), nil
+}
+
 func (r *RoomService) LoadRoomWithMetadata(roomId string) (*livekit.Room, *plugnmeet.RoomMetadata, error) {
 	room, err := r.LoadRoomInfo(roomId)
 	if err != nil {
@@ -248,8 +268,7 @@ func (r *RoomService) LoadRoomWithMetadata(roomId string) (*livekit.Room, *plugn
 		return room, nil, errors.New("empty metadata")
 	}
 
-	meta := new(plugnmeet.RoomMetadata)
-	err = json.Unmarshal([]byte(room.Metadata), meta)
+	meta, err := r.UnmarshalRoomMetadata(room.Metadata)
 	if err != nil {
 		log.Errorln(err)
 		return room, nil, err
@@ -259,12 +278,12 @@ func (r *RoomService) LoadRoomWithMetadata(roomId string) (*livekit.Room, *plugn
 }
 
 func (r *RoomService) UpdateRoomMetadataByStruct(roomId string, meta *plugnmeet.RoomMetadata) (*livekit.Room, error) {
-	marshal, err := json.Marshal(meta)
+	metadata, err := r.MarshalRoomMetadata(meta)
 	if err != nil {
 		log.Errorln(err)
 		return nil, err
 	}
-	room, err := r.UpdateRoomMetadata(roomId, string(marshal))
+	room, err := r.UpdateRoomMetadata(roomId, metadata)
 	if err != nil {
 		log.Errorln(err)
 		return nil, err
@@ -273,14 +292,33 @@ func (r *RoomService) UpdateRoomMetadataByStruct(roomId string, meta *plugnmeet.
 	return room, nil
 }
 
+func (r *RoomService) MarshalParticipantMetadata(meta *plugnmeet.UserMetadata) (string, error) {
+	marshal, err := json.Marshal(meta)
+	if err != nil {
+		log.Errorln(err)
+		return "", err
+	}
+
+	return string(marshal), nil
+}
+
+func (r *RoomService) UnmarshalParticipantMetadata(metadata string) (*plugnmeet.UserMetadata, error) {
+	m := new(plugnmeet.UserMetadata)
+	err := json.Unmarshal([]byte(metadata), m)
+	if err != nil {
+		return nil, err
+	}
+
+	return m, nil
+}
+
 func (r *RoomService) LoadParticipantWithMetadata(roomId, userId string) (*livekit.ParticipantInfo, *plugnmeet.UserMetadata, error) {
 	p, err := r.LoadParticipantInfo(roomId, userId)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	meta := new(plugnmeet.UserMetadata)
-	err = json.Unmarshal([]byte(p.Metadata), meta)
+	meta, err := r.UnmarshalParticipantMetadata(p.Metadata)
 	if err != nil {
 		log.Errorln(err)
 		return p, nil, err
@@ -290,12 +328,12 @@ func (r *RoomService) LoadParticipantWithMetadata(roomId, userId string) (*livek
 }
 
 func (r *RoomService) UpdateParticipantMetadataByStruct(roomId, userId string, meta *plugnmeet.UserMetadata) (*livekit.ParticipantInfo, error) {
-	marshal, err := json.Marshal(meta)
+	metadata, err := r.MarshalParticipantMetadata(meta)
 	if err != nil {
 		log.Errorln(err)
 		return nil, err
 	}
-	p, err := r.UpdateParticipantMetadata(roomId, userId, string(marshal))
+	p, err := r.UpdateParticipantMetadata(roomId, userId, metadata)
 	if err != nil {
 		log.Errorln(err)
 		return nil, err

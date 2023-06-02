@@ -33,15 +33,11 @@ func NewBreakoutRoomModel() *BreakoutRoom {
 }
 
 func (m *BreakoutRoom) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRoomsReq) error {
-	mainRoom, err := m.roomService.LoadRoomInfo(r.RoomId)
+	mainRoom, meta, err := m.roomService.LoadRoomWithMetadata(r.RoomId)
 	if err != nil {
 		return err
 	}
-	meta := new(plugnmeet.RoomMetadata)
-	err = json.Unmarshal([]byte(mainRoom.Metadata), meta)
-	if err != nil {
-		return err
-	}
+
 	// set room duration
 	meta.RoomFeatures.RoomDuration = &r.Duration
 	meta.IsBreakoutRoom = true
@@ -113,8 +109,7 @@ func (m *BreakoutRoom) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRoomsReq) 
 	}
 
 	// again here for update
-	origMeta := new(plugnmeet.RoomMetadata)
-	err = json.Unmarshal([]byte(mainRoom.Metadata), origMeta)
+	origMeta, err := m.roomService.UnmarshalRoomMetadata(mainRoom.Metadata)
 	if err != nil {
 		return err
 	}
@@ -310,8 +305,7 @@ func (m *BreakoutRoom) PostTaskAfterRoomEndWebhook(roomId, metadata string) erro
 	if metadata == "" {
 		return nil
 	}
-	meta := new(plugnmeet.RoomMetadata)
-	err := json.Unmarshal([]byte(metadata), meta)
+	meta, err := m.roomService.UnmarshalRoomMetadata(metadata)
 	if err != nil {
 		return err
 	}
