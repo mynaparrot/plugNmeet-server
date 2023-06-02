@@ -5,12 +5,16 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
 func HandleRoomCreate(c *fiber.Ctx) error {
+	op := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
 	req := new(plugnmeet.CreateRoomReq)
-	err := c.BodyParser(req)
+	err := op.Unmarshal(c.Body(), req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
