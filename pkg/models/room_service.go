@@ -3,13 +3,13 @@ package models
 import (
 	"context"
 	"errors"
-	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/livekit"
 	lksdk "github.com/livekit/server-sdk-go"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/redis/go-redis/v9"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 const (
@@ -240,7 +240,7 @@ func (r *RoomService) DeleteRoomBlockList(roomId string) (int64, error) {
 
 func (r *RoomService) UnmarshalRoomMetadata(metadata string) (*plugnmeet.RoomMetadata, error) {
 	meta := new(plugnmeet.RoomMetadata)
-	err := json.Unmarshal([]byte(metadata), meta)
+	err := protojson.Unmarshal([]byte(metadata), meta)
 	if err != nil {
 		log.Errorln(err)
 		return nil, err
@@ -250,7 +250,12 @@ func (r *RoomService) UnmarshalRoomMetadata(metadata string) (*plugnmeet.RoomMet
 }
 
 func (r *RoomService) MarshalRoomMetadata(meta *plugnmeet.RoomMetadata) (string, error) {
-	marshal, err := json.Marshal(meta)
+	op := protojson.MarshalOptions{
+		EmitUnpopulated: true,
+		UseProtoNames:   true,
+	}
+
+	marshal, err := op.Marshal(meta)
 	if err != nil {
 		return "", err
 	}
@@ -293,7 +298,11 @@ func (r *RoomService) UpdateRoomMetadataByStruct(roomId string, meta *plugnmeet.
 }
 
 func (r *RoomService) MarshalParticipantMetadata(meta *plugnmeet.UserMetadata) (string, error) {
-	marshal, err := json.Marshal(meta)
+	op := protojson.MarshalOptions{
+		EmitUnpopulated: true,
+		UseProtoNames:   true,
+	}
+	marshal, err := op.Marshal(meta)
 	if err != nil {
 		log.Errorln(err)
 		return "", err
@@ -304,7 +313,7 @@ func (r *RoomService) MarshalParticipantMetadata(meta *plugnmeet.UserMetadata) (
 
 func (r *RoomService) UnmarshalParticipantMetadata(metadata string) (*plugnmeet.UserMetadata, error) {
 	m := new(plugnmeet.UserMetadata)
-	err := json.Unmarshal([]byte(metadata), m)
+	err := protojson.Unmarshal([]byte(metadata), m)
 	if err != nil {
 		return nil, err
 	}

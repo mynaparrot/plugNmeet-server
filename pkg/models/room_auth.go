@@ -1,7 +1,6 @@
 package models
 
 import (
-	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
@@ -60,12 +59,12 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 		r.Metadata.RoomFeatures.SpeechToTextTranslationFeatures.IsAllow = false
 	}
 
-	meta, err := json.Marshal(r.Metadata)
+	meta, err := am.rs.MarshalRoomMetadata(r.Metadata)
 	if err != nil {
 		return false, "Error: " + err.Error(), nil
 	}
 
-	room, err := am.rs.CreateRoom(r.RoomId, r.EmptyTimeout, r.MaxParticipants, string(meta))
+	room, err := am.rs.CreateRoom(r.RoomId, r.EmptyTimeout, r.MaxParticipants, meta)
 	if err != nil {
 		return false, "Error: " + err.Error(), nil
 	}

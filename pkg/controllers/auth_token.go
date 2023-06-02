@@ -12,6 +12,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/version"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"strings"
 )
@@ -54,8 +55,11 @@ func HandleAuthHeaderCheck(c *fiber.Ctx) error {
 }
 
 func HandleGenerateJoinToken(c *fiber.Ctx) error {
+	op := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
 	req := new(plugnmeet.GenerateTokenReq)
-	err := c.BodyParser(req)
+	err := op.Unmarshal(c.Body(), req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
