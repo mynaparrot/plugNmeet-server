@@ -13,10 +13,10 @@ import (
 )
 
 type DataMessageReq struct {
-	Sid             string   `json:"sid" validate:"required"`
-	RoomId          string   `json:"room_id" validate:"required"`
-	MsgType         string   `json:"msg_type" validate:"required"`
-	Msg             string   `json:"msg" validate:"required"`
+	Sid             string   `json:"sid"`
+	RoomId          string   `json:"room_id"`
+	MsgType         string   `json:"msg_type"`
+	Msg             string   `json:"msg"`
 	RequestedUserId string   `json:"-"`
 	SendTo          []string // user sids
 	IsAdmin         bool

@@ -26,12 +26,11 @@ func HandleFileUpload(c *fiber.Ctx) error {
 		})
 	}
 
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
+	if req.Sid == "" || req.RoomId == "" || req.UserId == "" {
 		_ = c.SendStatus(fiber.StatusBadRequest)
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    check,
+			"msg":    "missing required fields",
 		})
 	}
 
@@ -103,11 +102,12 @@ func HandleConvertWhiteboardFile(c *fiber.Ctx) error {
 			"msg":    err.Error(),
 		})
 	}
-	check := config.AppCnf.DoValidateReq(req)
-	if len(check) > 0 {
+
+	if req.Sid == "" || req.RoomId == "" || req.UserId == "" {
+		_ = c.SendStatus(fiber.StatusBadRequest)
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    check,
+			"msg":    "missing required fields",
 		})
 	}
 

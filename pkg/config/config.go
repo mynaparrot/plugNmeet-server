@@ -2,7 +2,6 @@ package config
 
 import (
 	"database/sql"
-	"github.com/go-playground/validator/v10"
 	"github.com/mynaparrot/plugnmeet-protocol/factory"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
@@ -11,9 +10,6 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 	"io"
 	"os"
-	"reflect"
-	"regexp"
-	"strings"
 	"sync"
 	"time"
 )
@@ -163,36 +159,6 @@ func setLogger() {
 type ErrorResponse struct {
 	FailedField string
 	Tag         string
-}
-
-func (a *AppConfig) DoValidateReq(r interface{}) []*ErrorResponse {
-	var errors []*ErrorResponse
-
-	validate := validator.New()
-	_ = validate.RegisterValidation("require-valid-Id", ValidateId)
-	validate.RegisterTagNameFunc(func(fld reflect.StructField) string {
-		name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
-		if name == "-" {
-			return ""
-		}
-		return name
-	})
-
-	err := validate.Struct(r)
-	if err != nil {
-		for _, err := range err.(validator.ValidationErrors) {
-			var element ErrorResponse
-			element.FailedField = err.Field()
-			element.Tag = err.Tag()
-			errors = append(errors, &element)
-		}
-	}
-	return errors
-}
-
-func ValidateId(fl validator.FieldLevel) bool {
-	isValid := regexp.MustCompile(`^[a-zA-Z0-9\-_.:]+$`).MatchString
-	return isValid(fl.Field().String())
 }
 
 func (a *AppConfig) FormatDBTable(table string) string {

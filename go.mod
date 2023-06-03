@@ -6,7 +6,6 @@ require (
 	github.com/ansrivas/fiberprometheus/v2 v2.6.0
 	github.com/antoniodipinto/ikisocket v0.0.0-20230224142534-cb796a15fd08
 	github.com/gabriel-vasile/mimetype v1.4.2
-	github.com/go-playground/validator/v10 v10.14.0
 	github.com/goccy/go-json v0.10.2
 	github.com/gofiber/fiber/v2 v2.46.0
 	github.com/gofiber/template v1.8.1
@@ -43,15 +42,12 @@ require (
 	github.com/go-jose/go-jose/v3 v3.0.0 // indirect
 	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/go-playground/locales v0.14.1 // indirect
-	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-sql-driver/mysql v1.7.1 // indirect
 	github.com/gofiber/adaptor/v2 v2.2.1 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/jxskiss/base62 v1.1.0 // indirect
 	github.com/klauspost/compress v1.16.5 // indirect
-	github.com/leodido/go-urn v1.2.4 // indirect
 	github.com/lithammer/shortuuid/v4 v4.0.0 // indirect
 	github.com/livekit/mageutil v0.0.0-20230125210925-54e8a70427c1 // indirect
 	github.com/livekit/mediatransportutil v0.0.0-20230523035537-27577c4e1646 // indirect

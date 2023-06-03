@@ -19,9 +19,9 @@ import (
 )
 
 type ManageFile struct {
-	Sid                string `json:"sid" validate:"required"`
-	RoomId             string `json:"roomId" validate:"required"`
-	UserId             string `json:"userId" validate:"required"`
+	Sid                string `json:"sid"`
+	RoomId             string `json:"roomId"`
+	UserId             string `json:"userId"`
 	FilePath           string `json:"file_path"`
 	Resumable          bool   `json:"resumable"`
 	uploadFileSettings *config.UploadFileSettings
