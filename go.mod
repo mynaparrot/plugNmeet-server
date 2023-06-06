@@ -12,13 +12,13 @@ require (
 	github.com/gofiber/websocket/v2 v2.2.1
 	github.com/google/uuid v1.3.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/protocol v1.5.7
-	github.com/livekit/server-sdk-go v1.0.10
+	github.com/livekit/protocol v1.5.8-0.20230601212100-a186ecb11a98
+	github.com/livekit/server-sdk-go v1.0.11
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230606103709-df37ac4a54b7
 	github.com/redis/go-redis/v9 v9.0.5
-	github.com/sirupsen/logrus v1.9.2
-	github.com/stretchr/testify v1.8.3
-	github.com/urfave/cli/v2 v2.25.4
+	github.com/sirupsen/logrus v1.9.3
+	github.com/stretchr/testify v1.8.4
+	github.com/urfave/cli/v2 v2.25.5
 	google.golang.org/protobuf v1.30.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/square/go-jose.v2 v2.6.0
@@ -51,7 +51,7 @@ require (
 	github.com/lithammer/shortuuid/v4 v4.0.0 // indirect
 	github.com/livekit/mageutil v0.0.0-20230125210925-54e8a70427c1 // indirect
 	github.com/livekit/mediatransportutil v0.0.0-20230523035537-27577c4e1646 // indirect
-	github.com/livekit/psrpc v0.3.0 // indirect
+	github.com/livekit/psrpc v0.3.1 // indirect
 	github.com/mackerelio/go-osstat v0.2.4 // indirect
 	github.com/magefile/mage v1.15.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
@@ -77,7 +77,7 @@ require (
 	github.com/pion/stun v0.6.0 // indirect
 	github.com/pion/transport/v2 v2.2.1 // indirect
 	github.com/pion/turn/v2 v2.1.0 // indirect
-	github.com/pion/webrtc/v3 v3.2.8 // indirect
+	github.com/pion/webrtc/v3 v3.2.9 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.15.1 // indirect
 	github.com/prometheus/client_model v0.4.0 // indirect
