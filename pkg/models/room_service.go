@@ -121,6 +121,14 @@ func (r *RoomService) UpdateRoomMetadata(roomId string, metadata string) (*livek
 		return nil, err
 	}
 
+	// temporary we'll update metadata manually
+	// because livekit propagated quite lately now
+	m := NewDataMessageModel()
+	err = m.SendUpdatedMetadata(roomId, metadata)
+	if err != nil {
+		return nil, err
+	}
+
 	return room, nil
 }
 
