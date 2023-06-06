@@ -60,6 +60,23 @@ func (m *DataMessageModel) SendDataMessage(r *plugnmeet.DataMessageReq) error {
 	}
 }
 
+func (m *DataMessageModel) deliverMsg(roomId string, destinationSids []string, msg *plugnmeet.DataMessage) error {
+	data, err := proto.Marshal(msg)
+	if err != nil {
+		log.Errorln(err)
+		return err
+	}
+
+	// send as push message
+	_, err = m.roomService.SendData(roomId, data, livekit.DataPacket_RELIABLE, destinationSids)
+	if err != nil {
+		log.Errorln(err)
+		return err
+	}
+
+	return nil
+}
+
 func (m *DataMessageModel) raiseHand(r *plugnmeet.DataMessageReq) error {
 	participants, _ := m.roomService.LoadParticipants(r.RoomId)
 
@@ -104,16 +121,9 @@ func (m *DataMessageModel) raiseHand(r *plugnmeet.DataMessageReq) error {
 		},
 	}
 
-	data, err := proto.Marshal(msg)
-	if err != nil {
-		log.Errorln(err)
-		return err
-	}
-
 	// send as push message
-	_, err = m.roomService.SendData(r.RoomId, data, livekit.DataPacket_RELIABLE, sids)
+	err = m.deliverMsg(r.RoomId, sids, msg)
 	if err != nil {
-		log.Errorln(err)
 		return err
 	}
 
@@ -176,16 +186,31 @@ func (m *DataMessageModel) sendNotification(r *plugnmeet.DataMessageReq) error {
 		},
 	}
 
-	data, err := proto.Marshal(msg)
+	err := m.deliverMsg(r.RoomId, []string{}, msg)
 	if err != nil {
-		return err
-	}
-
-	_, err = m.roomService.SendData(r.RoomId, data, livekit.DataPacket_RELIABLE, r.SendTo)
-	if err != nil {
-		log.Errorln(err)
 		return err
 	}
 
 	return nil
+}
+
+func (m *DataMessageModel) SendUpdatedMetadata(roomId, metadata string) error {
+	mId := uuid.NewString()
+	tm := time.Now().Format(time.RFC1123Z)
+
+	msg := &plugnmeet.DataMessage{
+		Type:      plugnmeet.DataMsgType_SYSTEM,
+		MessageId: &mId,
+		Body: &plugnmeet.DataMsgBody{
+			Type: plugnmeet.DataMsgBodyType_UPDATE_ROOM_METADATA,
+			Time: &tm,
+			From: &plugnmeet.DataMsgReqFrom{
+				Sid: "system",
+			},
+			Msg: metadata,
+		},
+	}
+
+	err := m.deliverMsg(roomId, []string{}, msg)
+	return err
 }
