@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"errors"
+	"github.com/google/uuid"
 	"github.com/livekit/protocol/livekit"
 	lksdk "github.com/livekit/server-sdk-go"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -258,6 +259,9 @@ func (r *RoomService) UnmarshalRoomMetadata(metadata string) (*plugnmeet.RoomMet
 }
 
 func (r *RoomService) MarshalRoomMetadata(meta *plugnmeet.RoomMetadata) (string, error) {
+	mId := uuid.NewString()
+	meta.MetadataId = &mId
+
 	op := protojson.MarshalOptions{
 		EmitUnpopulated: true,
 		UseProtoNames:   true,
@@ -306,6 +310,9 @@ func (r *RoomService) UpdateRoomMetadataByStruct(roomId string, meta *plugnmeet.
 }
 
 func (r *RoomService) MarshalParticipantMetadata(meta *plugnmeet.UserMetadata) (string, error) {
+	mId := uuid.NewString()
+	meta.MetadataId = &mId
+
 	op := protojson.MarshalOptions{
 		EmitUnpopulated: true,
 		UseProtoNames:   true,
