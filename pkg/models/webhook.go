@@ -228,8 +228,12 @@ func (w *webhookEvent) trackUnpublished() {
 }
 
 func (w *webhookEvent) sendToWebhookNotifier(event *livekit.WebhookEvent) {
-	msg := utils.PrepareCommonWebhookNotifyEvent(event)
+	if event.Room == nil {
+		log.Errorln("empty room info for event: ", event.GetEvent())
+		return
+	}
 
+	msg := utils.PrepareCommonWebhookNotifyEvent(event)
 	err := w.notifier.Notify(event.Room.Sid, msg)
 	if err != nil {
 		log.Errorln(err)
