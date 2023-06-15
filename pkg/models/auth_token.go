@@ -115,30 +115,56 @@ func (a *AuthTokenModel) assignLockSettings(g *plugnmeet.GenerateTokenReq) {
 
 	if ul.LockWebcam == nil && dl.LockWebcam != nil {
 		l.LockWebcam = dl.LockWebcam
+	} else if ul.LockWebcam != nil {
+		l.LockWebcam = ul.LockWebcam
 	}
+
 	if ul.LockMicrophone == nil && dl.LockMicrophone != nil {
 		l.LockMicrophone = dl.LockMicrophone
+	} else if ul.LockMicrophone != nil {
+		l.LockMicrophone = ul.LockMicrophone
 	}
+
 	if ul.LockScreenSharing == nil && dl.LockScreenSharing != nil {
 		l.LockScreenSharing = dl.LockScreenSharing
+	} else if ul.LockScreenSharing != nil {
+		l.LockScreenSharing = ul.LockScreenSharing
 	}
+
 	if ul.LockChat == nil && dl.LockChat != nil {
 		l.LockChat = dl.LockChat
+	} else if ul.LockChat != nil {
+		l.LockChat = ul.LockChat
 	}
+
 	if ul.LockChatSendMessage == nil && dl.LockChatSendMessage != nil {
 		l.LockChatSendMessage = dl.LockChatSendMessage
+	} else if ul.LockChatSendMessage != nil {
+		l.LockChatSendMessage = ul.LockChatSendMessage
 	}
+
 	if ul.LockChatFileShare == nil && dl.LockChatFileShare != nil {
 		l.LockChatFileShare = dl.LockChatFileShare
+	} else if ul.LockChatFileShare != nil {
+		l.LockChatFileShare = ul.LockChatFileShare
 	}
+
 	if ul.LockPrivateChat == nil && dl.LockPrivateChat != nil {
 		l.LockPrivateChat = dl.LockPrivateChat
+	} else if ul.LockPrivateChat != nil {
+		l.LockPrivateChat = ul.LockPrivateChat
 	}
+
 	if ul.LockWhiteboard == nil && dl.LockWhiteboard != nil {
 		l.LockWhiteboard = dl.LockWhiteboard
+	} else if ul.LockWhiteboard != nil {
+		l.LockWhiteboard = ul.LockWhiteboard
 	}
+
 	if ul.LockSharedNotepad == nil && dl.LockSharedNotepad != nil {
 		l.LockSharedNotepad = dl.LockSharedNotepad
+	} else if ul.LockSharedNotepad != nil {
+		l.LockSharedNotepad = ul.LockSharedNotepad
 	}
 
 	// if waiting room feature active then we won't allow direct access
