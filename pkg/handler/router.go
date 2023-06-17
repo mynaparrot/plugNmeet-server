@@ -11,6 +11,7 @@ import (
 	"github.com/gofiber/websocket/v2"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
+	"github.com/mynaparrot/plugnmeet-server/version"
 )
 
 func Router() *fiber.App {
@@ -25,6 +26,7 @@ func Router() *fiber.App {
 		JSONEncoder: json.Marshal,
 		JSONDecoder: json.Unmarshal,
 		Views:       templateEngine,
+		AppName:     "plugNmeet version: " + version.Version,
 	}
 
 	if config.AppCnf.Client.ProxyHeader != "" {
