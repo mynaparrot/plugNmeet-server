@@ -398,8 +398,8 @@ github.com/modern-go/reflect2 v1.0.1/go.mod h1:bx2lNnkwVCuqBIxFjflWJWanXIb3Rllmb
 github.com/modern-go/reflect2 v1.0.2/go.mod h1:yWuevngMOJpCy52FWWMvUC8ws7m/LJsjYzDa0/r8luk=
 github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=
 github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=
-github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230607092834-e9a34965662b h1:+ZVDsoLDBwjmF4YcmR4zPOHZ76pkeA8iBj8FQ6HSW24=
-github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230607092834-e9a34965662b/go.mod h1:YSXa67UYQ9YUmYkhC/3se2e8CTHkkkZnJ771OATKh2E=
+github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230621143337-a175225507bf h1:2/0mZAKdVor4UA+3zrLKjGLeKjFCtD6JiK0mWSwtVi0=
+github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230621143337-a175225507bf/go.mod h1:YSXa67UYQ9YUmYkhC/3se2e8CTHkkkZnJ771OATKh2E=
 github.com/nats-io/jwt/v2 v2.3.0 h1:z2mA1a7tIf5ShggOFlR1oBPgd6hGqcDYsISxZByUzdI=
 github.com/nats-io/nats-server/v2 v2.9.8 h1:jgxZsv+A3Reb3MgwxaINcNq/za8xZInKhDg9Q0cGN1o=
 github.com/nats-io/nats.go v1.26.0 h1:fWJTYPnZ8DzxIaqIHOAMfColuznchnd5Ab5dbJpgPIE=

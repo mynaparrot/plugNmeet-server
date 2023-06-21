@@ -29,6 +29,11 @@ func (a *AuthTokenModel) DoGenerateToken(g *plugnmeet.GenerateTokenReq) (string,
 		a.makePresenter(g)
 	}
 
+	if g.UserInfo.UserMetadata.RecordWebcam == nil {
+		recordWebcam := true
+		g.UserInfo.UserMetadata.RecordWebcam = &recordWebcam
+	}
+
 	metadata, err := a.rs.MarshalParticipantMetadata(g.UserInfo.UserMetadata)
 	if err != nil {
 		return "", err
