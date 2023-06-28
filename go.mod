@@ -7,7 +7,7 @@ require (
 	github.com/antoniodipinto/ikisocket v0.0.0-20230224142534-cb796a15fd08
 	github.com/gabriel-vasile/mimetype v1.4.2
 	github.com/goccy/go-json v0.10.2
-	github.com/gofiber/fiber/v2 v2.46.0
+	github.com/gofiber/fiber/v2 v2.47.0
 	github.com/gofiber/template v1.8.1
 	github.com/gofiber/websocket/v2 v2.2.1
 	github.com/google/uuid v1.3.0
@@ -101,7 +101,7 @@ require (
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 // indirect
 	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/sync v0.2.0 // indirect
-	golang.org/x/sys v0.8.0 // indirect
+	golang.org/x/sys v0.9.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230530153820-e85fd2cbaebc // indirect
 	google.golang.org/grpc v1.55.0 // indirect
