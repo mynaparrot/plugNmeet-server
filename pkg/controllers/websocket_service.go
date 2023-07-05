@@ -90,7 +90,9 @@ func HandleWebSocket() func(*fiber.Ctx) error {
 		if isValid {
 			wc.addUser()
 		} else {
-			kws.Close()
+			if kws.IsAlive() {
+				kws.Close()
+			}
 		}
 	})
 }
