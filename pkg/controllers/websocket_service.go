@@ -45,10 +45,8 @@ func (c *websocketController) validation() bool {
 
 	claims, err := m.DoValidateToken(info, false)
 	if err != nil {
-		err = c.kws.EmitTo(c.kws.UUID, []byte("invalid token"), ikisocket.TextMessage)
-		if err == nil {
-			return false
-		}
+		_ = c.kws.EmitTo(c.kws.UUID, []byte("invalid token"), ikisocket.TextMessage)
+		return false
 	}
 
 	if claims.Identity != c.participant.UserId || claims.Video.Room != c.participant.RoomId {
