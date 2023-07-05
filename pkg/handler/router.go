@@ -6,15 +6,23 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/fiber/v2/middleware/recover"
+	rr "github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/template/html"
 	"github.com/gofiber/websocket/v2"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
 	"github.com/mynaparrot/plugnmeet-server/version"
+	log "github.com/sirupsen/logrus"
 )
 
 func Router() *fiber.App {
+	// call recovery if panic happen
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error(r)
+		}
+	}()
+
 	templateEngine := html.New(config.AppCnf.Client.Path, ".html")
 
 	if config.AppCnf.Client.Debug {
@@ -43,7 +51,7 @@ func Router() *fiber.App {
 		prometheus.RegisterAt(app, config.AppCnf.Client.PrometheusConf.MetricsPath)
 		app.Use(prometheus.Middleware)
 	}
-	app.Use(recover.New())
+	app.Use(rr.New())
 	app.Use(cors.New(cors.Config{
 		AllowMethods: "POST,GET,OPTIONS",
 	}))
