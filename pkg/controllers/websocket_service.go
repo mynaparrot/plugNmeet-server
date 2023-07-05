@@ -38,6 +38,11 @@ func newWebsocketController(kws *ikisocket.Websocket) *websocketController {
 }
 
 func (c *websocketController) validation() bool {
+	if c.token == "" {
+		_ = c.kws.EmitTo(c.kws.UUID, []byte("empty auth token"), ikisocket.TextMessage)
+		return false
+	}
+
 	m := models.NewAuthTokenModel()
 	info := &models.ValidateTokenReq{
 		Token: c.token,
@@ -45,7 +50,7 @@ func (c *websocketController) validation() bool {
 
 	claims, err := m.DoValidateToken(info, false)
 	if err != nil {
-		_ = c.kws.EmitTo(c.kws.UUID, []byte("invalid token"), ikisocket.TextMessage)
+		_ = c.kws.EmitTo(c.kws.UUID, []byte("invalid auth token"), ikisocket.TextMessage)
 		return false
 	}
 
