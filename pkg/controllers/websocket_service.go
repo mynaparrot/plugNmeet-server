@@ -50,10 +50,8 @@ func (c *websocketController) validation() bool {
 	}
 
 	if claims.Identity != c.participant.UserId || claims.Video.Room != c.participant.RoomId {
-		err = c.kws.EmitTo(c.kws.UUID, []byte("unauthorized access!"), ikisocket.TextMessage)
-		if err == nil {
-			return false
-		}
+		_ = c.kws.EmitTo(c.kws.UUID, []byte("unauthorized access!"), ikisocket.TextMessage)
+		return false
 	}
 
 	c.participant.Name = claims.Name
