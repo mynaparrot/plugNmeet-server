@@ -3,6 +3,7 @@ api_secret: 6aNur7qqupeZhFYNOJVUyeXxXhVw8f4lm13pEDUx8SgB
 ws_url: http://host.docker.internal:7880
 rtmp_port: 1935
 health_port: 8088
+whip_port: 8089
 redis:
   address: host.docker.internal:6379
   username: ""
