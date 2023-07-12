@@ -353,6 +353,8 @@ github.com/livekit/psrpc v0.3.1 h1:KfylgJHvoLQcc22t/oflwMOeSnx0c14G7cWsS+9MYS4=
 github.com/livekit/psrpc v0.3.1/go.mod h1:n6JntEg+zT6Ji8InoyTpV7wusPNwGqqtxmHlkNhDN0U=
 github.com/livekit/server-sdk-go v1.0.12 h1:8OFzZoPPP162LWTkvO2X0ZEGqROTGkx0tfTy4gOntIE=
 github.com/livekit/server-sdk-go v1.0.12/go.mod h1:2Q1KLiWyLjG1NGhe7y2r35qs8OVMwXzjyQeCXqGyAKU=
+github.com/livekit/server-sdk-go v1.0.13 h1:Rv+jQEqRy5pCto0TF0J0dweDQgLNH7NJiGWG+sHc8/o=
+github.com/livekit/server-sdk-go v1.0.13/go.mod h1:2Q1KLiWyLjG1NGhe7y2r35qs8OVMwXzjyQeCXqGyAKU=
 github.com/lyft/protoc-gen-star v0.5.3/go.mod h1:V0xaHgaf5oCCqmcxYcWiDfTiKsZsRc87/1qhoTACD8w=
 github.com/mackerelio/go-osstat v0.2.4 h1:qxGbdPkFo65PXOb/F/nhDKpF2nGmGaCFDLXoZjJTtUs=
 github.com/mackerelio/go-osstat v0.2.4/go.mod h1:Zy+qzGdZs3A9cuIqmgbJvwbmLQH9dJvtio5ZjJTbdlQ=
@@ -463,6 +465,7 @@ github.com/pion/transport/v2 v2.2.1 h1:7qYnCBlpgSJNYMbLCKuSY9KbQdBFoETvPNETv0y4N
 github.com/pion/transport/v2 v2.2.1/go.mod h1:cXXWavvCnFF6McHTft3DWS9iic2Mftcz1Aq29pGcU5g=
 github.com/pion/turn/v2 v2.1.0 h1:5wGHSgGhJhP/RpabkUb/T9PdsAjkGLS6toYz5HNzoSI=
 github.com/pion/turn/v2 v2.1.0/go.mod h1:yrT5XbXSGX1VFSF31A3c1kCNB5bBZgk/uu5LET162qs=
+github.com/pion/udp/v2 v2.0.1/go.mod h1:B7uvTMP00lzWdyMr/1PVZXtV3wpPIxBRd4Wl6AksXn8=
 github.com/pion/webrtc/v3 v3.2.10 h1:CPsuYs14f1aBhywmES0idje5t5XhftXeKMHwfzrxcIc=
 github.com/pion/webrtc/v3 v3.2.10/go.mod h1:mr/kJrVSGAOs1ZDAQDFpny4xogAuYKemWujj88XzeQE=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
