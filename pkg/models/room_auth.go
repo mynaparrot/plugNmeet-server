@@ -104,15 +104,15 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 	return true, "room created", room
 }
 
-func (am *RoomAuthModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (bool, string) {
+func (am *RoomAuthModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (bool, string, *plugnmeet.RoomMetadata) {
 	roomDbInfo, _ := am.rm.GetRoomInfo(r.RoomId, "", 1)
 
 	if roomDbInfo.Id == 0 {
-		return false, "room is not active"
+		return false, "room is not active", nil
 	}
 
 	// let's make sure room actually active
-	_, err := am.rs.LoadRoomInfo(r.RoomId)
+	_, meta, err := am.rs.LoadRoomWithMetadata(r.RoomId)
 	if err != nil {
 		// room isn't active. Change status
 		_, _ = am.rm.UpdateRoomStatus(&RoomInfo{
@@ -120,10 +120,10 @@ func (am *RoomAuthModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (bool, strin
 			IsRunning: 0,
 			Ended:     time.Now().Format("2006-01-02 15:04:05"),
 		})
-		return false, "room is not active"
+		return false, "room is not active", nil
 	}
 
-	return true, "room is active"
+	return true, "room is active", meta
 }
 
 func (am *RoomAuthModel) GetActiveRoomInfo(r *plugnmeet.GetActiveRoomInfoReq) (bool, string, *plugnmeet.ActiveRoomWithParticipant) {
