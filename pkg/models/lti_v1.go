@@ -202,7 +202,7 @@ func (m *LTIV1) LTIV1VerifyHeaderToken(token string) (*LtiClaims, error) {
 }
 
 func (m *LTIV1) LTIV1JoinRoom(c *plugnmeet.LtiClaims) (string, error) {
-	active, _ := m.authModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{
+	active, _, _ := m.authModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: c.RoomId,
 	})
 

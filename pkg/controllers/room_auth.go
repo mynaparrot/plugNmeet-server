@@ -57,7 +57,7 @@ func HandleIsRoomActive(c *fiber.Ctx) error {
 	}
 
 	m := models.NewRoomAuthModel()
-	status, msg := m.IsRoomActive(req)
+	status, msg, _ := m.IsRoomActive(req)
 	return utils.SendCommonProtoJsonResponse(c, status, msg)
 }
 
