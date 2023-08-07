@@ -68,6 +68,7 @@ func Router() *fiber.App {
 	app.Post("/webhook", controllers.HandleWebhook)
 	app.Get("/download/uploadedFile/:sid/*", controllers.HandleDownloadUploadedFile)
 	app.Get("/download/recording/:token", controllers.HandleDownloadRecording)
+	app.Get("/healthCheck", controllers.HandleHealthCheck)
 
 	// lti group
 	lti := app.Group("/lti")
