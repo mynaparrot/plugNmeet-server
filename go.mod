@@ -3,7 +3,7 @@ module github.com/mynaparrot/plugnmeet-server
 go 1.20
 
 require (
-	github.com/ansrivas/fiberprometheus/v2 v2.6.0
+	github.com/ansrivas/fiberprometheus/v2 v2.6.1
 	github.com/antoniodipinto/ikisocket v0.0.0-20230718083636-b16d8056efae
 	github.com/gabriel-vasile/mimetype v1.4.2
 	github.com/goccy/go-json v0.10.2
