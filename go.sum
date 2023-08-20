@@ -64,6 +64,8 @@ github.com/andybalholm/brotli v1.0.5 h1:8uQZIdzKmjc/iuPu7O2ioW48L81FgatrcpfFmiq/
 github.com/andybalholm/brotli v1.0.5/go.mod h1:fO7iG3H7G2nSZ7m0zPUDn85XEX2GTukHGRSepvi9Eig=
 github.com/ansrivas/fiberprometheus/v2 v2.6.0 h1:QUaaKxil/N5IM1R19k6jsmFEJMfa4O3qtnDkiF+zxUc=
 github.com/ansrivas/fiberprometheus/v2 v2.6.0/go.mod h1:hivZjKkqX04PPbMZNi9iGB0AQ90iN6RmKERiX1TdgTA=
+github.com/ansrivas/fiberprometheus/v2 v2.6.1 h1:wac3pXaE6BYYTF04AC6K0ktk6vCD+MnDOJZ3SK66kXM=
+github.com/ansrivas/fiberprometheus/v2 v2.6.1/go.mod h1:MloIKvy4yN6hVqlRpJ/jDiR244YnWJaQC0FIqS8A+MY=
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/antoniodipinto/ikisocket v0.0.0-20230718083636-b16d8056efae h1:fZP5UVabQ1mV0buyc4j24LN7V/R/fBQwy5g2ZJFGcT0=
 github.com/antoniodipinto/ikisocket v0.0.0-20230718083636-b16d8056efae/go.mod h1:3+ff1O9B3mu9tP4TA5aimJS8GVMAIJr8e6wyV96956Y=
