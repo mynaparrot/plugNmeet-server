@@ -417,6 +417,8 @@ github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223/go.mod h1:qRW
 github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=
 github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230726165653-c6a1bb02b9bc h1:I8XEoNNG5AeXTblKMpiThmFRDpf/ayRNKADxrNedzu0=
 github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230726165653-c6a1bb02b9bc/go.mod h1:tbwIhoTVd3uDwDY+qliua6DNLnD3IWJzyM/5zDkIQws=
+github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230820060214-ac04dcecf1d4 h1:GlPGhsev3QF8gsLdlTFfrjFELfi+nqfhV4WF2zqvUfo=
+github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230820060214-ac04dcecf1d4/go.mod h1:6Zf5Z+AzlKqoXIQrg7wAZcJwG9w1FWbv18ZTqw+gw+g=
 github.com/nats-io/jwt/v2 v2.3.0 h1:z2mA1a7tIf5ShggOFlR1oBPgd6hGqcDYsISxZByUzdI=
 github.com/nats-io/nats-server/v2 v2.9.8 h1:jgxZsv+A3Reb3MgwxaINcNq/za8xZInKhDg9Q0cGN1o=
 github.com/nats-io/nats.go v1.28.0 h1:Th4G6zdsz2d0OqXdfzKLClo6bOfoI/b1kInhRtFIy5c=
