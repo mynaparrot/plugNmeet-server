@@ -16,13 +16,6 @@ jobs:
           tags: |
             type=semver,pattern=v{{version}}
             type=semver,pattern=v{{major}}.{{minor}}
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: 1.18
-
-      - name: Download Go modules
-        run: go mod download
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
