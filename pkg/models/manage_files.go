@@ -138,7 +138,7 @@ func (m *ManageFile) ResumableFileUpload(c *fiber.Ctx) (*UploadedFileResponse, e
 		// we'll check the first one only.
 		if req.ResumableChunkNumber == 1 {
 			fo, _ := reqf.Open()
-			err = m.validateMimeType(fo)
+			err = m.detectMimeTypeForValidation(fo)
 			if err != nil {
 				_ = c.SendStatus(fiber.StatusUnsupportedMediaType)
 				return nil, err
@@ -192,13 +192,16 @@ func (m *ManageFile) ResumableFileUpload(c *fiber.Ctx) (*UploadedFileResponse, e
 	return res, nil
 }
 
-func (m *ManageFile) validateMimeType(file multipart.File) error {
+func (m *ManageFile) detectMimeTypeForValidation(file multipart.File) error {
 	defer file.Close()
 	mtype, err := mimetype.DetectReader(file)
 	if err != nil {
 		return err
 	}
+	return m.validateMimeType(mtype)
+}
 
+func (m *ManageFile) validateMimeType(mtype *mimetype.MIME) error {
 	allowedTypes := m.uploadFileSettings.AllowedTypes
 	sort.Strings(allowedTypes)
 

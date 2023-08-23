@@ -5,6 +5,7 @@ go 1.20
 require (
 	github.com/ansrivas/fiberprometheus/v2 v2.6.1
 	github.com/antoniodipinto/ikisocket v0.0.0-20230718083636-b16d8056efae
+	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/gabriel-vasile/mimetype v1.4.2
 	github.com/goccy/go-json v0.10.2
 	github.com/gofiber/fiber/v2 v2.48.0
@@ -14,7 +15,7 @@ require (
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.6.1
 	github.com/livekit/server-sdk-go v1.0.15
-	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230822122104-8a109e6acc82
+	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230823110745-763e368aa67b
 	github.com/redis/go-redis/v9 v9.1.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
