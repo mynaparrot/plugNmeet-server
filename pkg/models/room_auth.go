@@ -270,8 +270,14 @@ func (am *RoomAuthModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomR
 		RoomId: room.Name,
 	})
 
+	cType := resp.Header.Get("Content-Type")
+	if cType == "" {
+		log.Errorln("invalid Content-Type")
+		return
+	}
+
 	// validate file type
-	mtype := mimetype.Lookup(resp.Header.Get("Content-Type"))
+	mtype := mimetype.Lookup(cType)
 	err = fm.validateMimeType(mtype)
 	if err != nil {
 		log.Errorln(err)
