@@ -249,15 +249,7 @@ func (am *RoomAuthModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomR
 		return
 	}
 
-	downloadDir := fmt.Sprintf("%s/%s", config.AppCnf.UploadFileSettings.Path, room.Sid)
-	if _, err := os.Stat(downloadDir); os.IsNotExist(err) {
-		err = os.MkdirAll(downloadDir, os.ModePerm)
-		if err != nil {
-			log.Errorln(err)
-			return
-		}
-	}
-
+	// get file info
 	httpClient := &http.Client{Timeout: 5 * time.Second}
 	resp, err := httpClient.Head(*req.Metadata.RoomFeatures.WhiteboardFeatures.PreloadFile)
 	if err != nil {
@@ -265,10 +257,11 @@ func (am *RoomAuthModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomR
 		return
 	}
 
-	// lets at present set limit to 5MB
-	limit := int64(5 * 1000000)
-	if resp.ContentLength > limit {
-		log.Errorf("Allowd %d but given %d", limit, resp.ContentLength)
+	if resp.ContentLength < 1 {
+		log.Errorf("invalid file type")
+		return
+	} else if resp.ContentLength > config.MAX_PRELOADED_WHITEBOARD_FILE_SIZE {
+		log.Errorf("Allowd %d but given %d", config.MAX_PRELOADED_WHITEBOARD_FILE_SIZE, resp.ContentLength)
 		return
 	}
 
@@ -283,6 +276,15 @@ func (am *RoomAuthModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomR
 	if err != nil {
 		log.Errorln(err)
 		return
+	}
+
+	downloadDir := fmt.Sprintf("%s/%s", config.AppCnf.UploadFileSettings.Path, room.Sid)
+	if _, err = os.Stat(downloadDir); os.IsNotExist(err) {
+		err = os.MkdirAll(downloadDir, os.ModePerm)
+		if err != nil {
+			log.Errorln(err)
+			return
+		}
 	}
 
 	// now download the file
