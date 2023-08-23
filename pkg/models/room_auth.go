@@ -1,10 +1,17 @@
 package models
 
 import (
+	"fmt"
+	"github.com/cavaliergopher/grab/v3"
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	log "github.com/sirupsen/logrus"
+	"net/http"
+	"os"
+	"strings"
 	"time"
 )
 
@@ -72,6 +79,9 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 	isBreakoutRoom := 0
 	if r.Metadata.IsBreakoutRoom {
 		isBreakoutRoom = 1
+	} else {
+		// at present, we'll fetch file for main room only
+		go am.prepareWhiteboardPreloadFile(r, room)
 	}
 
 	updateTable := false
@@ -232,4 +242,74 @@ func (am *RoomAuthModel) ChangeVisibility(r *plugnmeet.ChangeVisibilityRes) (boo
 	}
 
 	return true, "success"
+}
+
+func (am *RoomAuthModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomReq, room *livekit.Room) {
+	if !req.Metadata.RoomFeatures.WhiteboardFeatures.AllowedWhiteboard || req.Metadata.RoomFeatures.WhiteboardFeatures.PreloadFile == nil {
+		return
+	}
+
+	downloadDir := fmt.Sprintf("%s/%s", config.AppCnf.UploadFileSettings.Path, room.Sid)
+	if _, err := os.Stat(downloadDir); os.IsNotExist(err) {
+		err = os.MkdirAll(downloadDir, os.ModePerm)
+		if err != nil {
+			log.Errorln(err)
+			return
+		}
+	}
+
+	httpClient := &http.Client{Timeout: 5 * time.Second}
+	resp, err := httpClient.Head(*req.Metadata.RoomFeatures.WhiteboardFeatures.PreloadFile)
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+
+	// lets at present set limit to 5MB
+	limit := int64(5 * 1000000)
+	if resp.ContentLength > limit {
+		log.Errorf("Allowd %d but given %d", limit, resp.ContentLength)
+		return
+	}
+
+	fm := NewManageFileModel(&ManageFile{
+		Sid:    room.Sid,
+		RoomId: room.Name,
+	})
+
+	// validate file type
+	mtype := mimetype.Lookup(resp.Header.Get("Content-Type"))
+	err = fm.validateMimeType(mtype)
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+
+	// now download the file
+	gres, err := grab.Get(downloadDir, *req.Metadata.RoomFeatures.WhiteboardFeatures.PreloadFile)
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+	// double check to make sure that dangerous file wasn't uploaded
+	mtype, err = mimetype.DetectFile(gres.Filename)
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+	err = fm.validateMimeType(mtype)
+	if err != nil {
+		log.Errorln(err)
+		// remove the file if validation not passed
+		_ = os.RemoveAll(gres.Filename)
+		return
+	}
+
+	ms := strings.SplitN(gres.Filename, "/", -1)
+	fm.FilePath = fmt.Sprintf("%s/%s", room.Sid, ms[len(ms)-1])
+
+	_, err = fm.ConvertWhiteboardFile()
+	if err != nil {
+		log.Errorln(err)
+	}
 }
