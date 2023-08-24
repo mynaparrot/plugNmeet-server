@@ -322,4 +322,6 @@ func (am *RoomAuthModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomR
 	if err != nil {
 		log.Errorln(err)
 	}
+	// finally delete the file
+	_ = os.RemoveAll(gres.Filename)
 }
