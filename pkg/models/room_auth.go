@@ -303,6 +303,8 @@ func (am *RoomAuthModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomR
 	mtype, err = mimetype.DetectFile(gres.Filename)
 	if err != nil {
 		log.Errorln(err)
+		// remove the file if have problem
+		_ = os.RemoveAll(gres.Filename)
 		return
 	}
 	err = fm.validateMimeType(mtype)
