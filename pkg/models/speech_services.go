@@ -18,18 +18,20 @@ import (
 )
 
 type SpeechServices struct {
-	rc          *redis.Client
-	ctx         context.Context
-	roomService *RoomService
+	rc             *redis.Client
+	ctx            context.Context
+	roomService    *RoomService
+	analyticsModel *AnalyticsModel
 }
 
 const SpeechServiceRedisKey = "pnm:speechService"
 
 func NewSpeechServices() *SpeechServices {
 	return &SpeechServices{
-		rc:          config.AppCnf.RDS,
-		ctx:         context.Background(),
-		roomService: NewRoomService(),
+		rc:             config.AppCnf.RDS,
+		ctx:            context.Background(),
+		roomService:    NewRoomService(),
+		analyticsModel: NewAnalyticsModel(),
 	}
 }
 
@@ -56,6 +58,17 @@ func (s *SpeechServices) SpeechToTextTranslationServiceStatus(r *plugnmeet.Speec
 	if err != nil {
 		return err
 	}
+
+	// send analytics
+	d := &plugnmeet.AnalyticsDataMsg{
+		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
+		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_SPEECH_SERVICE_STARTED,
+		RoomId:    &r.RoomId,
+	}
+	if !f.IsEnabled {
+		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_SPEECH_SERVICE_ENDED
+	}
+	s.analyticsModel.HandleEvent(d)
 
 	return nil
 }

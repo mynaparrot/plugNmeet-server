@@ -6,13 +6,15 @@ import (
 )
 
 type ExternalDisplayLink struct {
-	rs  *RoomService
-	req *plugnmeet.ExternalDisplayLinkReq
+	rs             *RoomService
+	req            *plugnmeet.ExternalDisplayLinkReq
+	analyticsModel *AnalyticsModel
 }
 
 func NewExternalDisplayLinkModel() *ExternalDisplayLink {
 	return &ExternalDisplayLink{
-		rs: NewRoomService(),
+		rs:             NewRoomService(),
+		analyticsModel: NewAnalyticsModel(),
 	}
 }
 
@@ -69,6 +71,17 @@ func (e *ExternalDisplayLink) updateRoomMetadata(opts *updateRoomMetadataOpts) e
 	}
 
 	_, err = e.rs.UpdateRoomMetadataByStruct(e.req.RoomId, roomMeta)
+
+	// send analytics
+	d := &plugnmeet.AnalyticsDataMsg{
+		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
+		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_EXTERNAL_DISPLAY_LINK_STARTED,
+		RoomId:    &e.req.RoomId,
+	}
+	if !roomMeta.RoomFeatures.DisplayExternalLinkFeatures.IsActive {
+		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_EXTERNAL_DISPLAY_LINK_ENDED
+	}
+	e.analyticsModel.HandleEvent(d)
 
 	return err
 }

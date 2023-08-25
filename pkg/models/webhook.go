@@ -22,6 +22,7 @@ type webhookEvent struct {
 	recorderModel  *RecorderModel
 	userModel      *UserModel
 	notifier       *WebhookNotifierModel
+	analyticsModel *AnalyticsModel
 }
 
 func NewWebhookModel(e *livekit.WebhookEvent) {
@@ -35,6 +36,7 @@ func NewWebhookModel(e *livekit.WebhookEvent) {
 		recorderModel:  NewRecorderModel(),
 		userModel:      NewUserModel(),
 		notifier:       NewWebhookNotifier(),
+		analyticsModel: NewAnalyticsModel(),
 	}
 
 	switch e.GetEvent() {
@@ -191,6 +193,15 @@ func (w *webhookEvent) participantJoined() {
 	if err != nil {
 		log.Errorln(err)
 	}
+
+	// send analytics
+	w.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
+		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
+		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_USER_JOIN,
+		RoomId:    &event.Room.Name,
+		UserId:    &event.Participant.Identity,
+		UserName:  &event.Participant.Name,
+	})
 }
 
 func (w *webhookEvent) participantLeft() {
@@ -214,17 +225,61 @@ func (w *webhookEvent) participantLeft() {
 	// if we missed to calculate this user's speech service usage stat
 	// for sudden disconnection
 	sm := NewSpeechServices()
-	sm.SpeechServiceUsersUsage(event.Room.Name, event.Room.Sid, event.Participant.Identity, plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED)
+	_ = sm.SpeechServiceUsersUsage(event.Room.Name, event.Room.Sid, event.Participant.Identity, plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED)
+
+	// send analytics
+	w.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
+		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
+		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_USER_LEFT,
+		RoomId:    &event.Room.Name,
+		UserId:    &event.Participant.Identity,
+	})
 }
 
 func (w *webhookEvent) trackPublished() {
 	// webhook notification
 	go w.sendToWebhookNotifier(w.event)
+
+	// send analytics
+	data := &plugnmeet.AnalyticsDataMsg{
+		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
+		RoomId:    &w.event.Room.Name,
+		UserId:    &w.event.Participant.Identity,
+	}
+
+	switch w.event.Track.Source {
+	case livekit.TrackSource_MICROPHONE:
+		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_STARTED_MIC
+	case livekit.TrackSource_CAMERA:
+		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_STARTED_WEBCAM
+	case livekit.TrackSource_SCREEN_SHARE,
+		livekit.TrackSource_SCREEN_SHARE_AUDIO:
+		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_STARTED_SCREEN_SHARE
+	}
+	w.analyticsModel.HandleEvent(data)
 }
 
 func (w *webhookEvent) trackUnpublished() {
 	// webhook notification
 	go w.sendToWebhookNotifier(w.event)
+
+	// send analytics
+	data := &plugnmeet.AnalyticsDataMsg{
+		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
+		RoomId:    &w.event.Room.Name,
+		UserId:    &w.event.Participant.Identity,
+	}
+
+	switch w.event.Track.Source {
+	case livekit.TrackSource_MICROPHONE:
+		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_STOPPED_MIC
+	case livekit.TrackSource_CAMERA:
+		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_STOPPED_WEBCAM
+	case livekit.TrackSource_SCREEN_SHARE,
+		livekit.TrackSource_SCREEN_SHARE_AUDIO:
+		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_STOPPED_SCREEN_SHARE
+	}
+	w.analyticsModel.HandleEvent(data)
 }
 
 func (w *webhookEvent) sendToWebhookNotifier(event *livekit.WebhookEvent) {

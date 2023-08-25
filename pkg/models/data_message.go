@@ -32,14 +32,16 @@ type ReqFrom struct {
 }
 
 type DataMessageModel struct {
-	db          *sql.DB
-	roomService *RoomService
+	db             *sql.DB
+	roomService    *RoomService
+	analyticsModel *AnalyticsModel
 }
 
 func NewDataMessageModel() *DataMessageModel {
 	return &DataMessageModel{
-		db:          config.AppCnf.DB,
-		roomService: NewRoomService(),
+		db:             config.AppCnf.DB,
+		roomService:    NewRoomService(),
+		analyticsModel: NewAnalyticsModel(),
 	}
 }
 
@@ -123,11 +125,10 @@ func (m *DataMessageModel) raiseHand(r *plugnmeet.DataMessageReq) error {
 
 	// send as push message
 	err = m.deliverMsg(r.RoomId, sids, msg)
-	if err != nil {
-		return err
-	}
+	// send analytics
+	m.analyticsModel.HandleWebSocketData(msg)
 
-	return nil
+	return err
 }
 
 func (m *DataMessageModel) lowerHand(r *plugnmeet.DataMessageReq) error {

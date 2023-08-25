@@ -99,12 +99,18 @@ func HandleWebSocket() func(*fiber.Ctx) error {
 }
 
 func SetupSocketListeners() {
+	analytics := models.NewAnalyticsModel()
 	// On message event
 	ikisocket.On(ikisocket.EventMessage, func(ep *ikisocket.EventPayload) {
 		//fmt.Println(fmt.Sprintf("Message event - User: %s - Message: %s", ep.Kws.GetStringAttribute("userId"), string(ep.Data)))
 		dataMsg := &plugnmeet.DataMessage{}
 		err := proto.Unmarshal(ep.Data, dataMsg)
 		if err != nil {
+			return
+		}
+
+		if dataMsg.Body.Type == plugnmeet.DataMsgBodyType_ANALYTICS_DATA {
+			//tt.HandleEvent()
 			return
 		}
 
@@ -121,6 +127,11 @@ func SetupSocketListeners() {
 		}
 
 		models.DistributeWebsocketMsgToRedisChannel(payload)
+		// send analytics
+		if dataMsg.Body.From != nil && dataMsg.Body.From.UserId != "" {
+			analytics.HandleWebSocketData(dataMsg)
+		}
+
 	})
 
 	// On disconnect event

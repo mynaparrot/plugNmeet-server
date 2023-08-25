@@ -16,13 +16,14 @@ import (
 )
 
 type EtherpadModel struct {
-	SharedNotePad config.SharedNotePad
-	NodeId        string
-	Host          string
-	ApiKey        string
-	context       context.Context
-	rc            *redis.Client
-	rs            *RoomService
+	SharedNotePad  config.SharedNotePad
+	NodeId         string
+	Host           string
+	ApiKey         string
+	context        context.Context
+	rc             *redis.Client
+	rs             *RoomService
+	analyticsModel *AnalyticsModel
 }
 
 type EtherpadHttpRes struct {
@@ -49,10 +50,11 @@ const (
 
 func NewEtherpadModel() *EtherpadModel {
 	return &EtherpadModel{
-		rc:            config.AppCnf.RDS,
-		context:       context.Background(),
-		SharedNotePad: config.AppCnf.SharedNotePad,
-		rs:            NewRoomService(),
+		rc:             config.AppCnf.RDS,
+		context:        context.Background(),
+		SharedNotePad:  config.AppCnf.SharedNotePad,
+		rs:             NewRoomService(),
+		analyticsModel: NewAnalyticsModel(),
 	}
 }
 
@@ -130,6 +132,13 @@ func (m *EtherpadModel) addPadToRoomMetadata(roomId string, c *plugnmeet.CreateE
 		log.Errorln(err)
 	}
 
+	// send analytics
+	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
+		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
+		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_ETHERPAD_ENABLED,
+		RoomId:    &roomId,
+	})
+
 	return err
 }
 
@@ -189,6 +198,17 @@ func (m *EtherpadModel) ChangeEtherpadStatus(r *plugnmeet.ChangeEtherpadStatusRe
 	if err != nil {
 		log.Errorln(err)
 	}
+
+	// send analytics
+	d := &plugnmeet.AnalyticsDataMsg{
+		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
+		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_ETHERPAD_ENABLED,
+		RoomId:    &r.RoomId,
+	}
+	if !r.IsActive {
+		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_ETHERPAD_DISABLED
+	}
+	m.analyticsModel.HandleEvent(d)
 
 	return err
 }
