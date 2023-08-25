@@ -35,6 +35,7 @@ type AppConfig struct {
 	RecorderInfo                 RecorderInfo                 `yaml:"recorder_info"`
 	SharedNotePad                SharedNotePad                `yaml:"shared_notepad"`
 	AzureCognitiveServicesSpeech AzureCognitiveServicesSpeech `yaml:"azure_cognitive_services_speech"`
+	AnalyticsSettings            *AnalyticsSettings           `yaml:"analytics_settings"`
 }
 
 type ClientInfo struct {
@@ -109,6 +110,13 @@ type AzureSubscriptionKey struct {
 	MaxConnection   int64  `yaml:"max_connection"`
 }
 
+type AnalyticsSettings struct {
+	Enabled         bool           `yaml:"enabled"`
+	FilesStorePath  *string        `yaml:"files_store_path"`
+	AutoDelete      *bool          `yaml:"auto_delete"`
+	AutoDeleteAfter *time.Duration `yaml:"auto_delete_after"`
+}
+
 type ChatParticipant struct {
 	RoomSid string
 	RoomId  string
@@ -129,6 +137,22 @@ func SetAppConfig(a *AppConfig) {
 	AppCnf = a
 	AppCnf.chatRooms = make(map[string]map[string]ChatParticipant)
 	AppCnf.roomWithDuration = make(map[string]RoomWithDuration)
+
+	// set default values
+	if AppCnf.AnalyticsSettings != nil {
+		if AppCnf.AnalyticsSettings.FilesStorePath == nil {
+			p := "./analytics"
+			AppCnf.AnalyticsSettings.FilesStorePath = &p
+		}
+		if AppCnf.AnalyticsSettings.AutoDelete == nil {
+			b := true
+			// by default 7 days
+			d := (time.Hour * 24 * 7)
+			AppCnf.AnalyticsSettings.AutoDelete = &b
+			AppCnf.AnalyticsSettings.AutoDeleteAfter = &d
+		}
+	}
+
 	setLogger()
 	a.readClientFiles()
 }

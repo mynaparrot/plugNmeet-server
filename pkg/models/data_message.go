@@ -103,6 +103,15 @@ func (m *DataMessageModel) raiseHand(r *plugnmeet.DataMessageReq) error {
 		return err
 	}
 
+	if metadata.RaisedHand {
+		m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
+			EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
+			EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_RAISE_HAND,
+			RoomId:    &r.RoomId,
+			UserId:    &r.RequestedUserId,
+		})
+	}
+
 	if len(sids) == 0 {
 		return nil
 	}
@@ -125,9 +134,6 @@ func (m *DataMessageModel) raiseHand(r *plugnmeet.DataMessageReq) error {
 
 	// send as push message
 	err = m.deliverMsg(r.RoomId, sids, msg)
-	// send analytics
-	m.analyticsModel.HandleWebSocketData(msg)
-
 	return err
 }
 

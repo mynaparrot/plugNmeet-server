@@ -263,24 +263,24 @@ func (rm *RoomModel) GetRoomInfo(roomId string, sid string, isRunning int) (*Roo
 	switch {
 	case len(roomId) > 0 && isRunning == 1 && len(sid) == 0:
 		// for roomId + isRunning
-		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time FROM "+rm.app.FormatDBTable("room_info")+" WHERE roomId = ? AND is_running = 1", roomId)
+		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time, ended FROM "+rm.app.FormatDBTable("room_info")+" WHERE roomId = ? AND is_running = 1", roomId)
 
 	case len(sid) > 0 && isRunning == 1 && len(roomId) == 0:
 		// for sid + isRunning
-		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time FROM "+rm.app.FormatDBTable("room_info")+" WHERE (sid = ? OR sid = CONCAT(?, '-', id)) AND is_running = 1", sid, sid)
+		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time, ended FROM "+rm.app.FormatDBTable("room_info")+" WHERE (sid = ? OR sid = CONCAT(?, '-', id)) AND is_running = 1", sid, sid)
 
 	case len(roomId) > 0 && len(sid) > 0 && isRunning == 1:
 		// for sid + roomId + isRunning
-		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time FROM "+rm.app.FormatDBTable("room_info")+" WHERE roomId = ? AND (sid = ? OR sid = CONCAT(?, '-', id)) AND is_running = 1", roomId, sid, sid)
+		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time, ended FROM "+rm.app.FormatDBTable("room_info")+" WHERE roomId = ? AND (sid = ? OR sid = CONCAT(?, '-', id)) AND is_running = 1", roomId, sid, sid)
 
 	default:
 		// for only sid
-		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time FROM "+rm.app.FormatDBTable("room_info")+" WHERE sid = ? OR sid = CONCAT(?, '-', id)", sid, sid)
+		query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time, ended FROM "+rm.app.FormatDBTable("room_info")+" WHERE sid = ? OR sid = CONCAT(?, '-', id)", sid, sid)
 	}
 
 	var room RoomInfo
 	var msg string
-	err := query.Scan(&room.Id, &room.RoomTitle, &room.RoomId, &room.Sid, &room.JoinedParticipants, &room.IsRunning, &room.IsRecording, &room.IsActiveRTMP, &room.WebhookUrl, &room.IsBreakoutRoom, &room.ParentRoomId, &room.CreationTime)
+	err := query.Scan(&room.Id, &room.RoomTitle, &room.RoomId, &room.Sid, &room.JoinedParticipants, &room.IsRunning, &room.IsRecording, &room.IsActiveRTMP, &room.WebhookUrl, &room.IsBreakoutRoom, &room.ParentRoomId, &room.CreationTime, &room.Ended)
 
 	switch {
 	case err == sql.ErrNoRows:

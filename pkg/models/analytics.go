@@ -7,12 +7,16 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/redis/go-redis/v9"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/encoding/protojson"
+	"os"
+	"strings"
 	"time"
 )
 
 const (
-	analyticsRoomKey = "pnm:analytics:%s"
-	analyticsUserKey = analyticsRoomKey + ":user:%s"
+	analyticsRoomKey          = "pnm:analytics:%s"
+	analyticsUserKey          = analyticsRoomKey + ":user:%s"
+	waitBeforeProcessDuration = time.Second * 10
 )
 
 type AnalyticsModel struct {
@@ -29,6 +33,11 @@ func NewAnalyticsModel() *AnalyticsModel {
 }
 
 func (m *AnalyticsModel) HandleEvent(d *plugnmeet.AnalyticsDataMsg) {
+	if config.AppCnf.AnalyticsSettings == nil ||
+		!config.AppCnf.AnalyticsSettings.Enabled {
+		return
+	}
+
 	now := time.Now().Unix()
 	d.Time = &now
 	m.data = d
@@ -77,7 +86,7 @@ func (m *AnalyticsModel) handleRoomTypeEvents() {
 	key := fmt.Sprintf(analyticsRoomKey+":room", *m.data.RoomId)
 
 	switch m.data.EventName {
-	case plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_USER_JOIN:
+	case plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_JOINED:
 		u := map[string]string{
 			*m.data.UserId: *m.data.UserName,
 		}
@@ -101,7 +110,6 @@ func (m *AnalyticsModel) handleUserTypeEvents() {
 		return
 	}
 	key := fmt.Sprintf(analyticsUserKey, *m.data.RoomId, *m.data.UserId)
-	//fmt.Println(fmt.Sprintf("%s:%s", key, m.data.EventName.String()))
 
 	_, err := m.rc.ZAdd(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), redis.Z{Score: float64(*m.data.Time), Member: *m.data.Time}).Result()
 	if err != nil {
@@ -109,8 +117,199 @@ func (m *AnalyticsModel) handleUserTypeEvents() {
 	}
 }
 
-func (m *AnalyticsModel) ExportAnalyticsToFile() {
-	//for _, n := range AnalyticsEvents_name {
-	//	fmt.Println(n)
-	//}
+func (m *AnalyticsModel) PrepareToExportAnalytics(sid, meta string) {
+	if config.AppCnf.AnalyticsSettings == nil || !config.AppCnf.AnalyticsSettings.Enabled {
+		return
+	}
+
+	rms := NewRoomService()
+	metadata, err := rms.UnmarshalRoomMetadata(meta)
+	if err != nil {
+		return
+	}
+
+	// let's wait 10 seconds so that all other process will finish
+	time.Sleep(waitBeforeProcessDuration)
+
+	if _, err := os.Stat(*config.AppCnf.AnalyticsSettings.FilesStorePath); os.IsNotExist(err) {
+		err = os.MkdirAll(*config.AppCnf.AnalyticsSettings.FilesStorePath, os.ModePerm)
+		if err != nil {
+			log.Errorln(err)
+			return
+		}
+	}
+
+	rm := NewRoomModel()
+	room, _ := rm.GetRoomInfo("", sid, 0)
+	if room == nil {
+		return
+	}
+
+	fileName := fmt.Sprintf("%s-%d.json", room.Sid, room.CreationTime)
+	path := fmt.Sprintf("%s/%s", *config.AppCnf.AnalyticsSettings.FilesStorePath, fileName)
+
+	// export file
+	err = m.exportAnalyticsToFile(room, path, metadata)
+	if err != nil {
+		return
+	}
+
+	// it's not possible to get room metadata as always
+	// so, if room didn't have activated analytics feature,
+	// we will simply won't create the in exportAnalyticsToFile method
+	// and won't record to DB
+	if metadata.RoomFeatures.EnableAnalytics {
+		// record in db
+		m.addAnalyticsFileToDB(room.Id, room.RoomId, fileName)
+	}
+}
+
+func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, metadata *plugnmeet.RoomMetadata) error {
+	ended, _ := time.Parse("2006-01-02 15:04:05", room.Ended)
+	roomInfo := &plugnmeet.AnalyticsRoomInfo{
+		RoomId:       room.RoomId,
+		RoomTitle:    room.RoomTitle,
+		RoomCreation: room.CreationTime,
+		RoomEnded:    ended.Unix(),
+		Events:       []*plugnmeet.AnalyticsEventData{},
+	}
+	usersInfo := []*plugnmeet.AnalyticsUserInfo{}
+	allKeys := []string{}
+
+	key := fmt.Sprintf(analyticsRoomKey+":room", room.RoomId)
+
+	// we'll collect all room related events
+	for _, ev := range plugnmeet.AnalyticsEvents_name {
+		if strings.Contains(ev, "ANALYTICS_EVENT_ROOM_") {
+			ekey := fmt.Sprintf(key+":%s", ev)
+			allKeys = append(allKeys, ekey)
+
+			result, err := m.rc.ZRange(m.ctx, ekey, 0, -1).Result()
+			if err != nil {
+				continue
+			}
+
+			ev = strings.ToLower(strings.Replace(ev, "ANALYTICS_EVENT_ROOM_", "", 1))
+			eventInfo := &plugnmeet.AnalyticsEventData{
+				Name:   ev,
+				Total:  uint32(len(result)),
+				Values: result,
+			}
+			roomInfo.Events = append(roomInfo.Events, eventInfo)
+		}
+	}
+
+	// get users first
+	users, err := m.rc.HGetAll(m.ctx, fmt.Sprintf("%s:users", key)).Result()
+	allKeys = append(allKeys, fmt.Sprintf("%s:users", key))
+	if err != nil {
+		log.Errorln(err)
+		return err
+	}
+	roomInfo.RoomTotalUsers = int64(len(users))
+	roomInfo.RoomDuration = roomInfo.RoomEnded - roomInfo.RoomCreation
+
+	// now users related events
+	for i, n := range users {
+		userInfo := &plugnmeet.AnalyticsUserInfo{
+			UserId: i,
+			Name:   n,
+			Events: []*plugnmeet.AnalyticsEventData{},
+		}
+
+		for _, ev := range plugnmeet.AnalyticsEvents_name {
+			if strings.Contains(ev, "ANALYTICS_EVENT_USER_") {
+				ekey := fmt.Sprintf(analyticsUserKey, room.RoomId, i)
+				ekey = fmt.Sprintf("%s:%s", ekey, ev)
+				allKeys = append(allKeys, ekey)
+
+				result, err := m.rc.ZRange(m.ctx, ekey, 0, -1).Result()
+				if err != nil {
+					continue
+				}
+
+				ev = strings.ToLower(strings.Replace(ev, "ANALYTICS_EVENT_USER_", "", 1))
+				event := &plugnmeet.AnalyticsEventData{
+					Name:   ev,
+					Total:  uint32(len(result)),
+					Values: result,
+				}
+				userInfo.Events = append(userInfo.Events, event)
+			}
+		}
+
+		usersInfo = append(usersInfo, userInfo)
+	}
+
+	// it's not possible to get room metadata as always
+	// so, if room didn't have activated analytics feature,
+	// we will simply won't create the file & delete all records
+	if metadata.RoomFeatures.EnableAnalytics {
+		result := &plugnmeet.AnalyticsResult{
+			Room:  roomInfo,
+			Users: usersInfo,
+		}
+		op := protojson.MarshalOptions{
+			EmitUnpopulated: true,
+			UseProtoNames:   true,
+		}
+		marshal, err := op.Marshal(result)
+		if err != nil {
+			log.Errorln(err)
+			return err
+		}
+
+		err = os.WriteFile(path, marshal, 0644)
+		if err != nil {
+			log.Errorln(err)
+			return err
+		}
+	}
+
+	// at the end delete all redis records
+	_, err = m.rc.Del(m.ctx, allKeys...).Result()
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	return err
+}
+
+func (m *AnalyticsModel) addAnalyticsFileToDB(roomTableId int64, roomId, fileName string) {
+	db := config.AppCnf.DB
+	ctx, cancel := context.WithTimeout(m.ctx, 3*time.Second)
+	defer cancel()
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+	defer tx.Rollback()
+
+	query := "INSERT INTO " + config.AppCnf.FormatDBTable("room_analytics") + " (room_table_id, room_id, file_name, creation_time) VALUES (?, ?, ?, ?)"
+
+	stmt, err := tx.PrepareContext(ctx, query)
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+
+	_, err = stmt.ExecContext(ctx, roomTableId, roomId, fileName, time.Now().Unix())
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+
+	err = stmt.Close()
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
 }

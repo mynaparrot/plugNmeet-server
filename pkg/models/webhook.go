@@ -174,6 +174,9 @@ func (w *webhookEvent) roomFinished() {
 	sm := NewSpeechServices()
 	// don't need to worry about room sid changes, because we'll compare both
 	go sm.OnAfterRoomEnded(event.Room.Name, event.Room.Sid)
+
+	// finally create analytics file
+	go w.analyticsModel.PrepareToExportAnalytics(event.Room.Sid, event.Room.Metadata)
 }
 
 func (w *webhookEvent) participantJoined() {
@@ -197,7 +200,7 @@ func (w *webhookEvent) participantJoined() {
 	// send analytics
 	w.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
-		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_USER_JOIN,
+		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_JOINED,
 		RoomId:    &event.Room.Name,
 		UserId:    &event.Participant.Identity,
 		UserName:  &event.Participant.Name,
@@ -230,7 +233,7 @@ func (w *webhookEvent) participantLeft() {
 	// send analytics
 	w.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
-		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_USER_LEFT,
+		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_LEFT,
 		RoomId:    &event.Room.Name,
 		UserId:    &event.Participant.Identity,
 	})
