@@ -204,6 +204,7 @@ func (w *webhookEvent) participantJoined() {
 		RoomId:    &event.Room.Name,
 		UserId:    &event.Participant.Identity,
 		UserName:  &event.Participant.Name,
+		ExtraData: &event.Participant.Metadata,
 	})
 }
 

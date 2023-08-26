@@ -88,22 +88,7 @@ func (m *AnalyticsModel) handleRoomTypeEvents() {
 
 	switch m.data.EventName {
 	case plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_JOINED:
-		uInfo := &plugnmeet.AnalyticsRedisUserInfo{
-			Name:    m.data.UserName,
-			IsAdmin: m.data.IsAdmin,
-		}
-		marshal, err := protojson.Marshal(uInfo)
-		if err != nil {
-			log.Errorln(err)
-		}
-
-		u := map[string]string{
-			*m.data.UserId: string(marshal),
-		}
-		_, err = m.rc.HMSet(m.ctx, fmt.Sprintf("%s:users", key), u).Result()
-		if err != nil {
-			log.Errorln(err)
-		}
+		m.handleFirstTimeUserJoined(key)
 		// we still need to run as user type too
 		m.handleUserTypeEvents()
 	default:
@@ -161,7 +146,7 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(sid, meta string) {
 		return
 	}
 
-	// if no metadata then it will hard to make next logics
+	// if no metadata then it will be hard to make next logics
 	// if still there was some data stored in redis
 	// we will have to think different way to clean those
 	if meta == "" {
@@ -223,6 +208,7 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, meta
 	allKeys := []string{}
 
 	key := fmt.Sprintf(analyticsRoomKey+":room", room.RoomId)
+	// we can store all users' type key to make things faster
 	userRedisKeys := []string{}
 	// we'll collect all room related events
 	for _, ev := range plugnmeet.AnalyticsEvents_name {
@@ -266,6 +252,7 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, meta
 
 			roomInfo.Events = append(roomInfo.Events, eventInfo)
 		} else {
+			// otherwise will be user type
 			userRedisKeys = append(userRedisKeys, ev)
 		}
 	}
@@ -407,5 +394,30 @@ func (m *AnalyticsModel) addAnalyticsFileToDB(roomTableId, roomCreationTime int6
 	if err != nil {
 		log.Errorln(err)
 		return
+	}
+}
+
+func (m *AnalyticsModel) handleFirstTimeUserJoined(key string) {
+	umeta := new(plugnmeet.UserMetadata)
+	if m.data.ExtraData != nil && *m.data.ExtraData != "" {
+		rs := NewRoomService()
+		umeta, _ = rs.UnmarshalParticipantMetadata(*m.data.ExtraData)
+	}
+
+	uInfo := &plugnmeet.AnalyticsRedisUserInfo{
+		Name:    m.data.UserName,
+		IsAdmin: umeta.IsAdmin,
+	}
+	marshal, err := protojson.Marshal(uInfo)
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	u := map[string]string{
+		*m.data.UserId: string(marshal),
+	}
+	_, err = m.rc.HMSet(m.ctx, fmt.Sprintf("%s:users", key), u).Result()
+	if err != nil {
+		log.Errorln(err)
 	}
 }
