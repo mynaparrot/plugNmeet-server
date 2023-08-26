@@ -11,7 +11,7 @@ require (
 	github.com/gofiber/fiber/v2 v2.48.0
 	github.com/gofiber/template v1.8.1
 	github.com/gofiber/websocket/v2 v2.2.1
-	github.com/google/uuid v1.3.0
+	github.com/google/uuid v1.3.1
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.6.1
 	github.com/livekit/server-sdk-go v1.0.15
