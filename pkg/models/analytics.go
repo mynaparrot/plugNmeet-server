@@ -88,10 +88,19 @@ func (m *AnalyticsModel) handleRoomTypeEvents() {
 
 	switch m.data.EventName {
 	case plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_JOINED:
-		u := map[string]string{
-			*m.data.UserId: *m.data.UserName,
+		uInfo := &plugnmeet.AnalyticsRedisUserInfo{
+			Name:    m.data.UserName,
+			IsAdmin: m.data.IsAdmin,
 		}
-		_, err := m.rc.HMSet(m.ctx, fmt.Sprintf("%s:users", key), u).Result()
+		marshal, err := protojson.Marshal(uInfo)
+		if err != nil {
+			log.Errorln(err)
+		}
+
+		u := map[string]string{
+			*m.data.UserId: string(marshal),
+		}
+		_, err = m.rc.HMSet(m.ctx, fmt.Sprintf("%s:users", key), u).Result()
 		if err != nil {
 			log.Errorln(err)
 		}
@@ -149,6 +158,13 @@ func (m *AnalyticsModel) handleUserTypeEvents() {
 
 func (m *AnalyticsModel) PrepareToExportAnalytics(sid, meta string) {
 	if config.AppCnf.AnalyticsSettings == nil || !config.AppCnf.AnalyticsSettings.Enabled {
+		return
+	}
+
+	// if no metadata then it will hard to make next logics
+	// if still there was some data stored in redis
+	// we will have to think different way to clean those
+	if meta == "" {
 		return
 	}
 
@@ -266,10 +282,13 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, meta
 
 	// now users related events
 	for i, n := range users {
+		uf := new(plugnmeet.AnalyticsRedisUserInfo)
+		_ = protojson.Unmarshal([]byte(n), uf)
 		userInfo := &plugnmeet.AnalyticsUserInfo{
-			UserId: i,
-			Name:   n,
-			Events: []*plugnmeet.AnalyticsEventData{},
+			UserId:  i,
+			Name:    *uf.Name,
+			IsAdmin: uf.IsAdmin,
+			Events:  []*plugnmeet.AnalyticsEventData{},
 		}
 
 		for _, ev := range userRedisKeys {
