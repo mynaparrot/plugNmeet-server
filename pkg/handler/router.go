@@ -68,6 +68,7 @@ func Router() *fiber.App {
 	app.Post("/webhook", controllers.HandleWebhook)
 	app.Get("/download/uploadedFile/:sid/*", controllers.HandleDownloadUploadedFile)
 	app.Get("/download/recording/:token", controllers.HandleDownloadRecording)
+	app.Get("/download/analytics/:token", controllers.HandleDownloadAnalytics)
 	app.Get("/healthCheck", controllers.HandleHealthCheck)
 
 	// lti group
@@ -99,6 +100,12 @@ func Router() *fiber.App {
 	recording.Post("/fetch", controllers.HandleFetchRecordings)
 	recording.Post("/delete", controllers.HandleDeleteRecording)
 	recording.Post("/getDownloadToken", controllers.HandleGetDownloadToken)
+
+	// for analytics
+	analytics := auth.Group("/analytics")
+	analytics.Post("/fetch", controllers.HandleFetchAnalytics)
+	analytics.Post("/delete", controllers.HandleDeleteAnalytics)
+	analytics.Post("/getDownloadToken", controllers.HandleGetAnalyticsDownloadToken)
 
 	// to handle different events from recorder
 	recorder := auth.Group("/recorder")

@@ -113,6 +113,7 @@ type AzureSubscriptionKey struct {
 type AnalyticsSettings struct {
 	Enabled         bool           `yaml:"enabled"`
 	FilesStorePath  *string        `yaml:"files_store_path"`
+	TokenValidity   *time.Duration `yaml:"token_validity"`
 	AutoDelete      *bool          `yaml:"auto_delete"`
 	AutoDeleteAfter *time.Duration `yaml:"auto_delete_after"`
 }
@@ -143,6 +144,8 @@ func SetAppConfig(a *AppConfig) {
 		if AppCnf.AnalyticsSettings.FilesStorePath == nil {
 			p := "./analytics"
 			AppCnf.AnalyticsSettings.FilesStorePath = &p
+			d := (time.Minute * 30)
+			AppCnf.AnalyticsSettings.TokenValidity = &d
 		}
 		if AppCnf.AnalyticsSettings.AutoDelete == nil {
 			b := true

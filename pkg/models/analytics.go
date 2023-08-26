@@ -190,7 +190,7 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(sid, meta string) {
 	// and won't record to DB
 	if metadata.RoomFeatures.EnableAnalytics {
 		// record in db
-		m.addAnalyticsFileToDB(room.Id, room.RoomId, fileId)
+		m.addAnalyticsFileToDB(room.Id, room.CreationTime, room.RoomId, fileId)
 	}
 }
 
@@ -352,7 +352,7 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, meta
 	return err
 }
 
-func (m *AnalyticsModel) addAnalyticsFileToDB(roomTableId int64, roomId, fileId string) {
+func (m *AnalyticsModel) addAnalyticsFileToDB(roomTableId, roomCreationTime int64, roomId, fileId string) {
 	db := config.AppCnf.DB
 	ctx, cancel := context.WithTimeout(m.ctx, 3*time.Second)
 	defer cancel()
@@ -364,7 +364,7 @@ func (m *AnalyticsModel) addAnalyticsFileToDB(roomTableId int64, roomId, fileId 
 	}
 	defer tx.Rollback()
 
-	query := "INSERT INTO " + config.AppCnf.FormatDBTable("room_analytics") + " (room_table_id, room_id, file_id, file_name, creation_time) VALUES (?, ?, ?, ?, ?)"
+	query := "INSERT INTO " + config.AppCnf.FormatDBTable("room_analytics") + " (room_table_id, room_id, file_id, file_name, room_creation_time, creation_time) VALUES (?, ?, ?, ?, ?, ?)"
 
 	stmt, err := tx.PrepareContext(ctx, query)
 	if err != nil {
@@ -372,7 +372,7 @@ func (m *AnalyticsModel) addAnalyticsFileToDB(roomTableId int64, roomId, fileId 
 		return
 	}
 
-	_, err = stmt.ExecContext(ctx, roomTableId, roomId, fileId, fileId+".json", time.Now().Unix())
+	_, err = stmt.ExecContext(ctx, roomTableId, roomId, fileId, fileId+".json", roomCreationTime, time.Now().Unix())
 	if err != nil {
 		log.Errorln(err)
 		return

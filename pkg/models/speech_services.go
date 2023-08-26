@@ -165,6 +165,13 @@ func (s *SpeechServices) SpeechServiceUsersUsage(roomId, rSid, userId string, ta
 		}
 		// webhook
 		s.sendToWebhookNotifier(roomId, rSid, userId, task, 0)
+		// send analytics
+		s.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
+			EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
+			EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_SPEECH_SERVICES_STARTED,
+			RoomId:    &roomId,
+			UserId:    &userId,
+		})
 	case plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED:
 		if ss != "" {
 			start, err := strconv.Atoi(ss)
@@ -189,6 +196,13 @@ func (s *SpeechServices) SpeechServiceUsersUsage(roomId, rSid, userId string, ta
 			// send webhook
 			s.sendToWebhookNotifier(roomId, rSid, userId, task, usage)
 			// send analytics
+			s.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
+				EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
+				EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_SPEECH_SERVICES_ENDED,
+				RoomId:    &roomId,
+				UserId:    &userId,
+			})
+			// another to record total usage
 			s.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 				EventType:         plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
 				EventName:         plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_SPEECH_SERVICES_USAGE,
