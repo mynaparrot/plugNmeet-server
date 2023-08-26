@@ -65,6 +65,10 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 	if !config.AppCnf.AzureCognitiveServicesSpeech.Enabled {
 		r.Metadata.RoomFeatures.SpeechToTextTranslationFeatures.IsAllow = false
 	}
+	if r.Metadata.IsBreakoutRoom && r.Metadata.RoomFeatures.EnableAnalytics {
+		// at present, we'll disable analytic report for breakout rooms
+		r.Metadata.RoomFeatures.EnableAnalytics = false
+	}
 
 	meta, err := am.rs.MarshalRoomMetadata(r.Metadata)
 	if err != nil {

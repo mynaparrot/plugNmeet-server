@@ -111,11 +111,9 @@ type AzureSubscriptionKey struct {
 }
 
 type AnalyticsSettings struct {
-	Enabled         bool           `yaml:"enabled"`
-	FilesStorePath  *string        `yaml:"files_store_path"`
-	TokenValidity   *time.Duration `yaml:"token_validity"`
-	AutoDelete      *bool          `yaml:"auto_delete"`
-	AutoDeleteAfter *time.Duration `yaml:"auto_delete_after"`
+	Enabled        bool           `yaml:"enabled"`
+	FilesStorePath *string        `yaml:"files_store_path"`
+	TokenValidity  *time.Duration `yaml:"token_validity"`
 }
 
 type ChatParticipant struct {
@@ -146,13 +144,6 @@ func SetAppConfig(a *AppConfig) {
 			AppCnf.AnalyticsSettings.FilesStorePath = &p
 			d := (time.Minute * 30)
 			AppCnf.AnalyticsSettings.TokenValidity = &d
-		}
-		if AppCnf.AnalyticsSettings.AutoDelete == nil {
-			b := true
-			// by default 7 days
-			d := (time.Hour * 24 * 7)
-			AppCnf.AnalyticsSettings.AutoDelete = &b
-			AppCnf.AnalyticsSettings.AutoDeleteAfter = &d
 		}
 	}
 

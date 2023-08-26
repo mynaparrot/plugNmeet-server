@@ -325,7 +325,7 @@ func (rm *RecordingModel) sendToWebhookNotifier(r *plugnmeet.RecorderToPlugNmeet
 
 	// send analytics
 	data := &plugnmeet.AnalyticsDataMsg{
-		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
+		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
 		RoomId:    &r.RoomId,
 	}
 

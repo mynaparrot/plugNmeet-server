@@ -6,6 +6,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -109,8 +110,14 @@ func SetupSocketListeners() {
 			return
 		}
 
+		// for analytics type data we won't need to deliver anywhere
 		if dataMsg.Body.Type == plugnmeet.DataMsgBodyType_ANALYTICS_DATA {
-			//tt.HandleEvent()
+			ad := new(plugnmeet.AnalyticsDataMsg)
+			err = protojson.Unmarshal([]byte(dataMsg.Body.Msg), ad)
+			if err != nil {
+				return
+			}
+			analytics.HandleEvent(ad)
 			return
 		}
 
