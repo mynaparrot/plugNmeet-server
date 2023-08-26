@@ -67,9 +67,8 @@ func (m *AnalyticsModel) HandleWebSocketData(dataMsg *plugnmeet.DataMessage) {
 	case plugnmeet.DataMsgBodyType_SCENE_UPDATE:
 		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_WHITEBOARD_ANNOTATED
 	case plugnmeet.DataMsgBodyType_USER_VISIBILITY_CHANGE:
-		if dataMsg.Body.Msg == "hidden" {
-			d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_INTERFACE_INVISIBILITY
-		}
+		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_INTERFACE_VISIBILITY
+		d.HsetValue = &dataMsg.Body.Msg
 	case plugnmeet.DataMsgBodyType_RAISE_HAND:
 		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_RAISE_HAND
 	}
@@ -90,13 +89,17 @@ func (m *AnalyticsModel) handleRoomTypeEvents() {
 		m.handleUserTypeEvents()
 	default:
 		if m.data.EventValueInteger == nil && m.data.EventValueString == nil {
-			var mebr interface{}
-			if m.data.ZsetMemberValue != nil {
-				mebr = *m.data.ZsetMemberValue
+			var val map[string]string
+			if m.data.HsetValue != nil {
+				val = map[string]string{
+					fmt.Sprintf("%d", *m.data.Time): *m.data.HsetValue,
+				}
 			} else {
-				mebr = *m.data.Time
+				val = map[string]string{
+					fmt.Sprintf("%d", *m.data.Time): fmt.Sprintf("%d", *m.data.Time),
+				}
 			}
-			_, err := m.rc.ZAdd(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), redis.Z{Score: float64(*m.data.Time), Member: mebr}).Result()
+			_, err := m.rc.HSet(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), val).Result()
 			if err != nil {
 				log.Errorln(err)
 			}
@@ -123,13 +126,17 @@ func (m *AnalyticsModel) handleUserTypeEvents() {
 	key := fmt.Sprintf(analyticsUserKey, *m.data.RoomId, *m.data.UserId)
 
 	if m.data.EventValueInteger == nil {
-		var mebr interface{}
-		if m.data.ZsetMemberValue != nil {
-			mebr = *m.data.ZsetMemberValue
+		var val map[string]string
+		if m.data.HsetValue != nil {
+			val = map[string]string{
+				fmt.Sprintf("%d", *m.data.Time): *m.data.HsetValue,
+			}
 		} else {
-			mebr = *m.data.Time
+			val = map[string]string{
+				fmt.Sprintf("%d", *m.data.Time): fmt.Sprintf("%d", *m.data.Time),
+			}
 		}
-		_, err := m.rc.ZAdd(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), redis.Z{Score: float64(*m.data.Time), Member: mebr}).Result()
+		_, err := m.rc.HSet(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), val).Result()
 		if err != nil {
 			log.Errorln(err)
 		}
@@ -238,17 +245,18 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, meta
 				continue
 			}
 
-			if rType == "zset" {
+			if rType == "hash" {
 				var evals []*plugnmeet.AnalyticsEventValue
-				result, err := m.rc.ZRangeWithScores(m.ctx, ekey, 0, -1).Result()
+				result, err := m.rc.HGetAll(m.ctx, ekey).Result()
 				if err != nil {
 					log.Println(err)
 					continue
 				}
-				for _, rv := range result {
+				for kk, rv := range result {
+					tt, _ := strconv.ParseInt(kk, 10, 64)
 					val := &plugnmeet.AnalyticsEventValue{
-						Time:  int64(rv.Score),
-						Value: rv.Member.(string),
+						Time:  tt,
+						Value: rv,
 					}
 					evals = append(evals, val)
 				}
@@ -312,17 +320,18 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, meta
 					log.Println(err)
 					continue
 				}
-				if rType == "zset" {
+				if rType == "hash" {
 					var evals []*plugnmeet.AnalyticsEventValue
-					result, err := m.rc.ZRangeWithScores(m.ctx, ekey, 0, -1).Result()
+					result, err := m.rc.HGetAll(m.ctx, ekey).Result()
 					if err != nil {
 						log.Errorln(err)
 						continue
 					}
-					for _, rv := range result {
+					for kk, rv := range result {
+						tt, _ := strconv.ParseInt(kk, 10, 64)
 						val := &plugnmeet.AnalyticsEventValue{
-							Time:  int64(rv.Score),
-							Value: rv.Member.(string),
+							Time:  tt,
+							Value: rv,
 						}
 						evals = append(evals, val)
 					}
