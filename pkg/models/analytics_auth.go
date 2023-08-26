@@ -137,7 +137,7 @@ func (m *AnalyticsAuthModel) DeleteAnalytics(r *plugnmeet.DeleteAnalyticsReq) er
 		return err
 	}
 
-	path := fmt.Sprintf("%s/%s", config.AppCnf.AnalyticsSettings.FilesStorePath, analytic.FileName)
+	path := fmt.Sprintf("%s/%s", *config.AppCnf.AnalyticsSettings.FilesStorePath, analytic.FileName)
 
 	// delete main file
 	err = os.Remove(path)
