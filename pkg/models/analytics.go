@@ -66,9 +66,6 @@ func (m *AnalyticsModel) HandleWebSocketData(dataMsg *plugnmeet.DataMessage) {
 		}
 	case plugnmeet.DataMsgBodyType_SCENE_UPDATE:
 		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_WHITEBOARD_ANNOTATED
-	//case plugnmeet.DataMsgBodyType_ADD_WHITEBOARD_FILE,
-	//	plugnmeet.DataMsgBodyType_ADD_WHITEBOARD_OFFICE_FILE:
-	//	d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_WHITEBOARD_FILES_ADDED
 	case plugnmeet.DataMsgBodyType_USER_VISIBILITY_CHANGE:
 		if dataMsg.Body.Msg == "hidden" {
 			d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_INVISIBLE_INTERFACE
@@ -93,7 +90,13 @@ func (m *AnalyticsModel) handleRoomTypeEvents() {
 		m.handleUserTypeEvents()
 	default:
 		if m.data.EventValueInteger == nil && m.data.EventValueString == nil {
-			_, err := m.rc.ZAdd(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), redis.Z{Score: float64(*m.data.Time), Member: *m.data.Time}).Result()
+			var mebr interface{}
+			if m.data.ZsetMemberValue != nil {
+				mebr = *m.data.ZsetMemberValue
+			} else {
+				mebr = *m.data.Time
+			}
+			_, err := m.rc.ZAdd(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), redis.Z{Score: float64(*m.data.Time), Member: mebr}).Result()
 			if err != nil {
 				log.Errorln(err)
 			}
@@ -120,7 +123,13 @@ func (m *AnalyticsModel) handleUserTypeEvents() {
 	key := fmt.Sprintf(analyticsUserKey, *m.data.RoomId, *m.data.UserId)
 
 	if m.data.EventValueInteger == nil {
-		_, err := m.rc.ZAdd(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), redis.Z{Score: float64(*m.data.Time), Member: *m.data.Time}).Result()
+		var mebr interface{}
+		if m.data.ZsetMemberValue != nil {
+			mebr = *m.data.ZsetMemberValue
+		} else {
+			mebr = *m.data.Time
+		}
+		_, err := m.rc.ZAdd(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), redis.Z{Score: float64(*m.data.Time), Member: mebr}).Result()
 		if err != nil {
 			log.Errorln(err)
 		}
@@ -218,9 +227,8 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, meta
 
 			ev = strings.ToLower(strings.Replace(ev, "ANALYTICS_EVENT_ROOM_", "", 1))
 			eventInfo := &plugnmeet.AnalyticsEventData{
-				Name:   ev,
-				Total:  0,
-				Values: []string{},
+				Name:  ev,
+				Total: 0,
 			}
 
 			// we'll check type first
@@ -231,13 +239,21 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, meta
 			}
 
 			if rType == "zset" {
-				result, err := m.rc.ZRange(m.ctx, ekey, 0, -1).Result()
+				var evals []*plugnmeet.AnalyticsEventValue
+				result, err := m.rc.ZRangeWithScores(m.ctx, ekey, 0, -1).Result()
 				if err != nil {
 					log.Println(err)
 					continue
 				}
-				eventInfo.Total = uint32(len(result))
-				eventInfo.Values = result
+				for _, rv := range result {
+					val := &plugnmeet.AnalyticsEventValue{
+						Time:  int64(rv.Score),
+						Value: rv.Member.(string),
+					}
+					evals = append(evals, val)
+				}
+				eventInfo.Total = uint32(len(evals))
+				eventInfo.Values = evals
 			} else {
 				result, err := m.rc.Get(m.ctx, ekey).Result()
 				if err != redis.Nil && err != nil {
@@ -286,9 +302,8 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, meta
 
 				ev = strings.ToLower(strings.Replace(ev, "ANALYTICS_EVENT_USER_", "", 1))
 				eventInfo := &plugnmeet.AnalyticsEventData{
-					Name:   ev,
-					Total:  0,
-					Values: []string{},
+					Name:  ev,
+					Total: 0,
 				}
 
 				// we'll check type first
@@ -298,13 +313,21 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, meta
 					continue
 				}
 				if rType == "zset" {
-					result, err := m.rc.ZRange(m.ctx, ekey, 0, -1).Result()
+					var evals []*plugnmeet.AnalyticsEventValue
+					result, err := m.rc.ZRangeWithScores(m.ctx, ekey, 0, -1).Result()
 					if err != nil {
 						log.Errorln(err)
 						continue
 					}
+					for _, rv := range result {
+						val := &plugnmeet.AnalyticsEventValue{
+							Time:  int64(rv.Score),
+							Value: rv.Member.(string),
+						}
+						evals = append(evals, val)
+					}
 					eventInfo.Total = uint32(len(result))
-					eventInfo.Values = result
+					eventInfo.Values = evals
 				} else {
 					result, err := m.rc.Get(m.ctx, ekey).Result()
 					if err != redis.Nil && err != nil {
