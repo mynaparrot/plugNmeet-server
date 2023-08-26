@@ -68,7 +68,7 @@ func (m *AnalyticsModel) HandleWebSocketData(dataMsg *plugnmeet.DataMessage) {
 		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_WHITEBOARD_ANNOTATED
 	case plugnmeet.DataMsgBodyType_USER_VISIBILITY_CHANGE:
 		if dataMsg.Body.Msg == "hidden" {
-			d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_INVISIBLE_INTERFACE
+			d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_INTERFACE_INVISIBILITY
 		}
 	case plugnmeet.DataMsgBodyType_RAISE_HAND:
 		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_RAISE_HAND
