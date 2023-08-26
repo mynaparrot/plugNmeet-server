@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -97,11 +98,24 @@ func (m *AnalyticsModel) handleRoomTypeEvents() {
 		// we still need to run as user type too
 		m.handleUserTypeEvents()
 	default:
-		_, err := m.rc.ZAdd(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), redis.Z{Score: float64(*m.data.Time), Member: *m.data.Time}).Result()
-		if err != nil {
-			log.Errorln(err)
+		if m.data.EventValueInteger == nil && m.data.EventValueString == nil {
+			_, err := m.rc.ZAdd(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), redis.Z{Score: float64(*m.data.Time), Member: *m.data.Time}).Result()
+			if err != nil {
+				log.Errorln(err)
+			}
+		} else if m.data.EventValueInteger != nil {
+			// in this case we'll simply use INCRBY, which will be string type
+			_, err := m.rc.IncrBy(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), *m.data.EventValueInteger).Result()
+			if err != nil {
+				log.Errorln(err)
+			}
+		} else if m.data.EventValueString != nil {
+			// if we've event value string then we'll simply set the value
+			_, err := m.rc.Set(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), *m.data.EventValueString, time.Duration(0)).Result()
+			if err != nil {
+				log.Errorln(err)
+			}
 		}
-
 	}
 }
 
@@ -111,9 +125,25 @@ func (m *AnalyticsModel) handleUserTypeEvents() {
 	}
 	key := fmt.Sprintf(analyticsUserKey, *m.data.RoomId, *m.data.UserId)
 
-	_, err := m.rc.ZAdd(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), redis.Z{Score: float64(*m.data.Time), Member: *m.data.Time}).Result()
-	if err != nil {
-		log.Errorln(err)
+	if m.data.EventValueInteger == nil {
+		_, err := m.rc.ZAdd(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), redis.Z{Score: float64(*m.data.Time), Member: *m.data.Time}).Result()
+		if err != nil {
+			log.Errorln(err)
+		}
+	} else if m.data.EventValueInteger != nil {
+		// we are assuming that the value will be always integer
+		// in this case we'll simply use INCRBY, which will be string type
+		_, err := m.rc.IncrBy(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), *m.data.EventValueInteger).Result()
+		if err != nil {
+			log.Errorln(err)
+		}
+	} else if m.data.EventValueString != nil {
+		// we are assuming that the value will be always integer
+		// in this case we'll simply use INCRBY, which will be string type
+		_, err := m.rc.Set(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), *m.data.EventValueString, time.Duration(0)).Result()
+		if err != nil {
+			log.Errorln(err)
+		}
 	}
 }
 
@@ -145,8 +175,8 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(sid, meta string) {
 		return
 	}
 
-	fileName := fmt.Sprintf("%s-%d.json", room.Sid, room.CreationTime)
-	path := fmt.Sprintf("%s/%s", *config.AppCnf.AnalyticsSettings.FilesStorePath, fileName)
+	fileId := fmt.Sprintf("%s-%d", room.Sid, room.CreationTime)
+	path := fmt.Sprintf("%s/%s.json", *config.AppCnf.AnalyticsSettings.FilesStorePath, fileId)
 
 	// export file
 	err = m.exportAnalyticsToFile(room, path, metadata)
@@ -160,7 +190,7 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(sid, meta string) {
 	// and won't record to DB
 	if metadata.RoomFeatures.EnableAnalytics {
 		// record in db
-		m.addAnalyticsFileToDB(room.Id, room.RoomId, fileName)
+		m.addAnalyticsFileToDB(room.Id, room.RoomId, fileId)
 	}
 }
 
@@ -177,25 +207,50 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, meta
 	allKeys := []string{}
 
 	key := fmt.Sprintf(analyticsRoomKey+":room", room.RoomId)
-
+	userRedisKeys := []string{}
 	// we'll collect all room related events
 	for _, ev := range plugnmeet.AnalyticsEvents_name {
 		if strings.Contains(ev, "ANALYTICS_EVENT_ROOM_") {
 			ekey := fmt.Sprintf(key+":%s", ev)
 			allKeys = append(allKeys, ekey)
 
-			result, err := m.rc.ZRange(m.ctx, ekey, 0, -1).Result()
-			if err != nil {
-				continue
-			}
-
 			ev = strings.ToLower(strings.Replace(ev, "ANALYTICS_EVENT_ROOM_", "", 1))
 			eventInfo := &plugnmeet.AnalyticsEventData{
 				Name:   ev,
-				Total:  uint32(len(result)),
-				Values: result,
+				Total:  0,
+				Values: []string{},
 			}
+
+			// we'll check type first
+			rType, err := m.rc.Type(m.ctx, ekey).Result()
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+
+			if rType == "zset" {
+				result, err := m.rc.ZRange(m.ctx, ekey, 0, -1).Result()
+				if err != nil {
+					log.Println(err)
+					continue
+				}
+				eventInfo.Total = uint32(len(result))
+				eventInfo.Values = result
+			} else {
+				result, err := m.rc.Get(m.ctx, ekey).Result()
+				if err != redis.Nil && err != nil {
+					log.Println(err)
+					continue
+				}
+				if result != "" {
+					c, _ := strconv.Atoi(result)
+					eventInfo.Total = uint32(c)
+				}
+			}
+
 			roomInfo.Events = append(roomInfo.Events, eventInfo)
+		} else {
+			userRedisKeys = append(userRedisKeys, ev)
 		}
 	}
 
@@ -217,24 +272,46 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, meta
 			Events: []*plugnmeet.AnalyticsEventData{},
 		}
 
-		for _, ev := range plugnmeet.AnalyticsEvents_name {
+		for _, ev := range userRedisKeys {
 			if strings.Contains(ev, "ANALYTICS_EVENT_USER_") {
 				ekey := fmt.Sprintf(analyticsUserKey, room.RoomId, i)
 				ekey = fmt.Sprintf("%s:%s", ekey, ev)
 				allKeys = append(allKeys, ekey)
 
-				result, err := m.rc.ZRange(m.ctx, ekey, 0, -1).Result()
-				if err != nil {
-					continue
+				ev = strings.ToLower(strings.Replace(ev, "ANALYTICS_EVENT_USER_", "", 1))
+				eventInfo := &plugnmeet.AnalyticsEventData{
+					Name:   ev,
+					Total:  0,
+					Values: []string{},
 				}
 
-				ev = strings.ToLower(strings.Replace(ev, "ANALYTICS_EVENT_USER_", "", 1))
-				event := &plugnmeet.AnalyticsEventData{
-					Name:   ev,
-					Total:  uint32(len(result)),
-					Values: result,
+				// we'll check type first
+				rType, err := m.rc.Type(m.ctx, ekey).Result()
+				if err != nil {
+					log.Println(err)
+					continue
 				}
-				userInfo.Events = append(userInfo.Events, event)
+				if rType == "zset" {
+					result, err := m.rc.ZRange(m.ctx, ekey, 0, -1).Result()
+					if err != nil {
+						log.Errorln(err)
+						continue
+					}
+					eventInfo.Total = uint32(len(result))
+					eventInfo.Values = result
+				} else {
+					result, err := m.rc.Get(m.ctx, ekey).Result()
+					if err != redis.Nil && err != nil {
+						log.Println(err)
+						continue
+					}
+					if result != "" {
+						c, _ := strconv.Atoi(result)
+						eventInfo.Total = uint32(c)
+					}
+				}
+
+				userInfo.Events = append(userInfo.Events, eventInfo)
 			}
 		}
 
@@ -275,7 +352,7 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, meta
 	return err
 }
 
-func (m *AnalyticsModel) addAnalyticsFileToDB(roomTableId int64, roomId, fileName string) {
+func (m *AnalyticsModel) addAnalyticsFileToDB(roomTableId int64, roomId, fileId string) {
 	db := config.AppCnf.DB
 	ctx, cancel := context.WithTimeout(m.ctx, 3*time.Second)
 	defer cancel()
@@ -287,7 +364,7 @@ func (m *AnalyticsModel) addAnalyticsFileToDB(roomTableId int64, roomId, fileNam
 	}
 	defer tx.Rollback()
 
-	query := "INSERT INTO " + config.AppCnf.FormatDBTable("room_analytics") + " (room_table_id, room_id, file_name, creation_time) VALUES (?, ?, ?, ?)"
+	query := "INSERT INTO " + config.AppCnf.FormatDBTable("room_analytics") + " (room_table_id, room_id, file_id, file_name, creation_time) VALUES (?, ?, ?, ?, ?)"
 
 	stmt, err := tx.PrepareContext(ctx, query)
 	if err != nil {
@@ -295,7 +372,7 @@ func (m *AnalyticsModel) addAnalyticsFileToDB(roomTableId int64, roomId, fileNam
 		return
 	}
 
-	_, err = stmt.ExecContext(ctx, roomTableId, roomId, fileName, time.Now().Unix())
+	_, err = stmt.ExecContext(ctx, roomTableId, roomId, fileId, fileId+".json", time.Now().Unix())
 	if err != nil {
 		log.Errorln(err)
 		return
