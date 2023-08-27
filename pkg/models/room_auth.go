@@ -255,7 +255,7 @@ func (am *RoomAuthModel) FetchPastRooms(r *plugnmeet.FetchPastRoomsReq) (*plugnm
 		args = append(args, r.From)
 		args = append(args, limit)
 
-		query := "SELECT a.id, a.room_title, a.roomId, a.sid, a.joined_participants, a.webhook_url, a.created, a.ended, b.file_id FROM " + config.AppCnf.FormatDBTable("room_info") + " AS a LEFT JOIN " + config.AppCnf.FormatDBTable("room_analytics") + " AS b ON a.id = b.room_table_id WHERE room_id IN (?" + strings.Repeat(",?", len(r.RoomIds)-1) + ") ORDER BY id " + orderBy + " LIMIT ?,?"
+		query := "SELECT a.id, a.room_title, a.roomId, a.sid, a.joined_participants, a.webhook_url, a.created, a.ended, b.file_id FROM " + config.AppCnf.FormatDBTable("room_info") + " AS a LEFT JOIN " + config.AppCnf.FormatDBTable("room_analytics") + " AS b ON a.id = b.room_table_id WHERE a.roomId IN (?" + strings.Repeat(",?", len(r.RoomIds)-1) + ") ORDER BY id " + orderBy + " LIMIT ?,?"
 
 		rows, err = db.QueryContext(ctx, query, args...)
 	default:
@@ -292,7 +292,7 @@ func (am *RoomAuthModel) FetchPastRooms(r *plugnmeet.FetchPastRoomsReq) (*plugnm
 		for _, rd := range r.RoomIds {
 			args = append(args, rd)
 		}
-		query := "SELECT COUNT(*) AS total FROM " + config.AppCnf.FormatDBTable("room_info") + " WHERE room_id IN (?" + strings.Repeat(",?", len(r.RoomIds)-1) + ")"
+		query := "SELECT COUNT(*) AS total FROM " + config.AppCnf.FormatDBTable("room_info") + " WHERE roomId IN (?" + strings.Repeat(",?", len(r.RoomIds)-1) + ")"
 		row = db.QueryRowContext(ctx, query, args...)
 	default:
 		row = db.QueryRowContext(ctx, "SELECT COUNT(*) AS total FROM "+config.AppCnf.FormatDBTable("room_info"))
