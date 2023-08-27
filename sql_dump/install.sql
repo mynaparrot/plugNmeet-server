@@ -47,15 +47,15 @@ CREATE TABLE IF NOT EXISTS `pnm_recordings` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `pnm_room_analytics` (
-    `id` int(11) NOT NULL AUTO_INCREMENT,
-    `room_table_id` int(11) NOT NULL,
-    `room_id` varchar(64) NOT NULL,
-    `file_id` varchar(255) NOT NULL,
-    `file_name` varchar(255) NOT NULL,
-    `room_creation_time` int(11) NOT NULL,
-    `creation_time` int(11) NOT NULL,
-    PRIMARY KEY (`id`),
-    KEY `room_table_id` (`room_table_id`),
-    KEY `room_id` (`room_id`),
-    KEY `file_id` (`file_id`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `room_table_id` int(11) NOT NULL,
+  `room_id` varchar(64) NOT NULL,
+  `file_id` varchar(255) NOT NULL,
+  `file_name` varchar(255) NOT NULL,
+  `room_creation_time` int(11) NOT NULL,
+  `creation_time` int(11) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `room_table_id` (`room_table_id`),
+  KEY `room_id` (`room_id`),
+  KEY `file_id` (`file_id`)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
