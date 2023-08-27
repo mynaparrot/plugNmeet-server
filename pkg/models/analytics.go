@@ -17,7 +17,7 @@ import (
 const (
 	analyticsRoomKey          = "pnm:analytics:%s"
 	analyticsUserKey          = analyticsRoomKey + ":user:%s"
-	waitBeforeProcessDuration = time.Second * 10
+	waitBeforeProcessDuration = time.Second * 30
 )
 
 type AnalyticsModel struct {
@@ -180,7 +180,7 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(sid, meta string) {
 		return
 	}
 
-	// let's wait 10 seconds so that all other process will finish
+	// let's wait few seconds so that all other process will finish
 	time.Sleep(waitBeforeProcessDuration)
 
 	if _, err := os.Stat(*config.AppCnf.AnalyticsSettings.FilesStorePath); os.IsNotExist(err) {
@@ -223,6 +223,7 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, meta
 		RoomTitle:    room.RoomTitle,
 		RoomCreation: room.CreationTime,
 		RoomEnded:    ended.Unix(),
+		EnabledE2Ee:  metadata.RoomFeatures.EndToEndEncryptionFeatures.IsEnabled,
 		Events:       []*plugnmeet.AnalyticsEventData{},
 	}
 	usersInfo := []*plugnmeet.AnalyticsUserInfo{}

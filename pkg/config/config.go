@@ -145,6 +145,9 @@ func SetAppConfig(a *AppConfig) {
 			d := (time.Minute * 30)
 			AppCnf.AnalyticsSettings.TokenValidity = &d
 		}
+		if _, err := os.Stat(*AppCnf.AnalyticsSettings.FilesStorePath); os.IsNotExist(err) {
+			_ = os.MkdirAll(*AppCnf.AnalyticsSettings.FilesStorePath, os.ModePerm)
+		}
 	}
 
 	setLogger()
