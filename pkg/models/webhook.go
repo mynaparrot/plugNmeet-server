@@ -245,6 +245,7 @@ func (w *webhookEvent) trackPublished() {
 	go w.sendToWebhookNotifier(w.event)
 
 	// send analytics
+	var val string
 	data := &plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
 		RoomId:    &w.event.Room.Name,
@@ -253,13 +254,17 @@ func (w *webhookEvent) trackPublished() {
 
 	switch w.event.Track.Source {
 	case livekit.TrackSource_MICROPHONE:
-		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_STARTED_MIC
+		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()
+		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_MIC_STATUS
 	case livekit.TrackSource_CAMERA:
-		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_STARTED_WEBCAM
+		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()
+		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_WEBCAM_STATUS
 	case livekit.TrackSource_SCREEN_SHARE,
 		livekit.TrackSource_SCREEN_SHARE_AUDIO:
-		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_STARTED_SCREEN_SHARE
+		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()
+		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_SCREEN_SHARE_STATUS
 	}
+	data.HsetValue = &val
 	w.analyticsModel.HandleEvent(data)
 }
 
@@ -268,6 +273,7 @@ func (w *webhookEvent) trackUnpublished() {
 	go w.sendToWebhookNotifier(w.event)
 
 	// send analytics
+	var val string
 	data := &plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
 		RoomId:    &w.event.Room.Name,
@@ -276,13 +282,17 @@ func (w *webhookEvent) trackUnpublished() {
 
 	switch w.event.Track.Source {
 	case livekit.TrackSource_MICROPHONE:
-		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_STOPPED_MIC
+		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()
+		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_MIC_STATUS
 	case livekit.TrackSource_CAMERA:
-		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_STOPPED_WEBCAM
+		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()
+		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_WEBCAM_STATUS
 	case livekit.TrackSource_SCREEN_SHARE,
 		livekit.TrackSource_SCREEN_SHARE_AUDIO:
-		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_STOPPED_SCREEN_SHARE
+		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()
+		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_SCREEN_SHARE_STATUS
 	}
+	data.HsetValue = &val
 	w.analyticsModel.HandleEvent(data)
 }
 

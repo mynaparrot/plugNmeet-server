@@ -73,13 +73,17 @@ func (e *ExternalDisplayLink) updateRoomMetadata(opts *updateRoomMetadataOpts) e
 	_, err = e.rs.UpdateRoomMetadataByStruct(e.req.RoomId, roomMeta)
 
 	// send analytics
+	val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()
 	d := &plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
-		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_EXTERNAL_DISPLAY_LINK_STARTED,
+		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_EXTERNAL_DISPLAY_LINK_STATUS,
 		RoomId:    &e.req.RoomId,
+		HsetValue: &val,
 	}
 	if !roomMeta.RoomFeatures.DisplayExternalLinkFeatures.IsActive {
-		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_EXTERNAL_DISPLAY_LINK_ENDED
+		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()
+		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_EXTERNAL_DISPLAY_LINK_STATUS
+		d.HsetValue = &val
 	}
 	e.analyticsModel.HandleEvent(d)
 

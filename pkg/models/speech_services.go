@@ -60,13 +60,17 @@ func (s *SpeechServices) SpeechToTextTranslationServiceStatus(r *plugnmeet.Speec
 	}
 
 	// send analytics
+	val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()
 	d := &plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
-		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_SPEECH_SERVICE_STARTED,
+		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_SPEECH_SERVICE_STATUS,
 		RoomId:    &r.RoomId,
+		HsetValue: &val,
 	}
 	if !f.IsEnabled {
-		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_SPEECH_SERVICE_ENDED
+		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()
+		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_SPEECH_SERVICE_STATUS
+		d.HsetValue = &val
 	}
 	s.analyticsModel.HandleEvent(d)
 
@@ -166,11 +170,13 @@ func (s *SpeechServices) SpeechServiceUsersUsage(roomId, rSid, userId string, ta
 		// webhook
 		s.sendToWebhookNotifier(roomId, rSid, userId, task, 0)
 		// send analytics
+		val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()
 		s.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 			EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
-			EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_SPEECH_SERVICES_STARTED,
+			EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_SPEECH_SERVICES_STATUS,
 			RoomId:    &roomId,
 			UserId:    &userId,
+			HsetValue: &val,
 		})
 	case plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED:
 		if ss != "" {
@@ -196,11 +202,13 @@ func (s *SpeechServices) SpeechServiceUsersUsage(roomId, rSid, userId string, ta
 			// send webhook
 			s.sendToWebhookNotifier(roomId, rSid, userId, task, usage)
 			// send analytics
+			val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()
 			s.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 				EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
-				EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_SPEECH_SERVICES_ENDED,
+				EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_SPEECH_SERVICES_STATUS,
 				RoomId:    &roomId,
 				UserId:    &userId,
+				HsetValue: &val,
 			})
 			// another to record total usage
 			s.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{

@@ -324,6 +324,7 @@ func (rm *RecordingModel) sendToWebhookNotifier(r *plugnmeet.RecorderToPlugNmeet
 	}
 
 	// send analytics
+	var val string
 	data := &plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
 		RoomId:    &r.RoomId,
@@ -331,13 +332,18 @@ func (rm *RecordingModel) sendToWebhookNotifier(r *plugnmeet.RecorderToPlugNmeet
 
 	switch r.Task {
 	case plugnmeet.RecordingTasks_START_RECORDING:
-		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_RECORDING_STARTED
+		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_RECORDING_STATUS
+		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()
 	case plugnmeet.RecordingTasks_END_RECORDING:
-		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_RECORDING_ENDED
+		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_RECORDING_STATUS
+		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()
 	case plugnmeet.RecordingTasks_START_RTMP:
-		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_RTMP_STARTED
+		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_RTMP_STATUS
+		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()
 	case plugnmeet.RecordingTasks_END_RTMP:
-		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_RTMP_ENDED
+		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_RTMP_STATUS
+		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()
 	}
+	data.HsetValue = &val
 	rm.analyticsModel.HandleEvent(data)
 }

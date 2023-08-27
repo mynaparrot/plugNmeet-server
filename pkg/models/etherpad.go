@@ -133,10 +133,12 @@ func (m *EtherpadModel) addPadToRoomMetadata(roomId string, c *plugnmeet.CreateE
 	}
 
 	// send analytics
+	val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()
 	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
-		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_ETHERPAD_ENABLED,
+		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_ETHERPAD_STATUS,
 		RoomId:    &roomId,
+		HsetValue: &val,
 	})
 
 	return err
@@ -200,13 +202,17 @@ func (m *EtherpadModel) ChangeEtherpadStatus(r *plugnmeet.ChangeEtherpadStatusRe
 	}
 
 	// send analytics
+	val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()
 	d := &plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
-		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_ETHERPAD_ENABLED,
+		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_ETHERPAD_STATUS,
 		RoomId:    &r.RoomId,
+		HsetValue: &val,
 	}
 	if !r.IsActive {
-		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_ETHERPAD_DISABLED
+		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()
+		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_ETHERPAD_STATUS
+		d.HsetValue = &val
 	}
 	m.analyticsModel.HandleEvent(d)
 
