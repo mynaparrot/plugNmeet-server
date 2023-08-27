@@ -107,7 +107,7 @@ func (m *DataMessageModel) raiseHand(r *plugnmeet.DataMessageReq) error {
 		m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 			EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
 			EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_RAISE_HAND,
-			RoomId:    &r.RoomId,
+			RoomId:    r.RoomId,
 			UserId:    &r.RequestedUserId,
 		})
 	}

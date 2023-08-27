@@ -201,7 +201,7 @@ func (w *webhookEvent) participantJoined() {
 	w.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
 		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_JOINED,
-		RoomId:    &event.Room.Name,
+		RoomId:    event.Room.Name,
 		UserId:    &event.Participant.Identity,
 		UserName:  &event.Participant.Name,
 		ExtraData: &event.Participant.Metadata,
@@ -235,7 +235,7 @@ func (w *webhookEvent) participantLeft() {
 	w.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
 		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_LEFT,
-		RoomId:    &event.Room.Name,
+		RoomId:    event.Room.Name,
 		UserId:    &event.Participant.Identity,
 	})
 }
@@ -248,7 +248,7 @@ func (w *webhookEvent) trackPublished() {
 	var val string
 	data := &plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
-		RoomId:    &w.event.Room.Name,
+		RoomId:    w.event.Room.Name,
 		UserId:    &w.event.Participant.Identity,
 	}
 
@@ -276,7 +276,7 @@ func (w *webhookEvent) trackUnpublished() {
 	var val string
 	data := &plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
-		RoomId:    &w.event.Room.Name,
+		RoomId:    w.event.Room.Name,
 		UserId:    &w.event.Participant.Identity,
 	}
 

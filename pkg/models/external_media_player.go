@@ -83,7 +83,7 @@ func (e *ExternalMediaPlayer) updateRoomMetadata(opts *updateRoomMetadataOpts) e
 	d := &plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
 		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_EXTERNAL_MEDIA_PLAYER_STATUS,
-		RoomId:    &e.req.RoomId,
+		RoomId:    e.req.RoomId,
 		HsetValue: &val,
 	}
 	if !roomMeta.RoomFeatures.ExternalMediaPlayerFeatures.IsActive {

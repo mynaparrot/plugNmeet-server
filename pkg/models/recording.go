@@ -327,7 +327,7 @@ func (rm *RecordingModel) sendToWebhookNotifier(r *plugnmeet.RecorderToPlugNmeet
 	var val string
 	data := &plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
-		RoomId:    &r.RoomId,
+		RoomId:    r.RoomId,
 	}
 
 	switch r.Task {

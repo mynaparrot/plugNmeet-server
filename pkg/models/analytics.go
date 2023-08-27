@@ -38,9 +38,8 @@ func (m *AnalyticsModel) HandleEvent(d *plugnmeet.AnalyticsDataMsg) {
 		!config.AppCnf.AnalyticsSettings.Enabled {
 		return
 	}
-
-	now := time.Now().Unix()
-	d.Time = &now
+	// we'll use unix milliseconds to make sure fields are unique
+	d.Time = time.Now().UnixMilli()
 	m.data = d
 
 	switch d.EventType {
@@ -54,7 +53,7 @@ func (m *AnalyticsModel) HandleEvent(d *plugnmeet.AnalyticsDataMsg) {
 func (m *AnalyticsModel) HandleWebSocketData(dataMsg *plugnmeet.DataMessage) {
 	d := &plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
-		RoomId:    &dataMsg.RoomId,
+		RoomId:    dataMsg.RoomId,
 		UserId:    &dataMsg.Body.From.UserId,
 	}
 	switch dataMsg.Body.Type {
@@ -66,6 +65,12 @@ func (m *AnalyticsModel) HandleWebSocketData(dataMsg *plugnmeet.DataMessage) {
 		}
 	case plugnmeet.DataMsgBodyType_SCENE_UPDATE:
 		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_WHITEBOARD_ANNOTATED
+		val := "screen_update"
+		d.HsetValue = &val
+	case plugnmeet.DataMsgBodyType_PAGE_CHANGE:
+		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_WHITEBOARD_ANNOTATED
+		val := "page_change"
+		d.HsetValue = &val
 	case plugnmeet.DataMsgBodyType_USER_VISIBILITY_CHANGE:
 		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_INTERFACE_VISIBILITY
 		d.HsetValue = &dataMsg.Body.Msg
@@ -80,7 +85,7 @@ func (m *AnalyticsModel) handleRoomTypeEvents() {
 	if m.data.EventName == plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_UNKNOWN {
 		return
 	}
-	key := fmt.Sprintf(analyticsRoomKey+":room", *m.data.RoomId)
+	key := fmt.Sprintf(analyticsRoomKey+":room", m.data.RoomId)
 
 	switch m.data.EventName {
 	case plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_JOINED:
@@ -92,11 +97,11 @@ func (m *AnalyticsModel) handleRoomTypeEvents() {
 			var val map[string]string
 			if m.data.HsetValue != nil {
 				val = map[string]string{
-					fmt.Sprintf("%d", *m.data.Time): *m.data.HsetValue,
+					fmt.Sprintf("%d", m.data.Time): *m.data.HsetValue,
 				}
 			} else {
 				val = map[string]string{
-					fmt.Sprintf("%d", *m.data.Time): fmt.Sprintf("%d", *m.data.Time),
+					fmt.Sprintf("%d", m.data.Time): fmt.Sprintf("%d", m.data.Time),
 				}
 			}
 			_, err := m.rc.HSet(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), val).Result()
@@ -123,17 +128,17 @@ func (m *AnalyticsModel) handleUserTypeEvents() {
 	if m.data.EventName == plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_UNKNOWN {
 		return
 	}
-	key := fmt.Sprintf(analyticsUserKey, *m.data.RoomId, *m.data.UserId)
+	key := fmt.Sprintf(analyticsUserKey, m.data.RoomId, *m.data.UserId)
 
 	if m.data.EventValueInteger == nil {
 		var val map[string]string
 		if m.data.HsetValue != nil {
 			val = map[string]string{
-				fmt.Sprintf("%d", *m.data.Time): *m.data.HsetValue,
+				fmt.Sprintf("%d", m.data.Time): *m.data.HsetValue,
 			}
 		} else {
 			val = map[string]string{
-				fmt.Sprintf("%d", *m.data.Time): fmt.Sprintf("%d", *m.data.Time),
+				fmt.Sprintf("%d", m.data.Time): fmt.Sprintf("%d", m.data.Time),
 			}
 		}
 		_, err := m.rc.HSet(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), val).Result()
@@ -440,7 +445,11 @@ func (m *AnalyticsModel) handleFirstTimeUserJoined(key string) {
 		Name:    m.data.UserName,
 		IsAdmin: umeta.IsAdmin,
 	}
-	marshal, err := protojson.Marshal(uInfo)
+	op := protojson.MarshalOptions{
+		EmitUnpopulated: true,
+		UseProtoNames:   true,
+	}
+	marshal, err := op.Marshal(uInfo)
 	if err != nil {
 		log.Errorln(err)
 	}

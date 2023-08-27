@@ -52,7 +52,7 @@ func (m *PollsModel) CreatePoll(r *plugnmeet.CreatePollReq, isAdmin bool) (error
 	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
 		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_POLL_ADDED,
-		RoomId:    &r.RoomId,
+		RoomId:    r.RoomId,
 	})
 
 	return nil, r.PollId
@@ -236,7 +236,7 @@ func (m *PollsModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq, isAd
 	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
 		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_VOTED_POLL,
-		RoomId:    &r.RoomId,
+		RoomId:    r.RoomId,
 		UserId:    &r.UserId,
 	})
 

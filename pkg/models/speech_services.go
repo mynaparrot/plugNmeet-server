@@ -64,7 +64,7 @@ func (s *SpeechServices) SpeechToTextTranslationServiceStatus(r *plugnmeet.Speec
 	d := &plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
 		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_SPEECH_SERVICE_STATUS,
-		RoomId:    &r.RoomId,
+		RoomId:    r.RoomId,
 		HsetValue: &val,
 	}
 	if !f.IsEnabled {
@@ -174,7 +174,7 @@ func (s *SpeechServices) SpeechServiceUsersUsage(roomId, rSid, userId string, ta
 		s.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 			EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
 			EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_SPEECH_SERVICES_STATUS,
-			RoomId:    &roomId,
+			RoomId:    roomId,
 			UserId:    &userId,
 			HsetValue: &val,
 		})
@@ -206,7 +206,7 @@ func (s *SpeechServices) SpeechServiceUsersUsage(roomId, rSid, userId string, ta
 			s.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 				EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
 				EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_SPEECH_SERVICES_STATUS,
-				RoomId:    &roomId,
+				RoomId:    roomId,
 				UserId:    &userId,
 				HsetValue: &val,
 			})
@@ -214,7 +214,7 @@ func (s *SpeechServices) SpeechServiceUsersUsage(roomId, rSid, userId string, ta
 			s.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 				EventType:         plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
 				EventName:         plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_SPEECH_SERVICES_USAGE,
-				RoomId:            &roomId,
+				RoomId:            roomId,
 				UserId:            &userId,
 				EventValueInteger: &usage,
 			})
@@ -255,7 +255,7 @@ func (s *SpeechServices) OnAfterRoomEnded(roomId, sId string) {
 			s.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 				EventType:        plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
 				EventName:        plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_SPEECH_SERVICE_TOTAL_USAGE,
-				RoomId:           &roomId,
+				RoomId:           roomId,
 				EventValueString: &usage,
 			})
 		}
