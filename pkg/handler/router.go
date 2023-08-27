@@ -95,6 +95,8 @@ func Router() *fiber.App {
 	room.Post("/getActiveRoomInfo", controllers.HandleGetActiveRoomInfo)
 	room.Post("/getActiveRoomsInfo", controllers.HandleGetActiveRoomsInfo)
 	room.Post("/endRoom", controllers.HandleEndRoom)
+	room.Post("/fetchPastRooms", controllers.HandleFetchPastRooms)
+
 	// for recording
 	recording := auth.Group("/recording")
 	recording.Post("/fetch", controllers.HandleFetchRecordings)

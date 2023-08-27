@@ -333,13 +333,13 @@ func (rm *RecordingModel) sendToWebhookNotifier(r *plugnmeet.RecorderToPlugNmeet
 	switch r.Task {
 	case plugnmeet.RecordingTasks_START_RECORDING:
 		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_RECORDING_STATUS
-		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()
+		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String() + ":" + r.RecorderId
 	case plugnmeet.RecordingTasks_END_RECORDING:
 		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_RECORDING_STATUS
 		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()
 	case plugnmeet.RecordingTasks_START_RTMP:
 		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_RTMP_STATUS
-		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()
+		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String() + ":" + r.RecorderId
 	case plugnmeet.RecordingTasks_END_RTMP:
 		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_RTMP_STATUS
 		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()
