@@ -187,7 +187,7 @@ func (m *AnalyticsAuthModel) DeleteAnalytics(r *plugnmeet.DeleteAnalyticsReq) er
 
 // GetAnalyticsDownloadToken will use same JWT token generator as Livekit is using
 func (m *AnalyticsAuthModel) GetAnalyticsDownloadToken(r *plugnmeet.GetAnalyticsDownloadTokenReq) (string, error) {
-	recording, err := m.fetchAnalytic(r.FileId)
+	analytic, err := m.fetchAnalytic(r.FileId)
 	if err != nil {
 		return "", err
 	}
@@ -202,7 +202,7 @@ func (m *AnalyticsAuthModel) GetAnalyticsDownloadToken(r *plugnmeet.GetAnalytics
 		Issuer:    m.app.Client.ApiKey,
 		NotBefore: jwt.NewNumericDate(time.Now()),
 		Expiry:    jwt.NewNumericDate(time.Now().Add(*m.app.AnalyticsSettings.TokenValidity)),
-		Subject:   recording.FileName,
+		Subject:   analytic.FileName,
 	}
 
 	return jwt.Signed(sig).Claims(cl).CompactSerialize()
