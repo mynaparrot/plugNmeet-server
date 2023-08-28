@@ -55,11 +55,11 @@ func (m *AnalyticsAuthModel) FetchAnalytics(r *plugnmeet.FetchAnalyticsReq) (*pl
 		args = append(args, r.From)
 		args = append(args, limit)
 
-		query := "SELECT room_id, file_id, file_name, room_creation_time, creation_time FROM " + m.app.FormatDBTable("room_analytics") + " WHERE room_id IN (?" + strings.Repeat(",?", len(r.RoomIds)-1) + ") ORDER BY id " + orderBy + " LIMIT ?,?"
+		query := "SELECT room_id, file_id, file_name, file_size, room_creation_time, creation_time FROM " + m.app.FormatDBTable("room_analytics") + " WHERE room_id IN (?" + strings.Repeat(",?", len(r.RoomIds)-1) + ") ORDER BY id " + orderBy + " LIMIT ?,?"
 
 		rows, err = db.QueryContext(ctx, query, args...)
 	default:
-		rows, err = db.QueryContext(ctx, "SELECT room_id, file_id, file_name, room_creation_time, creation_time FROM "+m.app.FormatDBTable("room_analytics")+" ORDER BY id "+orderBy+" LIMIT ?,?", r.From, limit)
+		rows, err = db.QueryContext(ctx, "SELECT room_id, file_id, file_name, file_size, room_creation_time, creation_time FROM "+m.app.FormatDBTable("room_analytics")+" ORDER BY id "+orderBy+" LIMIT ?,?", r.From, limit)
 	}
 
 	if err != nil {
@@ -72,7 +72,7 @@ func (m *AnalyticsAuthModel) FetchAnalytics(r *plugnmeet.FetchAnalyticsReq) (*pl
 	for rows.Next() {
 		var analytic plugnmeet.AnalyticsInfo
 
-		err = rows.Scan(&analytic.RoomId, &analytic.FileId, &analytic.FileName, &analytic.RoomCreationTime, &analytic.CreationTime)
+		err = rows.Scan(&analytic.RoomId, &analytic.FileId, &analytic.FileName, &analytic.FileSize, &analytic.RoomCreationTime, &analytic.CreationTime)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -145,7 +145,7 @@ func (m *AnalyticsAuthModel) DeleteAnalytics(r *plugnmeet.DeleteAnalyticsReq) er
 		// if file not exist then we can delete it from record without showing any error
 		if !os.IsNotExist(err) {
 			ms := strings.SplitN(err.Error(), "/", -1)
-			return errors.New(ms[3])
+			return errors.New(ms[len(ms)-1])
 		}
 	}
 

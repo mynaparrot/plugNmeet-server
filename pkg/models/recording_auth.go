@@ -160,7 +160,7 @@ func (a *AuthRecording) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
 		// if file not exist then we can delete it from record without showing any error
 		if !os.IsNotExist(err) {
 			ms := strings.SplitN(err.Error(), "/", -1)
-			return errors.New(ms[3])
+			return errors.New(ms[len(ms)-1])
 		}
 	}
 
