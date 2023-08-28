@@ -117,7 +117,7 @@ func (m *DataMessageModel) raiseHand(r *plugnmeet.DataMessageReq) error {
 	}
 
 	mId := uuid.NewString()
-	tm := time.Now().Format(time.RFC1123Z)
+	tm := time.Now().UTC().Format(time.RFC1123Z)
 	msg := &plugnmeet.DataMessage{
 		Type:      plugnmeet.DataMsgType_SYSTEM,
 		MessageId: &mId,
@@ -178,7 +178,7 @@ func (m *DataMessageModel) otherUserLowerHand(r *plugnmeet.DataMessageReq) error
 
 func (m *DataMessageModel) sendNotification(r *plugnmeet.DataMessageReq) error {
 	mId := uuid.NewString()
-	tm := time.Now().Format(time.RFC1123Z)
+	tm := time.Now().UTC().Format(time.RFC1123Z)
 
 	msg := &plugnmeet.DataMessage{
 		Type:      plugnmeet.DataMsgType_SYSTEM,
@@ -203,7 +203,7 @@ func (m *DataMessageModel) sendNotification(r *plugnmeet.DataMessageReq) error {
 
 func (m *DataMessageModel) SendUpdatedMetadata(roomId, metadata string) error {
 	mId := uuid.NewString()
-	tm := time.Now().Format(time.RFC1123Z)
+	tm := time.Now().UTC().Format(time.RFC1123Z)
 
 	msg := &plugnmeet.DataMessage{
 		Type:      plugnmeet.DataMsgType_SYSTEM,

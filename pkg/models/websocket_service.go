@@ -27,7 +27,7 @@ func (w *WebsocketServiceModel) HandleDataMessages(payload *plugnmeet.DataMessag
 		payload.MessageId = &uu
 	}
 	if payload.Body.Time == nil {
-		tt := time.Now().Format(time.RFC1123Z)
+		tt := time.Now().UTC().Format(time.RFC1123Z)
 		payload.Body.Time = &tt
 	}
 

@@ -263,7 +263,7 @@ func (m *BreakoutRoom) EndBreakoutRoom(r *plugnmeet.EndBreakoutRoomReq) error {
 	_, _ = model.UpdateRoomStatus(&RoomInfo{
 		RoomId:    r.BreakoutRoomId,
 		IsRunning: 0,
-		Ended:     time.Now().Format("2006-01-02 15:04:05"),
+		Ended:     time.Now().UTC().Format("2006-01-02 15:04:05"),
 	})
 
 	m.rc.HDel(m.ctx, breakoutRoomKey+r.RoomId, r.BreakoutRoomId)

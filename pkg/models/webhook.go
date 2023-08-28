@@ -69,7 +69,7 @@ func (w *webhookEvent) roomStarted() {
 		Sid:          event.Room.Sid,
 		IsRunning:    1,
 		CreationTime: event.Room.CreationTime,
-		Created:      time.Now().Format("2006-01-02 15:04:05"),
+		Created:      time.Now().UTC().Format("2006-01-02 15:04:05"),
 	}
 	_, err := w.roomModel.InsertOrUpdateRoomData(room, false)
 	if err != nil {
@@ -108,7 +108,7 @@ func (w *webhookEvent) roomFinished() {
 	room := &RoomInfo{
 		Sid:       event.Room.Sid,
 		IsRunning: 0,
-		Ended:     time.Now().Format("2006-01-02 15:04:05"),
+		Ended:     time.Now().UTC().Format("2006-01-02 15:04:05"),
 	}
 	_, err := w.roomModel.UpdateRoomStatus(room)
 	if err != nil {

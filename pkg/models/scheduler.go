@@ -134,7 +134,7 @@ func (s *SchedulerModel) activeRoomChecker() {
 			_, _ = s.ra.rm.UpdateRoomStatus(&RoomInfo{
 				Sid:       room.Sid,
 				IsRunning: 0,
-				Ended:     time.Now().Format("2006-01-02 15:04:05"),
+				Ended:     time.Now().UTC().Format("2006-01-02 15:04:05"),
 			})
 			continue
 		} else if fromRedis == nil {

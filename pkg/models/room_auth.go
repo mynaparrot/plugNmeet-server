@@ -98,7 +98,7 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 		JoinedParticipants: 0,
 		IsRunning:          1,
 		CreationTime:       room.CreationTime,
-		Created:            time.Now().Format("2006-01-02 15:04:05"),
+		Created:            time.Now().UTC().Format("2006-01-02 15:04:05"),
 		WebhookUrl:         "",
 		IsBreakoutRoom:     int64(isBreakoutRoom),
 		ParentRoomId:       r.Metadata.ParentRoomId,
@@ -134,7 +134,7 @@ func (am *RoomAuthModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (bool, strin
 		_, _ = am.rm.UpdateRoomStatus(&RoomInfo{
 			RoomId:    r.RoomId,
 			IsRunning: 0,
-			Ended:     time.Now().Format("2006-01-02 15:04:05"),
+			Ended:     time.Now().UTC().Format("2006-01-02 15:04:05"),
 		})
 		return false, "room is not active", nil
 	}
@@ -222,7 +222,7 @@ func (am *RoomAuthModel) EndRoom(r *plugnmeet.RoomEndReq) (bool, string) {
 	_, _ = am.rm.UpdateRoomStatus(&RoomInfo{
 		RoomId:    r.RoomId,
 		IsRunning: 0,
-		Ended:     time.Now().Format("2006-01-02 15:04:05"),
+		Ended:     time.Now().UTC().Format("2006-01-02 15:04:05"),
 	})
 
 	return true, "success"
