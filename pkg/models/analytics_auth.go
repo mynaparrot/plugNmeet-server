@@ -112,10 +112,10 @@ func (m *AnalyticsAuthModel) fetchAnalytic(fileId string) (*plugnmeet.AnalyticsI
 	ctx, cancel := context.WithTimeout(m.ctx, 3*time.Second)
 	defer cancel()
 
-	row := db.QueryRowContext(ctx, "SELECT room_id, file_id, file_name, room_creation_time, creation_time FROM "+m.app.FormatDBTable("room_analytics")+" WHERE file_id = ?", fileId)
+	row := db.QueryRowContext(ctx, "SELECT room_id, file_id, file_name, file_size, room_creation_time, creation_time FROM "+m.app.FormatDBTable("room_analytics")+" WHERE file_id = ?", fileId)
 
 	analytic := new(plugnmeet.AnalyticsInfo)
-	err := row.Scan(&analytic.RoomId, &analytic.FileId, &analytic.FileName, &analytic.RoomCreationTime, &analytic.CreationTime)
+	err := row.Scan(&analytic.RoomId, &analytic.FileId, &analytic.FileName, &analytic.FileSize, &analytic.RoomCreationTime, &analytic.CreationTime)
 
 	switch {
 	case err == sql.ErrNoRows:

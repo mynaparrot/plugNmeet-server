@@ -201,7 +201,7 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(sid, meta string) {
 	path := fmt.Sprintf("%s/%s.json", *config.AppCnf.AnalyticsSettings.FilesStorePath, fileId)
 
 	// export file
-	err = m.exportAnalyticsToFile(room, path, metadata)
+	stat, err := m.exportAnalyticsToFile(room, path, metadata)
 	if err != nil {
 		return
 	}
@@ -212,11 +212,11 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(sid, meta string) {
 	// and won't record to DB
 	if metadata.RoomFeatures.EnableAnalytics {
 		// record in db
-		m.addAnalyticsFileToDB(room.Id, room.CreationTime, room.RoomId, fileId)
+		m.addAnalyticsFileToDB(room.Id, room.CreationTime, room.RoomId, fileId, stat)
 	}
 }
 
-func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, metadata *plugnmeet.RoomMetadata) error {
+func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, metadata *plugnmeet.RoomMetadata) (os.FileInfo, error) {
 	ended, _ := time.Parse("2006-01-02 15:04:05", room.Ended)
 	roomInfo := &plugnmeet.AnalyticsRoomInfo{
 		RoomId:       room.RoomId,
@@ -292,7 +292,7 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, meta
 	allKeys = append(allKeys, fmt.Sprintf("%s:users", key))
 	if err != nil {
 		log.Errorln(err)
-		return err
+		return nil, err
 	}
 	roomInfo.RoomTotalUsers = int64(len(users))
 	roomInfo.RoomDuration = roomInfo.RoomEnded - roomInfo.RoomCreation
@@ -362,6 +362,7 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, meta
 		usersInfo = append(usersInfo, userInfo)
 	}
 
+	var stat os.FileInfo
 	// it's not possible to get room metadata as always
 	// so, if room didn't have activated analytics feature,
 	// we will simply won't create the file & delete all records
@@ -377,13 +378,18 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, meta
 		marshal, err := op.Marshal(result)
 		if err != nil {
 			log.Errorln(err)
-			return err
+			return nil, err
 		}
 
 		err = os.WriteFile(path, marshal, 0644)
 		if err != nil {
 			log.Errorln(err)
-			return err
+			return nil, err
+		}
+		stat, err = os.Stat(path)
+		if err != nil {
+			log.Errorln(err)
+			return nil, err
 		}
 	}
 
@@ -393,10 +399,10 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, meta
 		log.Errorln(err)
 	}
 
-	return err
+	return stat, err
 }
 
-func (m *AnalyticsModel) addAnalyticsFileToDB(roomTableId, roomCreationTime int64, roomId, fileId string) {
+func (m *AnalyticsModel) addAnalyticsFileToDB(roomTableId, roomCreationTime int64, roomId, fileId string, stat os.FileInfo) {
 	db := config.AppCnf.DB
 	ctx, cancel := context.WithTimeout(m.ctx, 3*time.Second)
 	defer cancel()
@@ -408,7 +414,7 @@ func (m *AnalyticsModel) addAnalyticsFileToDB(roomTableId, roomCreationTime int6
 	}
 	defer tx.Rollback()
 
-	query := "INSERT INTO " + config.AppCnf.FormatDBTable("room_analytics") + " (room_table_id, room_id, file_id, file_name, room_creation_time, creation_time) VALUES (?, ?, ?, ?, ?, ?)"
+	query := "INSERT INTO " + config.AppCnf.FormatDBTable("room_analytics") + " (room_table_id, room_id, file_id, file_name, file_size, room_creation_time, creation_time) VALUES (?, ?, ?, ?, ?, ?, ?)"
 
 	stmt, err := tx.PrepareContext(ctx, query)
 	if err != nil {
@@ -416,7 +422,15 @@ func (m *AnalyticsModel) addAnalyticsFileToDB(roomTableId, roomCreationTime int6
 		return
 	}
 
-	_, err = stmt.ExecContext(ctx, roomTableId, roomId, fileId, fileId+".json", roomCreationTime, time.Now().Unix())
+	fsize := float64(stat.Size())
+	// we'll convert bytes to KB
+	if fsize > 1000 {
+		fsize = fsize / 1000.0
+	} else {
+		fsize = 1
+	}
+
+	_, err = stmt.ExecContext(ctx, roomTableId, roomId, fileId, fileId+".json", fsize, roomCreationTime, time.Now().Unix())
 	if err != nil {
 		log.Errorln(err)
 		return
