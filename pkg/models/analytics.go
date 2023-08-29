@@ -63,14 +63,12 @@ func (m *AnalyticsModel) HandleWebSocketData(dataMsg *plugnmeet.DataMessage) {
 		} else {
 			d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_PUBLIC_CHAT
 		}
+		var val int64 = 1
+		d.EventValueInteger = &val
 	case plugnmeet.DataMsgBodyType_SCENE_UPDATE:
 		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_WHITEBOARD_ANNOTATED
-		val := "screen_update"
-		d.HsetValue = &val
-	case plugnmeet.DataMsgBodyType_PAGE_CHANGE:
-		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_WHITEBOARD_ANNOTATED
-		val := "page_change"
-		d.HsetValue = &val
+		var val int64 = 1
+		d.EventValueInteger = &val
 	case plugnmeet.DataMsgBodyType_USER_VISIBILITY_CHANGE:
 		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_INTERFACE_VISIBILITY
 		d.HsetValue = &dataMsg.Body.Msg
