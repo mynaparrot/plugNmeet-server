@@ -91,34 +91,7 @@ func (m *AnalyticsModel) handleRoomTypeEvents() {
 		// we still need to run as user type too
 		m.handleUserTypeEvents()
 	default:
-		if m.data.EventValueInteger == nil && m.data.EventValueString == nil {
-			var val map[string]string
-			if m.data.HsetValue != nil {
-				val = map[string]string{
-					fmt.Sprintf("%d", m.data.Time): *m.data.HsetValue,
-				}
-			} else {
-				val = map[string]string{
-					fmt.Sprintf("%d", m.data.Time): fmt.Sprintf("%d", m.data.Time),
-				}
-			}
-			_, err := m.rc.HSet(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), val).Result()
-			if err != nil {
-				log.Errorln(err)
-			}
-		} else if m.data.EventValueInteger != nil {
-			// in this case we'll simply use INCRBY, which will be string type
-			_, err := m.rc.IncrBy(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), *m.data.EventValueInteger).Result()
-			if err != nil {
-				log.Errorln(err)
-			}
-		} else if m.data.EventValueString != nil {
-			// if we've event value string then we'll simply set the value
-			_, err := m.rc.Set(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), *m.data.EventValueString, time.Duration(0)).Result()
-			if err != nil {
-				log.Errorln(err)
-			}
-		}
+		m.insertEventData(key)
 	}
 }
 
@@ -127,8 +100,12 @@ func (m *AnalyticsModel) handleUserTypeEvents() {
 		return
 	}
 	key := fmt.Sprintf(analyticsUserKey, m.data.RoomId, *m.data.UserId)
+	m.insertEventData(key)
+}
 
-	if m.data.EventValueInteger == nil {
+func (m *AnalyticsModel) insertEventData(key string) {
+	if m.data.EventValueInteger == nil && m.data.EventValueString == nil {
+		// so this will be HSET type
 		var val map[string]string
 		if m.data.HsetValue != nil {
 			val = map[string]string{
@@ -151,8 +128,8 @@ func (m *AnalyticsModel) handleUserTypeEvents() {
 			log.Errorln(err)
 		}
 	} else if m.data.EventValueString != nil {
-		// we are assuming that the value will be always integer
-		// in this case we'll simply use INCRBY, which will be string type
+		// we are assuming that we want to set the supplied value
+		// in this case we'll simply use SET, which will be string type
 		_, err := m.rc.Set(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), *m.data.EventValueString, time.Duration(0)).Result()
 		if err != nil {
 			log.Errorln(err)
