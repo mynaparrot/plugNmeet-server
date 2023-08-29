@@ -255,11 +255,11 @@ func (am *RoomAuthModel) FetchPastRooms(r *plugnmeet.FetchPastRoomsReq) (*plugnm
 		args = append(args, r.From)
 		args = append(args, limit)
 
-		query := "SELECT a.room_title, a.roomId, a.sid, a.joined_participants, a.webhook_url, a.created, a.ended, b.file_id FROM " + config.AppCnf.FormatDBTable("room_info") + " AS a LEFT JOIN " + config.AppCnf.FormatDBTable("room_analytics") + " AS b ON a.id = b.room_table_id WHERE a.roomId IN (?" + strings.Repeat(",?", len(r.RoomIds)-1) + ") ORDER BY a.id " + orderBy + " LIMIT ?,?"
+		query := "SELECT a.room_title, a.roomId, a.sid, a.joined_participants, a.webhook_url, a.created, a.ended, b.file_id FROM " + config.AppCnf.FormatDBTable("room_info") + " AS a LEFT JOIN " + config.AppCnf.FormatDBTable("room_analytics") + " AS b ON a.id = b.room_table_id WHERE a.roomId IN (?" + strings.Repeat(",?", len(r.RoomIds)-1) + ") AND a.is_running = '0' ORDER BY a.id " + orderBy + " LIMIT ?,?"
 
 		rows, err = db.QueryContext(ctx, query, args...)
 	default:
-		rows, err = db.QueryContext(ctx, "SELECT a.room_title, a.roomId, a.sid, a.joined_participants, a.webhook_url, a.created, a.ended, b.file_id FROM  "+config.AppCnf.FormatDBTable("room_info")+" AS a LEFT JOIN "+config.AppCnf.FormatDBTable("room_analytics")+" AS b ON a.id = b.room_table_id ORDER BY a.id "+orderBy+" LIMIT ?,?", r.From, limit)
+		rows, err = db.QueryContext(ctx, "SELECT a.room_title, a.roomId, a.sid, a.joined_participants, a.webhook_url, a.created, a.ended, b.file_id FROM  "+config.AppCnf.FormatDBTable("room_info")+" AS a LEFT JOIN "+config.AppCnf.FormatDBTable("room_analytics")+" AS b ON a.id = b.room_table_id WHERE a.is_running = '0' ORDER BY a.id "+orderBy+" LIMIT ?,?", r.From, limit)
 	}
 
 	if err != nil {
@@ -290,10 +290,10 @@ func (am *RoomAuthModel) FetchPastRooms(r *plugnmeet.FetchPastRoomsReq) (*plugnm
 		for _, rd := range r.RoomIds {
 			args = append(args, rd)
 		}
-		query := "SELECT COUNT(*) AS total FROM " + config.AppCnf.FormatDBTable("room_info") + " WHERE roomId IN (?" + strings.Repeat(",?", len(r.RoomIds)-1) + ")"
+		query := "SELECT COUNT(*) AS total FROM " + config.AppCnf.FormatDBTable("room_info") + " WHERE roomId IN (?" + strings.Repeat(",?", len(r.RoomIds)-1) + ") AND is_running = '0'"
 		row = db.QueryRowContext(ctx, query, args...)
 	default:
-		row = db.QueryRowContext(ctx, "SELECT COUNT(*) AS total FROM "+config.AppCnf.FormatDBTable("room_info"))
+		row = db.QueryRowContext(ctx, "SELECT COUNT(*) AS total FROM "+config.AppCnf.FormatDBTable("room_info")+" WHERE is_running = '0'")
 	}
 
 	var total int64
