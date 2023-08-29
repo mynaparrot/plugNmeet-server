@@ -242,40 +242,9 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, meta
 				Total: 0,
 			}
 
-			// we'll check type first
-			rType, err := m.rc.Type(m.ctx, ekey).Result()
+			err := m.buildEventInfo(ekey, eventInfo)
 			if err != nil {
-				log.Println(err)
 				continue
-			}
-
-			if rType == "hash" {
-				var evals []*plugnmeet.AnalyticsEventValue
-				result, err := m.rc.HGetAll(m.ctx, ekey).Result()
-				if err != nil {
-					log.Println(err)
-					continue
-				}
-				for kk, rv := range result {
-					tt, _ := strconv.ParseInt(kk, 10, 64)
-					val := &plugnmeet.AnalyticsEventValue{
-						Time:  tt,
-						Value: rv,
-					}
-					evals = append(evals, val)
-				}
-				eventInfo.Total = uint32(len(evals))
-				eventInfo.Values = evals
-			} else {
-				result, err := m.rc.Get(m.ctx, ekey).Result()
-				if err != redis.Nil && err != nil {
-					log.Println(err)
-					continue
-				}
-				if result != "" {
-					c, _ := strconv.Atoi(result)
-					eventInfo.Total = uint32(c)
-				}
 			}
 
 			roomInfo.Events = append(roomInfo.Events, eventInfo)
@@ -317,42 +286,10 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, meta
 					Name:  ev,
 					Total: 0,
 				}
-
-				// we'll check type first
-				rType, err := m.rc.Type(m.ctx, ekey).Result()
+				err = m.buildEventInfo(ekey, eventInfo)
 				if err != nil {
-					log.Println(err)
 					continue
 				}
-				if rType == "hash" {
-					var evals []*plugnmeet.AnalyticsEventValue
-					result, err := m.rc.HGetAll(m.ctx, ekey).Result()
-					if err != nil {
-						log.Errorln(err)
-						continue
-					}
-					for kk, rv := range result {
-						tt, _ := strconv.ParseInt(kk, 10, 64)
-						val := &plugnmeet.AnalyticsEventValue{
-							Time:  tt,
-							Value: rv,
-						}
-						evals = append(evals, val)
-					}
-					eventInfo.Total = uint32(len(result))
-					eventInfo.Values = evals
-				} else {
-					result, err := m.rc.Get(m.ctx, ekey).Result()
-					if err != redis.Nil && err != nil {
-						log.Println(err)
-						continue
-					}
-					if result != "" {
-						c, _ := strconv.Atoi(result)
-						eventInfo.Total = uint32(c)
-					}
-				}
-
 				userInfo.Events = append(userInfo.Events, eventInfo)
 			}
 		}
@@ -398,6 +335,53 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, meta
 	}
 
 	return stat, err
+}
+
+func (m *AnalyticsModel) buildEventInfo(ekey string, eventInfo *plugnmeet.AnalyticsEventData) error {
+	// we'll check type first
+	rType, err := m.rc.Type(m.ctx, ekey).Result()
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	if rType == "hash" {
+		var evals []*plugnmeet.AnalyticsEventValue
+		result, err := m.rc.HGetAll(m.ctx, ekey).Result()
+		if err != nil {
+			log.Errorln(err)
+			return err
+		}
+		for kk, rv := range result {
+			tt, _ := strconv.ParseInt(kk, 10, 64)
+			val := &plugnmeet.AnalyticsEventValue{
+				Time:  tt,
+				Value: rv,
+			}
+			evals = append(evals, val)
+		}
+		eventInfo.Total = uint32(len(result))
+		eventInfo.Values = evals
+	} else {
+		result, err := m.rc.Get(m.ctx, ekey).Result()
+		if err != redis.Nil && err != nil {
+			log.Println(err)
+			return err
+		}
+		if result != "" {
+			c, err := strconv.Atoi(result)
+			if err != nil {
+				// we are assuming that we want to get the value as it
+				eventInfo.Total = 1
+				val := &plugnmeet.AnalyticsEventValue{
+					Value: result,
+				}
+				eventInfo.Values = append(eventInfo.Values, val)
+			} else {
+				eventInfo.Total = uint32(c)
+			}
+		}
+	}
+	return nil
 }
 
 func (m *AnalyticsModel) addAnalyticsFileToDB(roomTableId, roomCreationTime int64, roomId, fileId string, stat os.FileInfo) {
