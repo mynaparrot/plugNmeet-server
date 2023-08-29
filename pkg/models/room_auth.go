@@ -271,8 +271,7 @@ func (am *RoomAuthModel) FetchPastRooms(r *plugnmeet.FetchPastRoomsReq) (*plugnm
 
 	for rows.Next() {
 		var room plugnmeet.PastRoomInfo
-		var rSid sql.NullString
-		var analyticsFileId sql.NullString
+		var rSid, analyticsFileId sql.NullString
 
 		err = rows.Scan(&room.RoomTitle, &room.RoomId, &rSid, &room.JoinedParticipants, &room.WebhookUrl, &room.Created, &room.Ended, &analyticsFileId)
 		if err != nil {
