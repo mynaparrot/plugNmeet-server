@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"gopkg.in/square/go-jose.v2"
@@ -209,19 +210,19 @@ func (m *AnalyticsAuthModel) GetAnalyticsDownloadToken(r *plugnmeet.GetAnalytics
 }
 
 // VerifyAnalyticsToken verify token & provide file path
-func (a *AnalyticsAuthModel) VerifyAnalyticsToken(token string) (string, error) {
+func (a *AnalyticsAuthModel) VerifyAnalyticsToken(token string) (string, int, error) {
 	tok, err := jwt.ParseSigned(token)
 	if err != nil {
-		return "", err
+		return "", fiber.StatusUnauthorized, err
 	}
 
 	out := jwt.Claims{}
 	if err = tok.Claims([]byte(config.AppCnf.Client.Secret), &out); err != nil {
-		return "", err
+		return "", fiber.StatusUnauthorized, err
 	}
 
 	if err = out.Validate(jwt.Expected{Issuer: config.AppCnf.Client.ApiKey, Time: time.Now()}); err != nil {
-		return "", err
+		return "", fiber.StatusUnauthorized, err
 	}
 
 	file := fmt.Sprintf("%s/%s", *config.AppCnf.AnalyticsSettings.FilesStorePath, out.Subject)
@@ -229,8 +230,8 @@ func (a *AnalyticsAuthModel) VerifyAnalyticsToken(token string) (string, error) 
 
 	if err != nil {
 		ms := strings.SplitN(err.Error(), "/", -1)
-		return "", errors.New(ms[len(ms)-1])
+		return "", fiber.StatusNotFound, errors.New(ms[len(ms)-1])
 	}
 
-	return file, nil
+	return file, fiber.StatusOK, nil
 }

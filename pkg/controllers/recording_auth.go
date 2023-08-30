@@ -100,10 +100,10 @@ func HandleDownloadRecording(c *fiber.Ctx) error {
 	}
 
 	m := models.NewRecordingAuth()
-	file, err := m.VerifyRecordingToken(token)
+	file, status, err := m.VerifyRecordingToken(token)
 
 	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).SendString(err.Error())
+		return c.Status(status).SendString(err.Error())
 	}
 
 	c.Attachment(file)

@@ -101,10 +101,10 @@ func HandleDownloadAnalytics(c *fiber.Ctx) error {
 	}
 
 	m := models.NewAnalyticsAuthModel()
-	file, err := m.VerifyAnalyticsToken(token)
+	file, status, err := m.VerifyAnalyticsToken(token)
 
 	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).SendString(err.Error())
+		return c.Status(status).SendString(err.Error())
 	}
 
 	c.Attachment(file)
