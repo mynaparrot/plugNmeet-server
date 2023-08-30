@@ -96,14 +96,14 @@ func HandleDownloadRecording(c *fiber.Ctx) error {
 	token := c.Params("token")
 
 	if len(token) == 0 {
-		return utils.SendCommonProtoJsonResponse(c, false, "token require or invalid url")
+		return c.Status(fiber.StatusUnauthorized).SendString("token require or invalid url")
 	}
 
 	m := models.NewRecordingAuth()
 	file, err := m.VerifyRecordingToken(token)
 
 	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+		return c.Status(fiber.StatusUnauthorized).SendString(err.Error())
 	}
 
 	c.Attachment(file)
