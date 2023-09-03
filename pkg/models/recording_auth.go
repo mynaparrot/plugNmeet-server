@@ -167,6 +167,8 @@ func (a *AuthRecording) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
 
 	// delete compressed, if any
 	_ = os.Remove(path + ".fiber.gz")
+	// delete record info file too
+	_ = os.Remove(path + ".json")
 
 	// no error, so we'll delete record from DB
 	db := a.db
