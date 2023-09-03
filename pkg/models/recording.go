@@ -312,16 +312,25 @@ func (rm *RecordingModel) addRecording(r *plugnmeet.RecorderToPlugNmeet, roomCre
 // or will get idea about the recording
 // format: path/recording_file_name.{mp4|webm}.json
 func (rm *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet, creation int64, roomInfo *RoomInfo) {
-	ended, _ := time.Parse("2006-01-02 15:04:05", roomInfo.Ended)
+	var ended int64 = 0
+	e, err := time.Parse("2006-01-02 15:04:05", roomInfo.Ended)
+	if err == nil {
+		ended = e.Unix()
+		// this is indicating that the session is still running
+		if ended < 1 {
+			ended = 0
+		}
+	}
+
 	toRecord := &plugnmeet.RecordingInfoFile{
 		RoomTableId:      r.RoomTableId,
 		RoomId:           r.RoomId,
 		RoomTitle:        roomInfo.RoomTitle,
 		RoomSid:          r.RoomSid,
 		RoomCreationTime: roomInfo.CreationTime,
-		RoomEnded:        ended.Unix(),
+		RoomEnded:        ended,
 		RecordingId:      r.RecordingId,
-		RecorderId:       r.RecordingId,
+		RecorderId:       r.RecorderId,
 		FilePath:         r.FilePath,
 		FileSize:         r.FileSize,
 		CreationTime:     creation,
