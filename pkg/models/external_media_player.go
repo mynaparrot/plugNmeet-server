@@ -6,13 +6,15 @@ import (
 )
 
 type ExternalMediaPlayer struct {
-	rs  *RoomService
-	req *plugnmeet.ExternalMediaPlayerReq
+	rs             *RoomService
+	req            *plugnmeet.ExternalMediaPlayerReq
+	analyticsModel *AnalyticsModel
 }
 
 func NewExternalMediaPlayerModel() *ExternalMediaPlayer {
 	return &ExternalMediaPlayer{
-		rs: NewRoomService(),
+		rs:             NewRoomService(),
+		analyticsModel: NewAnalyticsModel(),
 	}
 }
 
@@ -75,6 +77,21 @@ func (e *ExternalMediaPlayer) updateRoomMetadata(opts *updateRoomMetadataOpts) e
 	}
 
 	_, err = e.rs.UpdateRoomMetadataByStruct(e.req.RoomId, roomMeta)
+
+	// send analytics
+	val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()
+	d := &plugnmeet.AnalyticsDataMsg{
+		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
+		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_EXTERNAL_MEDIA_PLAYER_STATUS,
+		RoomId:    e.req.RoomId,
+		HsetValue: &val,
+	}
+	if !roomMeta.RoomFeatures.ExternalMediaPlayerFeatures.IsActive {
+		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()
+		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_EXTERNAL_MEDIA_PLAYER_STATUS
+		d.HsetValue = &val
+	}
+	e.analyticsModel.HandleEvent(d)
 
 	return err
 }

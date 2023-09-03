@@ -8,8 +8,8 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-func HandleFetchRecordings(c *fiber.Ctx) error {
-	req := new(plugnmeet.FetchRecordingsReq)
+func HandleFetchAnalytics(c *fiber.Ctx) error {
+	req := new(plugnmeet.FetchAnalyticsReq)
 	op := protojson.UnmarshalOptions{
 		DiscardUnknown: true,
 	}
@@ -17,22 +17,23 @@ func HandleFetchRecordings(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
+
 	err = req.Validate()
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := models.NewRecordingAuth()
-	result, err := m.FetchRecordings(req)
+	m := models.NewAnalyticsAuthModel()
+	result, err := m.FetchAnalytics(req)
 
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
-	if result.GetTotalRecordings() == 0 {
-		return utils.SendCommonProtoJsonResponse(c, false, "no recordings found")
+	if result.GetTotalAnalytics() == 0 {
+		return utils.SendCommonProtoJsonResponse(c, false, "no analytics found")
 	}
 
-	r := &plugnmeet.FetchRecordingsRes{
+	r := &plugnmeet.FetchAnalyticsRes{
 		Status: true,
 		Msg:    "success",
 		Result: result,
@@ -40,8 +41,8 @@ func HandleFetchRecordings(c *fiber.Ctx) error {
 	return utils.SendProtoJsonResponse(c, r)
 }
 
-func HandleDeleteRecording(c *fiber.Ctx) error {
-	req := new(plugnmeet.DeleteRecordingReq)
+func HandleDeleteAnalytics(c *fiber.Ctx) error {
+	req := new(plugnmeet.DeleteAnalyticsReq)
 	op := protojson.UnmarshalOptions{
 		DiscardUnknown: true,
 	}
@@ -54,8 +55,8 @@ func HandleDeleteRecording(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := models.NewRecordingAuth()
-	err = m.DeleteRecording(req)
+	m := models.NewAnalyticsAuthModel()
+	err = m.DeleteAnalytics(req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
@@ -63,8 +64,8 @@ func HandleDeleteRecording(c *fiber.Ctx) error {
 	return utils.SendCommonProtoJsonResponse(c, true, "success")
 }
 
-func HandleGetDownloadToken(c *fiber.Ctx) error {
-	req := new(plugnmeet.GetDownloadTokenReq)
+func HandleGetAnalyticsDownloadToken(c *fiber.Ctx) error {
+	req := new(plugnmeet.GetAnalyticsDownloadTokenReq)
 	op := protojson.UnmarshalOptions{
 		DiscardUnknown: true,
 	}
@@ -77,14 +78,14 @@ func HandleGetDownloadToken(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := models.NewRecordingAuth()
-	token, err := m.GetDownloadToken(req)
+	m := models.NewAnalyticsAuthModel()
+	token, err := m.GetAnalyticsDownloadToken(req)
 
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	r := &plugnmeet.GetDownloadTokenRes{
+	r := &plugnmeet.GetAnalyticsDownloadTokenRes{
 		Status: true,
 		Msg:    "success",
 		Token:  &token,
@@ -92,15 +93,15 @@ func HandleGetDownloadToken(c *fiber.Ctx) error {
 	return utils.SendProtoJsonResponse(c, r)
 }
 
-func HandleDownloadRecording(c *fiber.Ctx) error {
+func HandleDownloadAnalytics(c *fiber.Ctx) error {
 	token := c.Params("token")
 
 	if len(token) == 0 {
 		return c.Status(fiber.StatusUnauthorized).SendString("token require or invalid url")
 	}
 
-	m := models.NewRecordingAuth()
-	file, status, err := m.VerifyRecordingToken(token)
+	m := models.NewAnalyticsAuthModel()
+	file, status, err := m.VerifyAnalyticsToken(token)
 
 	if err != nil {
 		return c.Status(status).SendString(err.Error())

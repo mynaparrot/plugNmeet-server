@@ -6,6 +6,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -99,12 +100,24 @@ func HandleWebSocket() func(*fiber.Ctx) error {
 }
 
 func SetupSocketListeners() {
+	analytics := models.NewAnalyticsModel()
 	// On message event
 	ikisocket.On(ikisocket.EventMessage, func(ep *ikisocket.EventPayload) {
 		//fmt.Println(fmt.Sprintf("Message event - User: %s - Message: %s", ep.Kws.GetStringAttribute("userId"), string(ep.Data)))
 		dataMsg := &plugnmeet.DataMessage{}
 		err := proto.Unmarshal(ep.Data, dataMsg)
 		if err != nil {
+			return
+		}
+
+		// for analytics type data we won't need to deliver anywhere
+		if dataMsg.Body.Type == plugnmeet.DataMsgBodyType_ANALYTICS_DATA {
+			ad := new(plugnmeet.AnalyticsDataMsg)
+			err = protojson.Unmarshal([]byte(dataMsg.Body.Msg), ad)
+			if err != nil {
+				return
+			}
+			analytics.HandleEvent(ad)
 			return
 		}
 
@@ -121,6 +134,11 @@ func SetupSocketListeners() {
 		}
 
 		models.DistributeWebsocketMsgToRedisChannel(payload)
+		// send analytics
+		if dataMsg.Body.From != nil && dataMsg.Body.From.UserId != "" {
+			analytics.HandleWebSocketData(dataMsg)
+		}
+
 	})
 
 	// On disconnect event

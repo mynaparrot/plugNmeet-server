@@ -103,3 +103,7 @@ azure_cognitive_services_speech:
       # Azure has limit to max concurrent connection for single key.
       # you should communicate with azure to know your limit. Default 20
       max_connection: 20
+analytics_settings:
+  enabled: true
+  files_store_path: ./analytics
+  token_validity: 30m

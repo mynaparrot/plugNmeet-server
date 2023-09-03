@@ -1,6 +1,8 @@
 package models
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"github.com/cavaliergopher/grab/v3"
 	"github.com/gabriel-vasile/mimetype"
@@ -65,6 +67,10 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 	if !config.AppCnf.AzureCognitiveServicesSpeech.Enabled {
 		r.Metadata.RoomFeatures.SpeechToTextTranslationFeatures.IsAllow = false
 	}
+	if r.Metadata.IsBreakoutRoom && r.Metadata.RoomFeatures.EnableAnalytics {
+		// at present, we'll disable analytic report for breakout rooms
+		r.Metadata.RoomFeatures.EnableAnalytics = false
+	}
 
 	meta, err := am.rs.MarshalRoomMetadata(r.Metadata)
 	if err != nil {
@@ -92,7 +98,7 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 		JoinedParticipants: 0,
 		IsRunning:          1,
 		CreationTime:       room.CreationTime,
-		Created:            time.Now().Format("2006-01-02 15:04:05"),
+		Created:            time.Now().UTC().Format("2006-01-02 15:04:05"),
 		WebhookUrl:         "",
 		IsBreakoutRoom:     int64(isBreakoutRoom),
 		ParentRoomId:       r.Metadata.ParentRoomId,
@@ -128,7 +134,7 @@ func (am *RoomAuthModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (bool, strin
 		_, _ = am.rm.UpdateRoomStatus(&RoomInfo{
 			RoomId:    r.RoomId,
 			IsRunning: 0,
-			Ended:     time.Now().Format("2006-01-02 15:04:05"),
+			Ended:     time.Now().UTC().Format("2006-01-02 15:04:05"),
 		})
 		return false, "room is not active", nil
 	}
@@ -216,10 +222,92 @@ func (am *RoomAuthModel) EndRoom(r *plugnmeet.RoomEndReq) (bool, string) {
 	_, _ = am.rm.UpdateRoomStatus(&RoomInfo{
 		RoomId:    r.RoomId,
 		IsRunning: 0,
-		Ended:     time.Now().Format("2006-01-02 15:04:05"),
+		Ended:     time.Now().UTC().Format("2006-01-02 15:04:05"),
 	})
 
 	return true, "success"
+}
+
+func (am *RoomAuthModel) FetchPastRooms(r *plugnmeet.FetchPastRoomsReq) (*plugnmeet.FetchPastRoomsResult, error) {
+	db := config.AppCnf.DB
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	limit := r.Limit
+	orderBy := "DESC"
+
+	if limit == 0 {
+		limit = 20
+	}
+	if r.OrderBy == "ASC" {
+		orderBy = "ASC"
+	}
+
+	var rows *sql.Rows
+	var err error
+
+	switch {
+	case len(r.RoomIds) > 0:
+		var args []interface{}
+		for _, rd := range r.RoomIds {
+			args = append(args, rd)
+		}
+		args = append(args, r.From)
+		args = append(args, limit)
+
+		query := "SELECT a.room_title, a.roomId, a.sid, a.joined_participants, a.webhook_url, a.created, a.ended, b.file_id FROM " + config.AppCnf.FormatDBTable("room_info") + " AS a LEFT JOIN " + config.AppCnf.FormatDBTable("room_analytics") + " AS b ON a.id = b.room_table_id WHERE a.roomId IN (?" + strings.Repeat(",?", len(r.RoomIds)-1) + ") AND a.is_running = '0' ORDER BY a.id " + orderBy + " LIMIT ?,?"
+
+		rows, err = db.QueryContext(ctx, query, args...)
+	default:
+		rows, err = db.QueryContext(ctx, "SELECT a.room_title, a.roomId, a.sid, a.joined_participants, a.webhook_url, a.created, a.ended, b.file_id FROM  "+config.AppCnf.FormatDBTable("room_info")+" AS a LEFT JOIN "+config.AppCnf.FormatDBTable("room_analytics")+" AS b ON a.id = b.room_table_id WHERE a.is_running = '0' ORDER BY a.id "+orderBy+" LIMIT ?,?", r.From, limit)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+	var rooms []*plugnmeet.PastRoomInfo
+
+	for rows.Next() {
+		var room plugnmeet.PastRoomInfo
+		var rSid, analyticsFileId sql.NullString
+
+		err = rows.Scan(&room.RoomTitle, &room.RoomId, &rSid, &room.JoinedParticipants, &room.WebhookUrl, &room.Created, &room.Ended, &analyticsFileId)
+		if err != nil {
+			log.Errorln(err)
+		}
+		room.RoomSid = rSid.String
+		room.AnalyticsFileId = analyticsFileId.String
+		rooms = append(rooms, &room)
+	}
+
+	// get total number of recordings
+	var row *sql.Row
+	switch {
+	case len(r.RoomIds) > 0:
+		var args []interface{}
+		for _, rd := range r.RoomIds {
+			args = append(args, rd)
+		}
+		query := "SELECT COUNT(*) AS total FROM " + config.AppCnf.FormatDBTable("room_info") + " WHERE roomId IN (?" + strings.Repeat(",?", len(r.RoomIds)-1) + ") AND is_running = '0'"
+		row = db.QueryRowContext(ctx, query, args...)
+	default:
+		row = db.QueryRowContext(ctx, "SELECT COUNT(*) AS total FROM "+config.AppCnf.FormatDBTable("room_info")+" WHERE is_running = '0'")
+	}
+
+	var total int64
+	_ = row.Scan(&total)
+
+	result := &plugnmeet.FetchPastRoomsResult{
+		TotalRooms: total,
+		From:       r.From,
+		Limit:      limit,
+		OrderBy:    orderBy,
+		RoomsList:  rooms,
+	}
+
+	return result, nil
 }
 
 func (am *RoomAuthModel) ChangeVisibility(r *plugnmeet.ChangeVisibilityRes) (bool, string) {

@@ -32,14 +32,16 @@ type ReqFrom struct {
 }
 
 type DataMessageModel struct {
-	db          *sql.DB
-	roomService *RoomService
+	db             *sql.DB
+	roomService    *RoomService
+	analyticsModel *AnalyticsModel
 }
 
 func NewDataMessageModel() *DataMessageModel {
 	return &DataMessageModel{
-		db:          config.AppCnf.DB,
-		roomService: NewRoomService(),
+		db:             config.AppCnf.DB,
+		roomService:    NewRoomService(),
+		analyticsModel: NewAnalyticsModel(),
 	}
 }
 
@@ -101,12 +103,21 @@ func (m *DataMessageModel) raiseHand(r *plugnmeet.DataMessageReq) error {
 		return err
 	}
 
+	if metadata.RaisedHand {
+		m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
+			EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
+			EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_RAISE_HAND,
+			RoomId:    r.RoomId,
+			UserId:    &r.RequestedUserId,
+		})
+	}
+
 	if len(sids) == 0 {
 		return nil
 	}
 
 	mId := uuid.NewString()
-	tm := time.Now().Format(time.RFC1123Z)
+	tm := time.Now().UTC().Format(time.RFC1123Z)
 	msg := &plugnmeet.DataMessage{
 		Type:      plugnmeet.DataMsgType_SYSTEM,
 		MessageId: &mId,
@@ -123,11 +134,7 @@ func (m *DataMessageModel) raiseHand(r *plugnmeet.DataMessageReq) error {
 
 	// send as push message
 	err = m.deliverMsg(r.RoomId, sids, msg)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (m *DataMessageModel) lowerHand(r *plugnmeet.DataMessageReq) error {
@@ -171,7 +178,7 @@ func (m *DataMessageModel) otherUserLowerHand(r *plugnmeet.DataMessageReq) error
 
 func (m *DataMessageModel) sendNotification(r *plugnmeet.DataMessageReq) error {
 	mId := uuid.NewString()
-	tm := time.Now().Format(time.RFC1123Z)
+	tm := time.Now().UTC().Format(time.RFC1123Z)
 
 	msg := &plugnmeet.DataMessage{
 		Type:      plugnmeet.DataMsgType_SYSTEM,
@@ -196,7 +203,7 @@ func (m *DataMessageModel) sendNotification(r *plugnmeet.DataMessageReq) error {
 
 func (m *DataMessageModel) SendUpdatedMetadata(roomId, metadata string) error {
 	mId := uuid.NewString()
-	tm := time.Now().Format(time.RFC1123Z)
+	tm := time.Now().UTC().Format(time.RFC1123Z)
 
 	msg := &plugnmeet.DataMessage{
 		Type:      plugnmeet.DataMsgType_SYSTEM,

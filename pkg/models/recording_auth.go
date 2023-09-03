@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"gopkg.in/square/go-jose.v2"
@@ -160,7 +161,7 @@ func (a *AuthRecording) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
 		// if file not exist then we can delete it from record without showing any error
 		if !os.IsNotExist(err) {
 			ms := strings.SplitN(err.Error(), "/", -1)
-			return errors.New(ms[3])
+			return errors.New(ms[len(ms)-1])
 		}
 	}
 
@@ -229,19 +230,19 @@ func (a *AuthRecording) GetDownloadToken(r *plugnmeet.GetDownloadTokenReq) (stri
 }
 
 // VerifyRecordingToken verify token & provide file path
-func (a *AuthRecording) VerifyRecordingToken(token string) (string, error) {
+func (a *AuthRecording) VerifyRecordingToken(token string) (string, int, error) {
 	tok, err := jwt.ParseSigned(token)
 	if err != nil {
-		return "", err
+		return "", fiber.StatusUnauthorized, err
 	}
 
 	out := jwt.Claims{}
 	if err = tok.Claims([]byte(config.AppCnf.Client.Secret), &out); err != nil {
-		return "", err
+		return "", fiber.StatusUnauthorized, err
 	}
 
 	if err = out.Validate(jwt.Expected{Issuer: config.AppCnf.Client.ApiKey, Time: time.Now()}); err != nil {
-		return "", err
+		return "", fiber.StatusUnauthorized, err
 	}
 
 	file := fmt.Sprintf("%s/%s", config.AppCnf.RecorderInfo.RecordingFilesPath, out.Subject)
@@ -249,8 +250,8 @@ func (a *AuthRecording) VerifyRecordingToken(token string) (string, error) {
 
 	if err != nil {
 		ms := strings.SplitN(err.Error(), "/", -1)
-		return "", errors.New(ms[len(ms)-1])
+		return "", fiber.StatusNotFound, errors.New(ms[len(ms)-1])
 	}
 
-	return file, nil
+	return file, fiber.StatusOK, nil
 }

@@ -12,18 +12,20 @@ import (
 )
 
 type IngressModel struct {
-	lk  *lksdk.IngressClient
-	ctx context.Context
-	rs  *RoomService
+	lk             *lksdk.IngressClient
+	ctx            context.Context
+	rs             *RoomService
+	analyticsModel *AnalyticsModel
 }
 
 func NewIngressModel() *IngressModel {
 	lk := lksdk.NewIngressClient(config.AppCnf.LivekitInfo.Host, config.AppCnf.LivekitInfo.ApiKey, config.AppCnf.LivekitInfo.Secret)
 
 	return &IngressModel{
-		lk:  lk,
-		ctx: context.Background(),
-		rs:  NewRoomService(),
+		lk:             lk,
+		ctx:            context.Background(),
+		rs:             NewRoomService(),
+		analyticsModel: NewAnalyticsModel(),
 	}
 }
 
@@ -61,6 +63,13 @@ func (m *IngressModel) CreateIngress(r *plugnmeet.CreateIngressReq) (*livekit.In
 	if err != nil {
 		return nil, err
 	}
+
+	// send analytics
+	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
+		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
+		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INGRESS_CREATED,
+		RoomId:    r.RoomId,
+	})
 
 	return f, err
 }

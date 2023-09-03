@@ -123,6 +123,38 @@ func HandleEndRoom(c *fiber.Ctx) error {
 	return utils.SendCommonProtoJsonResponse(c, status, msg)
 }
 
+func HandleFetchPastRooms(c *fiber.Ctx) error {
+	req := new(plugnmeet.FetchPastRoomsReq)
+	op := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
+	err := op.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
+	err = req.Validate()
+	if err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
+
+	m := models.NewRoomAuthModel()
+	result, err := m.FetchPastRooms(req)
+
+	if err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
+	if result.GetTotalRooms() == 0 {
+		return utils.SendCommonProtoJsonResponse(c, false, "no info found")
+	}
+
+	r := &plugnmeet.FetchPastRoomsRes{
+		Status: true,
+		Msg:    "success",
+		Result: result,
+	}
+	return utils.SendProtoJsonResponse(c, r)
+}
+
 func HandleEndRoomForAPI(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")

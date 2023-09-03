@@ -20,6 +20,7 @@ type BreakoutRoom struct {
 	roomService    *RoomService
 	roomAuthModel  *RoomAuthModel
 	authTokenModel *AuthTokenModel
+	analyticsModel *AnalyticsModel
 }
 
 func NewBreakoutRoomModel() *BreakoutRoom {
@@ -29,6 +30,7 @@ func NewBreakoutRoomModel() *BreakoutRoom {
 		roomService:    NewRoomService(),
 		roomAuthModel:  NewRoomAuthModel(),
 		authTokenModel: NewAuthTokenModel(),
+		analyticsModel: NewAnalyticsModel(),
 	}
 }
 
@@ -115,6 +117,13 @@ func (m *BreakoutRoom) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRoomsReq) 
 	}
 	origMeta.RoomFeatures.BreakoutRoomFeatures.IsActive = true
 	_, err = m.roomService.UpdateRoomMetadataByStruct(r.RoomId, origMeta)
+
+	// send analytics
+	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
+		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
+		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_BREAKOUT_ROOM,
+		RoomId:    r.RoomId,
+	})
 
 	return err
 }
@@ -254,7 +263,7 @@ func (m *BreakoutRoom) EndBreakoutRoom(r *plugnmeet.EndBreakoutRoomReq) error {
 	_, _ = model.UpdateRoomStatus(&RoomInfo{
 		RoomId:    r.BreakoutRoomId,
 		IsRunning: 0,
-		Ended:     time.Now().Format("2006-01-02 15:04:05"),
+		Ended:     time.Now().UTC().Format("2006-01-02 15:04:05"),
 	})
 
 	m.rc.HDel(m.ctx, breakoutRoomKey+r.RoomId, r.BreakoutRoomId)

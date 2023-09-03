@@ -20,5 +20,6 @@ client/
 recorder/
 etc/tmp/
 tmp/
+analytics/
 
 !test/*

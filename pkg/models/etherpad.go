@@ -16,13 +16,14 @@ import (
 )
 
 type EtherpadModel struct {
-	SharedNotePad config.SharedNotePad
-	NodeId        string
-	Host          string
-	ApiKey        string
-	context       context.Context
-	rc            *redis.Client
-	rs            *RoomService
+	SharedNotePad  config.SharedNotePad
+	NodeId         string
+	Host           string
+	ApiKey         string
+	context        context.Context
+	rc             *redis.Client
+	rs             *RoomService
+	analyticsModel *AnalyticsModel
 }
 
 type EtherpadHttpRes struct {
@@ -49,10 +50,11 @@ const (
 
 func NewEtherpadModel() *EtherpadModel {
 	return &EtherpadModel{
-		rc:            config.AppCnf.RDS,
-		context:       context.Background(),
-		SharedNotePad: config.AppCnf.SharedNotePad,
-		rs:            NewRoomService(),
+		rc:             config.AppCnf.RDS,
+		context:        context.Background(),
+		SharedNotePad:  config.AppCnf.SharedNotePad,
+		rs:             NewRoomService(),
+		analyticsModel: NewAnalyticsModel(),
 	}
 }
 
@@ -130,6 +132,15 @@ func (m *EtherpadModel) addPadToRoomMetadata(roomId string, c *plugnmeet.CreateE
 		log.Errorln(err)
 	}
 
+	// send analytics
+	val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()
+	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
+		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
+		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_ETHERPAD_STATUS,
+		RoomId:    roomId,
+		HsetValue: &val,
+	})
+
 	return err
 }
 
@@ -189,6 +200,21 @@ func (m *EtherpadModel) ChangeEtherpadStatus(r *plugnmeet.ChangeEtherpadStatusRe
 	if err != nil {
 		log.Errorln(err)
 	}
+
+	// send analytics
+	val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()
+	d := &plugnmeet.AnalyticsDataMsg{
+		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
+		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_ETHERPAD_STATUS,
+		RoomId:    r.RoomId,
+		HsetValue: &val,
+	}
+	if !r.IsActive {
+		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()
+		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_ETHERPAD_STATUS
+		d.HsetValue = &val
+	}
+	m.analyticsModel.HandleEvent(d)
 
 	return err
 }

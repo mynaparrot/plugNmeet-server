@@ -12,20 +12,22 @@ import (
 )
 
 type RecordingModel struct {
-	app         *config.AppConfig
-	db          *sql.DB
-	roomService *RoomService
-	rds         *redis.Client
-	ctx         context.Context
+	app            *config.AppConfig
+	db             *sql.DB
+	roomService    *RoomService
+	rds            *redis.Client
+	ctx            context.Context
+	analyticsModel *AnalyticsModel
 }
 
 func NewRecordingModel() *RecordingModel {
 	return &RecordingModel{
-		app:         config.AppCnf,
-		db:          config.AppCnf.DB,
-		roomService: NewRoomService(),
-		rds:         config.AppCnf.RDS,
-		ctx:         context.Background(),
+		app:            config.AppCnf,
+		db:             config.AppCnf.DB,
+		roomService:    NewRoomService(),
+		rds:            config.AppCnf.RDS,
+		ctx:            context.Background(),
+		analyticsModel: NewAnalyticsModel(),
 	}
 }
 
@@ -320,4 +322,28 @@ func (rm *RecordingModel) sendToWebhookNotifier(r *plugnmeet.RecorderToPlugNmeet
 	if err != nil {
 		log.Errorln(err)
 	}
+
+	// send analytics
+	var val string
+	data := &plugnmeet.AnalyticsDataMsg{
+		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
+		RoomId:    r.RoomId,
+	}
+
+	switch r.Task {
+	case plugnmeet.RecordingTasks_START_RECORDING:
+		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_RECORDING_STATUS
+		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String() + ":" + r.RecorderId
+	case plugnmeet.RecordingTasks_END_RECORDING:
+		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_RECORDING_STATUS
+		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()
+	case plugnmeet.RecordingTasks_START_RTMP:
+		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_RTMP_STATUS
+		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String() + ":" + r.RecorderId
+	case plugnmeet.RecordingTasks_END_RTMP:
+		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_RTMP_STATUS
+		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()
+	}
+	data.HsetValue = &val
+	rm.analyticsModel.HandleEvent(data)
 }

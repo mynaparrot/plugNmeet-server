@@ -18,14 +18,16 @@ import (
 const pollsKey = "pnm:polls:"
 
 type PollsModel struct {
-	rc  *redis.Client
-	ctx context.Context
+	rc             *redis.Client
+	ctx            context.Context
+	analyticsModel *AnalyticsModel
 }
 
 func NewPollsModel() *PollsModel {
 	return &PollsModel{
-		rc:  config.AppCnf.RDS,
-		ctx: context.Background(),
+		rc:             config.AppCnf.RDS,
+		ctx:            context.Background(),
+		analyticsModel: NewAnalyticsModel(),
 	}
 }
 
@@ -45,6 +47,28 @@ func (m *PollsModel) CreatePoll(r *plugnmeet.CreatePollReq, isAdmin bool) (error
 	}
 
 	_ = m.broadcastNotification(r.RoomId, r.UserId, r.PollId, plugnmeet.DataMsgBodyType_POLL_CREATED, isAdmin)
+
+	// send analytics
+	toRecord := struct {
+		PollId   string                         `json:"poll_id"`
+		Question string                         `json:"question"`
+		Options  []*plugnmeet.CreatePollOptions `json:"options"`
+	}{
+		PollId:   r.PollId,
+		Question: r.Question,
+		Options:  r.Options,
+	}
+	marshal, err := json.Marshal(toRecord)
+	if err != nil {
+		log.Errorln(err)
+	}
+	val := string(marshal)
+	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
+		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
+		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_POLL_ADDED,
+		RoomId:    r.RoomId,
+		HsetValue: &val,
+	})
 
 	return nil, r.PollId
 }
@@ -223,6 +247,27 @@ func (m *PollsModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq, isAd
 
 	_ = m.broadcastNotification(r.RoomId, r.UserId, r.PollId, plugnmeet.DataMsgBodyType_NEW_POLL_RESPONSE, isAdmin)
 
+	// send analytics
+	toRecord := struct {
+		PollId         string `json:"poll_id"`
+		SelectedOption uint64 `json:"selected_option"`
+	}{
+		PollId:         r.PollId,
+		SelectedOption: r.SelectedOption,
+	}
+	marshal, err := json.Marshal(toRecord)
+	if err != nil {
+		log.Errorln(err)
+	}
+	val := string(marshal)
+	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
+		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
+		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_VOTED_POLL,
+		RoomId:    r.RoomId,
+		UserId:    &r.UserId,
+		HsetValue: &val,
+	})
+
 	return nil
 }
 
@@ -290,6 +335,14 @@ func (m *PollsModel) ClosePoll(r *plugnmeet.ClosePollReq, isAdmin bool) error {
 	}
 
 	_ = m.broadcastNotification(r.RoomId, r.UserId, r.PollId, plugnmeet.DataMsgBodyType_POLL_CLOSED, isAdmin)
+
+	// send analytics
+	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
+		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
+		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_POLL_ENDED,
+		RoomId:    r.RoomId,
+		HsetValue: &r.PollId,
+	})
 
 	return nil
 }
