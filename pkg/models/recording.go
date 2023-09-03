@@ -8,6 +8,8 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/redis/go-redis/v9"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/encoding/protojson"
+	"os"
 	"time"
 )
 
@@ -65,10 +67,12 @@ func (rm *RecordingModel) HandleRecorderResp(r *plugnmeet.RecorderToPlugNmeet, r
 		go rm.sendToWebhookNotifier(r)
 
 	case plugnmeet.RecordingTasks_RECORDING_PROCEEDED:
-		err := rm.addRecording(r, roomInfo.CreationTime)
+		creation, err := rm.addRecording(r, roomInfo.CreationTime)
 		if err != nil {
 			log.Errorln(err)
 		}
+		// keep record of this file
+		rm.addRecordingInfoFile(r, creation, roomInfo)
 		go rm.sendToWebhookNotifier(r)
 	}
 }
@@ -269,36 +273,84 @@ func (rm *RecordingModel) updateRoomRTMPStatus(r *plugnmeet.RecorderToPlugNmeet,
 	return nil
 }
 
-func (rm *RecordingModel) addRecording(r *plugnmeet.RecorderToPlugNmeet, roomCreation int64) error {
+func (rm *RecordingModel) addRecording(r *plugnmeet.RecorderToPlugNmeet, roomCreation int64) (int64, error) {
 	db := rm.db
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer tx.Rollback()
 	stmt, err := tx.Prepare("INSERT INTO " + rm.app.FormatDBTable("recordings") +
 		" (record_id, room_id, room_sid, recorder_id, file_path, size, creation_time, room_creation_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	_, err = stmt.Exec(r.RecordingId, r.RoomId, r.RoomSid, r.RecorderId, r.FilePath, fmt.Sprintf("%.2f", r.FileSize), time.Now().Unix(), roomCreation)
+	creation := time.Now().Unix()
+	_, err = stmt.Exec(r.RecordingId, r.RoomId, r.RoomSid, r.RecorderId, r.FilePath, fmt.Sprintf("%.2f", r.FileSize), creation, roomCreation)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	err = tx.Commit()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	err = stmt.Close()
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	return nil
+	return creation, nil
+}
+
+// addRecordingInfoFile will add information about recording file
+// there have certain case that our DB may have problem
+// using this recording info file we can import those recordings
+// or will get idea about the recording
+// format: path/recording_file_name.{mp4|webm}.json
+func (rm *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet, creation int64, roomInfo *RoomInfo) {
+	var ended int64 = 0
+	e, err := time.Parse("2006-01-02 15:04:05", roomInfo.Ended)
+	if err == nil {
+		ended = e.Unix()
+		// this is indicating that the session is still running
+		if ended < 1 {
+			ended = 0
+		}
+	}
+
+	toRecord := &plugnmeet.RecordingInfoFile{
+		RoomTableId:      r.RoomTableId,
+		RoomId:           r.RoomId,
+		RoomTitle:        roomInfo.RoomTitle,
+		RoomSid:          r.RoomSid,
+		RoomCreationTime: roomInfo.CreationTime,
+		RoomEnded:        ended,
+		RecordingId:      r.RecordingId,
+		RecorderId:       r.RecorderId,
+		FilePath:         r.FilePath,
+		FileSize:         r.FileSize,
+		CreationTime:     creation,
+	}
+	op := protojson.MarshalOptions{
+		EmitUnpopulated: true,
+		UseProtoNames:   true,
+	}
+	marshal, err := op.Marshal(toRecord)
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+	path := fmt.Sprintf("%s/%s.json", config.AppCnf.RecorderInfo.RecordingFilesPath, r.FilePath)
+
+	err = os.WriteFile(path, marshal, 0644)
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
 }
 
 func (rm *RecordingModel) sendToWebhookNotifier(r *plugnmeet.RecorderToPlugNmeet) {

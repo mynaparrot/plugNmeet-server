@@ -302,11 +302,11 @@ func (rm *RoomModel) GetRoomInfoByTableId(tableId int64) (*RoomInfo, string) {
 	defer cancel()
 
 	var query *sql.Row
-	query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time FROM "+rm.app.FormatDBTable("room_info")+" WHERE id = ?", tableId)
+	query = db.QueryRowContext(ctx, "SELECT id, room_title, roomId, sid, joined_participants, is_running, is_recording, is_active_rtmp, webhook_url, is_breakout_room, parent_room_id, creation_time, ended FROM "+rm.app.FormatDBTable("room_info")+" WHERE id = ?", tableId)
 
 	var room RoomInfo
 	var msg string
-	err := query.Scan(&room.Id, &room.RoomTitle, &room.RoomId, &room.Sid, &room.JoinedParticipants, &room.IsRunning, &room.IsRecording, &room.IsActiveRTMP, &room.WebhookUrl, &room.IsBreakoutRoom, &room.ParentRoomId, &room.CreationTime)
+	err := query.Scan(&room.Id, &room.RoomTitle, &room.RoomId, &room.Sid, &room.JoinedParticipants, &room.IsRunning, &room.IsRecording, &room.IsActiveRTMP, &room.WebhookUrl, &room.IsBreakoutRoom, &room.ParentRoomId, &room.CreationTime, &room.Ended)
 
 	switch {
 	case err == sql.ErrNoRows:
