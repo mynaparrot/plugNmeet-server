@@ -7,26 +7,27 @@ infrastructure [livekit](https://github.com/livekit/livekit-server). Please join
 
 ## Features:
 
-1) Compatible with all devices. Browser recommendation: Google Chrome, Firefox. For iOS: Safari.
-2) WebRTC based secured & encrypted communication.
+1) Compatible with all devices. Browser recommendation: Google Chrome, Firefox. For iOS: Safari;
+2) WebRTC based secured & encrypted communication;
 3) Scalable and high performance system written in Go programming language which made it possible to distributed as a
-   [single binary](https://github.com/mynaparrot/plugNmeet-server/releases) file!
-4) **Simulcast** and **Dynacast** features will allow you to continue online conferencing even if your internet
-   connection is slow! Supported video codecs: `H264`, `VP8`, `VP9` and `AV1`.
-5) Easy integration with any existing website or system.
-6) Easy customization with functionality, URL, logo, and branding colors.
-7) HD audio, video call and Screen sharing. **Virtual background** for webcams.
-8) **Shared notepad** and **Whiteboard** for live collaboration. Can upload, draw & share various office file (pdf, docx, pptx, xlsx, txt etc.) in whiteboard directly.
-9) Easy to use **Polls** & voting.
-10) Customizable **waiting room**.
-11) Various **Lock & control** settings.
-12) **Breakout rooms**
-13) Raise hand.
-14) Public & private chatting with File sharing.
-15) MP4 Recordings.
-16) RTMP Broadcasting & RTMP ingress.
-17) Speech to text/translation (Powered by [Microsoft Azure](https://learn.microsoft.com/en-us/azure/cognitive-services/speech-service/get-started-text-to-speech?pivots=programming-language-go&tabs=linux%2Cterminal#prerequisites))
-18) **End-to-End encryption (E2EE)** (`Supported browsers: browser based on Chromium 83+, Google Chrome, Microsoft Edge, Safari`).
+   [single binary](https://github.com/mynaparrot/plugNmeet-server/releases) file!;
+4) **Simulcast** and **Dynacast** features will allow you to continue online conferencing even if your internet;
+   connection is slow! Supported video codecs: `H264`, `VP8`, `VP9` and `AV1`;
+5) Easy integration with any existing website or system;
+6) Easy customization with functionality, URL, logo, and branding colors;
+7) HD audio, video call and Screen sharing. **Virtual background** for webcams;
+8) **Shared notepad** and **Whiteboard** for live collaboration. Can upload, draw & share various office file (pdf, docx, pptx, xlsx, txt etc.) in whiteboard directly;
+9) Easy to use **Polls** & voting;
+10) Customizable **waiting room**;
+11) Various **Lock & control** settings;
+12) **Breakout rooms**;
+13) Raise hand;
+14) Public & private chatting with File sharing;
+15) MP4 Recordings;
+16) RTMP Broadcasting & RTMP ingress;
+17) Speech to text/translation (Powered by [Microsoft Azure](https://learn.microsoft.com/en-us/azure/cognitive-services/speech-service/get-started-text-to-speech?pivots=programming-language-go&tabs=linux%2Cterminal#prerequisites));
+18) **End-to-End encryption (E2EE)** (`Supported browsers: browser based on Chromium 83+, Google Chrome, Microsoft Edge, Safari`);
+19) A detailed analytics report to assess students' performance in the online classroom;
 
 And many more!
 

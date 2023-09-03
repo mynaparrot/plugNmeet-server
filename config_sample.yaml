@@ -105,5 +105,8 @@ azure_cognitive_services_speech:
       max_connection: 20
 analytics_settings:
   enabled: true
+  # if you've multiple plugNmeet servers then make sure that
+  # all plugNmeet servers can access this directory
+  # otherwise it may fail to fetch file. This path can be NSF or other network path
   files_store_path: ./analytics
   token_validity: 30m
