@@ -4,11 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/goccy/go-json"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/redis/go-redis/v9"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/encoding/protojson"
 	"os"
 	"time"
 )
@@ -335,7 +335,11 @@ func (rm *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet,
 		FileSize:         r.FileSize,
 		CreationTime:     creation,
 	}
-	marshal, err := json.Marshal(toRecord)
+	op := protojson.MarshalOptions{
+		EmitUnpopulated: true,
+		UseProtoNames:   true,
+	}
+	marshal, err := op.Marshal(toRecord)
 	if err != nil {
 		log.Errorln(err)
 		return
