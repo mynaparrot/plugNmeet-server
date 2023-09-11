@@ -1,4 +1,4 @@
-FROM golang:1.20-buster as builder
+FROM golang:1.21-buster as builder
 
 ARG TARGETPLATFORM
 ARG TARGETARCH
