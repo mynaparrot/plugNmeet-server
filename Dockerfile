@@ -1,4 +1,4 @@
-FROM golang:1.21-buster as builder
+FROM golang:1.21 as builder
 
 ARG TARGETPLATFORM
 ARG TARGETARCH
@@ -18,7 +18,7 @@ COPY version/ version/
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH GO111MODULE=on go build -ldflags '-w -s -buildid=' -a -o plugnmeet-server ./cmd/server
 
-FROM debian:buster-slim
+FROM debian:stable-slim
 
 RUN export DEBIAN_FRONTEND=noninteractive; \
     apt update && \
