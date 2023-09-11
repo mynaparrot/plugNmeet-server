@@ -222,8 +222,8 @@ func (a *AuthRecording) GetDownloadToken(r *plugnmeet.GetDownloadTokenReq) (stri
 
 	cl := jwt.Claims{
 		Issuer:    a.app.Client.ApiKey,
-		NotBefore: jwt.NewNumericDate(time.Now()),
-		Expiry:    jwt.NewNumericDate(time.Now().Add(a.app.RecorderInfo.TokenValidity)),
+		NotBefore: jwt.NewNumericDate(time.Now().UTC()),
+		Expiry:    jwt.NewNumericDate(time.Now().UTC().Add(a.app.RecorderInfo.TokenValidity)),
 		// format: sub_path/roomSid/filename
 		Subject: recording.FilePath,
 	}
@@ -243,7 +243,7 @@ func (a *AuthRecording) VerifyRecordingToken(token string) (string, int, error) 
 		return "", fiber.StatusUnauthorized, err
 	}
 
-	if err = out.Validate(jwt.Expected{Issuer: config.AppCnf.Client.ApiKey, Time: time.Now()}); err != nil {
+	if err = out.Validate(jwt.Expected{Issuer: config.AppCnf.Client.ApiKey, Time: time.Now().UTC()}); err != nil {
 		return "", fiber.StatusUnauthorized, err
 	}
 

@@ -159,7 +159,7 @@ func (s *SchedulerModel) activeRoomChecker() {
 			// we'll check if room was created long before then we can end it
 			// here we can check if room was created more than 24 hours ago
 			expire := time.Unix(room.CreationTime, 0).Add(time.Hour * 24)
-			if time.Now().After(expire) {
+			if time.Now().UTC().After(expire) {
 				// we can close the room
 				s.ra.EndRoom(&plugnmeet.RoomEndReq{
 					RoomId: room.RoomId,

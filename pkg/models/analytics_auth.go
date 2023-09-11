@@ -201,8 +201,8 @@ func (m *AnalyticsAuthModel) GetAnalyticsDownloadToken(r *plugnmeet.GetAnalytics
 
 	cl := jwt.Claims{
 		Issuer:    m.app.Client.ApiKey,
-		NotBefore: jwt.NewNumericDate(time.Now()),
-		Expiry:    jwt.NewNumericDate(time.Now().Add(*m.app.AnalyticsSettings.TokenValidity)),
+		NotBefore: jwt.NewNumericDate(time.Now().UTC()),
+		Expiry:    jwt.NewNumericDate(time.Now().UTC().Add(*m.app.AnalyticsSettings.TokenValidity)),
 		Subject:   analytic.FileName,
 	}
 
@@ -221,7 +221,7 @@ func (a *AnalyticsAuthModel) VerifyAnalyticsToken(token string) (string, int, er
 		return "", fiber.StatusUnauthorized, err
 	}
 
-	if err = out.Validate(jwt.Expected{Issuer: config.AppCnf.Client.ApiKey, Time: time.Now()}); err != nil {
+	if err = out.Validate(jwt.Expected{Issuer: config.AppCnf.Client.ApiKey, Time: time.Now().UTC()}); err != nil {
 		return "", fiber.StatusUnauthorized, err
 	}
 
