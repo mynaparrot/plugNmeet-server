@@ -175,8 +175,8 @@ func (m *LTIV1) ToJWT(c *plugnmeet.LtiClaims) (string, error) {
 
 	cl := jwt.Claims{
 		Issuer:    config.AppCnf.Client.ApiKey,
-		NotBefore: jwt.NewNumericDate(time.Now()),
-		Expiry:    jwt.NewNumericDate(time.Now().Add(time.Hour * 2)), // valid for 2 hours
+		NotBefore: jwt.NewNumericDate(time.Now().UTC()),
+		Expiry:    jwt.NewNumericDate(time.Now().UTC().Add(time.Hour * 2)), // valid for 2 hours
 		Subject:   c.UserId,
 	}
 
@@ -194,7 +194,7 @@ func (m *LTIV1) LTIV1VerifyHeaderToken(token string) (*LtiClaims, error) {
 	if err = tok.Claims([]byte(config.AppCnf.Client.Secret), &out, claims); err != nil {
 		return nil, err
 	}
-	if err = out.Validate(jwt.Expected{Issuer: config.AppCnf.Client.ApiKey, Time: time.Now()}); err != nil {
+	if err = out.Validate(jwt.Expected{Issuer: config.AppCnf.Client.ApiKey, Time: time.Now().UTC()}); err != nil {
 		return nil, err
 	}
 
