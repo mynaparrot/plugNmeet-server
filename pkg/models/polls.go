@@ -199,8 +199,7 @@ func (m *PollsModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq, isAd
 
 	err := m.rc.Watch(m.ctx, func(tx *redis.Tx) error {
 		d := new(userResponseCommonFields)
-		v := tx.HMGet(m.ctx, key, "all_respondents")
-		err := v.Scan(d)
+		err := tx.HMGet(m.ctx, key, "all_respondents").Scan(d)
 		if err != nil {
 			return err
 		}
@@ -325,7 +324,7 @@ func (m *PollsModel) ClosePoll(r *plugnmeet.ClosePollReq, isAdmin bool) error {
 		pollVal := map[string]string{
 			r.PollId: string(marshal),
 		}
-		tx.HMSet(m.ctx, key, pollVal)
+		tx.HSet(m.ctx, key, pollVal)
 
 		return nil
 	}, key)

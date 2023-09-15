@@ -431,7 +431,7 @@ func (m *AnalyticsModel) handleFirstTimeUserJoined(key string) {
 	u := map[string]string{
 		*m.data.UserId: string(marshal),
 	}
-	_, err = m.rc.HMSet(m.ctx, fmt.Sprintf("%s:users", key), u).Result()
+	_, err = m.rc.HSet(m.ctx, fmt.Sprintf("%s:users", key), u).Result()
 	if err != nil {
 		log.Errorln(err)
 	}
