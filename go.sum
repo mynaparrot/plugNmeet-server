@@ -4,6 +4,8 @@ github.com/ansrivas/fiberprometheus/v2 v2.6.1 h1:wac3pXaE6BYYTF04AC6K0ktk6vCD+Mn
 github.com/ansrivas/fiberprometheus/v2 v2.6.1/go.mod h1:MloIKvy4yN6hVqlRpJ/jDiR244YnWJaQC0FIqS8A+MY=
 github.com/antoniodipinto/ikisocket v0.0.0-20230831104302-c892735a4950 h1:8dP3M19BzI9Tfy5G79q3s1FQuiJdFjDILVL0eFWu1dM=
 github.com/antoniodipinto/ikisocket v0.0.0-20230831104302-c892735a4950/go.mod h1:cwzlOmZ5/m6vGvkA5aawjqzVOBrlXoV8qSUjQU7Iz2s=
+github.com/antoniodipinto/ikisocket v0.0.0-20230914204858-ee499ed8c55e h1:NaqKWzpEjlSk/78wi2hqV4DeQEmV/IliCgKAFCFPLOw=
+github.com/antoniodipinto/ikisocket v0.0.0-20230914204858-ee499ed8c55e/go.mod h1:M2MsXW4ZUTgAvkA2K8Co80m4IOVLnjtJ4xpLaHPOdzU=
 github.com/benbjohnson/clock v1.3.0 h1:ip6w0uFQkncKQ979AypyG0ER7mqUSBdKLOgAle/AT8A=
 github.com/benbjohnson/clock v1.3.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
