@@ -82,6 +82,13 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 		return false, "Error: " + err.Error(), nil
 	}
 
+	if room.Sid == "" {
+		// without SID isn't hard to manage, if empty then we won't continue
+		// in this case we'll end the room to clean up
+		_, _ = am.rs.EndRoom(r.RoomId)
+		return false, "Error: can't create room with empty SID", nil
+	}
+
 	isBreakoutRoom := 0
 	if r.Metadata.IsBreakoutRoom {
 		isBreakoutRoom = 1
