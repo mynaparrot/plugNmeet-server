@@ -17,6 +17,7 @@ import (
 
 type RecorderModel struct {
 	app          *config.AppConfig
+	rm           *RoomModel
 	roomService  *RoomService
 	rds          *redis.Client
 	ctx          context.Context
@@ -37,6 +38,7 @@ type RecorderReq struct {
 func NewRecorderModel() *RecorderModel {
 	return &RecorderModel{
 		app:         config.AppCnf,
+		rm:          NewRoomModel(),
 		roomService: NewRoomService(),
 		rds:         config.AppCnf.RDS,
 		ctx:         context.Background(),
@@ -45,8 +47,20 @@ func NewRecorderModel() *RecorderModel {
 
 func (r *RecorderModel) SendMsgToRecorder(req *plugnmeet.RecordingReq) error {
 	recordId := time.Now().UnixMilli()
-	r.recordingReq = req
 
+	if req.RoomTableId == 0 {
+		if req.Sid == "" {
+			return errors.New("empty sid")
+		}
+		// in this case we'll try to fetch the room info
+		rmInfo, msg := r.rm.GetRoomInfo("", req.Sid, 0)
+		if rmInfo == nil {
+			return errors.New(msg)
+		}
+		req.RoomTableId = rmInfo.Id
+	}
+
+	r.recordingReq = req
 	toSend := &plugnmeet.PlugNmeetToRecorder{
 		From:        "plugnmeet",
 		RoomTableId: req.RoomTableId,
