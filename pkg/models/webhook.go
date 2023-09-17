@@ -101,55 +101,63 @@ func (w *webhookEvent) roomStarted() {
 
 func (w *webhookEvent) roomFinished() {
 	event := w.event
-
 	// webhook notification
-	go w.sendToWebhookNotifier(event)
-
-	room := &RoomInfo{
-		Sid:       event.Room.Sid,
-		IsRunning: 0,
-		Ended:     time.Now().UTC().Format("2006-01-02 15:04:05"),
+	if event != nil {
+		go w.sendToWebhookNotifier(event)
 	}
-	_, err := w.roomModel.UpdateRoomStatus(room)
-	if err != nil {
-		log.Errorln(err)
+
+	if event.Room.Sid != "" {
+		// we will only update table if the SID is not empty
+		room := &RoomInfo{
+			Sid:       event.Room.Sid,
+			IsRunning: 0,
+			Ended:     time.Now().UTC().Format("2006-01-02 15:04:05"),
+		}
+		_, err := w.roomModel.UpdateRoomStatus(room)
+		if err != nil {
+			log.Errorln(err)
+		}
 	}
 
 	//we'll send message to recorder to stop
 	_ = w.recorderModel.SendMsgToRecorder(&plugnmeet.RecordingReq{
 		Task:   plugnmeet.RecordingTasks_STOP,
-		Sid:    w.event.Room.Name,
+		Sid:    w.event.Room.Sid,
 		RoomId: w.event.Room.Name,
 	})
 
 	// Delete all the files those may upload during session
-	if !config.AppCnf.UploadFileSettings.KeepForever {
-		go func() {
+	go func() {
+		if !config.AppCnf.UploadFileSettings.KeepForever {
 			f := NewManageFileModel(&ManageFile{
 				Sid: event.Room.Sid,
 			})
 			_ = f.DeleteRoomUploadedDir()
-		}()
-	}
+		}
+	}()
 
 	// clear chatroom from memory
-	msg := &WebsocketToRedis{
-		Type:   "deleteRoom",
-		RoomId: event.Room.Name,
-	}
-	marshal, err := json.Marshal(msg)
-	if err == nil {
-		config.AppCnf.RDS.Publish(context.Background(), "plug-n-meet-user-websocket", marshal)
-	}
+	go func() {
+		msg := &WebsocketToRedis{
+			Type:   "deleteRoom",
+			RoomId: event.Room.Name,
+		}
+		marshal, err := json.Marshal(msg)
+		if err == nil {
+			_, _ = w.rc.Publish(context.Background(), "plug-n-meet-user-websocket", marshal).Result()
+		}
+	}()
 
 	// notify to clean room from room duration map
-	req := new(RedisRoomDurationCheckerReq)
-	req.Type = "delete"
-	req.RoomId = event.Room.Name
-	marshal, err = json.Marshal(req)
-	if err == nil {
-		w.rc.Publish(w.ctx, "plug-n-meet-room-duration-checker", marshal)
-	}
+	go func() {
+		req := new(RedisRoomDurationCheckerReq)
+		req.Type = "delete"
+		req.RoomId = event.Room.Name
+		marshal, err := json.Marshal(req)
+		if err == nil {
+			_, _ = w.rc.Publish(w.ctx, "plug-n-meet-room-duration-checker", marshal).Result()
+		}
+	}()
 
 	// clean shared note
 	go func() {
@@ -158,11 +166,15 @@ func (w *webhookEvent) roomFinished() {
 	}()
 
 	// clear users block list
-	_, _ = w.roomService.DeleteRoomBlockList(event.Room.Name)
+	go func() {
+		_, _ = w.roomService.DeleteRoomBlockList(event.Room.Name)
+	}()
 
 	// clean polls
-	pm := NewPollsModel()
-	_ = pm.CleanUpPolls(event.Room.Name)
+	go func() {
+		pm := NewPollsModel()
+		_ = pm.CleanUpPolls(event.Room.Name)
+	}()
 
 	// remove all breakout rooms
 	go func() {
@@ -171,9 +183,11 @@ func (w *webhookEvent) roomFinished() {
 	}()
 
 	// speech service clean up
-	sm := NewSpeechServices()
-	// don't need to worry about room sid changes, because we'll compare both
-	go sm.OnAfterRoomEnded(event.Room.Name, event.Room.Sid)
+	go func() {
+		sm := NewSpeechServices()
+		// don't need to worry about room sid changes, because we'll compare both
+		sm.OnAfterRoomEnded(event.Room.Name, event.Room.Sid)
+	}()
 
 	// finally create analytics file
 	go w.analyticsModel.PrepareToExportAnalytics(event.Room.Sid, event.Room.Metadata)

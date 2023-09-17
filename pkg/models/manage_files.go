@@ -278,6 +278,9 @@ func (m *ManageFile) DeleteFile(filePath string) error {
 }
 
 func (m *ManageFile) DeleteRoomUploadedDir() error {
+	if m.Sid == "" {
+		return errors.New("empty sid")
+	}
 	path := fmt.Sprintf("%s/%s", m.uploadFileSettings.Path, m.Sid)
 	err := os.RemoveAll(path)
 	if err != nil {

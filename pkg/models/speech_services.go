@@ -227,6 +227,9 @@ func (s *SpeechServices) SpeechServiceUsersUsage(roomId, rSid, userId string, ta
 }
 
 func (s *SpeechServices) OnAfterRoomEnded(roomId, sId string) {
+	if sId == "" {
+		return
+	}
 	// we'll wait little bit to make sure all users' requested has been received
 	time.Sleep(5 * time.Microsecond)
 

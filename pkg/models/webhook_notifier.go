@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/auth"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -32,6 +33,9 @@ func NewWebhookNotifier() *WebhookNotifierModel {
 func (n *WebhookNotifierModel) Notify(roomSid string, msg interface{}) error {
 	if !n.webhookConf.Enable {
 		return nil
+	}
+	if roomSid == "" {
+		return errors.New("empty sid")
 	}
 
 	if n.webhookConf.Url != "" {

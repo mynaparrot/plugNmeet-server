@@ -145,7 +145,7 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(sid, meta string) {
 	// if no metadata then it will be hard to make next logics
 	// if still there was some data stored in redis
 	// we will have to think different way to clean those
-	if meta == "" {
+	if meta == "" || sid == "" {
 		return
 	}
 
