@@ -128,8 +128,14 @@ func (s *SchedulerModel) activeRoomChecker() {
 	}
 
 	for _, room := range activeRooms {
-		fromRedis, err := s.ra.rs.LoadRoomInfo(room.RoomId)
+		if room.Sid == "" {
+			// if room Sid is empty then we won't do anything
+			// because may be the session is creating
+			// if we don't consider this then it will unnecessarily create empty field
+			continue
+		}
 
+		fromRedis, err := s.ra.rs.LoadRoomInfo(room.RoomId)
 		if fromRedis == nil && err.Error() == "requested room does not exist" {
 			_, _ = s.ra.rm.UpdateRoomStatus(&RoomInfo{
 				Sid:       room.Sid,
