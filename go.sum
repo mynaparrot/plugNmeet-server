@@ -60,6 +60,8 @@ github.com/gofiber/adaptor/v2 v2.2.1/go.mod h1:AhR16dEqs25W2FY/l8gSj1b51Azg5dtPD
 github.com/gofiber/contrib/websocket v1.2.0/go.mod h1:Sf8RYFluiIKxONa/Kq0jk05EOUtqrb81pJopTxzcsX4=
 github.com/gofiber/contrib/websocket v1.2.1 h1:z8yNG9rnhXBVeuyEIEM1jFAYZvjSjax4LHvmh6mgLV0=
 github.com/gofiber/contrib/websocket v1.2.1/go.mod h1:7OeR6WnMK0j/BfawrvNem8SdoHijGdf8KQdXEcmLXmw=
+github.com/gofiber/contrib/websocket v1.2.2 h1:6lygrypMM0LqfPUC8N5MZ5apsU9/3K/NJULrIVpS8FU=
+github.com/gofiber/contrib/websocket v1.2.2/go.mod h1:QPOQ5qazfR/oz7FZD4p5PO9B8TaxjAnaUG/xpbFI1r4=
 github.com/gofiber/fiber/v2 v2.48.0/go.mod h1:xqJgfqrc23FJuqGOW6DVgi3HyZEm2Mn9pRqUb2kHSX8=
 github.com/gofiber/fiber/v2 v2.49.0/go.mod h1:oxpt7wQaEYgdDmq7nMxCGhilYicBLFnZ+jQSJcQDlSE=
 github.com/gofiber/fiber/v2 v2.49.2 h1:ONEN3/Vc+dUCxxDgZZwpqvhISgHqb+bu+isBiEyKEQs=
