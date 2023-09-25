@@ -43,8 +43,13 @@ func (m *IngressModel) CreateIngress(r *plugnmeet.CreateIngressReq) (*livekit.In
 		return nil, errors.New("multiple ingress creation request not allow")
 	}
 
+	inputType := livekit.IngressInput_RTMP_INPUT
+	if r.InputType == plugnmeet.IngressInput_WHIP_INPUT {
+		inputType = livekit.IngressInput_WHIP_INPUT
+	}
+
 	req := &livekit.CreateIngressRequest{
-		InputType:           livekit.IngressInput_RTMP_INPUT,
+		InputType:           inputType,
 		Name:                fmt.Sprintf("%s:%d", r.RoomId, 1),
 		RoomName:            r.RoomId,
 		ParticipantIdentity: fmt.Sprintf("%d", time.Now().UnixMilli()),
