@@ -29,3 +29,6 @@ webhook:
   urls:
     - "http://plugnmeet-api:8080/webhook"
     #- "http://host.docker.internal:8080/webhook"
+ingress:
+  rtmp_base_url: rtmp://localhost/live
+  whip_base_url: http://localhost:8089/whip

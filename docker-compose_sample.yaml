@@ -27,6 +27,7 @@ services:
     image: livekit/ingress
     ports:
       - "1935:1935/tcp"
+      - "8089:8089/tcp"
     volumes:
       - .:/app
     command: --config "/app/ingress.yaml"
