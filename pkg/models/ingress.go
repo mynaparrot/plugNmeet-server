@@ -61,6 +61,7 @@ func (m *IngressModel) CreateIngress(r *plugnmeet.CreateIngressReq) (*livekit.In
 		return nil, err
 	}
 
+	ingressFeatures.InputType = r.InputType
 	ingressFeatures.Url = f.Url
 	ingressFeatures.StreamKey = f.StreamKey
 
