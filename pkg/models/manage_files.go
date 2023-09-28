@@ -378,7 +378,7 @@ func (m *ManageFile) ConvertWhiteboardFile() (*ConvertWhiteboardFileRes, error) 
 
 	status := make(chan convertStatus)
 	go func(file, outputDir string) {
-		cmd := exec.Command("/usr/bin/mutool", "convert", "-o", outputDir+"/page_%d.png", file)
+		cmd := exec.Command("/usr/bin/mutool", "convert", "-O", "resolution=300", "-o", outputDir+"/page_%d.png", file)
 		_, err = cmd.Output()
 
 		if err != nil {
