@@ -9,7 +9,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
 	"io"
-	"io/ioutil"
 	"mime/multipart"
 	"os"
 	"os/exec"
@@ -137,6 +136,7 @@ func (m *ManageFile) ResumableFileUpload(c *fiber.Ctx) (*UploadedFileResponse, e
 
 		// we'll check the first one only.
 		if req.ResumableChunkNumber == 1 {
+			fmt.Println(req.ResumableChunkNumber)
 			fo, _ := reqf.Open()
 			err = m.detectMimeTypeForValidation(fo)
 			if err != nil {
@@ -173,10 +173,17 @@ func (m *ManageFile) ResumableFileUpload(c *fiber.Ctx) (*UploadedFileResponse, e
 
 		if req.ResumableChunkNumber == req.ResumableTotalChunks {
 			// combining chunks into one file
-			err = m.combineResumableFiles(path, req.ResumableFilename, req.ResumableTotalChunks)
+			path, err = m.combineResumableFiles(path, req.ResumableFilename, req.ResumableTotalChunks)
 			if err != nil {
 				return nil, err
 			}
+			// we'll detect mime type again for sending data
+			mtype, err := mimetype.DetectFile(path)
+			if err != nil {
+				return nil, err
+			}
+			res.FileMimeType = mtype.String()
+			res.FileExtension = strings.Replace(mtype.Extension(), ".", "", 1)
 		} else {
 			res.FilePath = "part_uploaded"
 			return res, err
@@ -186,8 +193,6 @@ func (m *ManageFile) ResumableFileUpload(c *fiber.Ctx) (*UploadedFileResponse, e
 	finalPath := fmt.Sprintf("%s/%s", m.Sid, req.ResumableFilename)
 	res.FilePath = finalPath
 	res.FileName = req.ResumableFilename
-	res.FileExtension = m.fileExtension
-	res.FileMimeType = m.fileMimeType
 
 	return res, nil
 }
@@ -225,7 +230,7 @@ func (m *ManageFile) validateMimeType(mtype *mimetype.MIME) error {
 	return nil
 }
 
-func (m *ManageFile) combineResumableFiles(chunksDir string, fileName string, totalParts int) error {
+func (m *ManageFile) combineResumableFiles(chunksDir string, fileName string, totalParts int) (string, error) {
 	chunkSizeInBytes := 1048576
 	uploadDir := fmt.Sprintf("%s/%s", m.uploadFileSettings.Path, m.Sid)
 
@@ -240,7 +245,7 @@ func (m *ManageFile) combineResumableFiles(chunksDir string, fileName string, to
 	f, err := os.Create(path)
 	if err != nil {
 		log.Errorf("Error: %s", err)
-		return err
+		return "", err
 	}
 	defer f.Close()
 
@@ -251,7 +256,7 @@ func (m *ManageFile) combineResumableFiles(chunksDir string, fileName string, to
 		if i == 1 {
 			writeOffset = 0
 		}
-		dat, _ := ioutil.ReadFile(relativePath)
+		dat, _ := os.ReadFile(relativePath)
 		_, err = f.WriteAt(dat, writeOffset)
 
 		if err != nil {
@@ -262,10 +267,10 @@ func (m *ManageFile) combineResumableFiles(chunksDir string, fileName string, to
 	err = os.RemoveAll(chunksDir)
 	if err != nil {
 		log.Errorln(err)
-		return err
+		return "", err
 	}
 
-	return nil
+	return path, nil
 }
 
 func (m *ManageFile) DeleteFile(filePath string) error {
