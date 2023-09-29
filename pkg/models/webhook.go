@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"fmt"
 	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -212,6 +213,12 @@ func (w *webhookEvent) participantJoined() {
 	}
 
 	// send analytics
+	at := fmt.Sprintf("%d", time.Now().UnixMilli())
+	if event.GetCreatedAt() > 0 {
+		// sometime events send in unordered way, so better to use when it was created
+		// otherwise will give invalid data, for backward compatibility convert to milliseconds
+		at = fmt.Sprintf("%d", event.GetCreatedAt()*1000)
+	}
 	w.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
 		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_JOINED,
@@ -219,6 +226,7 @@ func (w *webhookEvent) participantJoined() {
 		UserId:    &event.Participant.Identity,
 		UserName:  &event.Participant.Name,
 		ExtraData: &event.Participant.Metadata,
+		HsetValue: &at,
 	})
 }
 
@@ -246,11 +254,18 @@ func (w *webhookEvent) participantLeft() {
 	_ = sm.SpeechServiceUsersUsage(event.Room.Name, event.Room.Sid, event.Participant.Identity, plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED)
 
 	// send analytics
+	at := fmt.Sprintf("%d", time.Now().UnixMilli())
+	if event.GetCreatedAt() > 0 {
+		// sometime events send in unordered way, so better to use when it was created
+		// otherwise will give invalid data, for backward compatibility convert to milliseconds
+		at = fmt.Sprintf("%d", event.GetCreatedAt()*1000)
+	}
 	w.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
 		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_LEFT,
 		RoomId:    event.Room.Name,
 		UserId:    &event.Participant.Identity,
+		HsetValue: &at,
 	})
 }
 
