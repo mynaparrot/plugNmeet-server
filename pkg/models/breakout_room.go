@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/goccy/go-json"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/redis/go-redis/v9"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/encoding/protojson"
 	"time"
 )
 
@@ -38,6 +38,15 @@ func (m *BreakoutRoom) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRoomsReq) 
 	mainRoom, meta, err := m.roomService.LoadRoomWithMetadata(r.RoomId)
 	if err != nil {
 		return err
+	}
+
+	// let's check if parent room has duration set or not
+	if meta.RoomFeatures.RoomDuration != nil && *meta.RoomFeatures.RoomDuration > 0 {
+		rDuration := NewRoomDurationModel()
+		err = rDuration.CompareDurationWithParentRoom(r.RoomId, r.Duration)
+		if err != nil {
+			return err
+		}
 	}
 
 	// set room duration
@@ -75,7 +84,7 @@ func (m *BreakoutRoom) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRoomsReq) 
 
 		room.Duration = r.Duration
 		room.Created = uint64(time.Now().Unix())
-		marshal, err := json.Marshal(room)
+		marshal, err := protojson.Marshal(room)
 
 		if err != nil {
 			log.Error(err)
@@ -202,19 +211,15 @@ func (m *BreakoutRoom) IncreaseBreakoutRoomDuration(r *plugnmeet.IncreaseBreakou
 	}
 
 	// update in room duration checker
-	req := new(RedisRoomDurationCheckerReq)
-	req.Type = "increaseDuration"
-	req.RoomId = r.BreakoutRoomId
-	req.Duration = r.Duration
-	reqMar, err := json.Marshal(req)
+	rd := NewRoomDurationModel()
+	newDuration, err := rd.IncreaseRoomDuration(r.BreakoutRoomId, r.Duration)
 	if err != nil {
 		return err
 	}
-	m.rc.Publish(m.ctx, "plug-n-meet-room-duration-checker", reqMar)
 
 	// now update redis
-	room.Duration += r.Duration
-	marshal, err := json.Marshal(room)
+	room.Duration = newDuration
+	marshal, err := protojson.Marshal(room)
 	if err != nil {
 		return err
 	}
@@ -295,10 +300,15 @@ func (m *BreakoutRoom) PostTaskAfterRoomStartWebhook(roomId string, metadata *pl
 		room.Created = metadata.StartedAt
 		room.Started = true
 
-		marshal, err := json.Marshal(room)
+		op := protojson.MarshalOptions{
+			EmitUnpopulated: true,
+			UseProtoNames:   true,
+		}
+		marshal, err := op.Marshal(room)
 		if err != nil {
 			return err
 		}
+
 		val := map[string]string{
 			roomId: string(marshal),
 		}
@@ -370,7 +380,7 @@ func (m *BreakoutRoom) fetchBreakoutRoom(roomId, breakoutRoomId string) (*plugnm
 	}
 
 	room := new(plugnmeet.BreakoutRoom)
-	err = json.Unmarshal([]byte(result), room)
+	err = protojson.Unmarshal([]byte(result), room)
 	if err != nil {
 		return nil, err
 	}
@@ -391,7 +401,7 @@ func (m *BreakoutRoom) fetchBreakoutRooms(roomId string) ([]*plugnmeet.BreakoutR
 	var breakoutRooms []*plugnmeet.BreakoutRoom
 	for i, r := range rooms {
 		room := new(plugnmeet.BreakoutRoom)
-		err := json.Unmarshal([]byte(r), room)
+		err := protojson.Unmarshal([]byte(r), room)
 		if err != nil {
 			continue
 		}

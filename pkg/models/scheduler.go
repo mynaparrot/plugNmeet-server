@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"github.com/goccy/go-json"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/redis/go-redis/v9"
@@ -14,20 +13,20 @@ type SchedulerModel struct {
 	rc          *redis.Client
 	ctx         context.Context
 	ra          *RoomAuthModel
+	rmDuration  *RoomDurationModel
 	closeTicker chan bool
 }
 
 func NewSchedulerModel() *SchedulerModel {
 	return &SchedulerModel{
-		rc:  config.AppCnf.RDS,
-		ctx: context.Background(),
-		ra:  NewRoomAuthModel(),
+		rc:         config.AppCnf.RDS,
+		ctx:        context.Background(),
+		ra:         NewRoomAuthModel(),
+		rmDuration: NewRoomDurationModel(),
 	}
 }
 
 func (s *SchedulerModel) StartScheduler() {
-	go s.subscribeRedisRoomDurationChecker()
-
 	s.closeTicker = make(chan bool)
 	checkRoomDuration := time.NewTicker(5 * time.Second)
 	defer checkRoomDuration.Stop()
@@ -47,41 +46,8 @@ func (s *SchedulerModel) StartScheduler() {
 	}
 }
 
-type RedisRoomDurationCheckerReq struct {
-	Type     string `json:"type"`
-	RoomId   string `json:"room_id"`
-	Duration uint64 `json:"duration"`
-}
-
-func (s *SchedulerModel) subscribeRedisRoomDurationChecker() {
-	pubsub := s.rc.Subscribe(s.ctx, "plug-n-meet-room-duration-checker")
-	defer pubsub.Close()
-
-	_, err := pubsub.Receive(s.ctx)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	ch := pubsub.Channel()
-	for msg := range ch {
-		req := new(RedisRoomDurationCheckerReq)
-		err := json.Unmarshal([]byte(msg.Payload), req)
-		if err != nil {
-			log.Errorln(err)
-			continue
-		}
-		if req.Type == "delete" {
-			config.AppCnf.DeleteRoomFromRoomWithDurationMap(req.RoomId)
-		} else if req.Type == "increaseDuration" {
-			s.increaseRoomDuration(req.RoomId, req.Duration)
-		}
-	}
-}
-
 func (s *SchedulerModel) checkRoomWithDuration() {
-	config.AppCnf.RLock()
-	defer config.AppCnf.RUnlock()
-
-	rooms := config.AppCnf.GetRoomsWithDurationMap()
+	rooms := s.rmDuration.GetRoomsWithDurationMap()
 	for i, r := range rooms {
 		now := uint64(time.Now().Unix())
 		valid := r.StartedAt + (r.Duration * 60)
@@ -91,28 +57,6 @@ func (s *SchedulerModel) checkRoomWithDuration() {
 				log.Errorln(err)
 			}
 		}
-	}
-}
-
-func (s *SchedulerModel) increaseRoomDuration(roomId string, duration uint64) {
-	newDuration := config.AppCnf.IncreaseRoomDuration(roomId, duration)
-	if newDuration == 0 {
-		// so record not found in this server
-		return
-	}
-
-	// increase room duration
-	roomService := NewRoomService()
-	_, meta, err := roomService.LoadRoomWithMetadata(roomId)
-	if err != nil {
-		return
-	}
-
-	meta.RoomFeatures.RoomDuration = &newDuration
-	_, err = roomService.UpdateRoomMetadataByStruct(roomId, meta)
-
-	if err != nil {
-		return
 	}
 }
 
