@@ -21,9 +21,8 @@ type AppConfig struct {
 	RDS *redis.Client
 
 	sync.RWMutex
-	chatRooms        map[string]map[string]ChatParticipant
-	roomWithDuration map[string]RoomWithDuration
-	ClientFiles      map[string][]string
+	chatRooms   map[string]map[string]ChatParticipant
+	ClientFiles map[string][]string
 
 	Client                       ClientInfo                   `yaml:"client"`
 	RoomDefaultSettings          *utils.RoomDefaultSettings   `yaml:"room_default_settings"`
@@ -126,23 +125,16 @@ type ChatParticipant struct {
 	IsAdmin bool
 }
 
-type RoomWithDuration struct {
-	RoomSid   string
-	Duration  uint64
-	StartedAt uint64
-}
-
 func SetAppConfig(a *AppConfig) {
 	AppCnf = a
 	AppCnf.chatRooms = make(map[string]map[string]ChatParticipant)
-	AppCnf.roomWithDuration = make(map[string]RoomWithDuration)
 
 	// set default values
 	if AppCnf.AnalyticsSettings != nil {
 		if AppCnf.AnalyticsSettings.FilesStorePath == nil {
 			p := "./analytics"
 			AppCnf.AnalyticsSettings.FilesStorePath = &p
-			d := (time.Minute * 30)
+			d := time.Minute * 30
 			AppCnf.AnalyticsSettings.TokenValidity = &d
 		}
 		if _, err := os.Stat(*AppCnf.AnalyticsSettings.FilesStorePath); os.IsNotExist(err) {
@@ -222,38 +214,6 @@ func (a *AppConfig) DeleteChatRoom(roomId string) {
 	if _, ok := a.chatRooms[roomId]; ok {
 		delete(a.chatRooms, roomId)
 	}
-}
-
-func (a *AppConfig) AddRoomWithDurationMap(roomId string, r RoomWithDuration) {
-	a.Lock()
-	defer a.Unlock()
-	a.roomWithDuration[roomId] = r
-}
-
-func (a *AppConfig) DeleteRoomFromRoomWithDurationMap(roomId string) {
-	a.Lock()
-	defer a.Unlock()
-	if _, ok := a.roomWithDuration[roomId]; ok {
-		delete(a.roomWithDuration, roomId)
-	}
-}
-
-func (a *AppConfig) GetRoomsWithDurationMap() map[string]RoomWithDuration {
-	// we don't need to lock implementation
-	// as we'll require locking before looping over anyway
-	return a.roomWithDuration
-}
-
-func (a *AppConfig) IncreaseRoomDuration(roomId string, duration uint64) uint64 {
-	a.Lock()
-	defer a.Unlock()
-	if r, ok := a.roomWithDuration[roomId]; ok {
-		r.Duration = (r.Duration + duration)
-		a.roomWithDuration[roomId] = r
-		return r.Duration
-	}
-
-	return 0
 }
 
 func (a *AppConfig) readClientFiles() {

@@ -24,6 +24,7 @@ type webhookEvent struct {
 	userModel      *UserModel
 	notifier       *WebhookNotifierModel
 	analyticsModel *AnalyticsModel
+	rmDuration     *RoomDurationModel
 }
 
 func NewWebhookModel(e *livekit.WebhookEvent) {
@@ -38,6 +39,7 @@ func NewWebhookModel(e *livekit.WebhookEvent) {
 		userModel:      NewUserModel(),
 		notifier:       NewWebhookNotifier(),
 		analyticsModel: NewAnalyticsModel(),
+		rmDuration:     NewRoomDurationModel(),
 	}
 
 	switch e.GetEvent() {
@@ -83,8 +85,7 @@ func (w *webhookEvent) roomStarted() {
 			info.StartedAt = uint64(time.Now().Unix())
 			if info.RoomFeatures.RoomDuration != nil && *info.RoomFeatures.RoomDuration > 0 {
 				// we'll add room info in map
-				config.AppCnf.AddRoomWithDurationMap(room.RoomId, config.RoomWithDuration{
-					RoomSid:   room.Sid,
+				w.rmDuration.AddRoomWithDurationInfo(room.RoomId, RoomDurationInfo{
 					Duration:  *info.RoomFeatures.RoomDuration,
 					StartedAt: info.StartedAt, // we can use from livekit
 				})
@@ -149,15 +150,9 @@ func (w *webhookEvent) roomFinished() {
 		}
 	}()
 
-	// notify to clean room from room duration map
+	// notify to clean room from room duration
 	go func() {
-		req := new(RedisRoomDurationCheckerReq)
-		req.Type = "delete"
-		req.RoomId = event.Room.Name
-		marshal, err := json.Marshal(req)
-		if err == nil {
-			_, _ = w.rc.Publish(w.ctx, "plug-n-meet-room-duration-checker", marshal).Result()
-		}
+		_ = w.rmDuration.DeleteRoomWithDuration(event.Room.Name)
 	}()
 
 	// clean shared note
