@@ -84,7 +84,12 @@ func (m *BreakoutRoom) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRoomsReq) 
 
 		room.Duration = r.Duration
 		room.Created = uint64(time.Now().Unix())
-		marshal, err := protojson.Marshal(room)
+
+		op := protojson.MarshalOptions{
+			EmitUnpopulated: true,
+			UseProtoNames:   true,
+		}
+		marshal, err := op.Marshal(room)
 
 		if err != nil {
 			log.Error(err)
@@ -292,29 +297,35 @@ func (m *BreakoutRoom) EndBreakoutRooms(roomId string) error {
 }
 
 func (m *BreakoutRoom) PostTaskAfterRoomStartWebhook(roomId string, metadata *plugnmeet.RoomMetadata) error {
-	if metadata.IsBreakoutRoom {
-		room, err := m.fetchBreakoutRoom(metadata.ParentRoomId, roomId)
-		if err != nil {
-			return err
-		}
-		room.Created = metadata.StartedAt
-		room.Started = true
+	// in livekit now rooms are created almost instantly & sending response webhook
+	// if this happened then we'll have to wait few seconds otherwise room info can't be found
+	time.Sleep(1 * time.Second)
 
-		op := protojson.MarshalOptions{
-			EmitUnpopulated: true,
-			UseProtoNames:   true,
-		}
-		marshal, err := op.Marshal(room)
-		if err != nil {
-			return err
-		}
+	room, err := m.fetchBreakoutRoom(metadata.ParentRoomId, roomId)
+	if err != nil {
+		return err
+	}
+	room.Created = metadata.StartedAt
+	room.Started = true
 
-		val := map[string]string{
-			roomId: string(marshal),
-		}
-		pp := m.rc.Pipeline()
-		pp.HSet(m.ctx, breakoutRoomKey+metadata.ParentRoomId, val)
-		_, err = pp.Exec(m.ctx)
+	op := protojson.MarshalOptions{
+		EmitUnpopulated: true,
+		UseProtoNames:   true,
+	}
+	marshal, err := op.Marshal(room)
+	if err != nil {
+		return err
+	}
+
+	val := map[string]string{
+		roomId: string(marshal),
+	}
+	pp := m.rc.Pipeline()
+	pp.HSet(m.ctx, breakoutRoomKey+metadata.ParentRoomId, val)
+	_, err = pp.Exec(m.ctx)
+	if err != nil {
+		log.Error(err)
+		return err
 	}
 
 	return nil
@@ -372,10 +383,12 @@ func (m *BreakoutRoom) broadcastNotification(roomId, fromUserId, toUserId, broad
 func (m *BreakoutRoom) fetchBreakoutRoom(roomId, breakoutRoomId string) (*plugnmeet.BreakoutRoom, error) {
 	cmd := m.rc.HGet(m.ctx, breakoutRoomKey+roomId, breakoutRoomId)
 	result, err := cmd.Result()
-	if err != nil {
+	switch {
+	case err == redis.Nil:
+		return nil, errors.New("not found")
+	case err != nil:
 		return nil, err
-	}
-	if result == "" {
+	case result == "":
 		return nil, errors.New("not found")
 	}
 
