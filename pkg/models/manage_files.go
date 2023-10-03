@@ -136,7 +136,6 @@ func (m *ManageFile) ResumableFileUpload(c *fiber.Ctx) (*UploadedFileResponse, e
 
 		// we'll check the first one only.
 		if req.ResumableChunkNumber == 1 {
-			fmt.Println(req.ResumableChunkNumber)
 			fo, _ := reqf.Open()
 			err = m.detectMimeTypeForValidation(fo)
 			if err != nil {
