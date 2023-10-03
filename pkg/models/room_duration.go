@@ -72,7 +72,7 @@ func (m *RoomDurationModel) IncreaseRoomDuration(roomId string, duration uint64)
 	}
 
 	// check if this is a breakout room
-	if meta.IsBreakoutRoom {
+	if meta.IsBreakoutRoom && info != nil {
 		// need to check how long time left for this room
 		now := uint64(time.Now().Unix())
 		valid := info.StartedAt + (info.Duration * 60)
@@ -81,7 +81,6 @@ func (m *RoomDurationModel) IncreaseRoomDuration(roomId string, duration uint64)
 		// we'll need to make sure that breakout room duration isn't bigger than main room duration
 		err = m.CompareDurationWithParentRoom(meta.ParentRoomId, d)
 		if err != nil {
-			m.setRoomDuration(roomId, durationField, d-duration)
 			return 0, err
 		}
 	}
@@ -96,6 +95,8 @@ func (m *RoomDurationModel) IncreaseRoomDuration(roomId string, duration uint64)
 	_, err = roomService.UpdateRoomMetadataByStruct(roomId, meta)
 
 	if err != nil {
+		// if error then we'll fall back to set previous duration
+		m.setRoomDuration(roomId, durationField, d-duration)
 		return 0, err
 	}
 
@@ -104,12 +105,12 @@ func (m *RoomDurationModel) IncreaseRoomDuration(roomId string, duration uint64)
 
 func (m *RoomDurationModel) CompareDurationWithParentRoom(mainRoomId string, duration uint64) error {
 	info, err := m.GetRoomDurationInfo(mainRoomId)
-	switch {
-	case err == redis.Nil:
-		// then this room didn't have duration set
-		return nil
-	case err != nil:
+	if err != nil {
 		return err
+	}
+	if info == nil {
+		// this is indicating that the no info found
+		return nil
 	}
 
 	now := uint64(time.Now().Unix())

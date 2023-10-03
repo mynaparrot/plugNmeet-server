@@ -297,9 +297,9 @@ func (m *BreakoutRoom) EndBreakoutRooms(roomId string) error {
 }
 
 func (m *BreakoutRoom) PostTaskAfterRoomStartWebhook(roomId string, metadata *plugnmeet.RoomMetadata) error {
-	// in livekit now rooms are created almost instantly & sending response webhook
+	// now in livekit rooms are created almost instantly & sending webhook response
 	// if this happened then we'll have to wait few seconds otherwise room info can't be found
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	room, err := m.fetchBreakoutRoom(metadata.ParentRoomId, roomId)
 	if err != nil {

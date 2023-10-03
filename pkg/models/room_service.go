@@ -9,7 +9,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/redis/go-redis/v9"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -42,7 +41,6 @@ func (r *RoomService) LoadRoomInfo(roomId string) (*livekit.Room, error) {
 
 	res, err := r.livekitClient.ListRooms(r.ctx, &req)
 	if err != nil {
-		log.Errorln(err)
 		return nil, err
 	}
 
@@ -63,7 +61,6 @@ func (r *RoomService) LoadParticipants(roomId string) ([]*livekit.ParticipantInf
 	}
 	res, err := r.livekitClient.ListParticipants(r.ctx, &req)
 	if err != nil {
-		log.Errorln(err)
 		return nil, err
 	}
 	return res.Participants, nil
@@ -77,7 +74,6 @@ func (r *RoomService) LoadParticipantInfo(roomId string, identity string) (*live
 
 	participant, err := r.livekitClient.GetParticipant(r.ctx, &req)
 	if err != nil {
-		log.Errorln(err)
 		return nil, err
 	}
 	if participant == nil {
@@ -103,7 +99,6 @@ func (r *RoomService) CreateRoom(roomId string, emptyTimeout *uint32, maxPartici
 
 	room, err := r.livekitClient.CreateRoom(r.ctx, req)
 	if err != nil {
-		log.Errorln(err)
 		return nil, err
 	}
 
@@ -118,7 +113,6 @@ func (r *RoomService) UpdateRoomMetadata(roomId string, metadata string) (*livek
 
 	room, err := r.livekitClient.UpdateRoomMetadata(r.ctx, &data)
 	if err != nil {
-		log.Errorln(err)
 		return nil, err
 	}
 
@@ -140,7 +134,6 @@ func (r *RoomService) EndRoom(roomId string) (string, error) {
 
 	res, err := r.livekitClient.DeleteRoom(r.ctx, &data)
 	if err != nil {
-		log.Errorln(err)
 		return "", err
 	}
 
@@ -156,7 +149,6 @@ func (r *RoomService) UpdateParticipantMetadata(roomId string, userId string, me
 
 	participant, err := r.livekitClient.UpdateParticipant(r.ctx, &data)
 	if err != nil {
-		log.Errorln(err)
 		return nil, err
 	}
 
@@ -172,7 +164,6 @@ func (r *RoomService) UpdateParticipantPermission(roomId string, userId string, 
 
 	participant, err := r.livekitClient.UpdateParticipant(r.ctx, &data)
 	if err != nil {
-		log.Errorln(err)
 		return nil, err
 	}
 
@@ -187,7 +178,6 @@ func (r *RoomService) RemoveParticipant(roomId string, userId string) (*livekit.
 
 	res, err := r.livekitClient.RemoveParticipant(r.ctx, &data)
 	if err != nil {
-		log.Errorln(err)
 		return nil, err
 	}
 
@@ -204,7 +194,6 @@ func (r *RoomService) MuteUnMuteTrack(roomId string, userId string, trackSid str
 
 	res, err := r.livekitClient.MutePublishedTrack(r.ctx, &data)
 	if err != nil {
-		log.Errorln(err)
 		return nil, err
 	}
 
@@ -221,7 +210,6 @@ func (r *RoomService) SendData(roomId string, data []byte, dataPacket_Kind livek
 
 	res, err := r.livekitClient.SendData(r.ctx, &req)
 	if err != nil {
-		log.Errorln(err)
 		return nil, err
 	}
 
@@ -251,7 +239,6 @@ func (r *RoomService) UnmarshalRoomMetadata(metadata string) (*plugnmeet.RoomMet
 	meta := new(plugnmeet.RoomMetadata)
 	err := protojson.Unmarshal([]byte(metadata), meta)
 	if err != nil {
-		log.Errorln(err)
 		return nil, err
 	}
 
@@ -287,7 +274,6 @@ func (r *RoomService) LoadRoomWithMetadata(roomId string) (*livekit.Room, *plugn
 
 	meta, err := r.UnmarshalRoomMetadata(room.Metadata)
 	if err != nil {
-		log.Errorln(err)
 		return room, nil, err
 	}
 
@@ -297,12 +283,10 @@ func (r *RoomService) LoadRoomWithMetadata(roomId string) (*livekit.Room, *plugn
 func (r *RoomService) UpdateRoomMetadataByStruct(roomId string, meta *plugnmeet.RoomMetadata) (*livekit.Room, error) {
 	metadata, err := r.MarshalRoomMetadata(meta)
 	if err != nil {
-		log.Errorln(err)
 		return nil, err
 	}
 	room, err := r.UpdateRoomMetadata(roomId, metadata)
 	if err != nil {
-		log.Errorln(err)
 		return nil, err
 	}
 
@@ -319,7 +303,6 @@ func (r *RoomService) MarshalParticipantMetadata(meta *plugnmeet.UserMetadata) (
 	}
 	marshal, err := op.Marshal(meta)
 	if err != nil {
-		log.Errorln(err)
 		return "", err
 	}
 
@@ -344,7 +327,6 @@ func (r *RoomService) LoadParticipantWithMetadata(roomId, userId string) (*livek
 
 	meta, err := r.UnmarshalParticipantMetadata(p.Metadata)
 	if err != nil {
-		log.Errorln(err)
 		return p, nil, err
 	}
 
@@ -354,12 +336,10 @@ func (r *RoomService) LoadParticipantWithMetadata(roomId, userId string) (*livek
 func (r *RoomService) UpdateParticipantMetadataByStruct(roomId, userId string, meta *plugnmeet.UserMetadata) (*livekit.ParticipantInfo, error) {
 	metadata, err := r.MarshalParticipantMetadata(meta)
 	if err != nil {
-		log.Errorln(err)
 		return nil, err
 	}
 	p, err := r.UpdateParticipantMetadata(roomId, userId, metadata)
 	if err != nil {
-		log.Errorln(err)
 		return nil, err
 	}
 

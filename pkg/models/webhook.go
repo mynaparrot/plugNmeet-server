@@ -85,7 +85,7 @@ func (w *webhookEvent) roomStarted() {
 			info.StartedAt = uint64(time.Now().Unix())
 			if info.RoomFeatures.RoomDuration != nil && *info.RoomFeatures.RoomDuration > 0 {
 				// we'll add room info in map
-				w.rmDuration.AddRoomWithDurationInfo(room.RoomId, RoomDurationInfo{
+				_ = w.rmDuration.AddRoomWithDurationInfo(room.RoomId, RoomDurationInfo{
 					Duration:  *info.RoomFeatures.RoomDuration,
 					StartedAt: info.StartedAt, // we can use from livekit
 				})
