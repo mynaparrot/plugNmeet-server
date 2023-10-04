@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/livekit/protocol/livekit"
 	lksdk "github.com/livekit/server-sdk-go"
@@ -10,10 +11,13 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/protobuf/encoding/protojson"
+	"time"
 )
 
 const (
 	BlockedUsersList = "pnm:block_users_list:"
+	ActiveRoomsKey   = "pnm:activeRooms"
+	ActiveRoomUsers  = "pnm:activeRoom:%s:users"
 )
 
 type RoomService struct {
@@ -32,6 +36,7 @@ func NewRoomService() *RoomService {
 	}
 }
 
+// LoadRoomInfo will room information from livekit
 func (r *RoomService) LoadRoomInfo(roomId string) (*livekit.Room, error) {
 	req := livekit.ListRoomsRequest{
 		Names: []string{
@@ -55,6 +60,7 @@ func (r *RoomService) LoadRoomInfo(roomId string) (*livekit.Room, error) {
 	return room, nil
 }
 
+// LoadParticipants will load all the participants info from livekit
 func (r *RoomService) LoadParticipants(roomId string) ([]*livekit.ParticipantInfo, error) {
 	req := livekit.ListParticipantsRequest{
 		Room: roomId,
@@ -66,6 +72,7 @@ func (r *RoomService) LoadParticipants(roomId string) ([]*livekit.ParticipantInf
 	return res.Participants, nil
 }
 
+// LoadParticipantInfo will load single participant info by identity
 func (r *RoomService) LoadParticipantInfo(roomId string, identity string) (*livekit.ParticipantInfo, error) {
 	req := livekit.RoomParticipantIdentity{
 		Room:     roomId,
@@ -83,6 +90,7 @@ func (r *RoomService) LoadParticipantInfo(roomId string, identity string) (*live
 	return participant, nil
 }
 
+// CreateRoom will create room in livekit
 func (r *RoomService) CreateRoom(roomId string, emptyTimeout *uint32, maxParticipants *uint32, metadata string) (*livekit.Room, error) {
 	req := &livekit.CreateRoomRequest{
 		Name: roomId,
@@ -105,6 +113,7 @@ func (r *RoomService) CreateRoom(roomId string, emptyTimeout *uint32, maxPartici
 	return room, nil
 }
 
+// UpdateRoomMetadata will directly send request to livekit to update metadata
 func (r *RoomService) UpdateRoomMetadata(roomId string, metadata string) (*livekit.Room, error) {
 	data := livekit.UpdateRoomMetadataRequest{
 		Room:     roomId,
@@ -127,6 +136,7 @@ func (r *RoomService) UpdateRoomMetadata(roomId string, metadata string) (*livek
 	return room, nil
 }
 
+// EndRoom will send API request to livekit
 func (r *RoomService) EndRoom(roomId string) (string, error) {
 	data := livekit.DeleteRoomRequest{
 		Room: roomId,
@@ -140,6 +150,7 @@ func (r *RoomService) EndRoom(roomId string) (string, error) {
 	return res.String(), nil
 }
 
+// UpdateParticipantMetadata will directly send request to livekit to update metadata
 func (r *RoomService) UpdateParticipantMetadata(roomId string, userId string, metadata string) (*livekit.ParticipantInfo, error) {
 	data := livekit.UpdateParticipantRequest{
 		Room:     roomId,
@@ -155,6 +166,7 @@ func (r *RoomService) UpdateParticipantMetadata(roomId string, userId string, me
 	return participant, nil
 }
 
+// UpdateParticipantPermission will change user's permission by sending request to livekit
 func (r *RoomService) UpdateParticipantPermission(roomId string, userId string, permission *livekit.ParticipantPermission) (*livekit.ParticipantInfo, error) {
 	data := livekit.UpdateParticipantRequest{
 		Room:       roomId,
@@ -170,6 +182,7 @@ func (r *RoomService) UpdateParticipantPermission(roomId string, userId string, 
 	return participant, nil
 }
 
+// RemoveParticipant will send request to livekit to remove user
 func (r *RoomService) RemoveParticipant(roomId string, userId string) (*livekit.RemoveParticipantResponse, error) {
 	data := livekit.RoomParticipantIdentity{
 		Room:     roomId,
@@ -184,6 +197,7 @@ func (r *RoomService) RemoveParticipant(roomId string, userId string) (*livekit.
 	return res, err
 }
 
+// MuteUnMuteTrack can be used to mute/unmute track. This will send request to livekit
 func (r *RoomService) MuteUnMuteTrack(roomId string, userId string, trackSid string, muted bool) (*livekit.MuteRoomTrackResponse, error) {
 	data := livekit.MuteRoomTrackRequest{
 		Room:     roomId,
@@ -200,6 +214,7 @@ func (r *RoomService) MuteUnMuteTrack(roomId string, userId string, trackSid str
 	return res, err
 }
 
+// SendData will send request to livekit for sending data message
 func (r *RoomService) SendData(roomId string, data []byte, dataPacket_Kind livekit.DataPacket_Kind, destinationSids []string) (*livekit.SendDataResponse, error) {
 	req := livekit.SendDataRequest{
 		Room:            roomId,
@@ -216,11 +231,13 @@ func (r *RoomService) SendData(roomId string, data []byte, dataPacket_Kind livek
 	return res, nil
 }
 
+// AddUserToBlockList will add users to block list, we're using redis set
 func (r *RoomService) AddUserToBlockList(roomId, userId string) (int64, error) {
 	key := BlockedUsersList + roomId
 	return r.rc.SAdd(r.ctx, key, userId).Result()
 }
 
+// IsUserExistInBlockList to check if user is present in the block list
 func (r *RoomService) IsUserExistInBlockList(roomId, userId string) bool {
 	key := BlockedUsersList + roomId
 	exist, err := r.rc.SIsMember(r.ctx, key, userId).Result()
@@ -230,11 +247,13 @@ func (r *RoomService) IsUserExistInBlockList(roomId, userId string) bool {
 	return exist
 }
 
+// DeleteRoomBlockList to completely delete block list set to provided roomId
 func (r *RoomService) DeleteRoomBlockList(roomId string) (int64, error) {
 	key := BlockedUsersList + roomId
 	return r.rc.Del(r.ctx, key).Result()
 }
 
+// UnmarshalRoomMetadata will convert metadata string to proper format
 func (r *RoomService) UnmarshalRoomMetadata(metadata string) (*plugnmeet.RoomMetadata, error) {
 	meta := new(plugnmeet.RoomMetadata)
 	err := protojson.Unmarshal([]byte(metadata), meta)
@@ -245,6 +264,7 @@ func (r *RoomService) UnmarshalRoomMetadata(metadata string) (*plugnmeet.RoomMet
 	return meta, nil
 }
 
+// MarshalRoomMetadata will convert metadata struct to proper json format
 func (r *RoomService) MarshalRoomMetadata(meta *plugnmeet.RoomMetadata) (string, error) {
 	mId := uuid.NewString()
 	meta.MetadataId = &mId
@@ -262,6 +282,7 @@ func (r *RoomService) MarshalRoomMetadata(meta *plugnmeet.RoomMetadata) (string,
 	return string(marshal), nil
 }
 
+// LoadRoomWithMetadata will load room info with proper formatted metadata
 func (r *RoomService) LoadRoomWithMetadata(roomId string) (*livekit.Room, *plugnmeet.RoomMetadata, error) {
 	room, err := r.LoadRoomInfo(roomId)
 	if err != nil {
@@ -280,6 +301,7 @@ func (r *RoomService) LoadRoomWithMetadata(roomId string) (*livekit.Room, *plugn
 	return room, meta, nil
 }
 
+// UpdateRoomMetadataByStruct to update metadata by providing formatted metadata
 func (r *RoomService) UpdateRoomMetadataByStruct(roomId string, meta *plugnmeet.RoomMetadata) (*livekit.Room, error) {
 	metadata, err := r.MarshalRoomMetadata(meta)
 	if err != nil {
@@ -293,6 +315,7 @@ func (r *RoomService) UpdateRoomMetadataByStruct(roomId string, meta *plugnmeet.
 	return room, nil
 }
 
+// MarshalParticipantMetadata will create proper json string of user's metadata
 func (r *RoomService) MarshalParticipantMetadata(meta *plugnmeet.UserMetadata) (string, error) {
 	mId := uuid.NewString()
 	meta.MetadataId = &mId
@@ -309,6 +332,7 @@ func (r *RoomService) MarshalParticipantMetadata(meta *plugnmeet.UserMetadata) (
 	return string(marshal), nil
 }
 
+// UnmarshalParticipantMetadata will create proper formatted medata from json string
 func (r *RoomService) UnmarshalParticipantMetadata(metadata string) (*plugnmeet.UserMetadata, error) {
 	m := new(plugnmeet.UserMetadata)
 	err := protojson.Unmarshal([]byte(metadata), m)
@@ -319,6 +343,7 @@ func (r *RoomService) UnmarshalParticipantMetadata(metadata string) (*plugnmeet.
 	return m, nil
 }
 
+// LoadParticipantWithMetadata to load participant with proper formatted metadata
 func (r *RoomService) LoadParticipantWithMetadata(roomId, userId string) (*livekit.ParticipantInfo, *plugnmeet.UserMetadata, error) {
 	p, err := r.LoadParticipantInfo(roomId, userId)
 	if err != nil {
@@ -333,6 +358,7 @@ func (r *RoomService) LoadParticipantWithMetadata(roomId, userId string) (*livek
 	return p, meta, nil
 }
 
+// UpdateParticipantMetadataByStruct will update user's medata by provided formatted metadata
 func (r *RoomService) UpdateParticipantMetadataByStruct(roomId, userId string, meta *plugnmeet.UserMetadata) (*livekit.ParticipantInfo, error) {
 	metadata, err := r.MarshalParticipantMetadata(meta)
 	if err != nil {
@@ -344,4 +370,108 @@ func (r *RoomService) UpdateParticipantMetadataByStruct(roomId, userId string, m
 	}
 
 	return p, nil
+}
+
+// ManageActiveRoomsList will use redis sorted sets to manage active sessions
+// task = add | del | get | fetchAll
+func (r *RoomService) ManageActiveRoomsList(roomId, task string, timeStamp int64) ([]redis.Z, error) {
+	if timeStamp == 0 {
+		timeStamp = time.Now().Unix()
+	}
+	var out []redis.Z
+	var err error
+
+	switch task {
+	case "add":
+		_, err = r.rc.ZAdd(r.ctx, ActiveRoomsKey, redis.Z{
+			Score:  float64(timeStamp),
+			Member: roomId,
+		}).Result()
+		if err != nil {
+			return out, err
+		}
+	case "del":
+		_, err = r.rc.ZRem(r.ctx, ActiveRoomsKey, roomId).Result()
+		if err != nil {
+			return out, err
+		}
+	case "get":
+		result, err := r.rc.ZScore(r.ctx, ActiveRoomsKey, roomId).Result()
+		switch {
+		case err == redis.Nil:
+			return out, err
+		case err != nil:
+			return out, err
+		case result == 0:
+			return out, nil
+		}
+
+		out = append(out, redis.Z{
+			Member: roomId,
+			Score:  result,
+		})
+	case "fetchAll":
+		out, err = r.rc.ZRandMemberWithScores(r.ctx, ActiveRoomsKey, -1).Result()
+		if err != nil {
+			return out, err
+		}
+	}
+
+	return out, nil
+}
+
+// ManageActiveUsersList will use redis sorted sets to manage active users
+// task = add | del | get | fetchAll | delList (to delete this entire list)
+func (r *RoomService) ManageActiveUsersList(roomId, userId, task string, timeStamp int64) ([]redis.Z, error) {
+	if timeStamp == 0 {
+		timeStamp = time.Now().Unix()
+	}
+	key := fmt.Sprintf(ActiveRoomUsers, roomId)
+	var out []redis.Z
+	var err error
+
+	switch task {
+	case "add":
+		_, err = r.rc.ZAdd(r.ctx, key, redis.Z{
+			Score:  float64(timeStamp),
+			Member: userId,
+		}).Result()
+		if err != nil {
+			return out, err
+		}
+	case "del":
+		_, err = r.rc.ZRem(r.ctx, key, userId).Result()
+		if err != nil {
+			return out, err
+		}
+	case "delList":
+		// this will delete this key completely
+		// we'll trigger this when the session was ended
+		_, err = r.rc.Del(r.ctx, key).Result()
+		if err != nil {
+			return out, err
+		}
+	case "get":
+		result, err := r.rc.ZScore(r.ctx, key, userId).Result()
+		switch {
+		case err == redis.Nil:
+			return out, err
+		case err != nil:
+			return out, err
+		case result == 0:
+			return out, nil
+		}
+
+		out = append(out, redis.Z{
+			Member: userId,
+			Score:  result,
+		})
+	case "fetchAll":
+		out, err = r.rc.ZRandMemberWithScores(r.ctx, key, -1).Result()
+		if err != nil {
+			return out, err
+		}
+	}
+
+	return out, nil
 }
