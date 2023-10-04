@@ -85,12 +85,7 @@ func (m *BreakoutRoom) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRoomsReq) 
 		room.Duration = r.Duration
 		room.Created = uint64(time.Now().Unix())
 
-		op := protojson.MarshalOptions{
-			EmitUnpopulated: true,
-			UseProtoNames:   true,
-		}
-		marshal, err := op.Marshal(room)
-
+		marshal, err := protojson.Marshal(room)
 		if err != nil {
 			log.Error(err)
 			e[bRoom.RoomId] = true
@@ -308,11 +303,7 @@ func (m *BreakoutRoom) PostTaskAfterRoomStartWebhook(roomId string, metadata *pl
 	room.Created = metadata.StartedAt
 	room.Started = true
 
-	op := protojson.MarshalOptions{
-		EmitUnpopulated: true,
-		UseProtoNames:   true,
-	}
-	marshal, err := op.Marshal(room)
+	marshal, err := protojson.Marshal(room)
 	if err != nil {
 		return err
 	}
@@ -421,11 +412,9 @@ func (m *BreakoutRoom) fetchBreakoutRooms(roomId string) ([]*plugnmeet.BreakoutR
 		room.Id = i
 		for _, u := range room.Users {
 			if room.Started {
-				joined, err := m.roomService.LoadParticipantInfo(room.Id, u.Id)
-				if err == nil {
-					if joined.Identity == u.Id {
-						u.Joined = true
-					}
+				joined, err := m.roomService.ManageActiveUsersList(room.Id, u.Id, "get", 0)
+				if err == nil && len(joined) > 0 {
+					u.Joined = true
 				}
 			}
 		}

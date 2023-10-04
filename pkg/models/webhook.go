@@ -63,7 +63,6 @@ func NewWebhookModel(e *livekit.WebhookEvent) {
 
 func (w *webhookEvent) roomStarted() {
 	event := w.event
-
 	// webhook notification
 	go w.sendToWebhookNotifier(event)
 
@@ -75,6 +74,12 @@ func (w *webhookEvent) roomStarted() {
 		Created:      time.Now().UTC().Format("2006-01-02 15:04:05"),
 	}
 	_, err := w.roomModel.InsertOrUpdateRoomData(room, false)
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	// now we'll insert this session in the active sessions list
+	_, err = w.roomService.ManageActiveRoomsList(event.Room.Name, "add", event.Room.CreationTime)
 	if err != nil {
 		log.Errorln(err)
 	}
@@ -104,9 +109,7 @@ func (w *webhookEvent) roomStarted() {
 func (w *webhookEvent) roomFinished() {
 	event := w.event
 	// webhook notification
-	if event != nil {
-		go w.sendToWebhookNotifier(event)
-	}
+	go w.sendToWebhookNotifier(event)
 
 	if event.Room.Sid != "" {
 		// we will only update table if the SID is not empty
@@ -120,6 +123,20 @@ func (w *webhookEvent) roomFinished() {
 			log.Errorln(err)
 		}
 	}
+	// now we'll remove this session from the active sessions list
+	_, err := w.roomService.ManageActiveRoomsList(event.Room.Name, "del", event.CreatedAt)
+	if err != nil {
+		log.Errorln(err)
+	}
+	// we'll also delete active users list for this room
+	go func() {
+		// let's wait few seconds so that any pending task will finish
+		time.Sleep(5 * time.Second)
+		_, err = w.roomService.ManageActiveUsersList(event.Room.Name, "", "delList", event.CreatedAt)
+		if err != nil {
+			log.Errorln(err)
+		}
+	}()
 
 	//we'll send message to recorder to stop
 	_ = w.recorderModel.SendMsgToRecorder(&plugnmeet.RecordingReq{
@@ -207,6 +224,12 @@ func (w *webhookEvent) participantJoined() {
 		log.Errorln(err)
 	}
 
+	// now we'll add this user to active users list for this room
+	_, err = w.roomService.ManageActiveUsersList(event.Room.Name, event.Participant.Identity, "add", event.Participant.JoinedAt)
+	if err != nil {
+		log.Errorln(err)
+	}
+
 	// send analytics
 	at := fmt.Sprintf("%d", time.Now().UnixMilli())
 	if event.GetCreatedAt() > 0 {
@@ -239,6 +262,11 @@ func (w *webhookEvent) participantLeft() {
 		Sid: event.Room.Sid,
 	}
 	_, err := w.roomModel.UpdateRoomParticipants(room, "-")
+	if err != nil {
+		log.Errorln(err)
+	}
+	// now we'll delete this user from active users list for this room
+	_, err = w.roomService.ManageActiveUsersList(event.Room.Name, event.Participant.Identity, "del", event.CreatedAt)
 	if err != nil {
 		log.Errorln(err)
 	}
@@ -321,6 +349,9 @@ func (w *webhookEvent) trackUnpublished() {
 }
 
 func (w *webhookEvent) sendToWebhookNotifier(event *livekit.WebhookEvent) {
+	if event == nil {
+		return
+	}
 	if event.Room == nil {
 		log.Errorln("empty room info for event: ", event.GetEvent())
 		return
