@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
-	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/auth"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
@@ -30,7 +29,7 @@ func NewWebhookNotifier() *WebhookNotifierModel {
 	}
 }
 
-func (n *WebhookNotifierModel) Notify(roomSid string, msg interface{}) error {
+func (n *WebhookNotifierModel) Notify(roomSid string, msg []byte) error {
 	if !n.webhookConf.Enable {
 		return nil
 	}
@@ -61,17 +60,10 @@ func (n *WebhookNotifierModel) Notify(roomSid string, msg interface{}) error {
 	return nil
 }
 
-func (n *WebhookNotifierModel) _notify(msg interface{}) error {
-	var encoded []byte
+func (n *WebhookNotifierModel) _notify(msg []byte) error {
 	var err error
-
-	encoded, err = json.Marshal(msg)
-	if err != nil {
-		return err
-	}
-
 	// sign payload
-	sum := sha256.Sum256(encoded)
+	sum := sha256.Sum256(msg)
 	b64 := base64.StdEncoding.EncodeToString(sum[:])
 
 	at := auth.NewAccessToken(n.apiKey, n.apiSecret).
@@ -84,7 +76,7 @@ func (n *WebhookNotifierModel) _notify(msg interface{}) error {
 	}
 
 	for _, url := range n.urls {
-		r, err := http.NewRequest("POST", url, bytes.NewReader(encoded))
+		r, err := http.NewRequest("POST", url, bytes.NewReader(msg))
 		if err != nil {
 			// ignore and continue
 			log.Errorln(err, "could not create request", "url", url)
