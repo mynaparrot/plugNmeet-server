@@ -265,7 +265,7 @@ func (w *webhookEvent) participantLeft() {
 	if err != nil {
 		log.Errorln(err)
 	}
-	// now we'll add this user to active users list for this room
+	// now we'll delete this user from active users list for this room
 	_, err = w.roomService.ManageActiveUsersList(event.Room.Name, event.Participant.Identity, "del", event.CreatedAt)
 	if err != nil {
 		log.Errorln(err)
