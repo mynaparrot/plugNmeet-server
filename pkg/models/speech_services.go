@@ -168,7 +168,7 @@ func (s *SpeechServices) SpeechServiceUsersUsage(roomId, rSid, userId string, ta
 			}
 		}
 		// webhook
-		s.sendToWebhookNotifier(roomId, rSid, userId, task, 0)
+		s.sendToWebhookNotifier(roomId, rSid, &userId, task, 0)
 		// send analytics
 		val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()
 		s.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
@@ -200,7 +200,7 @@ func (s *SpeechServices) SpeechServiceUsersUsage(roomId, rSid, userId string, ta
 				return err
 			}
 			// send webhook
-			s.sendToWebhookNotifier(roomId, rSid, userId, task, usage)
+			s.sendToWebhookNotifier(roomId, rSid, &userId, task, usage)
 			// send analytics
 			val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()
 			s.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
@@ -253,7 +253,7 @@ func (s *SpeechServices) OnAfterRoomEnded(roomId, sId string) {
 	if usage != "" {
 		c, err := strconv.ParseInt(usage, 10, 64)
 		if err == nil {
-			s.sendToWebhookNotifier(roomId, sId, "", plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_TOTAL_USAGE, c)
+			s.sendToWebhookNotifier(roomId, sId, nil, plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_TOTAL_USAGE, c)
 			// send analytics
 			s.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 				EventType:        plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
@@ -382,7 +382,7 @@ func (s *SpeechServices) selectAzureKey() (*config.AzureSubscriptionKey, error) 
 	return &keys[0], nil
 }
 
-func (s *SpeechServices) sendToWebhookNotifier(rId, rSid, userId string, task plugnmeet.SpeechServiceUserStatusTasks, usage int64) {
+func (s *SpeechServices) sendToWebhookNotifier(rId, rSid string, userId *string, task plugnmeet.SpeechServiceUserStatusTasks, usage int64) {
 	tk := task.String()
 	n := NewWebhookNotifier()
 	msg := &plugnmeet.CommonNotifyEvent{
@@ -392,11 +392,20 @@ func (s *SpeechServices) sendToWebhookNotifier(rId, rSid, userId string, task pl
 			RoomId: &rSid,
 		},
 		SpeechService: &plugnmeet.SpeechServiceEvent{
-			UserId:     &userId,
+			UserId:     userId,
 			TotalUsage: usage,
 		},
 	}
-	err := n.Notify(rSid, msg)
+	op := protojson.MarshalOptions{
+		EmitUnpopulated: false,
+		UseProtoNames:   true,
+	}
+	marshal, err := op.Marshal(msg)
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+	err = n.Notify(rSid, marshal)
 	if err != nil {
 		log.Errorln(err)
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/redis/go-redis/v9"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/encoding/protojson"
 	"time"
 )
 
@@ -19,9 +20,7 @@ type webhookEvent struct {
 	event          *livekit.WebhookEvent
 	roomModel      *RoomModel
 	roomService    *RoomService
-	recordingModel *RecordingModel
 	recorderModel  *RecorderModel
-	userModel      *UserModel
 	notifier       *WebhookNotifierModel
 	analyticsModel *AnalyticsModel
 	rmDuration     *RoomDurationModel
@@ -34,9 +33,7 @@ func NewWebhookModel(e *livekit.WebhookEvent) {
 		event:          e,
 		roomModel:      NewRoomModel(),
 		roomService:    NewRoomService(),
-		recordingModel: NewRecordingModel(),
 		recorderModel:  NewRecorderModel(),
-		userModel:      NewUserModel(),
 		notifier:       NewWebhookNotifier(),
 		analyticsModel: NewAnalyticsModel(),
 		rmDuration:     NewRoomDurationModel(),
@@ -358,7 +355,16 @@ func (w *webhookEvent) sendToWebhookNotifier(event *livekit.WebhookEvent) {
 	}
 
 	msg := utils.PrepareCommonWebhookNotifyEvent(event)
-	err := w.notifier.Notify(event.Room.Sid, msg)
+	op := protojson.MarshalOptions{
+		EmitUnpopulated: false,
+		UseProtoNames:   true,
+	}
+	marshal, err := op.Marshal(msg)
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+	err = w.notifier.Notify(event.Room.Sid, marshal)
 	if err != nil {
 		log.Errorln(err)
 	}

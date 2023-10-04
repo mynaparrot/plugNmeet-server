@@ -370,7 +370,17 @@ func (rm *RecordingModel) sendToWebhookNotifier(r *plugnmeet.RecorderToPlugNmeet
 			FileSize:    &r.FileSize,
 		},
 	}
-	err := n.Notify(r.RoomSid, msg)
+	op := protojson.MarshalOptions{
+		EmitUnpopulated: false,
+		UseProtoNames:   true,
+	}
+	marshal, err := op.Marshal(msg)
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+
+	err = n.Notify(r.RoomSid, marshal)
 	if err != nil {
 		log.Errorln(err)
 	}
