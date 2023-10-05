@@ -12,6 +12,7 @@ import (
 func HandleCreateEtherpad(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
+	requestedUserId := c.Locals("requestedUserId")
 
 	if !isAdmin.(bool) {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
@@ -34,7 +35,7 @@ func HandleCreateEtherpad(c *fiber.Ctx) error {
 	}
 
 	m := models.NewEtherpadModel()
-	res, err := m.CreateSession(rid)
+	res, err := m.CreateSession(rid, requestedUserId.(string))
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
