@@ -210,9 +210,9 @@ func (w *webhookEvent) roomFinished() {
 func (w *webhookEvent) participantJoined() {
 	event := w.event
 	// we won't count for recorder
-	if event.Participant.Identity == config.RECORDER_BOT || event.Participant.Identity == config.RTMP_BOT {
+	/*if event.Participant.Identity == config.RECORDER_BOT || event.Participant.Identity == config.RTMP_BOT {
 		return
-	}
+	}*/
 
 	// webhook notification
 	go w.sendToWebhookNotifier(event)
@@ -252,9 +252,9 @@ func (w *webhookEvent) participantJoined() {
 func (w *webhookEvent) participantLeft() {
 	event := w.event
 	// we won't count for recorder
-	if event.Participant.Identity == config.RECORDER_BOT || event.Participant.Identity == config.RTMP_BOT {
+	/*if event.Participant.Identity == config.RECORDER_BOT || event.Participant.Identity == config.RTMP_BOT {
 		return
-	}
+	}*/
 
 	// webhook notification
 	go w.sendToWebhookNotifier(event)
