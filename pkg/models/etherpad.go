@@ -44,7 +44,7 @@ type EtherpadDataTypes struct {
 }
 
 const (
-	APIVersion  = "1.2.15"
+	APIVersion  = "1.3.0"
 	EtherpadKey = "pnm:etherpad:"
 )
 
@@ -65,7 +65,7 @@ type CreateSessionRes struct {
 
 // CreateSession will create group, pad, session
 // return padId, readonlyPadId
-func (m *EtherpadModel) CreateSession(roomId string) (*plugnmeet.CreateEtherpadSessionRes, error) {
+func (m *EtherpadModel) CreateSession(roomId, requestedUserId string) (*plugnmeet.CreateEtherpadSessionRes, error) {
 	if len(m.SharedNotePad.EtherpadHosts) < 1 {
 		return nil, errors.New("need at least one etherpad host")
 	}
@@ -79,7 +79,7 @@ func (m *EtherpadModel) CreateSession(roomId string) (*plugnmeet.CreateEtherpadS
 	res.PadId = &pid
 
 	// step 1: create pad using session id
-	r, err := m.createPad(pid)
+	r, err := m.createPad(pid, requestedUserId)
 	if err != nil {
 		return nil, err
 	}
@@ -219,9 +219,12 @@ func (m *EtherpadModel) ChangeEtherpadStatus(r *plugnmeet.ChangeEtherpadStatusRe
 	return err
 }
 
-func (m *EtherpadModel) createPad(sessionId string) (*EtherpadHttpRes, error) {
+func (m *EtherpadModel) createPad(sessionId, requestedUserId string) (*EtherpadHttpRes, error) {
 	vals := url.Values{}
 	vals.Add("padID", sessionId)
+	if requestedUserId != "" {
+		vals.Add("authorId", requestedUserId)
+	}
 
 	res, err := m.postToEtherpad("createPad", vals)
 	if err != nil {

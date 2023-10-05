@@ -56,6 +56,8 @@ func (m *AnalyticsModel) HandleWebSocketData(dataMsg *plugnmeet.DataMessage) {
 		RoomId:    dataMsg.RoomId,
 		UserId:    &dataMsg.Body.From.UserId,
 	}
+	var val int64 = 1
+
 	switch dataMsg.Body.GetType() {
 	case plugnmeet.DataMsgBodyType_CHAT:
 		if dataMsg.Body.IsPrivate != nil && *dataMsg.Body.IsPrivate == 1 {
@@ -63,11 +65,9 @@ func (m *AnalyticsModel) HandleWebSocketData(dataMsg *plugnmeet.DataMessage) {
 		} else {
 			d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_PUBLIC_CHAT
 		}
-		var val int64 = 1
 		d.EventValueInteger = &val
 	case plugnmeet.DataMsgBodyType_SCENE_UPDATE:
 		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_WHITEBOARD_ANNOTATED
-		var val int64 = 1
 		d.EventValueInteger = &val
 	case plugnmeet.DataMsgBodyType_USER_VISIBILITY_CHANGE:
 		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_INTERFACE_VISIBILITY
@@ -198,15 +198,15 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, meta
 		RoomTitle:    room.RoomTitle,
 		RoomCreation: room.CreationTime,
 		RoomEnded:    ended.Unix(),
-		EnabledE2Ee:  metadata.RoomFeatures.EndToEndEncryptionFeatures.IsEnabled,
+		EnabledE2Ee:  metadata.GetRoomFeatures().GetEndToEndEncryptionFeatures().GetIsEnabled(),
 		Events:       []*plugnmeet.AnalyticsEventData{},
 	}
-	usersInfo := []*plugnmeet.AnalyticsUserInfo{}
-	allKeys := []string{}
+	var usersInfo []*plugnmeet.AnalyticsUserInfo
+	var allKeys []string
 
 	key := fmt.Sprintf(analyticsRoomKey+":room", room.RoomId)
 	// we can store all users' type key to make things faster
-	userRedisKeys := []string{}
+	var userRedisKeys []string
 	// we'll collect all room related events
 	for _, ev := range plugnmeet.AnalyticsEvents_name {
 		if strings.Contains(ev, "ANALYTICS_EVENT_ROOM_") {

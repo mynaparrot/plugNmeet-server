@@ -210,7 +210,7 @@ func (m *AnalyticsAuthModel) GetAnalyticsDownloadToken(r *plugnmeet.GetAnalytics
 }
 
 // VerifyAnalyticsToken verify token & provide file path
-func (a *AnalyticsAuthModel) VerifyAnalyticsToken(token string) (string, int, error) {
+func (m *AnalyticsAuthModel) VerifyAnalyticsToken(token string) (string, int, error) {
 	tok, err := jwt.ParseSigned(token)
 	if err != nil {
 		return "", fiber.StatusUnauthorized, err
