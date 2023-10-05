@@ -198,7 +198,7 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, meta
 		RoomTitle:    room.RoomTitle,
 		RoomCreation: room.CreationTime,
 		RoomEnded:    ended.Unix(),
-		EnabledE2Ee:  metadata.RoomFeatures.EndToEndEncryptionFeatures.IsEnabled,
+		EnabledE2Ee:  metadata.GetRoomFeatures().GetEndToEndEncryptionFeatures().GetIsEnabled(),
 		Events:       []*plugnmeet.AnalyticsEventData{},
 	}
 	var usersInfo []*plugnmeet.AnalyticsUserInfo
