@@ -63,20 +63,24 @@ func (w *webhookEvent) roomStarted() {
 	// webhook notification
 	go w.sendToWebhookNotifier(event)
 
-	room := &RoomInfo{
-		RoomId:       event.Room.Name,
-		Sid:          event.Room.Sid,
-		IsRunning:    1,
-		CreationTime: event.Room.CreationTime,
-		Created:      time.Now().UTC().Format("2006-01-02 15:04:05"),
-	}
-	_, err := w.roomModel.InsertOrUpdateRoomData(room, false)
-	if err != nil {
-		log.Errorln(err)
+	rm, _ := w.roomModel.GetRoomInfo(event.Room.Name, event.Room.Sid, 1)
+	if rm.Id == 0 {
+		// we'll only create if not exist
+		room := &RoomInfo{
+			RoomId:       event.Room.Name,
+			Sid:          event.Room.Sid,
+			IsRunning:    1,
+			CreationTime: event.Room.CreationTime,
+			Created:      time.Now().UTC().Format("2006-01-02 15:04:05"),
+		}
+		_, err := w.roomModel.InsertOrUpdateRoomData(room, false)
+		if err != nil {
+			log.Errorln(err)
+		}
 	}
 
 	// now we'll insert this session in the active sessions list
-	_, err = w.roomService.ManageActiveRoomsList(event.Room.Name, "add", event.Room.CreationTime)
+	_, err := w.roomService.ManageActiveRoomsList(event.Room.Name, "add", event.Room.CreationTime)
 	if err != nil {
 		log.Errorln(err)
 	}
@@ -87,17 +91,17 @@ func (w *webhookEvent) roomStarted() {
 			info.StartedAt = uint64(time.Now().Unix())
 			if info.RoomFeatures.RoomDuration != nil && *info.RoomFeatures.RoomDuration > 0 {
 				// we'll add room info in map
-				_ = w.rmDuration.AddRoomWithDurationInfo(room.RoomId, RoomDurationInfo{
+				_ = w.rmDuration.AddRoomWithDurationInfo(event.Room.Name, RoomDurationInfo{
 					Duration:  *info.RoomFeatures.RoomDuration,
 					StartedAt: info.StartedAt, // we can use from livekit
 				})
 			}
 			if info.IsBreakoutRoom {
 				bm := NewBreakoutRoomModel()
-				_ = bm.PostTaskAfterRoomStartWebhook(room.RoomId, info)
+				_ = bm.PostTaskAfterRoomStartWebhook(event.Room.Name, info)
 			}
 			if err == nil {
-				_, _ = w.roomService.UpdateRoomMetadataByStruct(room.RoomId, info)
+				_, _ = w.roomService.UpdateRoomMetadataByStruct(event.Room.Name, info)
 			}
 		}
 	}

@@ -253,6 +253,8 @@ func (rm *RoomModel) UpdateNumParticipants(roomSid string, num int64) (int64, er
 	return affectedId, nil
 }
 
+// GetRoomInfo can be used to get room information
+// Note: this won't send nil value, so always need to check if table Id is 0 or not
 func (rm *RoomModel) GetRoomInfo(roomId string, sid string, isRunning int) (*RoomInfo, string) {
 	db := rm.db
 	ctx, cancel := context.WithTimeout(rm.ctx, 3*time.Second)
@@ -283,7 +285,7 @@ func (rm *RoomModel) GetRoomInfo(roomId string, sid string, isRunning int) (*Roo
 	err := query.Scan(&room.Id, &room.RoomTitle, &room.RoomId, &room.Sid, &room.JoinedParticipants, &room.IsRunning, &room.IsRecording, &room.IsActiveRTMP, &room.WebhookUrl, &room.IsBreakoutRoom, &room.ParentRoomId, &room.CreationTime, &room.Ended)
 
 	switch {
-	case err == sql.ErrNoRows:
+	case errors.Is(err, sql.ErrNoRows):
 		msg = "no info found"
 	case err != nil:
 		msg = fmt.Sprintf("query error: %s", err.Error())
@@ -309,7 +311,7 @@ func (rm *RoomModel) GetRoomInfoByTableId(tableId int64) (*RoomInfo, string) {
 	err := query.Scan(&room.Id, &room.RoomTitle, &room.RoomId, &room.Sid, &room.JoinedParticipants, &room.IsRunning, &room.IsRecording, &room.IsActiveRTMP, &room.WebhookUrl, &room.IsBreakoutRoom, &room.ParentRoomId, &room.CreationTime, &room.Ended)
 
 	switch {
-	case err == sql.ErrNoRows:
+	case errors.Is(err, sql.ErrNoRows):
 		msg = "no info found"
 	case err != nil:
 		msg = fmt.Sprintf("query error: %s", err.Error())

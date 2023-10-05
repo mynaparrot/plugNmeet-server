@@ -168,7 +168,7 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(sid, meta string) {
 
 	rm := NewRoomModel()
 	room, _ := rm.GetRoomInfo("", sid, 0)
-	if room == nil {
+	if room.Id == 0 {
 		return
 	}
 
