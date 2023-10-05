@@ -56,7 +56,7 @@ func (m *AnalyticsModel) HandleWebSocketData(dataMsg *plugnmeet.DataMessage) {
 		RoomId:    dataMsg.RoomId,
 		UserId:    &dataMsg.Body.From.UserId,
 	}
-	switch dataMsg.Body.Type {
+	switch dataMsg.Body.GetType() {
 	case plugnmeet.DataMsgBodyType_CHAT:
 		if dataMsg.Body.IsPrivate != nil && *dataMsg.Body.IsPrivate == 1 {
 			d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_PRIVATE_CHAT
@@ -85,7 +85,7 @@ func (m *AnalyticsModel) handleRoomTypeEvents() {
 	}
 	key := fmt.Sprintf(analyticsRoomKey+":room", m.data.RoomId)
 
-	switch m.data.EventName {
+	switch m.data.GetEventName() {
 	case plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_JOINED:
 		m.handleFirstTimeUserJoined(key)
 		// we still need to run as user type too
@@ -99,7 +99,7 @@ func (m *AnalyticsModel) handleUserTypeEvents() {
 	if m.data.EventName == plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_UNKNOWN {
 		return
 	}
-	key := fmt.Sprintf(analyticsUserKey, m.data.RoomId, *m.data.UserId)
+	key := fmt.Sprintf(analyticsUserKey, m.data.RoomId, m.data.GetUserId())
 	m.insertEventData(key)
 }
 
@@ -109,7 +109,7 @@ func (m *AnalyticsModel) insertEventData(key string) {
 		var val map[string]string
 		if m.data.HsetValue != nil {
 			val = map[string]string{
-				fmt.Sprintf("%d", m.data.Time): *m.data.HsetValue,
+				fmt.Sprintf("%d", m.data.Time): m.data.GetHsetValue(),
 			}
 		} else {
 			val = map[string]string{
@@ -123,14 +123,14 @@ func (m *AnalyticsModel) insertEventData(key string) {
 	} else if m.data.EventValueInteger != nil {
 		// we are assuming that the value will be always integer
 		// in this case we'll simply use INCRBY, which will be string type
-		_, err := m.rc.IncrBy(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), *m.data.EventValueInteger).Result()
+		_, err := m.rc.IncrBy(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), m.data.GetEventValueInteger()).Result()
 		if err != nil {
 			log.Errorln(err)
 		}
 	} else if m.data.EventValueString != nil {
 		// we are assuming that we want to set the supplied value
 		// in this case we'll simply use SET, which will be string type
-		_, err := m.rc.Set(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), *m.data.EventValueString, time.Duration(0)).Result()
+		_, err := m.rc.Set(m.ctx, fmt.Sprintf("%s:%s", key, m.data.EventName.String()), m.data.GetEventValueString(), time.Duration(0)).Result()
 		if err != nil {
 			log.Errorln(err)
 		}
