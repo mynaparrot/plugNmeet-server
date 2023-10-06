@@ -233,7 +233,7 @@ func (u *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 		MsgBodyType: plugnmeet.DataMsgBodyType_ALERT,
 		Msg:         r.Msg,
 		RoomId:      r.RoomId,
-		SendTo:      []string{p.Sid},
+		SendTo:      []string{r.UserId},
 	})
 
 	// now remove

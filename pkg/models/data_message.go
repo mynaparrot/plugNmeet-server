@@ -184,16 +184,16 @@ func (m *DataMessageModel) sendNotification(r *plugnmeet.DataMessageReq) error {
 		Type:      plugnmeet.DataMsgType_SYSTEM,
 		MessageId: &mId,
 		Body: &plugnmeet.DataMsgBody{
-			Type: r.MsgBodyType,
+			Type: r.GetMsgBodyType(),
 			Time: &tm,
 			From: &plugnmeet.DataMsgReqFrom{
-				Sid: r.UserSid,
+				Sid: r.GetUserSid(),
 			},
-			Msg: r.Msg,
+			Msg: r.GetMsg(),
 		},
 	}
 
-	err := m.deliverMsg(r.RoomId, []string{}, msg)
+	err := m.deliverMsg(r.GetRoomId(), r.GetSendTo(), msg)
 	if err != nil {
 		return err
 	}
