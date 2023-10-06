@@ -215,12 +215,12 @@ func (r *RoomService) MuteUnMuteTrack(roomId string, userId string, trackSid str
 }
 
 // SendData will send request to livekit for sending data message
-func (r *RoomService) SendData(roomId string, data []byte, dataPacketKind livekit.DataPacket_Kind, destinationIdentities []string) (*livekit.SendDataResponse, error) {
+func (r *RoomService) SendData(roomId string, data []byte, dataPacketKind livekit.DataPacket_Kind, destinationSids []string) (*livekit.SendDataResponse, error) {
 	req := livekit.SendDataRequest{
-		Room:                  roomId,
-		Data:                  data,
-		Kind:                  dataPacketKind,
-		DestinationIdentities: destinationIdentities,
+		Room:            roomId,
+		Data:            data,
+		Kind:            dataPacketKind,
+		DestinationSids: destinationSids,
 	}
 
 	res, err := r.livekitClient.SendData(r.ctx, &req)
