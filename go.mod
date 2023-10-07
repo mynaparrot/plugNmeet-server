@@ -15,7 +15,7 @@ require (
 	github.com/gofiber/template/html/v2 v2.0.5
 	github.com/google/uuid v1.3.1
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/protocol v1.7.2
+	github.com/livekit/protocol v1.8.0
 	github.com/livekit/server-sdk-go v1.0.16
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20230928131929-9547b4a1688f
 	github.com/redis/go-redis/v9 v9.2.1
