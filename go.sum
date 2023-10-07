@@ -112,12 +112,18 @@ github.com/livekit/mageutil v0.0.0-20230125210925-54e8a70427c1 h1:jm09419p0lqTkD
 github.com/livekit/mageutil v0.0.0-20230125210925-54e8a70427c1/go.mod h1:Rs3MhFwutWhGwmY1VQsygw28z5bWcnEYmS1OG9OxjOQ=
 github.com/livekit/mediatransportutil v0.0.0-20230922062844-75229184cf79 h1:UQICDRiXnhtsjjf2uL3SFbnRHfPlzExoZ10Z59R50dg=
 github.com/livekit/mediatransportutil v0.0.0-20230922062844-75229184cf79/go.mod h1:+WIOYwiBMive5T81V8B2wdAc2zQNRjNQiJIcPxMTILY=
+github.com/livekit/mediatransportutil v0.0.0-20231003064835-a51e0ca1b1fd h1:Dqfr8ehKCukEYE9zr0C035VAOmMq8lntE4iD/DE7504=
+github.com/livekit/mediatransportutil v0.0.0-20231003064835-a51e0ca1b1fd/go.mod h1:+WIOYwiBMive5T81V8B2wdAc2zQNRjNQiJIcPxMTILY=
 github.com/livekit/protocol v1.7.2 h1:TPk8rIv5ZZSx1IU5jaGA2W+RdoDlE8dp4CFHE0MKoGo=
 github.com/livekit/protocol v1.7.2/go.mod h1:zbh0QPUcLGOeZeIO/VeigwWWbudz4Lv+Px94FnVfQH0=
+github.com/livekit/protocol v1.8.0 h1:0z2eRmEXFFXiJ7WPAxRLMNCyUu55w41iikbbeT8dvlQ=
+github.com/livekit/protocol v1.8.0/go.mod h1:zbh0QPUcLGOeZeIO/VeigwWWbudz4Lv+Px94FnVfQH0=
 github.com/livekit/psrpc v0.3.3 h1:+lltbuN39IdaynXhLLxRShgYqYsRMWeeXKzv60oqyWo=
 github.com/livekit/psrpc v0.3.3/go.mod h1:n6JntEg+zT6Ji8InoyTpV7wusPNwGqqtxmHlkNhDN0U=
 github.com/livekit/server-sdk-go v1.0.16 h1:o3lCl3ZR+aegPDaf8/0WNhAaGApGnh7waoUXdS1Rr4o=
 github.com/livekit/server-sdk-go v1.0.16/go.mod h1:lLDZe/p7v4xaVTRMAXXDFWg3PQwGKZQ3hCcLYbVD27k=
+github.com/livekit/server-sdk-go v1.1.0 h1:hlwi0dJDRmrqptwpVt7cclpB3722vfsXN4K84ldXhx4=
+github.com/livekit/server-sdk-go v1.1.0/go.mod h1:oYPFUsHAeg1QnaHyExYq9DSRf/1jKjZRwbIY3W1G+8c=
 github.com/mackerelio/go-osstat v0.2.4 h1:qxGbdPkFo65PXOb/F/nhDKpF2nGmGaCFDLXoZjJTtUs=
 github.com/mackerelio/go-osstat v0.2.4/go.mod h1:Zy+qzGdZs3A9cuIqmgbJvwbmLQH9dJvtio5ZjJTbdlQ=
 github.com/magefile/mage v1.15.0 h1:BvGheCMAsG3bWUDbZ8AyXXpCNwU9u5CB6sM+HNb9HYg=
@@ -165,6 +171,8 @@ github.com/pion/ice/v2 v2.3.11/go.mod h1:hPcLC3kxMa+JGRzMHqQzjoSj3xtE9F+eoncmXLl
 github.com/pion/interceptor v0.1.18/go.mod h1:tpvvF4cPM6NGxFA1DUMbhabzQBxdWMATDGEUYOR9x6I=
 github.com/pion/interceptor v0.1.19 h1:tq0TGBzuZQqipyBhaC1mVUCfCh8XjDKUuibq9rIl5t4=
 github.com/pion/interceptor v0.1.19/go.mod h1:VANhFxdJezB8mwToMMmrmyHyP9gym6xLqIUch31xryg=
+github.com/pion/interceptor v0.1.21 h1:owpNzUHITYK5IqP83LoPECO5Rq6uK4io7dGUx1SQJoo=
+github.com/pion/interceptor v0.1.21/go.mod h1:wkbPYAak5zKsfpVDYMtEfWEy8D4zL+rpxCxPImLOg3Y=
 github.com/pion/logging v0.2.2 h1:M9+AIj/+pxNsDfAT64+MAVgJO0rsyLnoJKCqf//DoeY=
 github.com/pion/logging v0.2.2/go.mod h1:k0/tDVsRCX2Mb2ZEmTqNa7CWsQPc+YYCB7Q+5pahoms=
 github.com/pion/mdns v0.0.8/go.mod h1:hYE72WX8WDveIhg7fmXgMKivD3Puklk0Ymzog0lSyaI=
