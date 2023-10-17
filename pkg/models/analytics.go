@@ -40,12 +40,11 @@ func (m *AnalyticsModel) HandleEvent(d *plugnmeet.AnalyticsDataMsg) {
 		!config.AppCnf.AnalyticsSettings.Enabled {
 		return
 	}
-
 	m.Lock()
+	defer m.Unlock()
 	// we'll use unix milliseconds to make sure fields are unique
 	d.Time = time.Now().UnixMilli()
 	m.data = d
-	m.Unlock()
 
 	switch d.EventType {
 	case plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM:
@@ -85,8 +84,8 @@ func (m *AnalyticsModel) HandleWebSocketData(dataMsg *plugnmeet.DataMessage) {
 }
 
 func (m *AnalyticsModel) handleRoomTypeEvents() {
-	m.Lock()
-	defer m.Unlock()
+	/*	m.Lock()
+		defer m.Unlock()*/
 
 	if m.data.EventName == plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_UNKNOWN {
 		return
@@ -104,8 +103,8 @@ func (m *AnalyticsModel) handleRoomTypeEvents() {
 }
 
 func (m *AnalyticsModel) handleUserTypeEvents() {
-	m.Lock()
-	defer m.Unlock()
+	/*	m.Lock()
+		defer m.Unlock()*/
 
 	if m.data.EventName == plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_UNKNOWN {
 		return
