@@ -2,8 +2,6 @@ module github.com/mynaparrot/plugnmeet-server
 
 go 1.21
 
-toolchain go1.21.1
-
 require (
 	github.com/ansrivas/fiberprometheus/v2 v2.6.1
 	github.com/antoniodipinto/ikisocket v0.0.0-20230914204858-ee499ed8c55e
