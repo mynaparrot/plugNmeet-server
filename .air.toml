@@ -5,7 +5,7 @@ tmp_dir = "./etc/tmp"
 [build]
   args_bin = []
   bin = "./etc/tmp/main"
-  cmd = "go build -o ./etc/tmp/main cmd/server/*.go"
+  cmd = "go build -race -o ./etc/tmp/main cmd/server/*.go"
   delay = 1000
   exclude_dir = ["tmp", "test", "log", "etc", "github_files", "sql_dump", "upload", "recording_files", "client"]
   exclude_file = []
