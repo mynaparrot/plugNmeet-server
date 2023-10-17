@@ -3,7 +3,6 @@ package controllers
 import (
 	"crypto/sha256"
 	"encoding/base64"
-	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
@@ -20,7 +19,6 @@ func HandleWebhook(c *fiber.Ctx) error {
 	copy(authToken, token)
 
 	if len(authToken) == 0 {
-		fmt.Println(authToken)
 		return c.SendStatus(fiber.StatusForbidden)
 	}
 
@@ -33,7 +31,6 @@ func HandleWebhook(c *fiber.Ctx) error {
 	// so, we'll use livekit secret to validate
 	claims, err := m.DoValidateToken(req, true)
 	if err != nil {
-		fmt.Println(err)
 		return c.SendStatus(fiber.StatusForbidden)
 	}
 
@@ -41,7 +38,6 @@ func HandleWebhook(c *fiber.Ctx) error {
 	hash := base64.StdEncoding.EncodeToString(sha[:])
 
 	if claims.Sha256 != hash {
-		fmt.Println(claims.Sha256, hash)
 		return c.SendStatus(fiber.StatusForbidden)
 	}
 
@@ -50,7 +46,6 @@ func HandleWebhook(c *fiber.Ctx) error {
 	}
 	event := new(livekit.WebhookEvent)
 	if err = op.Unmarshal(body, event); err != nil {
-		fmt.Println(err)
 		return c.SendStatus(fiber.StatusForbidden)
 	}
 
