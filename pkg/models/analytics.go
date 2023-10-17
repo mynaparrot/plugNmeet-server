@@ -84,9 +84,6 @@ func (m *AnalyticsModel) HandleWebSocketData(dataMsg *plugnmeet.DataMessage) {
 }
 
 func (m *AnalyticsModel) handleRoomTypeEvents() {
-	/*	m.Lock()
-		defer m.Unlock()*/
-
 	if m.data.EventName == plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_UNKNOWN {
 		return
 	}
@@ -103,9 +100,6 @@ func (m *AnalyticsModel) handleRoomTypeEvents() {
 }
 
 func (m *AnalyticsModel) handleUserTypeEvents() {
-	/*	m.Lock()
-		defer m.Unlock()*/
-
 	if m.data.EventName == plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_UNKNOWN {
 		return
 	}
