@@ -41,8 +41,11 @@ func HandleWebhook(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusForbidden)
 	}
 
+	op := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
 	event := new(livekit.WebhookEvent)
-	if err = protojson.Unmarshal(body, event); err != nil {
+	if err = op.Unmarshal(body, event); err != nil {
 		return c.SendStatus(fiber.StatusForbidden)
 	}
 
