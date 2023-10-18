@@ -1,94 +1,47 @@
 package models
 
 import (
-	"bytes"
-	"crypto/sha256"
-	"encoding/base64"
-	"errors"
-	"github.com/livekit/protocol/auth"
+	"github.com/mynaparrot/plugnmeet-protocol/webhook"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	log "github.com/sirupsen/logrus"
-	"net/http"
-	"time"
 )
 
-type WebhookNotifierModel struct {
-	apiKey      string
-	apiSecret   string
-	urls        []string
-	webhookConf config.WebhookConf
-	roomModel   *RoomModel
+var webhookNotifier *webhook.WebhookNotifier
+
+func GetWebhookNotifier(roomId, roomSid string) *webhook.WebhookNotifier {
+	if webhookNotifier != nil {
+		return webhookNotifier
+	}
+	webhookNotifier = webhook.NewWebhookNotifier(config.AppCnf.Client.ApiKey, config.AppCnf.Client.Secret, config.GetLogger())
+	RegisterRoomForWebhook(roomId, roomSid)
+
+	return webhookNotifier
 }
 
-func NewWebhookNotifier() *WebhookNotifierModel {
-	return &WebhookNotifierModel{
-		apiKey:      config.AppCnf.Client.ApiKey,
-		apiSecret:   config.AppCnf.Client.Secret,
-		webhookConf: config.AppCnf.Client.WebhookConf,
-		roomModel:   NewRoomModel(),
+// RegisterRoomForWebhook will check if room exist already or not
+// if not then it will add
+// it's important to call this method from roomStarted, otherwise new room won't be adding
+func RegisterRoomForWebhook(roomId, roomSid string) {
+	if webhookNotifier == nil {
+		return
 	}
-}
-
-func (n *WebhookNotifierModel) Notify(roomSid string, msg []byte) error {
-	if !n.webhookConf.Enable {
-		return nil
+	if webhookNotifier.RoomExist(roomId) {
+		return
 	}
-	if roomSid == "" {
-		return errors.New("empty sid")
-	}
-
-	if n.webhookConf.Url != "" {
-		n.urls = append(n.urls, n.webhookConf.Url)
-	}
-
-	if n.webhookConf.EnableForPerMeeting {
-		// if we set roomSid then it will avoid the value of isRunning
-		roomInfo, _ := n.roomModel.GetRoomInfo("", roomSid, 0)
-		if roomInfo.WebhookUrl != "" {
-			n.urls = append(n.urls, roomInfo.WebhookUrl)
+	webhookConf := config.AppCnf.Client.WebhookConf
+	if webhookConf.Enable {
+		var urls []string
+		if webhookConf.Url != "" {
+			urls = append(urls, webhookConf.Url)
+		}
+		if webhookConf.EnableForPerMeeting && roomSid != "" {
+			m := NewRoomModel()
+			roomInfo, _ := m.GetRoomInfo("", roomSid, 0)
+			if roomInfo.WebhookUrl != "" {
+				urls = append(urls, roomInfo.WebhookUrl)
+			}
+		}
+		if roomId != "" && len(urls) > 0 {
+			webhookNotifier.AddToWebhookQueuedNotifier(roomId, urls)
 		}
 	}
-
-	if len(n.urls) > 0 {
-		err := n._notify(msg)
-
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (n *WebhookNotifierModel) _notify(msg []byte) error {
-	var err error
-	// sign payload
-	sum := sha256.Sum256(msg)
-	b64 := base64.StdEncoding.EncodeToString(sum[:])
-
-	at := auth.NewAccessToken(n.apiKey, n.apiSecret).
-		SetValidFor(5 * time.Minute).
-		SetSha256(b64)
-	token, err := at.ToJWT()
-
-	if err != nil {
-		return err
-	}
-
-	for _, url := range n.urls {
-		r, err := http.NewRequest("POST", url, bytes.NewReader(msg))
-		if err != nil {
-			// ignore and continue
-			log.Errorln(err, "could not create request", "url", url)
-			continue
-		}
-		r.Header.Set("Authorization", token)
-		r.Header.Set("content-type", "application/json")
-		_, err = http.DefaultClient.Do(r)
-		if err != nil {
-			log.Errorln(err, "could not post to webhook", "url", url)
-		}
-	}
-
-	return nil
 }

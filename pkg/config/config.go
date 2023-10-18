@@ -169,6 +169,10 @@ func setLogger() {
 	logrus.SetOutput(w)
 }
 
+func GetLogger() *logrus.Logger {
+	return logrus.StandardLogger()
+}
+
 type ErrorResponse struct {
 	FailedField string
 	Tag         string

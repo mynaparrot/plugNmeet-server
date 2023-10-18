@@ -384,28 +384,22 @@ func (s *SpeechServices) selectAzureKey() (*config.AzureSubscriptionKey, error) 
 
 func (s *SpeechServices) sendToWebhookNotifier(rId, rSid string, userId *string, task plugnmeet.SpeechServiceUserStatusTasks, usage int64) {
 	tk := task.String()
-	n := NewWebhookNotifier()
+	n := GetWebhookNotifier(rId, rSid)
+	if n == nil {
+		return
+	}
 	msg := &plugnmeet.CommonNotifyEvent{
 		Event: &tk,
 		Room: &plugnmeet.NotifyEventRoom{
-			Sid:    &rId,
-			RoomId: &rSid,
+			Sid:    &rSid,
+			RoomId: &rId,
 		},
 		SpeechService: &plugnmeet.SpeechServiceEvent{
 			UserId:     userId,
 			TotalUsage: usage,
 		},
 	}
-	op := protojson.MarshalOptions{
-		EmitUnpopulated: false,
-		UseProtoNames:   true,
-	}
-	marshal, err := op.Marshal(msg)
-	if err != nil {
-		log.Errorln(err)
-		return
-	}
-	err = n.Notify(rSid, marshal)
+	err := n.SendWebhook(msg)
 	if err != nil {
 		log.Errorln(err)
 	}
