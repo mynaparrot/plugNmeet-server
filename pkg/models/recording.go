@@ -355,34 +355,27 @@ func (rm *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet,
 
 func (rm *RecordingModel) sendToWebhookNotifier(r *plugnmeet.RecorderToPlugNmeet) {
 	tk := r.Task.String()
-	n := NewWebhookNotifier()
-	msg := &plugnmeet.CommonNotifyEvent{
-		Event: &tk,
-		Room: &plugnmeet.NotifyEventRoom{
-			Sid:    &r.RoomSid,
-			RoomId: &r.RoomId,
-		},
-		RecordingInfo: &plugnmeet.RecordingInfoEvent{
-			RecordId:    r.RecordingId,
-			RecorderId:  r.RecorderId,
-			RecorderMsg: r.Msg,
-			FilePath:    &r.FilePath,
-			FileSize:    &r.FileSize,
-		},
-	}
-	op := protojson.MarshalOptions{
-		EmitUnpopulated: false,
-		UseProtoNames:   true,
-	}
-	marshal, err := op.Marshal(msg)
-	if err != nil {
-		log.Errorln(err)
-		return
-	}
+	n := GetWebhookNotifier(r.RoomId, r.RoomSid)
+	if n != nil {
+		msg := &plugnmeet.CommonNotifyEvent{
+			Event: &tk,
+			Room: &plugnmeet.NotifyEventRoom{
+				Sid:    &r.RoomSid,
+				RoomId: &r.RoomId,
+			},
+			RecordingInfo: &plugnmeet.RecordingInfoEvent{
+				RecordId:    r.RecordingId,
+				RecorderId:  r.RecorderId,
+				RecorderMsg: r.Msg,
+				FilePath:    &r.FilePath,
+				FileSize:    &r.FileSize,
+			},
+		}
 
-	err = n.Notify(r.RoomSid, marshal)
-	if err != nil {
-		log.Errorln(err)
+		err := n.SendWebhook(msg)
+		if err != nil {
+			log.Errorln(err)
+		}
 	}
 
 	// send analytics

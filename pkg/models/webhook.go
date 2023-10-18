@@ -7,10 +7,10 @@ import (
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
+	"github.com/mynaparrot/plugnmeet-protocol/webhook"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/redis/go-redis/v9"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/encoding/protojson"
 	"time"
 )
 
@@ -21,7 +21,7 @@ type webhookEvent struct {
 	roomModel      *RoomModel
 	roomService    *RoomService
 	recorderModel  *RecorderModel
-	notifier       *WebhookNotifierModel
+	notifier       *webhook.WebhookNotifier
 	analyticsModel *AnalyticsModel
 	rmDuration     *RoomDurationModel
 }
@@ -34,9 +34,9 @@ func NewWebhookModel(e *livekit.WebhookEvent) {
 		roomModel:      NewRoomModel(),
 		roomService:    NewRoomService(),
 		recorderModel:  NewRecorderModel(),
-		notifier:       NewWebhookNotifier(),
 		analyticsModel: NewAnalyticsModel(),
 		rmDuration:     NewRoomDurationModel(),
+		notifier:       GetWebhookNotifier(e.GetRoom().GetName(), e.GetRoom().GetSid()),
 	}
 
 	switch e.GetEvent() {
@@ -60,6 +60,8 @@ func NewWebhookModel(e *livekit.WebhookEvent) {
 
 func (w *webhookEvent) roomStarted() {
 	event := w.event
+	// register room for webhook
+	RegisterRoomForWebhook(event.GetRoom().GetName(), event.GetRoom().GetSid())
 	// webhook notification
 	go w.sendToWebhookNotifier(event)
 
@@ -205,6 +207,9 @@ func (w *webhookEvent) roomFinished() {
 
 	// finally create analytics file
 	go w.analyticsModel.PrepareToExportAnalytics(event.Room.Sid, event.Room.Metadata)
+
+	// let's delete webhook queue
+	go w.notifier.DeleteWebhookQueuedNotifier(event.Room.Name)
 }
 
 func (w *webhookEvent) participantJoined() {
@@ -350,7 +355,7 @@ func (w *webhookEvent) trackUnpublished() {
 }
 
 func (w *webhookEvent) sendToWebhookNotifier(event *livekit.WebhookEvent) {
-	if event == nil {
+	if event == nil || w.notifier == nil {
 		return
 	}
 	if event.Room == nil {
@@ -359,17 +364,5 @@ func (w *webhookEvent) sendToWebhookNotifier(event *livekit.WebhookEvent) {
 	}
 
 	msg := utils.PrepareCommonWebhookNotifyEvent(event)
-	op := protojson.MarshalOptions{
-		EmitUnpopulated: false,
-		UseProtoNames:   true,
-	}
-	marshal, err := op.Marshal(msg)
-	if err != nil {
-		log.Errorln(err)
-		return
-	}
-	err = w.notifier.Notify(event.Room.Sid, marshal)
-	if err != nil {
-		log.Errorln(err)
-	}
+	_ = w.notifier.SendWebhook(msg)
 }
