@@ -53,6 +53,7 @@ func (s *SpeechServices) SpeechToTextTranslationServiceStatus(r *plugnmeet.Speec
 
 	f.IsEnabledTranslation = r.IsEnabledTranslation
 	f.AllowedTransLangs = r.AllowedTransLangs
+	f.DefaultSubtitleLang = r.DefaultSubtitleLang
 
 	_, err = s.roomService.UpdateRoomMetadataByStruct(r.RoomId, meta)
 	if err != nil {
