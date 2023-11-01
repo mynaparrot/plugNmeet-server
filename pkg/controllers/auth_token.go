@@ -86,7 +86,7 @@ func HandleGenerateJoinToken(c *fiber.Ctx) error {
 	}
 
 	m := models.NewAuthTokenModel()
-	token, err := m.GeneratePlugNmeetToken(req)
+	token, err := m.GeneratePlugNmeetAccessToken(req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}

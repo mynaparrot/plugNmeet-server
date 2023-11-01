@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/go-jose/go-jose/v3"
+	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/jordic/lti"
@@ -13,8 +15,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/square/go-jose.v2"
-	"gopkg.in/square/go-jose.v2/jwt"
 	"net/url"
 	"strings"
 	"time"
@@ -227,7 +227,7 @@ func (m *LTIV1) createRoomSession(c *plugnmeet.LtiClaims) (bool, string, *liveki
 }
 
 func (m *LTIV1) joinRoom(c *plugnmeet.LtiClaims) (string, error) {
-	token, err := m.authTokenModel.GeneratePlugNmeetToken(&plugnmeet.GenerateTokenReq{
+	token, err := m.authTokenModel.GeneratePlugNmeetAccessToken(&plugnmeet.GenerateTokenReq{
 		RoomId: c.RoomId,
 		UserInfo: &plugnmeet.UserInfo{
 			UserId:  c.UserId,

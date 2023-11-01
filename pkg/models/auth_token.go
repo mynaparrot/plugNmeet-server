@@ -2,12 +2,9 @@ package models
 
 import (
 	"errors"
-	"github.com/go-jose/go-jose/v3"
-	"github.com/go-jose/go-jose/v3/jwt"
-	"github.com/livekit/protocol/auth"
+	"github.com/mynaparrot/plugnmeet-protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"time"
 )
 
 type AuthTokenModel struct {
@@ -22,12 +19,7 @@ func NewAuthTokenModel() *AuthTokenModel {
 	}
 }
 
-type AccessTokenUserInfo struct {
-	Name   string `json:"name"`
-	RoomId string `json:"roomId"`
-}
-
-func (a *AuthTokenModel) GeneratePlugNmeetToken(g *plugnmeet.GenerateTokenReq) (string, error) {
+func (a *AuthTokenModel) GeneratePlugNmeetAccessToken(g *plugnmeet.GenerateTokenReq) (string, error) {
 	if g.UserInfo.UserMetadata == nil {
 		g.UserInfo.UserMetadata = new(plugnmeet.UserMetadata)
 	}
@@ -60,50 +52,11 @@ func (a *AuthTokenModel) GeneratePlugNmeetToken(g *plugnmeet.GenerateTokenReq) (
 		IsHidden: g.UserInfo.IsHidden,
 	}
 
-	return a.generatePlugNmeetJWTToken(g.UserInfo.UserId, c)
+	return auth.GeneratePlugNmeetJWTAccessToken(a.app.Client.ApiKey, a.app.Client.Secret, g.UserInfo.UserId, a.app.LivekitInfo.TokenValidity, c)
 }
 
-func (a *AuthTokenModel) generatePlugNmeetJWTToken(userId string, c *plugnmeet.PlugNmeetTokenClaims) (string, error) {
-	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.HS256, Key: []byte(a.app.Client.Secret)},
-		(&jose.SignerOptions{}).WithType("JWT"))
-
-	if err != nil {
-		return "", err
-	}
-
-	cl := &jwt.Claims{
-		Issuer:    a.app.Client.ApiKey,
-		NotBefore: jwt.NewNumericDate(time.Now()),
-		Expiry:    jwt.NewNumericDate(time.Now().Add(a.app.LivekitInfo.TokenValidity)),
-		Subject:   userId,
-	}
-	return jwt.Signed(sig).Claims(cl).Claims(c).CompactSerialize()
-}
-
-// GenerateLivekitToken will generate token to join livekit server
-// It will use info as other validation. We just don't want user simple copy/past token from url
-// instated plugNmeet-server will generate once validation will be completed.
-func (a *AuthTokenModel) GenerateLivekitToken(c *plugnmeet.PlugNmeetTokenClaims) (string, error) {
-	metadata, err := a.rs.ManageRoomWithUsersMetadata(c.RoomId, c.UserId, "get", "")
-	if err != nil {
-		return "", err
-	}
-
-	at := auth.NewAccessToken(a.app.LivekitInfo.ApiKey, a.app.LivekitInfo.Secret)
-	grant := &auth.VideoGrant{
-		RoomJoin:  true,
-		Room:      c.RoomId,
-		RoomAdmin: c.IsAdmin,
-		Hidden:    c.IsHidden,
-	}
-
-	at.AddGrant(grant).
-		SetIdentity(c.UserId).
-		SetName(c.Name).
-		SetMetadata(metadata).
-		SetValidFor(a.app.LivekitInfo.TokenValidity)
-
-	return at.ToJWT()
+func (a *AuthTokenModel) VerifyPlugNmeetAccessToken(token string) (*plugnmeet.PlugNmeetTokenClaims, error) {
+	return auth.VerifyPlugNmeetAccessToken(a.app.Client.ApiKey, a.app.Client.Secret, token)
 }
 
 func (a *AuthTokenModel) assignLockSettings(g *plugnmeet.GenerateTokenReq) {
@@ -241,9 +194,8 @@ func (a *AuthTokenModel) DoRenewPlugNmeetToken(token string) (string, error) {
 		return "", err
 	}
 
-	m := NewRoomService()
 	// load current information
-	p, err := m.ManageActiveUsersList(claims.RoomId, claims.UserId, "get", 0)
+	p, err := a.rs.ManageActiveUsersList(claims.RoomId, claims.UserId, "get", 0)
 	if err != nil {
 		return "", err
 	}
@@ -251,40 +203,18 @@ func (a *AuthTokenModel) DoRenewPlugNmeetToken(token string) (string, error) {
 		return "", errors.New("user isn't online")
 	}
 
-	return a.generatePlugNmeetJWTToken(claims.UserId, claims)
+	return auth.GeneratePlugNmeetJWTAccessToken(a.app.Client.ApiKey, a.app.Client.Secret, claims.UserId, a.app.LivekitInfo.TokenValidity, claims)
 }
 
-func (a *AuthTokenModel) VerifyPlugNmeetAccessToken(token string) (*plugnmeet.PlugNmeetTokenClaims, error) {
-	tok, err := jwt.ParseSigned(token)
+func (a *AuthTokenModel) GenerateLivekitToken(c *plugnmeet.PlugNmeetTokenClaims) (string, error) {
+	metadata, err := a.rs.ManageRoomWithUsersMetadata(c.RoomId, c.UserId, "get", "")
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	out := jwt.Claims{}
-	claims := plugnmeet.PlugNmeetTokenClaims{}
-	if err = tok.Claims([]byte(a.app.Client.Secret), &out, &claims); err != nil {
-		return nil, err
-	}
-
-	if err = out.Validate(jwt.Expected{Issuer: a.app.Client.ApiKey, Time: time.Now()}); err != nil {
-		return nil, err
-	}
-	claims.UserId = out.Subject
-
-	return &claims, nil
+	return auth.GenerateLivekitAccessToken(a.app.LivekitInfo.ApiKey, a.app.LivekitInfo.Secret, a.app.LivekitInfo.TokenValidity, c, metadata)
 }
 
-// ValidateLivekitWebhookToken can be use to validate both livekit & plugnmeet token
-func (a *AuthTokenModel) ValidateLivekitWebhookToken(token string) (*auth.ClaimGrants, error) {
-	grant, err := auth.ParseAPIToken(token)
-	if err != nil {
-		return nil, err
-	}
-
-	claims, err := grant.Verify(a.app.LivekitInfo.Secret)
-	if err != nil {
-		return nil, err
-	}
-
-	return claims, nil
+func (a *AuthTokenModel) ValidateLivekitWebhookToken(token string) (string, error) {
+	return auth.ValidateLivekitWebhookToken(a.app.LivekitInfo.Secret, token)
 }

@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"github.com/gofiber/fiber/v2"
 	"github.com/livekit/protocol/livekit"
@@ -25,7 +26,7 @@ func HandleWebhook(c *fiber.Ctx) error {
 	m := models.NewAuthTokenModel()
 	// here request is coming from livekit
 	// so, we'll use livekit secret to validate
-	claims, err := m.ValidateLivekitWebhookToken(string(authToken))
+	ourHash, err := m.ValidateLivekitWebhookToken(string(authToken))
 	if err != nil {
 		return c.SendStatus(fiber.StatusForbidden)
 	}
@@ -33,7 +34,7 @@ func HandleWebhook(c *fiber.Ctx) error {
 	sha := sha256.Sum256(body)
 	hash := base64.StdEncoding.EncodeToString(sha[:])
 
-	if claims.Sha256 != hash {
+	if subtle.ConstantTimeCompare([]byte(ourHash), []byte(hash)) != 1 {
 		return c.SendStatus(fiber.StatusForbidden)
 	}
 
