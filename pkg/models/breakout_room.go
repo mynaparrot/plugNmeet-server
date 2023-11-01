@@ -170,7 +170,7 @@ func (m *BreakoutRoom) JoinBreakoutRoom(r *plugnmeet.JoinBreakoutRoomReq) (strin
 		},
 	}
 
-	token, err := m.authTokenModel.DoGenerateToken(req)
+	token, err := m.authTokenModel.GeneratePlugNmeetToken(req)
 	if err != nil {
 		return "", err
 	}

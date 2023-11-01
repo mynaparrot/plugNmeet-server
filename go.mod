@@ -7,6 +7,7 @@ require (
 	github.com/antoniodipinto/ikisocket v0.0.0-20230914204858-ee499ed8c55e
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/gabriel-vasile/mimetype v1.4.3
+	github.com/go-jose/go-jose/v3 v3.0.0
 	github.com/goccy/go-json v0.10.2
 	github.com/gofiber/contrib/websocket v1.2.2
 	github.com/gofiber/fiber/v2 v2.50.0
@@ -15,7 +16,7 @@ require (
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.8.1
 	github.com/livekit/server-sdk-go v1.1.1
-	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20231031161056-bfdd564a2187
+	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20231101001259-0b8ffc17e59c
 	github.com/redis/go-redis/v9 v9.3.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
@@ -40,7 +41,6 @@ require (
 	github.com/fasthttp/websocket v1.5.6 // indirect
 	github.com/frostbyte73/core v0.0.9 // indirect
 	github.com/gammazero/deque v0.2.1 // indirect
-	github.com/go-jose/go-jose/v3 v3.0.0 // indirect
 	github.com/go-logr/logr v1.3.0 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-sql-driver/mysql v1.7.1 // indirect

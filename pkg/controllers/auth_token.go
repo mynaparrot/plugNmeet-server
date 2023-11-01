@@ -6,7 +6,6 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"github.com/gofiber/fiber/v2"
-	"github.com/livekit/protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -87,7 +86,7 @@ func HandleGenerateJoinToken(c *fiber.Ctx) error {
 	}
 
 	m := models.NewAuthTokenModel()
-	token, err := m.DoGenerateToken(req)
+	token, err := m.GeneratePlugNmeetToken(req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
@@ -121,7 +120,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	if cm == nil {
 		return utils.SendCommonProtobufResponse(c, false, "invalid request")
 	}
-	claims := cm.(*auth.ClaimGrants)
+	claims := cm.(*plugnmeet.PlugNmeetTokenClaims)
 	// after usage, we can make it null as we don't need this value again.
 	c.Locals("claims", nil)
 
@@ -182,11 +181,7 @@ func HandleVerifyHeaderToken(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, "Authorization header is missing")
 	}
 
-	info := &models.ValidateTokenReq{
-		Token: authToken,
-	}
-
-	claims, err := m.DoValidateToken(info, false)
+	claims, err := m.VerifyPlugNmeetAccessToken(authToken)
 	if err != nil {
 		_ = c.SendStatus(errStatus)
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
@@ -198,16 +193,16 @@ func HandleVerifyHeaderToken(c *fiber.Ctx) error {
 		c.Locals("claims", claims)
 	}
 
-	c.Locals("isAdmin", claims.Video.RoomAdmin)
-	c.Locals("roomId", claims.Video.Room)
-	c.Locals("requestedUserId", claims.Identity)
+	c.Locals("isAdmin", claims.IsAdmin)
+	c.Locals("roomId", claims.RoomId)
+	c.Locals("requestedUserId", claims.UserId)
 
 	return c.Next()
 }
 
 // HandleRenewToken renew token only possible if it remains valid. This mean you'll require to renew it before expire.
 func HandleRenewToken(c *fiber.Ctx) error {
-	info := new(models.ValidateTokenReq)
+	info := new(models.RenewTokenReq)
 	m := models.NewAuthTokenModel()
 
 	err := c.BodyParser(info)
@@ -215,11 +210,11 @@ func HandleRenewToken(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	if info.Token == "" || info.Sid == "" || info.RoomId == "" {
+	if info.Token == "" {
 		return utils.SendCommonProtoJsonResponse(c, false, "missing required fields")
 	}
 
-	token, err := m.DoRenewToken(info)
+	token, err := m.DoRenewPlugNmeetToken(info.Token)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}

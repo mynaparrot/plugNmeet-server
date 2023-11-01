@@ -10,14 +10,16 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/redis/go-redis/v9"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 	"time"
 )
 
 const (
-	BlockedUsersList = "pnm:block_users_list:"
-	ActiveRoomsKey   = "pnm:activeRooms"
-	ActiveRoomUsers  = "pnm:activeRoom:%s:users"
+	BlockedUsersList      = "pnm:block_users_list:"
+	ActiveRoomsKey        = "pnm:activeRooms"
+	ActiveRoomUsers       = "pnm:activeRoom:%s:users"
+	RoomWithUsersMetadata = "pnm:roomWithUsersMetadata:%s"
 )
 
 type RoomService struct {
@@ -156,6 +158,12 @@ func (r *RoomService) UpdateParticipantMetadata(roomId string, userId string, me
 		Room:     roomId,
 		Identity: userId,
 		Metadata: metadata,
+	}
+
+	// we'll update our redis everytime
+	_, err := r.ManageRoomWithUsersMetadata(roomId, userId, "add", metadata)
+	if err != nil {
+		return nil, err
 	}
 
 	participant, err := r.livekitClient.UpdateParticipant(r.ctx, &data)
@@ -474,4 +482,65 @@ func (r *RoomService) ManageActiveUsersList(roomId, userId, task string, timeSta
 	}
 
 	return out, nil
+}
+
+// ManageRoomWithUsersMetadata can be used to store user metadata in redis
+// this way we'll be able to access info quickly
+// task = add | del | get | delList (to delete this entire list)
+func (r *RoomService) ManageRoomWithUsersMetadata(roomId, userId, task, metadata string) (string, error) {
+	key := fmt.Sprintf(RoomWithUsersMetadata, roomId)
+	switch task {
+	case "add":
+		_, err := r.rc.HSet(r.ctx, key, userId, metadata).Result()
+		if err != nil {
+			return "", err
+		}
+		return "", nil
+	case "get":
+		result, err := r.rc.HGet(r.ctx, key, userId).Result()
+		if err != nil {
+			return "", err
+		}
+		return result, nil
+	case "del":
+		_, err := r.rc.HDel(r.ctx, key, userId).Result()
+		if err != nil {
+			return "", err
+		}
+		return "", nil
+	case "delList":
+		// this will delete this key completely
+		// we'll trigger this when the session was ended
+		_, err := r.rc.Del(r.ctx, key).Result()
+		if err != nil {
+			return "", err
+		}
+		return "", nil
+	}
+	return "", errors.New("invalid task")
+}
+
+func (r *RoomService) OnAfterRoomClosed(roomId string) {
+	// remove this room from active room list
+	_, err := r.ManageActiveRoomsList(roomId, "del", 0)
+	if err != nil {
+		log.Errorln(err)
+	}
+	// completely remove the room key
+	_, err = r.ManageRoomWithUsersMetadata(roomId, "", "delList", "")
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	// completely remove room active users list
+	_, err = r.ManageActiveUsersList(roomId, "", "delList", 0)
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	// delete blocked users list
+	_, err = r.DeleteRoomBlockList(roomId)
+	if err != nil {
+		log.Errorln(err)
+	}
 }

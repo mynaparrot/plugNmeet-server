@@ -156,13 +156,8 @@ func (w *WebsocketServiceModel) handleSendChatMsgs() {
 }
 
 func (w *WebsocketServiceModel) handleRenewToken() {
-	req := &ValidateTokenReq{
-		Token:  w.pl.Body.Msg,
-		RoomId: w.pl.RoomId,
-		Sid:    w.pl.RoomSid,
-	}
 	m := NewAuthTokenModel()
-	token, err := m.DoRenewToken(req)
+	token, err := m.DoRenewPlugNmeetToken(w.pl.Body.Msg)
 	if err != nil {
 		return
 	}

@@ -107,7 +107,7 @@ func (r *RecorderModel) addTokenAndRecorder(rq *plugnmeet.PlugNmeetToRecorder, u
 			IsAdmin:  true,
 		},
 	}
-	token, err := m.DoGenerateToken(gt)
+	token, err := m.GeneratePlugNmeetToken(gt)
 	if err != nil {
 		log.Errorln(err)
 		return err

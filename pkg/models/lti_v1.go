@@ -227,7 +227,7 @@ func (m *LTIV1) createRoomSession(c *plugnmeet.LtiClaims) (bool, string, *liveki
 }
 
 func (m *LTIV1) joinRoom(c *plugnmeet.LtiClaims) (string, error) {
-	token, err := m.authTokenModel.DoGenerateToken(&plugnmeet.GenerateTokenReq{
+	token, err := m.authTokenModel.GeneratePlugNmeetToken(&plugnmeet.GenerateTokenReq{
 		RoomId: c.RoomId,
 		UserInfo: &plugnmeet.UserInfo{
 			UserId:  c.UserId,

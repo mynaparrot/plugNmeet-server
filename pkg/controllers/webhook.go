@@ -22,14 +22,10 @@ func HandleWebhook(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusForbidden)
 	}
 
-	req := &models.ValidateTokenReq{
-		Token: string(authToken),
-	}
 	m := models.NewAuthTokenModel()
-
 	// here request is coming from livekit
 	// so, we'll use livekit secret to validate
-	claims, err := m.DoValidateToken(req, true)
+	claims, err := m.ValidateLivekitWebhookToken(string(authToken))
 	if err != nil {
 		return c.SendStatus(fiber.StatusForbidden)
 	}

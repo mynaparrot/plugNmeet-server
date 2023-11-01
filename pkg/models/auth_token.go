@@ -2,9 +2,12 @@ package models
 
 import (
 	"errors"
+	"github.com/go-jose/go-jose/v3"
+	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/livekit/protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"time"
 )
 
 type AuthTokenModel struct {
@@ -19,7 +22,12 @@ func NewAuthTokenModel() *AuthTokenModel {
 	}
 }
 
-func (a *AuthTokenModel) DoGenerateToken(g *plugnmeet.GenerateTokenReq) (string, error) {
+type AccessTokenUserInfo struct {
+	Name   string `json:"name"`
+	RoomId string `json:"roomId"`
+}
+
+func (a *AuthTokenModel) GeneratePlugNmeetToken(g *plugnmeet.GenerateTokenReq) (string, error) {
 	if g.UserInfo.UserMetadata == nil {
 		g.UserInfo.UserMetadata = new(plugnmeet.UserMetadata)
 	}
@@ -39,43 +47,60 @@ func (a *AuthTokenModel) DoGenerateToken(g *plugnmeet.GenerateTokenReq) (string,
 		return "", err
 	}
 
-	at := auth.NewAccessToken(a.app.Client.ApiKey, a.app.Client.Secret)
-	grant := &auth.VideoGrant{
-		RoomJoin:  true,
-		Room:      g.RoomId,
-		RoomAdmin: g.UserInfo.IsAdmin,
-		Hidden:    g.UserInfo.IsHidden,
+	// let's update our redis
+	_, err = a.rs.ManageRoomWithUsersMetadata(g.RoomId, g.UserInfo.UserId, "add", metadata)
+	if err != nil {
+		return "", err
 	}
 
-	if g.UserInfo.UserId == config.RECORDER_BOT || g.UserInfo.UserId == config.RTMP_BOT {
-		grant.Recorder = true
+	c := &plugnmeet.PlugNmeetTokenClaims{
+		Name:     g.UserInfo.Name,
+		RoomId:   g.RoomId,
+		IsAdmin:  g.UserInfo.IsAdmin,
+		IsHidden: g.UserInfo.IsHidden,
 	}
 
-	at.AddGrant(grant).
-		SetIdentity(g.UserInfo.UserId).
-		SetName(g.UserInfo.Name).
-		SetMetadata(string(metadata)).
-		SetValidFor(a.app.LivekitInfo.TokenValidity)
+	return a.generatePlugNmeetJWTToken(g.UserInfo.UserId, c)
+}
 
-	return at.ToJWT()
+func (a *AuthTokenModel) generatePlugNmeetJWTToken(userId string, c *plugnmeet.PlugNmeetTokenClaims) (string, error) {
+	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.HS256, Key: []byte(a.app.Client.Secret)},
+		(&jose.SignerOptions{}).WithType("JWT"))
+
+	if err != nil {
+		return "", err
+	}
+
+	cl := &jwt.Claims{
+		Issuer:    a.app.Client.ApiKey,
+		NotBefore: jwt.NewNumericDate(time.Now()),
+		Expiry:    jwt.NewNumericDate(time.Now().Add(a.app.LivekitInfo.TokenValidity)),
+		Subject:   userId,
+	}
+	return jwt.Signed(sig).Claims(cl).Claims(c).CompactSerialize()
 }
 
 // GenerateLivekitToken will generate token to join livekit server
 // It will use info as other validation. We just don't want user simple copy/past token from url
 // instated plugNmeet-server will generate once validation will be completed.
-func (a *AuthTokenModel) GenerateLivekitToken(claims *auth.ClaimGrants) (string, error) {
+func (a *AuthTokenModel) GenerateLivekitToken(c *plugnmeet.PlugNmeetTokenClaims) (string, error) {
+	metadata, err := a.rs.ManageRoomWithUsersMetadata(c.RoomId, c.UserId, "get", "")
+	if err != nil {
+		return "", err
+	}
+
 	at := auth.NewAccessToken(a.app.LivekitInfo.ApiKey, a.app.LivekitInfo.Secret)
 	grant := &auth.VideoGrant{
 		RoomJoin:  true,
-		Room:      claims.Video.Room,
-		RoomAdmin: claims.Video.RoomAdmin,
-		Hidden:    claims.Video.Hidden,
+		Room:      c.RoomId,
+		RoomAdmin: c.IsAdmin,
+		Hidden:    c.IsHidden,
 	}
 
 	at.AddGrant(grant).
-		SetIdentity(claims.Identity).
-		SetName(claims.Name).
-		SetMetadata(claims.Metadata).
+		SetIdentity(c.UserId).
+		SetName(c.Name).
+		SetMetadata(metadata).
 		SetValidFor(a.app.LivekitInfo.TokenValidity)
 
 	return at.ToJWT()
@@ -205,92 +230,61 @@ func (a *AuthTokenModel) makePresenter(g *plugnmeet.GenerateTokenReq) {
 	}
 }
 
-// GenTokenForRecorder only for either recorder or RTMP bot
-// Because we don't want to add any service settings which may
-// prevent to work recorder/rtmp bot as expected.
-func (a *AuthTokenModel) GenTokenForRecorder(g *plugnmeet.GenerateTokenReq) (string, error) {
-	at := auth.NewAccessToken(a.app.Client.ApiKey, a.app.Client.Secret)
-	// basic permission
-	grant := &auth.VideoGrant{
-		RoomJoin:  true,
-		Room:      g.RoomId,
-		RoomAdmin: false,
-		Hidden:    g.UserInfo.IsHidden,
-	}
-
-	at.AddGrant(grant).
-		SetIdentity(g.UserInfo.UserId).
-		SetValidFor(a.app.LivekitInfo.TokenValidity)
-
-	return at.ToJWT()
+type RenewTokenReq struct {
+	Token string `json:"token"`
 }
 
-type ValidateTokenReq struct {
-	Token  string `json:"token"`
-	RoomId string `json:"room_id"`
-	Sid    string `json:"sid"`
-	grant  *auth.APIKeyTokenVerifier
-}
-
-// DoValidateToken can be use to validate both livekit & plugnmeet token
-func (a *AuthTokenModel) DoValidateToken(v *ValidateTokenReq, livekit bool) (*auth.ClaimGrants, error) {
-	grant, err := auth.ParseAPIToken(v.Token)
-	if err != nil {
-		return nil, err
-	}
-
-	secret := a.app.Client.Secret
-	if livekit {
-		secret = a.app.LivekitInfo.Secret
-	}
-
-	claims, err := grant.Verify(secret)
-	if err != nil {
-		return nil, err
-	}
-
-	v.grant = grant
-	return claims, nil
-}
-
-func (a *AuthTokenModel) verifyTokenWithRoomInfo(v *ValidateTokenReq) (*auth.ClaimGrants, *RoomInfo, error) {
-	claims, err := a.DoValidateToken(v, false)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if claims.Video.Room != v.RoomId {
-		return nil, nil, errors.New("roomId didn't match")
-	}
-
-	m := NewRoomModel()
-	roomInfo, _ := m.GetRoomInfo(claims.Video.Room, v.Sid, 1)
-	if roomInfo.Id == 0 {
-		return nil, nil, errors.New("room isn't actively running")
-	}
-
-	return claims, roomInfo, nil
-}
-
-// DoRenewToken we'll renew token
-func (a *AuthTokenModel) DoRenewToken(v *ValidateTokenReq) (string, error) {
-	claims, _, err := a.verifyTokenWithRoomInfo(v)
+// DoRenewPlugNmeetToken we'll renew token
+func (a *AuthTokenModel) DoRenewPlugNmeetToken(token string) (string, error) {
+	claims, err := a.VerifyPlugNmeetAccessToken(token)
 	if err != nil {
 		return "", err
 	}
 
 	m := NewRoomService()
 	// load current information
-	p, err := m.LoadParticipantInfo(claims.Video.Room, claims.Identity)
+	p, err := m.ManageActiveUsersList(claims.RoomId, claims.UserId, "get", 0)
 	if err != nil {
 		return "", err
 	}
+	if len(p) == 0 {
+		return "", errors.New("user isn't online")
+	}
 
-	at := auth.NewAccessToken(a.app.Client.ApiKey, a.app.Client.Secret)
-	at.AddGrant(claims.Video).
-		SetIdentity(claims.Identity).
-		SetName(p.Name).
-		SetMetadata(p.Metadata).SetValidFor(a.app.LivekitInfo.TokenValidity)
+	return a.generatePlugNmeetJWTToken(claims.UserId, claims)
+}
 
-	return at.ToJWT()
+func (a *AuthTokenModel) VerifyPlugNmeetAccessToken(token string) (*plugnmeet.PlugNmeetTokenClaims, error) {
+	tok, err := jwt.ParseSigned(token)
+	if err != nil {
+		return nil, err
+	}
+
+	out := jwt.Claims{}
+	claims := plugnmeet.PlugNmeetTokenClaims{}
+	if err = tok.Claims([]byte(a.app.Client.Secret), &out, &claims); err != nil {
+		return nil, err
+	}
+
+	if err = out.Validate(jwt.Expected{Issuer: a.app.Client.ApiKey, Time: time.Now()}); err != nil {
+		return nil, err
+	}
+	claims.UserId = out.Subject
+
+	return &claims, nil
+}
+
+// ValidateLivekitWebhookToken can be use to validate both livekit & plugnmeet token
+func (a *AuthTokenModel) ValidateLivekitWebhookToken(token string) (*auth.ClaimGrants, error) {
+	grant, err := auth.ParseAPIToken(token)
+	if err != nil {
+		return nil, err
+	}
+
+	claims, err := grant.Verify(a.app.LivekitInfo.Secret)
+	if err != nil {
+		return nil, err
+	}
+
+	return claims, nil
 }
