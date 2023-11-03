@@ -440,7 +440,7 @@ func (r *RoomService) ManageActiveRoomsWithMetadata(roomId, task, metadata strin
 			return nil, err
 		}
 	case "del":
-		r.rc.HDel(r.ctx, ActiveRoomsWithMetadataKey, roomId).Result()
+		_, err = r.rc.HDel(r.ctx, ActiveRoomsWithMetadataKey, roomId).Result()
 		if err != nil {
 			return nil, err
 		}
