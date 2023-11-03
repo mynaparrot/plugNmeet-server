@@ -448,7 +448,7 @@ func (r *RoomService) ManageActiveRoomsWithMetadata(roomId, task, metadata strin
 		result, err := r.rc.HGet(r.ctx, ActiveRoomsWithMetadataKey, roomId).Result()
 		switch {
 		case err == redis.Nil:
-			return nil, err
+			return nil, nil
 		case err != nil:
 			return nil, err
 		}
@@ -535,7 +535,10 @@ func (r *RoomService) ManageRoomWithUsersMetadata(roomId, userId, task, metadata
 		return "", nil
 	case "get":
 		result, err := r.rc.HGet(r.ctx, key, userId).Result()
-		if err != nil {
+		switch {
+		case err == redis.Nil:
+			return "", nil
+		case err != nil:
 			return "", err
 		}
 		return result, nil

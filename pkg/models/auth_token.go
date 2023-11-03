@@ -212,6 +212,10 @@ func (a *AuthTokenModel) GenerateLivekitToken(c *plugnmeet.PlugNmeetTokenClaims)
 	if err != nil {
 		return "", err
 	}
+	// without any metadata, we won't continue
+	if metadata == "" {
+		return "", errors.New("empty user metadata")
+	}
 
 	return auth.GenerateLivekitAccessToken(a.app.LivekitInfo.ApiKey, a.app.LivekitInfo.Secret, a.app.LivekitInfo.TokenValidity, c, metadata)
 }
