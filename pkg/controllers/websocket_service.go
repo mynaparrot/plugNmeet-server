@@ -11,9 +11,10 @@ import (
 )
 
 type websocketController struct {
-	kws         *ikisocket.Websocket
-	token       string
-	participant config.ChatParticipant
+	kws            *ikisocket.Websocket
+	token          string
+	participant    config.ChatParticipant
+	authTokenModel *models.AuthTokenModel
 }
 
 func newWebsocketController(kws *ikisocket.Websocket) *websocketController {
@@ -32,9 +33,10 @@ func newWebsocketController(kws *ikisocket.Websocket) *websocketController {
 	}
 
 	return &websocketController{
-		kws:         kws,
-		participant: p,
-		token:       authToken,
+		kws:            kws,
+		participant:    p,
+		token:          authToken,
+		authTokenModel: models.NewAuthTokenModel(),
 	}
 }
 
@@ -44,37 +46,22 @@ func (c *websocketController) validation() bool {
 		return false
 	}
 
-	m := models.NewAuthTokenModel()
-	info := &models.ValidateTokenReq{
-		Token: c.token,
-	}
-
-	claims, err := m.DoValidateToken(info, false)
+	claims, err := c.authTokenModel.VerifyPlugNmeetAccessToken(c.token)
 	if err != nil {
 		_ = c.kws.EmitTo(c.kws.UUID, []byte("invalid auth token"), ikisocket.TextMessage)
 		return false
 	}
 
-	if claims.Identity != c.participant.UserId || claims.Video.Room != c.participant.RoomId {
+	if claims.UserId != c.participant.UserId || claims.RoomId != c.participant.RoomId {
 		_ = c.kws.EmitTo(c.kws.UUID, []byte("unauthorized access!"), ikisocket.TextMessage)
 		return false
 	}
 
 	c.participant.Name = claims.Name
 	// default set false
-	c.kws.SetAttribute("isAdmin", false)
+	c.kws.SetAttribute("isAdmin", claims.IsAdmin)
+	c.participant.IsAdmin = true
 
-	rs := models.NewRoomService()
-	metadata, err := rs.UnmarshalParticipantMetadata(claims.Metadata)
-	if err != nil {
-		_ = c.kws.EmitTo(c.kws.UUID, []byte("can't Unmarshal metadata!"), ikisocket.TextMessage)
-		return false
-	}
-
-	if metadata.IsAdmin {
-		c.kws.SetAttribute("isAdmin", true)
-		c.participant.IsAdmin = true
-	}
 	return true
 }
 

@@ -82,7 +82,7 @@ func (w *webhookEvent) roomStarted() {
 	}
 
 	// now we'll insert this session in the active sessions list
-	_, err := w.roomService.ManageActiveRoomsList(event.Room.Name, "add", event.Room.CreationTime)
+	_, err := w.roomService.ManageActiveRoomsWithMetadata(event.Room.Name, "add", event.Room.Metadata)
 	if err != nil {
 		log.Errorln(err)
 	}
@@ -126,19 +126,12 @@ func (w *webhookEvent) roomFinished() {
 			log.Errorln(err)
 		}
 	}
-	// now we'll remove this session from the active sessions list
-	_, err := w.roomService.ManageActiveRoomsList(event.Room.Name, "del", event.CreatedAt)
-	if err != nil {
-		log.Errorln(err)
-	}
-	// we'll also delete active users list for this room
+
+	// now we'll perform few service related tasks
 	go func() {
 		// let's wait few seconds so that any pending task will finish
 		time.Sleep(5 * time.Second)
-		_, err = w.roomService.ManageActiveUsersList(event.Room.Name, "", "delList", event.CreatedAt)
-		if err != nil {
-			log.Errorln(err)
-		}
+		w.roomService.OnAfterRoomClosed(event.Room.Name)
 	}()
 
 	//we'll send message to recorder to stop
@@ -179,11 +172,6 @@ func (w *webhookEvent) roomFinished() {
 	go func() {
 		em := NewEtherpadModel()
 		_ = em.CleanAfterRoomEnd(event.Room.Name, event.Room.Metadata)
-	}()
-
-	// clear users block list
-	go func() {
-		_, _ = w.roomService.DeleteRoomBlockList(event.Room.Name)
 	}()
 
 	// clean polls

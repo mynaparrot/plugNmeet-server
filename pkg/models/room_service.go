@@ -10,14 +10,16 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/redis/go-redis/v9"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 	"time"
 )
 
 const (
-	BlockedUsersList = "pnm:block_users_list:"
-	ActiveRoomsKey   = "pnm:activeRooms"
-	ActiveRoomUsers  = "pnm:activeRoom:%s:users"
+	BlockedUsersList           = "pnm:block_users_list:"
+	ActiveRoomsWithMetadataKey = "pnm:activeRoomsWithMetadata"
+	ActiveRoomUsers            = "pnm:activeRoom:%s:users"
+	RoomWithUsersMetadata      = "pnm:roomWithUsersMetadata:%s"
 )
 
 type RoomService struct {
@@ -125,7 +127,13 @@ func (r *RoomService) UpdateRoomMetadata(roomId string, metadata string) (*livek
 		return nil, err
 	}
 
-	// temporary we'll update metadata manually
+	// we'll always update our own redis
+	_, err = r.ManageActiveRoomsWithMetadata(roomId, "add", metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	// temporarily we'll update metadata manually
 	// because livekit propagated quite lately now
 	m := NewDataMessageModel()
 	err = m.SendUpdatedMetadata(roomId, metadata)
@@ -159,6 +167,12 @@ func (r *RoomService) UpdateParticipantMetadata(roomId string, userId string, me
 	}
 
 	participant, err := r.livekitClient.UpdateParticipant(r.ctx, &data)
+	if err != nil {
+		return nil, err
+	}
+
+	// we'll update our redis everytime
+	_, err = r.ManageRoomWithUsersMetadata(roomId, userId, "add", metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -301,6 +315,19 @@ func (r *RoomService) LoadRoomWithMetadata(roomId string) (*livekit.Room, *plugn
 	return room, meta, nil
 }
 
+// LoadOnlyRoomMetadata will load metadata from our own redis system
+// we always update our redis metadata when we trigger to update.
+func (r *RoomService) LoadOnlyRoomMetadata(roomId string) (*plugnmeet.RoomMetadata, error) {
+	metadata, err := r.ManageActiveRoomsWithMetadata(roomId, "get", "")
+	if err != nil {
+		return nil, err
+	}
+	if metadata == nil {
+		return nil, errors.New("empty metadata")
+	}
+	return r.UnmarshalRoomMetadata(metadata[roomId])
+}
+
 // UpdateRoomMetadataByStruct to update metadata by providing formatted metadata
 func (r *RoomService) UpdateRoomMetadataByStruct(roomId string, meta *plugnmeet.RoomMetadata) (*livekit.Room, error) {
 	metadata, err := r.MarshalRoomMetadata(meta)
@@ -358,6 +385,34 @@ func (r *RoomService) LoadParticipantWithMetadata(roomId, userId string) (*livek
 	return p, meta, nil
 }
 
+// LoadOnlyParticipantMetadata will load participant metadata from our managed redis with online status
+func (r *RoomService) LoadOnlyParticipantMetadata(roomId, userId string) (*plugnmeet.UserMetadata, bool, error) {
+	metadata, err := r.ManageRoomWithUsersMetadata(roomId, userId, "get", "")
+	if err != nil {
+		return nil, false, err
+	}
+	if metadata == "" {
+		return nil, false, errors.New("empty metadata")
+	}
+
+	list, err := r.ManageActiveUsersList(roomId, userId, "get", 0)
+	if err != nil {
+		return nil, false, err
+	}
+
+	pm, err := r.UnmarshalParticipantMetadata(metadata)
+	if err != nil {
+		return nil, false, err
+	}
+
+	isOnline := false
+	if len(list) > 0 {
+		isOnline = true
+	}
+
+	return pm, isOnline, nil
+}
+
 // UpdateParticipantMetadataByStruct will update user's medata by provided formatted metadata
 func (r *RoomService) UpdateParticipantMetadataByStruct(roomId, userId string, meta *plugnmeet.UserMetadata) (*livekit.ParticipantInfo, error) {
 	metadata, err := r.MarshalParticipantMetadata(meta)
@@ -372,46 +427,36 @@ func (r *RoomService) UpdateParticipantMetadataByStruct(roomId, userId string, m
 	return p, nil
 }
 
-// ManageActiveRoomsList will use redis sorted sets to manage active sessions
+// ManageActiveRoomsWithMetadata will use redis sorted active rooms with their metadata
 // task = add | del | get | fetchAll
-func (r *RoomService) ManageActiveRoomsList(roomId, task string, timeStamp int64) ([]redis.Z, error) {
-	if timeStamp == 0 {
-		timeStamp = time.Now().Unix()
-	}
-	var out []redis.Z
+func (r *RoomService) ManageActiveRoomsWithMetadata(roomId, task, metadata string) (map[string]string, error) {
+	var out map[string]string
 	var err error
 
 	switch task {
 	case "add":
-		_, err = r.rc.ZAdd(r.ctx, ActiveRoomsKey, redis.Z{
-			Score:  float64(timeStamp),
-			Member: roomId,
-		}).Result()
+		_, err = r.rc.HSet(r.ctx, ActiveRoomsWithMetadataKey, roomId, metadata).Result()
 		if err != nil {
-			return out, err
+			return nil, err
 		}
 	case "del":
-		_, err = r.rc.ZRem(r.ctx, ActiveRoomsKey, roomId).Result()
+		_, err = r.rc.HDel(r.ctx, ActiveRoomsWithMetadataKey, roomId).Result()
 		if err != nil {
-			return out, err
+			return nil, err
 		}
 	case "get":
-		result, err := r.rc.ZScore(r.ctx, ActiveRoomsKey, roomId).Result()
+		result, err := r.rc.HGet(r.ctx, ActiveRoomsWithMetadataKey, roomId).Result()
 		switch {
 		case err == redis.Nil:
-			return out, err
+			return nil, nil
 		case err != nil:
-			return out, err
-		case result == 0:
-			return out, nil
+			return nil, err
 		}
-
-		out = append(out, redis.Z{
-			Member: roomId,
-			Score:  result,
-		})
+		out = map[string]string{
+			roomId: result,
+		}
 	case "fetchAll":
-		out, err = r.rc.ZRandMemberWithScores(r.ctx, ActiveRoomsKey, -1).Result()
+		out, err = r.rc.HGetAll(r.ctx, ActiveRoomsWithMetadataKey).Result()
 		if err != nil {
 			return out, err
 		}
@@ -474,4 +519,71 @@ func (r *RoomService) ManageActiveUsersList(roomId, userId, task string, timeSta
 	}
 
 	return out, nil
+}
+
+// ManageRoomWithUsersMetadata can be used to store user metadata in redis
+// this way we'll be able to access info quickly
+// task = add | del | get | delList (to delete this entire list)
+func (r *RoomService) ManageRoomWithUsersMetadata(roomId, userId, task, metadata string) (string, error) {
+	key := fmt.Sprintf(RoomWithUsersMetadata, roomId)
+	switch task {
+	case "add":
+		_, err := r.rc.HSet(r.ctx, key, userId, metadata).Result()
+		if err != nil {
+			return "", err
+		}
+		return "", nil
+	case "get":
+		result, err := r.rc.HGet(r.ctx, key, userId).Result()
+		switch {
+		case err == redis.Nil:
+			return "", nil
+		case err != nil:
+			return "", err
+		}
+		return result, nil
+	case "del":
+		_, err := r.rc.HDel(r.ctx, key, userId).Result()
+		if err != nil {
+			return "", err
+		}
+		return "", nil
+	case "delList":
+		// this will delete this key completely
+		// we'll trigger this when the session was ended
+		_, err := r.rc.Del(r.ctx, key).Result()
+		if err != nil {
+			return "", err
+		}
+		return "", nil
+	}
+	return "", errors.New("invalid task")
+}
+
+func (r *RoomService) OnAfterRoomClosed(roomId string) {
+	// completely remove room active users list
+	_, err := r.ManageActiveUsersList(roomId, "", "delList", 0)
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	// delete blocked users list
+	_, err = r.DeleteRoomBlockList(roomId)
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	// completely remove the room key
+	_, err = r.ManageRoomWithUsersMetadata(roomId, "", "delList", "")
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	// we'll wait a little bit before we clean up
+	time.Sleep(5 * time.Second)
+	// remove this room from an active room list
+	_, err = r.ManageActiveRoomsWithMetadata(roomId, "del", "")
+	if err != nil {
+		log.Errorln(err)
+	}
 }

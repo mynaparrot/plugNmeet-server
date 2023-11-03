@@ -124,6 +124,10 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 		return false, "Error: " + err.Error(), nil
 	}
 
+	// we'll silently add metadata into our redis
+	// we can avoid errors (if occur) because it will update from webhook too
+	_, _ = am.rs.ManageActiveRoomsWithMetadata(r.RoomId, "add", meta)
+
 	return true, "room created", room
 }
 
