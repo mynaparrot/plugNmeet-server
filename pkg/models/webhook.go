@@ -82,7 +82,7 @@ func (w *webhookEvent) roomStarted() {
 	}
 
 	// now we'll insert this session in the active sessions list
-	_, err := w.roomService.ManageActiveRoomsList(event.Room.Name, "add", event.Room.CreationTime)
+	_, err := w.roomService.ManageActiveRoomsWithMetadata(event.Room.Name, "add", event.Room.Metadata)
 	if err != nil {
 		log.Errorln(err)
 	}

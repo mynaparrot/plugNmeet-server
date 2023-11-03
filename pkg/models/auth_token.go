@@ -47,6 +47,7 @@ func (a *AuthTokenModel) GeneratePlugNmeetAccessToken(g *plugnmeet.GenerateToken
 
 	c := &plugnmeet.PlugNmeetTokenClaims{
 		Name:     g.UserInfo.Name,
+		UserId:   g.UserInfo.UserId,
 		RoomId:   g.RoomId,
 		IsAdmin:  g.UserInfo.IsAdmin,
 		IsHidden: g.UserInfo.IsHidden,

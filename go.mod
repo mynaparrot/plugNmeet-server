@@ -14,7 +14,7 @@ require (
 	github.com/gofiber/template/html/v2 v2.0.5
 	github.com/google/uuid v1.4.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/protocol v1.8.1
+	github.com/livekit/protocol v1.9.0
 	github.com/livekit/server-sdk-go v1.1.1
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20231101090512-986c547473f2
 	github.com/redis/go-redis/v9 v9.3.0
@@ -69,7 +69,7 @@ require (
 	github.com/pion/datachannel v1.5.5 // indirect
 	github.com/pion/dtls/v2 v2.2.7 // indirect
 	github.com/pion/ice/v2 v2.3.11 // indirect
-	github.com/pion/interceptor v0.1.24 // indirect
+	github.com/pion/interceptor v0.1.25 // indirect
 	github.com/pion/logging v0.2.2 // indirect
 	github.com/pion/mdns v0.0.9 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
