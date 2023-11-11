@@ -7,7 +7,7 @@ require (
 	github.com/antoniodipinto/ikisocket v0.0.0-20230914204858-ee499ed8c55e
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/gabriel-vasile/mimetype v1.4.3
-	github.com/go-jose/go-jose/v3 v3.0.0
+	github.com/go-jose/go-jose/v3 v3.0.1
 	github.com/goccy/go-json v0.10.2
 	github.com/gofiber/contrib/websocket v1.2.2
 	github.com/gofiber/fiber/v2 v2.50.0
