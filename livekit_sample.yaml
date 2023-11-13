@@ -20,6 +20,13 @@ redis:
 #  sentinel_password: pass
 room:
   enable_remote_unmute: true
+  enabled_codecs:
+    - mime: audio/opus
+    - mime: audio/red
+    - mime: video/vp8
+    - mime: video/vp9
+    - mime: video/av1
+    - mime: video/h264
 keys:
   APIiYAA5w37Cfo2: 6aNur7qqupeZhFYNOJVUyeXxXhVw8f4lm13pEDUx8SgB
 signal_relay:
