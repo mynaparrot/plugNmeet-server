@@ -400,7 +400,7 @@ func (s *SpeechServices) sendToWebhookNotifier(rId, rSid string, userId *string,
 			TotalUsage: usage,
 		},
 	}
-	err := n.SendWebhook(msg)
+	err := n.SendWebhook(msg, nil)
 	if err != nil {
 		log.Errorln(err)
 	}

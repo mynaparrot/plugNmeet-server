@@ -372,7 +372,7 @@ func (rm *RecordingModel) sendToWebhookNotifier(r *plugnmeet.RecorderToPlugNmeet
 			},
 		}
 
-		err := n.SendWebhook(msg)
+		err := n.SendWebhook(msg, nil)
 		if err != nil {
 			log.Errorln(err)
 		}

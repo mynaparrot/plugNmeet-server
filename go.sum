@@ -143,8 +143,8 @@ github.com/mattn/go-runewidth v0.0.15 h1:UNAjwbU9l54TA3KzvqLGxwWjHmMgBUVhBiTjelZ
 github.com/mattn/go-runewidth v0.0.15/go.mod h1:Jdepj2loyihRzMpdS35Xk/zdY8IAYHsh153qUoGf23w=
 github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0 h1:jWpvCLoY8Z/e3VKvlsiIGKtc+UG6U5vzxaoagmhXfyg=
 github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0/go.mod h1:QUyp042oQthUoa9bqDv0ER0wrtXnBruoNd7aNjkbP+k=
-github.com/mynaparrot/plugnmeet-protocol v0.0.0-20231116105620-9ec588f45cf6 h1:cWIsMwHbEi8RX/QuniUpFmXgx2wJRgkRzgeg+ZW4wMQ=
-github.com/mynaparrot/plugnmeet-protocol v0.0.0-20231116105620-9ec588f45cf6/go.mod h1:0vBy3B8TIvq1Zc8/bayiMtnL8450UHhWjTma4l/UiKI=
+github.com/mynaparrot/plugnmeet-protocol v0.0.0-20231116163140-015191151259 h1:PTl83CH2yBiy4ZqfKd2blMyIQgnGvNCdPSZ4Nes/8Tc=
+github.com/mynaparrot/plugnmeet-protocol v0.0.0-20231116163140-015191151259/go.mod h1:0vBy3B8TIvq1Zc8/bayiMtnL8450UHhWjTma4l/UiKI=
 github.com/nats-io/nats.go v1.31.0 h1:/WFBHEc/dOKBF6qf1TZhrdEfTmOZ5JzdJ+Y3m6Y/p7E=
 github.com/nats-io/nats.go v1.31.0/go.mod h1:di3Bm5MLsoB4Bx61CBTsxuarI36WbhAwOm8QrW39+i8=
 github.com/nats-io/nkeys v0.4.6 h1:IzVe95ru2CT6ta874rt9saQRkWfe2nFj1NtvYSLqMzY=

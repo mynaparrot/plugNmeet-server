@@ -352,5 +352,5 @@ func (w *webhookEvent) sendToWebhookNotifier(event *livekit.WebhookEvent) {
 	}
 
 	msg := utils.PrepareCommonWebhookNotifyEvent(event)
-	_ = w.notifier.SendWebhook(msg)
+	_ = w.notifier.SendWebhook(msg, nil)
 }
