@@ -58,12 +58,14 @@ func (r *RecorderModel) SendMsgToRecorder(req *plugnmeet.RecordingReq) error {
 			return errors.New(msg)
 		}
 		req.RoomTableId = rmInfo.Id
+		req.RoomId = rmInfo.RoomId
 	}
 
 	r.recordingReq = req
 	toSend := &plugnmeet.PlugNmeetToRecorder{
 		From:        "plugnmeet",
 		RoomTableId: req.RoomTableId,
+		RoomId:      req.RoomId,
 		RoomSid:     req.Sid,
 		Task:        req.Task,
 		RecordingId: req.Sid + "-" + strconv.Itoa(int(recordId)),

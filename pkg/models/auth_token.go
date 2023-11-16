@@ -220,6 +220,6 @@ func (a *AuthTokenModel) GenerateLivekitToken(c *plugnmeet.PlugNmeetTokenClaims)
 	return auth.GenerateLivekitAccessToken(a.app.LivekitInfo.ApiKey, a.app.LivekitInfo.Secret, a.app.LivekitInfo.TokenValidity, c, metadata)
 }
 
-func (a *AuthTokenModel) ValidateLivekitWebhookToken(token string) (string, error) {
-	return auth.ValidateLivekitWebhookToken(a.app.LivekitInfo.Secret, token)
+func (a *AuthTokenModel) ValidateLivekitWebhookToken(body []byte, token string) (bool, error) {
+	return auth.VerifyWebhookRequest(body, a.app.LivekitInfo.ApiKey, a.app.LivekitInfo.Secret, token)
 }
