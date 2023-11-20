@@ -192,6 +192,8 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(sid, meta string) {
 	if metadata.RoomFeatures.EnableAnalytics {
 		// record in db
 		m.addAnalyticsFileToDB(room.Id, room.CreationTime, room.RoomId, fileId, stat)
+		// notify
+		m.sendToWebhookNotifier(room.RoomId, room.Sid, "analytics_proceeded", fileId)
 	}
 }
 
@@ -307,6 +309,7 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *RoomInfo, path string, meta
 			log.Errorln(err)
 			return nil, err
 		}
+
 	}
 
 	// at the end delete all redis records
@@ -438,5 +441,26 @@ func (m *AnalyticsModel) handleFirstTimeUserJoined(key string) {
 	_, err = m.rc.HSet(m.ctx, fmt.Sprintf("%s:users", key), u).Result()
 	if err != nil {
 		log.Errorln(err)
+	}
+}
+
+func (m *AnalyticsModel) sendToWebhookNotifier(roomId, roomSid, task, fileId string) {
+	n := GetWebhookNotifier(roomId, roomSid)
+	if n != nil {
+		msg := &plugnmeet.CommonNotifyEvent{
+			Event: &task,
+			Room: &plugnmeet.NotifyEventRoom{
+				Sid:    &roomSid,
+				RoomId: &roomId,
+			},
+			Analytics: &plugnmeet.AnalyticsEvent{
+				FileId: &fileId,
+			},
+		}
+
+		err := n.SendWebhook(msg, nil)
+		if err != nil {
+			log.Errorln(err)
+		}
 	}
 }
