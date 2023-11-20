@@ -26,12 +26,6 @@ func HandleCreateBreakoutRooms(c *fiber.Ctx) error {
 		return SendBreakoutRoomResponse(c, res)
 	}
 
-	err = req.Validate()
-	if err != nil {
-		res.Msg = err.Error()
-		return SendBreakoutRoomResponse(c, res)
-	}
-
 	req.RoomId = roomId.(string)
 	req.RequestedUserId = requestedUserId.(string)
 

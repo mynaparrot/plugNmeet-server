@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"github.com/bufbuild/protovalidate-go"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
@@ -19,15 +20,12 @@ func HandleRoomCreate(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	if err = req.Validate(); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	v, err := protovalidate.New()
+	if err != nil {
+		utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
 	}
 
-	if err = req.Metadata.Validate(); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
-	}
-
-	if err = req.Metadata.RoomFeatures.Validate(); err != nil {
+	if err = v.Validate(req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
