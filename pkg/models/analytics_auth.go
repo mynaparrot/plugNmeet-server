@@ -119,7 +119,31 @@ func (m *AnalyticsAuthModel) fetchAnalytic(fileId string) (*plugnmeet.AnalyticsI
 	err := row.Scan(&analytic.RoomId, &analytic.FileId, &analytic.FileName, &analytic.FileSize, &analytic.RoomCreationTime, &analytic.CreationTime)
 
 	switch {
-	case err == sql.ErrNoRows:
+	case errors.Is(err, sql.ErrNoRows):
+		err = errors.New("no info found")
+	case err != nil:
+		err = errors.New(fmt.Sprintf("query error: %s", err.Error()))
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return analytic, nil
+}
+
+func (m *AnalyticsAuthModel) getAnalyticByRoomTableId(roomTableId int64) (*plugnmeet.AnalyticsInfo, error) {
+	db := m.db
+	ctx, cancel := context.WithTimeout(m.ctx, 3*time.Second)
+	defer cancel()
+
+	row := db.QueryRowContext(ctx, "SELECT room_id, file_id, file_name, file_size, room_creation_time, creation_time FROM "+m.app.FormatDBTable("room_analytics")+" WHERE room_table_id = ?", roomTableId)
+
+	analytic := new(plugnmeet.AnalyticsInfo)
+	err := row.Scan(&analytic.RoomId, &analytic.FileId, &analytic.FileName, &analytic.FileSize, &analytic.RoomCreationTime, &analytic.CreationTime)
+
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
 		err = errors.New("no info found")
 	case err != nil:
 		err = errors.New(fmt.Sprintf("query error: %s", err.Error()))
@@ -186,7 +210,7 @@ func (m *AnalyticsAuthModel) DeleteAnalytics(r *plugnmeet.DeleteAnalyticsReq) er
 	return nil
 }
 
-// GetAnalyticsDownloadToken will use same JWT token generator as Livekit is using
+// GetAnalyticsDownloadToken will use the same JWT token generator as plugNmeet is using
 func (m *AnalyticsAuthModel) GetAnalyticsDownloadToken(r *plugnmeet.GetAnalyticsDownloadTokenReq) (string, error) {
 	analytic, err := m.fetchAnalytic(r.FileId)
 	if err != nil {

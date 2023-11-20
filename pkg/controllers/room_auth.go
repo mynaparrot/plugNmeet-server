@@ -50,8 +50,14 @@ func HandleIsRoomActive(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
-	if req.RoomId == "" {
-		return utils.SendCommonProtoJsonResponse(c, false, "room_id required")
+
+	v, err := protovalidate.New()
+	if err != nil {
+		utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
+	}
+
+	if err = v.Validate(req); err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
 	m := models.NewRoomAuthModel()
@@ -71,11 +77,13 @@ func HandleGetActiveRoomInfo(c *fiber.Ctx) error {
 			"msg":    err.Error(),
 		})
 	}
-	if req.RoomId == "" {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "room_id required",
-		})
+	v, err := protovalidate.New()
+	if err != nil {
+		utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
+	}
+
+	if err = v.Validate(req); err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 	m := models.NewRoomAuthModel()
 	status, msg, res := m.GetActiveRoomInfo(req)
@@ -111,8 +119,13 @@ func HandleEndRoom(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
-	if req.RoomId == "" {
-		return utils.SendCommonProtoJsonResponse(c, false, "room_id required")
+	v, err := protovalidate.New()
+	if err != nil {
+		utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
+	}
+
+	if err = v.Validate(req); err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
 	m := models.NewRoomAuthModel()
@@ -130,8 +143,12 @@ func HandleFetchPastRooms(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
-	err = req.Validate()
+	v, err := protovalidate.New()
 	if err != nil {
+		utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
+	}
+
+	if err = v.Validate(req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 

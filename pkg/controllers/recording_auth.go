@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"github.com/bufbuild/protovalidate-go"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
@@ -17,8 +18,12 @@ func HandleFetchRecordings(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
-	err = req.Validate()
+	v, err := protovalidate.New()
 	if err != nil {
+		utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
+	}
+
+	if err = v.Validate(req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
@@ -40,6 +45,34 @@ func HandleFetchRecordings(c *fiber.Ctx) error {
 	return utils.SendProtoJsonResponse(c, r)
 }
 
+func HandleRecordingInfo(c *fiber.Ctx) error {
+	req := new(plugnmeet.RecordingInfoReq)
+	op := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
+	err := op.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
+
+	v, err := protovalidate.New()
+	if err != nil {
+		utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
+	}
+
+	if err = v.Validate(req); err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
+
+	m := models.NewRecordingAuth()
+	result, err := m.RecordingInfo(req)
+	if err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
+
+	return utils.SendProtoJsonResponse(c, result)
+}
+
 func HandleDeleteRecording(c *fiber.Ctx) error {
 	req := new(plugnmeet.DeleteRecordingReq)
 	op := protojson.UnmarshalOptions{
@@ -49,8 +82,12 @@ func HandleDeleteRecording(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
-	err = req.Validate()
+	v, err := protovalidate.New()
 	if err != nil {
+		utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
+	}
+
+	if err = v.Validate(req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
@@ -72,8 +109,12 @@ func HandleGetDownloadToken(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
-	err = req.Validate()
+	v, err := protovalidate.New()
 	if err != nil {
+		utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
+	}
+
+	if err = v.Validate(req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 

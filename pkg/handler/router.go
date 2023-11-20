@@ -100,6 +100,7 @@ func Router() *fiber.App {
 	// for recording
 	recording := auth.Group("/recording")
 	recording.Post("/fetch", controllers.HandleFetchRecordings)
+	recording.Post("/recordingInfo", controllers.HandleRecordingInfo)
 	recording.Post("/delete", controllers.HandleDeleteRecording)
 	recording.Post("/getDownloadToken", controllers.HandleGetDownloadToken)
 

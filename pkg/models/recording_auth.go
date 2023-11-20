@@ -130,7 +130,7 @@ func (a *AuthRecording) FetchRecording(recordId string) (*plugnmeet.RecordingInf
 	recording.RoomSid = rSid.String
 
 	switch {
-	case err == sql.ErrNoRows:
+	case errors.Is(err, sql.ErrNoRows):
 		err = errors.New("no info found")
 	case err != nil:
 		err = errors.New(fmt.Sprintf("query error: %s", err.Error()))
@@ -143,8 +143,42 @@ func (a *AuthRecording) FetchRecording(recordId string) (*plugnmeet.RecordingInf
 	return recording, nil
 }
 
-type DeleteRecordingReq struct {
-	RecordId string `json:"record_id" validate:"required"`
+func (a *AuthRecording) RecordingInfo(req *plugnmeet.RecordingInfoReq) (*plugnmeet.RecordingInfoRes, error) {
+	recording, err := a.FetchRecording(req.RecordId)
+	if err != nil {
+		return nil, err
+	}
+
+	pastRoomInfo := new(plugnmeet.PastRoomInfo)
+	// SID can't be null, so we'll check before
+	if recording.GetRoomSid() != "" {
+		rm := NewRoomModel()
+		roomInfo, _ := rm.GetRoomInfo("", recording.GetRoomSid(), 0)
+		if roomInfo != nil {
+			pastRoomInfo = &plugnmeet.PastRoomInfo{
+				RoomTitle:          roomInfo.RoomTitle,
+				RoomId:             roomInfo.RoomId,
+				RoomSid:            roomInfo.Sid,
+				JoinedParticipants: roomInfo.JoinedParticipants,
+				WebhookUrl:         roomInfo.WebhookUrl,
+				Ended:              roomInfo.Ended,
+			}
+			pastRoomInfo.Created = time.Unix(roomInfo.CreationTime, 0).UTC().Format("2006-01-02 15:04:05")
+
+			am := NewAnalyticsAuthModel()
+			an, err := am.getAnalyticByRoomTableId(roomInfo.Id)
+			if err == nil {
+				pastRoomInfo.AnalyticsFileId = an.GetFileId()
+			}
+		}
+	}
+
+	return &plugnmeet.RecordingInfoRes{
+		Status:        true,
+		Msg:           "success",
+		RecordingInfo: recording,
+		RoomInfo:      pastRoomInfo,
+	}, nil
 }
 
 func (a *AuthRecording) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
@@ -203,11 +237,7 @@ func (a *AuthRecording) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
 	return nil
 }
 
-type GetDownloadTokenReq struct {
-	RecordId string `json:"record_id" validate:"required"`
-}
-
-// GetDownloadToken will use same JWT token generator as Livekit is using
+// GetDownloadToken will use the same JWT token generator as plugNmeet is using
 func (a *AuthRecording) GetDownloadToken(r *plugnmeet.GetDownloadTokenReq) (string, error) {
 	recording, err := a.FetchRecording(r.RecordId)
 	if err != nil {
