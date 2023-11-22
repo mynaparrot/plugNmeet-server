@@ -30,8 +30,14 @@ func NewRoomAuthModel() *RoomAuthModel {
 }
 
 func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *livekit.Room) {
-	roomDbInfo, _ := am.rm.GetRoomInfo(r.RoomId, "", 1)
+	exist, err := am.rs.ManageActiveRoomsWithMetadata(r.GetRoomId(), "get", "")
+	if err == nil && exist != nil {
+		// maybe this room was ended just now, so we'll wait until clean up done
+		log.Infoln("this room:", r.GetRoomId(), "still active, we'll wait for:", config.WAIT_BEFORE_TRIGGER_ON_AFTER_ROOM_ENDED, "before recreating it again.")
+		time.Sleep(config.WAIT_BEFORE_TRIGGER_ON_AFTER_ROOM_ENDED)
+	}
 
+	roomDbInfo, _ := am.rm.GetRoomInfo(r.RoomId, "", 1)
 	if roomDbInfo.Id > 0 {
 		rf, err := am.rs.LoadRoomInfo(r.RoomId)
 		if err != nil && err.Error() != "requested room does not exist" {
@@ -42,8 +48,8 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 			return true, "room already exists", rf
 		}
 
-		// we'll allow to create room again & use the same DB row
-		// we can just update the DB row. No need to create new one
+		// we'll allow creating room again & use the same DB row
+		// we can just update the DB row. No need to create a new one
 	}
 
 	// we'll set default values otherwise client got confused if data is missing

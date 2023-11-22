@@ -561,7 +561,7 @@ func (r *RoomService) ManageRoomWithUsersMetadata(roomId, userId, task, metadata
 }
 
 func (r *RoomService) OnAfterRoomClosed(roomId string) {
-	// completely remove room active users list
+	// completely remove a room active users list
 	_, err := r.ManageActiveUsersList(roomId, "", "delList", 0)
 	if err != nil {
 		log.Errorln(err)
@@ -579,8 +579,6 @@ func (r *RoomService) OnAfterRoomClosed(roomId string) {
 		log.Errorln(err)
 	}
 
-	// we'll wait a little bit before we clean up
-	time.Sleep(5 * time.Second)
 	// remove this room from an active room list
 	_, err = r.ManageActiveRoomsWithMetadata(roomId, "del", "")
 	if err != nil {

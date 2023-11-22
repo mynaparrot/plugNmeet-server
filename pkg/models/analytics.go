@@ -26,12 +26,14 @@ type AnalyticsModel struct {
 	rc   *redis.Client
 	ctx  context.Context
 	data *plugnmeet.AnalyticsDataMsg
+	rs   *RoomService
 }
 
 func NewAnalyticsModel() *AnalyticsModel {
 	return &AnalyticsModel{
 		rc:  config.AppCnf.RDS,
 		ctx: context.Background(),
+		rs:  NewRoomService(),
 	}
 }
 
@@ -141,7 +143,7 @@ func (m *AnalyticsModel) insertEventData(key string) {
 	}
 }
 
-func (m *AnalyticsModel) PrepareToExportAnalytics(sid, meta string) {
+func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 	if config.AppCnf.AnalyticsSettings == nil || !config.AppCnf.AnalyticsSettings.Enabled {
 		return
 	}
@@ -159,8 +161,16 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(sid, meta string) {
 		return
 	}
 
-	// let's wait few seconds so that all other process will finish
+	// let's wait a few seconds so that all other processes will finish
 	time.Sleep(waitBeforeProcessDuration)
+
+	// we'll check if the room is still active or not.
+	// this may happen when we closed the room & re-created it instantly
+	exist, err := m.rs.ManageActiveRoomsWithMetadata(roomId, "get", "")
+	if err == nil && exist != nil {
+		log.Infoln("this room:", roomId, "still active, so we won't process to export analytics")
+		return
+	}
 
 	if _, err := os.Stat(*config.AppCnf.AnalyticsSettings.FilesStorePath); os.IsNotExist(err) {
 		err = os.MkdirAll(*config.AppCnf.AnalyticsSettings.FilesStorePath, os.ModePerm)

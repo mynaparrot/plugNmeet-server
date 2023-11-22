@@ -150,9 +150,9 @@ func (m *RoomDurationModel) GetRoomsWithDurationMap() map[string]RoomDurationInf
 	out := make(map[string]RoomDurationInfo)
 	for _, key := range roomsKey {
 		var val RoomDurationInfo
-		err := m.rc.HGetAll(m.ctx, key).Scan(&val)
+		err = m.rc.HGetAll(m.ctx, key).Scan(&val)
 		if err != nil {
-			fmt.Println(err)
+			log.Errorln(err)
 			continue
 		}
 		rId := strings.Replace(key, roomWithDurationInfoKey+":", "", 1)

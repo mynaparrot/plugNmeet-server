@@ -115,7 +115,7 @@ func (w *webhookEvent) roomFinished() {
 	go w.sendToWebhookNotifier(event)
 
 	if event.Room.Sid != "" {
-		// we will only update table if the SID is not empty
+		// we will only update the table if the SID is not empty
 		room := &RoomInfo{
 			Sid:       event.Room.Sid,
 			IsRunning: 0,
@@ -127,14 +127,14 @@ func (w *webhookEvent) roomFinished() {
 		}
 	}
 
-	// now we'll perform few service related tasks
+	// now we'll perform a few service related tasks
 	go func() {
-		// let's wait few seconds so that any pending task will finish
-		time.Sleep(5 * time.Second)
+		// let's wait a few seconds so that any pending task will finish
+		time.Sleep(config.WAIT_BEFORE_TRIGGER_ON_AFTER_ROOM_ENDED)
 		w.roomService.OnAfterRoomClosed(event.Room.Name)
 	}()
 
-	//we'll send message to recorder to stop
+	//we'll send a message to the recorder to stop
 	_ = w.recorderModel.SendMsgToRecorder(&plugnmeet.RecordingReq{
 		Task:   plugnmeet.RecordingTasks_STOP,
 		Sid:    w.event.Room.Sid,
@@ -193,8 +193,8 @@ func (w *webhookEvent) roomFinished() {
 		sm.OnAfterRoomEnded(event.Room.Name, event.Room.Sid)
 	}()
 
-	// finally create analytics file
-	go w.analyticsModel.PrepareToExportAnalytics(event.Room.Sid, event.Room.Metadata)
+	// finally, create the analytics file
+	go w.analyticsModel.PrepareToExportAnalytics(event.Room.Name, event.Room.Sid, event.Room.Metadata)
 
 	// let's delete webhook queue
 	go w.notifier.DeleteWebhookQueuedNotifier(event.Room.Name)
