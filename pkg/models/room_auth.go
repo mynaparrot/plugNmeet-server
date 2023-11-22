@@ -32,10 +32,10 @@ func NewRoomAuthModel() *RoomAuthModel {
 func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *livekit.Room) {
 	exist, err := am.rs.ManageActiveRoomsWithMetadata(r.GetRoomId(), "get", "")
 	if err == nil && exist != nil {
-		waitUntil := config.WAIT_BEFORE_TRIGGER_ON_AFTER_ROOM_ENDED + (1 * time.Second)
+		waitFor := config.WAIT_BEFORE_TRIGGER_ON_AFTER_ROOM_ENDED + (1 * time.Second)
 		// maybe this room was ended just now, so we'll wait until clean up done
-		log.Infoln("this room:", r.GetRoomId(), "still active, we'll wait for:", waitUntil, "before recreating it again.")
-		time.Sleep(waitUntil)
+		log.Infoln("this room:", r.GetRoomId(), "still active, we'll wait for:", waitFor, "before recreating it again.")
+		time.Sleep(waitFor)
 	}
 
 	roomDbInfo, _ := am.rm.GetRoomInfo(r.RoomId, "", 1)
