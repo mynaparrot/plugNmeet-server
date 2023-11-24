@@ -130,7 +130,7 @@ func (w *webhookEvent) roomFinished() {
 	// now we'll perform a few service related tasks
 	go func() {
 		// let's wait a few seconds so that any pending task will finish
-		time.Sleep(config.WAIT_BEFORE_TRIGGER_ON_AFTER_ROOM_ENDED)
+		time.Sleep(config.WaitBeforeTriggerOnAfterRoomEnded)
 		w.roomService.OnAfterRoomClosed(event.Room.Name)
 	}()
 

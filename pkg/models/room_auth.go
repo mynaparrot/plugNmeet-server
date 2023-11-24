@@ -32,8 +32,8 @@ func NewRoomAuthModel() *RoomAuthModel {
 func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *livekit.Room) {
 	exist, err := am.rs.ManageActiveRoomsWithMetadata(r.GetRoomId(), "get", "")
 	if err == nil && exist != nil {
-		waitFor := config.WAIT_BEFORE_TRIGGER_ON_AFTER_ROOM_ENDED + (1 * time.Second)
 		// maybe this room was ended just now, so we'll wait until clean up done
+		waitFor := config.WaitBeforeTriggerOnAfterRoomEnded + (1 * time.Second)
 		log.Infoln("this room:", r.GetRoomId(), "still active, we'll wait for:", waitFor, "before recreating it again.")
 		time.Sleep(waitFor)
 	}
@@ -366,8 +366,8 @@ func (am *RoomAuthModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomR
 	if resp.ContentLength < 1 {
 		log.Errorf("invalid file type")
 		return
-	} else if resp.ContentLength > config.MAX_PRELOADED_WHITEBOARD_FILE_SIZE {
-		log.Errorf("Allowd %d but given %d", config.MAX_PRELOADED_WHITEBOARD_FILE_SIZE, resp.ContentLength)
+	} else if resp.ContentLength > config.MaxPreloadedWhiteboardFileSize {
+		log.Errorf("Allowd %d but given %d", config.MaxPreloadedWhiteboardFileSize, resp.ContentLength)
 		return
 	}
 

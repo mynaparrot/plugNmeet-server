@@ -231,8 +231,8 @@ func (s *SpeechServices) OnAfterRoomEnded(roomId, sId string) {
 	if sId == "" {
 		return
 	}
-	// we'll wait little bit to make sure all users' requested has been received
-	time.Sleep(5 * time.Microsecond)
+	// we'll wait a little bit to make sure all users' requested has been received
+	time.Sleep(config.WaitBeforeSpeechServicesOnAfterRoomEnded)
 
 	key := fmt.Sprintf("%s:%s:usage", SpeechServiceRedisKey, roomId)
 	hkeys, err := s.rc.HKeys(s.ctx, key).Result()

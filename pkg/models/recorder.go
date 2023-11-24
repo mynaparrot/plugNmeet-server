@@ -73,13 +73,13 @@ func (r *RecorderModel) SendMsgToRecorder(req *plugnmeet.RecordingReq) error {
 
 	switch req.Task {
 	case plugnmeet.RecordingTasks_START_RECORDING:
-		err := r.addTokenAndRecorder(toSend, config.RECORDER_BOT)
+		err := r.addTokenAndRecorder(toSend, config.RecorderBot)
 		if err != nil {
 			return err
 		}
 	case plugnmeet.RecordingTasks_START_RTMP:
 		toSend.RtmpUrl = req.RtmpUrl
-		err := r.addTokenAndRecorder(toSend, config.RTMP_BOT)
+		err := r.addTokenAndRecorder(toSend, config.RtmpBot)
 		if err != nil {
 			return err
 		}

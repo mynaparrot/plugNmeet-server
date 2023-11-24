@@ -97,7 +97,7 @@ func (s *SchedulerModel) activeRoomChecker() {
 		}
 		var count int64 = 0
 		for _, p := range pp {
-			if p.Identity == config.RECORDER_BOT || p.Identity == config.RTMP_BOT {
+			if p.Identity == config.RecorderBot || p.Identity == config.RtmpBot {
 				continue
 			}
 			count++

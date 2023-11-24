@@ -16,9 +16,8 @@ import (
 )
 
 const (
-	analyticsRoomKey          = "pnm:analytics:%s"
-	analyticsUserKey          = analyticsRoomKey + ":user:%s"
-	waitBeforeProcessDuration = time.Second * 30
+	analyticsRoomKey = "pnm:analytics:%s"
+	analyticsUserKey = analyticsRoomKey + ":user:%s"
 )
 
 type AnalyticsModel struct {
@@ -162,7 +161,7 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 	}
 
 	// let's wait a few seconds so that all other processes will finish
-	time.Sleep(waitBeforeProcessDuration)
+	time.Sleep(config.WaitBeforeAnalyticsStartProcessing)
 
 	// we'll check if the room is still active or not.
 	// this may happen when we closed the room & re-created it instantly
