@@ -60,7 +60,7 @@ func (c *websocketController) validation() bool {
 	c.participant.Name = claims.Name
 	// default set false
 	c.kws.SetAttribute("isAdmin", claims.IsAdmin)
-	c.participant.IsAdmin = true
+	c.participant.IsAdmin = claims.IsAdmin
 
 	return true
 }
