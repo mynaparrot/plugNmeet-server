@@ -26,7 +26,7 @@ infrastructure [livekit](https://github.com/livekit/livekit-server). Please join
 15) MP4 Recordings;
 16) RTMP Broadcasting & RTMP ingress;
 17) Speech to text/translation (Powered by [Microsoft Azure](https://learn.microsoft.com/en-us/azure/cognitive-services/speech-service/get-started-text-to-speech?pivots=programming-language-go&tabs=linux%2Cterminal#prerequisites));
-18) **End-to-End encryption (E2EE)** (`Supported browsers: browser based on Chromium 83+, Google Chrome, Microsoft Edge, Safari`);
+18) **End-to-End encryption (E2EE)** (`Supported browsers: browser based on Chromium 83+, Google Chrome, Microsoft Edge, Safari, Firefox 117+`);
 19) A detailed **analytics report** to assess students' performance in the online classroom;
 
 And many more!
