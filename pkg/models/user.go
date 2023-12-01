@@ -101,7 +101,7 @@ type updateParticipantLockMetadata struct {
 }
 
 func (u *UserModel) updateParticipantLockMetadata(um updateParticipantLockMetadata) error {
-	if um.participantInfo.State.String() == "ACTIVE" {
+	if um.participantInfo.State == livekit.ParticipantInfo_ACTIVE {
 		meta := make([]byte, len(um.participantInfo.Metadata))
 		copy(meta, um.participantInfo.Metadata)
 
@@ -170,7 +170,7 @@ func (u *UserModel) MuteUnMuteTrack(r *plugnmeet.MuteUnMuteTrackReq) error {
 		return err
 	}
 
-	if p.State.String() != "ACTIVE" {
+	if p.State != livekit.ParticipantInfo_ACTIVE {
 		return errors.New("user isn't active now")
 	}
 	trackSid := r.TrackSid
@@ -199,7 +199,7 @@ func (u *UserModel) muteUnmuteAllMic(r *plugnmeet.MuteUnMuteTrackReq) error {
 	}
 
 	for _, p := range participants {
-		if p.State.String() == "ACTIVE" && p.Identity != r.RequestedUserId {
+		if p.State == livekit.ParticipantInfo_ACTIVE && p.Identity != r.RequestedUserId {
 			trackSid := ""
 			for _, t := range p.Tracks {
 				if t.Source.String() == livekit.TrackSource_MICROPHONE.String() {
@@ -223,7 +223,7 @@ func (u *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 		return err
 	}
 
-	if p.State.String() != "ACTIVE" {
+	if p.State != livekit.ParticipantInfo_ACTIVE {
 		return errors.New("user isn't active now")
 	}
 
@@ -233,7 +233,7 @@ func (u *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 		MsgBodyType: plugnmeet.DataMsgBodyType_ALERT,
 		Msg:         r.Msg,
 		RoomId:      r.RoomId,
-		SendTo:      []string{p.Sid},
+		SendTo:      []string{p.Identity},
 	})
 
 	// now remove

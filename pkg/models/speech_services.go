@@ -127,7 +127,7 @@ func (s *SpeechServices) GenerateAzureToken(r *plugnmeet.GenerateAzureTokenReq, 
 		UserSid:     "system",
 		MsgBodyType: plugnmeet.DataMsgBodyType_AZURE_COGNITIVE_SERVICE_SPEECH_TOKEN,
 		Msg:         string(marshal),
-		SendTo:      []string{r.UserSid},
+		SendTo:      []string{requestedUserId},
 	})
 
 	return err

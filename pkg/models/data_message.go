@@ -62,7 +62,7 @@ func (m *DataMessageModel) SendDataMessage(r *plugnmeet.DataMessageReq) error {
 	}
 }
 
-func (m *DataMessageModel) deliverMsg(roomId string, destinationSids []string, msg *plugnmeet.DataMessage) error {
+func (m *DataMessageModel) deliverMsg(roomId string, destinationUserIds []string, msg *plugnmeet.DataMessage) error {
 	data, err := proto.Marshal(msg)
 	if err != nil {
 		log.Errorln(err)
@@ -70,7 +70,7 @@ func (m *DataMessageModel) deliverMsg(roomId string, destinationSids []string, m
 	}
 
 	// send as push message
-	_, err = m.roomService.SendData(roomId, data, livekit.DataPacket_RELIABLE, destinationSids)
+	_, err = m.roomService.SendData(roomId, data, livekit.DataPacket_RELIABLE, destinationUserIds)
 	if err != nil {
 		log.Errorln(err)
 		return err
@@ -89,7 +89,7 @@ func (m *DataMessageModel) raiseHand(r *plugnmeet.DataMessageReq) error {
 			continue
 		}
 		if meta.IsAdmin && (r.RequestedUserId != participant.Identity) {
-			ids = append(ids, participant.Sid)
+			ids = append(ids, participant.Identity)
 		}
 	}
 
