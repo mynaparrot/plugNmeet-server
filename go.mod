@@ -15,7 +15,7 @@ require (
 	github.com/gofiber/template/html/v2 v2.0.5
 	github.com/google/uuid v1.4.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/protocol v1.9.1
+	github.com/livekit/protocol v1.9.3
 	github.com/livekit/server-sdk-go v1.1.1
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20231121113517-a61c90132af9
 	github.com/redis/go-redis/v9 v9.3.0
@@ -59,7 +59,7 @@ require (
 	github.com/lithammer/shortuuid/v4 v4.0.0 // indirect
 	github.com/livekit/mageutil v0.0.0-20230125210925-54e8a70427c1 // indirect
 	github.com/livekit/mediatransportutil v0.0.0-20231017082622-43f077b4e60e // indirect
-	github.com/livekit/psrpc v0.5.1 // indirect
+	github.com/livekit/psrpc v0.5.2 // indirect
 	github.com/mackerelio/go-osstat v0.2.4 // indirect
 	github.com/magefile/mage v1.15.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
@@ -84,7 +84,7 @@ require (
 	github.com/pion/stun v0.6.1 // indirect
 	github.com/pion/transport/v2 v2.2.4 // indirect
 	github.com/pion/turn/v2 v2.1.4 // indirect
-	github.com/pion/webrtc/v3 v3.2.22 // indirect
+	github.com/pion/webrtc/v3 v3.2.23 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.17.0 // indirect
 	github.com/prometheus/client_model v0.5.0 // indirect
