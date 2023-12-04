@@ -228,13 +228,13 @@ func (r *RoomService) MuteUnMuteTrack(roomId string, userId string, trackSid str
 	return res, err
 }
 
-// SendData will send request to livekit for sending data message
-func (r *RoomService) SendData(roomId string, data []byte, dataPacketKind livekit.DataPacket_Kind, destinationSids []string) (*livekit.SendDataResponse, error) {
+// SendData will send a request to livekit for sending data message
+func (r *RoomService) SendData(roomId string, data []byte, dataPacketKind livekit.DataPacket_Kind, destinationUserIds []string) (*livekit.SendDataResponse, error) {
 	req := livekit.SendDataRequest{
-		Room:            roomId,
-		Data:            data,
-		Kind:            dataPacketKind,
-		DestinationSids: destinationSids,
+		Room:                  roomId,
+		Data:                  data,
+		Kind:                  dataPacketKind,
+		DestinationIdentities: destinationUserIds,
 	}
 
 	res, err := r.livekitClient.SendData(r.ctx, &req)
@@ -245,13 +245,13 @@ func (r *RoomService) SendData(roomId string, data []byte, dataPacketKind liveki
 	return res, nil
 }
 
-// AddUserToBlockList will add users to block list, we're using redis set
+// AddUserToBlockList will add users to blocklist, we're using redis set
 func (r *RoomService) AddUserToBlockList(roomId, userId string) (int64, error) {
 	key := BlockedUsersList + roomId
 	return r.rc.SAdd(r.ctx, key, userId).Result()
 }
 
-// IsUserExistInBlockList to check if user is present in the block list
+// IsUserExistInBlockList to check if the user is present in the blocklist
 func (r *RoomService) IsUserExistInBlockList(roomId, userId string) bool {
 	key := BlockedUsersList + roomId
 	exist, err := r.rc.SIsMember(r.ctx, key, userId).Result()
