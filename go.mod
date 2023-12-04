@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/ansrivas/fiberprometheus/v2 v2.6.1
 	github.com/antoniodipinto/ikisocket v0.0.0-20230914204858-ee499ed8c55e
-	github.com/bufbuild/protovalidate-go v0.4.2
+	github.com/bufbuild/protovalidate-go v0.4.3
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/gabriel-vasile/mimetype v1.4.3
 	github.com/go-jose/go-jose/v3 v3.0.1
