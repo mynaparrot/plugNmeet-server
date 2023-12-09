@@ -155,6 +155,8 @@ github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0 h1:jWpvCLoY8Z/e3VKvls
 github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0/go.mod h1:QUyp042oQthUoa9bqDv0ER0wrtXnBruoNd7aNjkbP+k=
 github.com/mynaparrot/plugnmeet-protocol v0.0.0-20231121113517-a61c90132af9 h1:XfGD6NUbeRkcVPqJAS2wSRFcO+hw1R17kij+m6bQreE=
 github.com/mynaparrot/plugnmeet-protocol v0.0.0-20231121113517-a61c90132af9/go.mod h1:KXtBamxckRtrcWtmY5BIboDkhM5elHg23hZxbA9lw8Y=
+github.com/mynaparrot/plugnmeet-protocol v0.0.0-20231207143555-bfdbf8352248 h1:L/vTcMw8EgDC2+/8sj5VsqK8Dr+/4JOIbXK7qEopApM=
+github.com/mynaparrot/plugnmeet-protocol v0.0.0-20231207143555-bfdbf8352248/go.mod h1:KXtBamxckRtrcWtmY5BIboDkhM5elHg23hZxbA9lw8Y=
 github.com/nats-io/nats.go v1.31.0 h1:/WFBHEc/dOKBF6qf1TZhrdEfTmOZ5JzdJ+Y3m6Y/p7E=
 github.com/nats-io/nats.go v1.31.0/go.mod h1:di3Bm5MLsoB4Bx61CBTsxuarI36WbhAwOm8QrW39+i8=
 github.com/nats-io/nkeys v0.4.6 h1:IzVe95ru2CT6ta874rt9saQRkWfe2nFj1NtvYSLqMzY=
