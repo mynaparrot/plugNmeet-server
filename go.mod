@@ -16,7 +16,7 @@ require (
 	github.com/google/uuid v1.4.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.9.3
-	github.com/livekit/server-sdk-go v1.1.3
+	github.com/livekit/server-sdk-go v1.1.4
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20231207143555-bfdbf8352248
 	github.com/redis/go-redis/v9 v9.3.0
 	github.com/sirupsen/logrus v1.9.3

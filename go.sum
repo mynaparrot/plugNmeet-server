@@ -158,6 +158,8 @@ github.com/livekit/server-sdk-go v1.1.1 h1:TkDD/Ecyh7XNuxgxhpsDQ1uzbTlDWwwJrbkyU
 github.com/livekit/server-sdk-go v1.1.1/go.mod h1:724BcsVjpsQu8zK9VX2TfdEWt+DtsBeT3EnMrDbyT3I=
 github.com/livekit/server-sdk-go v1.1.3 h1:fTHXKSTvMa9N2c/eLu8u5XObhc/PfjyIt86qF+zTGCk=
 github.com/livekit/server-sdk-go v1.1.3/go.mod h1:xfNiF6LjyG4nLT58cU/K9ZPuBB6Bgtyiy6Zn+VNZY70=
+github.com/livekit/server-sdk-go v1.1.4 h1:gVTIRe8BNVyBpgOFfSbM3EdgPKN1oFwWNbks1bDF8RU=
+github.com/livekit/server-sdk-go v1.1.4/go.mod h1:xfNiF6LjyG4nLT58cU/K9ZPuBB6Bgtyiy6Zn+VNZY70=
 github.com/mackerelio/go-osstat v0.2.4 h1:qxGbdPkFo65PXOb/F/nhDKpF2nGmGaCFDLXoZjJTtUs=
 github.com/mackerelio/go-osstat v0.2.4/go.mod h1:Zy+qzGdZs3A9cuIqmgbJvwbmLQH9dJvtio5ZjJTbdlQ=
 github.com/magefile/mage v1.15.0 h1:BvGheCMAsG3bWUDbZ8AyXXpCNwU9u5CB6sM+HNb9HYg=
