@@ -106,7 +106,12 @@ func (s *SpeechServices) GenerateAzureToken(r *plugnmeet.GenerateAzureTokenReq, 
 		return errors.New("speech-services.service-disabled")
 	}
 
-	res, err := s.sendRequestToAzureForToken()
+	k, err := s.selectAzureKey()
+	if err != nil {
+		return err
+	}
+
+	res, err := s.sendRequestToAzureForToken(k.SubscriptionKey, k.ServiceRegion, k.Id)
 	if err != nil {
 		return err
 	}
@@ -122,15 +127,57 @@ func (s *SpeechServices) GenerateAzureToken(r *plugnmeet.GenerateAzureTokenReq, 
 		return err
 	}
 	dm := NewDataMessageModel()
-	err = dm.SendDataMessage(&plugnmeet.DataMessageReq{
+	return dm.SendDataMessage(&plugnmeet.DataMessageReq{
 		RoomId:      r.RoomId,
 		UserSid:     "system",
 		MsgBodyType: plugnmeet.DataMsgBodyType_AZURE_COGNITIVE_SERVICE_SPEECH_TOKEN,
 		Msg:         string(marshal),
 		SendTo:      []string{requestedUserId},
 	})
+}
 
-	return err
+func (s *SpeechServices) RenewAzureToken(r *plugnmeet.AzureTokenRenewReq, requestedUserId string) error {
+	ss, err := s.checkUserUsage(r.RoomId, requestedUserId)
+	if err != nil {
+		return err
+	}
+
+	if ss == "" {
+		return errors.New("speech-services.renew-need-already-using-service")
+	}
+
+	sub := config.AppCnf.AzureCognitiveServicesSpeech.SubscriptionKeys
+	var key string
+	for _, s := range sub {
+		if s.Id == r.KeyId {
+			key = s.SubscriptionKey
+			continue
+		}
+	}
+	if key == "" {
+		return errors.New("speech-services.renew-subscription-key-not-found")
+	}
+
+	res, err := s.sendRequestToAzureForToken(key, r.ServiceRegion, r.KeyId)
+	if err != nil {
+		return err
+	}
+
+	// send token by data channel
+	res.Renew = true
+	marshal, err := protojson.Marshal(res)
+	if err != nil {
+		return err
+	}
+
+	dm := NewDataMessageModel()
+	return dm.SendDataMessage(&plugnmeet.DataMessageReq{
+		RoomId:      r.RoomId,
+		UserSid:     "system",
+		MsgBodyType: plugnmeet.DataMsgBodyType_AZURE_COGNITIVE_SERVICE_SPEECH_TOKEN,
+		Msg:         string(marshal),
+		SendTo:      []string{requestedUserId},
+	})
 }
 
 func (s *SpeechServices) SpeechServiceUserStatus(r *plugnmeet.SpeechServiceUserStatusReq) error {
@@ -237,7 +284,7 @@ func (s *SpeechServices) OnAfterRoomEnded(roomId, sId string) {
 	key := fmt.Sprintf("%s:%s:usage", SpeechServiceRedisKey, roomId)
 	hkeys, err := s.rc.HKeys(s.ctx, key).Result()
 	switch {
-	case err == redis.Nil:
+	case errors.Is(err, redis.Nil):
 		//
 	case err != nil:
 		return
@@ -268,17 +315,13 @@ func (s *SpeechServices) OnAfterRoomEnded(roomId, sId string) {
 	s.rc.Del(s.ctx, key).Result()
 }
 
-func (s *SpeechServices) sendRequestToAzureForToken() (*plugnmeet.GenerateAzureTokenRes, error) {
-	k, err := s.selectAzureKey()
-	if err != nil {
-		return nil, err
-	}
-	url := fmt.Sprintf("https://%s.api.cognitive.microsoft.com/sts/v1.0/issueToken", k.ServiceRegion)
+func (s *SpeechServices) sendRequestToAzureForToken(subscriptionKey, serviceRegion, keyId string) (*plugnmeet.GenerateAzureTokenRes, error) {
+	url := fmt.Sprintf("https://%s.api.cognitive.microsoft.com/sts/v1.0/issueToken", serviceRegion)
 	r, err := http.NewRequest("POST", url, bytes.NewReader([]byte("{}")))
 	if err != nil {
 		return nil, err
 	}
-	r.Header.Set("Ocp-Apim-Subscription-Key", k.SubscriptionKey)
+	r.Header.Set("Ocp-Apim-Subscription-Key", subscriptionKey)
 	r.Header.Set("content-type", "application/json")
 	resp, err := http.DefaultClient.Do(r)
 	if err != nil {
@@ -295,8 +338,8 @@ func (s *SpeechServices) sendRequestToAzureForToken() (*plugnmeet.GenerateAzureT
 		Status:        true,
 		Msg:           "success",
 		Token:         &token,
-		ServiceRegion: &k.ServiceRegion,
-		KeyId:         &k.Id,
+		ServiceRegion: &serviceRegion,
+		KeyId:         &keyId,
 	}, nil
 }
 
@@ -305,7 +348,7 @@ func (s *SpeechServices) checkUserUsage(roomId, userId string) (string, error) {
 
 	ss, err := s.rc.HGet(s.ctx, key, userId).Result()
 	switch {
-	case err == redis.Nil:
+	case errors.Is(err, redis.Nil):
 		//
 	case err != nil:
 		return "", err
@@ -321,7 +364,7 @@ func (s *SpeechServices) azureKeyRequestedTask(roomId, userId string, task strin
 	case "check":
 		e, err := s.rc.Get(s.ctx, key).Result()
 		switch {
-		case err == redis.Nil:
+		case errors.Is(err, redis.Nil):
 			return "", nil
 		case err != nil:
 			return "", err
@@ -357,7 +400,7 @@ func (s *SpeechServices) selectAzureKey() (*config.AzureSubscriptionKey, error) 
 
 		conns, err := s.rc.Get(s.ctx, keyStatus).Result()
 		switch {
-		case err == redis.Nil:
+		case errors.Is(err, redis.Nil):
 			keys = append(keys, k)
 		case err != nil:
 			continue

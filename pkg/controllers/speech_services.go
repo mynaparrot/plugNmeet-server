@@ -75,3 +75,23 @@ func HandleSpeechServiceUserStatus(c *fiber.Ctx) error {
 
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
+
+func HandleRenewAzureToken(c *fiber.Ctx) error {
+	roomId := c.Locals("roomId")
+	requestedUserId := c.Locals("requestedUserId")
+
+	req := new(plugnmeet.AzureTokenRenewReq)
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+	req.RoomId = roomId.(string)
+
+	m := models.NewSpeechServices()
+	err = m.RenewAzureToken(req, requestedUserId.(string))
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	return utils.SendCommonProtobufResponse(c, true, "success")
+}
