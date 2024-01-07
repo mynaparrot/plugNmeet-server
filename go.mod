@@ -17,8 +17,8 @@ require (
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.9.3
 	github.com/livekit/server-sdk-go v1.1.4
-	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20231229141039-c4c86de508f5
-	github.com/redis/go-redis/v9 v9.3.1
+	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240107172620-68b434aa513f
+	github.com/redis/go-redis/v9 v9.4.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli/v2 v2.27.1
