@@ -9,6 +9,8 @@ github.com/antlr4-go/antlr/v4 v4.13.0 h1:lxCg3LAv+EUK6t1i0y1V6/SLeUi0eKEKdhQAlS8
 github.com/antlr4-go/antlr/v4 v4.13.0/go.mod h1:pfChB/xh/Unjila75QW7+VU4TSnWnnk9UTnmpPaOR2g=
 github.com/antoniodipinto/ikisocket v0.0.0-20231212084901-18facaeeee25 h1:YhkK0uOiwCHXwWfJDNCoYvDhltTnVErIBQ8lefdnEnI=
 github.com/antoniodipinto/ikisocket v0.0.0-20231212084901-18facaeeee25/go.mod h1:ML0EkTm0XmhStRHysIMLxkaZpcU+US1TrtmofyYmM5Y=
+github.com/antoniodipinto/ikisocket v0.0.0-20240113233230-e598eba0e310 h1:5KPQjVVi9MuOMo1sCo2hZezczBcdjk7JvcDy/aLAoMo=
+github.com/antoniodipinto/ikisocket v0.0.0-20240113233230-e598eba0e310/go.mod h1:ML0EkTm0XmhStRHysIMLxkaZpcU+US1TrtmofyYmM5Y=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/bep/debounce v1.2.1 h1:v67fRdBA9UQu2NhLFXrSg0Brw7CexQekrBwDMM8bzeY=
