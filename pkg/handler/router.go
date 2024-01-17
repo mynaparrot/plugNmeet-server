@@ -16,7 +16,7 @@ import (
 )
 
 func Router() *fiber.App {
-	// call recovery if panic happen
+	// call recovery if panic happens
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error(r)
@@ -83,7 +83,6 @@ func Router() *fiber.App {
 	ltiV1API.Post("/recording/download", controllers.HandleLTIV1GetRecordingDownloadToken)
 	ltiV1API.Post("/recording/delete", controllers.HandleLTIV1DeleteRecordings)
 
-	// auth group, will require API-KEY & API-SECRET as header value
 	auth := app.Group("/auth", controllers.HandleAuthHeaderCheck)
 	auth.Post("/getClientFiles", controllers.HandleGetClientFiles)
 
@@ -114,7 +113,7 @@ func Router() *fiber.App {
 	recorder := auth.Group("/recorder")
 	recorder.Post("/notify", controllers.HandleRecorderEvents)
 
-	// api group, will require sending token as Authorization header value
+	// api group will require sending token as Authorization header value
 	api := app.Group("/api", controllers.HandleVerifyHeaderToken)
 	api.Post("/verifyToken", controllers.HandleVerifyToken)
 	api.Post("/renewToken", controllers.HandleRenewToken)
