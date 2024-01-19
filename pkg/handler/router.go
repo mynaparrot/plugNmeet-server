@@ -117,11 +117,11 @@ func Router() *fiber.App {
 	bbb := app.Group("/:apiKey/bigbluebutton/api", controllers.HandleVerifyApiRequest)
 	bbb.Get("/create", controllers.HandleBBBCreate)
 	bbb.Get("/join", controllers.HandleBBBJoin)
-	/*bbb.Get("/isMeetingRunning")
-	bbb.Get("/getMeetingInfo")
-	bbb.Get("/getMeetings")
-	bbb.Get("/getRecordings")
-	bbb.Get("/deleteRecordings")*/
+	bbb.Get("/isMeetingRunning", controllers.HandleBBBIsMeetingRunning)
+	bbb.Get("/getMeetingInfo", controllers.HandleBBBGetMeetingInfo)
+	//bbb.Get("/getMeetings")
+	//bbb.Get("/getRecordings")
+	//bbb.Get("/deleteRecordings")
 
 	// api group will require sending token as Authorization header value
 	api := app.Group("/api", controllers.HandleVerifyHeaderToken)

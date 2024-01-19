@@ -2,11 +2,13 @@ package controllers
 
 import (
 	"crypto/subtle"
+	"encoding/xml"
 	"fmt"
 	"github.com/bufbuild/protovalidate-go"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/bbbapiwrapper"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"strings"
@@ -52,7 +54,7 @@ func HandleBBBCreate(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
 
-	pnmReq, err := bbbapiwrapper.ConvertCreateRequest(q)
+	pnmReq, err := bbbapiwrapper.ConvertCreateRequest(q, c.Queries())
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 	}
@@ -157,4 +159,51 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 
 	url := fmt.Sprintf("/?access_token=%s", token)
 	return c.Redirect(url)
+}
+
+func HandleBBBIsMeetingRunning(c *fiber.Ctx) error {
+	q := new(bbbapiwrapper.MeetingReq)
+	err := c.QueryParser(q)
+	if err != nil {
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
+	}
+
+	m := models.NewRoomAuthModel()
+	status, _, _ := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
+		RoomId: q.MeetingID,
+	})
+
+	return c.XML(bbbapiwrapper.IsMeetingRunningRes{
+		ReturnCode: "SUCCESS",
+		Running:    status,
+	})
+}
+
+func HandleBBBGetMeetingInfo(c *fiber.Ctx) error {
+	q := new(bbbapiwrapper.MeetingReq)
+	err := c.QueryParser(q)
+	if err != nil {
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
+	}
+
+	m := models.NewRoomAuthModel()
+	status, msg, res := m.GetActiveRoomInfo(&plugnmeet.GetActiveRoomInfoReq{
+		RoomId: q.MeetingID,
+	})
+
+	if !status {
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", msg))
+	}
+
+	d := bbbapiwrapper.ConvertActiveRoomInfoToBBBMeetingInfo(res)
+	marshal, err := xml.Marshal(d)
+	if err != nil {
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
+	}
+
+	dd := strings.Replace(string(marshal), "<MeetingInfo>", "", 1)
+	dd = strings.Replace(dd, "</MeetingInfo>", "", 1)
+
+	c.Set("Content-Type", "application/xml")
+	return c.SendString("<response><returncode>SUCCESS</returncode>" + dd + "</response>")
 }
