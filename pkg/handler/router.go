@@ -113,6 +113,16 @@ func Router() *fiber.App {
 	recorder := auth.Group("/recorder")
 	recorder.Post("/notify", controllers.HandleRecorderEvents)
 
+	// for convert BBB request to PlugNmeet
+	bbb := app.Group("/:apiKey/bigbluebutton/api", controllers.HandleVerifyApiRequest)
+	bbb.Get("/create", controllers.HandleBBBCreate)
+	bbb.Get("/join", controllers.HandleBBBJoin)
+	/*bbb.Get("/isMeetingRunning")
+	bbb.Get("/getMeetingInfo")
+	bbb.Get("/getMeetings")
+	bbb.Get("/getRecordings")
+	bbb.Get("/deleteRecordings")*/
+
 	// api group will require sending token as Authorization header value
 	api := app.Group("/api", controllers.HandleVerifyHeaderToken)
 	api.Post("/verifyToken", controllers.HandleVerifyToken)

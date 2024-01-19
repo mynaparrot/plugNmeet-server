@@ -447,7 +447,7 @@ func (r *RoomService) ManageActiveRoomsWithMetadata(roomId, task, metadata strin
 	case "get":
 		result, err := r.rc.HGet(r.ctx, ActiveRoomsWithMetadataKey, roomId).Result()
 		switch {
-		case err == redis.Nil:
+		case errors.Is(err, redis.Nil):
 			return nil, nil
 		case err != nil:
 			return nil, err
