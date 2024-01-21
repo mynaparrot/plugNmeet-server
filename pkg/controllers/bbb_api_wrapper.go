@@ -38,9 +38,20 @@ func HandleVerifyApiRequest(c *fiber.Ctx) error {
 	if len(s3) < 1 {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "checksumError", "Checksums do not match"))
 	}
-	ourSum := bbbapiwrapper.CalculateCheckSum(config.AppCnf.Client.Secret, method, s3[0])
 
-	if subtle.ConstantTimeCompare([]byte(s3[1]), []byte(ourSum)) != 1 {
+	var queries string
+	var checksum string
+	// if no other query
+	if len(s3) == 1 {
+		queries = ""
+		checksum = strings.Replace(s3[0], "checksum=", "", 1)
+	} else {
+		checksum = s3[1]
+		queries = s3[0]
+	}
+
+	ourSum := bbbapiwrapper.CalculateCheckSum(config.AppCnf.Client.Secret, method, queries)
+	if subtle.ConstantTimeCompare([]byte(checksum), []byte(ourSum)) != 1 {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "checksumError", "Checksums do not match"))
 	}
 
@@ -201,9 +212,30 @@ func HandleBBBGetMeetingInfo(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 	}
 
-	dd := strings.Replace(string(marshal), "<MeetingInfo>", "", 1)
-	dd = strings.Replace(dd, "</MeetingInfo>", "", 1)
+	dd := strings.Replace(string(marshal), "<meeting>", "", 1)
+	dd = strings.Replace(dd, "</meeting>", "", 1)
 
 	c.Set("Content-Type", "application/xml")
 	return c.SendString("<response><returncode>SUCCESS</returncode>" + dd + "</response>")
+}
+
+func HandleBBBGetMeetings(c *fiber.Ctx) error {
+	m := models.NewRoomAuthModel()
+	status, msg, rooms := m.GetActiveRoomsInfo()
+
+	if !status {
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", msg))
+	}
+
+	var meetings []*bbbapiwrapper.MeetingInfo
+	for _, r := range rooms {
+		d := bbbapiwrapper.ConvertActiveRoomInfoToBBBMeetingInfo(r)
+		meetings = append(meetings, d)
+	}
+
+	res := bbbapiwrapper.GetMeetingsRes{
+		ReturnCode: "SUCCESS",
+	}
+	res.MeetingsInfo.Meetings = meetings
+	return c.XML(res)
 }
