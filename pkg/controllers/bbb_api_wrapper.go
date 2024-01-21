@@ -34,7 +34,7 @@ func HandleVerifyApiRequest(c *fiber.Ctx) error {
 	s2 := strings.Split(s1[0], "/")
 	method := s2[len(s2)-1]
 
-	s3 := strings.Split(s1[1], "&checksum=")
+	s3 := strings.Split(s1[1], "checksum=")
 	if len(s3) < 1 {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "checksumError", "Checksums do not match"))
 	}
@@ -43,11 +43,10 @@ func HandleVerifyApiRequest(c *fiber.Ctx) error {
 	var checksum string
 	// if no other query
 	if len(s3) == 1 {
-		queries = ""
-		checksum = strings.Replace(s3[0], "checksum=", "", 1)
+		checksum = s3[0]
 	} else {
 		checksum = s3[1]
-		queries = s3[0]
+		queries = strings.TrimSuffix(s3[0], "&")
 	}
 
 	ourSum := bbbapiwrapper.CalculateCheckSum(config.AppCnf.Client.Secret, method, queries)
