@@ -120,6 +120,7 @@ func Router() *fiber.App {
 	bbb.Get("/isMeetingRunning", controllers.HandleBBBIsMeetingRunning)
 	bbb.Get("/getMeetingInfo", controllers.HandleBBBGetMeetingInfo)
 	bbb.Get("/getMeetings", controllers.HandleBBBGetMeetings)
+	bbb.Get("/end", controllers.HandleBBBEndMeetings)
 	//bbb.Get("/getRecordings")
 	//bbb.Get("/deleteRecordings")
 

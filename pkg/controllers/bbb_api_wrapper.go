@@ -239,3 +239,21 @@ func HandleBBBGetMeetings(c *fiber.Ctx) error {
 	res.MeetingsInfo.Meetings = meetings
 	return c.XML(res)
 }
+
+func HandleBBBEndMeetings(c *fiber.Ctx) error {
+	q := new(bbbapiwrapper.MeetingReq)
+	err := c.QueryParser(q)
+	if err != nil {
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
+	}
+
+	m := models.NewRoomAuthModel()
+	status, msg := m.EndRoom(&plugnmeet.RoomEndReq{
+		RoomId: q.MeetingID,
+	})
+
+	if !status {
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", msg))
+	}
+	return c.XML(bbbapiwrapper.CommonResponseMsg("SUCCESS", "sentEndMeetingRequest", "A request to end the meeting was sent.  Please wait a few seconds, and then use the getMeetingInfo or isMeetingRunning API calls to verify that it was ended"))
+}
