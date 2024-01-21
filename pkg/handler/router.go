@@ -121,7 +121,7 @@ func Router() *fiber.App {
 	bbb.Get("/getMeetingInfo", controllers.HandleBBBGetMeetingInfo)
 	bbb.Get("/getMeetings", controllers.HandleBBBGetMeetings)
 	bbb.Get("/end", controllers.HandleBBBEndMeetings)
-	//bbb.Get("/getRecordings")
+	bbb.Get("/getRecordings", controllers.HandleGetRecordings)
 	//bbb.Get("/deleteRecordings")
 
 	// api group will require sending token as Authorization header value

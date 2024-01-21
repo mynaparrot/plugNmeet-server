@@ -202,7 +202,7 @@ func HandleBBBGetMeetingInfo(c *fiber.Ctx) error {
 	})
 
 	if !status {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", msg))
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "notFound", msg))
 	}
 
 	d := bbbapiwrapper.ConvertActiveRoomInfoToBBBMeetingInfo(res)
@@ -223,7 +223,7 @@ func HandleBBBGetMeetings(c *fiber.Ctx) error {
 	status, msg, rooms := m.GetActiveRoomsInfo()
 
 	if !status {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", msg))
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "noMeetings", msg))
 	}
 
 	var meetings []*bbbapiwrapper.MeetingInfo
@@ -255,4 +255,27 @@ func HandleBBBEndMeetings(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", msg))
 	}
 	return c.XML(bbbapiwrapper.CommonResponseMsg("SUCCESS", "sentEndMeetingRequest", "A request to end the meeting was sent.  Please wait a few seconds, and then use the getMeetingInfo or isMeetingRunning API calls to verify that it was ended"))
+}
+
+func HandleGetRecordings(c *fiber.Ctx) error {
+	q := new(bbbapiwrapper.GetRecordingsReq)
+	err := c.QueryParser(q)
+	if err != nil {
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
+	}
+
+	m := models.NewBBBApiWrapperModel()
+	recordings, err := m.GetRecordings(q)
+	if err != nil {
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
+	}
+
+	if len(recordings) == 0 {
+		return c.XML(bbbapiwrapper.CommonResponseMsg("SUCCESS", "noRecordings", "There are no recordings for the meeting(s)."))
+	}
+	res := bbbapiwrapper.GetRecordingsRes{
+		ReturnCode: "SUCCESS",
+	}
+	res.RecordingsInfo.Recordings = recordings
+	return c.XML(res)
 }
