@@ -257,7 +257,7 @@ func HandleBBBEndMeetings(c *fiber.Ctx) error {
 	return c.XML(bbbapiwrapper.CommonResponseMsg("SUCCESS", "sentEndMeetingRequest", "A request to end the meeting was sent.  Please wait a few seconds, and then use the getMeetingInfo or isMeetingRunning API calls to verify that it was ended"))
 }
 
-func HandleGetRecordings(c *fiber.Ctx) error {
+func HandleBBBGetRecordings(c *fiber.Ctx) error {
 	q := new(bbbapiwrapper.GetRecordingsReq)
 	err := c.QueryParser(q)
 	if err != nil {
@@ -280,4 +280,42 @@ func HandleGetRecordings(c *fiber.Ctx) error {
 	}
 	res.RecordingsInfo.Recordings = recordings
 	return c.XML(res)
+}
+
+func HandleBBBDeleteRecordings(c *fiber.Ctx) error {
+	q := new(bbbapiwrapper.DeleteRecordingsReq)
+	err := c.QueryParser(q)
+	if err != nil {
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
+	}
+
+	m := models.NewRecordingAuth()
+	err = m.DeleteRecording(&plugnmeet.DeleteRecordingReq{
+		RecordId: q.RecordID,
+	})
+
+	if err != nil {
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
+	}
+
+	return c.XML(bbbapiwrapper.DeleteRecordingsRes{
+		ReturnCode: "SUCCESS",
+		Deleted:    true,
+	})
+}
+
+// HandleBBBPublishRecordings TO-DO: in the future
+func HandleBBBPublishRecordings(c *fiber.Ctx) error {
+	return c.XML(bbbapiwrapper.PublishRecordingsRes{
+		ReturnCode: "SUCCESS",
+		Published:  true,
+	})
+}
+
+// HandleBBBUpdateRecordings TO-DO: in the future
+func HandleBBBUpdateRecordings(c *fiber.Ctx) error {
+	return c.XML(bbbapiwrapper.UpdateRecordingsRes{
+		ReturnCode: "SUCCESS",
+		Updated:    true,
+	})
 }
