@@ -6,41 +6,48 @@ import (
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/bbbapiwrapper"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	log "github.com/sirupsen/logrus"
 	"strings"
 	"time"
 )
 
 type BBBApiWrapperModel struct {
-	app         *config.AppConfig
-	db          *sql.DB
-	roomService *RoomService
-	ctx         context.Context
+	app           *config.AppConfig
+	db            *sql.DB
+	roomService   *RoomService
+	ctx           context.Context
+	recordingAuth *AuthRecording
 }
 
 func NewBBBApiWrapperModel() *BBBApiWrapperModel {
 	return &BBBApiWrapperModel{
-		app:         config.AppCnf,
-		db:          config.AppCnf.DB,
-		roomService: NewRoomService(),
-		ctx:         context.Background(),
+		app:           config.AppCnf,
+		db:            config.AppCnf.DB,
+		roomService:   NewRoomService(),
+		ctx:           context.Background(),
+		recordingAuth: NewRecordingAuth(),
 	}
 }
 
-func (m *BBBApiWrapperModel) GetRecordings(r *bbbapiwrapper.GetRecordingsReq) ([]*bbbapiwrapper.RecordingInfo, error) {
+func (m *BBBApiWrapperModel) GetRecordings(host string, r *bbbapiwrapper.GetRecordingsReq) ([]*bbbapiwrapper.RecordingInfo, *bbbapiwrapper.Pagination, error) {
 	db := m.db
 	ctx, cancel := context.WithTimeout(m.ctx, 3*time.Second)
 	defer cancel()
 
-	var query string
+	var query []string
 	var args []interface{}
 	if r.Limit == 0 {
-		r.Limit = 20
+		// let's make it 50 for BBB as not all plugin still support pagination
+		r.Limit = 50
 	}
+
+	query = append(query, "SELECT a.record_id, a.room_id, a.room_sid, a.file_path, a.size, a.published, b.room_title, b.joined_participants, b.created, b.ended")
 
 	if r.MeetingID != "" {
 		mIds := strings.Split(r.MeetingID, ",")
-		query = "SELECT a.record_id, a.room_id, a.room_sid, a.file_path, a.size, a.published, b.room_title, b.joined_participants, b.created, b.ended FROM " + m.app.FormatDBTable("recordings") + " AS a LEFT JOIN " + m.app.FormatDBTable("room_info") + " AS b ON a.room_sid = b.sid WHERE room_id IN (?" + strings.Repeat(",?", len(mIds)-1) + ") ORDER BY a.id DESC LIMIT ?,?"
+		q := "FROM " + m.app.FormatDBTable("recordings") + " AS a LEFT JOIN " + m.app.FormatDBTable("room_info") + " AS b ON a.room_sid = b.sid WHERE room_id IN (?" + strings.Repeat(",?", len(mIds)-1) + ")"
 
+		query = append(query, q, "ORDER BY a.id DESC LIMIT ?,?")
 		for _, rd := range mIds {
 			args = append(args, rd)
 		}
@@ -49,8 +56,9 @@ func (m *BBBApiWrapperModel) GetRecordings(r *bbbapiwrapper.GetRecordingsReq) ([
 
 	} else if r.RecordID != "" {
 		rIds := strings.Split(r.RecordID, ",")
-		query = "SELECT a.record_id, a.room_id, a.room_sid, a.file_path, a.size, a.published, b.room_title, b.joined_participants, b.created, b.ended FROM " + m.app.FormatDBTable("recordings") + " AS a LEFT JOIN " + m.app.FormatDBTable("room_info") + " AS b ON a.room_sid = b.sid WHERE room_id IN (?" + strings.Repeat(",?", len(rIds)-1) + ") ORDER BY a.id DESC LIMIT ?,?"
+		q := "FROM " + m.app.FormatDBTable("recordings") + " AS a LEFT JOIN " + m.app.FormatDBTable("room_info") + " AS b ON a.room_sid = b.sid WHERE room_id IN (?" + strings.Repeat(",?", len(rIds)-1) + ")"
 
+		query = append(query, q, "ORDER BY a.id DESC LIMIT ?,?")
 		for _, rd := range rIds {
 			args = append(args, rd)
 		}
@@ -58,14 +66,16 @@ func (m *BBBApiWrapperModel) GetRecordings(r *bbbapiwrapper.GetRecordingsReq) ([
 		args = append(args, r.Limit)
 
 	} else {
-		query = "SELECT a.record_id, a.room_id, a.room_sid, a.file_path, a.size, a.published, b.room_title, b.joined_participants, b.created, b.ended FROM " + m.app.FormatDBTable("recordings") + " AS a LEFT JOIN " + m.app.FormatDBTable("room_info") + " AS b ON a.room_sid = b.sid ORDER BY a.id DESC LIMIT ?,?"
+		q := "FROM " + m.app.FormatDBTable("recordings") + " AS a LEFT JOIN " + m.app.FormatDBTable("room_info") + " AS b ON a.room_sid = b.sid"
+
+		query = append(query, q, "ORDER BY a.id DESC LIMIT ?,?")
 		args = append(args, r.Offset)
 		args = append(args, r.Limit)
 	}
 
-	rows, err := db.QueryContext(ctx, query, args...)
+	rows, err := db.QueryContext(ctx, strings.Join(query, " "), args...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer rows.Close()
 
@@ -79,12 +89,23 @@ func (m *BBBApiWrapperModel) GetRecordings(r *bbbapiwrapper.GetRecordingsReq) ([
 
 		err = rows.Scan(&recording.RecordID, &recording.MeetingID, &rSid, &path, &size, &recording.Published, &recording.Name, &participants, &created, &ended)
 		if err != nil {
-			fmt.Println(err)
+			log.Errorln(err)
 			continue
 		}
 		recording.InternalMeetingID = rSid.String
-		// for path let's create a download link directly
-		//for path
+
+		// for path, let's create a download link directly
+		url, err := m.createPlayBackURL(host, path)
+		if err != nil {
+			log.Errorln(err)
+			continue
+		}
+		recording.Playback.PlayBackFormat = []bbbapiwrapper.PlayBackFormat{
+			{
+				Type: "presentation",
+				URL:  url,
+			},
+		}
 
 		if date, err := time.Parse("2006-01-02 15:04:05", created); err == nil {
 			recording.StartTime = date.UnixMilli()
@@ -106,5 +127,36 @@ func (m *BBBApiWrapperModel) GetRecordings(r *bbbapiwrapper.GetRecordingsReq) ([
 		recordings = append(recordings, &recording)
 	}
 
-	return recordings, nil
+	// get total recordings
+	aa := args[:len(args)-2]
+	qq := fmt.Sprintf("SELECT COUNT(*) AS total %s", query[1])
+	row := db.QueryRowContext(ctx, qq, aa...)
+	var total uint64
+	err = row.Scan(&total)
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	pagination := &bbbapiwrapper.Pagination{
+		Pageable: &bbbapiwrapper.PaginationPageable{
+			Offset: r.Offset,
+			Limit:  r.Limit,
+		},
+		TotalElements: total,
+	}
+	if total == 0 {
+		pagination.Empty = true
+	}
+
+	return recordings, pagination, nil
+}
+
+func (m *BBBApiWrapperModel) createPlayBackURL(host, path string) (string, error) {
+	token, err := m.recordingAuth.CreateTokenForDownload(path)
+	if err != nil {
+		return "", err
+	}
+
+	url := fmt.Sprintf("%s/download/recording/%s", host, token)
+	return url, nil
 }

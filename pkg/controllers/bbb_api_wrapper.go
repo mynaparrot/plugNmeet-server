@@ -264,8 +264,9 @@ func HandleGetRecordings(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
 
+	host := fmt.Sprintf("%s://%s", c.Protocol(), c.Hostname())
 	m := models.NewBBBApiWrapperModel()
-	recordings, err := m.GetRecordings(q)
+	recordings, pagination, err := m.GetRecordings(host, q)
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 	}
@@ -275,6 +276,7 @@ func HandleGetRecordings(c *fiber.Ctx) error {
 	}
 	res := bbbapiwrapper.GetRecordingsRes{
 		ReturnCode: "SUCCESS",
+		Pagination: pagination,
 	}
 	res.RecordingsInfo.Recordings = recordings
 	return c.XML(res)
