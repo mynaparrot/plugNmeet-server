@@ -43,24 +43,24 @@ func (m *BBBApiWrapperModel) GetRecordings(host string, r *bbbapiwrapper.GetReco
 
 	query = append(query, "SELECT a.record_id, a.room_id, a.room_sid, a.file_path, a.size, a.published, b.room_title, b.joined_participants, b.created, b.ended")
 
-	if r.MeetingID != "" {
-		mIds := strings.Split(r.MeetingID, ",")
-		q := "FROM " + m.app.FormatDBTable("recordings") + " AS a LEFT JOIN " + m.app.FormatDBTable("room_info") + " AS b ON a.room_sid = b.sid WHERE room_id IN (?" + strings.Repeat(",?", len(mIds)-1) + ")"
-
-		query = append(query, q, "ORDER BY a.id DESC LIMIT ?,?")
-		for _, rd := range mIds {
-			args = append(args, bbbapiwrapper.CheckMeetingIdToMatchFormat(rd))
-		}
-		args = append(args, r.Offset)
-		args = append(args, r.Limit)
-
-	} else if r.RecordID != "" {
+	if r.RecordID != "" {
 		rIds := strings.Split(r.RecordID, ",")
 		q := "FROM " + m.app.FormatDBTable("recordings") + " AS a LEFT JOIN " + m.app.FormatDBTable("room_info") + " AS b ON a.room_sid = b.sid WHERE room_id IN (?" + strings.Repeat(",?", len(rIds)-1) + ")"
 
 		query = append(query, q, "ORDER BY a.id DESC LIMIT ?,?")
 		for _, rd := range rIds {
 			args = append(args, rd)
+		}
+		args = append(args, r.Offset)
+		args = append(args, r.Limit)
+
+	} else if r.MeetingID != "" {
+		mIds := strings.Split(r.MeetingID, ",")
+		q := "FROM " + m.app.FormatDBTable("recordings") + " AS a LEFT JOIN " + m.app.FormatDBTable("room_info") + " AS b ON a.room_sid = b.sid WHERE room_id IN (?" + strings.Repeat(",?", len(mIds)-1) + ")"
+
+		query = append(query, q, "ORDER BY a.id DESC LIMIT ?,?")
+		for _, rd := range mIds {
+			args = append(args, bbbapiwrapper.CheckMeetingIdToMatchFormat(rd))
 		}
 		args = append(args, r.Offset)
 		args = append(args, r.Limit)
