@@ -22,7 +22,7 @@ func HandleVerifyApiRequest(c *fiber.Ctx) error {
 	}
 
 	q := c.Queries()
-	if q == nil || len(q) == 0 {
+	if (q == nil || len(q) == 0) || (strings.HasSuffix(c.Path(), "/api") || strings.HasSuffix(c.Path(), "/api/")) {
 		return c.XML(bbbapiwrapper.CommonApiVersion{
 			ReturnCode: "SUCCESS",
 			Version:    0.9,
