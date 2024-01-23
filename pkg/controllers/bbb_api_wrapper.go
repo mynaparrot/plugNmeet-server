@@ -28,6 +28,7 @@ func HandleVerifyApiRequest(c *fiber.Ctx) error {
 			Version:    0.9,
 		})
 	}
+	fmt.Println(c.OriginalURL())
 
 	s1 := strings.Split(c.OriginalURL(), "?")
 	// we'll get method
@@ -220,10 +221,10 @@ func HandleBBBGetMeetingInfo(c *fiber.Ctx) error {
 
 func HandleBBBGetMeetings(c *fiber.Ctx) error {
 	m := models.NewRoomAuthModel()
-	status, msg, rooms := m.GetActiveRoomsInfo()
+	_, _, rooms := m.GetActiveRoomsInfo()
 
-	if !status {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "noMeetings", msg))
+	if rooms == nil {
+		return c.XML(bbbapiwrapper.CommonResponseMsg("SUCCESS", "noMeetings", "no meetings were found on this server"))
 	}
 
 	var meetings []*bbbapiwrapper.MeetingInfo
