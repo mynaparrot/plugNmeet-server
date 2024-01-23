@@ -198,7 +198,7 @@ func HandleBBBGetMeetingInfo(c *fiber.Ctx) error {
 
 	m := models.NewRoomAuthModel()
 	status, msg, res := m.GetActiveRoomInfo(&plugnmeet.GetActiveRoomInfoReq{
-		RoomId: q.MeetingID,
+		RoomId: bbbapiwrapper.CheckMeetingIdToMatchFormat(q.MeetingID),
 	})
 
 	if !status {
@@ -248,7 +248,7 @@ func HandleBBBEndMeetings(c *fiber.Ctx) error {
 
 	m := models.NewRoomAuthModel()
 	status, msg := m.EndRoom(&plugnmeet.RoomEndReq{
-		RoomId: q.MeetingID,
+		RoomId: bbbapiwrapper.CheckMeetingIdToMatchFormat(q.MeetingID),
 	})
 
 	if !status {

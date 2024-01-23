@@ -49,7 +49,7 @@ func (m *BBBApiWrapperModel) GetRecordings(host string, r *bbbapiwrapper.GetReco
 
 		query = append(query, q, "ORDER BY a.id DESC LIMIT ?,?")
 		for _, rd := range mIds {
-			args = append(args, rd)
+			args = append(args, bbbapiwrapper.CheckMeetingIdToMatchFormat(rd))
 		}
 		args = append(args, r.Offset)
 		args = append(args, r.Limit)
