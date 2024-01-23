@@ -36,6 +36,7 @@ func (m *BBBApiWrapperModel) GetRecordings(host string, r *bbbapiwrapper.GetReco
 
 	var query []string
 	var args []interface{}
+	oriIds := make(map[string]string)
 	if r.Limit == 0 {
 		// let's make it 50 for BBB as not all plugin still support pagination
 		r.Limit = 50
@@ -43,24 +44,26 @@ func (m *BBBApiWrapperModel) GetRecordings(host string, r *bbbapiwrapper.GetReco
 
 	query = append(query, "SELECT a.record_id, a.room_id, a.room_sid, a.file_path, a.size, a.published, b.room_title, b.joined_participants, b.created, b.ended")
 
-	if r.MeetingID != "" {
-		mIds := strings.Split(r.MeetingID, ",")
-		q := "FROM " + m.app.FormatDBTable("recordings") + " AS a LEFT JOIN " + m.app.FormatDBTable("room_info") + " AS b ON a.room_sid = b.sid WHERE room_id IN (?" + strings.Repeat(",?", len(mIds)-1) + ")"
+	if r.RecordID != "" {
+		rIds := strings.Split(r.RecordID, ",")
+		q := "FROM " + m.app.FormatDBTable("recordings") + " AS a LEFT JOIN " + m.app.FormatDBTable("room_info") + " AS b ON a.room_sid = b.sid WHERE record_id IN (?" + strings.Repeat(",?", len(rIds)-1) + ")"
 
 		query = append(query, q, "ORDER BY a.id DESC LIMIT ?,?")
-		for _, rd := range mIds {
+		for _, rd := range rIds {
 			args = append(args, rd)
 		}
 		args = append(args, r.Offset)
 		args = append(args, r.Limit)
 
-	} else if r.RecordID != "" {
-		rIds := strings.Split(r.RecordID, ",")
-		q := "FROM " + m.app.FormatDBTable("recordings") + " AS a LEFT JOIN " + m.app.FormatDBTable("room_info") + " AS b ON a.room_sid = b.sid WHERE room_id IN (?" + strings.Repeat(",?", len(rIds)-1) + ")"
+	} else if r.MeetingID != "" {
+		mIds := strings.Split(r.MeetingID, ",")
+		q := "FROM " + m.app.FormatDBTable("recordings") + " AS a LEFT JOIN " + m.app.FormatDBTable("room_info") + " AS b ON a.room_sid = b.sid WHERE room_id IN (?" + strings.Repeat(",?", len(mIds)-1) + ")"
 
 		query = append(query, q, "ORDER BY a.id DESC LIMIT ?,?")
-		for _, rd := range rIds {
-			args = append(args, rd)
+		for _, rd := range mIds {
+			fId := bbbapiwrapper.CheckMeetingIdToMatchFormat(rd)
+			oriIds[fId] = rd
+			args = append(args, fId)
 		}
 		args = append(args, r.Offset)
 		args = append(args, r.Limit)
@@ -83,14 +86,20 @@ func (m *BBBApiWrapperModel) GetRecordings(host string, r *bbbapiwrapper.GetReco
 	for rows.Next() {
 		var recording bbbapiwrapper.RecordingInfo
 		var rSid sql.NullString
-		var path, created, ended string
+		var meetingId, path, created, ended string
 		var size float64
 		var participants int64
 
-		err = rows.Scan(&recording.RecordID, &recording.MeetingID, &rSid, &path, &size, &recording.Published, &recording.Name, &participants, &created, &ended)
+		err = rows.Scan(&recording.RecordID, &meetingId, &rSid, &path, &size, &recording.Published, &recording.Name, &participants, &created, &ended)
 		if err != nil {
 			log.Errorln(err)
 			continue
+		}
+
+		if oriIds[meetingId] != "" {
+			recording.MeetingID = oriIds[meetingId]
+		} else {
+			recording.MeetingID = meetingId
 		}
 		recording.InternalMeetingID = rSid.String
 

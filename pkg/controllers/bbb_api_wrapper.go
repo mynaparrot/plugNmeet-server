@@ -198,7 +198,7 @@ func HandleBBBGetMeetingInfo(c *fiber.Ctx) error {
 
 	m := models.NewRoomAuthModel()
 	status, msg, res := m.GetActiveRoomInfo(&plugnmeet.GetActiveRoomInfoReq{
-		RoomId: q.MeetingID,
+		RoomId: bbbapiwrapper.CheckMeetingIdToMatchFormat(q.MeetingID),
 	})
 
 	if !status {
@@ -220,10 +220,10 @@ func HandleBBBGetMeetingInfo(c *fiber.Ctx) error {
 
 func HandleBBBGetMeetings(c *fiber.Ctx) error {
 	m := models.NewRoomAuthModel()
-	status, msg, rooms := m.GetActiveRoomsInfo()
+	_, _, rooms := m.GetActiveRoomsInfo()
 
-	if !status {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "noMeetings", msg))
+	if rooms == nil {
+		return c.XML(bbbapiwrapper.CommonResponseMsg("SUCCESS", "noMeetings", "no meetings were found on this server"))
 	}
 
 	var meetings []*bbbapiwrapper.MeetingInfo
@@ -248,7 +248,7 @@ func HandleBBBEndMeetings(c *fiber.Ctx) error {
 
 	m := models.NewRoomAuthModel()
 	status, msg := m.EndRoom(&plugnmeet.RoomEndReq{
-		RoomId: q.MeetingID,
+		RoomId: bbbapiwrapper.CheckMeetingIdToMatchFormat(q.MeetingID),
 	})
 
 	if !status {
