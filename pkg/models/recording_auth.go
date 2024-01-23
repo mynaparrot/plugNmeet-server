@@ -244,6 +244,10 @@ func (a *AuthRecording) GetDownloadToken(r *plugnmeet.GetDownloadTokenReq) (stri
 		return "", err
 	}
 
+	return a.CreateTokenForDownload(recording.FilePath)
+}
+
+func (a *AuthRecording) CreateTokenForDownload(path string) (string, error) {
 	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.HS256, Key: []byte(a.app.Client.Secret)}, (&jose.SignerOptions{}).WithType("JWT"))
 
 	if err != nil {
@@ -255,7 +259,7 @@ func (a *AuthRecording) GetDownloadToken(r *plugnmeet.GetDownloadTokenReq) (stri
 		NotBefore: jwt.NewNumericDate(time.Now().UTC()),
 		Expiry:    jwt.NewNumericDate(time.Now().UTC().Add(a.app.RecorderInfo.TokenValidity)),
 		// format: sub_path/roomSid/filename
-		Subject: recording.FilePath,
+		Subject: path,
 	}
 
 	return jwt.Signed(sig).Claims(cl).CompactSerialize()
