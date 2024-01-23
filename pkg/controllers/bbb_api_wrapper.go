@@ -28,7 +28,6 @@ func HandleVerifyApiRequest(c *fiber.Ctx) error {
 			Version:    0.9,
 		})
 	}
-	fmt.Println(c.OriginalURL())
 
 	s1 := strings.Split(c.OriginalURL(), "?")
 	// we'll get method
