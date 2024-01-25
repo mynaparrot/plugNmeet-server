@@ -46,7 +46,7 @@ func (m *BBBApiWrapperModel) GetRecordings(host string, r *bbbapiwrapper.GetReco
 
 	if r.RecordID != "" {
 		rIds := strings.Split(r.RecordID, ",")
-		q := "FROM " + m.app.FormatDBTable("recordings") + " AS a LEFT JOIN " + m.app.FormatDBTable("room_info") + " AS b ON a.room_sid = b.sid WHERE record_id IN (?" + strings.Repeat(",?", len(rIds)-1) + ")"
+		q := "FROM " + m.app.FormatDBTable("recordings") + " AS a LEFT JOIN " + m.app.FormatDBTable("room_info") + " AS b ON a.room_sid = b.sid WHERE a.record_id IN (?" + strings.Repeat(",?", len(rIds)-1) + ")"
 
 		query = append(query, q, "ORDER BY a.id DESC LIMIT ?,?")
 		for _, rd := range rIds {
@@ -57,7 +57,7 @@ func (m *BBBApiWrapperModel) GetRecordings(host string, r *bbbapiwrapper.GetReco
 
 	} else if r.MeetingID != "" {
 		mIds := strings.Split(r.MeetingID, ",")
-		q := "FROM " + m.app.FormatDBTable("recordings") + " AS a LEFT JOIN " + m.app.FormatDBTable("room_info") + " AS b ON a.room_sid = b.sid WHERE room_id IN (?" + strings.Repeat(",?", len(mIds)-1) + ")"
+		q := "FROM " + m.app.FormatDBTable("recordings") + " AS a LEFT JOIN " + m.app.FormatDBTable("room_info") + " AS b ON a.room_sid = b.sid WHERE a.room_id IN (?" + strings.Repeat(",?", len(mIds)-1) + ")"
 
 		query = append(query, q, "ORDER BY a.id DESC LIMIT ?,?")
 		for _, rd := range mIds {
