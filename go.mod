@@ -13,11 +13,11 @@ require (
 	github.com/gofiber/contrib/websocket v1.3.0
 	github.com/gofiber/fiber/v2 v2.52.0
 	github.com/gofiber/template/html/v2 v2.1.0
-	github.com/google/uuid v1.5.0
+	github.com/google/uuid v1.6.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.9.4
 	github.com/livekit/server-sdk-go v1.1.6
-	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240125123518-5b2dde40fa0c
+	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240125144752-8aba23d35871
 	github.com/redis/go-redis/v9 v9.4.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
