@@ -167,8 +167,19 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 	}
 
-	url := fmt.Sprintf("/?access_token=%s", token)
-	return c.Redirect(url)
+	if strings.ToLower(q.Redirect) == "true" {
+		return c.Redirect(fmt.Sprintf("/?access_token=%s", token))
+	}
+
+	host := fmt.Sprintf("%s://%s", c.Protocol(), c.Hostname())
+	return c.XML(bbbapiwrapper.JoinMeetingRes{
+		ReturnCode:   "SUCCESS",
+		MessageKey:   "success",
+		Message:      "You have joined successfully",
+		MeetingID:    q.MeetingID,
+		SessionToken: token,
+		Url:          fmt.Sprintf("%s/?access_token=%s", host, token),
+	})
 }
 
 func HandleBBBIsMeetingRunning(c *fiber.Ctx) error {

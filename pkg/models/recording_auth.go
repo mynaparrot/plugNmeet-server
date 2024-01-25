@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/go-jose/go-jose/v3"
 	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/gofiber/fiber/v2"
+	"github.com/mynaparrot/plugnmeet-protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"os"
@@ -247,22 +247,10 @@ func (a *AuthRecording) GetDownloadToken(r *plugnmeet.GetDownloadTokenReq) (stri
 	return a.CreateTokenForDownload(recording.FilePath)
 }
 
+// CreateTokenForDownload will generate token
+// path format: sub_path/roomSid/filename
 func (a *AuthRecording) CreateTokenForDownload(path string) (string, error) {
-	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.HS256, Key: []byte(a.app.Client.Secret)}, (&jose.SignerOptions{}).WithType("JWT"))
-
-	if err != nil {
-		return "", err
-	}
-
-	cl := jwt.Claims{
-		Issuer:    a.app.Client.ApiKey,
-		NotBefore: jwt.NewNumericDate(time.Now().UTC()),
-		Expiry:    jwt.NewNumericDate(time.Now().UTC().Add(a.app.RecorderInfo.TokenValidity)),
-		// format: sub_path/roomSid/filename
-		Subject: path,
-	}
-
-	return jwt.Signed(sig).Claims(cl).CompactSerialize()
+	return auth.GenerateTokenForDownloadRecording(path, a.app.Client.ApiKey, a.app.Client.Secret, a.app.RecorderInfo.TokenValidity)
 }
 
 // VerifyRecordingToken verify token & provide file path
