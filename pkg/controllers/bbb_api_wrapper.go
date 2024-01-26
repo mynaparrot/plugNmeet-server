@@ -147,8 +147,6 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
 
-	fmt.Println(c.OriginalURL())
-
 	roomId := bbbapiwrapper.CheckMeetingIdToMatchFormat(q.MeetingID)
 	rs := models.NewRoomService()
 	metadata, err := rs.ManageActiveRoomsWithMetadata(roomId, "get", "")
