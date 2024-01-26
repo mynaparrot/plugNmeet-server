@@ -116,16 +116,16 @@ func Router() *fiber.App {
 	// for convert BBB request to PlugNmeet
 	bbb := app.Group("/:apiKey/bigbluebutton/api", controllers.HandleVerifyApiRequest)
 	bbb.All("/create", controllers.HandleBBBCreate)
-	bbb.Get("/join", controllers.HandleBBBJoin)
-	bbb.Get("/isMeetingRunning", controllers.HandleBBBIsMeetingRunning)
-	bbb.Get("/getMeetingInfo", controllers.HandleBBBGetMeetingInfo)
-	bbb.Get("/getMeetings", controllers.HandleBBBGetMeetings)
-	bbb.Get("/end", controllers.HandleBBBEndMeetings)
-	bbb.Get("/getRecordings", controllers.HandleBBBGetRecordings)
-	bbb.Get("/deleteRecordings", controllers.HandleBBBDeleteRecordings)
+	bbb.All("/join", controllers.HandleBBBJoin)
+	bbb.All("/isMeetingRunning", controllers.HandleBBBIsMeetingRunning)
+	bbb.All("/getMeetingInfo", controllers.HandleBBBGetMeetingInfo)
+	bbb.All("/getMeetings", controllers.HandleBBBGetMeetings)
+	bbb.All("/end", controllers.HandleBBBEndMeetings)
+	bbb.All("/getRecordings", controllers.HandleBBBGetRecordings)
+	bbb.All("/deleteRecordings", controllers.HandleBBBDeleteRecordings)
 	// TO-DO: in the future
-	bbb.Get("/updateRecordings", controllers.HandleBBBUpdateRecordings)
-	bbb.Get("/publishRecordings", controllers.HandleBBBPublishRecordings)
+	bbb.All("/updateRecordings", controllers.HandleBBBUpdateRecordings)
+	bbb.All("/publishRecordings", controllers.HandleBBBPublishRecordings)
 
 	// api group will require sending token as Authorization header value
 	api := app.Group("/api", controllers.HandleVerifyHeaderToken)
