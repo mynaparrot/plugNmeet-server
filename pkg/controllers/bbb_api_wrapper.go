@@ -147,6 +147,8 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
 
+	fmt.Println(c.OriginalURL())
+
 	roomId := bbbapiwrapper.CheckMeetingIdToMatchFormat(q.MeetingID)
 	rs := models.NewRoomService()
 	metadata, err := rs.ManageActiveRoomsWithMetadata(roomId, "get", "")
@@ -173,7 +175,7 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 		}
 
-		if roomMetadata.ExtraData == nil {
+		if roomMetadata.ExtraData == nil || *roomMetadata.ExtraData == "" {
 			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", "did not found extra data"))
 		}
 
