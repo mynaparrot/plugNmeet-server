@@ -123,12 +123,15 @@ func HandleBBBCreate(c *fiber.Ctx) error {
 		ReturnCode:        "SUCCESS",
 		MessageKey:        "success",
 		Message:           msg,
-		MeetingID:         room.Name,
+		MeetingID:         q.MeetingID,
 		InternalMeetingID: room.Sid,
+		ParentMeetingID:   "bbb-none",
 		AttendeePW:        q.AttendeePW,
 		ModeratorPW:       q.ModeratorPW,
 		CreateTime:        room.GetCreationTime() * 1000,
 		CreateDate:        time.Unix(room.GetCreationTime(), 0).Format(time.RFC1123),
+		VoiceBridge:       q.VoiceBridge,
+		DialNumber:        q.DialNumber,
 	})
 }
 
