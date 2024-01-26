@@ -21,20 +21,49 @@ func HandleVerifyApiRequest(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "apiKeyError", "invalid api key"))
 	}
 
-	q := c.Queries()
-	if (q == nil || len(q) == 0) || (strings.HasSuffix(c.Path(), "/api") || strings.HasSuffix(c.Path(), "/api/")) {
+	hasParams := false
+	var data, method, rType string
+	if c.Method() == "GET" {
+		if len(c.Queries()) > 0 {
+			rType = "get"
+			hasParams = true
+		}
+	} else if c.Method() == "POST" {
+		if c.Get("Content-Type") == "application/x-www-form-urlencoded" {
+			if len(c.Body()) > 0 {
+				hasParams = true
+				rType = "post"
+			}
+		} else {
+			// probably xml for Pre-upload Slides
+			if len(c.Queries()) > 0 {
+				hasParams = true
+				rType = "get"
+			}
+		}
+	} else {
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", "unsupported http method"))
+	}
+
+	if !hasParams || (strings.HasSuffix(c.Path(), "/api") || strings.HasSuffix(c.Path(), "/api/")) {
 		return c.XML(bbbapiwrapper.CommonApiVersion{
 			ReturnCode: "SUCCESS",
 			Version:    0.9,
 		})
 	}
 
-	s1 := strings.Split(c.OriginalURL(), "?")
-	// we'll get method
-	s2 := strings.Split(s1[0], "/")
-	method := s2[len(s2)-1]
+	if rType == "post" {
+		s2 := strings.Split(c.Path(), "/")
+		method = s2[len(s2)-1]
+		data = string(c.Body())
+	} else {
+		s1 := strings.Split(c.OriginalURL(), "?")
+		s2 := strings.Split(c.Path(), "/")
+		method = s2[len(s2)-1]
+		data = s1[1]
+	}
 
-	s3 := strings.Split(s1[1], "checksum=")
+	s3 := strings.Split(data, "checksum=")
 	if len(s3) < 1 {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "checksumError", "Checksums do not match"))
 	}
@@ -59,7 +88,12 @@ func HandleVerifyApiRequest(c *fiber.Ctx) error {
 
 func HandleBBBCreate(c *fiber.Ctx) error {
 	q := new(bbbapiwrapper.CreateMeetingReq)
-	err := c.QueryParser(q)
+	var err error = nil
+	if c.Method() == "POST" && c.Get("Content-Type") == "application/x-www-form-urlencoded" {
+		err = c.BodyParser(q)
+	} else {
+		err = c.QueryParser(q)
+	}
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
@@ -100,7 +134,12 @@ func HandleBBBCreate(c *fiber.Ctx) error {
 
 func HandleBBBJoin(c *fiber.Ctx) error {
 	q := new(bbbapiwrapper.JoinMeetingReq)
-	err := c.QueryParser(q)
+	var err error = nil
+	if c.Method() == "POST" && c.Get("Content-Type") == "application/x-www-form-urlencoded" {
+		err = c.BodyParser(q)
+	} else {
+		err = c.QueryParser(q)
+	}
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
@@ -184,7 +223,12 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 
 func HandleBBBIsMeetingRunning(c *fiber.Ctx) error {
 	q := new(bbbapiwrapper.MeetingReq)
-	err := c.QueryParser(q)
+	var err error = nil
+	if c.Method() == "POST" && c.Get("Content-Type") == "application/x-www-form-urlencoded" {
+		err = c.BodyParser(q)
+	} else {
+		err = c.QueryParser(q)
+	}
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
@@ -202,7 +246,12 @@ func HandleBBBIsMeetingRunning(c *fiber.Ctx) error {
 
 func HandleBBBGetMeetingInfo(c *fiber.Ctx) error {
 	q := new(bbbapiwrapper.MeetingReq)
-	err := c.QueryParser(q)
+	var err error = nil
+	if c.Method() == "POST" && c.Get("Content-Type") == "application/x-www-form-urlencoded" {
+		err = c.BodyParser(q)
+	} else {
+		err = c.QueryParser(q)
+	}
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
@@ -252,7 +301,12 @@ func HandleBBBGetMeetings(c *fiber.Ctx) error {
 
 func HandleBBBEndMeetings(c *fiber.Ctx) error {
 	q := new(bbbapiwrapper.MeetingReq)
-	err := c.QueryParser(q)
+	var err error = nil
+	if c.Method() == "POST" && c.Get("Content-Type") == "application/x-www-form-urlencoded" {
+		err = c.BodyParser(q)
+	} else {
+		err = c.QueryParser(q)
+	}
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
@@ -270,7 +324,12 @@ func HandleBBBEndMeetings(c *fiber.Ctx) error {
 
 func HandleBBBGetRecordings(c *fiber.Ctx) error {
 	q := new(bbbapiwrapper.GetRecordingsReq)
-	err := c.QueryParser(q)
+	var err error = nil
+	if c.Method() == "POST" && c.Get("Content-Type") == "application/x-www-form-urlencoded" {
+		err = c.BodyParser(q)
+	} else {
+		err = c.QueryParser(q)
+	}
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
@@ -295,7 +354,12 @@ func HandleBBBGetRecordings(c *fiber.Ctx) error {
 
 func HandleBBBDeleteRecordings(c *fiber.Ctx) error {
 	q := new(bbbapiwrapper.DeleteRecordingsReq)
-	err := c.QueryParser(q)
+	var err error = nil
+	if c.Method() == "POST" && c.Get("Content-Type") == "application/x-www-form-urlencoded" {
+		err = c.BodyParser(q)
+	} else {
+		err = c.QueryParser(q)
+	}
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
