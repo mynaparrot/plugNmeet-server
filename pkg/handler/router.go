@@ -115,7 +115,7 @@ func Router() *fiber.App {
 
 	// for convert BBB request to PlugNmeet
 	bbb := app.Group("/:apiKey/bigbluebutton/api", controllers.HandleVerifyApiRequest)
-	bbb.Get("/create", controllers.HandleBBBCreate)
+	bbb.All("/create", controllers.HandleBBBCreate)
 	bbb.Get("/join", controllers.HandleBBBJoin)
 	bbb.Get("/isMeetingRunning", controllers.HandleBBBIsMeetingRunning)
 	bbb.Get("/getMeetingInfo", controllers.HandleBBBGetMeetingInfo)
