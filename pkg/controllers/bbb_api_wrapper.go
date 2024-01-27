@@ -11,6 +11,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"google.golang.org/protobuf/encoding/protojson"
 	"strings"
 	"time"
 )
@@ -123,12 +124,15 @@ func HandleBBBCreate(c *fiber.Ctx) error {
 		ReturnCode:        "SUCCESS",
 		MessageKey:        "success",
 		Message:           msg,
-		MeetingID:         room.Name,
+		MeetingID:         q.MeetingID,
 		InternalMeetingID: room.Sid,
+		ParentMeetingID:   "bbb-none",
 		AttendeePW:        q.AttendeePW,
 		ModeratorPW:       q.ModeratorPW,
 		CreateTime:        room.GetCreationTime() * 1000,
 		CreateDate:        time.Unix(room.GetCreationTime(), 0).Format(time.RFC1123),
+		VoiceBridge:       q.VoiceBridge,
+		DialNumber:        q.DialNumber,
 	})
 }
 
@@ -155,6 +159,27 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", "meeting is not active"))
 	}
 
+	roomMetadata, err := rs.UnmarshalRoomMetadata(metadata[roomId])
+	if err != nil {
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
+	}
+
+	ex := new(bbbapiwrapper.CreateMeetingDefaultExtraData)
+	customDesign := new(plugnmeet.CustomDesignParams)
+	if roomMetadata.ExtraData != nil {
+		err = json.Unmarshal([]byte(*roomMetadata.ExtraData), ex)
+		if err != nil {
+			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
+		}
+		if ex.Logo != "" {
+			customDesign.CustomLogo = &ex.Logo
+		}
+		styleUrl := c.Query("userdata-bbb_custom_style_url")
+		if styleUrl != "" {
+			customDesign.CustomCssUrl = &styleUrl
+		}
+	}
+
 	isAdmin := false
 	if q.Role != "" {
 		if strings.ToUpper(q.Role) == "MODERATOR" {
@@ -164,22 +189,9 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 		if q.Password == "" {
 			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", "password missing"))
 		}
-
-		roomMetadata, err := rs.UnmarshalRoomMetadata(metadata[roomId])
-		if err != nil {
-			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
-		}
-
 		if roomMetadata.ExtraData == nil {
 			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", "did not found extra data"))
 		}
-
-		ex := new(bbbapiwrapper.CreateMeetingDefaultExtraData)
-		err = json.Unmarshal([]byte(*roomMetadata.ExtraData), ex)
-		if err != nil {
-			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
-		}
-
 		if subtle.ConstantTimeCompare([]byte(q.Password), []byte(ex.ModeratorPW)) == 1 {
 			isAdmin = true
 		}
@@ -206,19 +218,31 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 	}
 
+	url := fmt.Sprintf("%s://%s/?access_token=%s", c.Protocol(), c.Hostname(), token)
+	if customDesign != nil && customDesign.String() != "" {
+		op := protojson.MarshalOptions{
+			EmitUnpopulated: false,
+			UseProtoNames:   true,
+		}
+		cd, err := op.Marshal(customDesign)
+		if err != nil {
+			return err
+		}
+		url = fmt.Sprintf("%s&custom_design=%s", url, string(cd))
+	}
+
 	if strings.ToLower(q.Redirect) == "false" {
-		host := fmt.Sprintf("%s://%s", c.Protocol(), c.Hostname())
 		return c.XML(bbbapiwrapper.JoinMeetingRes{
 			ReturnCode:   "SUCCESS",
 			MessageKey:   "success",
 			Message:      "You have joined successfully",
 			MeetingID:    q.MeetingID,
 			SessionToken: token,
-			Url:          fmt.Sprintf("%s/?access_token=%s", host, token),
+			Url:          url,
 		})
 	}
 
-	return c.Redirect(fmt.Sprintf("/?access_token=%s", token))
+	return c.Redirect(url)
 }
 
 func HandleBBBIsMeetingRunning(c *fiber.Ctx) error {
