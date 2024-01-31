@@ -71,11 +71,19 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 	}
 
 	// Azure cognitive services
-	if !config.AppCnf.AzureCognitiveServicesSpeech.Enabled {
+	azu := config.AppCnf.AzureCognitiveServicesSpeech
+	if !azu.Enabled {
 		r.Metadata.RoomFeatures.SpeechToTextTranslationFeatures.IsAllow = false
+	} else {
+		var maxAllow int32 = 2
+		if azu.MaxNumTranLangsAllowSelecting > 0 {
+			maxAllow = azu.MaxNumTranLangsAllowSelecting
+		}
+		r.Metadata.RoomFeatures.SpeechToTextTranslationFeatures.MaxNumTranLangsAllowSelecting = maxAllow
 	}
+
 	if r.Metadata.IsBreakoutRoom && r.Metadata.RoomFeatures.EnableAnalytics {
-		// at present, we'll disable analytic report for breakout rooms
+		// at present, we'll disable an analytic report for breakout rooms
 		r.Metadata.RoomFeatures.EnableAnalytics = false
 	}
 

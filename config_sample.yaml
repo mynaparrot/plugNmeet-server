@@ -94,6 +94,9 @@ shared_notepad:
       api_key: "eb2fb3fb78ca29eb6896852517d34a1be5f320664e3cce3a522a06dfa278f169"
 azure_cognitive_services_speech:
   enabled: false
+  # The Maximum number of translation languages allows selecting. Default: 2
+  # The pricing will be different if allow more languages. Please check azure pricing.
+  max_num_tran_langs: 2
   subscription_keys:
     -
       id: "key_1"
