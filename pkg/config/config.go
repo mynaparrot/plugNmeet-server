@@ -98,8 +98,9 @@ type EtherpadInfo struct {
 }
 
 type AzureCognitiveServicesSpeech struct {
-	Enabled          bool                   `yaml:"enabled"`
-	SubscriptionKeys []AzureSubscriptionKey `yaml:"subscription_keys"`
+	Enabled                       bool                   `yaml:"enabled"`
+	MaxNumTranLangsAllowSelecting int32                  `yaml:"max_num_tran_langs"`
+	SubscriptionKeys              []AzureSubscriptionKey `yaml:"subscription_keys"`
 }
 
 type AzureSubscriptionKey struct {
