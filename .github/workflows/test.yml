@@ -52,7 +52,7 @@ jobs:
           compose-file: "./test/docker-compose.yaml"
           down-flags: "--volumes"
       - name: Sleep for 20s
-        uses: juliangruber/sleep-action@v1
+        uses: juliangruber/sleep-action@v2
         with:
           time: 20s
       - name: Check logs
