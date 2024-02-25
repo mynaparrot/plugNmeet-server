@@ -15,8 +15,9 @@ require (
 	github.com/gofiber/template/html/v2 v2.1.0
 	github.com/google/uuid v1.6.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/protocol v1.9.7
+	github.com/livekit/protocol v1.9.9
 	github.com/livekit/server-sdk-go v1.1.8
+	github.com/livekit/server-sdk-go/v2 v2.0.2
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240224223828-ae4987a5e288
 	github.com/redis/go-redis/v9 v9.5.1
 	github.com/sirupsen/logrus v1.9.3
@@ -58,8 +59,8 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.6 // indirect
 	github.com/lithammer/shortuuid/v4 v4.0.0 // indirect
 	github.com/livekit/mageutil v0.0.0-20230125210925-54e8a70427c1 // indirect
-	github.com/livekit/mediatransportutil v0.0.0-20231213075826-cccbf2b93d3f // indirect
-	github.com/livekit/psrpc v0.5.3-0.20231214055026-06ce27a934c9 // indirect
+	github.com/livekit/mediatransportutil v0.0.0-20240206082112-9bf41dcbce76 // indirect
+	github.com/livekit/psrpc v0.5.3-0.20240129223932-473b29cda289 // indirect
 	github.com/mackerelio/go-osstat v0.2.4 // indirect
 	github.com/magefile/mage v1.15.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
@@ -69,11 +70,11 @@ require (
 	github.com/nats-io/nkeys v0.4.7 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/pion/datachannel v1.5.5 // indirect
-	github.com/pion/dtls/v2 v2.2.9 // indirect
-	github.com/pion/ice/v2 v2.3.12 // indirect
+	github.com/pion/dtls/v2 v2.2.10 // indirect
+	github.com/pion/ice/v2 v2.3.13 // indirect
 	github.com/pion/interceptor v0.1.25 // indirect
 	github.com/pion/logging v0.2.2 // indirect
-	github.com/pion/mdns v0.0.9 // indirect
+	github.com/pion/mdns v0.0.12 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
 	github.com/pion/rtcp v1.2.13 // indirect
 	github.com/pion/rtp v1.8.3 // indirect
@@ -83,7 +84,7 @@ require (
 	github.com/pion/stun v0.6.1 // indirect
 	github.com/pion/transport/v2 v2.2.4 // indirect
 	github.com/pion/turn/v2 v2.1.4 // indirect
-	github.com/pion/webrtc/v3 v3.2.24 // indirect
+	github.com/pion/webrtc/v3 v3.2.26 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.18.0 // indirect
 	github.com/prometheus/client_model v0.5.0 // indirect
@@ -104,7 +105,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.26.0 // indirect
 	golang.org/x/crypto v0.19.0 // indirect
-	golang.org/x/exp v0.0.0-20240119083558-1b970713d09a // indirect
+	golang.org/x/exp v0.0.0-20240205201215-2c58cdc269a3 // indirect
 	golang.org/x/net v0.20.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect
 	golang.org/x/sys v0.17.0 // indirect
