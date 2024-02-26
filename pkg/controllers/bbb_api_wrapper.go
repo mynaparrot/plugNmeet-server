@@ -104,9 +104,9 @@ func HandleBBBCreate(c *fiber.Ctx) error {
 		if err != nil {
 			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", err.Error()))
 		}
-		if len(b.Module.Document) > 0 {
-			for i := 0; i < len(b.Module.Document); i++ {
-				doc := b.Module.Document[i]
+		if len(b.Module.Documents) > 0 {
+			for i := 0; i < len(b.Module.Documents); i++ {
+				doc := b.Module.Documents[i]
 				if doc.URL != "" {
 					_, err := url.Parse(doc.URL)
 					if err == nil {
