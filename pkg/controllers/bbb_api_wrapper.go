@@ -96,9 +96,12 @@ func HandleBBBCreate(c *fiber.Ctx) error {
 	} else {
 		err = c.QueryParser(q)
 	}
+	if err != nil {
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
+	}
 
 	// now we'll check if any presentation file was sent or not
-	if c.Method() == "POST" && len(c.Body()) > 0 {
+	if c.Method() == "POST" && c.Get("Content-Type") != "application/x-www-form-urlencoded" && len(c.Body()) > 0 {
 		b := new(bbbapiwrapper.PreUploadWhiteboardPostFile)
 		err = xml.Unmarshal(c.Body(), b)
 		if err != nil {
@@ -117,10 +120,6 @@ func HandleBBBCreate(c *fiber.Ctx) error {
 				}
 			}
 		}
-	}
-
-	if err != nil {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
 
 	pnmReq, err := bbbapiwrapper.ConvertCreateRequest(q, c.Queries())
