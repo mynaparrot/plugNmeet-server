@@ -12,6 +12,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"google.golang.org/protobuf/encoding/protojson"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -95,6 +96,29 @@ func HandleBBBCreate(c *fiber.Ctx) error {
 	} else {
 		err = c.QueryParser(q)
 	}
+
+	// now we'll check if any presentation file was sent or not
+	if c.Method() == "POST" && len(c.Body()) > 0 {
+		b := new(bbbapiwrapper.PreUploadWhiteboardPostFile)
+		err = xml.Unmarshal(c.Body(), b)
+		if err != nil {
+			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", err.Error()))
+		}
+		if len(b.Module.Document) > 0 {
+			for i := 0; i < len(b.Module.Document); i++ {
+				doc := b.Module.Document[i]
+				if doc.URL != "" {
+					_, err := url.Parse(doc.URL)
+					if err == nil {
+						// we'll only accept one file
+						q.PreUploadedPresentation = doc.URL
+						continue
+					}
+				}
+			}
+		}
+	}
+
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
