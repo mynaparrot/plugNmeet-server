@@ -8,6 +8,7 @@ require (
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/gabriel-vasile/mimetype v1.4.3
 	github.com/go-jose/go-jose/v3 v3.0.3
+	github.com/go-jose/go-jose/v4 v4.0.1
 	github.com/goccy/go-json v0.10.2
 	github.com/gofiber/contrib/socketio v1.0.0
 	github.com/gofiber/contrib/websocket v1.3.0
