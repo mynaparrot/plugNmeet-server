@@ -1,6 +1,6 @@
 module github.com/mynaparrot/plugnmeet-server
 
-go 1.21
+go 1.22
 
 require (
 	github.com/ansrivas/fiberprometheus/v2 v2.6.1
@@ -8,7 +8,6 @@ require (
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/gabriel-vasile/mimetype v1.4.3
 	github.com/go-jose/go-jose/v3 v3.0.3
-	github.com/go-jose/go-jose/v4 v4.0.1
 	github.com/goccy/go-json v0.10.2
 	github.com/gofiber/contrib/socketio v1.0.0
 	github.com/gofiber/contrib/websocket v1.3.0
@@ -18,7 +17,6 @@ require (
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.11.0
 	github.com/livekit/server-sdk-go v1.1.8
-	github.com/livekit/server-sdk-go/v2 v2.0.6
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240313214217-3a12694cb9d7
 	github.com/redis/go-redis/v9 v9.5.1
 	github.com/sirupsen/logrus v1.9.3
