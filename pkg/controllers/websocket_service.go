@@ -1,7 +1,7 @@
 package controllers
 
 import (
-	"github.com/antoniodipinto/ikisocket"
+	"github.com/gofiber/contrib/socketio"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -11,13 +11,13 @@ import (
 )
 
 type websocketController struct {
-	kws            *ikisocket.Websocket
+	kws            *socketio.Websocket
 	token          string
 	participant    config.ChatParticipant
 	authTokenModel *models.AuthTokenModel
 }
 
-func newWebsocketController(kws *ikisocket.Websocket) *websocketController {
+func newWebsocketController(kws *socketio.Websocket) *websocketController {
 	authToken := kws.Query("token")
 	roomSid := kws.Query("roomSid")
 	userSid := kws.Query("userSid")
@@ -42,18 +42,18 @@ func newWebsocketController(kws *ikisocket.Websocket) *websocketController {
 
 func (c *websocketController) validation() bool {
 	if c.token == "" {
-		_ = c.kws.EmitTo(c.kws.UUID, []byte("empty auth token"), ikisocket.TextMessage)
+		_ = c.kws.EmitTo(c.kws.UUID, []byte("empty auth token"), socketio.TextMessage)
 		return false
 	}
 
 	claims, err := c.authTokenModel.VerifyPlugNmeetAccessToken(c.token)
 	if err != nil {
-		_ = c.kws.EmitTo(c.kws.UUID, []byte("invalid auth token"), ikisocket.TextMessage)
+		_ = c.kws.EmitTo(c.kws.UUID, []byte("invalid auth token"), socketio.TextMessage)
 		return false
 	}
 
 	if claims.UserId != c.participant.UserId || claims.RoomId != c.participant.RoomId {
-		_ = c.kws.EmitTo(c.kws.UUID, []byte("unauthorized access!"), ikisocket.TextMessage)
+		_ = c.kws.EmitTo(c.kws.UUID, []byte("unauthorized access!"), socketio.TextMessage)
 		return false
 	}
 
@@ -72,7 +72,7 @@ func (c *websocketController) addUser() {
 }
 
 func HandleWebSocket() func(*fiber.Ctx) error {
-	return ikisocket.New(func(kws *ikisocket.Websocket) {
+	return socketio.New(func(kws *socketio.Websocket) {
 		wc := newWebsocketController(kws)
 		isValid := wc.validation()
 
@@ -89,7 +89,7 @@ func HandleWebSocket() func(*fiber.Ctx) error {
 func SetupSocketListeners() {
 	analytics := models.NewAnalyticsModel()
 	// On message event
-	ikisocket.On(ikisocket.EventMessage, func(ep *ikisocket.EventPayload) {
+	socketio.On(socketio.EventMessage, func(ep *socketio.EventPayload) {
 		//fmt.Println(fmt.Sprintf("Message event - User: %s - Message: %s", ep.Kws.GetStringAttribute("userId"), string(ep.Data)))
 		dataMsg := &plugnmeet.DataMessage{}
 		err := proto.Unmarshal(ep.Data, dataMsg)
@@ -129,7 +129,7 @@ func SetupSocketListeners() {
 	})
 
 	// On disconnect event
-	ikisocket.On(ikisocket.EventDisconnect, func(ep *ikisocket.EventPayload) {
+	socketio.On(socketio.EventDisconnect, func(ep *socketio.EventPayload) {
 		roomId := ep.Kws.GetStringAttribute("roomId")
 		userId := ep.Kws.GetStringAttribute("userId")
 		// Remove the user from the local clients
@@ -137,7 +137,7 @@ func SetupSocketListeners() {
 	})
 
 	// This event is called when the server disconnects the user actively with .Close() method
-	ikisocket.On(ikisocket.EventClose, func(ep *ikisocket.EventPayload) {
+	socketio.On(socketio.EventClose, func(ep *socketio.EventPayload) {
 		roomId := ep.Kws.GetStringAttribute("roomId")
 		userId := ep.Kws.GetStringAttribute("userId")
 		// Remove the user from the local clients
@@ -145,7 +145,7 @@ func SetupSocketListeners() {
 	})
 
 	// On error event
-	//ikisocket.On(ikisocket.EventError, func(ep *ikisocket.EventPayload) {
+	//socketio.On(socketio.EventError, func(ep *socketio.EventPayload) {
 	//	log.Errorln(fmt.Sprintf("Error event - User: %s", ep.Kws.GetStringAttribute("userSid")), ep.Error)
 	//})
 }

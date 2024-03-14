@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/antoniodipinto/ikisocket"
+	"github.com/gofiber/contrib/socketio"
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -125,7 +125,7 @@ func (w *WebsocketServiceModel) handleChat() {
 	config.AppCnf.RUnlock()
 
 	if len(to) > 0 {
-		ikisocket.EmitToList(to, jm, ikisocket.BinaryMessage)
+		socketio.EmitToList(to, jm, socketio.BinaryMessage)
 	}
 }
 
@@ -148,7 +148,7 @@ func (w *WebsocketServiceModel) handleSendChatMsgs() {
 	config.AppCnf.RUnlock()
 
 	if userUUID != "" {
-		err = ikisocket.EmitTo(userUUID, jm, ikisocket.BinaryMessage)
+		err = socketio.EmitTo(userUUID, jm, socketio.BinaryMessage)
 		if err != nil {
 			log.Errorln(err)
 		}
@@ -182,7 +182,7 @@ func (w *WebsocketServiceModel) handleRenewToken() {
 	config.AppCnf.RLock()
 	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
 		if p.RoomId == w.roomId && w.pl.Body.From.UserId == p.UserId {
-			err = ikisocket.EmitTo(p.UUID, jm, ikisocket.BinaryMessage)
+			err = socketio.EmitTo(p.UUID, jm, socketio.BinaryMessage)
 			if err != nil {
 				log.Errorln(err)
 			}
@@ -214,7 +214,7 @@ func (w *WebsocketServiceModel) handleSendPushMsg() {
 	}
 	config.AppCnf.RUnlock()
 	if len(to) > 0 {
-		ikisocket.EmitToList(to, jm, ikisocket.BinaryMessage)
+		socketio.EmitToList(to, jm, socketio.BinaryMessage)
 	}
 }
 
@@ -243,7 +243,7 @@ func (w *WebsocketServiceModel) handleWhiteboard() {
 	config.AppCnf.RUnlock()
 
 	if len(to) > 0 {
-		ikisocket.EmitToList(to, jm, ikisocket.BinaryMessage)
+		socketio.EmitToList(to, jm, socketio.BinaryMessage)
 	}
 }
 
@@ -267,7 +267,7 @@ func (w *WebsocketServiceModel) handleUserVisibility() {
 	config.AppCnf.RUnlock()
 
 	if len(to) > 0 {
-		ikisocket.EmitToList(to, jm, ikisocket.BinaryMessage)
+		socketio.EmitToList(to, jm, socketio.BinaryMessage)
 	}
 }
 
@@ -291,7 +291,7 @@ func (w *WebsocketServiceModel) handleExternalMediaPlayerEvents() {
 	config.AppCnf.RUnlock()
 
 	if len(to) > 0 {
-		ikisocket.EmitToList(to, jm, ikisocket.BinaryMessage)
+		socketio.EmitToList(to, jm, socketio.BinaryMessage)
 	}
 }
 
@@ -315,7 +315,7 @@ func (w *WebsocketServiceModel) handlePollsNotifications() {
 	config.AppCnf.RUnlock()
 
 	if len(to) > 0 {
-		ikisocket.EmitToList(to, jm, ikisocket.BinaryMessage)
+		socketio.EmitToList(to, jm, socketio.BinaryMessage)
 	}
 }
 
@@ -342,7 +342,7 @@ func (w *WebsocketServiceModel) handleSendBreakoutRoomNotification() {
 	}
 	config.AppCnf.RUnlock()
 	if len(to) > 0 {
-		ikisocket.EmitToList(to, jm, ikisocket.BinaryMessage)
+		socketio.EmitToList(to, jm, socketio.BinaryMessage)
 	}
 }
 
@@ -370,6 +370,6 @@ func (w *WebsocketServiceModel) handleSpeechSubtitleText() {
 	config.AppCnf.RUnlock()
 
 	if len(to) > 0 {
-		ikisocket.EmitToList(to, jm, ikisocket.BinaryMessage)
+		socketio.EmitToList(to, jm, socketio.BinaryMessage)
 	}
 }
