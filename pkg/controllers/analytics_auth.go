@@ -21,7 +21,7 @@ func HandleFetchAnalytics(c *fiber.Ctx) error {
 
 	v, err := protovalidate.New()
 	if err != nil {
-		utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
+		return utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
 	}
 
 	if err = v.Validate(req); err != nil {
@@ -57,7 +57,7 @@ func HandleDeleteAnalytics(c *fiber.Ctx) error {
 	}
 	v, err := protovalidate.New()
 	if err != nil {
-		utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
+		return utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
 	}
 
 	if err = v.Validate(req); err != nil {
@@ -84,7 +84,7 @@ func HandleGetAnalyticsDownloadToken(c *fiber.Ctx) error {
 	}
 	v, err := protovalidate.New()
 	if err != nil {
-		utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
+		return utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
 	}
 
 	if err = v.Validate(req); err != nil {
