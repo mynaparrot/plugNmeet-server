@@ -355,7 +355,7 @@ func (rm *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet,
 
 func (rm *RecordingModel) sendToWebhookNotifier(r *plugnmeet.RecorderToPlugNmeet) {
 	tk := r.Task.String()
-	n := GetWebhookNotifier(r.RoomId, r.RoomSid)
+	n := GetWebhookNotifier()
 	if n != nil {
 		msg := &plugnmeet.CommonNotifyEvent{
 			Event: &tk,
@@ -371,10 +371,15 @@ func (rm *RecordingModel) sendToWebhookNotifier(r *plugnmeet.RecorderToPlugNmeet
 				FileSize:    &r.FileSize,
 			},
 		}
-
-		err := n.SendWebhook(msg, nil)
-		if err != nil {
-			log.Errorln(err)
+		if r.Task == plugnmeet.RecordingTasks_RECORDING_PROCEEDED {
+			// this process may take longer time & webhook url may clean up
+			// so, here we'll use ForceToPutInQueue method to retrieve url from mysql table
+			n.ForceToPutInQueue(msg)
+		} else {
+			err := n.SendWebhookEvent(msg)
+			if err != nil {
+				log.Errorln(err)
+			}
 		}
 	}
 

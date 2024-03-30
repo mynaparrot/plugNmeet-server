@@ -7,7 +7,6 @@ import (
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
-	"github.com/mynaparrot/plugnmeet-protocol/webhook"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/redis/go-redis/v9"
 	log "github.com/sirupsen/logrus"
@@ -21,7 +20,7 @@ type webhookEvent struct {
 	roomModel      *RoomModel
 	roomService    *RoomService
 	recorderModel  *RecorderModel
-	notifier       *webhook.WebhookNotifier
+	notifier       *WebhookNotifier
 	analyticsModel *AnalyticsModel
 	rmDuration     *RoomDurationModel
 }
@@ -36,7 +35,7 @@ func NewWebhookModel(e *livekit.WebhookEvent) {
 		recorderModel:  NewRecorderModel(),
 		analyticsModel: NewAnalyticsModel(),
 		rmDuration:     NewRoomDurationModel(),
-		notifier:       GetWebhookNotifier(e.GetRoom().GetName(), e.GetRoom().GetSid()),
+		notifier:       GetWebhookNotifier(),
 	}
 
 	switch e.GetEvent() {
@@ -61,7 +60,7 @@ func NewWebhookModel(e *livekit.WebhookEvent) {
 func (w *webhookEvent) roomStarted() {
 	event := w.event
 	// register room for webhook
-	RegisterRoomForWebhook(event.GetRoom().GetName(), event.GetRoom().GetSid())
+	w.notifier.RegisterWebhook(event.Room.GetName(), event.Room.GetSid())
 	// webhook notification
 	go w.sendToWebhookNotifier(event)
 
@@ -196,8 +195,13 @@ func (w *webhookEvent) roomFinished() {
 	// finally, create the analytics file
 	go w.analyticsModel.PrepareToExportAnalytics(event.Room.Name, event.Room.Sid, event.Room.Metadata)
 
-	// let's delete webhook queue
-	go w.notifier.DeleteWebhookQueuedNotifier(event.Room.Name)
+	// at last delete webhook
+	go func() {
+		err := w.notifier.DeleteWebhook(event.Room.GetName())
+		if err != nil {
+			log.Errorln(err)
+		}
+	}()
 }
 
 func (w *webhookEvent) participantJoined() {
@@ -352,5 +356,5 @@ func (w *webhookEvent) sendToWebhookNotifier(event *livekit.WebhookEvent) {
 	}
 
 	msg := utils.PrepareCommonWebhookNotifyEvent(event)
-	_ = w.notifier.SendWebhook(msg, nil)
+	_ = w.notifier.SendWebhookEvent(msg)
 }

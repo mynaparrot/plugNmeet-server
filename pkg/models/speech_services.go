@@ -428,7 +428,7 @@ func (s *SpeechServices) selectAzureKey() (*config.AzureSubscriptionKey, error) 
 
 func (s *SpeechServices) sendToWebhookNotifier(rId, rSid string, userId *string, task plugnmeet.SpeechServiceUserStatusTasks, usage int64) {
 	tk := task.String()
-	n := GetWebhookNotifier(rId, rSid)
+	n := GetWebhookNotifier()
 	if n == nil {
 		return
 	}
@@ -443,7 +443,7 @@ func (s *SpeechServices) sendToWebhookNotifier(rId, rSid string, userId *string,
 			TotalUsage: usage,
 		},
 	}
-	err := n.SendWebhook(msg, nil)
+	err := n.SendWebhookEvent(msg)
 	if err != nil {
 		log.Errorln(err)
 	}
