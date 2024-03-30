@@ -65,6 +65,8 @@ github.com/gofiber/contrib/websocket v1.3.0 h1:XADFAGorer1VJ1bqC4UkCjqS37kwRTV04
 github.com/gofiber/contrib/websocket v1.3.0/go.mod h1:xguaOzn2ZZ759LavtosEP+rcxIgBEE/rdumPINhR+Xo=
 github.com/gofiber/fiber/v2 v2.52.2 h1:b0rYH6b06Df+4NyrbdptQL8ifuxw/Tf2DgfkZkDaxEo=
 github.com/gofiber/fiber/v2 v2.52.2/go.mod h1:KEOE+cXMhXG0zHc9d8+E38hoX+ZN7bhOtgeF2oT6jrQ=
+github.com/gofiber/fiber/v2 v2.52.4 h1:P+T+4iK7VaqUsq2PALYEfBBo6bJZ4q3FP8cZ84EggTM=
+github.com/gofiber/fiber/v2 v2.52.4/go.mod h1:KEOE+cXMhXG0zHc9d8+E38hoX+ZN7bhOtgeF2oT6jrQ=
 github.com/gofiber/template v1.8.3 h1:hzHdvMwMo/T2kouz2pPCA0zGiLCeMnoGsQZBTSYgZxc=
 github.com/gofiber/template v1.8.3/go.mod h1:bs/2n0pSNPOkRa5VJ8zTIvedcI/lEYxzV3+YPXdBvq8=
 github.com/gofiber/template/html/v2 v2.1.1 h1:QEy3O3EBkvwDthy5bXVGUseOyO6ldJoiDxlF4+MJiV8=
