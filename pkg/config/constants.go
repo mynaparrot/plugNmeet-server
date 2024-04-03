@@ -12,4 +12,5 @@ const (
 	WaitBeforeSpeechServicesOnAfterRoomEnded = 3 * time.Second
 	WaitBeforeBreakoutRoomOnAfterRoomStart   = 2 * time.Second
 	WaitBeforeAnalyticsStartProcessing       = 30 * time.Second
+	MaxDurationWaitBeforeCleanRoomWebhook    = 1 * time.Minute
 )

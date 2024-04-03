@@ -454,7 +454,7 @@ func (m *AnalyticsModel) handleFirstTimeUserJoined(key string) {
 }
 
 func (m *AnalyticsModel) sendToWebhookNotifier(roomId, roomSid, task, fileId string) {
-	n := GetWebhookNotifier(roomId, roomSid)
+	n := GetWebhookNotifier()
 	if n != nil {
 		msg := &plugnmeet.CommonNotifyEvent{
 			Event: &task,
@@ -467,7 +467,7 @@ func (m *AnalyticsModel) sendToWebhookNotifier(roomId, roomSid, task, fileId str
 			},
 		}
 
-		err := n.SendWebhook(msg, nil)
+		err := n.SendWebhookEvent(msg)
 		if err != nil {
 			log.Errorln(err)
 		}
