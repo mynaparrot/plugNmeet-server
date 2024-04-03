@@ -59,19 +59,14 @@ func NewWebhookModel(e *livekit.WebhookEvent) {
 
 func (w *webhookEvent) roomStarted() {
 	event := w.event
-	// register room for webhook
-	w.notifier.RegisterWebhook(event.Room.GetName(), event.Room.GetSid())
-	// webhook notification
-	go w.sendToWebhookNotifier(event)
-
-	rm, _ := w.roomModel.GetRoomInfo(event.Room.Name, event.Room.Sid, 1)
+	rm, _ := w.roomModel.GetRoomInfo(event.Room.GetName(), event.Room.GetSid(), 1)
 	if rm.Id == 0 {
 		// we'll only create if not exist
 		room := &RoomInfo{
-			RoomId:       event.Room.Name,
-			Sid:          event.Room.Sid,
+			RoomId:       event.Room.GetName(),
+			Sid:          event.Room.GetSid(),
 			IsRunning:    1,
-			CreationTime: event.Room.CreationTime,
+			CreationTime: event.Room.GetCreationTime(),
 			Created:      time.Now().UTC().Format("2006-01-02 15:04:05"),
 		}
 		_, err := w.roomModel.InsertOrUpdateRoomData(room, false)
@@ -86,37 +81,47 @@ func (w *webhookEvent) roomStarted() {
 		log.Errorln(err)
 	}
 
-	if event.Room.Metadata != "" {
+	if event.Room.GetMetadata() != "" {
 		info, err := w.roomService.UnmarshalRoomMetadata(event.Room.Metadata)
 		if err == nil {
 			info.StartedAt = uint64(time.Now().Unix())
-			if info.RoomFeatures.RoomDuration != nil && *info.RoomFeatures.RoomDuration > 0 {
+			if info.RoomFeatures.GetRoomDuration() > 0 {
 				// we'll add room info in map
-				_ = w.rmDuration.AddRoomWithDurationInfo(event.Room.Name, RoomDurationInfo{
-					Duration:  *info.RoomFeatures.RoomDuration,
-					StartedAt: info.StartedAt, // we can use from livekit
+				err := w.rmDuration.AddRoomWithDurationInfo(event.Room.Name, RoomDurationInfo{
+					Duration:  info.RoomFeatures.GetRoomDuration(),
+					StartedAt: info.GetStartedAt(),
 				})
+				if err != nil {
+					log.Errorln(err)
+				}
 			}
 			if info.IsBreakoutRoom {
 				bm := NewBreakoutRoomModel()
-				_ = bm.PostTaskAfterRoomStartWebhook(event.Room.Name, info)
+				err := bm.PostTaskAfterRoomStartWebhook(event.Room.Name, info)
+				if err != nil {
+					log.Errorln(err)
+				}
 			}
-			if err == nil {
-				_, _ = w.roomService.UpdateRoomMetadataByStruct(event.Room.Name, info)
+			_, err := w.roomService.UpdateRoomMetadataByStruct(event.Room.Name, info)
+			if err != nil {
+				log.Errorln(err)
 			}
 		}
 	}
+
+	// for room_started event we should send webhook at the end
+	// otherwise some of the services may not be ready
+	w.notifier.RegisterWebhook(event.Room.GetName(), event.Room.GetSid())
+	// webhook notification
+	go w.sendToWebhookNotifier(event)
 }
 
 func (w *webhookEvent) roomFinished() {
 	event := w.event
-	// webhook notification
-	go w.sendToWebhookNotifier(event)
-
-	if event.Room.Sid != "" {
+	if event.Room.GetSid() != "" {
 		// we will only update the table if the SID is not empty
 		room := &RoomInfo{
-			Sid:       event.Room.Sid,
+			Sid:       event.Room.GetSid(),
 			IsRunning: 0,
 			Ended:     time.Now().UTC().Format("2006-01-02 15:04:05"),
 		}
@@ -125,6 +130,9 @@ func (w *webhookEvent) roomFinished() {
 			log.Errorln(err)
 		}
 	}
+
+	// better to send webhook notification after DB status update
+	go w.sendToWebhookNotifier(event)
 
 	// now we'll perform a few service related tasks
 	go func() {
@@ -356,5 +364,8 @@ func (w *webhookEvent) sendToWebhookNotifier(event *livekit.WebhookEvent) {
 	}
 
 	msg := utils.PrepareCommonWebhookNotifyEvent(event)
-	_ = w.notifier.SendWebhookEvent(msg)
+	err := w.notifier.SendWebhookEvent(msg)
+	if err != nil {
+		log.Errorln(err)
+	}
 }

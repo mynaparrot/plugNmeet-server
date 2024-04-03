@@ -42,7 +42,7 @@ type WebhookNotifier struct {
 
 type webhookRedisFields struct {
 	Urls            []string `json:"urls"`
-	PerformDeleting bool     `json:"progress_deleting"`
+	PerformDeleting bool     `json:"perform_deleting"`
 }
 
 func NewWebhookNotifier() *WebhookNotifier {
@@ -83,10 +83,8 @@ func (w *WebhookNotifier) RegisterWebhook(roomId, sid string) {
 
 	if w.enabledForPerMeeting {
 		roomInfo, _ := w.rm.GetRoomInfo("", sid, 0)
-		if roomInfo != nil {
-			if roomInfo.WebhookUrl != "" {
-				urls = append(urls, roomInfo.WebhookUrl)
-			}
+		if roomInfo != nil && roomInfo.WebhookUrl != "" {
+			urls = append(urls, roomInfo.WebhookUrl)
 		}
 	}
 
