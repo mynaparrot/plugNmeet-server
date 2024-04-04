@@ -45,7 +45,6 @@ func (m *RoomDurationModel) AddRoomWithDurationInfo(roomId string, r RoomDuratio
 func (m *RoomDurationModel) DeleteRoomWithDuration(roomId string) error {
 	_, err := m.rc.Del(m.ctx, fmt.Sprintf("%s:%s", roomWithDurationInfoKey, roomId)).Result()
 	if err != nil {
-		log.Error(err)
 		return err
 	}
 	return nil

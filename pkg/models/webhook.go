@@ -102,9 +102,13 @@ func (w *webhookEvent) roomStarted() {
 					log.Errorln(err)
 				}
 			}
-			_, err := w.roomService.UpdateRoomMetadataByStruct(event.Room.Name, info)
+			lk, err := w.roomService.UpdateRoomMetadataByStruct(event.Room.Name, info)
 			if err != nil {
 				log.Errorln(err)
+			}
+			if lk.GetMetadata() != "" {
+				// use updated metadata
+				event.Room.Metadata = lk.GetMetadata()
 			}
 		}
 	}
@@ -142,66 +146,17 @@ func (w *webhookEvent) roomFinished() {
 	w.roomService.OnAfterRoomClosed(event.Room.GetName())
 
 	//we'll send a message to the recorder to stop
-	_ = w.recorderModel.SendMsgToRecorder(&plugnmeet.RecordingReq{
+	err := w.recorderModel.SendMsgToRecorder(&plugnmeet.RecordingReq{
 		Task:   plugnmeet.RecordingTasks_STOP,
 		Sid:    w.event.Room.Sid,
 		RoomId: w.event.Room.Name,
 	})
+	if err != nil {
+		log.Errorln(err)
+	}
 
-	// Delete all the files those may upload during session
-	go func() {
-		if !config.AppCnf.UploadFileSettings.KeepForever {
-			f := NewManageFileModel(&ManageFile{
-				Sid: event.Room.Sid,
-			})
-			_ = f.DeleteRoomUploadedDir()
-		}
-	}()
-
-	// clear chatroom from memory
-	go func() {
-		msg := &WebsocketToRedis{
-			Type:   "deleteRoom",
-			RoomId: event.Room.Name,
-		}
-		marshal, err := json.Marshal(msg)
-		if err == nil {
-			_, _ = w.rc.Publish(context.Background(), "plug-n-meet-user-websocket", marshal).Result()
-		}
-	}()
-
-	// notify to clean room from room duration
-	go func() {
-		_ = w.rmDuration.DeleteRoomWithDuration(event.Room.Name)
-	}()
-
-	// clean shared note
-	go func() {
-		em := NewEtherpadModel()
-		_ = em.CleanAfterRoomEnd(event.Room.Name, event.Room.Metadata)
-	}()
-
-	// clean polls
-	go func() {
-		pm := NewPollsModel()
-		_ = pm.CleanUpPolls(event.Room.Name)
-	}()
-
-	// remove all breakout rooms
-	go func() {
-		bm := NewBreakoutRoomModel()
-		_ = bm.PostTaskAfterRoomEndWebhook(event.Room.Name, event.Room.Metadata)
-	}()
-
-	// speech service clean up
-	go func() {
-		sm := NewSpeechServices()
-		// don't need to worry about room sid changes, because we'll compare both
-		sm.OnAfterRoomEnded(event.Room.Name, event.Room.Sid)
-	}()
-
-	// finally, create the analytics file
-	go w.analyticsModel.PrepareToExportAnalytics(event.Room.Name, event.Room.Sid, event.Room.Metadata)
+	// few related task can be done in separate goroutine
+	go w.onAfterRoomFinishedTasks(event)
 
 	// at the end we'll handle event notification
 	go func() {
@@ -345,6 +300,70 @@ func (w *webhookEvent) trackUnpublished() {
 	}
 	data.HsetValue = &val
 	w.analyticsModel.HandleEvent(data)
+}
+
+func (w *webhookEvent) onAfterRoomFinishedTasks(event *livekit.WebhookEvent) {
+	// Delete all the files those may upload during session
+	if !config.AppCnf.UploadFileSettings.KeepForever {
+		f := NewManageFileModel(&ManageFile{
+			Sid: event.Room.Sid,
+		})
+		err := f.DeleteRoomUploadedDir()
+		if err != nil {
+			log.Errorln(err)
+		}
+	}
+
+	// clear chatroom from memory
+	msg := &WebsocketToRedis{
+		Type:   "deleteRoom",
+		RoomId: event.Room.Name,
+	}
+	marshal, err := json.Marshal(msg)
+	if err == nil {
+		_, err := w.rc.Publish(context.Background(), "plug-n-meet-user-websocket", marshal).Result()
+		if err != nil {
+			log.Errorln(err)
+		}
+	}
+
+	// notify to clean room from room duration
+	err = w.rmDuration.DeleteRoomWithDuration(event.Room.Name)
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	// clean shared note
+	em := NewEtherpadModel()
+	err = em.CleanAfterRoomEnd(event.Room.Name, event.Room.Metadata)
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	// clean polls
+	pm := NewPollsModel()
+	err = pm.CleanUpPolls(event.Room.Name)
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	// remove all breakout rooms
+	bm := NewBreakoutRoomModel()
+	err = bm.PostTaskAfterRoomEndWebhook(event.Room.Name, event.Room.Metadata)
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	// speech service clean up
+	sm := NewSpeechServices()
+	// don't need to worry about room sid changes, because we'll compare both
+	err = sm.OnAfterRoomEnded(event.Room.Name, event.Room.Sid)
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	// finally, create the analytics file
+	w.analyticsModel.PrepareToExportAnalytics(event.Room.Name, event.Room.Sid, event.Room.Metadata)
 }
 
 func (w *webhookEvent) sendToWebhookNotifier(event *livekit.WebhookEvent) {
