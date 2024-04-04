@@ -274,9 +274,9 @@ func (s *SpeechServices) SpeechServiceUsersUsage(roomId, rSid, userId string, ta
 	return nil
 }
 
-func (s *SpeechServices) OnAfterRoomEnded(roomId, sId string) {
+func (s *SpeechServices) OnAfterRoomEnded(roomId, sId string) error {
 	if sId == "" {
-		return
+		return nil
 	}
 	// we'll wait a little bit to make sure all users' requested has been received
 	time.Sleep(config.WaitBeforeSpeechServicesOnAfterRoomEnded)
@@ -287,7 +287,7 @@ func (s *SpeechServices) OnAfterRoomEnded(roomId, sId string) {
 	case errors.Is(err, redis.Nil):
 		//
 	case err != nil:
-		return
+		return err
 	}
 
 	for _, k := range hkeys {
@@ -311,8 +311,14 @@ func (s *SpeechServices) OnAfterRoomEnded(roomId, sId string) {
 			})
 		}
 	}
+
 	// now clean
-	s.rc.Del(s.ctx, key).Result()
+	_, err = s.rc.Del(s.ctx, key).Result()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *SpeechServices) sendRequestToAzureForToken(subscriptionKey, serviceRegion, keyId string) (*plugnmeet.GenerateAzureTokenRes, error) {

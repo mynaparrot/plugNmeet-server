@@ -363,7 +363,6 @@ func (m *PollsModel) CleanUpPolls(roomId string) error {
 
 	_, err = pp.Exec(m.ctx)
 	if err != nil {
-		log.Errorln(err)
 		return err
 	}
 
