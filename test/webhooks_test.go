@@ -77,7 +77,7 @@ func test_webhooks(t *testing.T, rInfo *livekit.Room, roomFinished bool) {
 			req.Header.Set("Content-Type", "application/json")
 
 			router := handler.Router()
-			res, err := router.Test(req)
+			res, err := router.Test(req, -1)
 			if err != nil {
 				t.Error(err)
 			}

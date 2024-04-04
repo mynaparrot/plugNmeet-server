@@ -59,6 +59,11 @@ func NewWebhookModel(e *livekit.WebhookEvent) {
 
 func (w *webhookEvent) roomStarted() {
 	event := w.event
+	if event.Room == nil {
+		log.Errorln("empty roomInfo")
+		return
+	}
+
 	rm, _ := w.roomModel.GetRoomInfo(event.Room.GetName(), event.Room.GetSid(), 1)
 	if rm.Id == 0 {
 		// we'll only create if not exist
@@ -122,6 +127,11 @@ func (w *webhookEvent) roomStarted() {
 
 func (w *webhookEvent) roomFinished() {
 	event := w.event
+	if event.Room == nil {
+		log.Errorln("empty roomInfo")
+		return
+	}
+
 	if event.Room.GetSid() != "" {
 		// we will only update the table if the SID is not empty
 		room := &RoomInfo{
@@ -172,6 +182,11 @@ func (w *webhookEvent) roomFinished() {
 
 func (w *webhookEvent) participantJoined() {
 	event := w.event
+	if event.Room == nil {
+		log.Errorln("empty roomInfo")
+		return
+	}
+
 	room := &RoomInfo{
 		Sid: event.Room.Sid,
 	}
@@ -209,6 +224,11 @@ func (w *webhookEvent) participantJoined() {
 
 func (w *webhookEvent) participantLeft() {
 	event := w.event
+	if event.Room == nil {
+		log.Errorln("empty roomInfo")
+		return
+	}
+
 	room := &RoomInfo{
 		Sid: event.Room.Sid,
 	}
@@ -247,6 +267,10 @@ func (w *webhookEvent) participantLeft() {
 }
 
 func (w *webhookEvent) trackPublished() {
+	if w.event.Room == nil {
+		log.Errorln("empty roomInfo")
+		return
+	}
 	// webhook notification
 	go w.sendToWebhookNotifier(w.event)
 
@@ -275,6 +299,10 @@ func (w *webhookEvent) trackPublished() {
 }
 
 func (w *webhookEvent) trackUnpublished() {
+	if w.event.Room == nil {
+		log.Errorln("empty roomInfo")
+		return
+	}
 	// webhook notification
 	go w.sendToWebhookNotifier(w.event)
 
