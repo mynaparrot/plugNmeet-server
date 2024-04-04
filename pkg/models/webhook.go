@@ -131,8 +131,11 @@ func (w *webhookEvent) roomFinished() {
 		}
 	}
 
-	// better to send webhook notification after DB status update
-	go w.sendToWebhookNotifier(event)
+	go func() {
+		// we are introducing a new event name here
+		// because for our case we still have remaining tasks
+		w.sendCustomTypeWebhook(event, "session_ended")
+	}()
 
 	// now we'll perform a few service related tasks
 	go func() {
@@ -203,8 +206,11 @@ func (w *webhookEvent) roomFinished() {
 	// finally, create the analytics file
 	go w.analyticsModel.PrepareToExportAnalytics(event.Room.Name, event.Room.Sid, event.Room.Metadata)
 
-	// at last delete webhook
+	// at the end we'll handle event notification
 	go func() {
+		// send first
+		w.sendToWebhookNotifier(event)
+		// now clean up
 		err := w.notifier.DeleteWebhook(event.Room.GetName())
 		if err != nil {
 			log.Errorln(err)
@@ -214,14 +220,6 @@ func (w *webhookEvent) roomFinished() {
 
 func (w *webhookEvent) participantJoined() {
 	event := w.event
-	// we won't count for recorder
-	/*if event.Participant.Identity == config.RECORDER_BOT || event.Participant.Identity == config.RTMP_BOT {
-		return
-	}*/
-
-	// webhook notification
-	go w.sendToWebhookNotifier(event)
-
 	room := &RoomInfo{
 		Sid: event.Room.Sid,
 	}
@@ -235,6 +233,9 @@ func (w *webhookEvent) participantJoined() {
 	if err != nil {
 		log.Errorln(err)
 	}
+
+	// webhook notification
+	go w.sendToWebhookNotifier(event)
 
 	// send analytics
 	at := fmt.Sprintf("%d", time.Now().UnixMilli())
@@ -256,14 +257,6 @@ func (w *webhookEvent) participantJoined() {
 
 func (w *webhookEvent) participantLeft() {
 	event := w.event
-	// we won't count for recorder
-	/*if event.Participant.Identity == config.RECORDER_BOT || event.Participant.Identity == config.RTMP_BOT {
-		return
-	}*/
-
-	// webhook notification
-	go w.sendToWebhookNotifier(event)
-
 	room := &RoomInfo{
 		Sid: event.Room.Sid,
 	}
@@ -276,6 +269,9 @@ func (w *webhookEvent) participantLeft() {
 	if err != nil {
 		log.Errorln(err)
 	}
+
+	// webhook notification
+	go w.sendToWebhookNotifier(event)
 
 	// if we missed to calculate this user's speech service usage stat
 	// for sudden disconnection
@@ -364,6 +360,23 @@ func (w *webhookEvent) sendToWebhookNotifier(event *livekit.WebhookEvent) {
 	}
 
 	msg := utils.PrepareCommonWebhookNotifyEvent(event)
+	err := w.notifier.SendWebhookEvent(msg)
+	if err != nil {
+		log.Errorln(err)
+	}
+}
+
+func (w *webhookEvent) sendCustomTypeWebhook(event *livekit.WebhookEvent, eventName string) {
+	if event == nil || w.notifier == nil {
+		return
+	}
+	if event.Room == nil {
+		log.Errorln("empty room info for event: ", event.GetEvent())
+		return
+	}
+
+	msg := utils.PrepareCommonWebhookNotifyEvent(event)
+	msg.Event = &eventName
 	err := w.notifier.SendWebhookEvent(msg)
 	if err != nil {
 		log.Errorln(err)
