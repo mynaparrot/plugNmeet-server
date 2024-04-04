@@ -138,11 +138,8 @@ func (w *webhookEvent) roomFinished() {
 	}()
 
 	// now we'll perform a few service related tasks
-	go func() {
-		// let's wait a few seconds so that any pending task will finish
-		time.Sleep(config.WaitBeforeTriggerOnAfterRoomEnded)
-		w.roomService.OnAfterRoomClosed(event.Room.Name)
-	}()
+	time.Sleep(config.WaitBeforeTriggerOnAfterRoomEnded)
+	w.roomService.OnAfterRoomClosed(event.Room.GetName())
 
 	//we'll send a message to the recorder to stop
 	_ = w.recorderModel.SendMsgToRecorder(&plugnmeet.RecordingReq{
