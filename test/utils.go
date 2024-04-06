@@ -7,7 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/goccy/go-json"
-	lksdk "github.com/livekit/server-sdk-go"
+	lksdk "github.com/livekit/server-sdk-go/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/handler"

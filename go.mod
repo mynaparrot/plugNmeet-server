@@ -8,7 +8,7 @@ require (
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/frostbyte73/core v0.0.10
 	github.com/gabriel-vasile/mimetype v1.4.3
-	github.com/go-jose/go-jose/v3 v3.0.3
+	github.com/go-jose/go-jose/v4 v4.0.1
 	github.com/goccy/go-json v0.10.2
 	github.com/gofiber/contrib/socketio v1.0.0
 	github.com/gofiber/contrib/websocket v1.3.0
@@ -18,9 +18,8 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.5
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.12.0
-	github.com/livekit/server-sdk-go v1.1.8
 	github.com/livekit/server-sdk-go/v2 v2.1.0
-	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240330004734-45c10afc00ff
+	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240406051026-b126e7e324eb
 	github.com/redis/go-redis/v9 v9.5.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
@@ -47,6 +46,7 @@ require (
 	github.com/fasthttp/websocket v1.5.8 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/gammazero/deque v0.2.1 // indirect
+	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-sql-driver/mysql v1.8.1 // indirect
@@ -96,7 +96,6 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/savsgio/gotils v0.0.0-20240303185622-093b76447511 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
-	github.com/thoas/go-funk v0.9.3 // indirect
 	github.com/twitchtv/twirp v8.1.3+incompatible // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.52.0 // indirect

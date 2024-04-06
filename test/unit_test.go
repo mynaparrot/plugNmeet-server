@@ -2,7 +2,7 @@ package test
 
 import (
 	"github.com/livekit/protocol/livekit"
-	lksdk "github.com/livekit/server-sdk-go"
+	lksdk "github.com/livekit/server-sdk-go/v2"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/stretchr/testify/suite"
 	"net/http"
