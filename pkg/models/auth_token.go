@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/mynaparrot/plugnmeet-protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-protocol/webhook"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
@@ -221,5 +222,5 @@ func (a *AuthTokenModel) GenerateLivekitToken(c *plugnmeet.PlugNmeetTokenClaims)
 }
 
 func (a *AuthTokenModel) ValidateLivekitWebhookToken(body []byte, token string) (bool, error) {
-	return auth.VerifyWebhookRequest(body, a.app.LivekitInfo.ApiKey, a.app.LivekitInfo.Secret, token)
+	return webhook.VerifyRequest(body, a.app.LivekitInfo.ApiKey, a.app.LivekitInfo.Secret, token)
 }
