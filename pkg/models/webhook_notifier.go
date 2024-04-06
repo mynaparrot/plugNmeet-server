@@ -14,9 +14,6 @@ import (
 const (
 	defaultQueueSize = 200
 	WebhookRedisKey  = "pnm:webhookData"
-	authHeader       = "Authorization"
-	hashToken        = "Hash-Token" // in various Apache modules will strip the Authorization header,
-	// so we'll use additional one
 )
 
 type WebhookNotifier struct {
@@ -35,7 +32,7 @@ type webhookRedisFields struct {
 }
 
 func newWebhookNotifier() *WebhookNotifier {
-	notifier := webhook.GetWebhookNotifier(100, config.AppCnf.Client.Debug, config.GetLogger())
+	notifier := webhook.GetWebhookNotifier(defaultQueueSize, config.AppCnf.Client.Debug, config.GetLogger())
 
 	w := &WebhookNotifier{
 		ctx:                  context.Background(),
