@@ -5,7 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/go-jose/go-jose/v3/jwt"
+	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -255,7 +256,7 @@ func (a *AuthRecording) CreateTokenForDownload(path string) (string, error) {
 
 // VerifyRecordingToken verify token & provide file path
 func (a *AuthRecording) VerifyRecordingToken(token string) (string, int, error) {
-	tok, err := jwt.ParseSigned(token)
+	tok, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.HS256})
 	if err != nil {
 		return "", fiber.StatusUnauthorized, err
 	}

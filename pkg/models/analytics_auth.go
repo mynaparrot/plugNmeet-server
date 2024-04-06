@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/go-jose/go-jose/v3"
-	"github.com/go-jose/go-jose/v3/jwt"
+	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -230,12 +230,12 @@ func (m *AnalyticsAuthModel) GetAnalyticsDownloadToken(r *plugnmeet.GetAnalytics
 		Subject:   analytic.FileName,
 	}
 
-	return jwt.Signed(sig).Claims(cl).CompactSerialize()
+	return jwt.Signed(sig).Claims(cl).Serialize()
 }
 
 // VerifyAnalyticsToken verify token & provide file path
 func (m *AnalyticsAuthModel) VerifyAnalyticsToken(token string) (string, int, error) {
-	tok, err := jwt.ParseSigned(token)
+	tok, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.HS256})
 	if err != nil {
 		return "", fiber.StatusUnauthorized, err
 	}

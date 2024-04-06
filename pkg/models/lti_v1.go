@@ -5,8 +5,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/go-jose/go-jose/v3"
-	"github.com/go-jose/go-jose/v3/jwt"
+	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/jordic/lti"
@@ -180,11 +180,11 @@ func (m *LTIV1) ToJWT(c *plugnmeet.LtiClaims) (string, error) {
 		Subject:   c.UserId,
 	}
 
-	return jwt.Signed(sig).Claims(cl).Claims(c).CompactSerialize()
+	return jwt.Signed(sig).Claims(cl).Claims(c).Serialize()
 }
 
 func (m *LTIV1) LTIV1VerifyHeaderToken(token string) (*LtiClaims, error) {
-	tok, err := jwt.ParseSigned(token)
+	tok, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.HS256})
 	if err != nil {
 		return nil, err
 	}
