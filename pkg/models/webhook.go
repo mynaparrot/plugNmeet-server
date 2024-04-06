@@ -363,10 +363,7 @@ func (w *webhookEvent) onAfterRoomFinishedTasks(event *livekit.WebhookEvent) {
 
 	// clean shared note
 	em := NewEtherpadModel()
-	err = em.CleanAfterRoomEnd(event.Room.Name, event.Room.Metadata)
-	if err != nil {
-		log.Errorln(err)
-	}
+	_ = em.CleanAfterRoomEnd(event.Room.Name, event.Room.Metadata)
 
 	// clean polls
 	pm := NewPollsModel()
