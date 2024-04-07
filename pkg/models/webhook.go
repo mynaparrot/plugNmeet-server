@@ -349,7 +349,7 @@ func (w *webhookEvent) onAfterRoomFinishedTasks(event *livekit.WebhookEvent) {
 	}
 	marshal, err := json.Marshal(msg)
 	if err == nil {
-		_, err := w.rc.Publish(context.Background(), "plug-n-meet-user-websocket", marshal).Result()
+		_, err := w.rc.Publish(w.ctx, config.UserWebsocketChannel, marshal).Result()
 		if err != nil {
 			log.Errorln(err)
 		}

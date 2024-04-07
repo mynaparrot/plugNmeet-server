@@ -12,8 +12,7 @@ import (
 )
 
 const (
-	defaultQueueSize = 200
-	WebhookRedisKey  = "pnm:webhookData"
+	WebhookRedisKey = "pnm:webhookData"
 )
 
 type WebhookNotifier struct {
@@ -32,7 +31,7 @@ type webhookRedisFields struct {
 }
 
 func newWebhookNotifier() *WebhookNotifier {
-	notifier := webhook.GetWebhookNotifier(defaultQueueSize, config.AppCnf.Client.Debug, config.GetLogger())
+	notifier := webhook.GetWebhookNotifier(config.DefaultWebhookQueueSize, config.AppCnf.Client.Debug, config.GetLogger())
 
 	w := &WebhookNotifier{
 		ctx:                  context.Background(),
