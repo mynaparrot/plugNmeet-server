@@ -13,4 +13,10 @@ const (
 	WaitBeforeBreakoutRoomOnAfterRoomStart   = 2 * time.Second
 	WaitBeforeAnalyticsStartProcessing       = 30 * time.Second
 	MaxDurationWaitBeforeCleanRoomWebhook    = 1 * time.Minute
+
+	DefaultWebsocketQueueSize  = 200
+	DefaultWebhookQueueSize    = 200
+	UserWebsocketChannel       = "plug-n-meet-user-websocket"
+	WhiteboardWebsocketChannel = "plug-n-meet-whiteboard-websocket"
+	SystemWebsocketChannel     = "plug-n-meet-system-websocket"
 )

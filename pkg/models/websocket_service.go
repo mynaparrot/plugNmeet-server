@@ -7,10 +7,12 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
+	"sync"
 	"time"
 )
 
 type WebsocketServiceModel struct {
+	sync.RWMutex
 	pl      *plugnmeet.DataMessage // payload msg
 	rSid    string                 // room sid
 	isAdmin bool
@@ -35,6 +37,7 @@ func (w *WebsocketServiceModel) HandleDataMessages(payload *plugnmeet.DataMessag
 		payload.To = nil
 	}
 
+	w.Lock()
 	w.pl = payload           // payload messages
 	w.rSid = payload.RoomSid // room sid
 	w.isAdmin = isAdmin
@@ -48,6 +51,7 @@ func (w *WebsocketServiceModel) HandleDataMessages(payload *plugnmeet.DataMessag
 	case plugnmeet.DataMsgType_WHITEBOARD:
 		w.handleWhiteboardMessages()
 	}
+	w.Unlock()
 }
 
 func (w *WebsocketServiceModel) userMessages() {
