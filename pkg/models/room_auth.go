@@ -30,13 +30,12 @@ func NewRoomAuthModel() *RoomAuthModel {
 }
 
 func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *livekit.Room) {
-	exist, err := am.rs.ManageActiveRoomsWithMetadata(r.GetRoomId(), "get", "")
-	if err == nil && exist != nil {
-		// maybe this room was ended just now, so we'll wait until clean up done
-		waitFor := config.WaitBeforeTriggerOnAfterRoomEnded + (1 * time.Second)
-		log.Infoln("this room:", r.GetRoomId(), "still active, we'll wait for:", waitFor, "before recreating it again.")
-		time.Sleep(waitFor)
-	}
+	// some pre creation tasks
+	am.preRoomCreationTasks(r)
+
+	// in preRoomCreationTasks we've added this room in progress list
+	// so, we'll just use defer to clean this room at the end of this function
+	defer am.rs.RoomCreationProgressList(r.RoomId, "del")
 
 	roomDbInfo, _ := am.rm.GetRoomInfo(r.RoomId, "", 1)
 	if roomDbInfo.Id > 0 {
@@ -144,6 +143,37 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 	_, _ = am.rs.ManageActiveRoomsWithMetadata(r.RoomId, "add", meta)
 
 	return true, "room created", room
+}
+
+func (am *RoomAuthModel) preRoomCreationTasks(r *plugnmeet.CreateRoomReq) {
+	exist, err := am.rs.ManageActiveRoomsWithMetadata(r.GetRoomId(), "get", "")
+	if err == nil && exist != nil {
+		// maybe this room was ended just now, so we'll wait until clean up done
+		waitFor := config.WaitBeforeTriggerOnAfterRoomEnded + (1 * time.Second)
+		log.Infoln("this room:", r.GetRoomId(), "still active, we'll wait for:", waitFor, "before recreating it again.")
+		time.Sleep(waitFor)
+	}
+
+	for {
+		list, err := am.rs.RoomCreationProgressList(r.GetRoomId(), "exist")
+		if err != nil {
+			log.Errorln(err)
+			break
+		}
+		if list {
+			log.Println(r.GetRoomId(), "creation in progress, so waiting for", config.WaitDurationIfRoomInProgress)
+			// we'll wait
+			time.Sleep(config.WaitDurationIfRoomInProgress)
+		} else {
+			break
+		}
+	}
+
+	// we'll add this room in processing list
+	_, err = am.rs.RoomCreationProgressList(r.RoomId, "add")
+	if err != nil {
+		log.Errorln(err)
+	}
 }
 
 func (am *RoomAuthModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (bool, string, *plugnmeet.RoomMetadata) {

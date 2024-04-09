@@ -20,6 +20,7 @@ const (
 	ActiveRoomsWithMetadataKey = "pnm:activeRoomsWithMetadata"
 	ActiveRoomUsers            = "pnm:activeRoom:%s:users"
 	RoomWithUsersMetadata      = "pnm:roomWithUsersMetadata:%s"
+	RoomCreationProgressList   = "pnm:roomCreationProgressList"
 )
 
 type RoomService struct {
@@ -560,6 +561,35 @@ func (r *RoomService) ManageRoomWithUsersMetadata(roomId, userId, task, metadata
 	return "", errors.New("invalid task")
 }
 
+// RoomCreationProgressList can be used during a room creation
+// we have seen that during create room in livekit an instant webhook sent from livekit but from our side we are still in progress,
+// so it's better we'll wait before processing
+// task = add | exist | del
+func (r *RoomService) RoomCreationProgressList(roomId, task string) (bool, error) {
+	switch task {
+	case "add":
+		_, err := r.rc.SAdd(r.ctx, RoomCreationProgressList, roomId).Result()
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	case "exist":
+		result, err := r.rc.SIsMember(r.ctx, RoomCreationProgressList, roomId).Result()
+		if err != nil {
+			return false, err
+		}
+		return result, nil
+	case "del":
+		_, err := r.rc.SRem(r.ctx, RoomCreationProgressList, roomId).Result()
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
+	return false, errors.New("invalid task")
+}
+
 func (r *RoomService) OnAfterRoomClosed(roomId string) {
 	// completely remove a room active users list
 	_, err := r.ManageActiveUsersList(roomId, "", "delList", 0)
@@ -584,4 +614,7 @@ func (r *RoomService) OnAfterRoomClosed(roomId string) {
 	if err != nil {
 		log.Errorln(err)
 	}
+
+	// remove from progress, if existed. no need to log if error
+	_, _ = r.RoomCreationProgressList(roomId, "del")
 }
