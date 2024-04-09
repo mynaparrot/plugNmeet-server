@@ -142,10 +142,8 @@ github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWE
 github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D7dTCTo3Y=
 github.com/mattn/go-runewidth v0.0.15 h1:UNAjwbU9l54TA3KzvqLGxwWjHmMgBUVhBiTjelZgg3U=
 github.com/mattn/go-runewidth v0.0.15/go.mod h1:Jdepj2loyihRzMpdS35Xk/zdY8IAYHsh153qUoGf23w=
-github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240409021551-ebded290efdd h1:LyZcRJiCXj65bSBKXx1VFahn4/W1pwXo+N2zxiYI/nE=
-github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240409021551-ebded290efdd/go.mod h1:5i+oGxga/FzAuTxhZzBeX6Oe/6HUtYHOW2CudM5pvyI=
-github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240409041749-bdb59edc0697 h1:gJRLTHAdCmcsElNV1Fs89h9uD9sPI/NQ7B/wmRADyBg=
-github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240409041749-bdb59edc0697/go.mod h1:5i+oGxga/FzAuTxhZzBeX6Oe/6HUtYHOW2CudM5pvyI=
+github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240409155002-51d7495c8be3 h1:FPVCVpQ3cW+P99S/RkO8NuoDN3h29KlkP7omcqHvxK8=
+github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240409155002-51d7495c8be3/go.mod h1:5i+oGxga/FzAuTxhZzBeX6Oe/6HUtYHOW2CudM5pvyI=
 github.com/nats-io/nats.go v1.34.1 h1:syWey5xaNHZgicYBemv0nohUPPmaLteiBEUT6Q5+F/4=
 github.com/nats-io/nats.go v1.34.1/go.mod h1:Ubdu4Nh9exXdSz0RVWRFBbRfrbSxOYd26oF0wkWclB8=
 github.com/nats-io/nkeys v0.4.7 h1:RwNJbbIdYCoClSDNY7QVKZlyb/wfT6ugvFCiKy6vDvI=
