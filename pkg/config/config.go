@@ -156,7 +156,9 @@ func setLogger() {
 	}
 
 	logrus.SetReportCaller(true)
-	logrus.SetFormatter(&logrus.JSONFormatter{})
+	logrus.SetFormatter(&logrus.JSONFormatter{
+		PrettyPrint: true,
+	})
 	logrus.RegisterExitHandler(func() {
 		_ = logWriter.Close()
 	})
