@@ -146,6 +146,7 @@ func (w *WebhookNotifier) ForceToPutInQueue(event *plugnmeet.CommonNotifyEvent) 
 		return
 	}
 	if event.Room.GetSid() == "" || event.Room.GetRoomId() == "" {
+		log.Errorln("empty room info for", event.GetEvent())
 		return
 	}
 
