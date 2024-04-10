@@ -81,7 +81,7 @@ func (m *LTIV1) LTIV1Landing(c *fiber.Ctx, requests, signingURL string) error {
 	}
 
 	if userId == "" {
-		return errors.New("either value of user_id or lis_person_contact_email_primary  required")
+		return errors.New(config.UserIdOrEmailRequired)
 	}
 
 	name := params.Get("lis_person_name_full")
@@ -141,7 +141,7 @@ func (m *LTIV1) VerifyAuth(requests, signingURL string) (*url.Values, error) {
 	}
 
 	if p.Get("oauth_consumer_key") != p.ConsumerKey {
-		return nil, errors.New("invalid consumer_key")
+		return nil, errors.New(config.InvalidConsumerKey)
 	}
 
 	sign, err := p.Sign()
@@ -152,7 +152,7 @@ func (m *LTIV1) VerifyAuth(requests, signingURL string) (*url.Values, error) {
 
 	if sign != providedSignature {
 		log.Errorln("Calculated: " + sign + " provided: " + providedSignature)
-		return nil, errors.New("verification failed")
+		return nil, errors.New(config.VerificationFailed)
 	}
 
 	return &params, nil
