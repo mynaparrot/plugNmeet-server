@@ -56,7 +56,7 @@ func (r *RoomService) LoadRoomInfo(roomId string) (*livekit.Room, error) {
 		// if you change this text then make sure
 		// you also update: scheduler.go activeRoomChecker()
 		// also room_auth.go CreateRoom()
-		return nil, errors.New("requested room does not exist")
+		return nil, errors.New(config.RequestedRoomNotExist)
 	}
 
 	room := res.Rooms[0]

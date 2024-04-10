@@ -40,7 +40,7 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 	roomDbInfo, _ := am.rm.GetRoomInfo(r.RoomId, "", 1)
 	if roomDbInfo.Id > 0 {
 		rf, err := am.rs.LoadRoomInfo(r.RoomId)
-		if err != nil && err.Error() != "requested room does not exist" {
+		if err != nil && err.Error() != config.RequestedRoomNotExist {
 			return false, "can't create room. try again", nil
 		}
 
