@@ -73,7 +73,6 @@ func (w *webhookEvent) roomStarted() {
 			break
 		}
 		if list {
-			log.Println(event.Room.GetName(), "creation in progress, so waiting for", config.WaitDurationIfRoomInProgress)
 			// we'll wait
 			time.Sleep(config.WaitDurationIfRoomInProgress)
 		} else {
