@@ -372,21 +372,6 @@ func (rm *RecordingModel) sendToWebhookNotifier(r *plugnmeet.RecorderToPlugNmeet
 			},
 		}
 		if r.Task == plugnmeet.RecordingTasks_RECORDING_PROCEEDED {
-			// at present recorder is not sending roomId or roomSid but roomTableId
-			// but for our webhook we'll need those 2 info otherwise next step will not be successful, so we'll get room Info
-			if r.GetRoomId() == "" || r.GetRoomSid() == "" {
-				rr := NewRoomModel()
-				rf, _ := rr.GetRoomInfoByTableId(r.GetRoomTableId())
-				if rf != nil {
-					msg.Room = &plugnmeet.NotifyEventRoom{
-						Sid:    &rf.Sid,
-						RoomId: &rf.RoomId,
-					}
-				} else {
-					log.Errorln("can not get room info with table id", r.GetRoomTableId())
-				}
-			}
-
 			// this process may take longer time & webhook url may clean up
 			// so, here we'll use ForceToPutInQueue method to retrieve url from mysql table
 			n.ForceToPutInQueue(msg)
