@@ -146,6 +146,7 @@ func (w *WebhookNotifier) ForceToPutInQueue(event *plugnmeet.CommonNotifyEvent) 
 		return
 	}
 	if event.Room.GetSid() == "" || event.Room.GetRoomId() == "" {
+		log.Errorln("empty room info for", event.GetEvent())
 		return
 	}
 
@@ -156,10 +157,8 @@ func (w *WebhookNotifier) ForceToPutInQueue(event *plugnmeet.CommonNotifyEvent) 
 
 	if w.enabledForPerMeeting {
 		roomInfo, _ := w.rm.GetRoomInfo("", event.Room.GetSid(), 0)
-		if roomInfo != nil {
-			if roomInfo.WebhookUrl != "" {
-				urls = append(urls, roomInfo.WebhookUrl)
-			}
+		if roomInfo != nil && roomInfo.WebhookUrl != "" {
+			urls = append(urls, roomInfo.WebhookUrl)
 		}
 	}
 
@@ -176,7 +175,7 @@ func (w *WebhookNotifier) saveData(roomId string, d *webhookRedisFields) error {
 		return err
 	}
 
-	// we'll simply overrider any existing value & put new
+	// we'll simply override any existing value & put new
 	_, err = w.rc.HSet(w.ctx, WebhookRedisKey, roomId, marshal).Result()
 	if err != nil {
 		return err

@@ -25,10 +25,10 @@ func (u *UserModel) CommonValidation(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 	if isAdmin != true {
-		return errors.New("only admin can send this request")
+		return errors.New(config.OnlyAdminCanRequest)
 	}
 	if roomId == "" {
-		return errors.New("no roomId in token")
+		return errors.New(config.NoRoomIdInToken)
 	}
 
 	return nil
@@ -113,7 +113,7 @@ func (u *UserModel) updateParticipantLockMetadata(um updateParticipantLockMetada
 		return err
 	}
 
-	return errors.New("user isn't active now")
+	return errors.New(config.UserNotActive)
 }
 
 func (u *UserModel) changeLockSettingsMetadata(service string, direction string, l *plugnmeet.LockSettings) *plugnmeet.LockSettings {
@@ -171,7 +171,7 @@ func (u *UserModel) MuteUnMuteTrack(r *plugnmeet.MuteUnMuteTrackReq) error {
 	}
 
 	if p.State != livekit.ParticipantInfo_ACTIVE {
-		return errors.New("user isn't active now")
+		return errors.New(config.UserNotActive)
 	}
 	trackSid := r.TrackSid
 
@@ -224,7 +224,7 @@ func (u *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 	}
 
 	if p.State != livekit.ParticipantInfo_ACTIVE {
-		return errors.New("user isn't active now")
+		return errors.New(config.UserNotActive)
 	}
 
 	// send message to user first
@@ -268,7 +268,7 @@ func (u *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
 				m.IsPresenter = false
 				_, err = u.roomService.UpdateParticipantMetadataByStruct(r.RoomId, p.Identity, m)
 				if err != nil {
-					return errors.New("can't demote current presenter")
+					return errors.New(config.CanNotDemotePresenter)
 				}
 			}
 		} else if r.Task == plugnmeet.SwitchPresenterTask_DEMOTE {
@@ -278,7 +278,7 @@ func (u *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
 				m.IsPresenter = true
 				_, err = u.roomService.UpdateParticipantMetadataByStruct(r.RoomId, p.Identity, m)
 				if err != nil {
-					return errors.New("can't change alternative presenter")
+					return errors.New(config.CanNotChangeAlternativePresenter)
 				}
 			}
 		}
@@ -298,13 +298,13 @@ func (u *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
 		m.IsPresenter = true
 		_, err = u.roomService.UpdateParticipantMetadataByStruct(r.RoomId, p.Identity, m)
 		if err != nil {
-			return errors.New("can't promote to presenter")
+			return errors.New(config.CanNotPromoteToPresenter)
 		}
 	} else if r.Task == plugnmeet.SwitchPresenterTask_DEMOTE {
 		m.IsPresenter = false
 		_, err = u.roomService.UpdateParticipantMetadataByStruct(r.RoomId, p.Identity, m)
 		if err != nil {
-			return errors.New("can't demote to presenter. try again")
+			return errors.New(config.CanNotDemotePresenter)
 		}
 	}
 

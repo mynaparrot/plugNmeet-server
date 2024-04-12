@@ -80,7 +80,7 @@ func (s *SchedulerModel) activeRoomChecker() {
 		}
 
 		fromRedis, err := s.ra.rs.LoadRoomInfo(room.RoomId)
-		if fromRedis == nil && err.Error() == "requested room does not exist" {
+		if fromRedis == nil && err.Error() == config.RequestedRoomNotExist {
 			_, _ = s.ra.rm.UpdateRoomStatus(&RoomInfo{
 				Sid:       room.Sid,
 				IsRunning: 0,
