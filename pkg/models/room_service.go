@@ -20,7 +20,7 @@ const (
 	ActiveRoomsWithMetadataKey = "pnm:activeRoomsWithMetadata"
 	ActiveRoomUsers            = "pnm:activeRoom:%s:users"
 	RoomWithUsersMetadata      = "pnm:roomWithUsersMetadata:%s"
-	RoomCreationProgressList   = "pnm:roomCreationProgressList"
+	RoomCreationProgressKey    = "pnm:roomCreationProgressList"
 )
 
 type RoomService struct {
@@ -566,21 +566,28 @@ func (r *RoomService) ManageRoomWithUsersMetadata(roomId, userId, task, metadata
 // so it's better we'll wait before processing
 // task = add | exist | del
 func (r *RoomService) RoomCreationProgressList(roomId, task string) (bool, error) {
+	key := fmt.Sprintf("%s:%s", RoomCreationProgressKey, roomId)
 	switch task {
 	case "add":
-		_, err := r.rc.SAdd(r.ctx, RoomCreationProgressList, roomId).Result()
+		// we'll set maximum 1 minute after that key will expire
+		// this way we can ensure that there will not be any deadlock
+		// otherwise in various reason key may stay in redis & create deadlock
+		_, err := r.rc.Set(r.ctx, key, roomId, time.Minute*1).Result()
 		if err != nil {
 			return false, err
 		}
 		return true, nil
 	case "exist":
-		result, err := r.rc.SIsMember(r.ctx, RoomCreationProgressList, roomId).Result()
+		result, err := r.rc.Exists(r.ctx, key).Result()
 		if err != nil {
 			return false, err
 		}
-		return result, nil
+		if result > 0 {
+			return true, nil
+		}
+		return false, nil
 	case "del":
-		_, err := r.rc.SRem(r.ctx, RoomCreationProgressList, roomId).Result()
+		_, err := r.rc.Del(r.ctx, key).Result()
 		if err != nil {
 			return false, err
 		}
