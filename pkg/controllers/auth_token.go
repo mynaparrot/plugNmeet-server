@@ -143,15 +143,15 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	}
 
 	m := models.NewRoomAuthModel()
-	status, msg, meta := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
+	rr, meta := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: roomId.(string),
 	})
 
 	// if production then we'll check if room is active or not
 	// if not active then we don't allow to join user
 	// livekit also don't allow but throw 500 error which make confused to user.
-	if !status && *req.IsProduction {
-		return utils.SendCommonProtobufResponse(c, status, msg)
+	if !rr.GetIsActive() && *req.IsProduction {
+		return utils.SendProtoJsonResponse(c, rr)
 	}
 
 	livekitHost := strings.Replace(config.AppCnf.LivekitInfo.Host, "host.docker.internal", "localhost", 1) // without this you won't be able to connect
@@ -164,7 +164,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 		ServerVersion: &v,
 		EnabledE2Ee:   false,
 	}
-	if status && meta != nil {
+	if rr.GetIsActive() && meta != nil {
 		res.EnabledE2Ee = meta.RoomFeatures.EndToEndEncryptionFeatures.IsEnabled
 	}
 

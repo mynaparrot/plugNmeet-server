@@ -241,7 +241,7 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 	}
 
-	url := fmt.Sprintf("%s://%s/?access_token=%s", c.Protocol(), c.Hostname(), token)
+	ul := fmt.Sprintf("%s://%s/?access_token=%s", c.Protocol(), c.Hostname(), token)
 	if customDesign != nil && customDesign.String() != "" {
 		op := protojson.MarshalOptions{
 			EmitUnpopulated: false,
@@ -251,7 +251,7 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 		if err != nil {
 			return err
 		}
-		url = fmt.Sprintf("%s&custom_design=%s", url, string(cd))
+		ul = fmt.Sprintf("%s&custom_design=%s", ul, string(cd))
 	}
 
 	if strings.ToLower(q.Redirect) == "false" {
@@ -261,11 +261,11 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 			Message:      "You have joined successfully",
 			MeetingID:    q.MeetingID,
 			SessionToken: token,
-			Url:          url,
+			Url:          ul,
 		})
 	}
 
-	return c.Redirect(url)
+	return c.Redirect(ul)
 }
 
 func HandleBBBIsMeetingRunning(c *fiber.Ctx) error {
@@ -281,13 +281,13 @@ func HandleBBBIsMeetingRunning(c *fiber.Ctx) error {
 	}
 
 	m := models.NewRoomAuthModel()
-	status, _, _ := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
+	res, _ := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: q.MeetingID,
 	})
 
 	return c.XML(bbbapiwrapper.IsMeetingRunningRes{
 		ReturnCode: "SUCCESS",
-		Running:    status,
+		Running:    res.GetIsActive(),
 	})
 }
 

@@ -29,7 +29,7 @@ type AppConfig struct {
 	LogSettings                  LogSettings                  `yaml:"log_settings"`
 	LivekitInfo                  LivekitInfo                  `yaml:"livekit_info"`
 	RedisInfo                    *factory.RedisInfo           `yaml:"redis_info"`
-	MySqlInfo                    *factory.MySqlInfo           `yaml:"mysql_info"`
+	DatabaseInfo                 *factory.DatabaseInfo        `yaml:"database_info"`
 	UploadFileSettings           UploadFileSettings           `yaml:"upload_file_settings"`
 	RecorderInfo                 RecorderInfo                 `yaml:"recorder_info"`
 	SharedNotePad                SharedNotePad                `yaml:"shared_notepad"`
@@ -182,8 +182,8 @@ type ErrorResponse struct {
 }
 
 func (a *AppConfig) FormatDBTable(table string) string {
-	if a.MySqlInfo.Prefix != "" {
-		return a.MySqlInfo.Prefix + table
+	if a.DatabaseInfo.Prefix != "" {
+		return a.DatabaseInfo.Prefix + table
 	}
 	return table
 }

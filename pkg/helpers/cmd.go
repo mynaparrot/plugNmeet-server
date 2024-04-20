@@ -19,7 +19,7 @@ func PrepareServer(c string) error {
 	}
 
 	// set mysql factory connection
-	db, err := factory.NewDbConnection(config.AppCnf.MySqlInfo)
+	db, err := factory.NewDbConnection(config.AppCnf.DatabaseInfo)
 	if err != nil {
 		return err
 	}

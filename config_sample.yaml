@@ -24,6 +24,10 @@ client:
   proxy_header: "" ## you can set X-Forwarded-For
   copyright_conf:
     display: true
+    # if true then user will be able to change copyright info by API
+    allow_override: false
+    # do not make the text longer, not all html tags are supported
+    # 'b', 'i', 'em', 'strong', 'a'
     text: 'Powered by <a href="https://www.plugnmeet.org" target="_blank">plugNmeet</a>'
 room_default_settings:
   max_duration: 0 # Duration in minutes. 0 = no limit
@@ -56,7 +60,9 @@ redis_info:
 #  If you use a different set of credentials for sentinel add
 #  sentinel_username: user
 #  sentinel_password: pass
-mysql_info:
+database_info:
+  # at present, we support only mysql/mariadb, in future we'll add more
+  driver_name: mysql
   host: db
   port: 3306
   username: "root"

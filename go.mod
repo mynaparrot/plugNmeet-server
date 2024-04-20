@@ -114,3 +114,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240401170217-c3f982113cda // indirect
 	google.golang.org/grpc v1.63.0 // indirect
 )
+
+replace (
+	github.com/mynaparrot/plugnmeet-protocol => ../protocol
+)
