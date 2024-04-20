@@ -90,7 +90,7 @@ shared_notepad:
   etherpad_hosts:
     -
       id: "node_01"
-      host: "http://localhost:9001"
+      host: "http://host.docker.internal:9001"
       client_id: "plugNmeet"
       client_secret: "lmpGEH0MxrBg7ymsbSh9TU1d6VHRMk"
 azure_cognitive_services_speech:
