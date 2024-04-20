@@ -92,9 +92,10 @@ type SharedNotePad struct {
 }
 
 type EtherpadInfo struct {
-	Id     string `yaml:"id"`
-	Host   string `yaml:"host"`
-	ApiKey string `yaml:"api_key"`
+	Id           string `yaml:"id"`
+	Host         string `yaml:"host"`
+	ClientId     string `yaml:"client_id"`
+	ClientSecret string `yaml:"client_secret"`
 }
 
 type AzureCognitiveServicesSpeech struct {

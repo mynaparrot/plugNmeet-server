@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/goccy/go-json"
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -13,13 +14,16 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strings"
+	"time"
 )
 
 type EtherpadModel struct {
 	SharedNotePad  config.SharedNotePad
 	NodeId         string
 	Host           string
-	ApiKey         string
+	ClientId       string
+	ClientSecret   string
 	context        context.Context
 	rc             *redis.Client
 	rs             *RoomService
@@ -44,8 +48,9 @@ type EtherpadDataTypes struct {
 }
 
 const (
-	APIVersion  = "1.3.0"
-	EtherpadKey = "pnm:etherpad:"
+	APIVersion       = "1.3.0"
+	EtherpadKey      = "pnm:etherpad:"
+	EtherpadTokenKey = "pnm:etherpadToken"
 )
 
 func NewEtherpadModel() *EtherpadModel {
@@ -148,8 +153,10 @@ func (m *EtherpadModel) addPadToRoomMetadata(roomId string, c *plugnmeet.CreateE
 func (m *EtherpadModel) CleanPad(roomId, nodeId, padId string) error {
 	for _, h := range m.SharedNotePad.EtherpadHosts {
 		if h.Id == nodeId {
+			m.NodeId = nodeId
 			m.Host = h.Host
-			m.ApiKey = h.ApiKey
+			m.ClientId = h.ClientId
+			m.ClientSecret = h.ClientSecret
 		}
 	}
 	if m.Host == "" {
@@ -275,14 +282,17 @@ func (m *EtherpadModel) selectHost() error {
 	selectedHost := m.SharedNotePad.EtherpadHosts[hosts[0].i]
 	m.NodeId = selectedHost.Id
 	m.Host = selectedHost.Host
-	m.ApiKey = selectedHost.ApiKey
+	m.ClientId = selectedHost.ClientId
+	m.ClientSecret = selectedHost.ClientSecret
 
 	return nil
 }
 
 func (m *EtherpadModel) checkStatus(h config.EtherpadInfo) bool {
+	m.NodeId = h.Id
 	m.Host = h.Host
-	m.ApiKey = h.ApiKey
+	m.ClientId = h.ClientId
+	m.ClientSecret = h.ClientSecret
 
 	vals := url.Values{}
 	_, err := m.postToEtherpad("getStats", vals)
@@ -295,22 +305,36 @@ func (m *EtherpadModel) checkStatus(h config.EtherpadInfo) bool {
 }
 
 func (m *EtherpadModel) postToEtherpad(method string, vals url.Values) (*EtherpadHttpRes, error) {
-	endPoint := m.Host + "/api/" + APIVersion + "/" + method
-	vals.Add("apikey", m.ApiKey)
+	if m.NodeId == "" {
+		return nil, errors.New("no notepad nodeId found")
+	}
+	token, err := m.getAccessToken()
+	if err != nil {
+		return nil, err
+	}
 
+	client := &http.Client{}
 	en := vals.Encode()
-	resp, err := http.Get(endPoint + "?" + en)
+	endPoint := fmt.Sprintf("%s/api/%s/%s?%s", m.Host, APIVersion, method, en)
+
+	req, err := http.NewRequest("GET", endPoint, nil)
 	if err != nil {
-		return nil, errors.New("can't connect to host")
+		return nil, err
 	}
 
-	if resp.Status != "200 OK" {
-		return nil, errors.New("error code: " + resp.Status)
+	req.Header.Add("Authorization", "Bearer "+token)
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, err
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	if res.StatusCode != 200 {
+		return nil, errors.New("error code: " + res.Status)
+	}
+
+	defer res.Body.Close()
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		log.Errorln(err)
 		return nil, err
 	}
 
@@ -322,4 +346,65 @@ func (m *EtherpadModel) postToEtherpad(method string, vals url.Values) (*Etherpa
 	}
 
 	return mar, nil
+}
+
+func (m *EtherpadModel) getAccessToken() (string, error) {
+	key := fmt.Sprintf("%s:%s", EtherpadTokenKey, m.NodeId)
+
+	token, err := m.rc.Get(m.context, key).Result()
+	switch {
+	case err == redis.Nil:
+		//
+	case err != nil:
+		log.Errorln(err)
+	}
+
+	if token != "" {
+		return token, nil
+	}
+
+	data := url.Values{}
+	data.Set("grant_type", "client_credentials")
+	data.Set("client_id", m.ClientId)
+	data.Set("client_secret", m.ClientSecret)
+	encodedData := data.Encode()
+
+	client := &http.Client{}
+	urlPath := fmt.Sprintf("%s/oidc/token", m.Host)
+
+	req, err := http.NewRequest("POST", urlPath, strings.NewReader(encodedData))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	res, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+
+	defer res.Body.Close()
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", err
+	}
+
+	vals := struct {
+		AccessToken string `json:"access_token"`
+	}{}
+	err = json.Unmarshal(body, &vals)
+	if err != nil {
+		return "", err
+	}
+
+	if vals.AccessToken == "" {
+		return "", errors.New("can not get access_token value")
+	}
+
+	// we'll store the value with expiry of 30 minutes max
+	_, err = m.rc.Set(m.context, key, vals.AccessToken, time.Minute*30).Result()
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	return vals.AccessToken, nil
 }

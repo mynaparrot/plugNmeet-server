@@ -640,5 +640,23 @@
   /*
    * Enable/Disable case-insensitive pad names.
    */
-  "lowerCasePadIds": "${LOWER_CASE_PAD_IDS:false}"
+  "lowerCasePadIds": "${LOWER_CASE_PAD_IDS:false}",
+  "sso": {
+    "issuer": "http://localhost:9001",
+    "clients": [
+      {
+        "client_id": "plugNmeet",
+        "client_secret": "lmpGEH0MxrBg7ymsbSh9TU1d6VHRMk",
+        "grant_types": ["client_credentials"],
+        "redirect_uris": [],
+        "response_types": [],
+        "extraParams": [
+          {
+            "name": "admin",
+            "value": "true"
+          }
+        ]
+      }
+    ]
+  }
 }
