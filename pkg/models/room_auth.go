@@ -67,14 +67,18 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 			Text:    "Powered by <a href=\"https://www.plugnmeet.org\" target=\"_blank\">plugNmeet</a>",
 		}
 	} else {
+		d := &plugnmeet.CopyrightConf{
+			Display: copyrightConf.Display,
+			Text:    copyrightConf.Text,
+		}
 		// this mean user has set copyright info by API
 		if r.Metadata.CopyrightConf != nil {
 			// if not allow to override then we will simply use default
 			if !copyrightConf.AllowOverride {
-				r.Metadata.CopyrightConf = copyrightConf
+				r.Metadata.CopyrightConf = d
 			}
 		} else {
-			r.Metadata.CopyrightConf = copyrightConf
+			r.Metadata.CopyrightConf = d
 		}
 	}
 

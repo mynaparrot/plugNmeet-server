@@ -3,7 +3,6 @@ package config
 import (
 	"database/sql"
 	"github.com/mynaparrot/plugnmeet-protocol/factory"
-	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
@@ -38,15 +37,15 @@ type AppConfig struct {
 }
 
 type ClientInfo struct {
-	Port           int                      `yaml:"port"`
-	Debug          bool                     `yaml:"debug"`
-	Path           string                   `yaml:"path"`
-	ApiKey         string                   `yaml:"api_key"`
-	Secret         string                   `yaml:"secret"`
-	WebhookConf    WebhookConf              `yaml:"webhook_conf"`
-	PrometheusConf PrometheusConf           `yaml:"prometheus"`
-	ProxyHeader    string                   `yaml:"proxy_header"`
-	CopyrightConf  *plugnmeet.CopyrightConf `yaml:"copyright_conf"`
+	Port           int            `yaml:"port"`
+	Debug          bool           `yaml:"debug"`
+	Path           string         `yaml:"path"`
+	ApiKey         string         `yaml:"api_key"`
+	Secret         string         `yaml:"secret"`
+	WebhookConf    WebhookConf    `yaml:"webhook_conf"`
+	PrometheusConf PrometheusConf `yaml:"prometheus"`
+	ProxyHeader    string         `yaml:"proxy_header"`
+	CopyrightConf  *CopyrightConf `yaml:"copyright_conf"`
 }
 
 type WebhookConf struct {
@@ -124,6 +123,12 @@ type ChatParticipant struct {
 	UserId  string
 	UUID    string
 	IsAdmin bool
+}
+
+type CopyrightConf struct {
+	Display       bool   `yaml:"display"`
+	AllowOverride bool   `yaml:"allow_override"`
+	Text          string `yaml:"text"`
 }
 
 func SetAppConfig(a *AppConfig) {
