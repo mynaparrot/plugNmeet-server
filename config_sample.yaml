@@ -23,9 +23,10 @@ client:
     metrics_path: "/metrics"
   proxy_header: "" ## you can set X-Forwarded-For
   copyright_conf:
-    display: true
     # if true then user will be able to change copyright info by API
     allow_override: false
+    # if true then copyright text will display
+    display: true
     # do not make the text longer, not all html tags are supported
     # 'b', 'i', 'em', 'strong', 'a'
     text: 'Powered by <a href="https://www.plugnmeet.org" target="_blank">plugNmeet</a>'
