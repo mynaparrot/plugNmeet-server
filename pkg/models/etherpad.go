@@ -176,7 +176,7 @@ func (m *EtherpadModel) CleanAfterRoomEnd(roomId, metadata string) error {
 	}
 
 	roomMeta, _ := m.rs.UnmarshalRoomMetadata(metadata)
-	if roomMeta.RoomFeatures.SharedNotePadFeatures == nil {
+	if roomMeta.GetRoomFeatures() == nil || roomMeta.GetRoomFeatures().GetSharedNotePadFeatures() == nil {
 		return nil
 	}
 
