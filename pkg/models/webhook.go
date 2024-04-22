@@ -284,7 +284,7 @@ func (w *webhookEvent) participantLeft() {
 
 func (w *webhookEvent) trackPublished() {
 	if w.event.Room == nil {
-		log.Errorln("empty roomInfo")
+		log.Errorln("empty roomInfo", w.event)
 		return
 	}
 	// webhook notification
@@ -316,7 +316,7 @@ func (w *webhookEvent) trackPublished() {
 
 func (w *webhookEvent) trackUnpublished() {
 	if w.event.Room == nil {
-		log.Errorln("empty roomInfo")
+		log.Errorln("empty roomInfo", w.event)
 		return
 	}
 	// webhook notification
