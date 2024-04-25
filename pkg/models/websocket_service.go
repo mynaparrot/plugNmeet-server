@@ -261,7 +261,7 @@ func (w *WebsocketServiceModel) handleWhiteboard() {
 			u := strings.Clone(t)
 			go func() {
 				defer wg.Done()
-				err = socketio.EmitTo(u, jm, socketio.BinaryMessage)
+				err := socketio.EmitTo(u, jm, socketio.BinaryMessage)
 				if err != nil {
 					log.Errorln(err)
 				}
