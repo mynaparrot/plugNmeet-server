@@ -7,6 +7,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
+	"strings"
 	"sync"
 	"time"
 )
@@ -246,8 +247,27 @@ func (w *WebsocketServiceModel) handleWhiteboard() {
 	}
 	config.AppCnf.RUnlock()
 
-	if len(to) > 0 {
-		socketio.EmitToList(to, jm, socketio.BinaryMessage)
+	l := len(to)
+	if l > 0 {
+		var wg sync.WaitGroup
+		// for network related issue delivery can be delay
+		// if this continues then messages will be overflow & drop
+		// using concurrent will give better result
+		// if one user have bad connection then waiting only for him
+		// as whiteboard transmit a lot of data very frequently
+		// at present we'll implement it here only
+		wg.Add(l)
+		for _, t := range to {
+			u := strings.Clone(t)
+			go func() {
+				defer wg.Done()
+				err = socketio.EmitTo(u, jm, socketio.BinaryMessage)
+				if err != nil {
+					log.Errorln(err)
+				}
+			}()
+		}
+		wg.Wait()
 	}
 }
 
