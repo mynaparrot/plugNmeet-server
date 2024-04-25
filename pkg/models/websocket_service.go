@@ -7,7 +7,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
-	"strings"
 	"sync"
 	"time"
 )
@@ -258,14 +257,13 @@ func (w *WebsocketServiceModel) handleWhiteboard() {
 		// at present we'll implement it here only
 		wg.Add(l)
 		for _, t := range to {
-			u := strings.Clone(t)
-			go func() {
+			go func(u string) {
 				defer wg.Done()
 				err := socketio.EmitTo(u, jm, socketio.BinaryMessage)
 				if err != nil {
 					log.Errorln(err)
 				}
-			}()
+			}(t)
 		}
 		wg.Wait()
 	}
