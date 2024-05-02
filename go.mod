@@ -16,7 +16,7 @@ require (
 	github.com/gofiber/template/html/v2 v2.1.1
 	github.com/google/uuid v1.6.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/protocol v1.12.0
+	github.com/livekit/protocol v1.15.0
 	github.com/livekit/server-sdk-go/v2 v2.1.0
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240409155002-51d7495c8be3
 	github.com/redis/go-redis/v9 v9.5.1
@@ -34,6 +34,7 @@ require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
+	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -104,6 +105,7 @@ require (
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
+	go.uber.org/zap/exp v0.2.0 // indirect
 	golang.org/x/crypto v0.22.0 // indirect
 	golang.org/x/exp v0.0.0-20240404231335-c0f41cb1a7a0 // indirect
 	golang.org/x/net v0.24.0 // indirect
