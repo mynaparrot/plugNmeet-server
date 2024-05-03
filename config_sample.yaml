@@ -33,6 +33,9 @@ client:
 room_default_settings:
   max_duration: 0 # Duration in minutes. 0 = no limit
   max_participants: 0 # 0 = no limit
+  # here you can limit the maximum number of breakout rooms
+  # default will be 6 & max 16
+  max_num_breakout_rooms: 6
 log_settings:
   log_file: "./log/plugNmeet.log"
   # maxsize of log file in MB
