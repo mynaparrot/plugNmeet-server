@@ -135,6 +135,8 @@ github.com/livekit/psrpc v0.5.3-0.20240228172457-3724cb4adbc4 h1:253WtQ2VGVHzIIz
 github.com/livekit/psrpc v0.5.3-0.20240228172457-3724cb4adbc4/go.mod h1:CQUBSPfYYAaevg1TNCc6/aYsa8DJH4jSRFdCeSZk5u0=
 github.com/livekit/server-sdk-go/v2 v2.1.0 h1:2YIW6c1IhHTVCsBsTD6P3TLIP3l/3nK+iokopquP8eE=
 github.com/livekit/server-sdk-go/v2 v2.1.0/go.mod h1:uOiQU0kIhiZM10y9RIuig2CwRA/g5fW5bzy+2WiIxP8=
+github.com/livekit/server-sdk-go/v2 v2.1.2 h1:3MhFqptHjzpsNAcisHYDtn77qrJ9szsAy4zJkeI3Mic=
+github.com/livekit/server-sdk-go/v2 v2.1.2/go.mod h1:ZjOQBtoFcU+oq1c2xaMLHhcQ3DNcfkwC3FHG8DAvkZ8=
 github.com/magefile/mage v1.15.0 h1:BvGheCMAsG3bWUDbZ8AyXXpCNwU9u5CB6sM+HNb9HYg=
 github.com/magefile/mage v1.15.0/go.mod h1:z5UZb/iS3GoOSn0JgWuiw7dxlurVYTu+/jHXqQg881A=
 github.com/mattn/go-colorable v0.1.13 h1:fFA4WZxdEF4tXPZVKMLwD8oUnCTTo08duU7wxecdEvA=
@@ -170,6 +172,8 @@ github.com/pion/dtls/v2 v2.2.10/go.mod h1:d9SYc9fch0CqK90mRk1dC7AkzzpwJj6u2GU3u+
 github.com/pion/ice/v2 v2.3.13/go.mod h1:KXJJcZK7E8WzrBEYnV4UtqEZsGeWfHxsNqhVcVvgjxw=
 github.com/pion/ice/v2 v2.3.14 h1:A7UaEmalw12Fko8YO0qguUbWyE69BnN4mDEqT7cLWQI=
 github.com/pion/ice/v2 v2.3.14/go.mod h1:KXJJcZK7E8WzrBEYnV4UtqEZsGeWfHxsNqhVcVvgjxw=
+github.com/pion/ice/v2 v2.3.15 h1:oCGVqnd6OWmJr4I6eQwSWn8VJDF45wIXFTjV3tyyris=
+github.com/pion/ice/v2 v2.3.15/go.mod h1:KXJJcZK7E8WzrBEYnV4UtqEZsGeWfHxsNqhVcVvgjxw=
 github.com/pion/interceptor v0.1.25/go.mod h1:wkbPYAak5zKsfpVDYMtEfWEy8D4zL+rpxCxPImLOg3Y=
 github.com/pion/interceptor v0.1.27 h1:mZ01OiGiukwRxezmDGzYjjokCVlDOk4T6BfaL5qrtGo=
 github.com/pion/interceptor v0.1.27/go.mod h1:/vVaqLwDjGv4GRbgmChIKZIT5EXFDijwmj4WmIYy9bI=
@@ -193,6 +197,8 @@ github.com/pion/sctp v1.8.13/go.mod h1:YKSgO/bO/6aOMP9LCie1DuD7m+GamiK2yIiPM6vH+
 github.com/pion/sctp v1.8.14/go.mod h1:P6PbDVA++OJMrVNg2AL3XtYHV4uD6dvfyOovCgMs0PE=
 github.com/pion/sctp v1.8.15 h1:Eig4+c0KUtlftepSYQeFjeeG6A/UhsK+NPVSxUf4Mmc=
 github.com/pion/sctp v1.8.15/go.mod h1:P6PbDVA++OJMrVNg2AL3XtYHV4uD6dvfyOovCgMs0PE=
+github.com/pion/sctp v1.8.16 h1:PKrMs+o9EMLRvFfXq59WFsC+V8mN1wnKzqrv+3D/gYY=
+github.com/pion/sctp v1.8.16/go.mod h1:P6PbDVA++OJMrVNg2AL3XtYHV4uD6dvfyOovCgMs0PE=
 github.com/pion/sdp/v3 v3.0.9 h1:pX++dCHoHUwq43kuwf3PyJfHlwIj4hXA7Vrifiq0IJY=
 github.com/pion/sdp/v3 v3.0.9/go.mod h1:B5xmvENq5IXJimIO4zfp6LAe1fD9N+kFv+V/1lOdz8M=
 github.com/pion/srtp/v2 v2.0.18 h1:vKpAXfawO9RtTRKZJbG4y0v1b11NZxQnxRl85kGuUlo=
@@ -214,6 +220,8 @@ github.com/pion/turn/v2 v2.1.5 h1:tTyy7TM3DCoX9IxTt/yHc/bThiRLyXK3T1YbNcgx9k4=
 github.com/pion/turn/v2 v2.1.5/go.mod h1:huEpByKKHix2/b9kmTAM3YoX6MKP+/D//0ClgUYR2fY=
 github.com/pion/webrtc/v3 v3.2.34 h1:wcKWYlVdfw+Zpdzx9csz/ou87ru9RGrl0yDJ2vKY+70=
 github.com/pion/webrtc/v3 v3.2.34/go.mod h1:0vW+VYQwUumq9R/dWjRE1IT+jeHh3MtiYDszdNrLjxo=
+github.com/pion/webrtc/v3 v3.2.38 h1:oA52VJAJhOjSi1JpKjf0CM+cCiZ3b7jBxvsoOiajeDU=
+github.com/pion/webrtc/v3 v3.2.38/go.mod h1:AQ8p56OLbm3MjhYovYdgPuyX6oc+JcKx/HFoCGFcYzA=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
@@ -397,6 +405,8 @@ google.golang.org/genproto/googleapis/rpc v0.0.0-20240401170217-c3f982113cda h1:
 google.golang.org/genproto/googleapis/rpc v0.0.0-20240401170217-c3f982113cda/go.mod h1:WtryC6hu0hhx87FDGxWCDptyssuo68sk10vYjF+T9fY=
 google.golang.org/grpc v1.63.0 h1:WjKe+dnvABXyPJMD7KDNLxtoGk5tgk+YFWN6cBWjZE8=
 google.golang.org/grpc v1.63.0/go.mod h1:WAX/8DgncnokcFUldAxq7GeB5DXHDbMF+lLvDomNkRA=
+google.golang.org/grpc v1.63.2 h1:MUeiw1B2maTVZthpU5xvASfTh3LDbxHd6IJ6QQVU+xM=
+google.golang.org/grpc v1.63.2/go.mod h1:WAX/8DgncnokcFUldAxq7GeB5DXHDbMF+lLvDomNkRA=
 google.golang.org/protobuf v0.0.0-20200109180630-ec00e32a8dfd/go.mod h1:DFci5gLYBciE7Vtevhsrf46CRTquxDuWsQurQQe4oz8=
 google.golang.org/protobuf v0.0.0-20200221191635-4d8936d0db64/go.mod h1:kwYJMbMJ01Woi6D6+Kah6886xMZcty6N08ah7+eCXa0=
 google.golang.org/protobuf v0.0.0-20200228230310-ab0ca4ff8a60/go.mod h1:cfTl7dwQJ+fmap5saPgwCLgHXTUD7jkjRqWcaiX5VyM=
