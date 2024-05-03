@@ -249,7 +249,7 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 		}
 		cd, err := op.Marshal(customDesign)
 		if err != nil {
-			return err
+			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 		}
 		ul = fmt.Sprintf("%s&custom_design=%s", ul, string(cd))
 	}
