@@ -128,8 +128,24 @@ func (w *WebsocketServiceModel) handleChat() {
 	}
 	config.AppCnf.RUnlock()
 
-	if len(to) > 0 {
-		socketio.EmitToList(to, jm, socketio.BinaryMessage)
+	l := len(to)
+	if l > 0 {
+		var wg sync.WaitGroup
+		// for network related issue delivery can be delay
+		// if this continues then messages will be overflow & drop
+		// using concurrent will give better result
+		// if one user have bad connection then waiting only for him
+		wg.Add(l)
+		for _, t := range to {
+			go func(u string) {
+				defer wg.Done()
+				err := socketio.EmitTo(u, jm, socketio.BinaryMessage)
+				if err != nil {
+					log.Errorln(err)
+				}
+			}(t)
+		}
+		wg.Wait()
 	}
 }
 
@@ -253,16 +269,11 @@ func (w *WebsocketServiceModel) handleWhiteboard() {
 		// if this continues then messages will be overflow & drop
 		// using concurrent will give better result
 		// if one user have bad connection then waiting only for him
-		// as whiteboard transmit a lot of data very frequently
-		// at present we'll implement it here only
 		wg.Add(l)
 		for _, t := range to {
 			go func(u string) {
 				defer wg.Done()
-				err := socketio.EmitTo(u, jm, socketio.BinaryMessage)
-				if err != nil {
-					log.Errorln(err)
-				}
+				_ = socketio.EmitTo(u, jm, socketio.BinaryMessage)
 			}(t)
 		}
 		wg.Wait()
@@ -391,7 +402,20 @@ func (w *WebsocketServiceModel) handleSpeechSubtitleText() {
 	}
 	config.AppCnf.RUnlock()
 
-	if len(to) > 0 {
-		socketio.EmitToList(to, jm, socketio.BinaryMessage)
+	l := len(to)
+	if l > 0 {
+		var wg sync.WaitGroup
+		// for network related issue delivery can be delay
+		// if this continues then messages will be overflow & drop
+		// using concurrent will give better result
+		// if one user have bad connection then waiting only for him
+		wg.Add(l)
+		for _, t := range to {
+			go func(u string) {
+				defer wg.Done()
+				_ = socketio.EmitTo(u, jm, socketio.BinaryMessage)
+			}(t)
+		}
+		wg.Wait()
 	}
 }
