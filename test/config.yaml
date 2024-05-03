@@ -22,6 +22,10 @@ client:
     enable: false
     metrics_path: "/metrics"
   proxy_header: ""
+room_default_settings:
+  max_duration: 0 # Duration in minutes. 0 = no limit
+  max_participants: 0 # 0 = no limit
+  max_num_breakout_rooms: 2
 log_settings:
   log_file: "../log/plugNmeet.log"
   # maxsize of log file in MB
@@ -40,7 +44,8 @@ redis_info:
   username: ""
   password: ""
   db: 0
-mysql_info:
+database_info:
+  driver_name: mysql
   host: localhost
   port: 3306
   username: root
@@ -78,7 +83,7 @@ shared_notepad:
   # server will be selected based on load
   # the value of id should be unique
   etherpad_hosts:
-    -
-      id: "node_01"
+    - id: "node_01"
       host: "http://localhost:9001"
-      api_key: "eb2fb3fb78ca29eb6896852517d34a1be5f320664e3cce3a522a06dfa278f169"
+      client_id: "plugNmeet"
+      client_secret: "lmpGEH0MxrBg7ymsbSh9TU1d6VHRMk"
