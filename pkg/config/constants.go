@@ -15,7 +15,7 @@ const (
 	MaxDurationWaitBeforeCleanRoomWebhook    = 1 * time.Minute
 	WaitDurationIfRoomInProgress             = 300 * time.Millisecond
 
-	DefaultWebsocketQueueSize  = 200
+	DefaultWebsocketQueueSize  = 1000
 	DefaultWebhookQueueSize    = 200
 	UserWebsocketChannel       = "plug-n-meet-user-websocket"
 	WhiteboardWebsocketChannel = "plug-n-meet-whiteboard-websocket"
