@@ -66,10 +66,12 @@ func SubscribeToUserWebsocketChannel() {
 			if err != nil {
 				log.Errorln(err)
 			}
-			if res.Type == "sendMsg" {
-				m.HandleDataMessages(res.DataMsg, res.RoomId, res.IsAdmin)
-			} else if res.Type == "deleteRoom" {
-				config.AppCnf.DeleteChatRoom(res.RoomId)
+			if res != nil {
+				if res.Type == "sendMsg" {
+					m.HandleDataMessages(res.DataMsg, res.RoomId, res.IsAdmin)
+				} else if res.Type == "deleteRoom" {
+					config.AppCnf.DeleteChatRoom(res.RoomId)
+				}
 			}
 		})
 	}
@@ -103,8 +105,9 @@ func SubscribeToWhiteboardWebsocketChannel() {
 			err = json.Unmarshal([]byte(msg.Payload), res)
 			if err != nil {
 				log.Errorln(err)
+			} else {
+				m.HandleDataMessages(res.DataMsg, res.RoomId, res.IsAdmin)
 			}
-			m.HandleDataMessages(res.DataMsg, res.RoomId, res.IsAdmin)
 		})
 	}
 }
@@ -138,8 +141,9 @@ func SubscribeToSystemWebsocketChannel() {
 			err = json.Unmarshal([]byte(msg.Payload), res)
 			if err != nil {
 				log.Errorln(err)
+			} else {
+				m.HandleDataMessages(res.DataMsg, res.RoomId, res.IsAdmin)
 			}
-			m.HandleDataMessages(res.DataMsg, res.RoomId, res.IsAdmin)
 		})
 	}
 }
