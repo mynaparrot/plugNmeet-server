@@ -3,7 +3,6 @@ package config
 import (
 	"database/sql"
 	"github.com/mynaparrot/plugnmeet-protocol/factory"
-	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
@@ -29,7 +28,7 @@ type AppConfig struct {
 	LogSettings                  LogSettings                  `yaml:"log_settings"`
 	LivekitInfo                  LivekitInfo                  `yaml:"livekit_info"`
 	RedisInfo                    *factory.RedisInfo           `yaml:"redis_info"`
-	MySqlInfo                    *factory.MySqlInfo           `yaml:"mysql_info"`
+	DatabaseInfo                 *factory.DatabaseInfo        `yaml:"database_info"`
 	UploadFileSettings           UploadFileSettings           `yaml:"upload_file_settings"`
 	RecorderInfo                 RecorderInfo                 `yaml:"recorder_info"`
 	SharedNotePad                SharedNotePad                `yaml:"shared_notepad"`
@@ -38,15 +37,15 @@ type AppConfig struct {
 }
 
 type ClientInfo struct {
-	Port           int                      `yaml:"port"`
-	Debug          bool                     `yaml:"debug"`
-	Path           string                   `yaml:"path"`
-	ApiKey         string                   `yaml:"api_key"`
-	Secret         string                   `yaml:"secret"`
-	WebhookConf    WebhookConf              `yaml:"webhook_conf"`
-	PrometheusConf PrometheusConf           `yaml:"prometheus"`
-	ProxyHeader    string                   `yaml:"proxy_header"`
-	CopyrightConf  *plugnmeet.CopyrightConf `yaml:"copyright_conf"`
+	Port           int            `yaml:"port"`
+	Debug          bool           `yaml:"debug"`
+	Path           string         `yaml:"path"`
+	ApiKey         string         `yaml:"api_key"`
+	Secret         string         `yaml:"secret"`
+	WebhookConf    WebhookConf    `yaml:"webhook_conf"`
+	PrometheusConf PrometheusConf `yaml:"prometheus"`
+	ProxyHeader    string         `yaml:"proxy_header"`
+	CopyrightConf  *CopyrightConf `yaml:"copyright_conf"`
 }
 
 type WebhookConf struct {
@@ -127,6 +126,12 @@ type ChatParticipant struct {
 	IsAdmin bool
 }
 
+type CopyrightConf struct {
+	Display       bool   `yaml:"display"`
+	AllowOverride bool   `yaml:"allow_override"`
+	Text          string `yaml:"text"`
+}
+
 func SetAppConfig(a *AppConfig) {
 	AppCnf = a
 	AppCnf.chatRooms = make(map[string]map[string]ChatParticipant)
@@ -183,8 +188,8 @@ type ErrorResponse struct {
 }
 
 func (a *AppConfig) FormatDBTable(table string) string {
-	if a.MySqlInfo.Prefix != "" {
-		return a.MySqlInfo.Prefix + table
+	if a.DatabaseInfo.Prefix != "" {
+		return a.DatabaseInfo.Prefix + table
 	}
 	return table
 }

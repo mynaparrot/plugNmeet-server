@@ -5,6 +5,7 @@ import (
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"strings"
 )
@@ -78,14 +79,11 @@ func HandleLTIV1IsRoomActive(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 
 	m := models.NewRoomAuthModel()
-	status, msg, _ := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
+	res, _ := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: roomId.(string),
 	})
 
-	return c.JSON(fiber.Map{
-		"status": status,
-		"msg":    msg,
-	})
+	return utils.SendProtoJsonResponse(c, res)
 }
 
 func HandleLTIV1JoinRoom(c *fiber.Ctx) error {

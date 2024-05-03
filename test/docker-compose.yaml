@@ -23,7 +23,6 @@ services:
     ports:
       - "9001:9001/tcp"
     volumes:
-      - ../etc/etherpad/APIKEY.txt:/opt/etherpad-lite/APIKEY.txt
       - ../etc/etherpad/settings.json:/opt/etherpad-lite/settings.json
     healthcheck:
       test: wget --no-verbose --tries=5 --spider "http://127.0.0.1:9001/api" || exit 1

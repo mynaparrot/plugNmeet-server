@@ -23,11 +23,19 @@ client:
     metrics_path: "/metrics"
   proxy_header: "" ## you can set X-Forwarded-For
   copyright_conf:
+    # if true then user will be able to change copyright info by API
+    allow_override: false
+    # if true then copyright text will display
     display: true
+    # do not make the text longer, not all html tags are supported
+    # 'b', 'i', 'em', 'strong', 'a'
     text: 'Powered by <a href="https://www.plugnmeet.org" target="_blank">plugNmeet</a>'
 room_default_settings:
   max_duration: 0 # Duration in minutes. 0 = no limit
   max_participants: 0 # 0 = no limit
+  # here you can limit the maximum number of breakout rooms
+  # default will be 6 & max 16
+  max_num_breakout_rooms: 6
 log_settings:
   log_file: "./log/plugNmeet.log"
   # maxsize of log file in MB
@@ -56,7 +64,9 @@ redis_info:
 #  If you use a different set of credentials for sentinel add
 #  sentinel_username: user
 #  sentinel_password: pass
-mysql_info:
+database_info:
+  # at present, we support only mysql/mariadb, in future we'll add more
+  driver_name: mysql
   host: db
   port: 3306
   username: "root"

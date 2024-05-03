@@ -60,13 +60,26 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 	utils.SetDefaultRoomSettings(config.AppCnf.RoomDefaultSettings, r)
 
 	// copyright
-	if config.AppCnf.Client.CopyrightConf == nil {
+	copyrightConf := config.AppCnf.Client.CopyrightConf
+	if copyrightConf == nil {
 		r.Metadata.CopyrightConf = &plugnmeet.CopyrightConf{
 			Display: true,
 			Text:    "Powered by <a href=\"https://www.plugnmeet.org\" target=\"_blank\">plugNmeet</a>",
 		}
 	} else {
-		r.Metadata.CopyrightConf = config.AppCnf.Client.CopyrightConf
+		d := &plugnmeet.CopyrightConf{
+			Display: copyrightConf.Display,
+			Text:    copyrightConf.Text,
+		}
+		// this mean user has set copyright info by API
+		if r.Metadata.CopyrightConf != nil {
+			// if not allow to override then we will simply use default
+			if !copyrightConf.AllowOverride {
+				r.Metadata.CopyrightConf = d
+			}
+		} else {
+			r.Metadata.CopyrightConf = d
+		}
 	}
 
 	// Azure cognitive services
@@ -176,11 +189,15 @@ func (am *RoomAuthModel) preRoomCreationTasks(r *plugnmeet.CreateRoomReq) {
 	}
 }
 
-func (am *RoomAuthModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (bool, string, *plugnmeet.RoomMetadata) {
-	roomDbInfo, _ := am.rm.GetRoomInfo(r.RoomId, "", 1)
+func (am *RoomAuthModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoomActiveRes, *plugnmeet.RoomMetadata) {
+	res := &plugnmeet.IsRoomActiveRes{
+		Status: true,
+		Msg:    "room is not active",
+	}
 
+	roomDbInfo, _ := am.rm.GetRoomInfo(r.RoomId, "", 1)
 	if roomDbInfo.Id == 0 {
-		return false, "room is not active", nil
+		return res, nil
 	}
 
 	// let's make sure room actually active
@@ -192,10 +209,12 @@ func (am *RoomAuthModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (bool, strin
 			IsRunning: 0,
 			Ended:     time.Now().UTC().Format("2006-01-02 15:04:05"),
 		})
-		return false, "room is not active", nil
+		return res, nil
 	}
 
-	return true, "room is active", meta
+	res.IsActive = true
+	res.Msg = "room is active"
+	return res, meta
 }
 
 func (am *RoomAuthModel) GetActiveRoomInfo(r *plugnmeet.GetActiveRoomInfoReq) (bool, string, *plugnmeet.ActiveRoomWithParticipant) {
