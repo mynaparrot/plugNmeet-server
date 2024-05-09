@@ -283,19 +283,34 @@ func (am *RoomAuthModel) GetActiveRoomsInfo() (bool, string, []*plugnmeet.Active
 }
 
 func (am *RoomAuthModel) EndRoom(r *plugnmeet.RoomEndReq) (bool, string) {
-	roomDbInfo, _ := am.rm.GetRoomInfo(r.RoomId, "", 1)
+	roomDbInfo, _ := am.rm.GetRoomInfo(r.GetRoomId(), "", 1)
 
 	if roomDbInfo.Id == 0 {
 		return false, "room not active"
 	}
 
-	_, err := am.rs.EndRoom(r.RoomId)
+	for {
+		list, err := am.rs.RoomCreationProgressList(r.GetRoomId(), "exist")
+		if err != nil {
+			log.Errorln(err)
+			break
+		}
+		if list {
+			log.Println(r.GetRoomId(), "creation in progress, so waiting for", config.WaitDurationIfRoomInProgress)
+			// we'll wait
+			time.Sleep(config.WaitDurationIfRoomInProgress)
+		} else {
+			break
+		}
+	}
+
+	_, err := am.rs.EndRoom(r.GetRoomId())
 	if err != nil {
 		return false, "can't end room"
 	}
 
 	_, _ = am.rm.UpdateRoomStatus(&RoomInfo{
-		RoomId:    r.RoomId,
+		RoomId:    r.GetRoomId(),
 		IsRunning: 0,
 		Ended:     time.Now().UTC().Format("2006-01-02 15:04:05"),
 	})
