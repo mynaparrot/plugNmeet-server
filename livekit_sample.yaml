@@ -27,6 +27,16 @@ room:
     - mime: video/vp9
     - mime: video/av1
     - mime: video/h264
+logging:
+  # log level, valid values: debug, info, warn, error
+  level: info
+  # log level for pion, default error
+  # pion_level: error
+  # when set to true, emit json fields
+  # json: false
+  # for production setups, enables sampling algorithm
+  # https://github.com/uber-go/zap/blob/master/FAQ.md#why-sample-application-logs
+  sample: false
 keys:
   APIiYAA5w37Cfo2: 6aNur7qqupeZhFYNOJVUyeXxXhVw8f4lm13pEDUx8SgB
 webhook:
