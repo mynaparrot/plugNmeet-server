@@ -21,6 +21,9 @@ func NewAuthTokenModel() *AuthTokenModel {
 }
 
 func (a *AuthTokenModel) GeneratePlugNmeetAccessToken(g *plugnmeet.GenerateTokenReq) (string, error) {
+	// check first
+	a.rs.CheckAndWaitUntilRoomCreationInProgress(g.GetRoomId())
+
 	if g.UserInfo.UserMetadata == nil {
 		g.UserInfo.UserMetadata = new(plugnmeet.UserMetadata)
 	}

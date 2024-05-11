@@ -167,29 +167,20 @@ func (am *RoomAuthModel) preRoomCreationTasks(r *plugnmeet.CreateRoomReq) {
 		time.Sleep(waitFor)
 	}
 
-	for {
-		list, err := am.rs.RoomCreationProgressList(r.GetRoomId(), "exist")
-		if err != nil {
-			log.Errorln(err)
-			break
-		}
-		if list {
-			log.Println(r.GetRoomId(), "creation in progress, so waiting for", config.WaitDurationIfRoomInProgress)
-			// we'll wait
-			time.Sleep(config.WaitDurationIfRoomInProgress)
-		} else {
-			break
-		}
-	}
+	// check & wait
+	am.rs.CheckAndWaitUntilRoomCreationInProgress(r.GetRoomId())
 
 	// we'll add this room in processing list
-	_, err = am.rs.RoomCreationProgressList(r.RoomId, "add")
+	_, err = am.rs.RoomCreationProgressList(r.GetRoomId(), "add")
 	if err != nil {
 		log.Errorln(err)
 	}
 }
 
 func (am *RoomAuthModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoomActiveRes, *plugnmeet.RoomMetadata) {
+	// check first
+	am.rs.CheckAndWaitUntilRoomCreationInProgress(r.GetRoomId())
+
 	res := &plugnmeet.IsRoomActiveRes{
 		Status: true,
 		Msg:    "room is not active",
@@ -218,6 +209,9 @@ func (am *RoomAuthModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.
 }
 
 func (am *RoomAuthModel) GetActiveRoomInfo(r *plugnmeet.GetActiveRoomInfoReq) (bool, string, *plugnmeet.ActiveRoomWithParticipant) {
+	// check first
+	am.rs.CheckAndWaitUntilRoomCreationInProgress(r.GetRoomId())
+
 	roomDbInfo, _ := am.rm.GetRoomInfo(r.RoomId, "", 1)
 
 	if roomDbInfo.Id == 0 {
@@ -283,25 +277,12 @@ func (am *RoomAuthModel) GetActiveRoomsInfo() (bool, string, []*plugnmeet.Active
 }
 
 func (am *RoomAuthModel) EndRoom(r *plugnmeet.RoomEndReq) (bool, string) {
-	roomDbInfo, _ := am.rm.GetRoomInfo(r.GetRoomId(), "", 1)
+	// check first
+	am.rs.CheckAndWaitUntilRoomCreationInProgress(r.GetRoomId())
 
+	roomDbInfo, _ := am.rm.GetRoomInfo(r.GetRoomId(), "", 1)
 	if roomDbInfo.Id == 0 {
 		return false, "room not active"
-	}
-
-	for {
-		list, err := am.rs.RoomCreationProgressList(r.GetRoomId(), "exist")
-		if err != nil {
-			log.Errorln(err)
-			break
-		}
-		if list {
-			log.Println(r.GetRoomId(), "creation in progress, so waiting for", config.WaitDurationIfRoomInProgress)
-			// we'll wait
-			time.Sleep(config.WaitDurationIfRoomInProgress)
-		} else {
-			break
-		}
 	}
 
 	_, err := am.rs.EndRoom(r.GetRoomId())

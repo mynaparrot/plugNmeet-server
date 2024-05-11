@@ -66,19 +66,7 @@ func (w *webhookEvent) roomStarted() {
 
 	// as livekit sent webhook instantly but our jobs may be in progress
 	// we'll check if this room is still under progress or not
-	for {
-		list, err := w.roomService.RoomCreationProgressList(event.Room.GetName(), "exist")
-		if err != nil {
-			log.Errorln(err)
-			break
-		}
-		if list {
-			// we'll wait
-			time.Sleep(config.WaitDurationIfRoomInProgress)
-		} else {
-			break
-		}
-	}
+	w.roomService.CheckAndWaitUntilRoomCreationInProgress(event.Room.GetName())
 
 	rm, _ := w.roomModel.GetRoomInfo(event.Room.GetName(), event.Room.GetSid(), 1)
 	if rm.Id == 0 {

@@ -597,6 +597,24 @@ func (r *RoomService) RoomCreationProgressList(roomId, task string) (bool, error
 	return false, errors.New("invalid task")
 }
 
+// CheckAndWaitUntilRoomCreationInProgress will check the process & wait if needed
+func (r *RoomService) CheckAndWaitUntilRoomCreationInProgress(roomId string) {
+	for {
+		list, err := r.RoomCreationProgressList(roomId, "exist")
+		if err != nil {
+			log.Errorln(err)
+			break
+		}
+		if list {
+			log.Println(roomId, "creation in progress, so waiting for", config.WaitDurationIfRoomInProgress)
+			// we'll wait
+			time.Sleep(config.WaitDurationIfRoomInProgress)
+		} else {
+			break
+		}
+	}
+}
+
 func (r *RoomService) OnAfterRoomClosed(roomId string) {
 	// completely remove a room active users list
 	_, err := r.ManageActiveUsersList(roomId, "", "delList", 0)
