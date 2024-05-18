@@ -55,6 +55,8 @@ github.com/go-jose/go-jose/v3 v3.0.3 h1:fFKWeig/irsp7XD2zBxvnmA/XaRWp5V3CBsZXJF7
 github.com/go-jose/go-jose/v3 v3.0.3/go.mod h1:5b+7YgP7ZICgJDBdfjZaIt+H/9L9T/YQrVfLAMboGkQ=
 github.com/go-jose/go-jose/v4 v4.0.1 h1:QVEPDE3OluqXBQZDcnNvQrInro2h0e4eqNbnZSWqS6U=
 github.com/go-jose/go-jose/v4 v4.0.1/go.mod h1:WVf9LFMHh/QVrmqrOfqun0C45tMe3RoiKJMPvgWwLfY=
+github.com/go-jose/go-jose/v4 v4.0.2 h1:R3l3kkBds16bO7ZFAEEcofK0MkrAJt3jlJznWZG0nvk=
+github.com/go-jose/go-jose/v4 v4.0.2/go.mod h1:WVf9LFMHh/QVrmqrOfqun0C45tMe3RoiKJMPvgWwLfY=
 github.com/go-logr/logr v1.2.2/go.mod h1:jdQByPbusPIv2/zmleS9BjJVeZ6kBagPoEUsqbVz/1A=
 github.com/go-logr/logr v1.4.1 h1:pKouT5E8xu9zeFC39JXRDukb6JFQPXM5p5I91188VAQ=
 github.com/go-logr/logr v1.4.1/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
@@ -135,6 +137,8 @@ github.com/livekit/mediatransportutil v0.0.0-20240329092818-a6cce9941f85 h1:lJqh
 github.com/livekit/mediatransportutil v0.0.0-20240329092818-a6cce9941f85/go.mod h1:jwKUCmObuiEDH0iiuJHaGMXwRs3RjrB4G6qqgkr/5oE=
 github.com/livekit/protocol v1.15.0 h1:JAatoWKYdFx3D0U4JBWg25ZlrY+NK26xHabFopS2Jhk=
 github.com/livekit/protocol v1.15.0/go.mod h1:pnn0Dv+/0K0OFqKHX6J6SreYO1dZxl6tDuAZ1ns8L/w=
+github.com/livekit/protocol v1.16.0 h1:TkUuirvfF1xIfpo5szXqAEEgg7QyML8d0O7+4NQpM7w=
+github.com/livekit/protocol v1.16.0/go.mod h1:pnn0Dv+/0K0OFqKHX6J6SreYO1dZxl6tDuAZ1ns8L/w=
 github.com/livekit/psrpc v0.5.3-0.20240228172457-3724cb4adbc4 h1:253WtQ2VGVHzIIzW9MUZj7vUDDILESU3zsEbiRdxYF0=
 github.com/livekit/psrpc v0.5.3-0.20240228172457-3724cb4adbc4/go.mod h1:CQUBSPfYYAaevg1TNCc6/aYsa8DJH4jSRFdCeSZk5u0=
 github.com/livekit/server-sdk-go/v2 v2.1.0 h1:2YIW6c1IhHTVCsBsTD6P3TLIP3l/3nK+iokopquP8eE=
@@ -154,6 +158,8 @@ github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240503064703-8502f4e67f08 h1:7
 github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240503064703-8502f4e67f08/go.mod h1:bewRJmLvCoNRonyV99HCi8AssBAmzFMcuDImnU7iYaM=
 github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240510063558-304155e97aa4 h1:lUitsgzVafRrsXXED1F0+ebuGAHSh23uIOSHiOmgE00=
 github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240510063558-304155e97aa4/go.mod h1:j2R+P5XkTGVTSgEV/LHjGq+gTAjKwLejH+PBrtjsNcE=
+github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240514095941-b542c3f97e6d h1:VsADwV8YJ794rDQexvD2wtb0ag3EpeVbvPmv+l+DMHI=
+github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240514095941-b542c3f97e6d/go.mod h1:S3FlNiKmpx4JBA7P6e97kJsd3WyGSPap7AMDkK4+Ls4=
 github.com/nats-io/nats.go v1.34.1 h1:syWey5xaNHZgicYBemv0nohUPPmaLteiBEUT6Q5+F/4=
 github.com/nats-io/nats.go v1.34.1/go.mod h1:Ubdu4Nh9exXdSz0RVWRFBbRfrbSxOYd26oF0wkWclB8=
 github.com/nats-io/nkeys v0.4.7 h1:RwNJbbIdYCoClSDNY7QVKZlyb/wfT6ugvFCiKy6vDvI=

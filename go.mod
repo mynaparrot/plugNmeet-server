@@ -8,7 +8,7 @@ require (
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/frostbyte73/core v0.0.10
 	github.com/gabriel-vasile/mimetype v1.4.3
-	github.com/go-jose/go-jose/v4 v4.0.1
+	github.com/go-jose/go-jose/v4 v4.0.2
 	github.com/goccy/go-json v0.10.2
 	github.com/gofiber/contrib/socketio v1.0.1
 	github.com/gofiber/contrib/websocket v1.3.1
@@ -16,9 +16,9 @@ require (
 	github.com/gofiber/template/html/v2 v2.1.1
 	github.com/google/uuid v1.6.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/protocol v1.15.0
+	github.com/livekit/protocol v1.16.0
 	github.com/livekit/server-sdk-go/v2 v2.1.2
-	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240510063558-304155e97aa4
+	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240514095941-b542c3f97e6d
 	github.com/redis/go-redis/v9 v9.5.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
