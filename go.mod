@@ -9,7 +9,7 @@ require (
 	github.com/frostbyte73/core v0.0.10
 	github.com/gabriel-vasile/mimetype v1.4.3
 	github.com/go-jose/go-jose/v4 v4.0.2
-	github.com/goccy/go-json v0.10.2
+	github.com/goccy/go-json v0.10.3
 	github.com/gofiber/contrib/socketio v1.0.1
 	github.com/gofiber/contrib/websocket v1.3.1
 	github.com/gofiber/fiber/v2 v2.52.4
