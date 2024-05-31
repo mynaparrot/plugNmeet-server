@@ -199,7 +199,8 @@ func (a *AuthRecording) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
 			log.Errorln(recording.FilePath + " does not exist, so deleting from DB without stopping")
 			fileExist = false
 		} else {
-			return err
+			ms := strings.SplitN(err.Error(), "/", -1)
+			return errors.New(ms[len(ms)-1])
 		}
 	}
 
@@ -208,7 +209,8 @@ func (a *AuthRecording) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
 	if fileExist {
 		err = os.Remove(path)
 		if err != nil {
-			return err
+			ms := strings.SplitN(err.Error(), "/", -1)
+			return errors.New(ms[len(ms)-1])
 		}
 	}
 
