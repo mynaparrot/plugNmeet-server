@@ -21,6 +21,7 @@ const (
 	ActiveRoomUsers            = "pnm:activeRoom:%s:users"
 	RoomWithUsersMetadata      = "pnm:roomWithUsersMetadata:%s"
 	RoomCreationProgressKey    = "pnm:roomCreationProgressList"
+	SchedulerLockKey           = "pnm:schedulerLock"
 )
 
 type RoomService struct {
@@ -537,7 +538,7 @@ func (r *RoomService) ManageRoomWithUsersMetadata(roomId, userId, task, metadata
 	case "get":
 		result, err := r.rc.HGet(r.ctx, key, userId).Result()
 		switch {
-		case err == redis.Nil:
+		case errors.Is(err, redis.Nil):
 			return "", nil
 		case err != nil:
 			return "", err
@@ -573,6 +574,38 @@ func (r *RoomService) RoomCreationProgressList(roomId, task string) (bool, error
 		// this way we can ensure that there will not be any deadlock
 		// otherwise in various reason key may stay in redis & create deadlock
 		_, err := r.rc.Set(r.ctx, key, roomId, time.Minute*1).Result()
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	case "exist":
+		result, err := r.rc.Exists(r.ctx, key).Result()
+		if err != nil {
+			return false, err
+		}
+		if result > 0 {
+			return true, nil
+		}
+		return false, nil
+	case "del":
+		_, err := r.rc.Del(r.ctx, key).Result()
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
+	return false, errors.New("invalid task")
+}
+
+// ManageSchedulerLock will lock the work it will perform
+// this way we can ensure one work was running in one server
+// task = add | exist | del
+func (r *RoomService) ManageSchedulerLock(task, workName string, expire time.Duration) (bool, error) {
+	key := fmt.Sprintf("%s:%s", SchedulerLockKey, workName)
+	switch task {
+	case "add":
+		_, err := r.rc.Set(r.ctx, key, time.Now().Unix(), expire).Result()
 		if err != nil {
 			return false, err
 		}

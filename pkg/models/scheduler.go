@@ -47,6 +47,17 @@ func (s *SchedulerModel) StartScheduler() {
 }
 
 func (s *SchedulerModel) checkRoomWithDuration() {
+	locked, _ := s.ra.rs.ManageSchedulerLock("exist", "checkRoomWithDuration", 0)
+	if locked {
+		// if lock then we will not perform here
+		return
+	}
+
+	// now set lock
+	_, _ = s.ra.rs.ManageSchedulerLock("add", "checkRoomWithDuration", time.Minute*4)
+	// clean at the end
+	defer s.ra.rs.ManageSchedulerLock("del", "checkRoomWithDuration", 0)
+
 	rooms := s.rmDuration.GetRoomsWithDurationMap()
 	for i, r := range rooms {
 		now := uint64(time.Now().Unix())
@@ -62,6 +73,17 @@ func (s *SchedulerModel) checkRoomWithDuration() {
 
 // activeRoomChecker will check & do reconciliation between DB & livekit
 func (s *SchedulerModel) activeRoomChecker() {
+	locked, _ := s.ra.rs.ManageSchedulerLock("exist", "activeRoomChecker", 0)
+	if locked {
+		// if lock then we will not perform here
+		return
+	}
+
+	// now set lock
+	_, _ = s.ra.rs.ManageSchedulerLock("add", "activeRoomChecker", time.Minute*10)
+	// clean at the end
+	defer s.ra.rs.ManageSchedulerLock("del", "activeRoomChecker", 0)
+
 	activeRooms, err := s.ra.rm.GetActiveRoomsInfo()
 	if err != nil {
 		return
@@ -75,7 +97,7 @@ func (s *SchedulerModel) activeRoomChecker() {
 		if room.Sid == "" {
 			// if room Sid is empty then we won't do anything
 			// because may be the session is creating
-			// if we don't consider this then it will unnecessarily create empty field
+			// if we don't consider this, then it will unnecessarily create empty field
 			continue
 		}
 

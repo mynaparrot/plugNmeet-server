@@ -11,6 +11,8 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	log "github.com/sirupsen/logrus"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -189,12 +191,24 @@ func (a *AuthRecording) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
 	}
 
 	path := fmt.Sprintf("%s/%s", config.AppCnf.RecorderInfo.RecordingFilesPath, recording.FilePath)
+	fileExist := true
 
-	// delete main file
-	err = os.Remove(path)
+	f, err := os.Stat(path)
 	if err != nil {
-		// if file not exist then we can delete it from record without showing any error
-		if !os.IsNotExist(err) {
+		if errors.Is(err, err.(*os.PathError)) {
+			log.Errorln(recording.FilePath + " does not exist, so deleting from DB without stopping")
+			fileExist = false
+		} else {
+			ms := strings.SplitN(err.Error(), "/", -1)
+			return errors.New(ms[len(ms)-1])
+		}
+	}
+
+	// if file not exists then will delete
+	// if not, we can just skip this & delete from DB
+	if fileExist {
+		err = os.Remove(path)
+		if err != nil {
 			ms := strings.SplitN(err.Error(), "/", -1)
 			return errors.New(ms[len(ms)-1])
 		}
@@ -204,6 +218,21 @@ func (a *AuthRecording) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
 	_ = os.Remove(path + ".fiber.gz")
 	// delete record info file too
 	_ = os.Remove(path + ".json")
+
+	// we will check if the directory is empty or not
+	// if empty then better to delete that directory
+	if fileExist {
+		dir := strings.Replace(path, f.Name(), "", 1)
+		if dir != config.AppCnf.RecorderInfo.RecordingFilesPath {
+			empty, err := a.isDirEmpty(dir)
+			if err == nil && empty {
+				err = os.Remove(dir)
+				if err != nil {
+					log.Error(err)
+				}
+			}
+		}
+	}
 
 	// no error, so we'll delete record from DB
 	db := a.db
@@ -236,6 +265,20 @@ func (a *AuthRecording) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
 	}
 
 	return nil
+}
+
+func (a *AuthRecording) isDirEmpty(name string) (bool, error) {
+	f, err := os.Open(name)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+
+	_, err = f.Readdirnames(1) // Or f.Readdir(1)
+	if err == io.EOF {
+		return true, nil
+	}
+	return false, err // Either not empty or error, suits both cases
 }
 
 // GetDownloadToken will use the same JWT token generator as plugNmeet is using
