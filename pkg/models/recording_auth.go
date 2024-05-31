@@ -221,13 +221,15 @@ func (a *AuthRecording) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
 
 	// we will check if the directory is empty or not
 	// if empty then better to delete that directory
-	dir := strings.Replace(path, f.Name(), "", 1)
-	if dir != config.AppCnf.RecorderInfo.RecordingFilesPath {
-		empty, err := a.isDirEmpty(dir)
-		if err == nil && empty {
-			err = os.Remove(dir)
-			if err != nil {
-				log.Error(err)
+	if fileExist {
+		dir := strings.Replace(path, f.Name(), "", 1)
+		if dir != config.AppCnf.RecorderInfo.RecordingFilesPath {
+			empty, err := a.isDirEmpty(dir)
+			if err == nil && empty {
+				err = os.Remove(dir)
+				if err != nil {
+					log.Error(err)
+				}
 			}
 		}
 	}
