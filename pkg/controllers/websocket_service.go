@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"github.com/gofiber/contrib/socketio"
+	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -71,7 +72,7 @@ func (c *websocketController) addUser() {
 	c.kws.SetAttribute("roomId", c.participant.RoomId)
 }
 
-func HandleWebSocket() func(*fiber.Ctx) error {
+func HandleWebSocket(cnf websocket.Config) func(*fiber.Ctx) error {
 	return socketio.New(func(kws *socketio.Websocket) {
 		wc := newWebsocketController(kws)
 		isValid := wc.validation()
@@ -83,7 +84,7 @@ func HandleWebSocket() func(*fiber.Ctx) error {
 				kws.Close()
 			}
 		}
-	})
+	}, cnf)
 }
 
 func SetupSocketListeners() {

@@ -16,13 +16,6 @@ import (
 )
 
 func Router() *fiber.App {
-	// call recovery if panic happens
-	defer func() {
-		if r := recover(); r != nil {
-			log.Error(r)
-		}
-	}()
-
 	templateEngine := html.New(config.AppCnf.Client.Path, ".html")
 
 	if config.AppCnf.Client.Debug {
@@ -203,8 +196,16 @@ func Router() *fiber.App {
 		}
 		return fiber.ErrUpgradeRequired
 	})
+
 	controllers.SetupSocketListeners()
-	app.Get("/ws", controllers.HandleWebSocket())
+	cfg := websocket.Config{
+		RecoverHandler: func(conn *websocket.Conn) {
+			if err := recover(); err != nil {
+				log.Errorln("error occurred during recovery from websocket")
+			}
+		},
+	}
+	app.Get("/ws", controllers.HandleWebSocket(cfg))
 
 	// last method
 	app.Use(func(c *fiber.Ctx) error {
