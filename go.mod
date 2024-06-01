@@ -18,8 +18,8 @@ require (
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.16.0
 	github.com/livekit/server-sdk-go/v2 v2.1.2
-	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240514095941-b542c3f97e6d
-	github.com/redis/go-redis/v9 v9.5.1
+	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240531125536-73eee1f2c339
+	github.com/redis/go-redis/v9 v9.5.2
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
 	github.com/urfave/cli/v2 v2.27.2
@@ -56,7 +56,7 @@ require (
 	github.com/google/cel-go v0.20.1 // indirect
 	github.com/gorilla/websocket v1.5.1 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
-	github.com/hashicorp/go-retryablehttp v0.7.6 // indirect
+	github.com/hashicorp/go-retryablehttp v0.7.7 // indirect
 	github.com/jxskiss/base62 v1.1.0 // indirect
 	github.com/klauspost/compress v1.17.8 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
