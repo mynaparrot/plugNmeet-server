@@ -19,7 +19,7 @@ require (
 	github.com/livekit/protocol v1.16.0
 	github.com/livekit/server-sdk-go/v2 v2.1.2
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240531125536-73eee1f2c339
-	github.com/redis/go-redis/v9 v9.5.2
+	github.com/redis/go-redis/v9 v9.5.3
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
 	github.com/urfave/cli/v2 v2.27.2
