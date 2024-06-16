@@ -39,7 +39,7 @@ jobs:
       - name: setup go
         uses: actions/setup-go@v5
         with:
-          go-version: '>=1.21'
+          go-version-file: "go.mod"
       - name: Prepare for test
         run: |
           mysql -u root -p12345 -h 127.0.0.1 -P 3306 -D plugnmeet < sql_dump/install.sql
