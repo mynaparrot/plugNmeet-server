@@ -44,8 +44,18 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 			return false, "can't create room. try again", nil
 		}
 
-		if err == nil && rf.Sid == roomDbInfo.Sid {
-			return true, "room already exists", rf
+		if rf != nil && rf.Sid != "" {
+			if roomDbInfo.Sid == "" {
+				roomDbInfo.Sid = rf.Sid
+				// we can just update
+				_, err = am.rm.InsertOrUpdateRoomData(roomDbInfo, true)
+				if err != nil {
+					return false, err.Error(), nil
+				}
+				return true, "room already exists", rf
+			} else if rf.Sid == roomDbInfo.Sid {
+				return true, "room already exists", rf
+			}
 		}
 
 		// we'll allow creating room again & use the same DB row
@@ -106,13 +116,18 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 
 	room, err := am.rs.CreateRoom(r.RoomId, r.EmptyTimeout, r.MaxParticipants, meta)
 	if err != nil {
+		log.Errorln(fmt.Sprintf("room creation error in livekit for %s with error: %s", r.RoomId, err.Error()))
 		return false, "Error: " + err.Error(), nil
 	}
 
 	if room.Sid == "" {
+		log.Errorln(fmt.Sprintf("got empty SID for %s", r.RoomId))
 		// without SID, it is hard to manage, if empty then we won't continue
 		// in this case we'll end the room to clean up
-		_, _ = am.rs.EndRoom(r.RoomId)
+		_, err = am.rs.EndRoom(r.RoomId)
+		if err != nil {
+			log.Errorln(err)
+		}
 		return false, "Error: can't create room with empty SID", nil
 	}
 
@@ -150,7 +165,7 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 
 	_, err = am.rm.InsertOrUpdateRoomData(ri, updateTable)
 	if err != nil {
-		log.Errorln(err)
+		log.Errorln(fmt.Sprintf("error during data saving in db for %s, updateDb: %v, error: %s", r.RoomId, updateTable, err.Error()))
 		return false, "Error: " + err.Error(), nil
 	}
 
