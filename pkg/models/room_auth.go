@@ -148,6 +148,7 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 
 	_, err = am.rm.InsertOrUpdateRoomData(ri, updateTable)
 	if err != nil {
+		log.Errorln(err)
 		return false, "Error: " + err.Error(), nil
 	}
 

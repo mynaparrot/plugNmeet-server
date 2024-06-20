@@ -68,19 +68,45 @@ func (w *webhookEvent) roomStarted() {
 	// we'll check if this room is still under progress or not
 	w.roomService.CheckAndWaitUntilRoomCreationInProgress(event.Room.GetName())
 
-	rm, _ := w.roomModel.GetRoomInfo(event.Room.GetName(), event.Room.GetSid(), 1)
-	if rm.Id == 0 {
-		// we'll only create if not exist
-		room := &RoomInfo{
-			RoomId:       event.Room.GetName(),
-			Sid:          event.Room.GetSid(),
-			IsRunning:    1,
-			CreationTime: event.Room.GetCreationTime(),
-			Created:      time.Now().UTC().Format("2006-01-02 15:04:05"),
+	rm, _ := w.roomModel.GetRoomInfo(event.Room.GetName(), "", 1)
+	if rm == nil || rm.Id == 0 {
+		if config.AppCnf.Client.Debug {
+			// then we can allow creating room
+			// we'll only create if not exist
+			room := &RoomInfo{
+				RoomId:       event.Room.GetName(),
+				Sid:          event.Room.GetSid(),
+				IsRunning:    1,
+				CreationTime: event.Room.GetCreationTime(),
+				Created:      time.Now().UTC().Format("2006-01-02 15:04:05"),
+			}
+			_, err := w.roomModel.InsertOrUpdateRoomData(room, false)
+			if err != nil {
+				log.Errorln(err)
+				return
+			}
+		} else {
+			// in production, we should not allow processing further
+			// because may be the room was created in livekit
+			// but our DB was not updated because of error
+			return
 		}
-		_, err := w.roomModel.InsertOrUpdateRoomData(room, false)
-		if err != nil {
-			log.Errorln(err)
+	}
+
+	// may be during room creation sid was not added
+	// we'll check and update during production mood
+	if !config.AppCnf.Client.Debug {
+		if rm.Sid == "" {
+			rm.Sid = event.Room.GetSid()
+			// just to update
+			rm.CreationTime = event.Room.GetCreationTime()
+			rm.Created = time.Now().UTC().Format("2006-01-02 15:04:05")
+
+			_, err := w.roomModel.InsertOrUpdateRoomData(rm, true)
+			if err != nil {
+				log.Errorln(err)
+				return
+			}
 		}
 	}
 
