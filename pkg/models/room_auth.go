@@ -142,6 +142,8 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 	}
 
 	if roomDbInfo.Id > 0 {
+		log.Infoln(fmt.Sprintf("running room found for %s, tableId: %d, sid: %s, not creating new db record again", r.RoomId, roomDbInfo.Id, roomDbInfo.Sid))
+
 		updateTable = true
 		ri.Id = roomDbInfo.Id
 	}
