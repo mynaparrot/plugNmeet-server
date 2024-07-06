@@ -4,7 +4,7 @@ go 1.22
 
 require (
 	github.com/ansrivas/fiberprometheus/v2 v2.6.1
-	github.com/bufbuild/protovalidate-go v0.6.2
+	github.com/bufbuild/protovalidate-go v0.6.3
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/frostbyte73/core v0.0.10
 	github.com/gabriel-vasile/mimetype v1.4.4
@@ -30,7 +30,7 @@ require (
 )
 
 require (
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.34.1-20240508200655-46a4cf4ba109.1 // indirect
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.34.2-20240508200655-46a4cf4ba109.2 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
