@@ -11,7 +11,7 @@ require (
 	github.com/go-jose/go-jose/v4 v4.0.2
 	github.com/goccy/go-json v0.10.3
 	github.com/gofiber/contrib/socketio v1.1.0
-	github.com/gofiber/contrib/websocket v1.3.1
+	github.com/gofiber/contrib/websocket v1.3.2
 	github.com/gofiber/fiber/v2 v2.52.5
 	github.com/gofiber/template/html/v2 v2.1.1
 	github.com/google/uuid v1.6.0
