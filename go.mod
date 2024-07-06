@@ -10,7 +10,7 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.4
 	github.com/go-jose/go-jose/v4 v4.0.2
 	github.com/goccy/go-json v0.10.3
-	github.com/gofiber/contrib/socketio v1.1.0
+	github.com/gofiber/contrib/socketio v1.1.1
 	github.com/gofiber/contrib/websocket v1.3.2
 	github.com/gofiber/fiber/v2 v2.52.5
 	github.com/gofiber/template/html/v2 v2.1.2
@@ -92,7 +92,7 @@ require (
 	github.com/stoewer/go-strcase v1.3.0 // indirect
 	github.com/twitchtv/twirp v8.1.3+incompatible // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.54.0 // indirect
+	github.com/valyala/fasthttp v1.55.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20240312152122-5f08fbb34913 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
