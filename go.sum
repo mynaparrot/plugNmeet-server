@@ -45,6 +45,8 @@ github.com/envoyproxy/protoc-gen-validate v1.0.4 h1:gVPz/FMfvh57HdSJQyvBtF00j8JU
 github.com/envoyproxy/protoc-gen-validate v1.0.4/go.mod h1:qys6tmnRsYrQqIhm2bvKZH4Blx/1gTIZ2UKVY1M+Yew=
 github.com/fasthttp/websocket v1.5.9 h1:9deGuzYcCRKjk940kNwSN6Hd14hk4zYwropm4UsUIUQ=
 github.com/fasthttp/websocket v1.5.9/go.mod h1:NLzHBFur260OMuZHohOfYQwMTpR7sfSpUnuqKxMpgKA=
+github.com/fasthttp/websocket v1.5.10 h1:bc7NIGyrg1L6sd5pRzCIbXpro54SZLEluZCu0rOpcN4=
+github.com/fasthttp/websocket v1.5.10/go.mod h1:BwHeuXGWzCW1/BIKUKD3+qfCl+cTdsHu/f243NcAI/Q=
 github.com/fatih/color v1.16.0 h1:zmkK9Ngbjj+K0yRhTVONQh1p/HknKYSlNT+vZCzyokM=
 github.com/fatih/color v1.16.0/go.mod h1:fL2Sau1YI5c0pdGEVCbKQbLXB6edEj1ZgiY4NijnWvE=
 github.com/frostbyte73/core v0.0.10 h1:D4DQXdPb8ICayz0n75rs4UYTXrUSdxzUfeleuNJORsU=
@@ -76,6 +78,8 @@ github.com/gofiber/contrib/socketio v1.1.0 h1:6Fw4ewdxDIa8uyXBF0i4zrFkrHI80hVdpF
 github.com/gofiber/contrib/socketio v1.1.0/go.mod h1:FgRqo+crzVuxFgYaQClss7T5phUdWfuLqGUAEC5LYNE=
 github.com/gofiber/contrib/socketio v1.1.1 h1:Z78xUaKTFU9rMoPxFmLox4rXOK81KB0RrbtVrzQCg74=
 github.com/gofiber/contrib/socketio v1.1.1/go.mod h1:lSoeZ1G2mK+IGxKlXnxNUzd1ANAfdLcyGszGpk1B8Go=
+github.com/gofiber/contrib/socketio v1.1.2 h1:6MXi/7s1HZUfcWQydlSA4DRwYmNR9EHTIhauVdtgndM=
+github.com/gofiber/contrib/socketio v1.1.2/go.mod h1:caZlhN9zLvCqy7sNGFk0OyWU2+4fXelw4rvMInloXqU=
 github.com/gofiber/contrib/websocket v1.3.1 h1:iINEnUIT7Wi1ttGWW5fY1fnKQlIEa5KTDXmMoedKinE=
 github.com/gofiber/contrib/websocket v1.3.1/go.mod h1:oDLA6uM7x4hFq1zjy3US3HuvmrlWJKO5nrsw2ZKNSfY=
 github.com/gofiber/contrib/websocket v1.3.2 h1:AUq5PYeKwK50s0nQrnluuINYeep1c4nRCJ0NWsV3cvg=
@@ -243,6 +247,8 @@ github.com/russross/blackfriday/v2 v2.1.0 h1:JIOH55/0cWyOuilr9/qlrm0BSXldqnqwMsf
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/savsgio/gotils v0.0.0-20240303185622-093b76447511 h1:KanIMPX0QdEdB4R3CiimCAbxFrhB3j7h0/OvpYGVQa8=
 github.com/savsgio/gotils v0.0.0-20240303185622-093b76447511/go.mod h1:sM7Mt7uEoCeFSCBM+qBrqvEo+/9vdmj19wzp3yzUhmg=
+github.com/savsgio/gotils v0.0.0-20240704082632-aef3928b8a38 h1:D0vL7YNisV2yqE55+q0lFuGse6U8lxlg7fYTctlT5Gc=
+github.com/savsgio/gotils v0.0.0-20240704082632-aef3928b8a38/go.mod h1:sM7Mt7uEoCeFSCBM+qBrqvEo+/9vdmj19wzp3yzUhmg=
 github.com/sirupsen/logrus v1.9.3 h1:dueUQJ1C2q9oE3F7wvmSGAaVtTmUizReu6fjN8uqzbQ=
 github.com/sirupsen/logrus v1.9.3/go.mod h1:naHLuLoDiP4jHNo9R0sCBMtWGeIprob74mVsIT4qYEQ=
 github.com/stoewer/go-strcase v1.3.0 h1:g0eASXYtp+yvN9fK8sH94oCIk0fau9uV1/ZdJ0AVEzs=
