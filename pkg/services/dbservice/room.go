@@ -97,7 +97,7 @@ func (s *DatabaseService) UpdateRoomStatus(info *dbmodels.RoomInfo) (int64, erro
 		update["sid"] = gorm.Expr("CONCAT(sid, '-', id)")
 		update["is_recording"] = 0
 		update["is_active_rtmp"] = 0
-		update["ended"] = time.Now()
+		update["ended"] = time.Now().UTC().Format("2006-01-02 15:04:05")
 	}
 
 	cond := &dbmodels.RoomInfo{}
