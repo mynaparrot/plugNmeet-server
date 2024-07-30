@@ -4,7 +4,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/factory"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
-	"github.com/mynaparrot/plugnmeet-server/pkg/tmp"
+	"github.com/mynaparrot/plugnmeet-server/pkg/temporary"
 	"gopkg.in/yaml.v3"
 	"os"
 )
@@ -21,7 +21,7 @@ func PrepareServer(c string) error {
 	config.SetAppConfig(cnf)
 
 	// orm
-	err = tmp.NewDatabaseConnection(config.AppCnf)
+	err = temporary.NewDatabaseConnection(config.AppCnf)
 	if err != nil {
 		return err
 	}
