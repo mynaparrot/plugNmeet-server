@@ -7,6 +7,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/natefinch/lumberjack.v2"
+	"gorm.io/gorm"
 	"io"
 	"os"
 	"sync"
@@ -18,6 +19,7 @@ var AppCnf *AppConfig
 type AppConfig struct {
 	DB  *sql.DB
 	RDS *redis.Client
+	ORM *gorm.DB
 
 	sync.RWMutex
 	chatRooms   map[string]map[string]ChatParticipant

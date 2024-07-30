@@ -4,6 +4,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/factory"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
+	"github.com/mynaparrot/plugnmeet-server/pkg/tmp"
 	"gopkg.in/yaml.v3"
 	"os"
 )
@@ -13,7 +14,14 @@ func PrepareServer(c string) error {
 		return nil
 	}
 
-	err := readYaml(c)
+	cnf, err := ReadConfig(c)
+	if err != nil {
+		return err
+	}
+	config.SetAppConfig(cnf)
+
+	// orm
+	err = tmp.NewDatabaseConnection(config.AppCnf)
 	if err != nil {
 		return err
 	}
@@ -39,19 +47,21 @@ func PrepareServer(c string) error {
 	return nil
 }
 
-func readYaml(filename string) error {
-	var appConfig config.AppConfig
+func ReadConfig(cnfFile string) (*config.AppConfig, error) {
+	return readYaml(cnfFile)
+}
+
+func readYaml(filename string) (*config.AppConfig, error) {
 	yamlFile, err := os.ReadFile(filename)
-
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	err = yaml.Unmarshal(yamlFile, &appConfig)
+	appCnf := new(config.AppConfig)
+	err = yaml.Unmarshal(yamlFile, &appCnf)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	config.SetAppConfig(&appConfig)
 
-	return nil
+	return appCnf, err
 }
