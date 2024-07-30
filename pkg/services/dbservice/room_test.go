@@ -90,7 +90,6 @@ func TestDatabaseService_InsertOrUpdateRoomInfo(t *testing.T) {
 		IsRunning:    1,
 		IsRecording:  1,
 		IsActiveRtmp: 1,
-		CreationTime: time.Now().Unix(),
 	}
 
 	_, err := s.InsertOrUpdateRoomInfo(info)

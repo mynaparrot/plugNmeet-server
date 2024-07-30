@@ -1,14 +1,15 @@
 package dbmodels
 
 import (
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"time"
 )
 
 type Recording struct {
-	ID               int64     `gorm:"column:id;primaryKey;AUTO_INCREMENT"`
-	RecordID         string    `gorm:"column:record_id;NOT NULL"`
+	ID               uint64    `gorm:"column:id;primaryKey;autoIncrement"`
+	RecordID         string    `gorm:"column:record_id;unique;NOT NULL"`
 	RoomID           string    `gorm:"column:room_id;NOT NULL"`
-	RoomSid          string    `gorm:"column:room_sid"`
+	RoomSid          string    `gorm:"column:room_sid;unique"`
 	RecorderID       string    `gorm:"column:recorder_id;NOT NULL"`
 	FilePath         string    `gorm:"column:file_path;NOT NULL"`
 	Size             float64   `gorm:"column:size;NOT NULL"`
@@ -20,5 +21,5 @@ type Recording struct {
 }
 
 func (m *Recording) TableName() string {
-	return "pnm_recordings"
+	return config.AppCnf.FormatDBTable("recordings")
 }

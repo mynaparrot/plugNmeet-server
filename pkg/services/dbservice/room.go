@@ -43,7 +43,7 @@ func (s *DatabaseService) GetRoomInfoBySid(sId string, isRunning *int) (*dbmodel
 	return info, nil
 }
 
-func (s *DatabaseService) GetRoomInfoByTableId(tableId int64) (*dbmodels.RoomInfo, error) {
+func (s *DatabaseService) GetRoomInfoByTableId(tableId uint64) (*dbmodels.RoomInfo, error) {
 	info := new(dbmodels.RoomInfo)
 	cond := &dbmodels.RoomInfo{
 		ID: tableId,

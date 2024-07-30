@@ -1,8 +1,10 @@
 package dbmodels
 
+import "github.com/mynaparrot/plugnmeet-server/pkg/config"
+
 type Analytics struct {
-	ID               int64   `gorm:"column:id;primaryKey;AUTO_INCREMENT"`
-	RoomTableID      int64   `gorm:"column:room_table_id"`
+	ID               uint64  `gorm:"column:id;primaryKey;autoIncrement"`
+	RoomTableID      int64   `gorm:"column:room_table_id;unique"`
 	RoomID           string  `gorm:"column:room_id;NOT NULL"`
 	FileID           string  `gorm:"column:file_id;NOT NULL"`
 	FileName         string  `gorm:"column:file_name;NOT NULL"`
@@ -12,5 +14,5 @@ type Analytics struct {
 }
 
 func (m *Analytics) TableName() string {
-	return "pnm_room_analytics"
+	return config.AppCnf.FormatDBTable("room_analytics")
 }
