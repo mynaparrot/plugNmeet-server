@@ -6,6 +6,15 @@ import (
 	"gorm.io/gorm"
 )
 
+func (s *DatabaseService) InsertRecordingData(info *dbmodels.Recording) (int64, error) {
+	result := s.db.Create(info)
+	if result.Error != nil {
+		return 0, result.Error
+	}
+
+	return result.RowsAffected, nil
+}
+
 func (s *DatabaseService) GetRecordings(roomIds []string, offset, limit uint64, direction *string) ([]dbmodels.Recording, int64, error) {
 	var recordings []dbmodels.Recording
 
@@ -41,4 +50,37 @@ func (s *DatabaseService) GetRecordings(roomIds []string, offset, limit uint64, 
 	}
 
 	return recordings, total, nil
+}
+
+func (s *DatabaseService) GetRecording(recordId string) (*dbmodels.Recording, error) {
+	info := new(dbmodels.Recording)
+	cond := &dbmodels.Recording{
+		RecordID: recordId,
+	}
+
+	result := s.db.Where(cond).Take(info)
+	switch {
+	case errors.Is(result.Error, gorm.ErrRecordNotFound):
+		return nil, nil
+	case result.Error != nil:
+		return nil, result.Error
+	}
+
+	return info, nil
+}
+
+func (s *DatabaseService) DeleteRecording(recordId string) (int64, error) {
+	cond := &dbmodels.Recording{
+		RecordID: recordId,
+	}
+
+	result := s.db.Where(cond).Delete(&dbmodels.Recording{})
+	switch {
+	case errors.Is(result.Error, gorm.ErrRecordNotFound):
+		return 0, nil
+	case result.Error != nil:
+		return 0, result.Error
+	}
+
+	return result.RowsAffected, nil
 }
