@@ -3,7 +3,6 @@ package helpers
 import (
 	"github.com/mynaparrot/plugnmeet-protocol/factory"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/temporary"
 	"gopkg.in/yaml.v3"
 	"os"
@@ -39,10 +38,6 @@ func PrepareServer(c string) error {
 		return err
 	}
 	config.AppCnf.RDS = rds
-
-	// we'll subscribe to redis channels now
-	go controllers.SubscribeToWebsocketChannel()
-	go controllers.StartScheduler()
 
 	return nil
 }

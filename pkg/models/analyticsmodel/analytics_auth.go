@@ -8,6 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/dbservice"
 	"os"
 	"strings"
@@ -25,6 +26,27 @@ func NewAnalyticsAuthModel() *AnalyticsAuthModel {
 		app: config.AppCnf,
 		ds:  ds,
 	}
+}
+
+func (m *AnalyticsAuthModel) AddAnalyticsFileToDB(roomTableId uint64, roomCreationTime int64, roomId, fileId string, stat os.FileInfo) (int64, error) {
+	fSize := float64(stat.Size())
+	// we'll convert bytes to KB
+	if fSize > 1000 {
+		fSize = fSize / 1000.0
+	} else {
+		fSize = 1
+	}
+
+	info := &dbmodels.Analytics{
+		RoomTableID:      roomTableId,
+		RoomID:           roomId,
+		FileID:           fileId,
+		FileName:         fileId + ".json",
+		FileSize:         fSize,
+		RoomCreationTime: roomCreationTime,
+	}
+
+	return m.ds.InsertAnalyticsData(info)
 }
 
 func (m *AnalyticsAuthModel) FetchAnalytics(r *plugnmeet.FetchAnalyticsReq) (*plugnmeet.FetchAnalyticsResult, error) {
@@ -61,6 +83,9 @@ func (m *AnalyticsAuthModel) fetchAnalytic(fileId string) (*plugnmeet.AnalyticsI
 	if err != nil {
 		return nil, err
 	}
+	if v == nil {
+		return nil, errors.New("no info found")
+	}
 	analytic := &plugnmeet.AnalyticsInfo{
 		RoomId:           v.RoomID,
 		FileId:           v.FileID,
@@ -72,10 +97,13 @@ func (m *AnalyticsAuthModel) fetchAnalytic(fileId string) (*plugnmeet.AnalyticsI
 	return analytic, nil
 }
 
-func (m *AnalyticsAuthModel) getAnalyticByRoomTableId(roomTableId int64) (*plugnmeet.AnalyticsInfo, error) {
-	v, err := m.ds.GetAnalyticByRoomTableId(uint64(roomTableId))
+func (m *AnalyticsAuthModel) getAnalyticByRoomTableId(roomTableId uint64) (*plugnmeet.AnalyticsInfo, error) {
+	v, err := m.ds.GetAnalyticByRoomTableId(roomTableId)
 	if err != nil {
 		return nil, err
+	}
+	if v == nil {
+		return nil, errors.New("no info found")
 	}
 	analytic := &plugnmeet.AnalyticsInfo{
 		RoomId:           v.RoomID,
@@ -124,6 +152,10 @@ func (m *AnalyticsAuthModel) GetAnalyticsDownloadToken(r *plugnmeet.GetAnalytics
 		return "", err
 	}
 
+	return m.generateToken(analytic.FileName)
+}
+
+func (m *AnalyticsAuthModel) generateToken(fileName string) (string, error) {
 	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.HS256, Key: []byte(m.app.Client.Secret)}, (&jose.SignerOptions{}).WithType("JWT"))
 
 	if err != nil {
@@ -134,7 +166,7 @@ func (m *AnalyticsAuthModel) GetAnalyticsDownloadToken(r *plugnmeet.GetAnalytics
 		Issuer:    m.app.Client.ApiKey,
 		NotBefore: jwt.NewNumericDate(time.Now().UTC()),
 		Expiry:    jwt.NewNumericDate(time.Now().UTC().Add(*m.app.AnalyticsSettings.TokenValidity)),
-		Subject:   analytic.FileName,
+		Subject:   fileName,
 	}
 
 	return jwt.Signed(sig).Claims(cl).Serialize()

@@ -1,6 +1,7 @@
 package dbservice
 
 import (
+	"database/sql"
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"testing"
@@ -10,10 +11,15 @@ import (
 var recordId = fmt.Sprintf("%d", time.Now().UnixMilli())
 
 func TestDatabaseService_InsertRecordingData(t *testing.T) {
+	v := sql.NullString{
+		String: sid,
+		Valid:  true,
+	}
+
 	data := &dbmodels.Recording{
 		RecordID:         recordId,
 		RoomID:           roomId,
-		RoomSid:          sid,
+		RoomSid:          v,
 		Size:             10.10,
 		RoomCreationTime: roomCreationTime,
 	}

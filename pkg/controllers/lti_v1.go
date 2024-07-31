@@ -7,6 +7,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/recordingmodel"
 	"strings"
 )
 
@@ -155,7 +156,7 @@ func HandleLTIV1FetchRecordings(c *fiber.Ctx) error {
 		})
 	}
 
-	m := models.NewRecordingAuth()
+	m := recordingmodel.NewRecordingAuth()
 	req.RoomIds = []string{roomId.(string)}
 	result, err := m.FetchRecordings(req)
 
@@ -183,7 +184,7 @@ func HandleLTIV1GetRecordingDownloadToken(c *fiber.Ctx) error {
 		})
 	}
 
-	m := models.NewRecordingAuth()
+	m := recordingmodel.NewRecordingAuth()
 	token, err := m.GetDownloadToken(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -218,7 +219,7 @@ func HandleLTIV1DeleteRecordings(c *fiber.Ctx) error {
 		})
 	}
 
-	m := models.NewRecordingAuth()
+	m := recordingmodel.NewRecordingAuth()
 	err = m.DeleteRecording(req)
 	if err != nil {
 		return c.JSON(fiber.Map{

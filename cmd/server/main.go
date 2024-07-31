@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/handler"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/mynaparrot/plugnmeet-server/version"
@@ -44,6 +45,10 @@ func startServer(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
+
+	// we'll subscribe to redis channels now
+	go controllers.SubscribeToWebsocketChannel()
+	go controllers.StartScheduler()
 
 	// defer close connections
 	defer config.AppCnf.DB.Close()

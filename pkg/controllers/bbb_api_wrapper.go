@@ -12,6 +12,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/bbbmodel"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/recordingmodel"
 	"google.golang.org/protobuf/encoding/protojson"
 	"net/url"
 	"strings"
@@ -412,7 +413,7 @@ func HandleBBBDeleteRecordings(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
 
-	m := models.NewRecordingAuth()
+	m := recordingmodel.NewRecordingAuth()
 	err = m.DeleteRecording(&plugnmeet.DeleteRecordingReq{
 		RecordId: q.RecordID,
 	})
