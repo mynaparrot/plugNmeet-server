@@ -11,6 +11,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/bbbmodel"
 	"google.golang.org/protobuf/encoding/protojson"
 	"net/url"
 	"strings"
@@ -382,7 +383,7 @@ func HandleBBBGetRecordings(c *fiber.Ctx) error {
 	}
 
 	host := fmt.Sprintf("%s://%s", c.Protocol(), c.Hostname())
-	m := models.NewBBBApiWrapperModel()
+	m := bbbmodel.NewBBBApiWrapperModel()
 	recordings, pagination, err := m.GetRecordings(host, q)
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))

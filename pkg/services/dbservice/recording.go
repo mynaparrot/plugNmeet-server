@@ -84,3 +84,35 @@ func (s *DatabaseService) DeleteRecording(recordId string) (int64, error) {
 
 	return result.RowsAffected, nil
 }
+
+func (s *DatabaseService) GetRecordingsForBBB(recordIds, meetingIds []string, offset, limit uint64) ([]dbmodels.Recording, int64, error) {
+	var recordings []dbmodels.Recording
+	d := s.db.Model(&dbmodels.Recording{})
+
+	if len(recordIds) > 0 {
+		d.Where("record_id IN ?", recordIds)
+	} else if len(meetingIds) > 0 {
+		d.Where("room_id IN ?", meetingIds)
+	}
+
+	result := d.Offset(int(offset)).Limit(int(limit)).Find(&recordings)
+	switch {
+	case errors.Is(result.Error, gorm.ErrRecordNotFound):
+		return nil, 0, nil
+	case result.Error != nil:
+		return nil, 0, result.Error
+	}
+
+	var total int64
+	if len(recordings) > 0 {
+		d = s.db.Model(&dbmodels.Recording{})
+		if len(recordIds) > 0 {
+			d.Where("record_id IN ?", recordIds)
+		} else if len(meetingIds) > 0 {
+			d.Where("room_id IN ?", meetingIds)
+		}
+		d.Count(&total)
+	}
+
+	return recordings, total, nil
+}

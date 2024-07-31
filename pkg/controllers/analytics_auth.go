@@ -5,7 +5,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/analyticsmodel"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -28,7 +28,7 @@ func HandleFetchAnalytics(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := models.NewAnalyticsAuthModel()
+	m := analyticsmodel.NewAnalyticsAuthModel()
 	result, err := m.FetchAnalytics(req)
 
 	if err != nil {
@@ -64,7 +64,7 @@ func HandleDeleteAnalytics(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := models.NewAnalyticsAuthModel()
+	m := analyticsmodel.NewAnalyticsAuthModel()
 	err = m.DeleteAnalytics(req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
@@ -91,7 +91,7 @@ func HandleGetAnalyticsDownloadToken(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := models.NewAnalyticsAuthModel()
+	m := analyticsmodel.NewAnalyticsAuthModel()
 	token, err := m.GetAnalyticsDownloadToken(req)
 
 	if err != nil {
@@ -113,7 +113,7 @@ func HandleDownloadAnalytics(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).SendString("token require or invalid url")
 	}
 
-	m := models.NewAnalyticsAuthModel()
+	m := analyticsmodel.NewAnalyticsAuthModel()
 	file, status, err := m.VerifyAnalyticsToken(token)
 
 	if err != nil {

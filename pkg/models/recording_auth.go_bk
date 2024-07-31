@@ -11,6 +11,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/services/dbservice"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"os"
@@ -22,13 +23,16 @@ type AuthRecording struct {
 	app *config.AppConfig
 	db  *sql.DB
 	ctx context.Context
+	ds  *dbservice.DatabaseService
 }
 
 func NewRecordingAuth() *AuthRecording {
+	ds := dbservice.NewDBService(config.AppCnf.ORM)
 	return &AuthRecording{
 		app: config.AppCnf,
 		db:  config.AppCnf.DB,
 		ctx: context.Background(),
+		ds:  ds,
 	}
 }
 
@@ -168,10 +172,8 @@ func (a *AuthRecording) RecordingInfo(req *plugnmeet.RecordingInfoReq) (*plugnme
 			}
 			pastRoomInfo.Created = time.Unix(roomInfo.CreationTime, 0).UTC().Format("2006-01-02 15:04:05")
 
-			am := NewAnalyticsAuthModel()
-			an, err := am.getAnalyticByRoomTableId(roomInfo.Id)
-			if err == nil {
-				pastRoomInfo.AnalyticsFileId = an.GetFileId()
+			if an, err := a.ds.GetAnalyticByRoomTableId(uint64(roomInfo.Id)); err == nil {
+				pastRoomInfo.AnalyticsFileId = an.FileID
 			}
 		}
 	}
