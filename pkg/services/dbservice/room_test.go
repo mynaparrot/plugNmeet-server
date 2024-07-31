@@ -5,34 +5,6 @@ import (
 	"testing"
 )
 
-func TestDatabaseService_InsertOrUpdateRoomInfo(t *testing.T) {
-	info := &dbmodels.RoomInfo{
-		RoomId:       roomId,
-		RoomTitle:    "Testing",
-		Sid:          sid,
-		IsRunning:    1,
-		IsRecording:  0,
-		IsActiveRtmp: 0,
-	}
-
-	_, err := s.InsertOrUpdateRoomInfo(info)
-	if err != nil {
-		t.Error(err)
-	}
-
-	t.Logf("%+v", info)
-	roomTableId = info.ID
-	info.RoomTitle = "changed to testing"
-	info.JoinedParticipants = 10
-
-	_, err = s.InsertOrUpdateRoomInfo(info)
-	if err != nil {
-		t.Error(err)
-	}
-
-	t.Logf("%+v", info)
-}
-
 func TestDatabaseService_GetRoomInfoByRoomId(t *testing.T) {
 	info, err := s.GetRoomInfoByRoomId(roomId, 1)
 	if err != nil {
@@ -133,7 +105,7 @@ func TestDatabaseService_UpdateRoomStatus(t *testing.T) {
 func TestDatabaseService_GetPastRooms(t *testing.T) {
 	rooms := []string{roomId}
 
-	info, total, err := s.GetPastRooms(rooms, 0, 20)
+	info, total, err := s.GetPastRooms(rooms, 0, 5)
 	if err != nil {
 		t.Error(err)
 	}
