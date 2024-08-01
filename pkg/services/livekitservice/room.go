@@ -63,12 +63,12 @@ func (s *LivekitService) UpdateRoomMetadata(roomId string, metadata string) (*li
 }
 
 // UpdateRoomMetadataByStruct to update metadata by providing formatted metadata
-func (r *LivekitService) UpdateRoomMetadataByStruct(roomId string, meta *plugnmeet.RoomMetadata) (*livekit.Room, error) {
-	metadata, err := r.MarshalRoomMetadata(meta)
+func (s *LivekitService) UpdateRoomMetadataByStruct(roomId string, meta *plugnmeet.RoomMetadata) (*livekit.Room, error) {
+	metadata, err := s.MarshalRoomMetadata(meta)
 	if err != nil {
 		return nil, err
 	}
-	room, err := r.UpdateRoomMetadata(roomId, metadata)
+	room, err := s.UpdateRoomMetadata(roomId, metadata)
 	if err != nil {
 		return nil, err
 	}
