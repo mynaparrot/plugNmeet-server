@@ -93,7 +93,7 @@ func HandleGenerateJoinToken(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, "room is not active. create room first")
 	}
 
-	m := roommodel.NewRoomModel()
+	m := roommodel.NewRoomModel(nil, nil, nil, nil)
 	token, err := m.GetPNMJoinToken(req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())

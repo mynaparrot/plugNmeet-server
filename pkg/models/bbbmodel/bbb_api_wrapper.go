@@ -12,13 +12,21 @@ import (
 )
 
 type BBBApiWrapperModel struct {
-	ds *dbservice.DatabaseService
+	app *config.AppConfig
+	ds  *dbservice.DatabaseService
 }
 
-func NewBBBApiWrapperModel() *BBBApiWrapperModel {
-	ds := dbservice.NewDBService(config.GetConfig().ORM)
+func NewBBBApiWrapperModel(app *config.AppConfig, ds *dbservice.DatabaseService) *BBBApiWrapperModel {
+	if app == nil {
+		app = config.GetConfig()
+	}
+	if ds == nil {
+		ds = dbservice.NewDBService(app.ORM)
+	}
+
 	return &BBBApiWrapperModel{
-		ds: ds,
+		app: app,
+		ds:  ds,
 	}
 }
 
@@ -104,7 +112,7 @@ func (m *BBBApiWrapperModel) GetRecordings(host string, r *bbbapiwrapper.GetReco
 }
 
 func (m *BBBApiWrapperModel) createPlayBackURL(host, path string) (string, error) {
-	auth := recordingmodel.NewRecordingAuth()
+	auth := recordingmodel.NewRecordingAuth(m.app, m.ds)
 	token, err := auth.CreateTokenForDownload(path)
 	if err != nil {
 		return "", err

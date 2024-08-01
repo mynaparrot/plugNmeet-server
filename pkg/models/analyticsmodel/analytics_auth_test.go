@@ -40,7 +40,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	m = NewAnalyticsAuthModel()
+	m = NewAnalyticsAuthModel(nil, nil)
 }
 
 func TestAnalyticsAuthModel_AddAnalyticsFileToDB(t *testing.T) {

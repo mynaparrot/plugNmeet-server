@@ -16,11 +16,19 @@ type RoomModel struct {
 	lk  *livekitservice.LivekitService
 }
 
-func NewRoomModel() *RoomModel {
-	app := config.GetConfig()
-	ds := dbservice.NewDBService(app.ORM)
-	rs := redisservice.NewRedisService(app.RDS)
-	lk := livekitservice.NewLivekitService(rs)
+func NewRoomModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService) *RoomModel {
+	if app == nil {
+		app = config.GetConfig()
+	}
+	if ds == nil {
+		ds = dbservice.NewDBService(app.ORM)
+	}
+	if rs == nil {
+		rs = redisservice.NewRedisService(app.RDS)
+	}
+	if lk == nil {
+		lk = livekitservice.NewLivekitService(rs)
+	}
 
 	return &RoomModel{
 		app: app,

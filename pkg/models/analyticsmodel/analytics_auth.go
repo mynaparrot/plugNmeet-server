@@ -20,8 +20,14 @@ type AnalyticsAuthModel struct {
 	ds  *dbservice.DatabaseService
 }
 
-func NewAnalyticsAuthModel() *AnalyticsAuthModel {
-	ds := dbservice.NewDBService(config.GetConfig().ORM)
+func NewAnalyticsAuthModel(app *config.AppConfig, ds *dbservice.DatabaseService) *AnalyticsAuthModel {
+	if app == nil {
+		app = config.GetConfig()
+	}
+	if ds == nil {
+		ds = dbservice.NewDBService(app.ORM)
+	}
+
 	return &AnalyticsAuthModel{
 		app: config.GetConfig(),
 		ds:  ds,

@@ -22,8 +22,14 @@ type AuthRecording struct {
 	ds  *dbservice.DatabaseService
 }
 
-func NewRecordingAuth() *AuthRecording {
-	ds := dbservice.NewDBService(config.GetConfig().ORM)
+func NewRecordingAuth(app *config.AppConfig, ds *dbservice.DatabaseService) *AuthRecording {
+	if app == nil {
+		app = config.GetConfig()
+	}
+	if ds == nil {
+		ds = dbservice.NewDBService(app.ORM)
+	}
+
 	return &AuthRecording{
 		app: config.GetConfig(),
 		ds:  ds,

@@ -156,7 +156,7 @@ func HandleLTIV1FetchRecordings(c *fiber.Ctx) error {
 		})
 	}
 
-	m := recordingmodel.NewRecordingAuth()
+	m := recordingmodel.NewRecordingAuth(nil, nil)
 	req.RoomIds = []string{roomId.(string)}
 	result, err := m.FetchRecordings(req)
 
@@ -184,7 +184,7 @@ func HandleLTIV1GetRecordingDownloadToken(c *fiber.Ctx) error {
 		})
 	}
 
-	m := recordingmodel.NewRecordingAuth()
+	m := recordingmodel.NewRecordingAuth(nil, nil)
 	token, err := m.GetDownloadToken(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -219,7 +219,7 @@ func HandleLTIV1DeleteRecordings(c *fiber.Ctx) error {
 		})
 	}
 
-	m := recordingmodel.NewRecordingAuth()
+	m := recordingmodel.NewRecordingAuth(nil, nil)
 	err = m.DeleteRecording(req)
 	if err != nil {
 		return c.JSON(fiber.Map{

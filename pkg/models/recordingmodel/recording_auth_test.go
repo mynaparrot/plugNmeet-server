@@ -41,7 +41,7 @@ func init() {
 		panic(err)
 	}
 
-	m = NewRecordingAuth()
+	m = NewRecordingAuth(nil, nil)
 	info := &dbmodels.RoomInfo{
 		RoomId:       roomId,
 		RoomTitle:    "Testing",
