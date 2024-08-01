@@ -3,7 +3,7 @@ package controllers
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/breakoutroommodel"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -29,7 +29,7 @@ func HandleCreateBreakoutRooms(c *fiber.Ctx) error {
 	req.RoomId = roomId.(string)
 	req.RequestedUserId = requestedUserId.(string)
 
-	m := models.NewBreakoutRoomModel()
+	m := breakoutroommodel.NewBreakoutRoomModel(nil, nil, nil, nil)
 	err = m.CreateBreakoutRooms(req)
 	if err != nil {
 		res.Msg = err.Error()
@@ -57,7 +57,7 @@ func HandleJoinBreakoutRoom(c *fiber.Ctx) error {
 
 	req.RoomId = roomId.(string)
 	req.IsAdmin = isAdmin.(bool)
-	m := models.NewBreakoutRoomModel()
+	m := breakoutroommodel.NewBreakoutRoomModel(nil, nil, nil, nil)
 	token, err := m.JoinBreakoutRoom(req)
 	if err != nil {
 		res.Msg = err.Error()
@@ -75,7 +75,7 @@ func HandleGetBreakoutRooms(c *fiber.Ctx) error {
 	res := new(plugnmeet.BreakoutRoomRes)
 	res.Status = false
 
-	m := models.NewBreakoutRoomModel()
+	m := breakoutroommodel.NewBreakoutRoomModel(nil, nil, nil, nil)
 	rooms, err := m.GetBreakoutRooms(roomId.(string))
 	if err != nil {
 		res.Msg = err.Error()
@@ -94,7 +94,7 @@ func HandleGetMyBreakoutRooms(c *fiber.Ctx) error {
 	res := new(plugnmeet.BreakoutRoomRes)
 	res.Status = false
 
-	m := models.NewBreakoutRoomModel()
+	m := breakoutroommodel.NewBreakoutRoomModel(nil, nil, nil, nil)
 	room, err := m.GetMyBreakoutRooms(roomId.(string), requestedUserId.(string))
 	if err != nil {
 		res.Msg = err.Error()
@@ -120,7 +120,7 @@ func HandleIncreaseBreakoutRoomDuration(c *fiber.Ctx) error {
 	}
 
 	req.RoomId = roomId.(string)
-	m := models.NewBreakoutRoomModel()
+	m := breakoutroommodel.NewBreakoutRoomModel(nil, nil, nil, nil)
 	err = m.IncreaseBreakoutRoomDuration(req)
 	if err != nil {
 		res.Msg = err.Error()
@@ -145,7 +145,7 @@ func HandleSendBreakoutRoomMsg(c *fiber.Ctx) error {
 	}
 
 	req.RoomId = roomId.(string)
-	m := models.NewBreakoutRoomModel()
+	m := breakoutroommodel.NewBreakoutRoomModel(nil, nil, nil, nil)
 	err = m.SendBreakoutRoomMsg(req)
 	if err != nil {
 		res.Msg = err.Error()
@@ -170,7 +170,7 @@ func HandleEndBreakoutRoom(c *fiber.Ctx) error {
 	}
 
 	req.RoomId = roomId.(string)
-	m := models.NewBreakoutRoomModel()
+	m := breakoutroommodel.NewBreakoutRoomModel(nil, nil, nil, nil)
 	err = m.EndBreakoutRoom(req)
 	if err != nil {
 		res.Msg = err.Error()
@@ -193,7 +193,7 @@ func HandleEndBreakoutRooms(c *fiber.Ctx) error {
 		return SendBreakoutRoomResponse(c, res)
 	}
 
-	m := models.NewBreakoutRoomModel()
+	m := breakoutroommodel.NewBreakoutRoomModel(nil, nil, nil, nil)
 	err := m.EndBreakoutRooms(roomId.(string))
 	if err != nil {
 		res.Msg = err.Error()
