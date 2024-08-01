@@ -16,8 +16,6 @@ import (
 	"time"
 )
 
-const breakoutRoomKey = "pnm:breakoutRoom:"
-
 type BreakoutRoomModel struct {
 	ds *dbservice.DatabaseService
 	rs *redisservice.RedisService
