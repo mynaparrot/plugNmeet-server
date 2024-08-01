@@ -11,6 +11,9 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/roommodel"
+	"github.com/mynaparrot/plugnmeet-server/pkg/services/dbservice"
+	"github.com/mynaparrot/plugnmeet-server/pkg/services/redisservice"
 	"github.com/mynaparrot/plugnmeet-server/version"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -78,20 +81,20 @@ func HandleGenerateJoinToken(c *fiber.Ctx) error {
 	}
 
 	// don't generate token if user is blocked
-	rs := models.NewRoomService()
+	rs := redisservice.NewRedisService(config.GetConfig().RDS)
 	exist := rs.IsUserExistInBlockList(req.RoomId, req.UserInfo.UserId)
 	if exist {
 		return utils.SendCommonProtoJsonResponse(c, false, "this user is blocked to join this session")
 	}
 
-	rm := models.NewRoomModel()
-	ri, _ := rm.GetRoomInfo(req.RoomId, "", 1)
-	if ri.Id == 0 {
+	ds := dbservice.NewDBService(config.GetConfig().ORM)
+	ri, _ := ds.GetRoomInfoByRoomId(req.RoomId, 1)
+	if ri == nil || ri.ID == 0 {
 		return utils.SendCommonProtoJsonResponse(c, false, "room is not active. create room first")
 	}
 
-	m := models.NewAuthTokenModel()
-	token, err := m.GeneratePlugNmeetAccessToken(req)
+	m := roommodel.NewRoomModel()
+	token, err := m.GetPNMJoinToken(req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
@@ -109,7 +112,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
 
-	rs := models.NewRoomService()
+	rs := redisservice.NewRedisService(config.GetConfig().RDS)
 	exist := rs.IsUserExistInBlockList(roomId.(string), requestedUserId.(string))
 	if exist {
 		return utils.SendCommonProtobufResponse(c, false, "notifications.you-are-blocked")

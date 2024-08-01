@@ -10,20 +10,23 @@ import (
 )
 
 type RoomModel struct {
-	ds *dbservice.DatabaseService
-	rs *redisservice.RedisService
-	lk *livekitservice.LivekitService
+	app *config.AppConfig
+	ds  *dbservice.DatabaseService
+	rs  *redisservice.RedisService
+	lk  *livekitservice.LivekitService
 }
 
 func NewRoomModel() *RoomModel {
-	ds := dbservice.NewDBService(config.GetConfig().ORM)
-	rs := redisservice.NewRedisService(config.GetConfig().RDS)
+	app := config.GetConfig()
+	ds := dbservice.NewDBService(app.ORM)
+	rs := redisservice.NewRedisService(app.RDS)
 	lk := livekitservice.NewLivekitService(rs)
 
 	return &RoomModel{
-		ds: ds,
-		rs: rs,
-		lk: lk,
+		app: app,
+		ds:  ds,
+		rs:  rs,
+		lk:  lk,
 	}
 }
 

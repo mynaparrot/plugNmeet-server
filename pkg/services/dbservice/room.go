@@ -77,7 +77,7 @@ func (s *DatabaseService) GetActiveRoomsInfo() ([]dbmodels.RoomInfo, error) {
 	return rooms, nil
 }
 
-func (s *DatabaseService) GetPastRooms(roomIds []string, offset, limit uint64) ([]dbmodels.RoomInfo, int64, error) {
+func (s *DatabaseService) GetPastRooms(roomIds []string, offset, limit uint64, direction *string) ([]dbmodels.RoomInfo, int64, error) {
 	var roomsInfo []dbmodels.RoomInfo
 	cond := &dbmodels.RoomInfo{
 		IsRunning: 0,
@@ -91,8 +91,12 @@ func (s *DatabaseService) GetPastRooms(roomIds []string, offset, limit uint64) (
 	if limit == 0 {
 		limit = 20
 	}
+	orderBy := "DESC"
+	if direction != nil && *direction == "ASC" {
+		orderBy = "ASC"
+	}
 
-	result := d.Offset(int(offset)).Limit(int(limit)).Find(&roomsInfo)
+	result := d.Offset(int(offset)).Limit(int(limit)).Order("id " + orderBy).Find(&roomsInfo)
 	switch {
 	case errors.Is(result.Error, gorm.ErrRecordNotFound):
 		return nil, 0, nil
