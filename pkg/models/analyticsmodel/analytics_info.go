@@ -5,7 +5,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 )
 
-func (m *AnalyticsAuthModel) FetchAnalytics(r *plugnmeet.FetchAnalyticsReq) (*plugnmeet.FetchAnalyticsResult, error) {
+func (m *AnalyticsModel) FetchAnalytics(r *plugnmeet.FetchAnalyticsReq) (*plugnmeet.FetchAnalyticsResult, error) {
 	data, total, err := m.ds.GetAnalytics(r.RoomIds, uint64(r.From), uint64(r.Limit), &r.OrderBy)
 	if err != nil {
 		return nil, err
@@ -34,7 +34,7 @@ func (m *AnalyticsAuthModel) FetchAnalytics(r *plugnmeet.FetchAnalyticsReq) (*pl
 	return result, nil
 }
 
-func (m *AnalyticsAuthModel) fetchAnalytic(fileId string) (*plugnmeet.AnalyticsInfo, error) {
+func (m *AnalyticsModel) fetchAnalytic(fileId string) (*plugnmeet.AnalyticsInfo, error) {
 	v, err := m.ds.GetAnalyticByFileId(fileId)
 	if err != nil {
 		return nil, err
@@ -53,7 +53,7 @@ func (m *AnalyticsAuthModel) fetchAnalytic(fileId string) (*plugnmeet.AnalyticsI
 	return analytic, nil
 }
 
-func (m *AnalyticsAuthModel) getAnalyticByRoomTableId(roomTableId uint64) (*plugnmeet.AnalyticsInfo, error) {
+func (m *AnalyticsModel) getAnalyticByRoomTableId(roomTableId uint64) (*plugnmeet.AnalyticsInfo, error) {
 	v, err := m.ds.GetAnalyticByRoomTableId(roomTableId)
 	if err != nil {
 		return nil, err

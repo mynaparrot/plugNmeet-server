@@ -14,7 +14,7 @@ import (
 )
 
 // GetAnalyticsDownloadToken will use the same JWT token generator as plugNmeet is using
-func (m *AnalyticsAuthModel) GetAnalyticsDownloadToken(r *plugnmeet.GetAnalyticsDownloadTokenReq) (string, error) {
+func (m *AnalyticsModel) GetAnalyticsDownloadToken(r *plugnmeet.GetAnalyticsDownloadTokenReq) (string, error) {
 	analytic, err := m.fetchAnalytic(r.FileId)
 	if err != nil {
 		return "", err
@@ -23,7 +23,7 @@ func (m *AnalyticsAuthModel) GetAnalyticsDownloadToken(r *plugnmeet.GetAnalytics
 	return m.generateToken(analytic.FileName)
 }
 
-func (m *AnalyticsAuthModel) generateToken(fileName string) (string, error) {
+func (m *AnalyticsModel) generateToken(fileName string) (string, error) {
 	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.HS256, Key: []byte(m.app.Client.Secret)}, (&jose.SignerOptions{}).WithType("JWT"))
 
 	if err != nil {
@@ -41,7 +41,7 @@ func (m *AnalyticsAuthModel) generateToken(fileName string) (string, error) {
 }
 
 // VerifyAnalyticsToken verify token & provide file path
-func (m *AnalyticsAuthModel) VerifyAnalyticsToken(token string) (string, int, error) {
+func (m *AnalyticsModel) VerifyAnalyticsToken(token string) (string, int, error) {
 	tok, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.HS256})
 	if err != nil {
 		return "", fiber.StatusUnauthorized, err

@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-func (m *AnalyticsAuthModel) AddAnalyticsFileToDB(roomTableId uint64, roomCreationTime int64, roomId, fileId string, stat os.FileInfo) (int64, error) {
+func (m *AnalyticsModel) AddAnalyticsFileToDB(roomTableId uint64, roomCreationTime int64, roomId, fileId string, stat os.FileInfo) (int64, error) {
 	fSize := float64(stat.Size())
 	// we'll convert bytes to KB
 	if fSize > 1000 {

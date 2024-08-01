@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-func (m *AnalyticsAuthModel) DeleteAnalytics(r *plugnmeet.DeleteAnalyticsReq) error {
+func (m *AnalyticsModel) DeleteAnalytics(r *plugnmeet.DeleteAnalyticsReq) error {
 	analytic, err := m.fetchAnalytic(r.FileId)
 	if err != nil {
 		return err
