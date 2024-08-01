@@ -1,0 +1,73 @@
+package analyticsmodel
+
+import (
+	"errors"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+)
+
+func (m *AnalyticsAuthModel) FetchAnalytics(r *plugnmeet.FetchAnalyticsReq) (*plugnmeet.FetchAnalyticsResult, error) {
+	data, total, err := m.ds.GetAnalytics(r.RoomIds, uint64(r.From), uint64(r.Limit), &r.OrderBy)
+	if err != nil {
+		return nil, err
+	}
+
+	var analytics []*plugnmeet.AnalyticsInfo
+	for _, v := range data {
+		analytic := &plugnmeet.AnalyticsInfo{
+			RoomId:           v.RoomID,
+			FileId:           v.FileID,
+			FileSize:         v.FileSize,
+			CreationTime:     v.CreationTime,
+			RoomCreationTime: v.RoomCreationTime,
+		}
+		analytics = append(analytics, analytic)
+	}
+
+	result := &plugnmeet.FetchAnalyticsResult{
+		TotalAnalytics: total,
+		From:           r.From,
+		Limit:          r.Limit,
+		OrderBy:        r.OrderBy,
+		AnalyticsList:  analytics,
+	}
+
+	return result, nil
+}
+
+func (m *AnalyticsAuthModel) fetchAnalytic(fileId string) (*plugnmeet.AnalyticsInfo, error) {
+	v, err := m.ds.GetAnalyticByFileId(fileId)
+	if err != nil {
+		return nil, err
+	}
+	if v == nil {
+		return nil, errors.New("no info found")
+	}
+	analytic := &plugnmeet.AnalyticsInfo{
+		RoomId:           v.RoomID,
+		FileId:           v.FileID,
+		FileSize:         v.FileSize,
+		CreationTime:     v.CreationTime,
+		RoomCreationTime: v.RoomCreationTime,
+	}
+
+	return analytic, nil
+}
+
+func (m *AnalyticsAuthModel) getAnalyticByRoomTableId(roomTableId uint64) (*plugnmeet.AnalyticsInfo, error) {
+	v, err := m.ds.GetAnalyticByRoomTableId(roomTableId)
+	if err != nil {
+		return nil, err
+	}
+	if v == nil {
+		return nil, errors.New("no info found")
+	}
+	analytic := &plugnmeet.AnalyticsInfo{
+		RoomId:           v.RoomID,
+		FileId:           v.FileID,
+		FileSize:         v.FileSize,
+		CreationTime:     v.CreationTime,
+		RoomCreationTime: v.RoomCreationTime,
+	}
+
+	return analytic, nil
+}

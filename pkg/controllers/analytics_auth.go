@@ -28,7 +28,7 @@ func HandleFetchAnalytics(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := analyticsmodel.NewAnalyticsAuthModel(nil, nil)
+	m := analyticsmodel.New(nil, nil)
 	result, err := m.FetchAnalytics(req)
 
 	if err != nil {
@@ -64,7 +64,7 @@ func HandleDeleteAnalytics(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := analyticsmodel.NewAnalyticsAuthModel(nil, nil)
+	m := analyticsmodel.New(nil, nil)
 	err = m.DeleteAnalytics(req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
@@ -91,7 +91,7 @@ func HandleGetAnalyticsDownloadToken(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := analyticsmodel.NewAnalyticsAuthModel(nil, nil)
+	m := analyticsmodel.New(nil, nil)
 	token, err := m.GetAnalyticsDownloadToken(req)
 
 	if err != nil {
@@ -113,7 +113,7 @@ func HandleDownloadAnalytics(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).SendString("token require or invalid url")
 	}
 
-	m := analyticsmodel.NewAnalyticsAuthModel(nil, nil)
+	m := analyticsmodel.New(nil, nil)
 	file, status, err := m.VerifyAnalyticsToken(token)
 
 	if err != nil {

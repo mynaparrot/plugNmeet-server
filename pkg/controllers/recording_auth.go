@@ -27,7 +27,7 @@ func HandleFetchRecordings(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := recordingmodel.NewRecordingAuth(nil, nil)
+	m := recordingmodel.New(nil, nil)
 	result, err := m.FetchRecordings(req)
 
 	if err != nil {
@@ -64,7 +64,7 @@ func HandleRecordingInfo(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := recordingmodel.NewRecordingAuth(nil, nil)
+	m := recordingmodel.New(nil, nil)
 	result, err := m.RecordingInfo(req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
@@ -91,7 +91,7 @@ func HandleDeleteRecording(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := recordingmodel.NewRecordingAuth(nil, nil)
+	m := recordingmodel.New(nil, nil)
 	err = m.DeleteRecording(req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
@@ -118,7 +118,7 @@ func HandleGetDownloadToken(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := recordingmodel.NewRecordingAuth(nil, nil)
+	m := recordingmodel.New(nil, nil)
 	token, err := m.GetDownloadToken(req)
 
 	if err != nil {
@@ -140,7 +140,7 @@ func HandleDownloadRecording(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).SendString("token require or invalid url")
 	}
 
-	m := recordingmodel.NewRecordingAuth(nil, nil)
+	m := recordingmodel.New(nil, nil)
 	file, status, err := m.VerifyRecordingToken(token)
 
 	if err != nil {

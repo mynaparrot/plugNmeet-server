@@ -39,7 +39,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	m = NewBBBApiWrapperModel(nil, nil)
+	m = New(nil, nil)
 
 	info := &dbmodels.RoomInfo{
 		RoomId:       roomId,

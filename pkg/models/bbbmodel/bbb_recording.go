@@ -3,32 +3,11 @@ package bbbmodel
 import (
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/bbbapiwrapper"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/recordingmodel"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/dbservice"
 	log "github.com/sirupsen/logrus"
 	"strings"
 	"time"
 )
-
-type BBBApiWrapperModel struct {
-	app *config.AppConfig
-	ds  *dbservice.DatabaseService
-}
-
-func NewBBBApiWrapperModel(app *config.AppConfig, ds *dbservice.DatabaseService) *BBBApiWrapperModel {
-	if app == nil {
-		app = config.GetConfig()
-	}
-	if ds == nil {
-		ds = dbservice.NewDBService(app.ORM)
-	}
-
-	return &BBBApiWrapperModel{
-		app: app,
-		ds:  ds,
-	}
-}
 
 func (m *BBBApiWrapperModel) GetRecordings(host string, r *bbbapiwrapper.GetRecordingsReq) ([]*bbbapiwrapper.RecordingInfo, *bbbapiwrapper.Pagination, error) {
 	oriIds := make(map[string]string)
@@ -112,7 +91,7 @@ func (m *BBBApiWrapperModel) GetRecordings(host string, r *bbbapiwrapper.GetReco
 }
 
 func (m *BBBApiWrapperModel) createPlayBackURL(host, path string) (string, error) {
-	auth := recordingmodel.NewRecordingAuth(m.app, m.ds)
+	auth := recordingmodel.New(m.app, m.ds)
 	token, err := auth.CreateTokenForDownload(path)
 	if err != nil {
 		return "", err

@@ -16,7 +16,7 @@ type RoomModel struct {
 	lk  *livekitservice.LivekitService
 }
 
-func NewRoomModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService) *RoomModel {
+func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService) *RoomModel {
 	if app == nil {
 		app = config.GetConfig()
 	}

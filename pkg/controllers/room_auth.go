@@ -29,7 +29,7 @@ func HandleRoomCreate(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := roommodel.NewRoomModel(nil, nil, nil, nil)
+	m := roommodel.New(nil, nil, nil, nil)
 	status, msg, room := m.CreateRoom(req)
 
 	r := &plugnmeet.CreateRoomRes{
@@ -60,7 +60,7 @@ func HandleIsRoomActive(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := roommodel.NewRoomModel(nil, nil, nil, nil)
+	m := roommodel.New(nil, nil, nil, nil)
 	res, _ := m.IsRoomActive(req)
 	return utils.SendProtoJsonResponse(c, res)
 }
@@ -85,7 +85,7 @@ func HandleGetActiveRoomInfo(c *fiber.Ctx) error {
 	if err = v.Validate(req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
-	m := roommodel.NewRoomModel(nil, nil, nil, nil)
+	m := roommodel.New(nil, nil, nil, nil)
 	status, msg, res := m.GetActiveRoomInfo(req)
 
 	r := &plugnmeet.GetActiveRoomInfoRes{
@@ -98,7 +98,7 @@ func HandleGetActiveRoomInfo(c *fiber.Ctx) error {
 }
 
 func HandleGetActiveRoomsInfo(c *fiber.Ctx) error {
-	m := roommodel.NewRoomModel(nil, nil, nil, nil)
+	m := roommodel.New(nil, nil, nil, nil)
 	status, msg, res := m.GetActiveRoomsInfo()
 
 	r := &plugnmeet.GetActiveRoomsInfoRes{
@@ -128,7 +128,7 @@ func HandleEndRoom(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := roommodel.NewRoomModel(nil, nil, nil, nil)
+	m := roommodel.New(nil, nil, nil, nil)
 	status, msg := m.EndRoom(req)
 
 	return utils.SendCommonProtoJsonResponse(c, status, msg)
@@ -152,7 +152,7 @@ func HandleFetchPastRooms(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := roommodel.NewRoomModel(nil, nil, nil, nil)
+	m := roommodel.New(nil, nil, nil, nil)
 	result, err := m.FetchPastRooms(req)
 
 	if err != nil {
@@ -188,7 +188,7 @@ func HandleEndRoomForAPI(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "requested roomId & token roomId mismatched")
 	}
 
-	m := roommodel.NewRoomModel(nil, nil, nil, nil)
+	m := roommodel.New(nil, nil, nil, nil)
 	status, msg := m.EndRoom(req)
 	return utils.SendCommonProtobufResponse(c, status, msg)
 }
@@ -211,7 +211,7 @@ func HandleChangeVisibilityForAPI(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "requested roomId & token roomId mismatched")
 	}
 
-	m := roommodel.NewRoomModel(nil, nil, nil, nil)
+	m := roommodel.New(nil, nil, nil, nil)
 	status, msg := m.ChangeVisibility(req)
 	return utils.SendCommonProtobufResponse(c, status, msg)
 }
