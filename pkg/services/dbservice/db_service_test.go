@@ -24,7 +24,17 @@ var roomCreationTime int64
 var analyticFileId = fmt.Sprintf("file-%d", time.Now().Unix())
 
 func init() {
-	err := helpers.PrepareServer(root + "/config.yaml")
+	appCnf, err := helpers.ReadConfig(root + "/config.yaml")
+	if err != nil {
+		panic(err)
+	}
+
+	appCnf.RootWorkingDir = root
+	// set this config for global usage
+	config.NewAppConfig(appCnf)
+
+	// now prepare server
+	err = helpers.PrepareServer(config.GetConfig())
 	if err != nil {
 		panic(err)
 	}

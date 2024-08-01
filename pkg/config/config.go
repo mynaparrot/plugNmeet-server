@@ -10,6 +10,8 @@ import (
 	"gorm.io/gorm"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -17,9 +19,10 @@ import (
 var AppCnf *AppConfig
 
 type AppConfig struct {
-	DB  *sql.DB
-	RDS *redis.Client
-	ORM *gorm.DB
+	DB             *sql.DB
+	RDS            *redis.Client
+	ORM            *gorm.DB
+	RootWorkingDir string
 
 	sync.RWMutex
 	chatRooms   map[string]map[string]ChatParticipant
@@ -134,7 +137,14 @@ type CopyrightConf struct {
 	Text          string `yaml:"text"`
 }
 
-func SetAppConfig(a *AppConfig) {
+func NewAppConfig(a *AppConfig) {
+	if AppCnf != nil {
+		// not allow multiple config
+		return
+	}
+
+	AppCnf = new(AppConfig) // otherwise will give error
+	// now set the config
 	AppCnf = a
 	AppCnf.chatRooms = make(map[string]map[string]ChatParticipant)
 
@@ -146,8 +156,14 @@ func SetAppConfig(a *AppConfig) {
 			d := time.Minute * 30
 			AppCnf.AnalyticsSettings.TokenValidity = &d
 		}
-		if _, err := os.Stat(*AppCnf.AnalyticsSettings.FilesStorePath); os.IsNotExist(err) {
-			_ = os.MkdirAll(*AppCnf.AnalyticsSettings.FilesStorePath, os.ModePerm)
+
+		p := *AppCnf.AnalyticsSettings.FilesStorePath
+		if strings.HasPrefix(p, "./") {
+			p = filepath.Join(a.RootWorkingDir, p)
+		}
+
+		if _, err := os.Stat(p); os.IsNotExist(err) {
+			_ = os.MkdirAll(p, os.ModePerm)
 		}
 	}
 
@@ -155,9 +171,18 @@ func SetAppConfig(a *AppConfig) {
 	a.readClientFiles()
 }
 
+func GetConfig() *AppConfig {
+	return AppCnf
+}
+
 func setLogger() {
+	p := AppCnf.LogSettings.LogFile
+	if strings.HasPrefix(p, "./") {
+		p = filepath.Join(AppCnf.RootWorkingDir, p)
+	}
+
 	logWriter := &lumberjack.Logger{
-		Filename:   AppCnf.LogSettings.LogFile,
+		Filename:   p,
 		MaxSize:    AppCnf.LogSettings.MaxSize,
 		MaxBackups: AppCnf.LogSettings.MaxBackups,
 		MaxAge:     AppCnf.LogSettings.MaxAge,

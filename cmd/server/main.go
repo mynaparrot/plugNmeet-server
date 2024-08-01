@@ -41,9 +41,17 @@ func main() {
 }
 
 func startServer(c *cli.Context) error {
-	err := helpers.PrepareServer(c.String("config"))
+	appCnf, err := helpers.ReadConfig(c.String("config"))
 	if err != nil {
-		return err
+		panic(err)
+	}
+	// set this config for global usage
+	config.NewAppConfig(appCnf)
+
+	// now prepare our server
+	err = helpers.PrepareServer(config.GetConfig())
+	if err != nil {
+		log.Fatalln(err)
 	}
 
 	// we'll subscribe to redis channels now
@@ -51,8 +59,8 @@ func startServer(c *cli.Context) error {
 	go controllers.StartScheduler()
 
 	// defer close connections
-	defer config.AppCnf.DB.Close()
-	defer config.AppCnf.RDS.Close()
+	defer config.GetConfig().DB.Close()
+	defer config.GetConfig().RDS.Close()
 
 	router := handler.Router()
 	sigChan := make(chan os.Signal, 1)

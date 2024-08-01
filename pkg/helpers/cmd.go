@@ -8,36 +8,26 @@ import (
 	"os"
 )
 
-func PrepareServer(c string) error {
-	if config.AppCnf != nil {
-		return nil
-	}
-
-	cnf, err := ReadConfig(c)
-	if err != nil {
-		return err
-	}
-	config.SetAppConfig(cnf)
-
+func PrepareServer(appCnf *config.AppConfig) error {
 	// orm
-	err = temporary.NewDatabaseConnection(config.AppCnf)
+	err := temporary.NewDatabaseConnection(appCnf)
 	if err != nil {
 		return err
 	}
 
 	// set mysql factory connection
-	db, err := factory.NewDbConnection(config.AppCnf.DatabaseInfo)
+	db, err := factory.NewDbConnection(appCnf.DatabaseInfo)
 	if err != nil {
 		return err
 	}
-	config.AppCnf.DB = db
+	appCnf.DB = db
 
 	// set redis connection
-	rds, err := factory.NewRedisConnection(config.AppCnf.RedisInfo)
+	rds, err := factory.NewRedisConnection(appCnf.RedisInfo)
 	if err != nil {
 		return err
 	}
-	config.AppCnf.RDS = rds
+	appCnf.RDS = rds
 
 	return nil
 }
@@ -57,6 +47,15 @@ func readYaml(filename string) (*config.AppConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// get current working dir
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+
+	// set the root path
+	appCnf.RootWorkingDir = wd
 
 	return appCnf, err
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"path/filepath"
@@ -25,12 +26,22 @@ var roomCreationTime int64
 var recordId = fmt.Sprintf("rec-%d", time.Now().UnixMilli())
 
 func init() {
-	err := helpers.PrepareServer(root + "/config.yaml")
+	appCnf, err := helpers.ReadConfig(root + "/config.yaml")
 	if err != nil {
 		panic(err)
 	}
-	m = NewRecordingAuth()
 
+	appCnf.RootWorkingDir = root
+	// set this config for global usage
+	config.NewAppConfig(appCnf)
+
+	// now prepare server
+	err = helpers.PrepareServer(config.GetConfig())
+	if err != nil {
+		panic(err)
+	}
+
+	m = NewRecordingAuth()
 	info := &dbmodels.RoomInfo{
 		RoomId:       roomId,
 		RoomTitle:    "Testing",
