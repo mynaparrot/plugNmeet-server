@@ -3,11 +3,14 @@ package livekitservice
 import (
 	"context"
 	"errors"
+	"github.com/google/uuid"
 	"github.com/livekit/protocol/livekit"
 	lksdk "github.com/livekit/server-sdk-go/v2"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redisservice"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type LivekitService struct {
@@ -232,4 +235,52 @@ func (s *LivekitService) SendData(roomId string, data []byte, dataPacketKind liv
 	}
 
 	return res, nil
+}
+
+// UnmarshalRoomMetadata will convert metadata string to proper format
+func (s *LivekitService) UnmarshalRoomMetadata(metadata string) (*plugnmeet.RoomMetadata, error) {
+	meta := new(plugnmeet.RoomMetadata)
+	err := protojson.Unmarshal([]byte(metadata), meta)
+	if err != nil {
+		return nil, err
+	}
+
+	return meta, nil
+}
+
+// MarshalRoomMetadata will convert metadata struct to proper json format
+func (s *LivekitService) MarshalRoomMetadata(meta *plugnmeet.RoomMetadata) (string, error) {
+	mId := uuid.NewString()
+	meta.MetadataId = &mId
+
+	op := protojson.MarshalOptions{
+		EmitUnpopulated: true,
+		UseProtoNames:   true,
+	}
+
+	marshal, err := op.Marshal(meta)
+	if err != nil {
+		return "", err
+	}
+
+	return string(marshal), nil
+}
+
+// LoadRoomWithMetadata will load room info with proper formatted metadata
+func (s *LivekitService) LoadRoomWithMetadata(roomId string) (*livekit.Room, *plugnmeet.RoomMetadata, error) {
+	room, err := s.LoadRoomInfo(roomId)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if room.Metadata == "" {
+		return room, nil, errors.New("empty metadata")
+	}
+
+	meta, err := s.UnmarshalRoomMetadata(room.Metadata)
+	if err != nil {
+		return room, nil, err
+	}
+
+	return room, meta, nil
 }

@@ -455,7 +455,7 @@ func (am *RoomAuthModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomR
 
 	// validate file type
 	mtype := mimetype.Lookup(cType)
-	err = fm.validateMimeType(mtype)
+	err = fm.ValidateMimeType(mtype)
 	if err != nil {
 		log.Errorln(err)
 		return
@@ -484,7 +484,7 @@ func (am *RoomAuthModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomR
 		_ = os.RemoveAll(gres.Filename)
 		return
 	}
-	err = fm.validateMimeType(mtype)
+	err = fm.ValidateMimeType(mtype)
 	if err != nil {
 		log.Errorln(err)
 		// remove the file if validation not passed

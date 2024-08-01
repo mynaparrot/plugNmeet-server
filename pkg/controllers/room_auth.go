@@ -6,6 +6,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/roommodel"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -29,7 +30,7 @@ func HandleRoomCreate(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := models.NewRoomAuthModel()
+	m := roommodel.NewRoomModel()
 	status, msg, room := m.CreateRoom(req)
 
 	r := &plugnmeet.CreateRoomRes{

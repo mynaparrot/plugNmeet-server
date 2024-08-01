@@ -3,9 +3,7 @@ package redisservice
 import (
 	"errors"
 	"fmt"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/redis/go-redis/v9"
-	log "github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -87,22 +85,4 @@ func (s *RedisService) RoomCreationProgressList(roomId, task string) (bool, erro
 	}
 
 	return false, errors.New("invalid task")
-}
-
-// CheckAndWaitUntilRoomCreationInProgress will check the process & wait if needed
-func (s *RedisService) CheckAndWaitUntilRoomCreationInProgress(roomId string) {
-	for {
-		list, err := s.RoomCreationProgressList(roomId, "exist")
-		if err != nil {
-			log.Errorln(err)
-			break
-		}
-		if list {
-			log.Println(roomId, "creation in progress, so waiting for", config.WaitDurationIfRoomInProgress)
-			// we'll wait
-			time.Sleep(config.WaitDurationIfRoomInProgress)
-		} else {
-			break
-		}
-	}
 }

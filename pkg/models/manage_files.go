@@ -202,10 +202,10 @@ func (m *ManageFile) detectMimeTypeForValidation(file multipart.File) error {
 	if err != nil {
 		return err
 	}
-	return m.validateMimeType(mtype)
+	return m.ValidateMimeType(mtype)
 }
 
-func (m *ManageFile) validateMimeType(mtype *mimetype.MIME) error {
+func (m *ManageFile) ValidateMimeType(mtype *mimetype.MIME) error {
 	allowedTypes := m.uploadFileSettings.AllowedTypes
 	sort.Strings(allowedTypes)
 
