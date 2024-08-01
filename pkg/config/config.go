@@ -16,8 +16,6 @@ import (
 	"time"
 )
 
-var AppCnf *AppConfig
-
 type AppConfig struct {
 	DB             *sql.DB
 	RDS            *redis.Client
@@ -137,27 +135,29 @@ type CopyrightConf struct {
 	Text          string `yaml:"text"`
 }
 
+var appCnf *AppConfig
+
 func NewAppConfig(a *AppConfig) {
-	if AppCnf != nil {
+	if appCnf != nil {
 		// not allow multiple config
 		return
 	}
 
-	AppCnf = new(AppConfig) // otherwise will give error
+	appCnf = new(AppConfig) // otherwise will give error
 	// now set the config
-	AppCnf = a
-	AppCnf.chatRooms = make(map[string]map[string]ChatParticipant)
+	appCnf = a
+	appCnf.chatRooms = make(map[string]map[string]ChatParticipant)
 
 	// set default values
-	if AppCnf.AnalyticsSettings != nil {
-		if AppCnf.AnalyticsSettings.FilesStorePath == nil {
+	if appCnf.AnalyticsSettings != nil {
+		if appCnf.AnalyticsSettings.FilesStorePath == nil {
 			p := "./analytics"
-			AppCnf.AnalyticsSettings.FilesStorePath = &p
+			appCnf.AnalyticsSettings.FilesStorePath = &p
 			d := time.Minute * 30
-			AppCnf.AnalyticsSettings.TokenValidity = &d
+			appCnf.AnalyticsSettings.TokenValidity = &d
 		}
 
-		p := *AppCnf.AnalyticsSettings.FilesStorePath
+		p := *appCnf.AnalyticsSettings.FilesStorePath
 		if strings.HasPrefix(p, "./") {
 			p = filepath.Join(a.RootWorkingDir, p)
 		}
@@ -172,20 +172,20 @@ func NewAppConfig(a *AppConfig) {
 }
 
 func GetConfig() *AppConfig {
-	return AppCnf
+	return appCnf
 }
 
 func setLogger() {
-	p := AppCnf.LogSettings.LogFile
+	p := appCnf.LogSettings.LogFile
 	if strings.HasPrefix(p, "./") {
-		p = filepath.Join(AppCnf.RootWorkingDir, p)
+		p = filepath.Join(appCnf.RootWorkingDir, p)
 	}
 
 	logWriter := &lumberjack.Logger{
 		Filename:   p,
-		MaxSize:    AppCnf.LogSettings.MaxSize,
-		MaxBackups: AppCnf.LogSettings.MaxBackups,
-		MaxAge:     AppCnf.LogSettings.MaxAge,
+		MaxSize:    appCnf.LogSettings.MaxSize,
+		MaxBackups: appCnf.LogSettings.MaxBackups,
+		MaxAge:     appCnf.LogSettings.MaxAge,
 	}
 
 	logrus.SetReportCaller(true)
@@ -197,7 +197,7 @@ func setLogger() {
 	})
 
 	var w io.Writer
-	if AppCnf.Client.Debug {
+	if appCnf.Client.Debug {
 		w = io.MultiWriter(os.Stdout, logWriter)
 	} else {
 		w = io.Writer(logWriter)
@@ -262,7 +262,7 @@ func (a *AppConfig) readClientFiles() {
 	if a.Client.Debug {
 		return
 	}
-	AppCnf.ClientFiles = make(map[string][]string)
+	appCnf.ClientFiles = make(map[string][]string)
 
 	css, err := utils.GetFilesFromDir(a.Client.Path+"/assets/css", ".css", "des")
 	if err != nil {
@@ -274,6 +274,6 @@ func (a *AppConfig) readClientFiles() {
 		logrus.Errorln(err)
 	}
 
-	AppCnf.ClientFiles["css"] = css
-	AppCnf.ClientFiles["js"] = js
+	appCnf.ClientFiles["css"] = css
+	appCnf.ClientFiles["js"] = js
 }

@@ -37,10 +37,10 @@ type RecorderReq struct {
 
 func NewRecorderModel() *RecorderModel {
 	return &RecorderModel{
-		app:         config.AppCnf,
+		app:         config.GetConfig(),
 		rm:          NewRoomModel(),
 		roomService: NewRoomService(),
-		rds:         config.AppCnf.RDS,
+		rds:         config.GetConfig().RDS,
 		ctx:         context.Background(),
 	}
 }

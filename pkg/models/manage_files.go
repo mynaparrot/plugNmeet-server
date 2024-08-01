@@ -30,7 +30,7 @@ type ManageFile struct {
 }
 
 func NewManageFileModel(m *ManageFile) *ManageFile {
-	m.uploadFileSettings = &config.AppCnf.UploadFileSettings
+	m.uploadFileSettings = &config.GetConfig().UploadFileSettings
 	m.rs = NewRoomService()
 	return m
 }

@@ -22,5 +22,5 @@ type Recording struct {
 }
 
 func (m *Recording) TableName() string {
-	return config.AppCnf.FormatDBTable("recordings")
+	return config.GetConfig().FormatDBTable("recordings")
 }

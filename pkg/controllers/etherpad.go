@@ -18,7 +18,7 @@ func HandleCreateEtherpad(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	if !config.AppCnf.SharedNotePad.Enabled {
+	if !config.GetConfig().SharedNotePad.Enabled {
 		return utils.SendCommonProtobufResponse(c, false, "feature disabled")
 	}
 

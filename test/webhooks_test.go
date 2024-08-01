@@ -62,7 +62,7 @@ func test_webhooks(t *testing.T, rInfo *livekit.Room, roomFinished bool) {
 		sum := sha256.Sum256(encoded)
 		b64 := base64.StdEncoding.EncodeToString(sum[:])
 
-		at := auth.NewAccessToken(config.AppCnf.LivekitInfo.ApiKey, config.AppCnf.LivekitInfo.Secret).
+		at := auth.NewAccessToken(config.GetConfig().LivekitInfo.ApiKey, config.GetConfig().LivekitInfo.Secret).
 			SetValidFor(5 * time.Minute).
 			SetSha256(b64)
 		token, err := at.ToJWT()

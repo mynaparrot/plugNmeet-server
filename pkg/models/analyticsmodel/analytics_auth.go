@@ -21,9 +21,9 @@ type AnalyticsAuthModel struct {
 }
 
 func NewAnalyticsAuthModel() *AnalyticsAuthModel {
-	ds := dbservice.NewDBService(config.AppCnf.ORM)
+	ds := dbservice.NewDBService(config.GetConfig().ORM)
 	return &AnalyticsAuthModel{
-		app: config.AppCnf,
+		app: config.GetConfig(),
 		ds:  ds,
 	}
 }
@@ -122,7 +122,7 @@ func (m *AnalyticsAuthModel) DeleteAnalytics(r *plugnmeet.DeleteAnalyticsReq) er
 		return err
 	}
 
-	path := fmt.Sprintf("%s/%s", *config.AppCnf.AnalyticsSettings.FilesStorePath, analytic.FileName)
+	path := fmt.Sprintf("%s/%s", *config.GetConfig().AnalyticsSettings.FilesStorePath, analytic.FileName)
 
 	// delete the main file
 	err = os.Remove(path)
@@ -184,7 +184,7 @@ func (m *AnalyticsAuthModel) VerifyAnalyticsToken(token string) (string, int, er
 		return "", fiber.StatusUnauthorized, err
 	}
 
-	if err = out.Validate(jwt.Expected{Issuer: config.AppCnf.Client.ApiKey, Time: time.Now().UTC()}); err != nil {
+	if err = out.Validate(jwt.Expected{Issuer: config.GetConfig().Client.ApiKey, Time: time.Now().UTC()}); err != nil {
 		return "", fiber.StatusUnauthorized, err
 	}
 

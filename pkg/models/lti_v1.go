@@ -125,9 +125,9 @@ func (m *LTIV1) LTIV1Landing(c *fiber.Ctx, requests, signingURL string) error {
 
 func (m *LTIV1) VerifyAuth(requests, signingURL string) (*url.Values, error) {
 	r := strings.Split(requests, "&")
-	p := lti.NewProvider(config.AppCnf.Client.Secret, signingURL)
+	p := lti.NewProvider(config.GetConfig().Client.Secret, signingURL)
 	p.Method = "POST"
-	p.ConsumerKey = config.AppCnf.Client.ApiKey
+	p.ConsumerKey = config.GetConfig().Client.ApiKey
 	var providedSignature string
 
 	for _, f := range r {
@@ -167,14 +167,14 @@ func (m *LTIV1) genHashId(id string) string {
 }
 
 func (m *LTIV1) ToJWT(c *plugnmeet.LtiClaims) (string, error) {
-	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.HS256, Key: []byte(config.AppCnf.Client.Secret)},
+	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.HS256, Key: []byte(config.GetConfig().Client.Secret)},
 		(&jose.SignerOptions{}).WithType("JWT"))
 	if err != nil {
 		return "", err
 	}
 
 	cl := jwt.Claims{
-		Issuer:    config.AppCnf.Client.ApiKey,
+		Issuer:    config.GetConfig().Client.ApiKey,
 		NotBefore: jwt.NewNumericDate(time.Now().UTC()),
 		Expiry:    jwt.NewNumericDate(time.Now().UTC().Add(time.Hour * 2)), // valid for 2 hours
 		Subject:   c.UserId,
@@ -191,10 +191,10 @@ func (m *LTIV1) LTIV1VerifyHeaderToken(token string) (*LtiClaims, error) {
 
 	out := jwt.Claims{}
 	claims := &LtiClaims{}
-	if err = tok.Claims([]byte(config.AppCnf.Client.Secret), &out, claims); err != nil {
+	if err = tok.Claims([]byte(config.GetConfig().Client.Secret), &out, claims); err != nil {
 		return nil, err
 	}
-	if err = out.Validate(jwt.Expected{Issuer: config.AppCnf.Client.ApiKey, Time: time.Now().UTC()}); err != nil {
+	if err = out.Validate(jwt.Expected{Issuer: config.GetConfig().Client.ApiKey, Time: time.Now().UTC()}); err != nil {
 		return nil, err
 	}
 

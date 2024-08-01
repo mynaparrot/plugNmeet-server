@@ -28,18 +28,18 @@ func DistributeWebsocketMsgToRedisChannel(payload *WebsocketToRedis) {
 
 	switch payload.DataMsg.Type {
 	case plugnmeet.DataMsgType_USER:
-		config.AppCnf.RDS.Publish(ctx, config.UserWebsocketChannel, msg)
+		config.GetConfig().RDS.Publish(ctx, config.UserWebsocketChannel, msg)
 	case plugnmeet.DataMsgType_WHITEBOARD:
-		config.AppCnf.RDS.Publish(ctx, config.WhiteboardWebsocketChannel, msg)
+		config.GetConfig().RDS.Publish(ctx, config.WhiteboardWebsocketChannel, msg)
 	case plugnmeet.DataMsgType_SYSTEM:
-		config.AppCnf.RDS.Publish(ctx, config.SystemWebsocketChannel, msg)
+		config.GetConfig().RDS.Publish(ctx, config.SystemWebsocketChannel, msg)
 	}
 }
 
 // SubscribeToUserWebsocketChannel will delivery message to user websocket
 func SubscribeToUserWebsocketChannel() {
 	ctx := context.Background()
-	pubsub := config.AppCnf.RDS.Subscribe(ctx, config.UserWebsocketChannel)
+	pubsub := config.GetConfig().RDS.Subscribe(ctx, config.UserWebsocketChannel)
 	defer pubsub.Close()
 
 	_, err := pubsub.Receive(ctx)
@@ -70,7 +70,7 @@ func SubscribeToUserWebsocketChannel() {
 				if res.Type == "sendMsg" {
 					m.HandleDataMessages(res.DataMsg, res.RoomId, res.IsAdmin)
 				} else if res.Type == "deleteRoom" {
-					config.AppCnf.DeleteChatRoom(res.RoomId)
+					config.GetConfig().DeleteChatRoom(res.RoomId)
 				}
 			}
 		})
@@ -80,7 +80,7 @@ func SubscribeToUserWebsocketChannel() {
 // SubscribeToWhiteboardWebsocketChannel will delivery message to whiteboard websocket
 func SubscribeToWhiteboardWebsocketChannel() {
 	ctx := context.Background()
-	pubsub := config.AppCnf.RDS.Subscribe(ctx, config.WhiteboardWebsocketChannel)
+	pubsub := config.GetConfig().RDS.Subscribe(ctx, config.WhiteboardWebsocketChannel)
 	defer pubsub.Close()
 
 	_, err := pubsub.Receive(ctx)
@@ -115,7 +115,7 @@ func SubscribeToWhiteboardWebsocketChannel() {
 // SubscribeToSystemWebsocketChannel will delivery message to websocket
 func SubscribeToSystemWebsocketChannel() {
 	ctx := context.Background()
-	pubsub := config.AppCnf.RDS.Subscribe(ctx, config.SystemWebsocketChannel)
+	pubsub := config.GetConfig().RDS.Subscribe(ctx, config.SystemWebsocketChannel)
 	defer pubsub.Close()
 
 	_, err := pubsub.Receive(ctx)

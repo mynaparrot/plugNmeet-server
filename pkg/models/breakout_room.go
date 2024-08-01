@@ -26,7 +26,7 @@ type BreakoutRoom struct {
 func NewBreakoutRoomModel() *BreakoutRoom {
 	return &BreakoutRoom{
 		ctx:            context.Background(),
-		rc:             config.AppCnf.RDS,
+		rc:             config.GetConfig().RDS,
 		roomService:    NewRoomService(),
 		roomAuthModel:  NewRoomAuthModel(),
 		authTokenModel: NewAuthTokenModel(),

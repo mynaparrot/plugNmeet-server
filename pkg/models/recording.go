@@ -24,10 +24,10 @@ type RecordingModel struct {
 
 func NewRecordingModel() *RecordingModel {
 	return &RecordingModel{
-		app:            config.AppCnf,
-		db:             config.AppCnf.DB,
+		app:            config.GetConfig(),
+		db:             config.GetConfig().DB,
 		roomService:    NewRoomService(),
-		rds:            config.AppCnf.RDS,
+		rds:            config.GetConfig().RDS,
 		ctx:            context.Background(),
 		analyticsModel: NewAnalyticsModel(),
 	}
@@ -344,7 +344,7 @@ func (rm *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet,
 		log.Errorln(err)
 		return
 	}
-	path := fmt.Sprintf("%s/%s.json", config.AppCnf.RecorderInfo.RecordingFilesPath, r.FilePath)
+	path := fmt.Sprintf("%s/%s.json", config.GetConfig().RecorderInfo.RecordingFilesPath, r.FilePath)
 
 	err = os.WriteFile(path, marshal, 0644)
 	if err != nil {

@@ -16,7 +16,7 @@ type BBBApiWrapperModel struct {
 }
 
 func NewBBBApiWrapperModel() *BBBApiWrapperModel {
-	ds := dbservice.NewDBService(config.AppCnf.ORM)
+	ds := dbservice.NewDBService(config.GetConfig().ORM)
 	return &BBBApiWrapperModel{
 		ds: ds,
 	}

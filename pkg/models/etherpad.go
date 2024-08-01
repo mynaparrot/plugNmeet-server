@@ -55,9 +55,9 @@ const (
 
 func NewEtherpadModel() *EtherpadModel {
 	return &EtherpadModel{
-		rc:             config.AppCnf.RDS,
+		rc:             config.GetConfig().RDS,
 		context:        context.Background(),
-		SharedNotePad:  config.AppCnf.SharedNotePad,
+		SharedNotePad:  config.GetConfig().SharedNotePad,
 		rs:             NewRoomService(),
 		analyticsModel: NewAnalyticsModel(),
 	}

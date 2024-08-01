@@ -11,7 +11,7 @@ type RoomCreateModel struct {
 
 func NewRoomCreateModel() *RoomCreateModel {
 	return &RoomCreateModel{
-		ds: dbservice.NewDBService(config.AppCnf.ORM),
+		ds: dbservice.NewDBService(config.GetConfig().ORM),
 	}
 }
 

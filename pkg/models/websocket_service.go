@@ -106,8 +106,8 @@ func (w *WebsocketServiceModel) handleChat() {
 
 	var to []string
 
-	config.AppCnf.RLock()
-	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
+	config.GetConfig().RLock()
+	for _, p := range config.GetConfig().GetChatParticipants(w.roomId) {
 		if p.RoomId == w.roomId {
 			// only for specific user
 			if w.pl.To != nil {
@@ -126,7 +126,7 @@ func (w *WebsocketServiceModel) handleChat() {
 			}
 		}
 	}
-	config.AppCnf.RUnlock()
+	config.GetConfig().RUnlock()
 
 	l := len(to)
 	if l > 0 {
@@ -156,8 +156,8 @@ func (w *WebsocketServiceModel) handleSendChatMsgs() {
 	}
 	var userUUID string
 
-	config.AppCnf.RLock()
-	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
+	config.GetConfig().RLock()
+	for _, p := range config.GetConfig().GetChatParticipants(w.roomId) {
 		if p.RoomSid == w.rSid {
 			if *w.pl.To == p.UserSid || *w.pl.To == p.UserId {
 				userUUID = p.UUID
@@ -165,7 +165,7 @@ func (w *WebsocketServiceModel) handleSendChatMsgs() {
 			}
 		}
 	}
-	config.AppCnf.RUnlock()
+	config.GetConfig().RUnlock()
 
 	if userUUID != "" {
 		err = socketio.EmitTo(userUUID, jm, socketio.BinaryMessage)
@@ -199,8 +199,8 @@ func (w *WebsocketServiceModel) handleRenewToken() {
 		return
 	}
 
-	config.AppCnf.RLock()
-	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
+	config.GetConfig().RLock()
+	for _, p := range config.GetConfig().GetChatParticipants(w.roomId) {
 		if p.RoomId == w.roomId && w.pl.Body.From.UserId == p.UserId {
 			err = socketio.EmitTo(p.UUID, jm, socketio.BinaryMessage)
 			if err != nil {
@@ -208,7 +208,7 @@ func (w *WebsocketServiceModel) handleRenewToken() {
 			}
 		}
 	}
-	config.AppCnf.RUnlock()
+	config.GetConfig().RUnlock()
 }
 
 func (w *WebsocketServiceModel) handleSendPushMsg() {
@@ -218,8 +218,8 @@ func (w *WebsocketServiceModel) handleSendPushMsg() {
 	}
 	var to []string
 
-	config.AppCnf.RLock()
-	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
+	config.GetConfig().RLock()
+	for _, p := range config.GetConfig().GetChatParticipants(w.roomId) {
 		if p.RoomSid == w.rSid {
 			// only for specific user
 			if w.pl.To != nil {
@@ -232,7 +232,7 @@ func (w *WebsocketServiceModel) handleSendPushMsg() {
 			}
 		}
 	}
-	config.AppCnf.RUnlock()
+	config.GetConfig().RUnlock()
 	if len(to) > 0 {
 		socketio.EmitToList(to, jm, socketio.BinaryMessage)
 	}
@@ -246,8 +246,8 @@ func (w *WebsocketServiceModel) handleWhiteboard() {
 
 	var to []string
 
-	config.AppCnf.RLock()
-	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
+	config.GetConfig().RLock()
+	for _, p := range config.GetConfig().GetChatParticipants(w.roomId) {
 		if p.RoomSid == w.rSid {
 			// this is basically for initial request
 			if w.pl.To != nil {
@@ -260,7 +260,7 @@ func (w *WebsocketServiceModel) handleWhiteboard() {
 			}
 		}
 	}
-	config.AppCnf.RUnlock()
+	config.GetConfig().RUnlock()
 
 	l := len(to)
 	if l > 0 {
@@ -288,8 +288,8 @@ func (w *WebsocketServiceModel) handleUserVisibility() {
 
 	var to []string
 
-	config.AppCnf.RLock()
-	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
+	config.GetConfig().RLock()
+	for _, p := range config.GetConfig().GetChatParticipants(w.roomId) {
 		if p.RoomSid == w.rSid {
 			if w.pl.Body.From.UserId != p.UserId && p.IsAdmin {
 				// we don't need to send update to sender
@@ -297,7 +297,7 @@ func (w *WebsocketServiceModel) handleUserVisibility() {
 			}
 		}
 	}
-	config.AppCnf.RUnlock()
+	config.GetConfig().RUnlock()
 
 	if len(to) > 0 {
 		socketio.EmitToList(to, jm, socketio.BinaryMessage)
@@ -312,8 +312,8 @@ func (w *WebsocketServiceModel) handleExternalMediaPlayerEvents() {
 
 	var to []string
 
-	config.AppCnf.RLock()
-	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
+	config.GetConfig().RLock()
+	for _, p := range config.GetConfig().GetChatParticipants(w.roomId) {
 		if p.RoomSid == w.rSid {
 			if w.pl.Body.From.UserId != p.UserId {
 				// we don't need to send update to sender
@@ -321,7 +321,7 @@ func (w *WebsocketServiceModel) handleExternalMediaPlayerEvents() {
 			}
 		}
 	}
-	config.AppCnf.RUnlock()
+	config.GetConfig().RUnlock()
 
 	if len(to) > 0 {
 		socketio.EmitToList(to, jm, socketio.BinaryMessage)
@@ -336,8 +336,8 @@ func (w *WebsocketServiceModel) handlePollsNotifications() {
 
 	var to []string
 
-	config.AppCnf.RLock()
-	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
+	config.GetConfig().RLock()
+	for _, p := range config.GetConfig().GetChatParticipants(w.roomId) {
 		if p.RoomId == w.roomId {
 			if w.pl.Body.From.UserId != p.UserId {
 				// we don't need to send update to sender
@@ -345,7 +345,7 @@ func (w *WebsocketServiceModel) handlePollsNotifications() {
 			}
 		}
 	}
-	config.AppCnf.RUnlock()
+	config.GetConfig().RUnlock()
 
 	if len(to) > 0 {
 		socketio.EmitToList(to, jm, socketio.BinaryMessage)
@@ -359,8 +359,8 @@ func (w *WebsocketServiceModel) handleSendBreakoutRoomNotification() {
 	}
 	var to []string
 
-	config.AppCnf.RLock()
-	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
+	config.GetConfig().RLock()
+	for _, p := range config.GetConfig().GetChatParticipants(w.roomId) {
 		if p.RoomId == w.roomId {
 			// only for specific user
 			if w.pl.To != nil {
@@ -373,7 +373,7 @@ func (w *WebsocketServiceModel) handleSendBreakoutRoomNotification() {
 			}
 		}
 	}
-	config.AppCnf.RUnlock()
+	config.GetConfig().RUnlock()
 	if len(to) > 0 {
 		socketio.EmitToList(to, jm, socketio.BinaryMessage)
 	}
@@ -387,8 +387,8 @@ func (w *WebsocketServiceModel) handleSpeechSubtitleText() {
 
 	var to []string
 
-	config.AppCnf.RLock()
-	for _, p := range config.AppCnf.GetChatParticipants(w.roomId) {
+	config.GetConfig().RLock()
+	for _, p := range config.GetConfig().GetChatParticipants(w.roomId) {
 		if p.RoomSid == w.rSid {
 			if w.pl.To != nil {
 				if *w.pl.To == p.UserSid || *w.pl.To == p.UserId {
@@ -400,7 +400,7 @@ func (w *WebsocketServiceModel) handleSpeechSubtitleText() {
 			}
 		}
 	}
-	config.AppCnf.RUnlock()
+	config.GetConfig().RUnlock()
 
 	l := len(to)
 	if l > 0 {

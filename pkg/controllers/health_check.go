@@ -7,12 +7,12 @@ import (
 )
 
 func HandleHealthCheck(c *fiber.Ctx) error {
-	err := config.AppCnf.DB.Ping()
+	err := config.GetConfig().DB.Ping()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString("DB connection error")
 	}
 
-	_, err = config.AppCnf.RDS.Ping(context.Background()).Result()
+	_, err = config.GetConfig().RDS.Ping(context.Background()).Result()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString("Redis connection error")
 	}

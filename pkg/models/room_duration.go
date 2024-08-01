@@ -28,7 +28,7 @@ type RoomDurationInfo struct {
 
 func NewRoomDurationModel() *RoomDurationModel {
 	return &RoomDurationModel{
-		rc:  config.AppCnf.RDS,
+		rc:  config.GetConfig().RDS,
 		ctx: context.Background(),
 	}
 }

@@ -16,9 +16,9 @@ import (
 )
 
 func Router() *fiber.App {
-	templateEngine := html.New(config.AppCnf.Client.Path, ".html")
+	templateEngine := html.New(config.GetConfig().Client.Path, ".html")
 
-	if config.AppCnf.Client.Debug {
+	if config.GetConfig().Client.Debug {
 		templateEngine.Reload(true)
 		templateEngine.Debug(true)
 	}
@@ -30,18 +30,18 @@ func Router() *fiber.App {
 		AppName:     "plugNmeet version: " + version.Version,
 	}
 
-	if config.AppCnf.Client.ProxyHeader != "" {
-		cnf.ProxyHeader = config.AppCnf.Client.ProxyHeader
+	if config.GetConfig().Client.ProxyHeader != "" {
+		cnf.ProxyHeader = config.GetConfig().Client.ProxyHeader
 	}
 
 	app := fiber.New(cnf)
 
-	if config.AppCnf.Client.Debug {
+	if config.GetConfig().Client.Debug {
 		app.Use(logger.New())
 	}
-	if config.AppCnf.Client.PrometheusConf.Enable {
+	if config.GetConfig().Client.PrometheusConf.Enable {
 		prometheus := fiberprometheus.New("plugNmeet")
-		prometheus.RegisterAt(app, config.AppCnf.Client.PrometheusConf.MetricsPath)
+		prometheus.RegisterAt(app, config.GetConfig().Client.PrometheusConf.MetricsPath)
 		app.Use(prometheus.Middleware)
 	}
 	app.Use(rr.New())
@@ -49,8 +49,8 @@ func Router() *fiber.App {
 		AllowMethods: "POST,GET,OPTIONS",
 	}))
 
-	app.Static("/assets", config.AppCnf.Client.Path+"/assets")
-	app.Static("/favicon.ico", config.AppCnf.Client.Path+"/assets/imgs/favicon.ico")
+	app.Static("/assets", config.GetConfig().Client.Path+"/assets")
+	app.Static("/favicon.ico", config.GetConfig().Client.Path+"/assets/imgs/favicon.ico")
 
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.Render("index", nil)

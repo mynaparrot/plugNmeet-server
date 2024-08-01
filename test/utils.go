@@ -20,12 +20,12 @@ import (
 )
 
 func prepareStringReq(method, router, body string) *http.Request {
-	mac := hmac.New(sha256.New, []byte(config.AppCnf.Client.Secret))
+	mac := hmac.New(sha256.New, []byte(config.GetConfig().Client.Secret))
 	mac.Write([]byte(body))
 	signature := hex.EncodeToString(mac.Sum(nil))
 
 	req := httptest.NewRequest(method, router, strings.NewReader(body))
-	req.Header.Set("API-KEY", config.AppCnf.Client.ApiKey)
+	req.Header.Set("API-KEY", config.GetConfig().Client.ApiKey)
 	req.Header.Set("HASH-SIGNATURE", signature)
 	req.Header.Set("Content-Type", "application/json")
 	return req
@@ -40,12 +40,12 @@ func prepareStringWithTokenReq(token, method, router string, m proto.Message) *h
 }
 
 func prepareByteReq(method, router string, b []byte) *http.Request {
-	mac := hmac.New(sha256.New, []byte(config.AppCnf.Client.Secret))
+	mac := hmac.New(sha256.New, []byte(config.GetConfig().Client.Secret))
 	mac.Write(b)
 	signature := hex.EncodeToString(mac.Sum(nil))
 
 	req := httptest.NewRequest(method, router, bytes.NewReader(b))
-	req.Header.Set("API-KEY", config.AppCnf.Client.ApiKey)
+	req.Header.Set("API-KEY", config.GetConfig().Client.ApiKey)
 	req.Header.Set("HASH-SIGNATURE", signature)
 	req.Header.Set("Content-Type", "application/protobuf")
 	return req

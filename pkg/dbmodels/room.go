@@ -26,5 +26,5 @@ type RoomInfo struct {
 }
 
 func (m *RoomInfo) TableName() string {
-	return config.AppCnf.FormatDBTable("room_info")
+	return config.GetConfig().FormatDBTable("room_info")
 }

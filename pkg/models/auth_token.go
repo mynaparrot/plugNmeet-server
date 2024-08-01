@@ -15,7 +15,7 @@ type AuthTokenModel struct {
 
 func NewAuthTokenModel() *AuthTokenModel {
 	return &AuthTokenModel{
-		app: config.AppCnf,
+		app: config.GetConfig(),
 		rs:  NewRoomService(),
 	}
 }

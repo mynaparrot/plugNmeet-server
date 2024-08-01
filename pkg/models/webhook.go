@@ -27,7 +27,7 @@ type webhookEvent struct {
 
 func NewWebhookModel(e *livekit.WebhookEvent) {
 	w := &webhookEvent{
-		rc:             config.AppCnf.RDS,
+		rc:             config.GetConfig().RDS,
 		ctx:            context.Background(),
 		event:          e,
 		roomModel:      NewRoomModel(),
@@ -70,7 +70,7 @@ func (w *webhookEvent) roomStarted() {
 
 	rm, _ := w.roomModel.GetRoomInfo(event.Room.GetName(), "", 1)
 	if rm == nil || rm.Id == 0 {
-		if config.AppCnf.Client.Debug {
+		if config.GetConfig().Client.Debug {
 			// then we can allow creating room
 			// we'll only create if not exist
 			room := &RoomInfo{
@@ -95,7 +95,7 @@ func (w *webhookEvent) roomStarted() {
 
 	// may be during room creation sid was not added
 	// we'll check and update during production mood
-	if !config.AppCnf.Client.Debug {
+	if !config.GetConfig().Client.Debug {
 		if rm.Sid == "" {
 			rm.Sid = event.Room.GetSid()
 			// just to update
@@ -362,7 +362,7 @@ func (w *webhookEvent) trackUnpublished() {
 
 func (w *webhookEvent) onAfterRoomFinishedTasks(event *livekit.WebhookEvent) {
 	// Delete all the files those may upload during session
-	if !config.AppCnf.UploadFileSettings.KeepForever {
+	if !config.GetConfig().UploadFileSettings.KeepForever {
 		f := NewManageFileModel(&ManageFile{
 			Sid: event.Room.Sid,
 		})

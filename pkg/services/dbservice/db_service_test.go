@@ -38,7 +38,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	s = NewDBService(config.AppCnf.ORM)
+	s = NewDBService(config.GetConfig().ORM)
 }
 
 func TestDatabaseService_InsertOrUpdateRoomInfo(t *testing.T) {

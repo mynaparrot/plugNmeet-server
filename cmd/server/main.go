@@ -73,5 +73,5 @@ func startServer(c *cli.Context) error {
 		log.Exit(1)
 	}()
 
-	return router.Listen(fmt.Sprintf(":%d", config.AppCnf.Client.Port))
+	return router.Listen(fmt.Sprintf(":%d", config.GetConfig().Client.Port))
 }

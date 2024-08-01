@@ -23,9 +23,9 @@ type AuthRecording struct {
 }
 
 func NewRecordingAuth() *AuthRecording {
-	ds := dbservice.NewDBService(config.AppCnf.ORM)
+	ds := dbservice.NewDBService(config.GetConfig().ORM)
 	return &AuthRecording{
-		app: config.AppCnf,
+		app: config.GetConfig(),
 		ds:  ds,
 	}
 }
@@ -121,7 +121,7 @@ func (a *AuthRecording) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
 		return err
 	}
 
-	path := fmt.Sprintf("%s/%s", config.AppCnf.RecorderInfo.RecordingFilesPath, recording.FilePath)
+	path := fmt.Sprintf("%s/%s", config.GetConfig().RecorderInfo.RecordingFilesPath, recording.FilePath)
 	fileExist := true
 
 	f, err := os.Stat(path)
@@ -154,7 +154,7 @@ func (a *AuthRecording) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
 	// if empty then better to delete that directory
 	if fileExist {
 		dir := strings.Replace(path, f.Name(), "", 1)
-		if dir != config.AppCnf.RecorderInfo.RecordingFilesPath {
+		if dir != config.GetConfig().RecorderInfo.RecordingFilesPath {
 			empty, err := a.isDirEmpty(dir)
 			if err == nil && empty {
 				err = os.Remove(dir)
@@ -211,15 +211,15 @@ func (a *AuthRecording) VerifyRecordingToken(token string) (string, int, error) 
 	}
 
 	out := jwt.Claims{}
-	if err = tok.Claims([]byte(config.AppCnf.Client.Secret), &out); err != nil {
+	if err = tok.Claims([]byte(config.GetConfig().Client.Secret), &out); err != nil {
 		return "", fiber.StatusUnauthorized, err
 	}
 
-	if err = out.Validate(jwt.Expected{Issuer: config.AppCnf.Client.ApiKey, Time: time.Now().UTC()}); err != nil {
+	if err = out.Validate(jwt.Expected{Issuer: config.GetConfig().Client.ApiKey, Time: time.Now().UTC()}); err != nil {
 		return "", fiber.StatusUnauthorized, err
 	}
 
-	file := fmt.Sprintf("%s/%s", config.AppCnf.RecorderInfo.RecordingFilesPath, out.Subject)
+	file := fmt.Sprintf("%s/%s", config.GetConfig().RecorderInfo.RecordingFilesPath, out.Subject)
 	_, err = os.Lstat(file)
 
 	if err != nil {

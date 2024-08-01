@@ -27,7 +27,7 @@ func HandleAuthHeaderCheck(c *fiber.Ctx) error {
 	signature := c.Get("HASH-SIGNATURE", "")
 	body := c.Body()
 
-	if apiKey != config.AppCnf.Client.ApiKey {
+	if apiKey != config.GetConfig().Client.ApiKey {
 		c.Status(fiber.StatusUnauthorized)
 		return utils.SendCommonProtoJsonResponse(c, false, "invalid API key")
 	}
@@ -38,7 +38,7 @@ func HandleAuthHeaderCheck(c *fiber.Ctx) error {
 
 	status := false
 	if signature != "" {
-		mac := hmac.New(sha256.New, []byte(config.AppCnf.Client.Secret))
+		mac := hmac.New(sha256.New, []byte(config.GetConfig().Client.Secret))
 		mac.Write(body)
 		expectedSignature := hex.EncodeToString(mac.Sum(nil))
 		if subtle.ConstantTimeCompare([]byte(expectedSignature), []byte(signature)) == 1 {
@@ -154,7 +154,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 		return utils.SendProtoJsonResponse(c, rr)
 	}
 
-	livekitHost := strings.Replace(config.AppCnf.LivekitInfo.Host, "host.docker.internal", "localhost", 1) // without this you won't be able to connect
+	livekitHost := strings.Replace(config.GetConfig().LivekitInfo.Host, "host.docker.internal", "localhost", 1) // without this you won't be able to connect
 	v := version.Version
 	res := &plugnmeet.VerifyTokenRes{
 		Status:        true,

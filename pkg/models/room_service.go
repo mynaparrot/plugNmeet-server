@@ -31,10 +31,10 @@ type RoomService struct {
 }
 
 func NewRoomService() *RoomService {
-	livekitClient := lksdk.NewRoomServiceClient(config.AppCnf.LivekitInfo.Host, config.AppCnf.LivekitInfo.ApiKey, config.AppCnf.LivekitInfo.Secret)
+	livekitClient := lksdk.NewRoomServiceClient(config.GetConfig().LivekitInfo.Host, config.GetConfig().LivekitInfo.ApiKey, config.GetConfig().LivekitInfo.Secret)
 
 	return &RoomService{
-		rc:            config.AppCnf.RDS,
+		rc:            config.GetConfig().RDS,
 		ctx:           context.Background(),
 		livekitClient: livekitClient,
 	}

@@ -64,13 +64,13 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 
 	// we'll set default values otherwise client got confused if data is missing
 	utils.PrepareDefaultRoomFeatures(r)
-	utils.SetCreateRoomDefaultValues(r, config.AppCnf.UploadFileSettings.MaxSize, config.AppCnf.UploadFileSettings.AllowedTypes, config.AppCnf.SharedNotePad.Enabled)
+	utils.SetCreateRoomDefaultValues(r, config.GetConfig().UploadFileSettings.MaxSize, config.GetConfig().UploadFileSettings.AllowedTypes, config.GetConfig().SharedNotePad.Enabled)
 	utils.SetRoomDefaultLockSettings(r)
 	// set default room settings
-	utils.SetDefaultRoomSettings(config.AppCnf.RoomDefaultSettings, r)
+	utils.SetDefaultRoomSettings(config.GetConfig().RoomDefaultSettings, r)
 
 	// copyright
-	copyrightConf := config.AppCnf.Client.CopyrightConf
+	copyrightConf := config.GetConfig().Client.CopyrightConf
 	if copyrightConf == nil {
 		r.Metadata.CopyrightConf = &plugnmeet.CopyrightConf{
 			Display: true,
@@ -93,7 +93,7 @@ func (am *RoomAuthModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *
 	}
 
 	// Azure cognitive services
-	azu := config.AppCnf.AzureCognitiveServicesSpeech
+	azu := config.GetConfig().AzureCognitiveServicesSpeech
 	if !azu.Enabled {
 		r.Metadata.RoomFeatures.SpeechToTextTranslationFeatures.IsAllow = false
 	} else {
@@ -318,7 +318,7 @@ func (am *RoomAuthModel) EndRoom(r *plugnmeet.RoomEndReq) (bool, string) {
 }
 
 func (am *RoomAuthModel) FetchPastRooms(r *plugnmeet.FetchPastRoomsReq) (*plugnmeet.FetchPastRoomsResult, error) {
-	db := config.AppCnf.DB
+	db := config.GetConfig().DB
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -344,11 +344,11 @@ func (am *RoomAuthModel) FetchPastRooms(r *plugnmeet.FetchPastRoomsReq) (*plugnm
 		args = append(args, r.From)
 		args = append(args, limit)
 
-		query := "SELECT a.room_title, a.roomId, a.sid, a.joined_participants, a.webhook_url, a.created, a.ended, b.file_id FROM " + config.AppCnf.FormatDBTable("room_info") + " AS a LEFT JOIN " + config.AppCnf.FormatDBTable("room_analytics") + " AS b ON a.id = b.room_table_id WHERE a.roomId IN (?" + strings.Repeat(",?", len(r.RoomIds)-1) + ") AND a.is_running = '0' ORDER BY a.id " + orderBy + " LIMIT ?,?"
+		query := "SELECT a.room_title, a.roomId, a.sid, a.joined_participants, a.webhook_url, a.created, a.ended, b.file_id FROM " + config.GetConfig().FormatDBTable("room_info") + " AS a LEFT JOIN " + config.GetConfig().FormatDBTable("room_analytics") + " AS b ON a.id = b.room_table_id WHERE a.roomId IN (?" + strings.Repeat(",?", len(r.RoomIds)-1) + ") AND a.is_running = '0' ORDER BY a.id " + orderBy + " LIMIT ?,?"
 
 		rows, err = db.QueryContext(ctx, query, args...)
 	default:
-		rows, err = db.QueryContext(ctx, "SELECT a.room_title, a.roomId, a.sid, a.joined_participants, a.webhook_url, a.created, a.ended, b.file_id FROM  "+config.AppCnf.FormatDBTable("room_info")+" AS a LEFT JOIN "+config.AppCnf.FormatDBTable("room_analytics")+" AS b ON a.id = b.room_table_id WHERE a.is_running = '0' ORDER BY a.id "+orderBy+" LIMIT ?,?", r.From, limit)
+		rows, err = db.QueryContext(ctx, "SELECT a.room_title, a.roomId, a.sid, a.joined_participants, a.webhook_url, a.created, a.ended, b.file_id FROM  "+config.GetConfig().FormatDBTable("room_info")+" AS a LEFT JOIN "+config.GetConfig().FormatDBTable("room_analytics")+" AS b ON a.id = b.room_table_id WHERE a.is_running = '0' ORDER BY a.id "+orderBy+" LIMIT ?,?", r.From, limit)
 	}
 
 	if err != nil {
@@ -379,10 +379,10 @@ func (am *RoomAuthModel) FetchPastRooms(r *plugnmeet.FetchPastRoomsReq) (*plugnm
 		for _, rd := range r.RoomIds {
 			args = append(args, rd)
 		}
-		query := "SELECT COUNT(*) AS total FROM " + config.AppCnf.FormatDBTable("room_info") + " WHERE roomId IN (?" + strings.Repeat(",?", len(r.RoomIds)-1) + ") AND is_running = '0'"
+		query := "SELECT COUNT(*) AS total FROM " + config.GetConfig().FormatDBTable("room_info") + " WHERE roomId IN (?" + strings.Repeat(",?", len(r.RoomIds)-1) + ") AND is_running = '0'"
 		row = db.QueryRowContext(ctx, query, args...)
 	default:
-		row = db.QueryRowContext(ctx, "SELECT COUNT(*) AS total FROM "+config.AppCnf.FormatDBTable("room_info")+" WHERE is_running = '0'")
+		row = db.QueryRowContext(ctx, "SELECT COUNT(*) AS total FROM "+config.GetConfig().FormatDBTable("room_info")+" WHERE is_running = '0'")
 	}
 
 	var total int64
@@ -461,7 +461,7 @@ func (am *RoomAuthModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomR
 		return
 	}
 
-	downloadDir := fmt.Sprintf("%s/%s", config.AppCnf.UploadFileSettings.Path, room.Sid)
+	downloadDir := fmt.Sprintf("%s/%s", config.GetConfig().UploadFileSettings.Path, room.Sid)
 	if _, err = os.Stat(downloadDir); os.IsNotExist(err) {
 		err = os.MkdirAll(downloadDir, os.ModePerm)
 		if err != nil {

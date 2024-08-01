@@ -16,7 +16,7 @@ type UserModel struct {
 
 func NewUserModel() *UserModel {
 	return &UserModel{
-		db:          config.AppCnf.DB,
+		db:          config.GetConfig().DB,
 		roomService: NewRoomService(),
 	}
 }

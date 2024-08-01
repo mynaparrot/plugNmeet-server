@@ -30,15 +30,15 @@ type AnalyticsModel struct {
 
 func NewAnalyticsModel() *AnalyticsModel {
 	return &AnalyticsModel{
-		rc:  config.AppCnf.RDS,
+		rc:  config.GetConfig().RDS,
 		ctx: context.Background(),
 		rs:  NewRoomService(),
 	}
 }
 
 func (m *AnalyticsModel) HandleEvent(d *plugnmeet.AnalyticsDataMsg) {
-	if config.AppCnf.AnalyticsSettings == nil ||
-		!config.AppCnf.AnalyticsSettings.Enabled {
+	if config.GetConfig().AnalyticsSettings == nil ||
+		!config.GetConfig().AnalyticsSettings.Enabled {
 		return
 	}
 	m.Lock()
@@ -143,7 +143,7 @@ func (m *AnalyticsModel) insertEventData(key string) {
 }
 
 func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
-	if config.AppCnf.AnalyticsSettings == nil || !config.AppCnf.AnalyticsSettings.Enabled {
+	if config.GetConfig().AnalyticsSettings == nil || !config.GetConfig().AnalyticsSettings.Enabled {
 		return
 	}
 
@@ -171,8 +171,8 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 		return
 	}
 
-	if _, err := os.Stat(*config.AppCnf.AnalyticsSettings.FilesStorePath); os.IsNotExist(err) {
-		err = os.MkdirAll(*config.AppCnf.AnalyticsSettings.FilesStorePath, os.ModePerm)
+	if _, err := os.Stat(*config.GetConfig().AnalyticsSettings.FilesStorePath); os.IsNotExist(err) {
+		err = os.MkdirAll(*config.GetConfig().AnalyticsSettings.FilesStorePath, os.ModePerm)
 		if err != nil {
 			log.Errorln(err)
 			return
@@ -186,7 +186,7 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 	}
 
 	fileId := fmt.Sprintf("%s-%d", room.Sid, room.CreationTime)
-	path := fmt.Sprintf("%s/%s.json", *config.AppCnf.AnalyticsSettings.FilesStorePath, fileId)
+	path := fmt.Sprintf("%s/%s.json", *config.GetConfig().AnalyticsSettings.FilesStorePath, fileId)
 
 	// export file
 	stat, err := m.exportAnalyticsToFile(room, path, metadata)
@@ -378,7 +378,7 @@ func (m *AnalyticsModel) buildEventInfo(ekey string, eventInfo *plugnmeet.Analyt
 }
 
 func (m *AnalyticsModel) addAnalyticsFileToDB(roomTableId, roomCreationTime int64, roomId, fileId string, stat os.FileInfo) {
-	db := config.AppCnf.DB
+	db := config.GetConfig().DB
 	ctx, cancel := context.WithTimeout(m.ctx, 3*time.Second)
 	defer cancel()
 
@@ -389,7 +389,7 @@ func (m *AnalyticsModel) addAnalyticsFileToDB(roomTableId, roomCreationTime int6
 	}
 	defer tx.Rollback()
 
-	query := "INSERT INTO " + config.AppCnf.FormatDBTable("room_analytics") + " (room_table_id, room_id, file_id, file_name, file_size, room_creation_time, creation_time) VALUES (?, ?, ?, ?, ?, ?, ?)"
+	query := "INSERT INTO " + config.GetConfig().FormatDBTable("room_analytics") + " (room_table_id, room_id, file_id, file_name, file_size, room_creation_time, creation_time) VALUES (?, ?, ?, ?, ?, ?, ?)"
 
 	stmt, err := tx.PrepareContext(ctx, query)
 	if err != nil {

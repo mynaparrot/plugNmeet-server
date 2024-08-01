@@ -28,7 +28,7 @@ const SpeechServiceRedisKey = "pnm:speechService"
 
 func NewSpeechServices() *SpeechServices {
 	return &SpeechServices{
-		rc:             config.AppCnf.RDS,
+		rc:             config.GetConfig().RDS,
 		ctx:            context.Background(),
 		roomService:    NewRoomService(),
 		analyticsModel: NewAnalyticsModel(),
@@ -36,7 +36,7 @@ func NewSpeechServices() *SpeechServices {
 }
 
 func (s *SpeechServices) SpeechToTextTranslationServiceStatus(r *plugnmeet.SpeechToTextTranslationReq) error {
-	if !config.AppCnf.AzureCognitiveServicesSpeech.Enabled {
+	if !config.GetConfig().AzureCognitiveServicesSpeech.Enabled {
 		return errors.New("speech service disabled")
 	}
 
@@ -102,7 +102,7 @@ func (s *SpeechServices) GenerateAzureToken(r *plugnmeet.GenerateAzureTokenReq, 
 	}
 	f := meta.RoomFeatures.SpeechToTextTranslationFeatures
 
-	if !config.AppCnf.AzureCognitiveServicesSpeech.Enabled || !f.IsEnabled {
+	if !config.GetConfig().AzureCognitiveServicesSpeech.Enabled || !f.IsEnabled {
 		return errors.New("speech-services.service-disabled")
 	}
 
@@ -146,7 +146,7 @@ func (s *SpeechServices) RenewAzureToken(r *plugnmeet.AzureTokenRenewReq, reques
 		return errors.New("speech-services.renew-need-already-using-service")
 	}
 
-	sub := config.AppCnf.AzureCognitiveServicesSpeech.SubscriptionKeys
+	sub := config.GetConfig().AzureCognitiveServicesSpeech.SubscriptionKeys
 	var key string
 	for _, s := range sub {
 		if s.Id == r.KeyId {
@@ -393,7 +393,7 @@ func (s *SpeechServices) azureKeyRequestedTask(roomId, userId string, task strin
 }
 
 func (s *SpeechServices) selectAzureKey() (*config.AzureSubscriptionKey, error) {
-	sub := config.AppCnf.AzureCognitiveServicesSpeech.SubscriptionKeys
+	sub := config.GetConfig().AzureCognitiveServicesSpeech.SubscriptionKeys
 	if len(sub) == 0 {
 		return nil, errors.New("no key found")
 	} else if len(sub) == 1 {

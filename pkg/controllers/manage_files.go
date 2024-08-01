@@ -79,7 +79,7 @@ func HandleDownloadUploadedFile(c *fiber.Ctx) error {
 	otherParts := c.Params("*")
 	otherParts, _ = url.QueryUnescape(otherParts)
 
-	file := fmt.Sprintf("%s/%s/%s", config.AppCnf.UploadFileSettings.Path, sid, otherParts)
+	file := fmt.Sprintf("%s/%s/%s", config.GetConfig().UploadFileSettings.Path, sid, otherParts)
 	mtype, err := mimetype.DetectFile(file)
 	if err != nil {
 		ms := strings.SplitN(err.Error(), "/", -1)
@@ -140,20 +140,20 @@ func HandleConvertWhiteboardFile(c *fiber.Ctx) error {
 func HandleGetClientFiles(c *fiber.Ctx) error {
 	var css, js []string
 
-	if config.AppCnf.Client.Debug {
+	if config.GetConfig().Client.Debug {
 		var err error
-		css, err = utils.GetFilesFromDir(config.AppCnf.Client.Path+"/assets/css", ".css", "des")
+		css, err = utils.GetFilesFromDir(config.GetConfig().Client.Path+"/assets/css", ".css", "des")
 		if err != nil {
 			log.Errorln(err)
 		}
 
-		js, err = utils.GetFilesFromDir(config.AppCnf.Client.Path+"/assets/js", ".js", "asc")
+		js, err = utils.GetFilesFromDir(config.GetConfig().Client.Path+"/assets/js", ".js", "asc")
 		if err != nil {
 			log.Errorln(err)
 		}
 	} else {
-		css = config.AppCnf.ClientFiles["css"]
-		js = config.AppCnf.ClientFiles["js"]
+		css = config.GetConfig().ClientFiles["css"]
+		js = config.GetConfig().ClientFiles["js"]
 	}
 
 	return c.JSON(fiber.Map{

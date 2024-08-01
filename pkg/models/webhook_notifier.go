@@ -31,15 +31,15 @@ type webhookRedisFields struct {
 }
 
 func newWebhookNotifier() *WebhookNotifier {
-	notifier := webhook.GetWebhookNotifier(config.DefaultWebhookQueueSize, config.AppCnf.Client.Debug, config.GetLogger())
+	notifier := webhook.GetWebhookNotifier(config.DefaultWebhookQueueSize, config.GetConfig().Client.Debug, config.GetLogger())
 
 	w := &WebhookNotifier{
 		ctx:                  context.Background(),
-		rc:                   config.AppCnf.RDS,
+		rc:                   config.GetConfig().RDS,
 		rm:                   NewRoomModel(),
-		isEnabled:            config.AppCnf.Client.WebhookConf.Enable,
-		enabledForPerMeeting: config.AppCnf.Client.WebhookConf.EnableForPerMeeting,
-		defaultUrl:           config.AppCnf.Client.WebhookConf.Url,
+		isEnabled:            config.GetConfig().Client.WebhookConf.Enable,
+		enabledForPerMeeting: config.GetConfig().Client.WebhookConf.EnableForPerMeeting,
+		defaultUrl:           config.GetConfig().Client.WebhookConf.Url,
 		notifier:             notifier,
 	}
 
@@ -135,7 +135,7 @@ func (w *WebhookNotifier) SendWebhookEvent(event *plugnmeet.CommonNotifyEvent) e
 		}
 	}
 
-	w.notifier.AddInNotifyQueue(event, config.AppCnf.Client.ApiKey, config.AppCnf.Client.Secret, d.Urls)
+	w.notifier.AddInNotifyQueue(event, config.GetConfig().Client.ApiKey, config.GetConfig().Client.Secret, d.Urls)
 	return nil
 }
 
@@ -166,7 +166,7 @@ func (w *WebhookNotifier) ForceToPutInQueue(event *plugnmeet.CommonNotifyEvent) 
 		return
 	}
 
-	w.notifier.AddInNotifyQueue(event, config.AppCnf.Client.ApiKey, config.AppCnf.Client.Secret, urls)
+	w.notifier.AddInNotifyQueue(event, config.GetConfig().Client.ApiKey, config.GetConfig().Client.Secret, urls)
 }
 
 func (w *WebhookNotifier) saveData(roomId string, d *webhookRedisFields) error {

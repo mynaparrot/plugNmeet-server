@@ -67,7 +67,7 @@ func (c *websocketController) validation() bool {
 }
 
 func (c *websocketController) addUser() {
-	config.AppCnf.AddChatUser(c.participant.RoomId, c.participant)
+	config.GetConfig().AddChatUser(c.participant.RoomId, c.participant)
 	c.kws.SetAttribute("userId", c.participant.UserId)
 	c.kws.SetAttribute("roomId", c.participant.RoomId)
 }
@@ -134,7 +134,7 @@ func SetupSocketListeners() {
 		roomId := ep.Kws.GetStringAttribute("roomId")
 		userId := ep.Kws.GetStringAttribute("userId")
 		// Remove the user from the local clients
-		config.AppCnf.RemoveChatParticipant(roomId, userId)
+		config.GetConfig().RemoveChatParticipant(roomId, userId)
 	})
 
 	// This event is called when the server disconnects the user actively with .Close() method
@@ -142,7 +142,7 @@ func SetupSocketListeners() {
 		roomId := ep.Kws.GetStringAttribute("roomId")
 		userId := ep.Kws.GetStringAttribute("userId")
 		// Remove the user from the local clients
-		config.AppCnf.RemoveChatParticipant(roomId, userId)
+		config.GetConfig().RemoveChatParticipant(roomId, userId)
 	})
 
 	// On error event

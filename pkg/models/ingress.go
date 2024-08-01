@@ -19,7 +19,7 @@ type IngressModel struct {
 }
 
 func NewIngressModel() *IngressModel {
-	lk := lksdk.NewIngressClient(config.AppCnf.LivekitInfo.Host, config.AppCnf.LivekitInfo.ApiKey, config.AppCnf.LivekitInfo.Secret)
+	lk := lksdk.NewIngressClient(config.GetConfig().LivekitInfo.Host, config.GetConfig().LivekitInfo.ApiKey, config.GetConfig().LivekitInfo.Secret)
 
 	return &IngressModel{
 		lk:             lk,

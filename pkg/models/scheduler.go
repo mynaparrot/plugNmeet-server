@@ -19,7 +19,7 @@ type SchedulerModel struct {
 
 func NewSchedulerModel() *SchedulerModel {
 	return &SchedulerModel{
-		rc:         config.AppCnf.RDS,
+		rc:         config.GetConfig().RDS,
 		ctx:        context.Background(),
 		ra:         NewRoomAuthModel(),
 		rmDuration: NewRoomDurationModel(),

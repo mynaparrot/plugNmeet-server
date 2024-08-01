@@ -38,8 +38,8 @@ type RoomModel struct {
 
 func NewRoomModel() *RoomModel {
 	return &RoomModel{
-		app: config.AppCnf,
-		db:  config.AppCnf.DB,
+		app: config.GetConfig(),
+		db:  config.GetConfig().DB,
 		ctx: context.Background(),
 	}
 }

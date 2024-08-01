@@ -21,7 +21,7 @@ import (
 
 func HandleVerifyApiRequest(c *fiber.Ctx) error {
 	apiKey := c.Params("apiKey")
-	if apiKey == "" || apiKey != config.AppCnf.Client.ApiKey {
+	if apiKey == "" || apiKey != config.GetConfig().Client.ApiKey {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "apiKeyError", "invalid api key"))
 	}
 
@@ -82,7 +82,7 @@ func HandleVerifyApiRequest(c *fiber.Ctx) error {
 		queries = strings.TrimSuffix(s3[0], "&")
 	}
 
-	ourSum := bbbapiwrapper.CalculateCheckSum(config.AppCnf.Client.Secret, method, queries)
+	ourSum := bbbapiwrapper.CalculateCheckSum(config.GetConfig().Client.Secret, method, queries)
 	if subtle.ConstantTimeCompare([]byte(checksum), []byte(ourSum)) != 1 {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "checksumError", "Checksums do not match"))
 	}

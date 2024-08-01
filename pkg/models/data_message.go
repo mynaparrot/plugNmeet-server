@@ -39,7 +39,7 @@ type DataMessageModel struct {
 
 func NewDataMessageModel() *DataMessageModel {
 	return &DataMessageModel{
-		db:             config.AppCnf.DB,
+		db:             config.GetConfig().DB,
 		roomService:    NewRoomService(),
 		analyticsModel: NewAnalyticsModel(),
 	}

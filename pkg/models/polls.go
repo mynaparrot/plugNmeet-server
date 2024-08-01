@@ -25,7 +25,7 @@ type PollsModel struct {
 
 func NewPollsModel() *PollsModel {
 	return &PollsModel{
-		rc:             config.AppCnf.RDS,
+		rc:             config.GetConfig().RDS,
 		ctx:            context.Background(),
 		analyticsModel: NewAnalyticsModel(),
 	}
