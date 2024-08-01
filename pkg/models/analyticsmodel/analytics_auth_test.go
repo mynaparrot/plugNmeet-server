@@ -128,12 +128,12 @@ func TestAnalyticsAuthModel_generateTokenAndVerify(t *testing.T) {
 
 	_, res, err := m.VerifyAnalyticsToken(token)
 	if err == nil {
-		t.Error("should found the file")
+		t.Error("should not found the file")
 		return
 	}
 
 	if res != fiber.StatusNotFound {
-		t.Errorf("should got response: %d", fiber.StatusNotFound)
+		t.Errorf("should get response: %d", fiber.StatusNotFound)
 	}
 
 	t.Logf("%+v, response: %d", err, fiber.StatusNotFound)

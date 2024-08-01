@@ -9,7 +9,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/dbservice"
 	log "github.com/sirupsen/logrus"
 	"io"
@@ -67,6 +66,9 @@ func (a *AuthRecording) FetchRecording(recordId string) (*plugnmeet.RecordingInf
 	if err != nil {
 		return nil, err
 	}
+	if v == nil {
+		return nil, errors.New("no info found")
+	}
 	recording := &plugnmeet.RecordingInfo{
 		RecordId:         v.RecordID,
 		RoomId:           v.RoomID,
@@ -89,20 +91,17 @@ func (a *AuthRecording) RecordingInfo(req *plugnmeet.RecordingInfoReq) (*plugnme
 	pastRoomInfo := new(plugnmeet.PastRoomInfo)
 	// SID can't be null, so we'll check before
 	if recording.GetRoomSid() != "" {
-		rm := models.NewRoomModel()
-		roomInfo, _ := rm.GetRoomInfo("", recording.GetRoomSid(), 0)
-		if roomInfo != nil {
+		if roomInfo, err := a.ds.GetRoomInfoBySid(recording.GetRoomSid(), nil); err == nil && roomInfo != nil {
 			pastRoomInfo = &plugnmeet.PastRoomInfo{
 				RoomTitle:          roomInfo.RoomTitle,
 				RoomId:             roomInfo.RoomId,
 				RoomSid:            roomInfo.Sid,
 				JoinedParticipants: roomInfo.JoinedParticipants,
 				WebhookUrl:         roomInfo.WebhookUrl,
-				Ended:              roomInfo.Ended,
+				Created:            roomInfo.Created.Format("2006-01-02 15:04:05"),
+				Ended:              roomInfo.Ended.Format("2006-01-02 15:04:05"),
 			}
-			pastRoomInfo.Created = time.Unix(roomInfo.CreationTime, 0).UTC().Format("2006-01-02 15:04:05")
-
-			if an, err := a.ds.GetAnalyticByRoomTableId(uint64(roomInfo.Id)); err == nil {
+			if an, err := a.ds.GetAnalyticByRoomTableId(roomInfo.ID); err == nil && an != nil {
 				pastRoomInfo.AnalyticsFileId = an.FileID
 			}
 		}

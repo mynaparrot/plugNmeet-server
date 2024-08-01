@@ -8,6 +8,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/dbservice"
 	log "github.com/sirupsen/logrus"
 	"strings"
+	"time"
 )
 
 type BBBApiWrapperModel struct {
@@ -28,28 +29,29 @@ func (m *BBBApiWrapperModel) GetRecordings(host string, r *bbbapiwrapper.GetReco
 		r.Limit = 50
 	}
 	var rIds []string
-
+	var mIds []string
 	if r.RecordID != "" {
 		rIds = strings.Split(r.RecordID, ",")
 	} else if r.MeetingID != "" {
-		rIds = strings.Split(r.MeetingID, ",")
-		for _, rd := range rIds {
+		mIds = strings.Split(r.MeetingID, ",")
+		for _, rd := range mIds {
 			fId := bbbapiwrapper.CheckMeetingIdToMatchFormat(rd)
 			oriIds[fId] = rd
 		}
 	}
 
-	data, total, err := m.ds.GetRecordingsForBBB(rIds, rIds, r.Offset, r.Limit)
+	data, total, err := m.ds.GetRecordingsForBBB(rIds, mIds, r.Offset, r.Limit)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var recordings []*bbbapiwrapper.RecordingInfo
 	for _, v := range data {
-		//	err = rows.Scan(&recording.RecordID, &meetingId, &rSid, &path, &size, &recording.Published, &recording.Name, &participants, &created, &ended)
-		recording := bbbapiwrapper.RecordingInfo{
-			RecordID:          v.RecorderID,
+		recording := &bbbapiwrapper.RecordingInfo{
+			RecordID:          v.RecordID,
 			InternalMeetingID: v.RoomSid.String,
+			Published:         true,
+			State:             "published",
 		}
 
 		if oriIds[v.RoomID] != "" {
@@ -71,20 +73,20 @@ func (m *BBBApiWrapperModel) GetRecordings(host string, r *bbbapiwrapper.GetReco
 			},
 		}
 
-		if mInfo, err := m.ds.GetRoomInfoBySid(v.RoomSid.String, nil); err != nil {
+		if mInfo, err := m.ds.GetRoomInfoBySid(v.RoomSid.String, nil); err == nil && mInfo != nil {
+			recording.Name = mInfo.RoomTitle
 			recording.StartTime = mInfo.Created.UnixMilli()
-			recording.EndTime = mInfo.Ended.UnixMilli()
+			if !mInfo.Ended.Equal(time.Time{}) {
+				recording.EndTime = mInfo.Ended.UnixMilli()
+			}
 			recording.Participants = uint64(mInfo.JoinedParticipants)
 		}
 
-		if recording.Published {
-			recording.State = "published"
-		}
 		if v.Size > 0 {
 			recording.RawSize = int64(v.Size * 1000000)
 			recording.Size = recording.RawSize
 		}
-		recordings = append(recordings, &recording)
+		recordings = append(recordings, recording)
 	}
 
 	pagination := &bbbapiwrapper.Pagination{
