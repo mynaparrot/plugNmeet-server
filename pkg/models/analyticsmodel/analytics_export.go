@@ -54,7 +54,7 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 
 	isRunning := 0
 	room, _ := m.ds.GetRoomInfoBySid(sid, &isRunning)
-	if room.ID == 0 {
+	if room == nil || room.ID == 0 {
 		return
 	}
 

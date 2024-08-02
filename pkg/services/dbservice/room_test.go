@@ -105,7 +105,7 @@ func TestDatabaseService_UpdateRoomStatus(t *testing.T) {
 func TestDatabaseService_GetPastRooms(t *testing.T) {
 	rooms := []string{roomId}
 
-	info, total, err := s.GetPastRooms(rooms, 0, 5)
+	info, total, err := s.GetPastRooms(rooms, 0, 5, nil)
 	if err != nil {
 		t.Error(err)
 	}

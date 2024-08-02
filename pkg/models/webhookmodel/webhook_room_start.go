@@ -2,7 +2,6 @@ package webhookmodel
 
 import (
 	"github.com/livekit/protocol/livekit"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/breakoutroommodel"
 	log "github.com/sirupsen/logrus"
@@ -21,7 +20,7 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 
 	rm, _ := m.ds.GetRoomInfoByRoomId(event.Room.GetName(), 1)
 	if rm == nil || rm.ID == 0 {
-		if config.GetConfig().Client.Debug {
+		if m.app.Client.Debug {
 			// then we can allow creating room
 			// we'll only create if not exist
 			room := &dbmodels.RoomInfo{
@@ -46,7 +45,7 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 
 	// may be during room creation sid was not added
 	// we'll check and update during production mood
-	if !config.GetConfig().Client.Debug {
+	if !m.app.Client.Debug {
 		if rm.Sid == "" {
 			rm.Sid = event.Room.GetSid()
 			// just to update

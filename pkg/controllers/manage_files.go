@@ -6,7 +6,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/filemodel"
 	log "github.com/sirupsen/logrus"
 	"net/url"
 	"strconv"
@@ -16,7 +16,7 @@ import (
 // HandleFileUpload method can only be use if you are using resumable.js as your frontend.
 // Library link: https://github.com/23/resumable.js
 func HandleFileUpload(c *fiber.Ctx) error {
-	req := new(models.ManageFile)
+	req := new(filemodel.FileUploadReq)
 	err := c.QueryParser(req)
 	if err != nil {
 		_ = c.SendStatus(fiber.StatusBadRequest)
@@ -34,7 +34,8 @@ func HandleFileUpload(c *fiber.Ctx) error {
 		})
 	}
 
-	m := models.NewManageFileModel(req)
+	m := filemodel.New(nil, nil, nil, nil)
+	m.AddRequest(req)
 	err = m.CommonValidation(c)
 	if err != nil {
 		_ = c.SendStatus(fiber.StatusBadRequest)
@@ -94,7 +95,7 @@ func HandleDownloadUploadedFile(c *fiber.Ctx) error {
 }
 
 func HandleConvertWhiteboardFile(c *fiber.Ctx) error {
-	req := new(models.ManageFile)
+	req := new(filemodel.FileUploadReq)
 	err := c.BodyParser(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -118,7 +119,8 @@ func HandleConvertWhiteboardFile(c *fiber.Ctx) error {
 		})
 	}
 
-	m := models.NewManageFileModel(req)
+	m := filemodel.New(nil, nil, nil, nil)
+	m.AddRequest(req)
 	res, err := m.ConvertWhiteboardFile()
 	if err != nil {
 		return c.JSON(fiber.Map{

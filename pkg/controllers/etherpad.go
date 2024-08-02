@@ -31,7 +31,7 @@ func HandleCreateEtherpad(c *fiber.Ctx) error {
 	// now need to check if meeting is running or not
 	rm := dbservice.NewDBService(config.GetConfig().ORM)
 	room, _ := rm.GetRoomInfoByRoomId(rid, 1)
-	if room.ID == 0 {
+	if room == nil || room.ID == 0 {
 		return utils.SendCommonProtobufResponse(c, false, "room isn't active")
 	}
 
