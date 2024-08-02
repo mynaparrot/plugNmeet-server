@@ -63,11 +63,6 @@ func NewEtherpadModel() *EtherpadModel {
 	}
 }
 
-type CreateSessionRes struct {
-	PadId         string
-	ReadOnlyPadId string
-}
-
 // CreateSession will create group, pad, session
 // return padId, readonlyPadId
 func (m *EtherpadModel) CreateSession(roomId, requestedUserId string) (*plugnmeet.CreateEtherpadSessionRes, error) {

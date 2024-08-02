@@ -4,6 +4,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/webhookmodel"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -37,6 +38,8 @@ func HandleWebhook(c *fiber.Ctx) error {
 	}
 
 	models.NewWebhookModel(event)
+	mm := webhookmodel.New(nil, nil, nil, nil)
+	mm.HandleWebhookEvents(event)
 
 	return c.SendStatus(fiber.StatusOK)
 }

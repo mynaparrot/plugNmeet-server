@@ -5,7 +5,8 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/etherpadmodel"
+	"github.com/mynaparrot/plugnmeet-server/pkg/services/dbservice"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -28,13 +29,13 @@ func HandleCreateEtherpad(c *fiber.Ctx) error {
 	}
 
 	// now need to check if meeting is running or not
-	rm := models.NewRoomModel()
-	room, _ := rm.GetRoomInfo(rid, "", 1)
-	if room.Id == 0 {
+	rm := dbservice.NewDBService(config.GetConfig().ORM)
+	room, _ := rm.GetRoomInfoByRoomId(rid, 1)
+	if room.ID == 0 {
 		return utils.SendCommonProtobufResponse(c, false, "room isn't active")
 	}
 
-	m := models.NewEtherpadModel()
+	m := etherpadmodel.New(nil, nil, nil, nil)
 	res, err := m.CreateSession(rid, requestedUserId.(string))
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -55,7 +56,7 @@ func HandleCleanPad(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	m := models.NewEtherpadModel()
+	m := etherpadmodel.New(nil, nil, nil, nil)
 	err = m.CleanPad(req.RoomId, req.NodeId, req.PadId)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -76,7 +77,7 @@ func HandleChangeEtherpadStatus(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	m := models.NewEtherpadModel()
+	m := etherpadmodel.New(nil, nil, nil, nil)
 	err = m.ChangeEtherpadStatus(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
