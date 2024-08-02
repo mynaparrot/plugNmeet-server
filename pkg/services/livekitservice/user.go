@@ -75,6 +75,20 @@ func (s *LivekitService) UpdateParticipantMetadata(roomId string, userId string,
 	return participant, nil
 }
 
+// UpdateParticipantMetadataByStruct will update user's medata by provided formatted metadata
+func (r *LivekitService) UpdateParticipantMetadataByStruct(roomId, userId string, meta *plugnmeet.UserMetadata) (*livekit.ParticipantInfo, error) {
+	metadata, err := r.MarshalParticipantMetadata(meta)
+	if err != nil {
+		return nil, err
+	}
+	p, err := r.UpdateParticipantMetadata(roomId, userId, metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	return p, nil
+}
+
 // UpdateParticipantPermission will change user's permission by sending request to livekit
 func (s *LivekitService) UpdateParticipantPermission(roomId string, userId string, permission *livekit.ParticipantPermission) (*livekit.ParticipantInfo, error) {
 	data := livekit.UpdateParticipantRequest{
