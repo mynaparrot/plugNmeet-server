@@ -2,7 +2,6 @@ package datamsgmodel
 
 import (
 	"errors"
-	"github.com/golang/protobuf/proto"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -11,6 +10,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekitservice"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redisservice"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/proto"
 )
 
 type DataMsgModel struct {
@@ -32,7 +32,7 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 		rs = redisservice.NewRedisService(app.RDS)
 	}
 	if lk == nil {
-		lk = livekitservice.NewLivekitService(rs)
+		lk = livekitservice.NewLivekitService(app, rs)
 	}
 
 	return &DataMsgModel{

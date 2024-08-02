@@ -4,7 +4,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/exmediamodel"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -28,10 +28,10 @@ func HandleExternalMediaPlayer(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, true, err.Error())
 	}
 
-	m := models.NewExternalMediaPlayerModel()
+	m := exmediamodel.New(nil, nil, nil, nil)
 	req.RoomId = rid
 	req.UserId = requestedUserId.(string)
-	err = m.PerformTask(req)
+	err = m.HandleTask(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, true, err.Error())
 	}

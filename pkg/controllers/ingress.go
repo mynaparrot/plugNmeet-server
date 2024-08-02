@@ -3,7 +3,7 @@ package controllers
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/ingressmodel"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -25,7 +25,7 @@ func HandleCreateIngress(c *fiber.Ctx) error {
 		return SendCreateIngressResponse(c, res)
 	}
 
-	m := models.NewIngressModel()
+	m := ingressmodel.New(nil, nil, nil, nil)
 	req.RoomId = roomId.(string)
 	f, err := m.CreateIngress(req)
 	if err != nil {

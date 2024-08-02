@@ -1,24 +1,20 @@
-package analyticsmodel
+package ingressmodel
 
 import (
-	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/dbservice"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekitservice"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redisservice"
-	"sync"
 )
 
-type AnalyticsModel struct {
-	sync.RWMutex
-	data *plugnmeet.AnalyticsDataMsg
-	app  *config.AppConfig
-	ds   *dbservice.DatabaseService
-	rs   *redisservice.RedisService
-	lk   *livekitservice.LivekitService
+type IngressModel struct {
+	app *config.AppConfig
+	ds  *dbservice.DatabaseService
+	rs  *redisservice.RedisService
+	lk  *livekitservice.LivekitService
 }
 
-func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService) *AnalyticsModel {
+func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService) *IngressModel {
 	if app == nil {
 		app = config.GetConfig()
 	}
@@ -32,9 +28,10 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 		lk = livekitservice.NewLivekitService(app, rs)
 	}
 
-	return &AnalyticsModel{
-		app: config.GetConfig(),
+	return &IngressModel{
+		app: app,
 		ds:  ds,
 		rs:  rs,
+		lk:  lk,
 	}
 }

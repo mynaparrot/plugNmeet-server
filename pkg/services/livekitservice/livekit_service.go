@@ -8,17 +8,19 @@ import (
 )
 
 type LivekitService struct {
+	app *config.AppConfig
 	ctx context.Context
 	lkc *lksdk.RoomServiceClient
 	rs  *redisservice.RedisService
 }
 
-func NewLivekitService(rs *redisservice.RedisService) *LivekitService {
-	cnf := config.GetConfig().LivekitInfo
+func NewLivekitService(app *config.AppConfig, rs *redisservice.RedisService) *LivekitService {
+	cnf := app.LivekitInfo
 	lkc := lksdk.NewRoomServiceClient(cnf.Host, cnf.ApiKey, cnf.Secret)
 
 	return &LivekitService{
 		ctx: context.Background(),
+		app: app,
 		lkc: lkc,
 		rs:  rs,
 	}

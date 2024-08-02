@@ -55,7 +55,7 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 		rs = redisservice.NewRedisService(app.RDS)
 	}
 	if lk == nil {
-		lk = livekitservice.NewLivekitService(rs)
+		lk = livekitservice.NewLivekitService(app, rs)
 	}
 
 	return &EtherpadModel{
