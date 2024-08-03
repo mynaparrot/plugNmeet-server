@@ -55,3 +55,32 @@ func (m *RoomModel) CheckAndWaitUntilRoomCreationInProgress(roomId string) {
 		}
 	}
 }
+
+func (m *RoomModel) OnAfterRoomClosed(roomId string) {
+	// completely remove a room active users list
+	_, err := m.rs.ManageActiveUsersList(roomId, "", "delList", 0)
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	// delete blocked users list
+	_, err = m.rs.DeleteRoomBlockList(roomId)
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	// completely remove the room key
+	_, err = m.rs.ManageRoomWithUsersMetadata(roomId, "", "delList", "")
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	// remove this room from an active room list
+	_, err = m.rs.ManageActiveRoomsWithMetadata(roomId, "del", "")
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	// remove from progress, if existed. no need to log if error
+	_, _ = m.rs.RoomCreationProgressList(roomId, "del")
+}

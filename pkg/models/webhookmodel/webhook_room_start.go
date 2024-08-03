@@ -4,6 +4,7 @@ import (
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/breakoutroommodel"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/roomdurationmodel"
 	log "github.com/sirupsen/logrus"
 	"time"
 )
@@ -71,15 +72,15 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 		if err == nil {
 			info.StartedAt = uint64(time.Now().Unix())
 			if info.RoomFeatures.GetRoomDuration() > 0 {
-				// TODO: update here
 				// we'll add room info in map
-				//err := m.rmDuration.AddRoomWithDurationInfo(event.Room.Name, RoomDurationInfo{
-				//	Duration:  info.RoomFeatures.GetRoomDuration(),
-				//	StartedAt: info.GetStartedAt(),
-				//})
-				//if err != nil {
-				//	log.Errorln(err)
-				//}
+				rmDuration := roomdurationmodel.New(m.app, m.rs, m.lk)
+				err := rmDuration.AddRoomWithDurationInfo(event.Room.Name, &roomdurationmodel.RoomDurationInfo{
+					Duration:  info.RoomFeatures.GetRoomDuration(),
+					StartedAt: info.GetStartedAt(),
+				})
+				if err != nil {
+					log.Errorln(err)
+				}
 			}
 			if info.IsBreakoutRoom {
 				bm := breakoutroommodel.New(m.app, m.ds, m.rs, m.lk)
