@@ -15,23 +15,23 @@ import (
 )
 
 // GetDownloadToken will use the same JWT token generator as plugNmeet is using
-func (a *AuthRecording) GetDownloadToken(r *plugnmeet.GetDownloadTokenReq) (string, error) {
-	recording, err := a.FetchRecording(r.RecordId)
+func (m *RecordingModel) GetDownloadToken(r *plugnmeet.GetDownloadTokenReq) (string, error) {
+	recording, err := m.FetchRecording(r.RecordId)
 	if err != nil {
 		return "", err
 	}
 
-	return a.CreateTokenForDownload(recording.FilePath)
+	return m.CreateTokenForDownload(recording.FilePath)
 }
 
 // CreateTokenForDownload will generate token
 // path format: sub_path/roomSid/filename
-func (a *AuthRecording) CreateTokenForDownload(path string) (string, error) {
-	return auth.GenerateTokenForDownloadRecording(path, a.app.Client.ApiKey, a.app.Client.Secret, a.app.RecorderInfo.TokenValidity)
+func (m *RecordingModel) CreateTokenForDownload(path string) (string, error) {
+	return auth.GenerateTokenForDownloadRecording(path, m.app.Client.ApiKey, m.app.Client.Secret, m.app.RecorderInfo.TokenValidity)
 }
 
 // VerifyRecordingToken verify token & provide file path
-func (a *AuthRecording) VerifyRecordingToken(token string) (string, int, error) {
+func (m *RecordingModel) VerifyRecordingToken(token string) (string, int, error) {
 	tok, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.HS256})
 	if err != nil {
 		return "", fiber.StatusUnauthorized, err

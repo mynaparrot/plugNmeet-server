@@ -43,7 +43,7 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 		lk:             lk,
 		rm:             roommodel.New(app, ds, rs, lk),
 		analyticsModel: analyticsmodel.New(app, ds, rs, lk),
-		notifier:       GetWebhookNotifier(ds, rs),
+		notifier:       getNotifier(ds, rs),
 	}
 }
 
@@ -97,4 +97,8 @@ func (m *WebhookModel) sendCustomTypeWebhook(event *livekit.WebhookEvent, eventN
 	if err != nil {
 		log.Errorln(err)
 	}
+}
+
+func (m *WebhookModel) GetWebhookNotifier() *WebhookNotifier {
+	return m.notifier
 }

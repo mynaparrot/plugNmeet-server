@@ -11,8 +11,8 @@ import (
 	"strings"
 )
 
-func (a *AuthRecording) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
-	recording, err := a.FetchRecording(r.RecordId)
+func (m *RecordingModel) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
+	recording, err := m.FetchRecording(r.RecordId)
 	if err != nil {
 		return err
 	}
@@ -51,7 +51,7 @@ func (a *AuthRecording) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
 	if fileExist {
 		dir := strings.Replace(path, f.Name(), "", 1)
 		if dir != config.GetConfig().RecorderInfo.RecordingFilesPath {
-			empty, err := a.isDirEmpty(dir)
+			empty, err := m.isDirEmpty(dir)
 			if err == nil && empty {
 				err = os.Remove(dir)
 				if err != nil {
@@ -62,14 +62,14 @@ func (a *AuthRecording) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
 	}
 
 	// no error, so we'll delete record from DB
-	_, err = a.ds.DeleteRecording(r.RecordId)
+	_, err = m.ds.DeleteRecording(r.RecordId)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (a *AuthRecording) isDirEmpty(name string) (bool, error) {
+func (m *RecordingModel) isDirEmpty(name string) (bool, error) {
 	f, err := os.Open(name)
 	if err != nil {
 		return false, err

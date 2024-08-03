@@ -4,7 +4,10 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/recordermodel"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/recordingmodel"
+	"github.com/mynaparrot/plugnmeet-server/pkg/services/dbservice"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 )
@@ -22,8 +25,6 @@ func HandleRecording(c *fiber.Ctx) error {
 	}
 
 	req := new(plugnmeet.RecordingReq)
-	m := models.NewRecorderModel()
-
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -35,10 +36,14 @@ func HandleRecording(c *fiber.Ctx) error {
 	}
 
 	// now need to check if meeting is running or not
-	rm := models.NewRoomModel()
-	room, _ := rm.GetRoomInfo("", req.Sid, 1)
+	rm := dbservice.NewDBService(config.GetConfig().ORM)
+	isRunning := 1
+	room, err := rm.GetRoomInfoBySid(req.Sid, &isRunning)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
 
-	if room.Id == 0 {
+	if room == nil || room.ID == 0 {
 		return utils.SendCommonProtobufResponse(c, false, "notifications.room-not-active")
 	}
 
@@ -52,14 +57,16 @@ func HandleRecording(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "notifications.recording-not-running")
 	}
 
-	if room.IsActiveRTMP == 1 && req.Task == plugnmeet.RecordingTasks_START_RTMP {
+	if room.IsActiveRtmp == 1 && req.Task == plugnmeet.RecordingTasks_START_RTMP {
 		return utils.SendCommonProtobufResponse(c, false, "notifications.rtmp-already-running")
-	} else if room.IsActiveRTMP == 0 && req.Task == plugnmeet.RecordingTasks_STOP_RTMP {
+	} else if room.IsActiveRtmp == 0 && req.Task == plugnmeet.RecordingTasks_STOP_RTMP {
 		return utils.SendCommonProtobufResponse(c, false, "notifications.rtmp-not-running")
 	}
 
 	req.RoomId = room.RoomId
-	req.RoomTableId = room.Id
+	req.RoomTableId = int64(room.ID)
+
+	m := recordermodel.New(nil, nil, nil, nil)
 	err = m.SendMsgToRecorder(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -82,8 +89,6 @@ func HandleRTMP(c *fiber.Ctx) error {
 
 	// we can use same as RecordingReq
 	req := new(plugnmeet.RecordingReq)
-	m := models.NewRecorderModel()
-
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -103,25 +108,31 @@ func HandleRTMP(c *fiber.Ctx) error {
 	}
 
 	// now need to check if meeting is running or not
-	rm := models.NewRoomModel()
-	room, _ := rm.GetRoomInfo("", req.Sid, 1)
+	rm := dbservice.NewDBService(config.GetConfig().ORM)
+	isRunning := 1
+	room, err := rm.GetRoomInfoBySid(req.Sid, &isRunning)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
 
-	if room.Id == 0 {
-		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
+	if room == nil || room.ID == 0 {
+		return utils.SendCommonProtobufResponse(c, false, "notifications.room-not-active")
 	}
 
 	if room.RoomId != roomId {
 		return utils.SendCommonProtobufResponse(c, false, "roomId in token mismatched")
 	}
 
-	if room.IsActiveRTMP == 1 && req.Task == plugnmeet.RecordingTasks_START_RTMP {
+	if room.IsActiveRtmp == 1 && req.Task == plugnmeet.RecordingTasks_START_RTMP {
 		return utils.SendCommonProtobufResponse(c, false, "RTMP broadcasting already running")
-	} else if room.IsActiveRTMP == 0 && req.Task == plugnmeet.RecordingTasks_STOP_RTMP {
+	} else if room.IsActiveRtmp == 0 && req.Task == plugnmeet.RecordingTasks_STOP_RTMP {
 		return utils.SendCommonProtobufResponse(c, false, "RTMP broadcasting not running")
 	}
 
 	req.RoomId = room.RoomId
-	req.RoomTableId = room.Id
+	req.RoomTableId = int64(room.ID)
+
+	m := recordermodel.New(nil, nil, nil, nil)
 	err = m.SendMsgToRecorder(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -132,8 +143,6 @@ func HandleRTMP(c *fiber.Ctx) error {
 
 func HandleRecorderEvents(c *fiber.Ctx) error {
 	req := new(plugnmeet.RecorderToPlugNmeet)
-	m := models.NewRecordingModel()
-
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		log.Errorln(err)
@@ -144,12 +153,14 @@ func HandleRecorderEvents(c *fiber.Ctx) error {
 	}
 
 	if req.From == "recorder" {
-		rm := models.NewRoomModel()
-		roomInfo, _ := rm.GetRoomInfoByTableId(req.RoomTableId)
+		app := config.GetConfig()
+		ds := dbservice.NewDBService(app.ORM)
+		roomInfo, _ := ds.GetRoomInfoByTableId(uint64(req.RoomTableId))
 		if roomInfo == nil {
 			return c.SendStatus(fiber.StatusNotFound)
 		}
 
+		m := recordingmodel.New(app, ds, nil, nil)
 		req.RoomId = roomInfo.RoomId
 		req.RoomSid = roomInfo.Sid
 		m.HandleRecorderResp(req, roomInfo)

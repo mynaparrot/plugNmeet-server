@@ -19,7 +19,7 @@ var (
 	root       = filepath.Join(filepath.Dir(b), "../../..")
 )
 
-var m *AuthRecording
+var m *RecordingModel
 var sid = fmt.Sprintf("%d", time.Now().Unix())
 var roomId = "test01"
 var roomCreationTime int64
@@ -41,7 +41,7 @@ func init() {
 		panic(err)
 	}
 
-	m = New(nil, nil)
+	m = New(nil, nil, nil, nil)
 	info := &dbmodels.RoomInfo{
 		RoomId:       roomId,
 		RoomTitle:    "Testing",

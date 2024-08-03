@@ -11,10 +11,6 @@ import (
 	"time"
 )
 
-const (
-	WebhookRedisKey = "pnm:webhookData"
-)
-
 type WebhookNotifier struct {
 	ds                   *dbservice.DatabaseService
 	rs                   *redisservice.RedisService
@@ -202,7 +198,7 @@ func (w *WebhookNotifier) getData(roomId string) (*webhookRedisFields, error) {
 
 var webhookNotifier *WebhookNotifier
 
-func GetWebhookNotifier(ds *dbservice.DatabaseService, rs *redisservice.RedisService) *WebhookNotifier {
+func getNotifier(ds *dbservice.DatabaseService, rs *redisservice.RedisService) *WebhookNotifier {
 	if webhookNotifier != nil {
 		return webhookNotifier
 	}
