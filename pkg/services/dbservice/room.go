@@ -193,3 +193,16 @@ func (s *DatabaseService) UpdateRoomRTMPStatus(roomTableId uint64, isActiveRtmp 
 
 	return result.RowsAffected, nil
 }
+
+func (s *DatabaseService) UpdateNumParticipants(sId string, num int64) (int64, error) {
+	update := map[string]interface{}{
+		"joined_participants": num,
+	}
+
+	result := s.db.Model(&dbmodels.RoomInfo{}).Where("sid = ? OR sid = CONCAT(?, '-', id)", sId, sId).Updates(update)
+	if result.Error != nil {
+		return 0, result.Error
+	}
+
+	return result.RowsAffected, nil
+}
