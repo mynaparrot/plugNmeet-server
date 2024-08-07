@@ -14,6 +14,7 @@ import (
 type WebhookNotifier struct {
 	ds                   *dbservice.DatabaseService
 	rs                   *redisservice.RedisService
+	app                  *config.AppConfig
 	isEnabled            bool
 	enabledForPerMeeting bool
 	defaultUrl           string
@@ -25,15 +26,16 @@ type webhookRedisFields struct {
 	PerformDeleting bool     `json:"perform_deleting"`
 }
 
-func newWebhookNotifier(ds *dbservice.DatabaseService, rs *redisservice.RedisService) *WebhookNotifier {
-	notifier := webhook.GetWebhookNotifier(config.DefaultWebhookQueueSize, config.GetConfig().Client.Debug, config.GetLogger())
+func newWebhookNotifier(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *WebhookNotifier {
+	notifier := webhook.GetWebhookNotifier(config.DefaultWebhookQueueSize, app.Client.Debug, config.GetLogger())
 
 	w := &WebhookNotifier{
 		ds:                   ds,
 		rs:                   rs,
-		isEnabled:            config.GetConfig().Client.WebhookConf.Enable,
-		enabledForPerMeeting: config.GetConfig().Client.WebhookConf.EnableForPerMeeting,
-		defaultUrl:           config.GetConfig().Client.WebhookConf.Url,
+		app:                  app,
+		isEnabled:            app.Client.WebhookConf.Enable,
+		enabledForPerMeeting: app.Client.WebhookConf.EnableForPerMeeting,
+		defaultUrl:           app.Client.WebhookConf.Url,
 		notifier:             notifier,
 	}
 
@@ -128,7 +130,7 @@ func (w *WebhookNotifier) SendWebhookEvent(event *plugnmeet.CommonNotifyEvent) e
 		}
 	}
 
-	w.notifier.AddInNotifyQueue(event, config.GetConfig().Client.ApiKey, config.GetConfig().Client.Secret, d.Urls)
+	w.notifier.AddInNotifyQueue(event, w.app.Client.ApiKey, w.app.Client.Secret, d.Urls)
 	return nil
 }
 
@@ -159,7 +161,7 @@ func (w *WebhookNotifier) ForceToPutInQueue(event *plugnmeet.CommonNotifyEvent) 
 		return
 	}
 
-	w.notifier.AddInNotifyQueue(event, config.GetConfig().Client.ApiKey, config.GetConfig().Client.Secret, urls)
+	w.notifier.AddInNotifyQueue(event, w.app.Client.ApiKey, w.app.Client.Secret, urls)
 }
 
 func (w *WebhookNotifier) saveData(roomId string, d *webhookRedisFields) error {
@@ -198,11 +200,11 @@ func (w *WebhookNotifier) getData(roomId string) (*webhookRedisFields, error) {
 
 var webhookNotifier *WebhookNotifier
 
-func GetWebhookNotifier(ds *dbservice.DatabaseService, rs *redisservice.RedisService) *WebhookNotifier {
+func GetWebhookNotifier(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *WebhookNotifier {
 	if webhookNotifier != nil {
 		return webhookNotifier
 	}
-	webhookNotifier = newWebhookNotifier(ds, rs)
+	webhookNotifier = newWebhookNotifier(app, ds, rs)
 
 	return webhookNotifier
 }

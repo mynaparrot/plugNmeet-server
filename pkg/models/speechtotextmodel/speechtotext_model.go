@@ -42,7 +42,7 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 		rs:              rs,
 		lk:              lk,
 		analyticsModel:  analyticsmodel.New(app, ds, rs, lk),
-		webhookNotifier: helpers.GetWebhookNotifier(ds, rs),
+		webhookNotifier: helpers.GetWebhookNotifier(app, ds, rs),
 	}
 }
 
@@ -82,7 +82,7 @@ func (m *SpeechToTextModel) OnAfterRoomEnded(roomId, sId string) error {
 	}
 	for _, k := range hkeys {
 		if k != "total_usage" {
-			m.SpeechServiceUsersUsage(roomId, sId, k, plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED)
+			_ = m.SpeechServiceUsersUsage(roomId, sId, k, plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED)
 		}
 	}
 

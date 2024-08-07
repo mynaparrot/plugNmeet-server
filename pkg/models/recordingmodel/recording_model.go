@@ -41,7 +41,7 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 		rs:              rs,
 		lk:              lk,
 		analyticsModel:  analyticsmodel.New(app, ds, rs, lk),
-		webhookNotifier: helpers.GetWebhookNotifier(ds, rs),
+		webhookNotifier: helpers.GetWebhookNotifier(app, ds, rs),
 	}
 }
 

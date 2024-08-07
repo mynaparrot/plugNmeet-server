@@ -4,7 +4,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/waitingroommodel"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -16,7 +16,7 @@ func HandleApproveUsers(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	m := models.NewWaitingRoomModel()
+	m := waitingroommodel.New(nil, nil, nil)
 	req := new(plugnmeet.ApproveWaitingUsersReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
@@ -40,7 +40,7 @@ func HandleUpdateWaitingRoomMessage(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	m := models.NewWaitingRoomModel()
+	m := waitingroommodel.New(nil, nil, nil)
 	req := new(plugnmeet.UpdateWaitingRoomMessageReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
