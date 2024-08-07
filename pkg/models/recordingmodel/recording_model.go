@@ -4,8 +4,8 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/analyticsmodel"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models/webhookmodel"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/dbservice"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekitservice"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redisservice"
@@ -13,12 +13,12 @@ import (
 )
 
 type RecordingModel struct {
-	app            *config.AppConfig
-	ds             *dbservice.DatabaseService
-	rs             *redisservice.RedisService
-	lk             *livekitservice.LivekitService
-	analyticsModel *analyticsmodel.AnalyticsModel
-	webhookModel   *webhookmodel.WebhookModel
+	app             *config.AppConfig
+	ds              *dbservice.DatabaseService
+	rs              *redisservice.RedisService
+	lk              *livekitservice.LivekitService
+	analyticsModel  *analyticsmodel.AnalyticsModel
+	webhookNotifier *helpers.WebhookNotifier
 }
 
 func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService) *RecordingModel {
@@ -36,12 +36,12 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 	}
 
 	return &RecordingModel{
-		app:            app,
-		ds:             ds,
-		rs:             rs,
-		lk:             lk,
-		analyticsModel: analyticsmodel.New(app, ds, rs, lk),
-		webhookModel:   webhookmodel.New(app, ds, rs, lk),
+		app:             app,
+		ds:              ds,
+		rs:              rs,
+		lk:              lk,
+		analyticsModel:  analyticsmodel.New(app, ds, rs, lk),
+		webhookNotifier: helpers.GetWebhookNotifier(ds, rs),
 	}
 }
 
@@ -76,7 +76,7 @@ func (m *RecordingModel) HandleRecorderResp(r *plugnmeet.RecorderToPlugNmeet, ro
 
 func (m *RecordingModel) sendToWebhookNotifier(r *plugnmeet.RecorderToPlugNmeet) {
 	tk := r.Task.String()
-	n := m.webhookModel.GetWebhookNotifier()
+	n := m.webhookNotifier
 	if n != nil {
 		msg := &plugnmeet.CommonNotifyEvent{
 			Event: &tk,

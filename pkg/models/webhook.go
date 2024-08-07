@@ -277,8 +277,8 @@ func (w *webhookEvent) participantLeft() {
 
 	// if we missed to calculate this user's speech service usage stat
 	// for sudden disconnection
-	sm := NewSpeechServices()
-	_ = sm.SpeechServiceUsersUsage(event.Room.Name, event.Room.Sid, event.Participant.Identity, plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED)
+	//sm := NewSpeechServices()
+	//_ = sm.SpeechServiceUsersUsage(event.Room.Name, event.Room.Sid, event.Participant.Identity, plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED)
 
 	// send analytics
 	at := fmt.Sprintf("%d", time.Now().UnixMilli())
@@ -410,12 +410,12 @@ func (w *webhookEvent) onAfterRoomFinishedTasks(event *livekit.WebhookEvent) {
 	}
 
 	// speech service clean up
-	sm := NewSpeechServices()
-	// don't need to worry about room sid changes, because we'll compare both
-	err = sm.OnAfterRoomEnded(event.Room.Name, event.Room.Sid)
-	if err != nil {
-		log.Errorln(err)
-	}
+	//sm := NewSpeechServices()
+	//// don't need to worry about room sid changes, because we'll compare both
+	//err = sm.OnAfterRoomEnded(event.Room.Name, event.Room.Sid)
+	//if err != nil {
+	//	log.Errorln(err)
+	//}
 
 	// finally, create the analytics file
 	w.analyticsModel.PrepareToExportAnalytics(event.Room.Name, event.Room.Sid, event.Room.Metadata)

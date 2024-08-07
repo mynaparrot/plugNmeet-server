@@ -102,7 +102,7 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 
 	// for room_started event we should send webhook at the end
 	// otherwise some of the services may not be ready
-	m.notifier.RegisterWebhook(event.Room.GetName(), event.Room.GetSid())
+	m.webhookNotifier.RegisterWebhook(event.Room.GetName(), event.Room.GetSid())
 	// webhook notification
 	go m.sendToWebhookNotifier(event)
 }

@@ -4,7 +4,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/speechtotextmodel"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -22,8 +22,8 @@ func HandleSpeechToTextTranslationServiceStatus(c *fiber.Ctx) error {
 	}
 
 	req.RoomId = roomId.(string)
-	m := models.NewSpeechServices()
-	err = m.SpeechToTextTranslationServiceStatus(req)
+	m := speechtotextmodel.New(nil, nil, nil, nil)
+	err = m.SpeechToTextTranslationServiceStart(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -42,7 +42,7 @@ func HandleGenerateAzureToken(c *fiber.Ctx) error {
 	}
 	req.RoomId = roomId.(string)
 
-	m := models.NewSpeechServices()
+	m := speechtotextmodel.New(nil, nil, nil, nil)
 	err = m.GenerateAzureToken(req, requestedUserId.(string))
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -67,7 +67,7 @@ func HandleSpeechServiceUserStatus(c *fiber.Ctx) error {
 	req.RoomId = roomId.(string)
 	req.UserId = requestedUserId.(string)
 
-	m := models.NewSpeechServices()
+	m := speechtotextmodel.New(nil, nil, nil, nil)
 	err = m.SpeechServiceUserStatus(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -87,7 +87,7 @@ func HandleRenewAzureToken(c *fiber.Ctx) error {
 	}
 	req.RoomId = roomId.(string)
 
-	m := models.NewSpeechServices()
+	m := speechtotextmodel.New(nil, nil, nil, nil)
 	err = m.RenewAzureToken(req, requestedUserId.(string))
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())

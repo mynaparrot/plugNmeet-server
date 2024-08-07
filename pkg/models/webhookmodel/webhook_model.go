@@ -4,6 +4,7 @@ import (
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/analyticsmodel"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/roommodel"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/dbservice"
@@ -13,13 +14,13 @@ import (
 )
 
 type WebhookModel struct {
-	app            *config.AppConfig
-	ds             *dbservice.DatabaseService
-	rs             *redisservice.RedisService
-	lk             *livekitservice.LivekitService
-	rm             *roommodel.RoomModel
-	analyticsModel *analyticsmodel.AnalyticsModel
-	notifier       *WebhookNotifier
+	app             *config.AppConfig
+	ds              *dbservice.DatabaseService
+	rs              *redisservice.RedisService
+	lk              *livekitservice.LivekitService
+	rm              *roommodel.RoomModel
+	analyticsModel  *analyticsmodel.AnalyticsModel
+	webhookNotifier *helpers.WebhookNotifier
 }
 
 func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService) *WebhookModel {
@@ -37,13 +38,13 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 	}
 
 	return &WebhookModel{
-		app:            app,
-		ds:             ds,
-		rs:             rs,
-		lk:             lk,
-		rm:             roommodel.New(app, ds, rs, lk),
-		analyticsModel: analyticsmodel.New(app, ds, rs, lk),
-		notifier:       getNotifier(ds, rs),
+		app:             app,
+		ds:              ds,
+		rs:              rs,
+		lk:              lk,
+		rm:              roommodel.New(app, ds, rs, lk),
+		analyticsModel:  analyticsmodel.New(app, ds, rs, lk),
+		webhookNotifier: helpers.GetWebhookNotifier(ds, rs),
 	}
 }
 
@@ -67,7 +68,7 @@ func (m *WebhookModel) HandleWebhookEvents(e *livekit.WebhookEvent) {
 }
 
 func (m *WebhookModel) sendToWebhookNotifier(event *livekit.WebhookEvent) {
-	if event == nil || m.notifier == nil {
+	if event == nil || m.webhookNotifier == nil {
 		return
 	}
 	if event.Room == nil {
@@ -76,14 +77,14 @@ func (m *WebhookModel) sendToWebhookNotifier(event *livekit.WebhookEvent) {
 	}
 
 	msg := utils.PrepareCommonWebhookNotifyEvent(event)
-	err := m.notifier.SendWebhookEvent(msg)
+	err := m.webhookNotifier.SendWebhookEvent(msg)
 	if err != nil {
 		log.Errorln(err)
 	}
 }
 
 func (m *WebhookModel) sendCustomTypeWebhook(event *livekit.WebhookEvent, eventName string) {
-	if event == nil || m.notifier == nil {
+	if event == nil || m.webhookNotifier == nil {
 		return
 	}
 	if event.Room == nil {
@@ -93,12 +94,8 @@ func (m *WebhookModel) sendCustomTypeWebhook(event *livekit.WebhookEvent, eventN
 
 	msg := utils.PrepareCommonWebhookNotifyEvent(event)
 	msg.Event = &eventName
-	err := m.notifier.SendWebhookEvent(msg)
+	err := m.webhookNotifier.SendWebhookEvent(msg)
 	if err != nil {
 		log.Errorln(err)
 	}
-}
-
-func (m *WebhookModel) GetWebhookNotifier() *WebhookNotifier {
-	return m.notifier
 }

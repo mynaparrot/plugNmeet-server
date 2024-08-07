@@ -1,4 +1,4 @@
-package webhookmodel
+package helpers
 
 import (
 	"github.com/goccy/go-json"
@@ -198,7 +198,7 @@ func (w *WebhookNotifier) getData(roomId string) (*webhookRedisFields, error) {
 
 var webhookNotifier *WebhookNotifier
 
-func getNotifier(ds *dbservice.DatabaseService, rs *redisservice.RedisService) *WebhookNotifier {
+func GetWebhookNotifier(ds *dbservice.DatabaseService, rs *redisservice.RedisService) *WebhookNotifier {
 	if webhookNotifier != nil {
 		return webhookNotifier
 	}

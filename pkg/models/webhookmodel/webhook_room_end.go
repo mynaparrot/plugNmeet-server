@@ -11,6 +11,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/pollmodel"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/recordermodel"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/roomdurationmodel"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/speechtotextmodel"
 	log "github.com/sirupsen/logrus"
 	"time"
 )
@@ -63,7 +64,7 @@ func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 		// send first
 		m.sendToWebhookNotifier(event)
 		// now clean up
-		err := m.notifier.DeleteWebhook(event.Room.GetName())
+		err := m.webhookNotifier.DeleteWebhook(event.Room.GetName())
 		if err != nil {
 			log.Errorln(err)
 		}
@@ -123,13 +124,12 @@ func (m *WebhookModel) onAfterRoomFinishedTasks(event *livekit.WebhookEvent) {
 	}
 
 	// speech service clean up
-	// TODO: update here
-	//sm := NewSpeechServices()
-	//// don't need to worry about room sid changes, because we'll compare both
-	//err = sm.OnAfterRoomEnded(event.Room.Name, event.Room.Sid)
-	//if err != nil {
-	//	log.Errorln(err)
-	//}
+	sm := speechtotextmodel.New(m.app, m.ds, m.rs, m.lk)
+	// don't need to worry about room sid changes, because we'll compare both
+	err = sm.OnAfterRoomEnded(event.Room.Name, event.Room.Sid)
+	if err != nil {
+		log.Errorln(err)
+	}
 
 	// finally, create the analytics file
 	m.analyticsModel.PrepareToExportAnalytics(event.Room.Name, event.Room.Sid, event.Room.Metadata)
