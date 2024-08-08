@@ -59,8 +59,7 @@ func startServer(c *cli.Context) error {
 	go controllers.StartScheduler()
 
 	// defer close connections
-	defer config.GetConfig().DB.Close()
-	defer config.GetConfig().RDS.Close()
+	defer helpers.HandleCloseConnections()
 
 	router := handler.Router()
 	sigChan := make(chan os.Signal, 1)
@@ -70,7 +69,6 @@ func startServer(c *cli.Context) error {
 		sig := <-sigChan
 		log.Infoln("exit requested, shutting down", "signal", sig)
 		_ = router.Shutdown()
-		log.Exit(1)
 	}()
 
 	return router.Listen(fmt.Sprintf(":%d", config.GetConfig().Client.Port))

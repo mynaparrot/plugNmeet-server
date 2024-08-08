@@ -1,7 +1,6 @@
 package config
 
 import (
-	"database/sql"
 	"github.com/mynaparrot/plugnmeet-protocol/factory"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/redis/go-redis/v9"
@@ -17,7 +16,6 @@ import (
 )
 
 type AppConfig struct {
-	DB             *sql.DB
 	RDS            *redis.Client
 	ORM            *gorm.DB
 	RootWorkingDir string

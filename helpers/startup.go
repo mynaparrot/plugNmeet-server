@@ -15,13 +15,6 @@ func PrepareServer(appCnf *config.AppConfig) error {
 		return err
 	}
 
-	// set mysql factory connection
-	db, err := factory.NewDbConnection(appCnf.DatabaseInfo)
-	if err != nil {
-		return err
-	}
-	appCnf.DB = db
-
 	// set redis connection
 	rds, err := factory.NewRedisConnection(appCnf.RedisInfo)
 	if err != nil {
