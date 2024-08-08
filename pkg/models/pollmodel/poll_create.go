@@ -9,23 +9,22 @@ import (
 	"time"
 )
 
-func (m *PollModel) CreatePoll(r *plugnmeet.CreatePollReq, isAdmin bool) (error, string) {
+func (m *PollModel) CreatePoll(r *plugnmeet.CreatePollReq, isAdmin bool) (string, error) {
 	r.PollId = uuid.NewString()
 
 	// first add to room
 	err := m.createRoomPollHash(r)
 	if err != nil {
-		return err, ""
+		return "", err
 	}
 
 	// now create empty respondent hash
 	err = m.createRespondentHash(r)
 	if err != nil {
-		return err, ""
+		return "", err
 	}
 
-	// TODO: update here
-	//_ = m.broadcastNotification(r.RoomId, r.UserId, r.PollId, plugnmeet.DataMsgBodyType_POLL_CREATED, isAdmin)
+	_ = m.broadcastNotification(r.RoomId, r.UserId, r.PollId, plugnmeet.DataMsgBodyType_POLL_CREATED, isAdmin)
 
 	// send analytics
 	toRecord := struct {
@@ -49,7 +48,7 @@ func (m *PollModel) CreatePoll(r *plugnmeet.CreatePollReq, isAdmin bool) (error,
 		HsetValue: &val,
 	})
 
-	return nil, r.PollId
+	return r.PollId, nil
 }
 
 // createRoomPollHash will insert the poll to room hash

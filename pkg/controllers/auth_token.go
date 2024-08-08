@@ -10,7 +10,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/roommodel"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/dbservice"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redisservice"
@@ -132,7 +131,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	// after usage, we can make it null as we don't need this value again.
 	c.Locals("claims", nil)
 
-	au := models.NewAuthTokenModel()
+	au := roommodel.New(nil, nil, nil, nil)
 	token, err := au.GenerateLivekitToken(claims)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -145,7 +144,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 		req.IsProduction = b
 	}
 
-	m := models.NewRoomAuthModel()
+	m := roommodel.New(nil, nil, nil, nil)
 	rr, meta := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: roomId.(string),
 	})
@@ -176,7 +175,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 
 func HandleVerifyHeaderToken(c *fiber.Ctx) error {
 	authToken := c.Get("Authorization")
-	m := models.NewAuthTokenModel()
+	m := roommodel.New(nil, nil, nil, nil)
 
 	errStatus := fiber.StatusUnauthorized
 	path := c.Path()
@@ -210,8 +209,8 @@ func HandleVerifyHeaderToken(c *fiber.Ctx) error {
 
 // HandleRenewToken renew token only possible if it remains valid. This mean you'll require to renew it before expire.
 func HandleRenewToken(c *fiber.Ctx) error {
-	info := new(models.RenewTokenReq)
-	m := models.NewAuthTokenModel()
+	info := new(roommodel.RenewTokenReq)
+	m := roommodel.New(nil, nil, nil, nil)
 
 	err := c.BodyParser(info)
 	if err != nil {

@@ -6,8 +6,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/analyticsmodel"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/roommodel"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/websocketmodel"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redisservice"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -15,10 +15,10 @@ import (
 )
 
 type websocketController struct {
-	kws            *socketio.Websocket
-	token          string
-	participant    config.ChatParticipant
-	authTokenModel *models.AuthTokenModel
+	kws         *socketio.Websocket
+	token       string
+	participant config.ChatParticipant
+	rm          *roommodel.RoomModel
 }
 
 func newWebsocketController(kws *socketio.Websocket) *websocketController {
@@ -37,10 +37,10 @@ func newWebsocketController(kws *socketio.Websocket) *websocketController {
 	}
 
 	return &websocketController{
-		kws:            kws,
-		participant:    p,
-		token:          authToken,
-		authTokenModel: models.NewAuthTokenModel(),
+		kws:         kws,
+		participant: p,
+		token:       authToken,
+		rm:          roommodel.New(nil, nil, nil, nil),
 	}
 }
 
@@ -50,7 +50,7 @@ func (c *websocketController) validation() bool {
 		return false
 	}
 
-	claims, err := c.authTokenModel.VerifyPlugNmeetAccessToken(c.token)
+	claims, err := c.rm.VerifyPlugNmeetAccessToken(c.token)
 	if err != nil {
 		_ = c.kws.EmitTo(c.kws.UUID, []byte("invalid auth token"), socketio.TextMessage)
 		return false

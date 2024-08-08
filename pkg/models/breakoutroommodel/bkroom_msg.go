@@ -2,7 +2,7 @@ package breakoutroommodel
 
 import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/services/redisservice"
 )
 
 type SendBreakoutRoomMsgReq struct {
@@ -42,13 +42,13 @@ func (m *BreakoutRoomModel) broadcastNotification(roomId, fromUserId, toUserId, 
 		payload.To = &toUserId
 	}
 
-	msg := &models.WebsocketToRedis{
+	msg := &redisservice.WebsocketToRedis{
 		Type:    "sendMsg",
 		DataMsg: payload,
 		RoomId:  roomId,
 		IsAdmin: isAdmin,
 	}
-	models.DistributeWebsocketMsgToRedisChannel(msg)
+	m.rs.DistributeWebsocketMsgToRedisChannel(msg)
 
 	return nil
 }

@@ -4,7 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/analyticsmodel"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/roomdurationmodel"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 	"time"
@@ -16,9 +17,9 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRooms
 		return err
 	}
 
-	// let's check if parent room has duration set or not
+	// let's check if parent room has a duration set or not
 	if meta.RoomFeatures.RoomDuration != nil && *meta.RoomFeatures.RoomDuration > 0 {
-		rDuration := models.NewRoomDurationModel()
+		rDuration := roomdurationmodel.New(m.app, m.rs, m.lk)
 		err = rDuration.CompareDurationWithParentRoom(r.RoomId, r.Duration)
 		if err != nil {
 			return err
@@ -102,7 +103,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRooms
 	_, err = m.lk.UpdateRoomMetadataByStruct(r.RoomId, origMeta)
 
 	// send analytics
-	analyticsModel := models.NewAnalyticsModel()
+	analyticsModel := analyticsmodel.New(m.app, m.ds, m.rs, m.lk)
 	analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
 		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_BREAKOUT_ROOM,

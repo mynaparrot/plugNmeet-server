@@ -88,6 +88,18 @@ func TestDatabaseService_UpdateRoomRTMPStatus(t *testing.T) {
 	}
 }
 
+func TestDatabaseService_IncrementOrDecrementNumParticipants(t *testing.T) {
+	_, err := s.IncrementOrDecrementNumParticipants(sid, "+")
+	if err != nil {
+		t.Error(err)
+	}
+
+	_, err = s.IncrementOrDecrementNumParticipants(sid, "-")
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func TestDatabaseService_UpdateRoomStatus(t *testing.T) {
 	info := &dbmodels.RoomInfo{
 		RoomId:    roomId,

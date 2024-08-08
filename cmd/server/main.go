@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
+	"github.com/mynaparrot/plugnmeet-server/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/handler"
-	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/mynaparrot/plugnmeet-server/version"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"

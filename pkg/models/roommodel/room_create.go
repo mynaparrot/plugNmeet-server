@@ -9,7 +9,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/filemodel"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"os"
@@ -207,11 +207,7 @@ func (m *RoomModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomReq, r
 		return
 	}
 
-	fm := models.NewManageFileModel(&models.ManageFile{
-		Sid:    room.Sid,
-		RoomId: room.Name,
-	})
-
+	fm := filemodel.New(m.app, m.ds, m.rs, m.lk)
 	cType := resp.Header.Get("Content-Type")
 	if cType == "" {
 		log.Errorln("invalid Content-Type")
@@ -258,7 +254,11 @@ func (m *RoomModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomReq, r
 	}
 
 	ms := strings.SplitN(gres.Filename, "/", -1)
-	fm.FilePath = fmt.Sprintf("%s/%s", room.Sid, ms[len(ms)-1])
+	fm.AddRequest(&filemodel.FileUploadReq{
+		Sid:      room.Sid,
+		RoomId:   room.Name,
+		FilePath: fmt.Sprintf("%s/%s", room.Sid, ms[len(ms)-1]),
+	})
 
 	_, err = fm.ConvertWhiteboardFile()
 	if err != nil {

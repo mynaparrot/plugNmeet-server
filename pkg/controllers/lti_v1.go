@@ -6,8 +6,9 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/ltimodel/v1"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/recordingmodel"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/roommodel"
 	"strings"
 )
 
@@ -25,7 +26,7 @@ func HandleLTIV1Landing(c *fiber.Ctx) error {
 	}
 	signingURL := fmt.Sprintf("%s://%s%s", proto, c.Hostname(), c.Path())
 
-	m := models.NewLTIV1Model()
+	m := ltiv1model.New(nil, nil, nil, nil)
 	err := m.LTIV1Landing(c, string(b), signingURL)
 	if err != nil {
 		return err
@@ -50,7 +51,7 @@ func HandleLTIV1VerifyHeaderToken(c *fiber.Ctx) error {
 		})
 	}
 
-	m := models.NewLTIV1Model()
+	m := ltiv1model.New(nil, nil, nil, nil)
 	auth, err := m.LTIV1VerifyHeaderToken(authToken)
 	if err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -79,7 +80,7 @@ func HandleLTIV1VerifyHeaderToken(c *fiber.Ctx) error {
 func HandleLTIV1IsRoomActive(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 
-	m := models.NewRoomAuthModel()
+	m := roommodel.New(nil, nil, nil, nil)
 	res, _ := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: roomId.(string),
 	})
@@ -88,7 +89,7 @@ func HandleLTIV1IsRoomActive(c *fiber.Ctx) error {
 }
 
 func HandleLTIV1JoinRoom(c *fiber.Ctx) error {
-	m := models.NewLTIV1Model()
+	m := ltiv1model.New(nil, nil, nil, nil)
 	customParams := c.Locals("customParams").([]byte)
 
 	claim := &plugnmeet.LtiClaims{
@@ -133,7 +134,7 @@ func HandleLTIV1EndRoom(c *fiber.Ctx) error {
 		})
 	}
 
-	m := models.NewRoomAuthModel()
+	m := roommodel.New(nil, nil, nil, nil)
 	status, msg := m.EndRoom(&plugnmeet.RoomEndReq{
 		RoomId: roomId.(string),
 	})

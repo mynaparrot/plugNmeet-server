@@ -2,7 +2,7 @@ package breakoutroommodel
 
 import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/roomdurationmodel"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -13,7 +13,7 @@ func (m *BreakoutRoomModel) IncreaseBreakoutRoomDuration(r *plugnmeet.IncreaseBr
 	}
 
 	// update in room duration checker
-	rd := models.NewRoomDurationModel()
+	rd := roomdurationmodel.New(m.app, m.rs, m.lk)
 	newDuration, err := rd.IncreaseRoomDuration(r.BreakoutRoomId, r.Duration)
 	if err != nil {
 		return err

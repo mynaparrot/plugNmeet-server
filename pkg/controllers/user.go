@@ -5,7 +5,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/usermodel"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/dbservice"
 	"google.golang.org/protobuf/proto"
@@ -31,10 +30,12 @@ func HandleUpdateUserLockSetting(c *fiber.Ctx) error {
 	}
 
 	// now need to check if meeting is running or not
-	rm := models.NewRoomModel()
-	room, _ := rm.GetRoomInfo(req.RoomId, req.RoomSid, 1)
+	app := config.GetConfig()
+	ds := dbservice.NewDBService(app.ORM)
+	isRunning := 1
+	room, _ := ds.GetRoomInfoBySid(req.RoomSid, &isRunning)
 
-	if room.Id == 0 {
+	if room != nil || room.ID == 0 {
 		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
 	}
 

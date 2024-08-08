@@ -1,6 +1,7 @@
 package pollmodel
 
 import (
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/analyticsmodel"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/dbservice"
@@ -39,27 +40,25 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 	}
 }
 
-// TODO: update here
-//func (m *PollModel) broadcastNotification(roomId, userId, pollId string, mType plugnmeet.DataMsgBodyType, isAdmin bool) error {
-//	payload := &plugnmeet.DataMessage{
-//		Type:   plugnmeet.DataMsgType_SYSTEM,
-//		RoomId: roomId,
-//		Body: &plugnmeet.DataMsgBody{
-//			Type: mType,
-//			From: &plugnmeet.DataMsgReqFrom{
-//				UserId: userId,
-//			},
-//			Msg: pollId,
-//		},
-//	}
-//
-//	msg := &WebsocketToRedis{
-//		Type:    "sendMsg",
-//		DataMsg: payload,
-//		RoomId:  roomId,
-//		IsAdmin: isAdmin,
-//	}
-//	DistributeWebsocketMsgToRedisChannel(msg)
-//
-//	return nil
-//}
+func (m *PollModel) broadcastNotification(roomId, userId, pollId string, mType plugnmeet.DataMsgBodyType, isAdmin bool) error {
+	payload := &plugnmeet.DataMessage{
+		Type:   plugnmeet.DataMsgType_SYSTEM,
+		RoomId: roomId,
+		Body: &plugnmeet.DataMsgBody{
+			Type: mType,
+			From: &plugnmeet.DataMsgReqFrom{
+				UserId: userId,
+			},
+			Msg: pollId,
+		},
+	}
+
+	msg := &redisservice.WebsocketToRedis{
+		Type:    "sendMsg",
+		DataMsg: payload,
+		RoomId:  roomId,
+		IsAdmin: isAdmin,
+	}
+
+	return m.rs.DistributeWebsocketMsgToRedisChannel(msg)
+}

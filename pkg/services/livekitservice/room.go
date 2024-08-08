@@ -6,7 +6,6 @@ import (
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -51,13 +50,14 @@ func (s *LivekitService) UpdateRoomMetadata(roomId string, metadata string) (*li
 		return nil, err
 	}
 
+	// TODO: update here
 	// temporarily we'll update metadata manually
 	// because livekit propagated quite lately now
-	m := models.NewDataMessageModel()
-	err = m.SendUpdatedMetadata(roomId, metadata)
-	if err != nil {
-		return nil, err
-	}
+	//m := datamsgmodel.New(nil, nil, nil, nil)
+	//err = m.SendUpdatedMetadata(roomId, metadata)
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	return room, nil
 }

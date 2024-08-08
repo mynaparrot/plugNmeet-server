@@ -2,9 +2,9 @@ package dbservice
 
 import (
 	"fmt"
+	"github.com/mynaparrot/plugnmeet-server/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
-	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"path/filepath"
 	"runtime"
 	"testing"

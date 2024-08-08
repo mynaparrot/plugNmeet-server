@@ -3,7 +3,7 @@ package controllers
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/livekit/protocol/livekit"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/roommodel"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/webhookmodel"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -21,7 +21,7 @@ func HandleWebhook(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusForbidden)
 	}
 
-	m := models.NewAuthTokenModel()
+	m := roommodel.New(nil, nil, nil, nil)
 	// here request is coming from livekit
 	// so, we'll use livekit secret to validate
 	_, err := m.ValidateLivekitWebhookToken(body, string(authToken))
@@ -37,7 +37,6 @@ func HandleWebhook(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusForbidden)
 	}
 
-	models.NewWebhookModel(event)
 	mm := webhookmodel.New(nil, nil, nil, nil)
 	mm.HandleWebhookEvents(event)
 

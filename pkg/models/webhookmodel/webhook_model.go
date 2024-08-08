@@ -55,15 +55,15 @@ func (m *WebhookModel) HandleWebhookEvents(e *livekit.WebhookEvent) {
 	case "room_finished":
 		m.roomFinished(e)
 
-		//case "participant_joined":
-		//	m.participantJoined()
-		//case "participant_left":
-		//	m.participantLeft()
-		//
-		//case "track_published":
-		//	m.trackPublished()
-		//case "track_unpublished":
-		//	m.trackUnpublished()
+	case "participant_joined":
+		m.participantJoined(e)
+	case "participant_left":
+		m.participantLeft(e)
+
+	case "track_published":
+		m.trackPublished(e)
+	case "track_unpublished":
+		m.trackUnpublished(e)
 	}
 }
 

@@ -5,7 +5,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/redis/go-redis/v9"
-	log "github.com/sirupsen/logrus"
 )
 
 func (s *RedisService) PublishToWebsocketChannel(channel string, msg interface{}) error {
@@ -32,19 +31,29 @@ type WebsocketToRedis struct {
 	IsAdmin bool                   `json:"is_admin,omitempty"`
 }
 
-func (s *RedisService) DistributeWebsocketMsgToRedisChannel(payload *WebsocketToRedis) {
+func (s *RedisService) DistributeWebsocketMsgToRedisChannel(payload *WebsocketToRedis) error {
 	msg, err := json.Marshal(payload)
 	if err != nil {
-		log.Errorln(err)
-		return
+		return err
 	}
 
 	switch payload.DataMsg.Type {
 	case plugnmeet.DataMsgType_USER:
-		_ = s.PublishToWebsocketChannel(config.UserWebsocketChannel, msg)
+		err = s.PublishToWebsocketChannel(config.UserWebsocketChannel, msg)
+		if err != nil {
+			return err
+		}
 	case plugnmeet.DataMsgType_WHITEBOARD:
-		_ = s.PublishToWebsocketChannel(config.WhiteboardWebsocketChannel, msg)
+		err = s.PublishToWebsocketChannel(config.WhiteboardWebsocketChannel, msg)
+		if err != nil {
+			return err
+		}
 	case plugnmeet.DataMsgType_SYSTEM:
-		_ = s.PublishToWebsocketChannel(config.SystemWebsocketChannel, msg)
+		err = s.PublishToWebsocketChannel(config.SystemWebsocketChannel, msg)
+		if err != nil {
+			return err
+		}
 	}
+
+	return nil
 }

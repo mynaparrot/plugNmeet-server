@@ -4,7 +4,9 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/datamsgmodel"
+	"github.com/mynaparrot/plugnmeet-server/pkg/services/dbservice"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -24,10 +26,12 @@ func HandleDataMessage(c *fiber.Ctx) error {
 	}
 
 	// now need to check if meeting is running or not
-	rm := models.NewRoomModel()
-	room, _ := rm.GetRoomInfo(req.RoomId, req.RoomSid, 1)
+	app := config.GetConfig()
+	ds := dbservice.NewDBService(app.ORM)
+	isRunning := 1
+	room, _ := ds.GetRoomInfoBySid(req.RoomSid, &isRunning)
 
-	if room.Id == 0 {
+	if room == nil || room.ID == 0 {
 		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
 	}
 
@@ -37,7 +41,7 @@ func HandleDataMessage(c *fiber.Ctx) error {
 
 	req.RequestedUserId = requestedUserId.(string)
 	req.IsAdmin = isAdmin.(bool)
-	m := models.NewDataMessageModel()
+	m := datamsgmodel.New(app, ds, nil, nil)
 	err = m.SendDataMessage(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())

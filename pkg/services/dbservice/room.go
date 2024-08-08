@@ -206,3 +206,17 @@ func (s *DatabaseService) UpdateNumParticipants(sId string, num int64) (int64, e
 
 	return result.RowsAffected, nil
 }
+
+// IncrementOrDecrementNumParticipants will increment or decrement the number of Participants
+func (s *DatabaseService) IncrementOrDecrementNumParticipants(sId, operator string) (int64, error) {
+	update := map[string]interface{}{
+		"joined_participants": gorm.Expr("joined_participants " + operator + "1"),
+	}
+
+	result := s.db.Model(&dbmodels.RoomInfo{}).Where("sid = ? OR sid = CONCAT(?, '-', id)", sId, sId).Updates(update)
+	if result.Error != nil {
+		return 0, result.Error
+	}
+
+	return result.RowsAffected, nil
+}

@@ -9,10 +9,11 @@ import (
 )
 
 type BreakoutRoomModel struct {
-	ds *dbservice.DatabaseService
-	rs *redisservice.RedisService
-	lk *livekitservice.LivekitService
-	rm *roommodel.RoomModel
+	app *config.AppConfig
+	ds  *dbservice.DatabaseService
+	rs  *redisservice.RedisService
+	lk  *livekitservice.LivekitService
+	rm  *roommodel.RoomModel
 }
 
 func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService) *BreakoutRoomModel {
@@ -30,9 +31,10 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 	}
 
 	return &BreakoutRoomModel{
-		ds: ds,
-		rs: rs,
-		lk: lk,
-		rm: roommodel.New(app, ds, rs, lk),
+		app: app,
+		ds:  ds,
+		rs:  rs,
+		lk:  lk,
+		rm:  roommodel.New(app, ds, rs, lk),
 	}
 }
