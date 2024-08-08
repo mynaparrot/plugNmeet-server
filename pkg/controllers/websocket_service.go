@@ -7,6 +7,9 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/analyticsmodel"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/websocketmodel"
+	"github.com/mynaparrot/plugnmeet-server/pkg/services/redisservice"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -88,7 +91,10 @@ func HandleWebSocket(cnf websocket.Config) func(*fiber.Ctx) error {
 }
 
 func SetupSocketListeners() {
-	analytics := models.NewAnalyticsModel()
+	app := config.GetConfig()
+	rs := redisservice.NewRedisService(app.RDS)
+	analytics := analyticsmodel.New(app, nil, rs, nil)
+
 	// On message event
 	socketio.On(socketio.EventMessage, func(ep *socketio.EventPayload) {
 		//fmt.Println(fmt.Sprintf("Message event - User: %s - Message: %s", ep.Kws.GetStringAttribute("userId"), string(ep.Data)))
@@ -110,7 +116,7 @@ func SetupSocketListeners() {
 		}
 
 		roomId := ep.Kws.GetStringAttribute("roomId")
-		payload := &models.WebsocketToRedis{
+		payload := &redisservice.WebsocketToRedis{
 			Type:    "sendMsg",
 			DataMsg: dataMsg,
 			RoomId:  roomId,
@@ -121,7 +127,7 @@ func SetupSocketListeners() {
 			payload.IsAdmin = isAdmin.(bool)
 		}
 
-		models.DistributeWebsocketMsgToRedisChannel(payload)
+		rs.DistributeWebsocketMsgToRedisChannel(payload)
 		// send analytics
 		if dataMsg.Body.From != nil && dataMsg.Body.From.UserId != "" {
 			analytics.HandleWebSocketData(dataMsg)
@@ -153,7 +159,8 @@ func SetupSocketListeners() {
 
 // SubscribeToWebsocketChannel will subscribe to all websocket channels
 func SubscribeToWebsocketChannel() {
-	go models.SubscribeToUserWebsocketChannel()
-	go models.SubscribeToWhiteboardWebsocketChannel()
-	go models.SubscribeToSystemWebsocketChannel()
+	m := websocketmodel.New(nil, nil, nil, nil)
+	go m.SubscribeToUserWebsocketChannel()
+	go m.SubscribeToWhiteboardWebsocketChannel()
+	go m.SubscribeToSystemWebsocketChannel()
 }

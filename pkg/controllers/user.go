@@ -4,7 +4,10 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/usermodel"
+	"github.com/mynaparrot/plugnmeet-server/pkg/services/dbservice"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -36,7 +39,7 @@ func HandleUpdateUserLockSetting(c *fiber.Ctx) error {
 	}
 
 	req.RequestedUserId = requestedUserId.(string)
-	m := models.NewUserModel()
+	m := usermodel.New(nil, nil, nil, nil)
 	err = m.UpdateUserLockSettings(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -54,7 +57,10 @@ func HandleMuteUnMuteTrack(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	m := models.NewUserModel()
+	app := config.GetConfig()
+	ds := dbservice.NewDBService(app.ORM)
+	m := usermodel.New(app, ds, nil, nil)
+
 	err := m.CommonValidation(c)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -71,10 +77,9 @@ func HandleMuteUnMuteTrack(c *fiber.Ctx) error {
 	}
 
 	// now need to check if meeting is running or not
-	rm := models.NewRoomModel()
-	room, _ := rm.GetRoomInfo(req.RoomId, req.Sid, 1)
-
-	if room.Id == 0 {
+	isRunning := 1
+	room, _ := ds.GetRoomInfoBySid(req.Sid, &isRunning)
+	if room == nil || room.ID == 0 {
 		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
 	}
 
@@ -96,7 +101,9 @@ func HandleRemoveParticipant(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	m := models.NewUserModel()
+	app := config.GetConfig()
+	ds := dbservice.NewDBService(app.ORM)
+	m := usermodel.New(app, ds, nil, nil)
 	err := m.CommonValidation(c)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -116,10 +123,9 @@ func HandleRemoveParticipant(c *fiber.Ctx) error {
 	}
 
 	// now need to check if meeting is running or not
-	rm := models.NewRoomModel()
-	room, _ := rm.GetRoomInfo(req.RoomId, req.Sid, 1)
-
-	if room.Id == 0 {
+	isRunning := 1
+	room, _ := ds.GetRoomInfoBySid(req.Sid, &isRunning)
+	if room == nil || room.ID == 0 {
 		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
 	}
 
@@ -146,7 +152,7 @@ func HandleSwitchPresenter(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	m := models.NewUserModel()
+	m := usermodel.New(nil, nil, nil, nil)
 	req.RoomId = roomId.(string)
 	req.RequestedUserId = requestedUserId.(string)
 	err = m.SwitchPresenter(req)
