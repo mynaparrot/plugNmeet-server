@@ -1,6 +1,7 @@
 package webhookmodel
 
 import (
+	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -12,6 +13,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/recordermodel"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/roomdurationmodel"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/speechtotextmodel"
+	"github.com/mynaparrot/plugnmeet-server/pkg/services/redisservice"
 	log "github.com/sirupsen/logrus"
 	"time"
 )
@@ -85,22 +87,21 @@ func (m *WebhookModel) onAfterRoomFinishedTasks(event *livekit.WebhookEvent) {
 	}
 
 	// clear chatroom from memory
-	// TODO: update here
-	//msg := &WebsocketToRedis{
-	//	Type:   "deleteRoom",
-	//	RoomId: event.Room.Name,
-	//}
-	//marshal, err := json.Marshal(msg)
-	//if err == nil {
-	//	_, err := m.rc.Publish(m.ctx, config.UserWebsocketChannel, marshal).Result()
-	//	if err != nil {
-	//		log.Errorln(err)
-	//	}
-	//}
+	msg := &redisservice.WebsocketToRedis{
+		Type:   "deleteRoom",
+		RoomId: event.Room.Name,
+	}
+	marshal, err := json.Marshal(msg)
+	if err == nil {
+		err := m.rs.PublishToWebsocketChannel(config.UserWebsocketChannel, marshal)
+		if err != nil {
+			log.Errorln(err)
+		}
+	}
 
 	// notify to clean room from room duration
 	rmDuration := roomdurationmodel.New(m.app, m.rs, m.lk)
-	err := rmDuration.DeleteRoomWithDuration(event.Room.Name)
+	err = rmDuration.DeleteRoomWithDuration(event.Room.Name)
 	if err != nil {
 		log.Errorln(err)
 	}
