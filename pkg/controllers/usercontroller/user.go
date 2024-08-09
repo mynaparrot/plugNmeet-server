@@ -35,7 +35,7 @@ func HandleUpdateUserLockSetting(c *fiber.Ctx) error {
 	isRunning := 1
 	room, _ := ds.GetRoomInfoBySid(req.RoomSid, &isRunning)
 
-	if room != nil || room.ID == 0 {
+	if room == nil || room.ID == 0 {
 		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
 	}
 
