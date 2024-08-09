@@ -139,11 +139,17 @@ func (s *DatabaseService) UpdateRoomStatus(info *dbmodels.RoomInfo) (int64, erro
 		update["ended"] = time.Now().UTC().Format("2006-01-02 15:04:05")
 	}
 
-	cond := &dbmodels.RoomInfo{}
-	if info.RoomId != "" {
-		cond.RoomId = info.RoomId
+	var cond interface{}
+	if info.ID > 0 {
+		cond = map[string]interface{}{
+			"id": info.ID,
+		}
+	} else if info.RoomId != "" {
+		cond = map[string]interface{}{
+			"roomId": info.RoomId,
+		}
 	} else {
-		cond.Sid = info.Sid
+		cond = gorm.Expr("sid = ? OR sid = CONCAT(?, '-', id)", info.Sid, info.Sid)
 	}
 
 	result := s.db.Model(&dbmodels.RoomInfo{}).Where(cond).Not("is_running = ?", info.IsRunning).Updates(update)

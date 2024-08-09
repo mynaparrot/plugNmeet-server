@@ -111,6 +111,16 @@ func TestDatabaseService_UpdateRoomStatus(t *testing.T) {
 		t.Error(err)
 	}
 
+	info = &dbmodels.RoomInfo{
+		Sid:       sid,
+		IsRunning: 0,
+	}
+
+	_, err = s.UpdateRoomStatus(info)
+	if err != nil {
+		t.Error(err)
+	}
+
 	t.Logf("%+v", info)
 }
 
