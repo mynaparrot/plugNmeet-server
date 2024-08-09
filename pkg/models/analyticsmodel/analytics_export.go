@@ -59,11 +59,12 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 	}
 
 	fileId := fmt.Sprintf("%s-%d", room.Sid, room.CreationTime)
-	path := fmt.Sprintf("%s/%s.json", *config.GetConfig().AnalyticsSettings.FilesStorePath, fileId)
+	path := fmt.Sprintf("%s/%s.json", *m.app.AnalyticsSettings.FilesStorePath, fileId)
 
 	// export file
 	stat, err := m.exportAnalyticsToFile(room, path, metadata)
 	if err != nil {
+		log.Errorln(err)
 		return
 	}
 
@@ -73,7 +74,10 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 	// and won't record to DB
 	if metadata.RoomFeatures.EnableAnalytics {
 		// record in db
-		m.AddAnalyticsFileToDB(room.ID, room.CreationTime, room.RoomId, fileId, stat)
+		_, err = m.AddAnalyticsFileToDB(room.ID, room.CreationTime, room.RoomId, fileId, stat)
+		if err != nil {
+			log.Errorln(err)
+		}
 		// notify
 		m.sendToWebhookNotifier(room.RoomId, room.Sid, "analytics_proceeded", fileId)
 	}

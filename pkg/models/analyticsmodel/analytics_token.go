@@ -7,7 +7,6 @@ import (
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"os"
 	"strings"
 	"time"
@@ -52,13 +51,15 @@ func (m *AnalyticsModel) VerifyAnalyticsToken(token string) (string, int, error)
 		return "", fiber.StatusUnauthorized, err
 	}
 
-	if err = out.Validate(jwt.Expected{Issuer: config.GetConfig().Client.ApiKey, Time: time.Now().UTC()}); err != nil {
+	if err = out.Validate(jwt.Expected{
+		Issuer: m.app.Client.ApiKey,
+		Time:   time.Now().UTC(),
+	}); err != nil {
 		return "", fiber.StatusUnauthorized, err
 	}
 
 	file := fmt.Sprintf("%s/%s", *m.app.AnalyticsSettings.FilesStorePath, out.Subject)
 	_, err = os.Lstat(file)
-
 	if err != nil {
 		ms := strings.SplitN(err.Error(), "/", -1)
 		return "", fiber.StatusNotFound, errors.New(ms[len(ms)-1])

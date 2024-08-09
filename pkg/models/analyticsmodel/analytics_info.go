@@ -17,6 +17,7 @@ func (m *AnalyticsModel) FetchAnalytics(r *plugnmeet.FetchAnalyticsReq) (*plugnm
 			RoomId:           v.RoomID,
 			FileId:           v.FileID,
 			FileSize:         v.FileSize,
+			FileName:         v.FileName,
 			CreationTime:     v.CreationTime,
 			RoomCreationTime: v.RoomCreationTime,
 		}
@@ -46,6 +47,7 @@ func (m *AnalyticsModel) fetchAnalytic(fileId string) (*plugnmeet.AnalyticsInfo,
 		RoomId:           v.RoomID,
 		FileId:           v.FileID,
 		FileSize:         v.FileSize,
+		FileName:         v.FileName,
 		CreationTime:     v.CreationTime,
 		RoomCreationTime: v.RoomCreationTime,
 	}
@@ -64,6 +66,7 @@ func (m *AnalyticsModel) getAnalyticByRoomTableId(roomTableId uint64) (*plugnmee
 	analytic := &plugnmeet.AnalyticsInfo{
 		RoomId:           v.RoomID,
 		FileId:           v.FileID,
+		FileName:         v.FileName,
 		FileSize:         v.FileSize,
 		CreationTime:     v.CreationTime,
 		RoomCreationTime: v.RoomCreationTime,

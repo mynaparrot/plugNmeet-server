@@ -155,8 +155,8 @@ func (m *RoomModel) makePresenter(g *plugnmeet.GenerateTokenReq) {
 			meta := make([]byte, len(p.Metadata))
 			copy(meta, p.Metadata)
 
-			m, _ := m.lk.UnmarshalParticipantMetadata(string(meta))
-			if m.IsAdmin && m.IsPresenter {
+			mm, _ := m.lk.UnmarshalParticipantMetadata(string(meta))
+			if mm.IsAdmin && mm.IsPresenter {
 				hasPresenter = true
 				break
 			}
