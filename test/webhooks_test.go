@@ -8,7 +8,7 @@ import (
 	"github.com/livekit/protocol/auth"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/handler"
+	"github.com/mynaparrot/plugnmeet-server/pkg/routers"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -76,7 +76,7 @@ func test_webhooks(t *testing.T, rInfo *livekit.Room, roomFinished bool) {
 			req.Header.Set("Authorization", token)
 			req.Header.Set("Content-Type", "application/json")
 
-			router := handler.Router()
+			router := routers.New()
 			res, err := router.Test(req, -1)
 			if err != nil {
 				t.Error(err)

@@ -135,7 +135,7 @@ type CopyrightConf struct {
 
 var appCnf *AppConfig
 
-func NewAppConfig(a *AppConfig) {
+func New(a *AppConfig) {
 	if appCnf != nil {
 		// not allow multiple config
 		return
@@ -255,8 +255,8 @@ func (a *AppConfig) DeleteChatRoom(roomId string) {
 }
 
 func (a *AppConfig) readClientFiles() {
-	// if enable debug mode then we won't cache files
-	// otherwise changes of files won't be load
+	// if enable debug mode, then we won't cache files
+	// otherwise changes of files won't be loaded
 	if a.Client.Debug {
 		return
 	}

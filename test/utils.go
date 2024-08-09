@@ -10,7 +10,7 @@ import (
 	lksdk "github.com/livekit/server-sdk-go/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/handler"
+	"github.com/mynaparrot/plugnmeet-server/pkg/routers"
 	"google.golang.org/protobuf/proto"
 	"io"
 	"net/http"
@@ -52,7 +52,7 @@ func prepareByteReq(method, router string, b []byte) *http.Request {
 }
 
 func performCommonReq(t *testing.T, req *http.Request, expectedStatus bool) {
-	router := handler.Router()
+	router := routers.New()
 
 	res, err := router.Test(req)
 	if err != nil {
@@ -84,7 +84,7 @@ func performCommonReq(t *testing.T, req *http.Request, expectedStatus bool) {
 }
 
 func performCommonProtoReq(t *testing.T, req *http.Request, expectedStatus bool) {
-	router := handler.Router()
+	router := routers.New()
 
 	res, err := router.Test(req)
 	if err != nil {
@@ -116,7 +116,7 @@ func performCommonProtoReq(t *testing.T, req *http.Request, expectedStatus bool)
 }
 
 func performCommonStatusReq(t *testing.T, req *http.Request) {
-	router := handler.Router()
+	router := routers.New()
 	res, err := router.Test(req)
 	if err != nil {
 		t.Error(err)

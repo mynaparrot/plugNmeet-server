@@ -14,7 +14,7 @@ type RedisService struct {
 	ctx context.Context
 }
 
-func NewRedisService(rc *redis.Client) *RedisService {
+func New(rc *redis.Client) *RedisService {
 	return &RedisService{
 		rc:  rc,
 		ctx: context.Background(),

@@ -18,7 +18,7 @@ func TestAppConfig_ChatUser(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	NewAppConfig(&appConfig)
+	New(&appConfig)
 
 	p := ChatParticipant{
 		RoomSid: "RM_test01",

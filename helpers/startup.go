@@ -8,29 +8,8 @@ import (
 	"os"
 )
 
-func PrepareServer(appCnf *config.AppConfig) error {
-	// orm
-	err := temporary.NewDatabaseConnection(appCnf)
-	if err != nil {
-		return err
-	}
-
-	// set redis connection
-	rds, err := factory.NewRedisConnection(appCnf.RedisInfo)
-	if err != nil {
-		return err
-	}
-	appCnf.RDS = rds
-
-	return nil
-}
-
-func ReadConfig(cnfFile string) (*config.AppConfig, error) {
-	return readYaml(cnfFile)
-}
-
-func readYaml(filename string) (*config.AppConfig, error) {
-	yamlFile, err := os.ReadFile(filename)
+func ReadYamlConfigFile(file string) (*config.AppConfig, error) {
+	yamlFile, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
@@ -51,4 +30,21 @@ func readYaml(filename string) (*config.AppConfig, error) {
 	appCnf.RootWorkingDir = wd
 
 	return appCnf, err
+}
+
+func PrepareServer(appCnf *config.AppConfig) error {
+	// orm
+	err := temporary.NewDatabaseConnection(appCnf)
+	if err != nil {
+		return err
+	}
+
+	// set redis connection
+	rds, err := factory.NewRedisConnection(appCnf.RedisInfo)
+	if err != nil {
+		return err
+	}
+	appCnf.RDS = rds
+
+	return nil
 }

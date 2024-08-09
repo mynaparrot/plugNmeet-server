@@ -5,9 +5,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func HandleCloseConnections() error {
+func HandleCloseConnections() {
 	if config.GetConfig() == nil {
-		return nil
+		return
 	}
 
 	// handle to close DB connection
@@ -22,5 +22,5 @@ func HandleCloseConnections() error {
 	// close logger
 	logrus.Exit(0)
 
-	return nil
+	return
 }

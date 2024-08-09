@@ -2,16 +2,16 @@ package redisservice
 
 import (
 	"errors"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/redis/go-redis/v9"
 )
 
 const (
-	RecorderChannel = "plug-n-meet-recorder"
-	RecordersKey    = Prefix + "recorders"
+	RecordersKey = Prefix + "recorders"
 )
 
 func (s *RedisService) PublishToRecorderChannel(payload string) error {
-	_, err := s.rc.Publish(s.ctx, RecorderChannel, payload).Result()
+	_, err := s.rc.Publish(s.ctx, config.RecorderChannel, payload).Result()
 	if err != nil {
 		return err
 	}

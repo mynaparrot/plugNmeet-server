@@ -19,10 +19,10 @@ func New(app *config.AppConfig, rs *redisservice.RedisService, lk *livekitservic
 		app = config.GetConfig()
 	}
 	if rs == nil {
-		rs = redisservice.NewRedisService(app.RDS)
+		rs = redisservice.New(app.RDS)
 	}
 	if lk == nil {
-		lk = livekitservice.NewLivekitService(app, rs)
+		lk = livekitservice.New(app, rs)
 	}
 
 	return &RoomDurationModel{

@@ -19,13 +19,13 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 		app = config.GetConfig()
 	}
 	if ds == nil {
-		ds = dbservice.NewDBService(app.ORM)
+		ds = dbservice.New(app.ORM)
 	}
 	if rs == nil {
-		rs = redisservice.NewRedisService(app.RDS)
+		rs = redisservice.New(app.RDS)
 	}
 	if lk == nil {
-		lk = livekitservice.NewLivekitService(app, rs)
+		lk = livekitservice.New(app, rs)
 	}
 
 	return &IngressModel{

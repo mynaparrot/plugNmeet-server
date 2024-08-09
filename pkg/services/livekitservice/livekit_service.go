@@ -14,7 +14,7 @@ type LivekitService struct {
 	rs  *redisservice.RedisService
 }
 
-func NewLivekitService(app *config.AppConfig, rs *redisservice.RedisService) *LivekitService {
+func New(app *config.AppConfig, rs *redisservice.RedisService) *LivekitService {
 	cnf := app.LivekitInfo
 	lkc := lksdk.NewRoomServiceClient(cnf.Host, cnf.ApiKey, cnf.Secret)
 

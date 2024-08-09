@@ -24,21 +24,21 @@ var roomCreationTime int64
 var analyticFileId = fmt.Sprintf("file-%d", time.Now().Unix())
 
 func init() {
-	appCnf, err := helpers.ReadConfig(root + "/config.yaml")
+	appCnf, err := helpers.ReadYamlConfigFile(root + "/config.yaml")
 	if err != nil {
 		panic(err)
 	}
 
 	appCnf.RootWorkingDir = root
 	// set this config for global usage
-	config.NewAppConfig(appCnf)
+	config.New(appCnf)
 
 	// now prepare server
 	err = helpers.PrepareServer(config.GetConfig())
 	if err != nil {
 		panic(err)
 	}
-	s = NewDBService(config.GetConfig().ORM)
+	s = New(config.GetConfig().ORM)
 }
 
 func TestDatabaseService_InsertOrUpdateRoomInfo(t *testing.T) {
