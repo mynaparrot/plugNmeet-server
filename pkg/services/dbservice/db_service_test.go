@@ -17,7 +17,7 @@ var (
 )
 
 var s *DatabaseService
-var sid = fmt.Sprintf("%d", time.Now().Unix())
+var sid = fmt.Sprintf("%d", time.Now().UnixMicro())
 var roomTableId uint64
 var roomId = "test01"
 var roomCreationTime int64

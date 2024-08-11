@@ -17,7 +17,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRooms
 		return err
 	}
 
-	// let's check if parent room has a duration set or not
+	// let's check if the parent room has a duration set or not
 	if meta.RoomFeatures.RoomDuration != nil && *meta.RoomFeatures.RoomDuration > 0 {
 		rDuration := roomdurationmodel.New(m.app, m.rs, m.lk)
 		err = rDuration.CompareDurationWithParentRoom(r.RoomId, r.Duration)

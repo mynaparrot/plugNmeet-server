@@ -76,12 +76,12 @@ func (s *LivekitService) UpdateParticipantMetadata(roomId string, userId string,
 }
 
 // UpdateParticipantMetadataByStruct will update user's medata by provided formatted metadata
-func (r *LivekitService) UpdateParticipantMetadataByStruct(roomId, userId string, meta *plugnmeet.UserMetadata) (*livekit.ParticipantInfo, error) {
-	metadata, err := r.MarshalParticipantMetadata(meta)
+func (s *LivekitService) UpdateParticipantMetadataByStruct(roomId, userId string, meta *plugnmeet.UserMetadata) (*livekit.ParticipantInfo, error) {
+	metadata, err := s.MarshalParticipantMetadata(meta)
 	if err != nil {
 		return nil, err
 	}
-	p, err := r.UpdateParticipantMetadata(roomId, userId, metadata)
+	p, err := s.UpdateParticipantMetadata(roomId, userId, metadata)
 	if err != nil {
 		return nil, err
 	}

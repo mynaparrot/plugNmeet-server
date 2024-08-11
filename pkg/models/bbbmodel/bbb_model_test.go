@@ -19,7 +19,7 @@ var (
 )
 
 var m *BBBApiWrapperModel
-var sid = fmt.Sprintf("%d", time.Now().Unix())
+var sid = fmt.Sprintf("%d", time.Now().UnixMicro())
 var roomId = "test01"
 var roomCreationTime int64
 var recordId = fmt.Sprintf("rec-%d", time.Now().UnixMilli())

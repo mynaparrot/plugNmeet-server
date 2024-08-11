@@ -20,7 +20,7 @@ var (
 )
 
 var m *AnalyticsModel
-var sid = fmt.Sprintf("%d", time.Now().Unix())
+var sid = fmt.Sprintf("%d", time.Now().UnixMicro())
 var roomId = "test01"
 var roomTableId uint64
 var fileId = fmt.Sprintf("%d", time.Now().Unix())
