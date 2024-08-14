@@ -6,7 +6,7 @@ require (
 	github.com/ansrivas/fiberprometheus/v2 v2.7.0
 	github.com/bufbuild/protovalidate-go v0.6.3
 	github.com/cavaliergopher/grab/v3 v3.0.1
-	github.com/frostbyte73/core v0.0.10
+	github.com/frostbyte73/core v0.0.12
 	github.com/gabriel-vasile/mimetype v1.4.5
 	github.com/go-jose/go-jose/v4 v4.0.4
 	github.com/goccy/go-json v0.10.3
