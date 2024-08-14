@@ -6,13 +6,14 @@ RUN echo building for "$TARGETPLATFORM"
 
 WORKDIR /go/src/app
 
+COPY main.go main.go
 COPY go.mod go.mod
 COPY go.sum go.sum
 # download if above files changed
 RUN go mod download
 
 # Copy the go source
-COPY cmd/ cmd/
+COPY helpers/ helpers/
 COPY pkg/ pkg/
 COPY version/ version/
 
