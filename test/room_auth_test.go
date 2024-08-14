@@ -4,7 +4,7 @@ import (
 	"github.com/goccy/go-json"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/routers"
+	"github.com/mynaparrot/plugnmeet-server/pkg/handler"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"io"
@@ -17,7 +17,7 @@ func test_HandleRoomCreate(t *testing.T) *livekit.Room {
 
 	req := prepareStringReq(http.MethodPost, "/auth/room/create", body)
 
-	router := routers.New()
+	router := handler.Router()
 	res, err := router.Test(req)
 	if err != nil {
 		t.Error(err)
@@ -52,7 +52,7 @@ func test_HandleJoinToken(t *testing.T) string {
 
 	req := prepareStringReq(http.MethodPost, "/auth/room/getJoinToken", body)
 
-	router := routers.New()
+	router := handler.Router()
 	res, err := router.Test(req)
 	if err != nil {
 		t.Error(err)
@@ -86,7 +86,7 @@ func test_HandleJoinToken(t *testing.T) string {
 func test_verifyToken(t *testing.T, token string) *plugnmeet.VerifyTokenRes {
 	req := prepareStringWithTokenReq(token, http.MethodPost, "/api/verifyToken", nil)
 
-	router := routers.New()
+	router := handler.Router()
 	res, err := router.Test(req)
 	if err != nil {
 		t.Error(err)

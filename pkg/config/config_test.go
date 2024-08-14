@@ -18,7 +18,7 @@ func TestAppConfig_ChatUser(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	New(&appConfig)
+	SetAppConfig(&appConfig)
 
 	p := ChatParticipant{
 		RoomSid: "RM_test01",
@@ -28,21 +28,21 @@ func TestAppConfig_ChatUser(t *testing.T) {
 		UserId:  "test001",
 	}
 
-	appCnf.AddChatUser("room01", p)
-	pp := appCnf.GetChatParticipants("room01")
+	AppCnf.AddChatUser("room01", p)
+	pp := AppCnf.GetChatParticipants("room01")
 
 	if pp[p.UserId].UserSid != p.UserSid {
 		t.Errorf("Expected UserSid %s didn't match", p.UserId)
 	}
 
-	appCnf.RemoveChatParticipant("room01", p.UserId)
-	pp = appCnf.GetChatParticipants("room01")
+	AppCnf.RemoveChatParticipant("room01", p.UserId)
+	pp = AppCnf.GetChatParticipants("room01")
 	if pp[p.UserId].UserId == p.UserSid {
 		t.Errorf("Expected UserSid %s shouldn't found", p.UserId)
 	}
 
-	appCnf.DeleteChatRoom("room01")
-	pp = appCnf.GetChatParticipants("room01")
+	AppCnf.DeleteChatRoom("room01")
+	pp = AppCnf.GetChatParticipants("room01")
 
 	if pp != nil {
 		t.Error("Expected nil")

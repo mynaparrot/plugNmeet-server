@@ -10,7 +10,7 @@ import (
 	lksdk "github.com/livekit/server-sdk-go/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/routers"
+	"github.com/mynaparrot/plugnmeet-server/pkg/handler"
 	"google.golang.org/protobuf/proto"
 	"io"
 	"net/http"
@@ -20,12 +20,12 @@ import (
 )
 
 func prepareStringReq(method, router, body string) *http.Request {
-	mac := hmac.New(sha256.New, []byte(config.GetConfig().Client.Secret))
+	mac := hmac.New(sha256.New, []byte(config.AppCnf.Client.Secret))
 	mac.Write([]byte(body))
 	signature := hex.EncodeToString(mac.Sum(nil))
 
 	req := httptest.NewRequest(method, router, strings.NewReader(body))
-	req.Header.Set("API-KEY", config.GetConfig().Client.ApiKey)
+	req.Header.Set("API-KEY", config.AppCnf.Client.ApiKey)
 	req.Header.Set("HASH-SIGNATURE", signature)
 	req.Header.Set("Content-Type", "application/json")
 	return req
@@ -40,19 +40,19 @@ func prepareStringWithTokenReq(token, method, router string, m proto.Message) *h
 }
 
 func prepareByteReq(method, router string, b []byte) *http.Request {
-	mac := hmac.New(sha256.New, []byte(config.GetConfig().Client.Secret))
+	mac := hmac.New(sha256.New, []byte(config.AppCnf.Client.Secret))
 	mac.Write(b)
 	signature := hex.EncodeToString(mac.Sum(nil))
 
 	req := httptest.NewRequest(method, router, bytes.NewReader(b))
-	req.Header.Set("API-KEY", config.GetConfig().Client.ApiKey)
+	req.Header.Set("API-KEY", config.AppCnf.Client.ApiKey)
 	req.Header.Set("HASH-SIGNATURE", signature)
 	req.Header.Set("Content-Type", "application/protobuf")
 	return req
 }
 
 func performCommonReq(t *testing.T, req *http.Request, expectedStatus bool) {
-	router := routers.New()
+	router := handler.Router()
 
 	res, err := router.Test(req)
 	if err != nil {
@@ -84,7 +84,7 @@ func performCommonReq(t *testing.T, req *http.Request, expectedStatus bool) {
 }
 
 func performCommonProtoReq(t *testing.T, req *http.Request, expectedStatus bool) {
-	router := routers.New()
+	router := handler.Router()
 
 	res, err := router.Test(req)
 	if err != nil {
@@ -116,7 +116,7 @@ func performCommonProtoReq(t *testing.T, req *http.Request, expectedStatus bool)
 }
 
 func performCommonStatusReq(t *testing.T, req *http.Request) {
-	router := routers.New()
+	router := handler.Router()
 	res, err := router.Test(req)
 	if err != nil {
 		t.Error(err)

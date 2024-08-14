@@ -26,7 +26,7 @@ func test_recorderTasks(t *testing.T, rInfo *livekit.Room) string {
 		RoomId:      rInfo.Name,
 		RoomSid:     rInfo.Sid,
 		RecorderId:  "node_01",
-		FilePath:    fmt.Sprintf("%s/node_01/%s.mp4", config.GetConfig().RecorderInfo.RecordingFilesPath, rid),
+		FilePath:    fmt.Sprintf("%s/node_01/%s.mp4", config.AppCnf.RecorderInfo.RecordingFilesPath, rid),
 		FileSize:    10,
 	}
 

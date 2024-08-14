@@ -1,24 +1,23 @@
 package config
 
 import (
+	"database/sql"
 	"github.com/mynaparrot/plugnmeet-protocol/factory"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/natefinch/lumberjack.v2"
-	"gorm.io/gorm"
 	"io"
 	"os"
-	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 )
 
+var AppCnf *AppConfig
+
 type AppConfig struct {
-	RDS            *redis.Client
-	ORM            *gorm.DB
-	RootWorkingDir string
+	DB  *sql.DB
+	RDS *redis.Client
 
 	sync.RWMutex
 	chatRooms   map[string]map[string]ChatParticipant
@@ -133,35 +132,20 @@ type CopyrightConf struct {
 	Text          string `yaml:"text"`
 }
 
-var appCnf *AppConfig
-
-func New(a *AppConfig) {
-	if appCnf != nil {
-		// not allow multiple config
-		return
-	}
-
-	appCnf = new(AppConfig) // otherwise will give error
-	// now set the config
-	appCnf = a
-	appCnf.chatRooms = make(map[string]map[string]ChatParticipant)
+func SetAppConfig(a *AppConfig) {
+	AppCnf = a
+	AppCnf.chatRooms = make(map[string]map[string]ChatParticipant)
 
 	// set default values
-	if appCnf.AnalyticsSettings != nil {
-		if appCnf.AnalyticsSettings.FilesStorePath == nil {
+	if AppCnf.AnalyticsSettings != nil {
+		if AppCnf.AnalyticsSettings.FilesStorePath == nil {
 			p := "./analytics"
-			appCnf.AnalyticsSettings.FilesStorePath = &p
+			AppCnf.AnalyticsSettings.FilesStorePath = &p
 			d := time.Minute * 30
-			appCnf.AnalyticsSettings.TokenValidity = &d
+			AppCnf.AnalyticsSettings.TokenValidity = &d
 		}
-
-		p := *appCnf.AnalyticsSettings.FilesStorePath
-		if strings.HasPrefix(p, "./") {
-			p = filepath.Join(a.RootWorkingDir, p)
-		}
-
-		if _, err := os.Stat(p); os.IsNotExist(err) {
-			_ = os.MkdirAll(p, os.ModePerm)
+		if _, err := os.Stat(*AppCnf.AnalyticsSettings.FilesStorePath); os.IsNotExist(err) {
+			_ = os.MkdirAll(*AppCnf.AnalyticsSettings.FilesStorePath, os.ModePerm)
 		}
 	}
 
@@ -169,21 +153,12 @@ func New(a *AppConfig) {
 	a.readClientFiles()
 }
 
-func GetConfig() *AppConfig {
-	return appCnf
-}
-
 func setLogger() {
-	p := appCnf.LogSettings.LogFile
-	if strings.HasPrefix(p, "./") {
-		p = filepath.Join(appCnf.RootWorkingDir, p)
-	}
-
 	logWriter := &lumberjack.Logger{
-		Filename:   p,
-		MaxSize:    appCnf.LogSettings.MaxSize,
-		MaxBackups: appCnf.LogSettings.MaxBackups,
-		MaxAge:     appCnf.LogSettings.MaxAge,
+		Filename:   AppCnf.LogSettings.LogFile,
+		MaxSize:    AppCnf.LogSettings.MaxSize,
+		MaxBackups: AppCnf.LogSettings.MaxBackups,
+		MaxAge:     AppCnf.LogSettings.MaxAge,
 	}
 
 	logrus.SetReportCaller(true)
@@ -195,7 +170,7 @@ func setLogger() {
 	})
 
 	var w io.Writer
-	if appCnf.Client.Debug {
+	if AppCnf.Client.Debug {
 		w = io.MultiWriter(os.Stdout, logWriter)
 	} else {
 		w = io.Writer(logWriter)
@@ -255,12 +230,12 @@ func (a *AppConfig) DeleteChatRoom(roomId string) {
 }
 
 func (a *AppConfig) readClientFiles() {
-	// if enable debug mode, then we won't cache files
-	// otherwise changes of files won't be loaded
+	// if enable debug mode then we won't cache files
+	// otherwise changes of files won't be load
 	if a.Client.Debug {
 		return
 	}
-	appCnf.ClientFiles = make(map[string][]string)
+	AppCnf.ClientFiles = make(map[string][]string)
 
 	css, err := utils.GetFilesFromDir(a.Client.Path+"/assets/css", ".css", "des")
 	if err != nil {
@@ -272,6 +247,6 @@ func (a *AppConfig) readClientFiles() {
 		logrus.Errorln(err)
 	}
 
-	appCnf.ClientFiles["css"] = css
-	appCnf.ClientFiles["js"] = js
+	AppCnf.ClientFiles["css"] = css
+	AppCnf.ClientFiles["js"] = js
 }

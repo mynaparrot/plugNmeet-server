@@ -1,9 +1,9 @@
 NAME=plugnmeet-server
 BINDIR=bin
-FILE_PATH=main.go
+FILE_PATH=cmd/server/*.go
+GOBUILD=CGO_ENABLED=0 go build -ldflags '-w -s -buildid='
 # The -w and -s flags reduce binary sizes by excluding unnecessary symbols and debug info
 # The -buildid= flag makes builds reproducible
-GOBUILD=CGO_ENABLED=0 go build -ldflags '-w -s -buildid='
 
 linux-amd64:
 	GOARCH=amd64 GOOS=linux $(GOBUILD) -o $(BINDIR)/$(NAME)-$@ $(FILE_PATH)

@@ -8,7 +8,7 @@ import (
 	"github.com/livekit/protocol/auth"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/routers"
+	"github.com/mynaparrot/plugnmeet-server/pkg/handler"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -62,7 +62,7 @@ func test_webhooks(t *testing.T, rInfo *livekit.Room, roomFinished bool) {
 		sum := sha256.Sum256(encoded)
 		b64 := base64.StdEncoding.EncodeToString(sum[:])
 
-		at := auth.NewAccessToken(config.GetConfig().LivekitInfo.ApiKey, config.GetConfig().LivekitInfo.Secret).
+		at := auth.NewAccessToken(config.AppCnf.LivekitInfo.ApiKey, config.AppCnf.LivekitInfo.Secret).
 			SetValidFor(5 * time.Minute).
 			SetSha256(b64)
 		token, err := at.ToJWT()
@@ -76,7 +76,7 @@ func test_webhooks(t *testing.T, rInfo *livekit.Room, roomFinished bool) {
 			req.Header.Set("Authorization", token)
 			req.Header.Set("Content-Type", "application/json")
 
-			router := routers.New()
+			router := handler.Router()
 			res, err := router.Test(req, -1)
 			if err != nil {
 				t.Error(err)
