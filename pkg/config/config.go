@@ -3,6 +3,8 @@ package config
 import (
 	"github.com/mynaparrot/plugnmeet-protocol/factory"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -16,8 +18,11 @@ import (
 )
 
 type AppConfig struct {
-	RDS            *redis.Client
-	ORM            *gorm.DB
+	RDS       *redis.Client
+	ORM       *gorm.DB
+	NatsConn  *nats.Conn
+	JetStream jetstream.JetStream
+
 	RootWorkingDir string
 
 	sync.RWMutex
@@ -35,6 +40,7 @@ type AppConfig struct {
 	SharedNotePad                SharedNotePad                `yaml:"shared_notepad"`
 	AzureCognitiveServicesSpeech AzureCognitiveServicesSpeech `yaml:"azure_cognitive_services_speech"`
 	AnalyticsSettings            *AnalyticsSettings           `yaml:"analytics_settings"`
+	NatsInfo                     NatsInfo                     `yaml:"nats_info"`
 }
 
 type ClientInfo struct {
@@ -131,6 +137,24 @@ type CopyrightConf struct {
 	Display       bool   `yaml:"display"`
 	AllowOverride bool   `yaml:"allow_override"`
 	Text          string `yaml:"text"`
+}
+
+type NatsInfo struct {
+	NatsUrl                  string       `yaml:"nats_url"`
+	Account                  string       `yaml:"account"`
+	User                     string       `yaml:"user"`
+	Password                 string       `yaml:"password"`
+	AuthCalloutIssuerPrivate string       `yaml:"auth_callout_issuer_private"`
+	Subjects                 NatsSubjects `yaml:"subjects"`
+}
+
+type NatsSubjects struct {
+	SystemWorker  string `yaml:"system_worker"`
+	SystemPublic  string `yaml:"system_public"`
+	SystemPrivate string `yaml:"system_private"`
+	ChatPublic    string `yaml:"chat_public"`
+	ChatPrivate   string `yaml:"chat_private"`
+	Whiteboard    string `yaml:"whiteboard"`
 }
 
 var appCnf *AppConfig

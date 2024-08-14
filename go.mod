@@ -19,6 +19,9 @@ require (
 	github.com/livekit/protocol v1.19.3
 	github.com/livekit/server-sdk-go/v2 v2.2.0
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240728070254-76539e3c239c
+	github.com/nats-io/jwt/v2 v2.5.8
+	github.com/nats-io/nats.go v1.37.0
+	github.com/nats-io/nkeys v0.4.7
 	github.com/redis/go-redis/v9 v9.6.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
@@ -67,6 +70,7 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
+	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/pion/datachannel v1.5.6 // indirect
 	github.com/pion/dtls/v2 v2.2.11 // indirect
 	github.com/pion/ice/v2 v2.3.24 // indirect

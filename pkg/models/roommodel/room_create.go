@@ -1,6 +1,7 @@
 package roommodel
 
 import (
+	"context"
 	"fmt"
 	"github.com/cavaliergopher/grab/v3"
 	"github.com/gabriel-vasile/mimetype"
@@ -10,6 +11,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/filemodel"
+	"github.com/nats-io/nats.go/jetstream"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"os"
@@ -160,6 +162,9 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *livek
 		return false, "Error: " + err.Error(), nil
 	}
 
+	// now create stream
+	m.createNatsStreams(r.RoomId)
+
 	// we'll silently add metadata into our redis
 	// we can avoid errors (if occur) because it will update from webhook too
 	_, _ = m.rs.ManageActiveRoomsWithMetadata(r.RoomId, "add", meta)
@@ -266,4 +271,23 @@ func (m *RoomModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomReq, r
 	}
 	// finally, delete the file
 	_ = os.RemoveAll(gres.Filename)
+}
+
+func (m *RoomModel) createNatsStreams(roomId string) error {
+	ctx := context.Background()
+	_, err := m.app.JetStream.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
+		Name: roomId,
+		Subjects: []string{
+			fmt.Sprintf("%s:%s.*", roomId, m.app.NatsInfo.Subjects.ChatPublic),
+			fmt.Sprintf("%s:%s.*.*", roomId, m.app.NatsInfo.Subjects.ChatPrivate),
+			fmt.Sprintf("%s:%s.*", roomId, m.app.NatsInfo.Subjects.SystemPublic),
+			fmt.Sprintf("%s:%s.*.*", roomId, m.app.NatsInfo.Subjects.SystemPrivate),
+			fmt.Sprintf("%s:%s.*", roomId, m.app.NatsInfo.Subjects.Whiteboard),
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -73,6 +73,19 @@ database_info:
   password: "12345"
   db: "plugnmeet"
   prefix: "pnm_"
+nats_info:
+  nats_url: "nats://127.0.0.1:4222"
+  account: PNM
+  user: auth
+  password: "LM(jTdsUGbB7M9y8^dNta1"
+  auth_callout_issuer_private: "SAAMTMBUANSRW3XDXZBIBF4JYRRUMWGV2GZT5MQ54VNWNRPN2Y4J46NQSA"
+  subjects:
+    system_worker: "systemWorker"
+    system_public: "sysPublic"
+    system_private: "sysPrivate"
+    chat_public: "chatPublic"
+    chat_private: "chatPrivate"
+    whiteboard: "whiteboard"
 upload_file_settings:
   path: "./upload"
   # file size in MB. Default 10MB

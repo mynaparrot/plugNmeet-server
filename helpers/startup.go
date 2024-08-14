@@ -46,5 +46,11 @@ func PrepareServer(appCnf *config.AppConfig) error {
 	}
 	appCnf.RDS = rds
 
+	// orm
+	err = temporary.NewNatsConnection(appCnf)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

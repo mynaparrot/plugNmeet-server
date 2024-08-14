@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-server/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/natscontroller"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/schedulercontroller"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/websocketcontroller"
 	"github.com/mynaparrot/plugnmeet-server/pkg/routers"
@@ -54,6 +55,10 @@ func startServer(c *cli.Context) error {
 	if err != nil {
 		log.Fatalln(err)
 	}
+
+	// start nats services
+	nts := natscontroller.NewNatsController()
+	go nts.StartUp()
 
 	// we'll subscribe to redis channels now
 	go websocketcontroller.SubscribeToWebsocketChannel()

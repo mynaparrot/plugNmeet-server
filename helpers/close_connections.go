@@ -19,6 +19,9 @@ func HandleCloseConnections() {
 	// close redis
 	_ = config.GetConfig().RDS.Close()
 
+	// close nats
+	config.GetConfig().NatsConn.Close()
+
 	// close logger
 	logrus.Exit(0)
 
