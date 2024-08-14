@@ -6,17 +6,18 @@ RUN echo building for "$TARGETPLATFORM"
 
 WORKDIR /go/src/app
 
+COPY main.go main.go
 COPY go.mod go.mod
 COPY go.sum go.sum
 # download if above files changed
 RUN go mod download
 
 # Copy the go source
-COPY cmd/ cmd/
+COPY helpers/ helpers/
 COPY pkg/ pkg/
 COPY version/ version/
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH GO111MODULE=on go build -ldflags '-w -s -buildid=' -a -o plugnmeet-server ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH GO111MODULE=on go build -ldflags '-w -s -buildid=' -a -o plugnmeet-server main.go
 
 FROM debian:stable-slim
 
