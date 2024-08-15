@@ -105,7 +105,7 @@ func (c *NatsController) subscribeToUsersConnEvents() {
 				return
 			}
 			p := strings.Split(e.Client["user"].(string), ":")
-			err = c.natsModel.SendRoomMetadata(p[0], &p[1])
+			err = c.natsModel.OnAfterUserJoined(p[0], p[1])
 			if err != nil {
 				log.Errorln(err)
 			}
@@ -115,7 +115,13 @@ func (c *NatsController) subscribeToUsersConnEvents() {
 			if err != nil {
 				return
 			}
-			fmt.Println(e.Client["user"])
+			go func() {
+				p := strings.Split(e.Client["user"].(string), ":")
+				err = c.natsModel.OnAfterUserDisconnected(p[0], p[1])
+				if err != nil {
+					log.Errorln(err)
+				}
+			}()
 		}
 	})
 	if err != nil {

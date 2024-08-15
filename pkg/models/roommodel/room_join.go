@@ -2,6 +2,7 @@ package roommodel
 
 import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/services/natsservice"
 )
 
 func (m *RoomModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, error) {
@@ -23,6 +24,13 @@ func (m *RoomModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, erro
 	}
 
 	metadata, err := m.lk.MarshalParticipantMetadata(g.UserInfo.UserMetadata)
+	if err != nil {
+		return "", err
+	}
+
+	// update our bucket
+	nsts := natsservice.New(m.app)
+	err = nsts.AddUser(g.RoomId, g.UserInfo.UserId, "", g.UserInfo.Name, g.UserInfo.UserMetadata)
 	if err != nil {
 		return "", err
 	}

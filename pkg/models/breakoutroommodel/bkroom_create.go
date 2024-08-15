@@ -48,7 +48,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRooms
 
 	for _, room := range r.Rooms {
 		bRoom := new(plugnmeet.CreateRoomReq)
-		bRoom.RoomId = fmt.Sprintf("%s:%s", r.RoomId, room.Id)
+		bRoom.RoomId = fmt.Sprintf("%s-%s", r.RoomId, room.Id)
 		meta.RoomTitle = room.Title
 		bRoom.Metadata = meta
 		status, msg, _ := m.rm.CreateRoom(bRoom)

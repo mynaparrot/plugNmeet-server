@@ -5,25 +5,31 @@ import (
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/redisservice"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
+const (
+	Prefix = "pnm-"
+)
+
+//var mustCompile = regexp.MustCompile("/[_.:]/g")
+
 type NatsService struct {
 	ctx context.Context
 	app *config.AppConfig
-	rs  *redisservice.RedisService
 	nc  *nats.Conn
 	js  jetstream.JetStream
 }
 
-func New(app *config.AppConfig, rs *redisservice.RedisService) *NatsService {
+func New(app *config.AppConfig) *NatsService {
+	if app == nil {
+		app = config.GetConfig()
+	}
 	return &NatsService{
 		ctx: context.Background(),
 		app: app,
-		rs:  rs,
 		nc:  app.NatsConn,
 		js:  app.JetStream,
 	}
@@ -45,4 +51,32 @@ func (s *NatsService) MarshalRoomMetadata(meta *plugnmeet.RoomMetadata) (string,
 	}
 
 	return string(marshal), nil
+}
+
+// MarshalParticipantMetadata will create proper json string of user's metadata
+func (s *NatsService) MarshalParticipantMetadata(meta *plugnmeet.UserMetadata) (string, error) {
+	mId := uuid.NewString()
+	meta.MetadataId = &mId
+
+	op := protojson.MarshalOptions{
+		EmitUnpopulated: true,
+		UseProtoNames:   true,
+	}
+	marshal, err := op.Marshal(meta)
+	if err != nil {
+		return "", err
+	}
+
+	return string(marshal), nil
+}
+
+// UnmarshalParticipantMetadata will create proper formatted medata from json string
+func (s *NatsService) UnmarshalParticipantMetadata(metadata string) (*plugnmeet.UserMetadata, error) {
+	m := new(plugnmeet.UserMetadata)
+	err := protojson.Unmarshal([]byte(metadata), m)
+	if err != nil {
+		return nil, err
+	}
+
+	return m, nil
 }

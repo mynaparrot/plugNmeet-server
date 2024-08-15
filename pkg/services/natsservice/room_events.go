@@ -10,7 +10,7 @@ import (
 
 func (s *NatsService) BroadcastRoomMetadata(roomId string, metadata, userId *string) error {
 	if metadata == nil {
-		result, err := s.rs.ManageActiveRoomsWithMetadata(roomId, "get", "")
+		result, err := s.GetRoomInfo(roomId)
 		if err != nil {
 			return err
 		}
@@ -18,8 +18,7 @@ func (s *NatsService) BroadcastRoomMetadata(roomId string, metadata, userId *str
 		if result == nil {
 			return errors.New("did not found the room")
 		}
-		md := result[roomId]
-		metadata = &md
+		metadata = &result.Metadata
 	}
 
 	payload := plugnmeet.NatsMsgServerToClient{
@@ -45,12 +44,9 @@ func (s *NatsService) BroadcastRoomMetadata(roomId string, metadata, userId *str
 	return nil
 }
 
+// UpdateAndBroadcastRoomMetadata will update and broadcast to everyone
 func (s *NatsService) UpdateAndBroadcastRoomMetadata(roomId string, meta *plugnmeet.RoomMetadata) error {
-	metadata, err := s.MarshalRoomMetadata(meta)
-	if err != nil {
-		return err
-	}
-	_, err = s.rs.ManageActiveRoomsWithMetadata(roomId, "add", metadata)
+	metadata, err := s.UpdateRoom(roomId, meta)
 	if err != nil {
 		return err
 	}
