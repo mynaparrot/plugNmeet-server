@@ -2,8 +2,10 @@ package natscontroller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/natsmodel"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/roommodel"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/dbservice"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekitservice"
@@ -22,10 +24,11 @@ import (
 )
 
 type NatsController struct {
-	ctx context.Context
-	app *config.AppConfig
-	kp  nkeys.KeyPair
-	rm  *roommodel.RoomModel
+	ctx       context.Context
+	app       *config.AppConfig
+	kp        nkeys.KeyPair
+	rm        *roommodel.RoomModel
+	natsModel *natsmodel.NatsModel
 }
 
 func NewNatsController() *NatsController {
@@ -42,10 +45,11 @@ func NewNatsController() *NatsController {
 
 	rm := roommodel.New(app, ds, rs, lk)
 	return &NatsController{
-		ctx: context.Background(),
-		app: app,
-		kp:  kp,
-		rm:  rm,
+		ctx:       context.Background(),
+		app:       app,
+		kp:        kp,
+		rm:        rm,
+		natsModel: natsmodel.New(app, ds, rs),
 	}
 }
 
@@ -85,14 +89,33 @@ func (c *NatsController) StartUp() {
 	<-sig
 }
 
+type NatsEvents struct {
+	Client map[string]interface{} `json:"client"`
+	Reason string                 `json:"reason"`
+}
+
 // SubscribeToUsersConnEvents will be used to subscribe with users' connection events
 // based on user connection we can determine user's connection status
 func (c *NatsController) subscribeToUsersConnEvents() {
 	_, err := c.app.NatsConn.QueueSubscribe(fmt.Sprintf("$SYS.ACCOUNT.%s.>", c.app.NatsInfo.Account), "pnm-conn-event", func(msg *nats.Msg) {
 		if strings.Contains(msg.Subject, ".CONNECT") {
-			fmt.Println(msg.Subject, string(msg.Data))
+			e := new(NatsEvents)
+			err := json.Unmarshal(msg.Data, e)
+			if err != nil {
+				return
+			}
+			p := strings.Split(e.Client["user"].(string), ":")
+			err = c.natsModel.SendRoomMetadata(p[0], &p[1])
+			if err != nil {
+				log.Errorln(err)
+			}
 		} else if strings.Contains(msg.Subject, ".DISCONNECT") {
-			fmt.Println(msg.Subject, string(msg.Data))
+			e := new(NatsEvents)
+			err := json.Unmarshal(msg.Data, e)
+			if err != nil {
+				return
+			}
+			fmt.Println(e.Client["user"])
 		}
 	})
 	if err != nil {

@@ -53,7 +53,6 @@ func (s *NatsAuthController) Handle(r micro.Request) {
 func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (*jwt.UserClaims, error) {
 	claims := jwt.NewUserClaims(req.UserNkey)
 	claims.Audience = s.app.NatsInfo.Account
-	fmt.Println(req.ConnectOptions.Token)
 
 	// check the info first
 	data, err := s.rm.VerifyPlugNmeetAccessToken(req.ConnectOptions.Token)
@@ -65,7 +64,6 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 
 	roomId := data.GetRoomId()
 	userId := data.GetUserId()
-	fmt.Println(roomId)
 
 	// public chat
 	_, err = s.js.CreateOrUpdateConsumer(s.ctx, roomId, jetstream.ConsumerConfig{
@@ -104,7 +102,7 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 	_, err = s.js.CreateOrUpdateConsumer(s.ctx, roomId, jetstream.ConsumerConfig{
 		Durable: fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.SystemPrivate, userId),
 		FilterSubjects: []string{
-			fmt.Sprintf("%s:%s.%s.>", roomId, s.app.NatsInfo.Subjects.SystemPublic, userId),
+			fmt.Sprintf("%s:%s.%s.>", roomId, s.app.NatsInfo.Subjects.SystemPrivate, userId),
 		},
 	})
 	if err != nil {
@@ -150,7 +148,6 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 				// system private message
 				fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.SystemPrivate, userId),
 				fmt.Sprintf("$JS.API.CONSUMER.MSG.NEXT.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.SystemPrivate, userId),
-				fmt.Sprintf("%s:%s.*.%s", roomId, s.app.NatsInfo.Subjects.SystemPrivate, userId),
 				fmt.Sprintf("$JS.ACK.%s.%s:%s.>", roomId, s.app.NatsInfo.Subjects.SystemPrivate, userId),
 
 				// whiteboard message

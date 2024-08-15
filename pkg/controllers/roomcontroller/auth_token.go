@@ -110,8 +110,9 @@ func HandleGenerateJoinToken(c *fiber.Ctx) error {
 func HandleVerifyToken(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
+	app := config.GetConfig()
 
-	rs := redisservice.New(config.GetConfig().RDS)
+	rs := redisservice.New(app.RDS)
 	exist := rs.IsUserExistInBlockList(roomId.(string), requestedUserId.(string))
 	if exist {
 		return utils.SendCommonProtobufResponse(c, false, "notifications.you-are-blocked")
@@ -131,7 +132,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	// after usage, we can make it null as we don't need this value again.
 	c.Locals("claims", nil)
 
-	au := roommodel.New(nil, nil, nil, nil)
+	au := roommodel.New(app, nil, nil, nil)
 	token, err := au.GenerateLivekitToken(claims)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -158,6 +159,9 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 
 	livekitHost := strings.Replace(config.GetConfig().LivekitInfo.Host, "host.docker.internal", "localhost", 1) // without this you won't be able to connect
 	v := version.Version
+	rId := roomId.(string)
+	uId := requestedUserId.(string)
+	natsSubjs := app.NatsInfo.Subjects
 	res := &plugnmeet.VerifyTokenRes{
 		Status:        true,
 		Msg:           "token is valid",
@@ -165,6 +169,16 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 		Token:         &token,
 		ServerVersion: &v,
 		EnabledE2Ee:   false,
+		RoomId:        &rId,
+		UserId:        &uId,
+		NatsSubjects: &plugnmeet.NatsSubjects{
+			SystemWorker:  natsSubjs.SystemWorker,
+			SystemPublic:  natsSubjs.SystemPublic,
+			SystemPrivate: natsSubjs.SystemPrivate,
+			ChatPublic:    natsSubjs.ChatPublic,
+			ChatPrivate:   natsSubjs.ChatPrivate,
+			Whiteboard:    natsSubjs.Whiteboard,
+		},
 	}
 	if rr.GetIsActive() && meta != nil {
 		res.EnabledE2Ee = meta.RoomFeatures.EndToEndEncryptionFeatures.IsEnabled
