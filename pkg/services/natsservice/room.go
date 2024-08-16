@@ -6,16 +6,18 @@ import (
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/nats-io/nats.go/jetstream"
+	log "github.com/sirupsen/logrus"
 	"strconv"
 	"time"
 )
 
 const (
-	RoomInfoBucket  = Prefix + "roomInfo"
-	roomIdKey       = "id"
-	roomSidKey      = "sid"
-	roomMetadataKey = "metadata"
-	roomCreatedKey  = "created_at"
+	RoomInfoBucket     = Prefix + "roomInfo"
+	roomIdKey          = "id"
+	roomSidKey         = "sid"
+	roomEnabledE2EEKey = "enabled_e2ee"
+	roomMetadataKey    = "metadata"
+	roomCreatedKey     = "created_at"
 )
 
 func (s *NatsService) CreateRoomNatsStreams(roomId string) error {
@@ -44,29 +46,24 @@ func (s *NatsService) AddRoom(roomId, roomSid string, metadata *plugnmeet.RoomMe
 		return err
 	}
 
-	_, err = kv.PutString(s.ctx, roomIdKey, roomId)
-	if err != nil {
-		return err
-	}
-
-	_, err = kv.PutString(s.ctx, roomSidKey, roomSid)
-	if err != nil {
-		return err
-	}
-
-	_, err = kv.PutString(s.ctx, roomCreatedKey, fmt.Sprintf("%d", time.Now().UnixMilli()))
-	if err != nil {
-		return err
-	}
-
 	mt, err := s.MarshalRoomMetadata(metadata)
 	if err != nil {
 		return err
 	}
 
-	_, err = kv.PutString(s.ctx, roomMetadataKey, mt)
-	if err != nil {
-		return err
+	data := map[string]string{
+		roomIdKey:          roomId,
+		roomSidKey:         roomSid,
+		roomEnabledE2EEKey: fmt.Sprintf("%v", metadata.RoomFeatures.EndToEndEncryptionFeatures.IsEnabled),
+		roomCreatedKey:     fmt.Sprintf("%d", time.Now().UnixMilli()),
+		roomMetadataKey:    mt,
+	}
+
+	for k, v := range data {
+		_, err = kv.PutString(s.ctx, k, v)
+		if err != nil {
+			log.Errorln(err)
+		}
 	}
 
 	return nil
@@ -81,24 +78,32 @@ func (s *NatsService) GetRoomInfo(roomId string) (*plugnmeet.NatsKvRoomInfo, err
 		return nil, err
 	}
 
-	id, _ := kv.Get(s.ctx, roomIdKey)
-	sid, _ := kv.Get(s.ctx, roomSidKey)
-	metadata, _ := kv.Get(s.ctx, roomMetadataKey)
+	info := new(plugnmeet.NatsKvRoomInfo)
 
-	info := &plugnmeet.NatsKvRoomInfo{
-		RoomId:   string(id.Value()),
-		RoomSid:  string(sid.Value()),
-		Metadata: string(metadata.Value()),
+	if id, err := kv.Get(s.ctx, roomIdKey); err == nil && id != nil {
+		info.RoomId = string(id.Value())
 	}
-	createdAt, _ := kv.Get(s.ctx, roomCreatedKey)
-	if parseUint, err := strconv.ParseUint(string(createdAt.Value()), 10, 64); err == nil {
-		info.CreatedAt = parseUint
+	if sid, err := kv.Get(s.ctx, roomSidKey); err == nil && sid != nil {
+		info.RoomSid = string(sid.Value())
+	}
+	if enabledE2EE, err := kv.Get(s.ctx, roomEnabledE2EEKey); err == nil && enabledE2EE != nil {
+		if val, err := strconv.ParseBool(string(enabledE2EE.Value())); err == nil {
+			info.EnabledE2Ee = val
+		}
+	}
+	if metadata, err := kv.Get(s.ctx, roomMetadataKey); err == nil && metadata != nil {
+		info.Metadata = string(metadata.Value())
+	}
+	if createdAt, err := kv.Get(s.ctx, roomCreatedKey); err == nil && createdAt != nil {
+		if parseUint, err := strconv.ParseUint(string(createdAt.Value()), 10, 64); err == nil {
+			info.CreatedAt = parseUint
+		}
 	}
 
 	return info, nil
 }
 
-func (s *NatsService) UpdateRoom(roomId string, metadata *plugnmeet.RoomMetadata) (string, error) {
+func (s *NatsService) UpdateRoomMetadata(roomId string, metadata *plugnmeet.RoomMetadata) (string, error) {
 	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomInfoBucket, roomId))
 	if err != nil {
 		return "", err

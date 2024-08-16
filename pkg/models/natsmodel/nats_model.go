@@ -74,6 +74,21 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId string) error {
 		return err
 	}
 
+	// send media server connection info
+	token, err := m.GenerateLivekitToken(roomId, userInfo)
+	if err != nil {
+		return err
+	}
+	data := &plugnmeet.MediaServerConnInfo{
+		Url:         m.app.LivekitInfo.Host,
+		Token:       token,
+		EnabledE2Ee: rInfo.EnabledE2Ee,
+	}
+	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_MEDIA_SERVER_INFO, roomId, data, &userId)
+	if err != nil {
+		return err
+	}
+
 	// send users' list
 	users, err := m.natsService.GetOnlineUsersListAsJson(roomId)
 	if err != nil {

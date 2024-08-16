@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/nats-io/nats.go/jetstream"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 	"strconv"
 	"time"
@@ -20,6 +21,7 @@ const (
 	userSidKey         = "sid"
 	userNameKey        = "name"
 	userRoomIdKey      = "room_id"
+	userIsAdminKey     = "is_admin"
 	userMetadataKey    = "metadata"
 	userJoinedAt       = "joined_at"
 	userReconnectedAt  = "reconnected_at"
@@ -53,34 +55,25 @@ func (s *NatsService) AddUser(roomId, userId, sid, name string, metadata *plugnm
 		return err
 	}
 
-	_, err = kv.PutString(s.ctx, userIdKey, userId)
-	if err != nil {
-		return err
-	}
-
-	_, err = kv.PutString(s.ctx, userSidKey, sid)
-	if err != nil {
-		return err
-	}
-
-	_, err = kv.PutString(s.ctx, userNameKey, name)
-	if err != nil {
-		return err
-	}
-
-	_, err = kv.PutString(s.ctx, userRoomIdKey, roomId)
-	if err != nil {
-		return err
-	}
-
 	mt, err := s.MarshalParticipantMetadata(metadata)
 	if err != nil {
 		return err
 	}
 
-	_, err = kv.PutString(s.ctx, userMetadataKey, mt)
-	if err != nil {
-		return err
+	data := map[string]string{
+		userIdKey:       userId,
+		userSidKey:      sid,
+		userNameKey:     name,
+		userRoomIdKey:   roomId,
+		userIsAdminKey:  fmt.Sprintf("%v", metadata.IsAdmin),
+		userMetadataKey: mt,
+	}
+
+	for k, v := range data {
+		_, err = kv.PutString(s.ctx, k, v)
+		if err != nil {
+			log.Errorln(err)
+		}
 	}
 
 	return nil
@@ -156,18 +149,27 @@ func (s *NatsService) GetUserInfo(userId string) (*plugnmeet.NatsKvUserInfo, err
 		return nil, err
 	}
 
-	id, _ := kv.Get(s.ctx, userIdKey)
-	sid, _ := kv.Get(s.ctx, userSidKey)
-	name, _ := kv.Get(s.ctx, userNameKey)
-	roomId, _ := kv.Get(s.ctx, userRoomIdKey)
-	metadata, _ := kv.Get(s.ctx, userMetadataKey)
+	info := new(plugnmeet.NatsKvUserInfo)
 
-	info := &plugnmeet.NatsKvUserInfo{
-		UserId:   string(id.Value()),
-		UserSid:  string(sid.Value()),
-		Name:     string(name.Value()),
-		RoomId:   string(roomId.Value()),
-		Metadata: string(metadata.Value()),
+	if id, err := kv.Get(s.ctx, userIdKey); err == nil && id != nil {
+		info.UserId = string(id.Value())
+	}
+	if sid, err := kv.Get(s.ctx, userSidKey); err == nil && sid != nil {
+		info.UserSid = string(sid.Value())
+	}
+	if name, err := kv.Get(s.ctx, userNameKey); err == nil && name != nil {
+		info.Name = string(name.Value())
+	}
+	if roomId, err := kv.Get(s.ctx, userRoomIdKey); err == nil && roomId != nil {
+		info.RoomId = string(roomId.Value())
+	}
+	if metadata, err := kv.Get(s.ctx, userMetadataKey); err == nil && metadata != nil {
+		info.Metadata = string(metadata.Value())
+	}
+	if isAdmin, err := kv.Get(s.ctx, userIsAdminKey); err == nil && isAdmin != nil {
+		if val, err := strconv.ParseBool(string(isAdmin.Value())); err == nil {
+			info.IsAdmin = val
+		}
 	}
 	if joinedAt, err := kv.Get(s.ctx, userJoinedAt); err == nil && joinedAt != nil {
 		if parseUint, err := strconv.ParseUint(string(joinedAt.Value()), 10, 64); err == nil {
