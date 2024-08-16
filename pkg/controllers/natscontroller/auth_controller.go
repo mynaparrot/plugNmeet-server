@@ -89,7 +89,8 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 
 	// system public
 	_, err = s.js.CreateOrUpdateConsumer(s.ctx, roomId, jetstream.ConsumerConfig{
-		Durable: fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.SystemPublic, userId),
+		Durable:       fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.SystemPublic, userId),
+		DeliverPolicy: jetstream.DeliverNewPolicy,
 		FilterSubjects: []string{
 			fmt.Sprintf("%s:%s.>", roomId, s.app.NatsInfo.Subjects.SystemPublic),
 		},
@@ -100,7 +101,8 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 
 	// system private
 	_, err = s.js.CreateOrUpdateConsumer(s.ctx, roomId, jetstream.ConsumerConfig{
-		Durable: fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.SystemPrivate, userId),
+		Durable:       fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.SystemPrivate, userId),
+		DeliverPolicy: jetstream.DeliverNewPolicy,
 		FilterSubjects: []string{
 			fmt.Sprintf("%s:%s.%s.>", roomId, s.app.NatsInfo.Subjects.SystemPrivate, userId),
 		},

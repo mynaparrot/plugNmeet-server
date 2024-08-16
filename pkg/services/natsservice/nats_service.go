@@ -8,6 +8,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -79,4 +80,19 @@ func (s *NatsService) UnmarshalParticipantMetadata(metadata string) (*plugnmeet.
 	}
 
 	return m, nil
+}
+
+// MarshalToProtoJson will convert data into proper format
+func (s *NatsService) MarshalToProtoJson(m proto.Message) (string, error) {
+	op := protojson.MarshalOptions{
+		EmitUnpopulated: true,
+		UseProtoNames:   true,
+	}
+
+	marshal, err := op.Marshal(m)
+	if err != nil {
+		return "", err
+	}
+
+	return string(marshal), nil
 }

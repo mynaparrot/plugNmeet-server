@@ -1,21 +1,29 @@
 package natsservice
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/nats-io/nats.go/jetstream"
+	"google.golang.org/protobuf/encoding/protojson"
+	"strconv"
+	"time"
 )
 
 const (
 	RoomUsers      = Prefix + "roomUsers"
 	UserInfoBucket = Prefix + "userInfo"
 
-	userIdKey       = "id"
-	userSidKey      = "sid"
-	userNameKey     = "name"
-	userRoomIdKey   = "room_id"
-	userMetadataKey = "metadata"
+	userIdKey          = "id"
+	userSidKey         = "sid"
+	userNameKey        = "name"
+	userRoomIdKey      = "room_id"
+	userMetadataKey    = "metadata"
+	userJoinedAt       = "joined_at"
+	userReconnectedAt  = "reconnected_at"
+	userDisconnectedAt = "disconnected_at"
 
 	UserAdded        = "added"
 	UserOnline       = "online"
@@ -32,7 +40,7 @@ func (s *NatsService) AddUser(roomId, userId, sid, name string, metadata *plugnm
 		return err
 	}
 	// format of user, userid & value is the status
-	_, err = kv.Put(s.ctx, userId, []byte(UserAdded))
+	_, err = kv.PutString(s.ctx, userId, UserAdded)
 	if err != nil {
 		return err
 	}
@@ -45,22 +53,22 @@ func (s *NatsService) AddUser(roomId, userId, sid, name string, metadata *plugnm
 		return err
 	}
 
-	_, err = kv.Put(s.ctx, userIdKey, []byte(userId))
+	_, err = kv.PutString(s.ctx, userIdKey, userId)
 	if err != nil {
 		return err
 	}
 
-	_, err = kv.Put(s.ctx, userSidKey, []byte(sid))
+	_, err = kv.PutString(s.ctx, userSidKey, sid)
 	if err != nil {
 		return err
 	}
 
-	_, err = kv.Put(s.ctx, userNameKey, []byte(name))
+	_, err = kv.PutString(s.ctx, userNameKey, name)
 	if err != nil {
 		return err
 	}
 
-	_, err = kv.Put(s.ctx, userRoomIdKey, []byte(roomId))
+	_, err = kv.PutString(s.ctx, userRoomIdKey, roomId)
 	if err != nil {
 		return err
 	}
@@ -70,7 +78,7 @@ func (s *NatsService) AddUser(roomId, userId, sid, name string, metadata *plugnm
 		return err
 	}
 
-	_, err = kv.Put(s.ctx, userMetadataKey, []byte(mt))
+	_, err = kv.PutString(s.ctx, userMetadataKey, mt)
 	if err != nil {
 		return err
 	}
@@ -104,9 +112,36 @@ func (s *NatsService) UpdateUserStatus(roomId, userId string, status string) err
 		return err
 	}
 
-	_, err = kv.Put(s.ctx, userId, []byte(status))
+	_, err = kv.PutString(s.ctx, userId, status)
 	if err != nil {
 		return err
+	}
+
+	kv, err = s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", UserInfoBucket, userId))
+	if err != nil {
+		return err
+	}
+
+	// update user info for
+	if status == UserOnline {
+		// first check if data exist
+		joined, _ := kv.Get(s.ctx, userJoinedAt)
+		if joined != nil && len(joined.Value()) > 0 {
+			_, err = kv.PutString(s.ctx, userReconnectedAt, fmt.Sprintf("%d", time.Now().UnixMilli()))
+			if err != nil {
+				return err
+			}
+		} else {
+			_, err = kv.PutString(s.ctx, userJoinedAt, fmt.Sprintf("%d", time.Now().UnixMilli()))
+			if err != nil {
+				return err
+			}
+		}
+	} else if status == UserDisconnected || status == UserOffline {
+		_, err = kv.PutString(s.ctx, userDisconnectedAt, fmt.Sprintf("%d", time.Now().UnixMilli()))
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -134,24 +169,96 @@ func (s *NatsService) GetUserInfo(userId string) (*plugnmeet.NatsKvUserInfo, err
 		RoomId:   string(roomId.Value()),
 		Metadata: string(metadata.Value()),
 	}
+	if joinedAt, err := kv.Get(s.ctx, userJoinedAt); err == nil && joinedAt != nil {
+		if parseUint, err := strconv.ParseUint(string(joinedAt.Value()), 10, 64); err == nil {
+			info.JoinedAt = parseUint
+		}
+	}
+	if reconnectedAt, err := kv.Get(s.ctx, userReconnectedAt); err == nil && reconnectedAt != nil {
+		if parseUint, err := strconv.ParseUint(string(reconnectedAt.Value()), 10, 64); err == nil {
+			info.ReconnectedAt = parseUint
+		}
+	}
+	if disconnectedAt, err := kv.Get(s.ctx, userDisconnectedAt); err == nil && disconnectedAt != nil {
+		if parseUint, err := strconv.ParseUint(string(disconnectedAt.Value()), 10, 64); err == nil {
+			info.DisconnectedAt = parseUint
+		}
+	}
 
 	return info, nil
 }
 
-// UpdateUserInfo will basically update metadata only
+func (s *NatsService) GetOnlineUsersList(roomId string) ([]*plugnmeet.NatsKvUserInfo, error) {
+	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomUsers, roomId))
+	switch {
+	case errors.Is(err, jetstream.ErrBucketNotFound):
+		return nil, nil
+	case err != nil:
+		return nil, err
+	}
+
+	kl, err := kv.ListKeys(s.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var users []*plugnmeet.NatsKvUserInfo
+	for k := range kl.Keys() {
+		if status, err := kv.Get(s.ctx, k); err == nil && status != nil {
+			if string(status.Value()) == UserOnline {
+				info, err := s.GetUserInfo(k)
+				if err == nil && info != nil {
+					users = append(users, info)
+				}
+			}
+		}
+	}
+
+	return users, nil
+}
+
+func (s *NatsService) GetOnlineUsersListAsJson(roomId string) ([]byte, error) {
+	users, err := s.GetOnlineUsersList(roomId)
+	if err != nil {
+		return nil, err
+	}
+	if len(users) == 0 {
+		return nil, nil
+	}
+	op := protojson.MarshalOptions{
+		EmitUnpopulated: true,
+		UseProtoNames:   true,
+	}
+	raw := make([]json.RawMessage, len(users))
+	for i, u := range users {
+		r, err := op.Marshal(u)
+		if err != nil {
+			return nil, err
+		}
+		raw[i] = r
+	}
+
+	return json.Marshal(raw)
+}
+
+// UpdateUserMetadata will basically update metadata only
 // because normally we do not need to update other info
-func (s *NatsService) UpdateUserInfo(userId string, metadata *plugnmeet.UserMetadata) (string, error) {
+func (s *NatsService) UpdateUserMetadata(userId string, metadata *plugnmeet.UserMetadata) (string, error) {
 	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", UserInfoBucket, userId))
 	if err != nil {
 		return "", err
 	}
+
+	// update id
+	id := uuid.NewString()
+	metadata.MetadataId = &id
 
 	mt, err := s.MarshalParticipantMetadata(metadata)
 	if err != nil {
 		return "", err
 	}
 
-	_, err = kv.Put(s.ctx, userMetadataKey, []byte(mt))
+	_, err = kv.PutString(s.ctx, userMetadataKey, mt)
 	if err != nil {
 		return "", err
 	}

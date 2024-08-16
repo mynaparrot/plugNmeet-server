@@ -2,10 +2,7 @@ package natsservice
 
 import (
 	"errors"
-	"fmt"
-	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"google.golang.org/protobuf/proto"
 )
 
 func (s *NatsService) BroadcastRoomMetadata(roomId string, metadata, userId *string) error {
@@ -21,27 +18,7 @@ func (s *NatsService) BroadcastRoomMetadata(roomId string, metadata, userId *str
 		metadata = &result.Metadata
 	}
 
-	payload := plugnmeet.NatsMsgServerToClient{
-		Id:    uuid.NewString(),
-		Event: plugnmeet.NatsMsgServerToClientEvents_ROOM_METADATA,
-		Msg:   *metadata,
-	}
-	message, err := proto.Marshal(&payload)
-	if err != nil {
-		return err
-	}
-
-	sub := fmt.Sprintf("%s:%s.system", roomId, s.app.NatsInfo.Subjects.SystemPublic)
-	if userId != nil {
-		sub = fmt.Sprintf("%s:%s.%s.system", roomId, s.app.NatsInfo.Subjects.SystemPrivate, *userId)
-	}
-
-	_, err = s.app.JetStream.Publish(s.ctx, sub, message)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return s.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_ROOM_METADATA_UPDATE, roomId, *metadata, userId)
 }
 
 // UpdateAndBroadcastRoomMetadata will update and broadcast to everyone

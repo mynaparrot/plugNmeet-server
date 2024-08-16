@@ -2,10 +2,7 @@ package natsservice
 
 import (
 	"errors"
-	"fmt"
-	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"google.golang.org/protobuf/proto"
 )
 
 func (s *NatsService) BroadcastUserMetadata(roomId string, userId string, metadata, toUser *string) error {
@@ -21,32 +18,12 @@ func (s *NatsService) BroadcastUserMetadata(roomId string, userId string, metada
 		metadata = &result.Metadata
 	}
 
-	payload := plugnmeet.NatsMsgServerToClient{
-		Id:    uuid.NewString(),
-		Event: plugnmeet.NatsMsgServerToClientEvents_USER_METADATA,
-		Msg:   *metadata,
-	}
-	message, err := proto.Marshal(&payload)
-	if err != nil {
-		return err
-	}
-
-	sub := fmt.Sprintf("%s:%s.system", roomId, s.app.NatsInfo.Subjects.SystemPublic)
-	if toUser != nil {
-		sub = fmt.Sprintf("%s:%s.%s.system", roomId, s.app.NatsInfo.Subjects.SystemPrivate, *toUser)
-	}
-
-	_, err = s.app.JetStream.Publish(s.ctx, sub, message)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return s.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_USER_METADATA_UPDATE, roomId, *metadata, toUser)
 }
 
 // UpdateAndBroadcastUserMetadata will update metadata & broadcast to everyone
 func (s *NatsService) UpdateAndBroadcastUserMetadata(roomId, userId string, meta *plugnmeet.UserMetadata) error {
-	mt, err := s.UpdateUserInfo(userId, meta)
+	mt, err := s.UpdateUserMetadata(userId, meta)
 	if err != nil {
 		return err
 	}

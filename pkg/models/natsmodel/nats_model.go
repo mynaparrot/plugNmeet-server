@@ -1,6 +1,7 @@
 package natsmodel
 
 import (
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/dbservice"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/natsservice"
@@ -42,22 +43,40 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId string) error {
 	}
 
 	// send room info
-
-	// send room metadata
-	err = m.SendRoomMetadata(roomId, &userId)
+	rInfo, err := m.natsService.GetRoomInfo(roomId)
+	if err != nil {
+		return err
+	}
+	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_ROOM_INFO, roomId, rInfo, &userId)
 	if err != nil {
 		return err
 	}
 
 	// send this user's info
-
-	// send this user's metadata
-	err = m.SendUserMetadata(roomId, userId, &userId)
+	userInfo, err := m.natsService.GetUserInfo(userId)
+	if err != nil {
+		return err
+	}
+	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_LOCAL_USER_INFO, roomId, userInfo, &userId)
 	if err != nil {
 		return err
 	}
 
 	// send users' list
+	users, err := m.natsService.GetOnlineUsersListAsJson(roomId)
+	if err != nil {
+		return err
+	}
+	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_JOINED_USERS_LIST, roomId, users, &userId)
+	if err != nil {
+		return err
+	}
+
+	// broadcast this user to everyone
+	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_USER_JOINED, roomId, userInfo, nil)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -66,6 +85,10 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId string) error {
 // we'll wait for 5 seconds before declare user as offline
 // but will broadcast as disconnected
 func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) error {
+	// need to check if the session was ended or not
+	// if ended, then we do not need to do anything else.
+
+	// now change the user's status
 	err := m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserDisconnected)
 	if err != nil {
 		return err
