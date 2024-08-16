@@ -70,7 +70,7 @@ func (s *RedisService) ManageActiveUsersList(roomId, userId, task string, timeSt
 		result, err := s.rc.ZScore(s.ctx, key, userId).Result()
 		switch {
 		case errors.Is(err, redis.Nil):
-			return out, err
+			return out, nil
 		case err != nil:
 			return out, err
 		case result == 0:

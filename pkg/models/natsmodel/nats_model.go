@@ -3,6 +3,7 @@ package natsmodel
 import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/roommodel"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/dbservice"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/natsservice"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redisservice"
@@ -13,6 +14,7 @@ type NatsModel struct {
 	app         *config.AppConfig
 	ds          *dbservice.DatabaseService
 	rs          *redisservice.RedisService
+	rm          *roommodel.RoomModel
 	natsService *natsservice.NatsService
 }
 
@@ -31,8 +33,18 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 		app:         app,
 		ds:          ds,
 		rs:          rs,
+		rm:          roommodel.New(app, ds, rs, nil),
 		natsService: natsservice.New(app),
 	}
+}
+
+func (m *NatsModel) HandleFromClientToServerReq(roomId, userId *string, req *plugnmeet.NatsMsgClientToServer) error {
+	switch req.Event {
+	case plugnmeet.NatsMsgClientToServerEvents_RENEW_PNM_TOKEN:
+		return m.RenewPNMToken(*roomId, *userId, req.Msg)
+	}
+
+	return nil
 }
 
 func (m *NatsModel) OnAfterUserJoined(roomId, userId string) error {
@@ -85,7 +97,7 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId string) error {
 // we'll wait for 5 seconds before declare user as offline
 // but will broadcast as disconnected
 func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) error {
-	// need to check if the session was ended or not
+	// TODO: need to check if the session was ended or not
 	// if ended, then we do not need to do anything else.
 
 	// now change the user's status
@@ -96,13 +108,21 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) error {
 
 	// notify to everyone of the room &
 	// 1. pause all the media but not from the list
+	userInfo, err := m.natsService.GetUserInfo(userId)
+	if err != nil {
+		return err
+	}
+	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_USER_DISCONNECTED, roomId, userInfo, nil)
+	if err != nil {
+		return err
+	}
 
 	// we'll wait 5 seconds before declare this user as offline
 	// 2. remove from the online list but not delete as user may reconnect again
 	for i := 0; i < 5; i++ {
 		if status, err := m.natsService.GetRoomUserStatus(roomId, userId); err == nil {
 			if status == natsservice.UserOnline {
-				// we'll broadcast the user as online again
+				// we do not need to do anything
 				return nil
 			}
 		}
@@ -113,7 +133,15 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) error {
 	if err != nil {
 		return err
 	}
+
 	// now broadcast to everyone
+	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_USER_OFFLINE, roomId, userInfo, nil)
+	if err != nil {
+		return err
+	}
+
+	// this user may join again & join hook will perform everything
+	// we do not need to clean this user from the bucket
 
 	return nil
 }

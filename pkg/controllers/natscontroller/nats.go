@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/natsmodel"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/roommodel"
@@ -16,6 +17,7 @@ import (
 	"github.com/nats-io/nats.go/micro"
 	"github.com/nats-io/nkeys"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/proto"
 	"net"
 	"os"
 	"os/signal"
@@ -147,27 +149,21 @@ func (c *NatsController) subscribeToSystemWorker() {
 	}
 
 	cc, err := cons.Consume(func(msg jetstream.Msg) {
-		fmt.Println(msg.Subject())
-
-		fmt.Println(string(msg.Data()))
-		msg.Ack()
-
+		req := new(plugnmeet.NatsMsgClientToServer)
+		err := proto.Unmarshal(msg.Data(), req)
+		if err != nil {
+			log.Errorln(err)
+			return
+		}
 		p := strings.Split(msg.Subject(), ".")
-		fmt.Println(p[1])
-
-		sub := fmt.Sprintf("%s:%s.system", p[1], c.app.NatsInfo.Subjects.SystemPublic)
-		_, err := c.app.JetStream.Publish(c.ctx, sub, []byte("sending back.."))
+		roomId := p[1]
+		userId := p[2]
+		err = c.natsModel.HandleFromClientToServerReq(&roomId, &userId, req)
 		if err != nil {
 			log.Errorln(err)
 		}
 
-		//// after task reply back
-		//sub := fmt.Sprintf("%s:system.jibon", RoomId)
-		//_, err := c.app.JetStream.Publish(c.appctx, sub, []byte("sending back.."))
-		//if err != nil {
-		//	log.Fatal(err)
-		//}
-
+		msg.Ack()
 	}, jetstream.ConsumeErrHandler(func(consumeCtx jetstream.ConsumeContext, err error) {
 		log.Errorln(err)
 	}))

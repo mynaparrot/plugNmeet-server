@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/roommodel"
+	"github.com/mynaparrot/plugnmeet-server/pkg/services/natsservice"
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/nats-io/nats.go/micro"
@@ -17,6 +18,7 @@ type NatsAuthController struct {
 	ctx           context.Context
 	app           *config.AppConfig
 	rm            *roommodel.RoomModel
+	natsService   *natsservice.NatsService
 	js            jetstream.JetStream
 	issuerKeyPair nkeys.KeyPair
 }
@@ -26,6 +28,7 @@ func NewNatsAuthController(app *config.AppConfig, rm *roommodel.RoomModel, kp nk
 		ctx:           context.Background(),
 		app:           app,
 		rm:            rm,
+		natsService:   natsservice.New(app),
 		js:            js,
 		issuerKeyPair: kp,
 	}
@@ -60,10 +63,16 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 		return nil, err
 	}
 
-	// TODO: now check if user's info exists
-
 	roomId := data.GetRoomId()
 	userId := data.GetUserId()
+
+	userInfo, err := s.natsService.GetUserInfo(userId)
+	if err != nil {
+		return nil, err
+	}
+	if userInfo == nil {
+		return nil, errors.New("user not found in the list")
+	}
 
 	// public chat
 	_, err = s.js.CreateOrUpdateConsumer(s.ctx, roomId, jetstream.ConsumerConfig{
@@ -122,8 +131,8 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 		return nil, err
 	}
 
-	// Assign Permissions
 	claims.Name = fmt.Sprintf("%s:%s", roomId, userId)
+	// Assign Permissions
 	claims.Permissions = jwt.Permissions{
 		Pub: jwt.Permission{
 			Allow: jwt.StringList{

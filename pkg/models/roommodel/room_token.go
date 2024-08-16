@@ -26,14 +26,14 @@ func (m *RoomModel) DoRenewPlugNmeetToken(token string) (string, error) {
 		return "", err
 	}
 
-	// load current information
-	p, err := m.rs.ManageActiveUsersList(claims.RoomId, claims.UserId, "get", 0)
-	if err != nil {
-		return "", err
-	}
-	if len(p) == 0 {
-		return "", errors.New("user isn't online")
-	}
+	// TODO: check information before renew
+	//p, err := m.rs.ManageActiveUsersList(claims.RoomId, claims.UserId, "get", 0)
+	//if err != nil {
+	//	return "", err
+	//}
+	//if len(p) == 0 {
+	//	return "", errors.New("user isn't online")
+	//}
 
 	return auth.GeneratePlugNmeetJWTAccessToken(m.app.Client.ApiKey, m.app.Client.Secret, claims.UserId, m.app.LivekitInfo.TokenValidity, claims)
 }
