@@ -39,17 +39,27 @@ func New(app *config.AppConfig) *NatsService {
 	}
 }
 
-// MarshalRoomMetadata will convert metadata struct to proper json format
-func (s *NatsService) MarshalRoomMetadata(meta *plugnmeet.RoomMetadata) (string, error) {
-	mId := uuid.NewString()
-	meta.MetadataId = &mId
-
-	marshal, err := protoJsonOpts.Marshal(meta)
+// MarshalToProtoJson will convert data into proper format
+func (s *NatsService) MarshalToProtoJson(m proto.Message) (string, error) {
+	marshal, err := protoJsonOpts.Marshal(m)
 	if err != nil {
 		return "", err
 	}
 
 	return string(marshal), nil
+}
+
+// MarshalRoomMetadata will convert metadata struct to proper json format
+func (s *NatsService) MarshalRoomMetadata(meta *plugnmeet.RoomMetadata) (string, error) {
+	mId := uuid.NewString()
+	meta.MetadataId = &mId
+
+	marshal, err := s.MarshalToProtoJson(meta)
+	if err != nil {
+		return "", err
+	}
+
+	return marshal, nil
 }
 
 // UnmarshalRoomMetadata will convert metadata string to proper format
@@ -68,12 +78,12 @@ func (s *NatsService) MarshalParticipantMetadata(meta *plugnmeet.UserMetadata) (
 	mId := uuid.NewString()
 	meta.MetadataId = &mId
 
-	marshal, err := protoJsonOpts.Marshal(meta)
+	marshal, err := s.MarshalToProtoJson(meta)
 	if err != nil {
 		return "", err
 	}
 
-	return string(marshal), nil
+	return marshal, nil
 }
 
 // UnmarshalParticipantMetadata will create proper formatted medata from json string
@@ -85,14 +95,4 @@ func (s *NatsService) UnmarshalParticipantMetadata(metadata string) (*plugnmeet.
 	}
 
 	return m, nil
-}
-
-// MarshalToProtoJson will convert data into proper format
-func (s *NatsService) MarshalToProtoJson(m proto.Message) (string, error) {
-	marshal, err := protoJsonOpts.Marshal(m)
-	if err != nil {
-		return "", err
-	}
-
-	return string(marshal), nil
 }
