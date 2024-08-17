@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models/roommodel"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/authmodel"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/natsservice"
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nats.go/jetstream"
@@ -17,17 +17,17 @@ import (
 type NatsAuthController struct {
 	ctx           context.Context
 	app           *config.AppConfig
-	rm            *roommodel.RoomModel
+	authModel     *authmodel.AuthModel
 	natsService   *natsservice.NatsService
 	js            jetstream.JetStream
 	issuerKeyPair nkeys.KeyPair
 }
 
-func NewNatsAuthController(app *config.AppConfig, rm *roommodel.RoomModel, kp nkeys.KeyPair, js jetstream.JetStream) *NatsAuthController {
+func NewNatsAuthController(app *config.AppConfig, authModel *authmodel.AuthModel, kp nkeys.KeyPair, js jetstream.JetStream) *NatsAuthController {
 	return &NatsAuthController{
 		ctx:           context.Background(),
 		app:           app,
-		rm:            rm,
+		authModel:     authModel,
 		natsService:   natsservice.New(app),
 		js:            js,
 		issuerKeyPair: kp,
@@ -58,7 +58,7 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 	claims.Audience = s.app.NatsInfo.Account
 
 	// check the info first
-	data, err := s.rm.VerifyPlugNmeetAccessToken(req.ConnectOptions.Token)
+	data, err := s.authModel.VerifyPlugNmeetAccessToken(req.ConnectOptions.Token)
 	if err != nil {
 		return nil, err
 	}

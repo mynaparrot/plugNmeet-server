@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/authmodel"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/natsmodel"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models/roommodel"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/dbservice"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekitservice"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redisservice"
 	"github.com/mynaparrot/plugnmeet-server/version"
 	"github.com/nats-io/nats.go"
@@ -29,7 +28,7 @@ type NatsController struct {
 	ctx       context.Context
 	app       *config.AppConfig
 	kp        nkeys.KeyPair
-	rm        *roommodel.RoomModel
+	authModel *authmodel.AuthModel
 	natsModel *natsmodel.NatsModel
 }
 
@@ -43,14 +42,13 @@ func NewNatsController() *NatsController {
 
 	ds := dbservice.New(app.ORM)
 	rs := redisservice.New(app.RDS)
-	lk := livekitservice.New(app, rs)
 
-	rm := roommodel.New(app, ds, rs, lk)
+	rm := authmodel.New(app, nil)
 	return &NatsController{
 		ctx:       context.Background(),
 		app:       app,
 		kp:        kp,
-		rm:        rm,
+		authModel: rm,
 		natsModel: natsmodel.New(app, ds, rs),
 	}
 }
@@ -74,7 +72,7 @@ func (c *NatsController) StartUp() {
 	go c.subscribeToSystemWorker()
 
 	// auth service
-	authService := NewNatsAuthController(c.app, c.rm, c.kp, c.app.JetStream)
+	authService := NewNatsAuthController(c.app, c.authModel, c.kp, c.app.JetStream)
 	_, err = micro.AddService(c.app.NatsConn, micro.Config{
 		Name:        "pnm-auth",
 		Version:     version.Version,

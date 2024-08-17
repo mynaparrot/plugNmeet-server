@@ -10,6 +10,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/authmodel"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/roommodel"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/dbservice"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redisservice"
@@ -132,7 +133,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	// after usage, we can make it null as we don't need this value again.
 	c.Locals("claims", nil)
 
-	au := roommodel.New(app, nil, nil, nil)
+	au := authmodel.New(nil, nil)
 	token, err := au.GenerateLivekitToken(claims)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -189,7 +190,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 
 func HandleVerifyHeaderToken(c *fiber.Ctx) error {
 	authToken := c.Get("Authorization")
-	m := roommodel.New(nil, nil, nil, nil)
+	m := authmodel.New(nil, nil)
 
 	errStatus := fiber.StatusUnauthorized
 	path := c.Path()
@@ -223,8 +224,8 @@ func HandleVerifyHeaderToken(c *fiber.Ctx) error {
 
 // HandleRenewToken renew token only possible if it remains valid. This mean you'll require to renew it before expire.
 func HandleRenewToken(c *fiber.Ctx) error {
-	info := new(roommodel.RenewTokenReq)
-	m := roommodel.New(nil, nil, nil, nil)
+	info := new(authmodel.RenewTokenReq)
+	m := authmodel.New(nil, nil)
 
 	err := c.BodyParser(info)
 	if err != nil {
@@ -235,7 +236,7 @@ func HandleRenewToken(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, "missing required fields")
 	}
 
-	token, err := m.DoRenewPlugNmeetToken(info.Token)
+	token, err := m.RenewPNMToken(info.Token)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}

@@ -286,12 +286,12 @@ func (s *NatsService) DeleteAllRoomUsers(roomId string) error {
 		return err
 	}
 
-	users, err := kv.Keys(s.ctx)
+	kl, err := kv.ListKeys(s.ctx)
 	if err != nil {
 		return err
 	}
 
-	for _, u := range users {
+	for u := range kl.Keys() {
 		// delete bucket of the user info
 		_ = s.js.DeleteKeyValue(s.ctx, fmt.Sprintf("%s-%s", UserInfoBucket, u))
 	}

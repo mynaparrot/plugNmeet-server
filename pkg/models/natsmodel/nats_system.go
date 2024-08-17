@@ -7,7 +7,7 @@ import (
 )
 
 func (m *NatsModel) RenewPNMToken(roomId, userId, token string) error {
-	token, err := m.rm.DoRenewPlugNmeetToken(token)
+	token, err := m.authModel.RenewPNMToken(token)
 	if err != nil {
 		log.Errorln(err)
 		return err

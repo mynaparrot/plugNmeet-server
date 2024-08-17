@@ -3,7 +3,7 @@ package websocketmodel
 import (
 	"github.com/gofiber/contrib/socketio"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models/roommodel"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/authmodel"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"sync"
@@ -61,8 +61,8 @@ func (m *WebsocketModel) handleSendChatMsgs(pl *plugnmeet.DataMessage, roomId st
 }
 
 func (m *WebsocketModel) handleRenewToken(pl *plugnmeet.DataMessage, roomId string) {
-	rm := roommodel.New(m.app, m.ds, m.rs, m.lk)
-	token, err := rm.DoRenewPlugNmeetToken(pl.Body.Msg)
+	rm := authmodel.New(m.app, nil)
+	token, err := rm.RenewPNMToken(pl.Body.Msg)
 	if err != nil {
 		return
 	}

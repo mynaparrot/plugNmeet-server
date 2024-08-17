@@ -2,6 +2,7 @@ package roommodel
 
 import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/authmodel"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/natsservice"
 )
 
@@ -49,7 +50,8 @@ func (m *RoomModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, erro
 		IsHidden: g.UserInfo.IsHidden,
 	}
 
-	return m.GeneratePNMJoinToken(c)
+	am := authmodel.New(m.app, nil)
+	return am.GeneratePNMJoinToken(c)
 }
 
 func (m *RoomModel) assignLockSettings(g *plugnmeet.GenerateTokenReq) {

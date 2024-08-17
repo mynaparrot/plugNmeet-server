@@ -3,7 +3,7 @@ package natsmodel
 import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models/roommodel"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models/authmodel"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/dbservice"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/natsservice"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redisservice"
@@ -14,7 +14,7 @@ type NatsModel struct {
 	app         *config.AppConfig
 	ds          *dbservice.DatabaseService
 	rs          *redisservice.RedisService
-	rm          *roommodel.RoomModel
+	authModel   *authmodel.AuthModel
 	natsService *natsservice.NatsService
 }
 
@@ -28,13 +28,14 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 	if rs == nil {
 		rs = redisservice.New(app.RDS)
 	}
+	natsService := natsservice.New(app)
 
 	return &NatsModel{
 		app:         app,
 		ds:          ds,
 		rs:          rs,
-		rm:          roommodel.New(app, ds, rs, nil),
-		natsService: natsservice.New(app),
+		authModel:   authmodel.New(app, natsService),
+		natsService: natsService,
 	}
 }
 
