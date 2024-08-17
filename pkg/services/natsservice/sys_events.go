@@ -7,6 +7,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
+	"time"
 )
 
 func (s *NatsService) BroadcastSystemEventToRoom(event plugnmeet.NatsMsgServerToClientEvents, roomId string, data interface{}, toUserId *string) error {
@@ -64,12 +65,30 @@ func (s *NatsService) BroadcastSystemEventToEveryoneExceptUserId(event plugnmeet
 
 	for _, id := range ids {
 		if id != exceptUserId {
-			err := s.BroadcastSystemEventToRoom(event, roomId, data, &id)
-			if err != nil {
-				log.Errorln(err)
-			}
+			go func(id string) {
+				err := s.BroadcastSystemEventToRoom(event, roomId, data, &id)
+				if err != nil {
+					log.Errorln(err)
+				}
+			}(id)
 		}
 	}
 
 	return nil
+}
+
+func (s *NatsService) BroadcastSystemNotificationToRoom(roomId, msg string, msgType plugnmeet.NatsSystemNotificationTypes) error {
+	data := &plugnmeet.NatsSystemNotification{
+		Id:     uuid.NewString(),
+		Type:   msgType,
+		Msg:    msg,
+		SentAt: time.Now().UnixMilli(),
+	}
+
+	marshal, err := protoJsonOpts.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	return s.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SYSTEM_NOTIFICATION, roomId, marshal, nil)
 }

@@ -15,7 +15,10 @@ const (
 	Prefix = "pnm-"
 )
 
-//var mustCompile = regexp.MustCompile("/[_.:]/g")
+var protoJsonOpts = protojson.MarshalOptions{
+	EmitUnpopulated: true,
+	UseProtoNames:   true,
+}
 
 type NatsService struct {
 	ctx context.Context
@@ -41,12 +44,7 @@ func (s *NatsService) MarshalRoomMetadata(meta *plugnmeet.RoomMetadata) (string,
 	mId := uuid.NewString()
 	meta.MetadataId = &mId
 
-	op := protojson.MarshalOptions{
-		EmitUnpopulated: true,
-		UseProtoNames:   true,
-	}
-
-	marshal, err := op.Marshal(meta)
+	marshal, err := protoJsonOpts.Marshal(meta)
 	if err != nil {
 		return "", err
 	}
@@ -54,16 +52,23 @@ func (s *NatsService) MarshalRoomMetadata(meta *plugnmeet.RoomMetadata) (string,
 	return string(marshal), nil
 }
 
+// UnmarshalRoomMetadata will convert metadata string to proper format
+func (s *NatsService) UnmarshalRoomMetadata(metadata string) (*plugnmeet.RoomMetadata, error) {
+	meta := new(plugnmeet.RoomMetadata)
+	err := protojson.Unmarshal([]byte(metadata), meta)
+	if err != nil {
+		return nil, err
+	}
+
+	return meta, nil
+}
+
 // MarshalParticipantMetadata will create proper json string of user's metadata
 func (s *NatsService) MarshalParticipantMetadata(meta *plugnmeet.UserMetadata) (string, error) {
 	mId := uuid.NewString()
 	meta.MetadataId = &mId
 
-	op := protojson.MarshalOptions{
-		EmitUnpopulated: true,
-		UseProtoNames:   true,
-	}
-	marshal, err := op.Marshal(meta)
+	marshal, err := protoJsonOpts.Marshal(meta)
 	if err != nil {
 		return "", err
 	}
@@ -84,12 +89,7 @@ func (s *NatsService) UnmarshalParticipantMetadata(metadata string) (*plugnmeet.
 
 // MarshalToProtoJson will convert data into proper format
 func (s *NatsService) MarshalToProtoJson(m proto.Message) (string, error) {
-	op := protojson.MarshalOptions{
-		EmitUnpopulated: true,
-		UseProtoNames:   true,
-	}
-
-	marshal, err := op.Marshal(m)
+	marshal, err := protoJsonOpts.Marshal(m)
 	if err != nil {
 		return "", err
 	}

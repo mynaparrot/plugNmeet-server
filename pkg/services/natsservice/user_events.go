@@ -2,7 +2,9 @@ package natsservice
 
 import (
 	"errors"
+	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"time"
 )
 
 func (s *NatsService) BroadcastUserMetadata(roomId string, userId string, metadata, toUser *string) error {
@@ -28,4 +30,20 @@ func (s *NatsService) UpdateAndBroadcastUserMetadata(roomId, userId string, meta
 		return err
 	}
 	return s.BroadcastUserMetadata(roomId, userId, &mt, nil)
+}
+
+func (s *NatsService) SendSystemNotificationToUser(roomId, userId, msg string, msgType plugnmeet.NatsSystemNotificationTypes) error {
+	data := &plugnmeet.NatsSystemNotification{
+		Id:     uuid.NewString(),
+		Type:   msgType,
+		Msg:    msg,
+		SentAt: time.Now().UnixMilli(),
+	}
+
+	marshal, err := protoJsonOpts.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	return s.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SYSTEM_NOTIFICATION, roomId, marshal, &userId)
 }

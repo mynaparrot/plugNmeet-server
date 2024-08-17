@@ -7,6 +7,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/dbservice"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/natsservice"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redisservice"
+	log "github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -48,37 +49,47 @@ func (m *NatsModel) HandleFromClientToServerReq(roomId, userId *string, req *plu
 	return nil
 }
 
-func (m *NatsModel) OnAfterUserJoined(roomId, userId string) error {
+func (m *NatsModel) OnAfterUserJoined(roomId, userId string) {
 	// update user status to online
 	err := m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserOnline)
 	if err != nil {
-		return err
+		log.Warnln(err)
 	}
 
 	// send room info
 	rInfo, err := m.natsService.GetRoomInfo(roomId)
 	if err != nil {
-		return err
+		log.Errorln(err)
+		// send an error message
+		_ = m.natsService.SendSystemNotificationToUser(roomId, userId, err.Error(), plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_ERROR)
+		return
 	}
 	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_ROOM_INFO, roomId, rInfo, &userId)
 	if err != nil {
-		return err
+		log.Warnln(err)
 	}
 
 	// send this user's info
 	userInfo, err := m.natsService.GetUserInfo(userId)
 	if err != nil {
-		return err
+		log.Errorln(err)
+		// send an error message
+		_ = m.natsService.SendSystemNotificationToUser(roomId, userId, err.Error(), plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_ERROR)
+		return
 	}
+
 	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_LOCAL_USER_INFO, roomId, userInfo, &userId)
 	if err != nil {
-		return err
+		log.Warnln(err)
 	}
 
 	// send media server connection info
 	token, err := m.GenerateLivekitToken(roomId, userInfo)
 	if err != nil {
-		return err
+		log.Errorln(err)
+		// send an error message
+		_ = m.natsService.SendSystemNotificationToUser(roomId, userId, err.Error(), plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_ERROR)
+		return
 	}
 	data := &plugnmeet.MediaServerConnInfo{
 		Url:         m.app.LivekitInfo.Host,
@@ -87,52 +98,50 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId string) error {
 	}
 	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_MEDIA_SERVER_INFO, roomId, data, &userId)
 	if err != nil {
-		return err
+		log.Warnln(err)
 	}
 
 	// send users' list
 	users, err := m.natsService.GetOnlineUsersListAsJson(roomId)
 	if err != nil {
-		return err
+		log.Warnln(err)
 	}
 	if users != nil || len(users) > 0 {
 		err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_JOINED_USERS_LIST, roomId, users, &userId)
 		if err != nil {
-			return err
+			log.Warnln(err)
 		}
 	}
 
 	// broadcast this user to everyone
-	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_USER_JOINED, roomId, userInfo, nil)
+	err = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_JOINED, roomId, userInfo, userId)
 	if err != nil {
-		return err
+		log.Warnln(err)
 	}
-
-	return nil
 }
 
 // OnAfterUserDisconnected should be run in separate goroutine
 // we'll wait for 5 seconds before declare user as offline
 // but will broadcast as disconnected
-func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) error {
+func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) {
 	// TODO: need to check if the session was ended or not
 	// if ended, then we do not need to do anything else.
 
 	// now change the user's status
 	err := m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserDisconnected)
 	if err != nil {
-		return err
+		log.Warnln(err)
 	}
 
 	// notify to everyone of the room &
 	// 1. pause all the media but not from the list
 	userInfo, err := m.natsService.GetUserInfo(userId)
 	if err != nil {
-		return err
+		log.Warnln(err)
 	}
-	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_USER_DISCONNECTED, roomId, userInfo, nil)
+	err = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_DISCONNECTED, roomId, userInfo, userId)
 	if err != nil {
-		return err
+		log.Warnln(err)
 	}
 
 	// we'll wait 5 seconds before declare this user as offline
@@ -141,7 +150,7 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) error {
 		if status, err := m.natsService.GetRoomUserStatus(roomId, userId); err == nil {
 			if status == natsservice.UserOnline {
 				// we do not need to do anything
-				return nil
+				return
 			}
 		}
 		time.Sleep(1 * time.Second)
@@ -149,17 +158,12 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) error {
 
 	err = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserOffline)
 	if err != nil {
-		return err
+		log.Warnln(err)
 	}
 
 	// now broadcast to everyone
-	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_USER_OFFLINE, roomId, userInfo, nil)
-	if err != nil {
-		return err
-	}
+	_ = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_OFFLINE, roomId, userInfo, userId)
 
 	// this user may join again & join hook will perform everything
 	// we do not need to clean this user from the bucket
-
-	return nil
 }

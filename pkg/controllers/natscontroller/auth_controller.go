@@ -74,101 +74,49 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 		return nil, errors.New("user not found in the list")
 	}
 
-	// public chat
-	_, err = s.js.CreateOrUpdateConsumer(s.ctx, roomId, jetstream.ConsumerConfig{
-		Durable: fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.ChatPublic, userId),
-		FilterSubjects: []string{
-			fmt.Sprintf("%s:%s.>", roomId, s.app.NatsInfo.Subjects.ChatPublic),
-		},
-	})
+	allow := jwt.StringList{
+		"$JS.API.INFO",
+		fmt.Sprintf("$JS.API.STREAM.INFO.%s", roomId),
+		// allow sending messages to the system
+		fmt.Sprintf("%s.%s.%s", s.app.NatsInfo.Subjects.SystemWorker, roomId, userId),
+	}
+
+	publicChatPermission, err := s.natsService.CreatePublicChatConsumer(roomId, userId)
 	if err != nil {
 		return nil, err
 	}
+	allow.Add(publicChatPermission...)
 
-	// private chat
-	_, err = s.js.CreateOrUpdateConsumer(s.ctx, roomId, jetstream.ConsumerConfig{
-		Durable: fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.ChatPrivate, userId),
-		FilterSubjects: []string{
-			fmt.Sprintf("%s:%s.%s.>", roomId, s.app.NatsInfo.Subjects.ChatPrivate, userId),
-		},
-	})
+	privateChatPermission, err := s.natsService.CreatePrivateChatConsumer(roomId, userId)
 	if err != nil {
 		return nil, err
 	}
+	allow.Add(privateChatPermission...)
 
-	// system public
-	_, err = s.js.CreateOrUpdateConsumer(s.ctx, roomId, jetstream.ConsumerConfig{
-		Durable:       fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.SystemPublic, userId),
-		DeliverPolicy: jetstream.DeliverNewPolicy,
-		FilterSubjects: []string{
-			fmt.Sprintf("%s:%s.>", roomId, s.app.NatsInfo.Subjects.SystemPublic),
-		},
-	})
+	sysPublicPermission, err := s.natsService.CreateSystemPublicConsumer(roomId, userId)
 	if err != nil {
 		return nil, err
 	}
+	allow.Add(sysPublicPermission...)
 
-	// system private
-	_, err = s.js.CreateOrUpdateConsumer(s.ctx, roomId, jetstream.ConsumerConfig{
-		Durable:       fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.SystemPrivate, userId),
-		DeliverPolicy: jetstream.DeliverNewPolicy,
-		FilterSubjects: []string{
-			fmt.Sprintf("%s:%s.%s.>", roomId, s.app.NatsInfo.Subjects.SystemPrivate, userId),
-		},
-	})
+	sysPrivatePermission, err := s.natsService.CreateSystemPrivateConsumer(roomId, userId)
 	if err != nil {
 		return nil, err
 	}
+	allow.Add(sysPrivatePermission...)
 
-	// whiteboard
-	_, err = s.js.CreateOrUpdateConsumer(s.ctx, roomId, jetstream.ConsumerConfig{
-		Durable: fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.Whiteboard, userId),
-		FilterSubjects: []string{
-			fmt.Sprintf("%s:%s.>", roomId, s.app.NatsInfo.Subjects.Whiteboard),
-		},
-	})
+	whiteboardPermission, err := s.natsService.CreateWhiteboardConsumer(roomId, userId)
 	if err != nil {
 		return nil, err
 	}
+	allow.Add(whiteboardPermission...)
 
+	// put name in proper format
 	claims.Name = fmt.Sprintf("%s:%s", roomId, userId)
 	// Assign Permissions
 	claims.Permissions = jwt.Permissions{
 		Pub: jwt.Permission{
-			Allow: jwt.StringList{
-				"$JS.API.INFO",
-				fmt.Sprintf("$JS.API.STREAM.INFO.%s", roomId),
-
-				// public message
-				fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.ChatPublic, userId),
-				fmt.Sprintf("$JS.API.CONSUMER.MSG.NEXT.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.ChatPublic, userId),
-				fmt.Sprintf("%s:%s.%s", roomId, s.app.NatsInfo.Subjects.ChatPublic, userId),
-				fmt.Sprintf("$JS.ACK.%s.%s:%s.>", roomId, s.app.NatsInfo.Subjects.ChatPublic, userId),
-
-				// private message
-				fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.ChatPrivate, userId),
-				fmt.Sprintf("$JS.API.CONSUMER.MSG.NEXT.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.ChatPrivate, userId),
-				fmt.Sprintf("%s:%s.*.%s", roomId, s.app.NatsInfo.Subjects.ChatPrivate, userId),
-				fmt.Sprintf("$JS.ACK.%s.%s:%s.>", roomId, s.app.NatsInfo.Subjects.ChatPrivate, userId),
-
-				// system public message
-				fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.SystemPublic, userId),
-				fmt.Sprintf("$JS.API.CONSUMER.MSG.NEXT.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.SystemPublic, userId),
-				fmt.Sprintf("$JS.ACK.%s.%s:%s.>", roomId, s.app.NatsInfo.Subjects.SystemPublic, userId),
-
-				// system private message
-				fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.SystemPrivate, userId),
-				fmt.Sprintf("$JS.API.CONSUMER.MSG.NEXT.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.SystemPrivate, userId),
-				fmt.Sprintf("$JS.ACK.%s.%s:%s.>", roomId, s.app.NatsInfo.Subjects.SystemPrivate, userId),
-
-				// whiteboard message
-				fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.Whiteboard, userId),
-				fmt.Sprintf("$JS.API.CONSUMER.MSG.NEXT.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.Whiteboard, userId),
-				fmt.Sprintf("$JS.ACK.%s.%s:%s.>", roomId, s.app.NatsInfo.Subjects.Whiteboard, userId),
-
-				// allow sending messages to the system
-				fmt.Sprintf("%s.%s.%s", s.app.NatsInfo.Subjects.SystemWorker, roomId, userId),
-			},
+			Allow: allow,
 		},
 	}
 

@@ -173,7 +173,7 @@ func (s *NatsService) GetUserKeyValue(userId, key string) (jetstream.KeyValueEnt
 	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", UserInfoBucket, userId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
-		return nil, nil
+		return nil, errors.New(fmt.Sprintf("no user found with userId: %s", userId))
 	case err != nil:
 		return nil, err
 	}
@@ -184,4 +184,17 @@ func (s *NatsService) GetUserKeyValue(userId, key string) (jetstream.KeyValueEnt
 	}
 
 	return val, nil
+}
+
+func (s *NatsService) GetUserMetadataStruct(userId string) (*plugnmeet.UserMetadata, error) {
+	metadata, err := s.GetUserKeyValue(userId, UserMetadataKey)
+	if err != nil {
+		return nil, err
+	}
+
+	if metadata == nil || len(metadata.Value()) == 0 {
+		return nil, errors.New(fmt.Sprintf("metadata info not found for userId: %s", userId))
+	}
+
+	return s.UnmarshalParticipantMetadata(string(metadata.Value()))
 }
