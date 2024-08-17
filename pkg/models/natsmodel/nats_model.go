@@ -64,10 +64,6 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId string) {
 		_ = m.natsService.SendSystemNotificationToUser(roomId, userId, err.Error(), plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_ERROR)
 		return
 	}
-	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_ROOM_INFO, roomId, rInfo, &userId)
-	if err != nil {
-		log.Warnln(err)
-	}
 
 	// send this user's info
 	userInfo, err := m.natsService.GetUserInfo(userId)
@@ -78,11 +74,6 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId string) {
 		return
 	}
 
-	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_LOCAL_USER_INFO, roomId, userInfo, &userId)
-	if err != nil {
-		log.Warnln(err)
-	}
-
 	// send media server connection info
 	token, err := m.GenerateLivekitToken(roomId, userInfo)
 	if err != nil {
@@ -91,26 +82,25 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId string) {
 		_ = m.natsService.SendSystemNotificationToUser(roomId, userId, err.Error(), plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_ERROR)
 		return
 	}
-	data := &plugnmeet.MediaServerConnInfo{
-		Url:         m.app.LivekitInfo.Host,
-		Token:       token,
-		EnabledE2Ee: rInfo.EnabledE2Ee,
-	}
-	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_MEDIA_SERVER_INFO, roomId, data, &userId)
-	if err != nil {
-		log.Warnln(err)
+
+	initial := &plugnmeet.NatsInitialData{
+		Room:      rInfo,
+		LocalUser: userInfo,
+		MediaServerInfo: &plugnmeet.MediaServerConnInfo{
+			Url:         m.app.LivekitInfo.Host,
+			Token:       token,
+			EnabledE2Ee: rInfo.EnabledE2Ee,
+		},
 	}
 
 	// send users' list
-	users, err := m.natsService.GetOnlineUsersListAsJson(roomId)
+	if users, err := m.natsService.GetOnlineUsersList(roomId); err == nil && users != nil || len(users) > 0 {
+		initial.OnlineUsers = users
+	}
+
+	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_INITIAL_DATA, roomId, initial, &userId)
 	if err != nil {
 		log.Warnln(err)
-	}
-	if users != nil || len(users) > 0 {
-		err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_JOINED_USERS_LIST, roomId, users, &userId)
-		if err != nil {
-			log.Warnln(err)
-		}
 	}
 
 	// broadcast this user to everyone
