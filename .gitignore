@@ -17,9 +17,8 @@ mariadb-data/
 upload/
 recording_files/
 client/
-recorder/
 etc/tmp/
 tmp/
-analytics/
+/analytics/
 
 !test/*
