@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -47,6 +48,27 @@ func (s *NatsService) BroadcastSystemEventToRoom(event plugnmeet.NatsMsgServerTo
 	_, err = s.app.JetStream.Publish(s.ctx, sub, message)
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (s *NatsService) BroadcastSystemEventToEveryoneExceptUserId(event plugnmeet.NatsMsgServerToClientEvents, roomId string, data interface{}, exceptUserId string) error {
+	ids, err := s.GetOlineUsersId(roomId)
+	if err != nil {
+		return err
+	}
+	if ids == nil || len(ids) == 0 {
+		return errors.New("no online user found")
+	}
+
+	for _, id := range ids {
+		if id != exceptUserId {
+			err := s.BroadcastSystemEventToRoom(event, roomId, data, &id)
+			if err != nil {
+				log.Errorln(err)
+			}
+		}
 	}
 
 	return nil

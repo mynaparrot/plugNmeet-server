@@ -95,9 +95,11 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId string) error {
 	if err != nil {
 		return err
 	}
-	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_JOINED_USERS_LIST, roomId, users, &userId)
-	if err != nil {
-		return err
+	if users != nil || len(users) > 0 {
+		err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_JOINED_USERS_LIST, roomId, users, &userId)
+		if err != nil {
+			return err
+		}
 	}
 
 	// broadcast this user to everyone
