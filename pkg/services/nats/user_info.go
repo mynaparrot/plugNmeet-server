@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/nats-io/nats.go/jetstream"
-	"google.golang.org/protobuf/encoding/protojson"
 	"strconv"
 )
 
@@ -153,13 +152,10 @@ func (s *NatsService) GetOnlineUsersListAsJson(roomId string) ([]byte, error) {
 	if users == nil || len(users) == 0 {
 		return nil, nil
 	}
-	op := protojson.MarshalOptions{
-		EmitUnpopulated: true,
-		UseProtoNames:   true,
-	}
+
 	raw := make([]json.RawMessage, len(users))
 	for i, u := range users {
-		r, err := op.Marshal(u)
+		r, err := protoJsonOpts.Marshal(u)
 		if err != nil {
 			return nil, err
 		}
