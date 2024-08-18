@@ -13,12 +13,19 @@ func (m *NatsModel) HandleInitialData(roomId, userId string) {
 		_ = m.natsService.NotifyErrorMsg(roomId, err.Error(), &userId)
 		return
 	}
+	if rInfo == nil {
+		_ = m.natsService.NotifyErrorMsg(roomId, "room information not found", &userId)
+	}
 
 	// send this user's info
 	userInfo, err := m.natsService.GetUserInfo(userId)
 	if err != nil {
 		log.Errorln(err)
 		_ = m.natsService.NotifyErrorMsg(roomId, err.Error(), &userId)
+		return
+	}
+	if userInfo == nil {
+		_ = m.natsService.NotifyErrorMsg(roomId, "no user found", &userId)
 		return
 	}
 
@@ -47,7 +54,7 @@ func (m *NatsModel) HandleInitialData(roomId, userId string) {
 	}
 
 	// now send users' list
-	if users, err := m.natsService.GetOnlineUsersListAsJson(roomId); err == nil && users != nil || len(users) > 0 {
+	if users, err := m.natsService.GetOnlineUsersListAsJson(roomId); err == nil && users != nil {
 		err := m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_JOINED_USERS_LIST, roomId, users, &userId)
 		if err != nil {
 			log.Warnln(err)

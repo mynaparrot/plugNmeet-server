@@ -3,6 +3,7 @@ package natsservice
 import (
 	"errors"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	log "github.com/sirupsen/logrus"
 )
 
 func (s *NatsService) BroadcastUserMetadata(roomId string, userId string, metadata, toUser *string) error {
@@ -28,4 +29,21 @@ func (s *NatsService) UpdateAndBroadcastUserMetadata(roomId, userId string, meta
 		return err
 	}
 	return s.BroadcastUserMetadata(roomId, userId, &mt, nil)
+}
+
+func (s *NatsService) BroadcastUserInfoToRoom(event plugnmeet.NatsMsgServerToClientEvents, roomId, userId string, userInfo *plugnmeet.NatsKvUserInfo) {
+	if userInfo == nil {
+		info, err := s.GetUserInfo(userId)
+		if err != nil {
+			return
+		}
+		if info == nil {
+			return
+		}
+	}
+
+	err := s.BroadcastSystemEventToRoom(event, roomId, userInfo, nil)
+	if err != nil {
+		log.Warnln(err)
+	}
 }

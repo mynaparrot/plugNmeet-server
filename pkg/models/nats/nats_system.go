@@ -1,9 +1,12 @@
 package natsmodel
 
 import (
+	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	log "github.com/sirupsen/logrus"
+	"time"
 )
 
 func (m *NatsModel) RenewPNMToken(roomId, userId, token string) {
@@ -28,4 +31,11 @@ func (m *NatsModel) GenerateLivekitToken(roomId string, userInfo *plugnmeet.Nats
 	}
 
 	return auth.GenerateLivekitAccessToken(m.app.LivekitInfo.ApiKey, m.app.LivekitInfo.Secret, m.app.LivekitInfo.TokenValidity, c, userInfo.Metadata)
+}
+
+func (m *NatsModel) HandleClientPing(userId string) {
+	err := m.natsService.UpdateUserKeyValue(userId, natsservice.UserLastPingAt, fmt.Sprintf("%d", time.Now().UnixMilli()))
+	if err != nil {
+		log.Errorln(err)
+	}
 }

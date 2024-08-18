@@ -3,7 +3,6 @@ package natsservice
 import (
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/nats-io/nats.go/jetstream"
 	log "github.com/sirupsen/logrus"
@@ -52,14 +51,14 @@ func (s *NatsService) AddRoom(roomId, roomSid string, metadata *plugnmeet.RoomMe
 
 func (s *NatsService) UpdateRoomMetadata(roomId string, metadata *plugnmeet.RoomMetadata) (string, error) {
 	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomInfoBucket, roomId))
-	if err != nil {
+	switch {
+	case errors.Is(err, jetstream.ErrBucketNotFound):
+		return "", errors.New(fmt.Sprintf("no room found with roomId: %s", roomId))
+	case err != nil:
 		return "", err
 	}
 
-	// update id
-	id := uuid.NewString()
-	metadata.MetadataId = &id
-
+	// id will be updated during Marshal
 	mt, err := s.MarshalRoomMetadata(metadata)
 	if err != nil {
 		return "", err

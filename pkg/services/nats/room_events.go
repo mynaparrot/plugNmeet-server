@@ -7,15 +7,15 @@ import (
 
 func (s *NatsService) BroadcastRoomMetadata(roomId string, metadata, userId *string) error {
 	if metadata == nil {
-		result, err := s.GetRoomInfo(roomId)
+		rInfo, err := s.GetRoomInfo(roomId)
 		if err != nil {
 			return err
 		}
 
-		if result == nil {
+		if rInfo == nil {
 			return errors.New("did not found the room")
 		}
-		metadata = &result.Metadata
+		metadata = &rInfo.Metadata
 	}
 
 	return s.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_ROOM_METADATA_UPDATE, roomId, *metadata, userId)

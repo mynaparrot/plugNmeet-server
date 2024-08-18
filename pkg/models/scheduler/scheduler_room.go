@@ -1,8 +1,12 @@
 package schedulermodel
 
 import (
+	"context"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
+	log "github.com/sirupsen/logrus"
+	"strings"
 	"time"
 )
 
@@ -69,6 +73,27 @@ func (m *SchedulerModel) activeRoomChecker() {
 			if time.Now().UTC().After(expire) {
 				// we can close the room
 				_, _ = m.lk.EndRoom(room.RoomId)
+			}
+		}
+	}
+}
+
+// checkRoomActiveUsersForRoomStatus will count online users
+// if none then will end the session
+func (m *SchedulerModel) checkRoomActiveUsersForRoomStatus() {
+	kl := m.app.JetStream.KeyValueStoreNames(context.Background())
+
+	for s := range kl.Name() {
+		if strings.HasPrefix(s, natsservice.RoomInfoBucket) {
+			roomId := strings.ReplaceAll(s, natsservice.RoomInfoBucket+"-", "")
+			users, err := m.natsService.GetOlineUsersId(roomId)
+			if err != nil {
+				continue
+			}
+			if users == nil || len(users) == 0 {
+				// TODO: this room should be ended
+				// or may be it was ended, but proper cleaning was not possible
+				log.Infoln("TODO: this room should be ended or clean up")
 			}
 		}
 	}

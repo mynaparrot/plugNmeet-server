@@ -10,7 +10,7 @@ import (
 )
 
 func (s *NatsService) GetRoomUserStatus(roomId, userId string) (string, error) {
-	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomUsers, roomId))
+	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomUsersBucket, roomId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
 		return "", nil
@@ -82,7 +82,7 @@ func (s *NatsService) GetUserInfo(userId string) (*plugnmeet.NatsKvUserInfo, err
 }
 
 func (s *NatsService) GetRoomAllUsersFromStatusBucket(roomId string) (map[string]jetstream.KeyValueEntry, error) {
-	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomUsers, roomId))
+	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomUsersBucket, roomId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
 		return nil, nil
@@ -111,7 +111,9 @@ func (s *NatsService) GetOlineUsersId(roomId string) ([]string, error) {
 		return nil, err
 	}
 	if users == nil || len(users) == 0 {
-		return nil, errors.New("no user found")
+		// important to return nil
+		// allows other method to handle an empty result
+		return nil, nil
 	}
 
 	var userIds []string
@@ -130,13 +132,12 @@ func (s *NatsService) GetOnlineUsersList(roomId string) ([]*plugnmeet.NatsKvUser
 		return nil, err
 	}
 	if userIds == nil || len(userIds) == 0 {
-		return nil, errors.New("no user found")
+		return nil, nil
 	}
 
 	var users []*plugnmeet.NatsKvUserInfo
 	for _, id := range userIds {
-		info, err := s.GetUserInfo(id)
-		if err == nil && info != nil {
+		if info, err := s.GetUserInfo(id); err == nil && info != nil {
 			users = append(users, info)
 		}
 	}
@@ -169,7 +170,7 @@ func (s *NatsService) GetUserKeyValue(userId, key string) (jetstream.KeyValueEnt
 	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", UserInfoBucket, userId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
-		return nil, errors.New(fmt.Sprintf("no user found with userId: %s", userId))
+		return nil, nil
 	case err != nil:
 		return nil, err
 	}
@@ -189,8 +190,17 @@ func (s *NatsService) GetUserMetadataStruct(userId string) (*plugnmeet.UserMetad
 	}
 
 	if metadata == nil || len(metadata.Value()) == 0 {
-		return nil, errors.New(fmt.Sprintf("metadata info not found for userId: %s", userId))
+		return nil, nil
 	}
 
 	return s.UnmarshalParticipantMetadata(string(metadata.Value()))
+}
+
+func (s *NatsService) GetUserLastPing(userId string) int64 {
+	if lastPing, err := s.GetUserKeyValue(userId, UserLastPingAt); err == nil && lastPing != nil {
+		if parseUint, err := strconv.ParseInt(string(lastPing.Value()), 10, 64); err == nil {
+			return parseUint
+		}
+	}
+	return 0
 }

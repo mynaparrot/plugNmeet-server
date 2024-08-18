@@ -12,7 +12,7 @@ func (s *NatsService) GetRoomInfo(roomId string) (*plugnmeet.NatsKvRoomInfo, err
 	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomInfoBucket, roomId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
-		return nil, errors.New(fmt.Sprintf("no room found with roomId: %s", roomId))
+		return nil, nil
 	case err != nil:
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func (s *NatsService) GetRoomKeyValue(roomId, key string) (jetstream.KeyValueEnt
 	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomInfoBucket, roomId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
-		return nil, errors.New(fmt.Sprintf("no room found with roomId: %s", roomId))
+		return nil, nil
 	case err != nil:
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func (s *NatsService) GetRoomMetadataStruct(roomId string) (*plugnmeet.RoomMetad
 	}
 
 	if metadata == nil || len(metadata.Value()) == 0 {
-		return nil, errors.New(fmt.Sprintf("metadata info not found for roomId: %s", roomId))
+		return nil, nil
 	}
 
 	return s.UnmarshalRoomMetadata(string(metadata.Value()))

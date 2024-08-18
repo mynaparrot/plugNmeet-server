@@ -3,7 +3,6 @@ package natsservice
 import (
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/nats-io/nats.go/jetstream"
 	log "github.com/sirupsen/logrus"
@@ -11,8 +10,9 @@ import (
 )
 
 const (
-	RoomUsers      = Prefix + "roomUsers"
-	UserInfoBucket = Prefix + "userInfo"
+	RoomUsersBucket       = Prefix + "roomUsers"
+	UserInfoBucket        = Prefix + "userInfo"
+	UserOnlineMaxPingDiff = time.Second * 30 // after 30 seconds we'll treat user as offline
 
 	UserIdKey          = "id"
 	UserSidKey         = "sid"
@@ -24,6 +24,7 @@ const (
 	UserJoinedAt       = "joined_at"
 	UserReconnectedAt  = "reconnected_at"
 	UserDisconnectedAt = "disconnected_at"
+	UserLastPingAt     = "last_ping_at"
 
 	UserAdded        = "added"
 	UserOnline       = "online"
@@ -35,7 +36,7 @@ const (
 func (s *NatsService) AddUser(roomId, userId, sid, name string, isAdmin, isPresenter bool, metadata *plugnmeet.UserMetadata) error {
 	// first add user to room
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
-		Bucket: fmt.Sprintf("%s-%s", RoomUsers, roomId),
+		Bucket: fmt.Sprintf("%s-%s", RoomUsersBucket, roomId),
 	})
 	if err != nil {
 		return err
@@ -67,6 +68,7 @@ func (s *NatsService) AddUser(roomId, userId, sid, name string, isAdmin, isPrese
 		UserIsAdminKey:     fmt.Sprintf("%v", isAdmin),
 		UserIsPresenterKey: fmt.Sprintf("%v", isPresenter),
 		UserMetadataKey:    mt,
+		UserLastPingAt:     "0",
 	}
 
 	for k, v := range data {
@@ -80,10 +82,10 @@ func (s *NatsService) AddUser(roomId, userId, sid, name string, isAdmin, isPrese
 }
 
 func (s *NatsService) UpdateUserStatus(roomId, userId string, status string) error {
-	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomUsers, roomId))
+	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomUsersBucket, roomId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
-		return nil
+		return errors.New(fmt.Sprintf("no user found with userId: %s", userId))
 	case err != nil:
 		return err
 	}
@@ -126,21 +128,13 @@ func (s *NatsService) UpdateUserStatus(roomId, userId string, status string) err
 // UpdateUserMetadata will basically update metadata only
 // because normally we do not need to update other info
 func (s *NatsService) UpdateUserMetadata(userId string, metadata *plugnmeet.UserMetadata) (string, error) {
-	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", UserInfoBucket, userId))
-	if err != nil {
-		return "", err
-	}
-
-	// update id
-	id := uuid.NewString()
-	metadata.MetadataId = &id
-
+	// is will update during marshaling
 	mt, err := s.MarshalParticipantMetadata(metadata)
 	if err != nil {
 		return "", err
 	}
 
-	_, err = kv.PutString(s.ctx, UserMetadataKey, mt)
+	err = s.UpdateUserKeyValue(userId, UserMetadataKey, mt)
 	if err != nil {
 		return "", err
 	}
@@ -149,7 +143,7 @@ func (s *NatsService) UpdateUserMetadata(userId string, metadata *plugnmeet.User
 }
 
 func (s *NatsService) DeleteUser(roomId, userId string) {
-	if kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomUsers, roomId)); err == nil {
+	if kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomUsersBucket, roomId)); err == nil {
 		_ = kv.Delete(s.ctx, userId)
 	}
 
@@ -157,7 +151,7 @@ func (s *NatsService) DeleteUser(roomId, userId string) {
 }
 
 func (s *NatsService) DeleteAllRoomUsers(roomId string) error {
-	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomUsers, roomId))
+	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomUsersBucket, roomId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
 		// nothing found
@@ -177,7 +171,7 @@ func (s *NatsService) DeleteAllRoomUsers(roomId string) error {
 	}
 
 	// now delete room users bucket
-	_ = s.js.DeleteKeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomUsers, roomId))
+	_ = s.js.DeleteKeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomUsersBucket, roomId))
 
 	return nil
 }
@@ -186,7 +180,7 @@ func (s *NatsService) UpdateUserKeyValue(userId, key, val string) error {
 	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", UserInfoBucket, userId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
-		return nil
+		return errors.New(fmt.Sprintf("no user found with userId: %s", userId))
 	case err != nil:
 		return err
 	}

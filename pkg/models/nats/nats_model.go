@@ -47,6 +47,8 @@ func (m *NatsModel) HandleFromClientToServerReq(roomId, userId string, req *plug
 		m.RenewPNMToken(roomId, userId, req.Msg)
 	case plugnmeet.NatsMsgClientToServerEvents_REQ_INITIAL_DATA:
 		m.HandleInitialData(roomId, userId)
+	case plugnmeet.NatsMsgClientToServerEvents_PING:
+		m.HandleClientPing(userId)
 	}
 }
 
@@ -85,6 +87,12 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) {
 	userInfo, err := m.natsService.GetUserInfo(userId)
 	if err != nil {
 		log.Warnln(err)
+	}
+	if userInfo == nil {
+		log.Warnln(fmt.Sprintf("no user info found with id: %s, which should not happen", userId))
+		// no way to continue
+		// but this should not happen
+		return
 	}
 	_ = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_DISCONNECTED, roomId, userInfo, userId)
 
