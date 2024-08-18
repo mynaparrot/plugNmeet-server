@@ -1,5 +1,5 @@
 package natsmodel
 
-func (m *NatsModel) name() {
+func (m *NatsModel) OnAfterRoomEnded() {
 
 }

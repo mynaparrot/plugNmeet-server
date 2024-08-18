@@ -104,20 +104,16 @@ func (c *NatsController) subscribeToUsersConnEvents() {
 			if err != nil {
 				return
 			}
-			go func(user string) {
-				p := strings.Split(user, ":")
-				c.natsModel.OnAfterUserJoined(p[0], p[1])
-			}(e.Client["user"].(string))
+			p := strings.Split(e.Client["user"].(string), ":")
+			c.natsModel.OnAfterUserJoined(p[0], p[1])
 		} else if strings.Contains(msg.Subject, ".DISCONNECT") {
 			e := new(NatsEvents)
 			err := json.Unmarshal(msg.Data, e)
 			if err != nil {
 				return
 			}
-			go func(user string) {
-				p := strings.Split(user, ":")
-				c.natsModel.OnAfterUserDisconnected(p[0], p[1])
-			}(e.Client["user"].(string))
+			p := strings.Split(e.Client["user"].(string), ":")
+			c.natsModel.OnAfterUserDisconnected(p[0], p[1])
 		}
 	})
 	if err != nil {

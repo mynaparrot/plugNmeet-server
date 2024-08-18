@@ -30,7 +30,6 @@ const (
 	UserOnline       = "online"
 	UserDisconnected = "disconnected"
 	UserOffline      = "offline"
-	UserLoggedOut    = "logged-out"
 )
 
 func (s *NatsService) AddUser(roomId, userId, sid, name string, isAdmin, isPresenter bool, metadata *plugnmeet.UserMetadata) error {

@@ -33,8 +33,23 @@ func (m *NatsModel) GenerateLivekitToken(roomId string, userInfo *plugnmeet.Nats
 	return auth.GenerateLivekitAccessToken(m.app.LivekitInfo.ApiKey, m.app.LivekitInfo.Secret, m.app.LivekitInfo.TokenValidity, c, userInfo.Metadata)
 }
 
-func (m *NatsModel) HandleClientPing(userId string) {
-	err := m.natsService.UpdateUserKeyValue(userId, natsservice.UserLastPingAt, fmt.Sprintf("%d", time.Now().UnixMilli()))
+func (m *NatsModel) HandleClientPing(roomId, userId string) {
+	// check user status
+	// if we found offline/disconnected, then we'll update
+	//  because the server may receive this join status a bit lately
+	// as user has sent ping request, this indicates the user is online
+	status, err := m.natsService.GetRoomUserStatus(roomId, userId)
+	if err != nil {
+		return
+	}
+	if status != natsservice.UserOnline {
+		err = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserOnline)
+		if err != nil {
+			return
+		}
+	}
+
+	err = m.natsService.UpdateUserKeyValue(userId, natsservice.UserLastPingAt, fmt.Sprintf("%d", time.Now().UnixMilli()))
 	if err != nil {
 		log.Errorln(err)
 	}
