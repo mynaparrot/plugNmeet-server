@@ -13,13 +13,13 @@ func (m *RecordingModel) rtmpStarted(r *plugnmeet.RecorderToPlugNmeet) {
 	}
 
 	// update room metadata
-	_, roomMeta, err := m.lk.LoadRoomWithMetadata(r.RoomId)
+	roomMeta, err := m.natsService.GetRoomMetadataStruct(r.RoomId)
 	if err != nil {
 		return
 	}
 
 	roomMeta.IsActiveRtmp = true
-	_, _ = m.lk.UpdateRoomMetadataByStruct(r.RoomId, roomMeta)
+	_ = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, roomMeta)
 
 	// send message to room
 	dm := datamsgmodel.New(m.app, m.ds, m.rs, m.lk)

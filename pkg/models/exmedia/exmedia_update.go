@@ -6,7 +6,7 @@ import (
 )
 
 func (m *ExMediaModel) updateRoomMetadata(roomId string, opts *updateRoomMetadataOpts) error {
-	_, roomMeta, err := m.lk.LoadRoomWithMetadata(roomId)
+	roomMeta, err := m.natsService.GetRoomMetadataStruct(roomId)
 	if err != nil {
 		return err
 	}
@@ -21,7 +21,7 @@ func (m *ExMediaModel) updateRoomMetadata(roomId string, opts *updateRoomMetadat
 		roomMeta.RoomFeatures.ExternalMediaPlayerFeatures.SharedBy = opts.sharedBy
 	}
 
-	_, err = m.lk.UpdateRoomMetadataByStruct(roomId, roomMeta)
+	err = m.natsService.UpdateAndBroadcastRoomMetadata(roomId, roomMeta)
 
 	// send analytics
 	val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()

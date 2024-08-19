@@ -9,6 +9,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/room"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	log "github.com/sirupsen/logrus"
 )
@@ -21,6 +22,7 @@ type WebhookModel struct {
 	rm              *roommodel.RoomModel
 	analyticsModel  *analyticsmodel.AnalyticsModel
 	webhookNotifier *helpers.WebhookNotifier
+	natsService     *natsservice.NatsService
 }
 
 func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService) *WebhookModel {
@@ -45,6 +47,7 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 		rm:              roommodel.New(app, ds, rs, lk),
 		analyticsModel:  analyticsmodel.New(app, ds, rs, lk),
 		webhookNotifier: helpers.GetWebhookNotifier(app, ds, rs),
+		natsService:     natsservice.New(app),
 	}
 }
 

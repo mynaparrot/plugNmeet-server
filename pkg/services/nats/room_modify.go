@@ -49,7 +49,26 @@ func (s *NatsService) AddRoom(roomId, roomSid string, metadata *plugnmeet.RoomMe
 	return nil
 }
 
-func (s *NatsService) UpdateRoomMetadata(roomId string, metadata *plugnmeet.RoomMetadata) (string, error) {
+// updateRoomMetadata should be internal only
+func (s *NatsService) updateRoomMetadata(roomId string, metadata interface{}) (string, error) {
+	var mt *plugnmeet.RoomMetadata
+	var err error
+
+	switch v := metadata.(type) {
+	case string:
+		// because we'll need to update id
+		mt, err = s.UnmarshalRoomMetadata(v)
+		if err != nil {
+			return "", err
+		}
+	case plugnmeet.RoomMetadata:
+		mt = &v
+	case *plugnmeet.RoomMetadata:
+		mt = v
+	default:
+		return "", errors.New("invalid metadata data type")
+	}
+
 	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomInfoBucket, roomId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
@@ -59,17 +78,17 @@ func (s *NatsService) UpdateRoomMetadata(roomId string, metadata *plugnmeet.Room
 	}
 
 	// id will be updated during Marshal
-	mt, err := s.MarshalRoomMetadata(metadata)
+	ml, err := s.MarshalRoomMetadata(mt)
 	if err != nil {
 		return "", err
 	}
 
-	_, err = kv.PutString(s.ctx, RoomMetadataKey, mt)
+	_, err = kv.PutString(s.ctx, RoomMetadataKey, ml)
 	if err != nil {
 		return "", err
 	}
 
-	return mt, nil
+	return ml, nil
 }
 
 func (s *NatsService) DeleteRoom(roomId string) error {

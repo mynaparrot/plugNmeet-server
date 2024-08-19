@@ -193,7 +193,7 @@ func (s *NatsService) GetUserMetadataStruct(userId string) (*plugnmeet.UserMetad
 		return nil, nil
 	}
 
-	return s.UnmarshalParticipantMetadata(string(metadata.Value()))
+	return s.UnmarshalUserMetadata(string(metadata.Value()))
 }
 
 func (s *NatsService) GetUserLastPing(userId string) int64 {

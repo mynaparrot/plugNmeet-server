@@ -3,13 +3,15 @@ package waitingroommodel
 import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 )
 
 type WaitingRoomModel struct {
-	app *config.AppConfig
-	rs  *redisservice.RedisService
-	lk  *livekitservice.LivekitService
+	app         *config.AppConfig
+	rs          *redisservice.RedisService
+	lk          *livekitservice.LivekitService
+	natsService *natsservice.NatsService
 }
 
 func New(app *config.AppConfig, rs *redisservice.RedisService, lk *livekitservice.LivekitService) *WaitingRoomModel {
@@ -24,8 +26,9 @@ func New(app *config.AppConfig, rs *redisservice.RedisService, lk *livekitservic
 	}
 
 	return &WaitingRoomModel{
-		app: app,
-		rs:  rs,
-		lk:  lk,
+		app:         app,
+		rs:          rs,
+		lk:          lk,
+		natsService: natsservice.New(app),
 	}
 }

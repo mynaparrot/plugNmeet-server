@@ -7,7 +7,7 @@ import (
 )
 
 func (m *ExDisplayModel) updateRoomMetadata(roomId string, opts *updateRoomMetadataOpts) error {
-	_, roomMeta, err := m.lk.LoadRoomWithMetadata(roomId)
+	roomMeta, err := m.natsService.GetRoomMetadataStruct(roomId)
 	if err != nil {
 		return err
 	}
@@ -22,7 +22,7 @@ func (m *ExDisplayModel) updateRoomMetadata(roomId string, opts *updateRoomMetad
 		roomMeta.RoomFeatures.DisplayExternalLinkFeatures.SharedBy = opts.sharedBy
 	}
 
-	_, err = m.lk.UpdateRoomMetadataByStruct(roomId, roomMeta)
+	err = m.natsService.UpdateAndBroadcastRoomMetadata(roomId, roomMeta)
 	if err != nil {
 		log.Errorln(err)
 	}

@@ -11,7 +11,7 @@ import (
 
 func (m *IngressModel) CreateIngress(r *plugnmeet.CreateIngressReq) (*livekit.IngressInfo, error) {
 	// we'll update room metadata
-	_, metadata, err := m.lk.LoadRoomWithMetadata(r.RoomId)
+	metadata, err := m.natsService.GetRoomMetadataStruct(r.RoomId)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func (m *IngressModel) CreateIngress(r *plugnmeet.CreateIngressReq) (*livekit.In
 	ingressFeatures.Url = f.Url
 	ingressFeatures.StreamKey = f.StreamKey
 
-	_, err = m.lk.UpdateRoomMetadataByStruct(r.RoomId, metadata)
+	err = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, metadata)
 	if err != nil {
 		return nil, err
 	}

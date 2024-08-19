@@ -73,8 +73,8 @@ func (s *NatsService) UnmarshalRoomMetadata(metadata string) (*plugnmeet.RoomMet
 	return meta, nil
 }
 
-// MarshalParticipantMetadata will create proper json string of user's metadata
-func (s *NatsService) MarshalParticipantMetadata(meta *plugnmeet.UserMetadata) (string, error) {
+// MarshalUserMetadata will create proper json string of user's metadata
+func (s *NatsService) MarshalUserMetadata(meta *plugnmeet.UserMetadata) (string, error) {
 	mId := uuid.NewString()
 	meta.MetadataId = &mId
 
@@ -86,8 +86,8 @@ func (s *NatsService) MarshalParticipantMetadata(meta *plugnmeet.UserMetadata) (
 	return marshal, nil
 }
 
-// UnmarshalParticipantMetadata will create proper formatted medata from json string
-func (s *NatsService) UnmarshalParticipantMetadata(metadata string) (*plugnmeet.UserMetadata, error) {
+// UnmarshalUserMetadata will create proper formatted medata from json string
+func (s *NatsService) UnmarshalUserMetadata(metadata string) (*plugnmeet.UserMetadata, error) {
 	m := new(plugnmeet.UserMetadata)
 	err := protojson.Unmarshal([]byte(metadata), m)
 	if err != nil {

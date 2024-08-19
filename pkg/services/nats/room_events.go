@@ -22,8 +22,12 @@ func (s *NatsService) BroadcastRoomMetadata(roomId string, metadata, userId *str
 }
 
 // UpdateAndBroadcastRoomMetadata will update and broadcast to everyone
-func (s *NatsService) UpdateAndBroadcastRoomMetadata(roomId string, meta *plugnmeet.RoomMetadata) error {
-	metadata, err := s.UpdateRoomMetadata(roomId, meta)
+// if provided userId then only to that user
+func (s *NatsService) UpdateAndBroadcastRoomMetadata(roomId string, meta interface{}) error {
+	if meta == nil {
+		return errors.New("metadata cannot be nil")
+	}
+	metadata, err := s.updateRoomMetadata(roomId, meta)
 	if err != nil {
 		return err
 	}

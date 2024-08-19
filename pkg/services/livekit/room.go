@@ -32,49 +32,49 @@ func (s *LivekitService) CreateRoom(roomId string, emptyTimeout *uint32, maxPart
 	return room, nil
 }
 
-// UpdateRoomMetadata will directly send request to livekit to update metadata
-func (s *LivekitService) UpdateRoomMetadata(roomId string, metadata string) (*livekit.Room, error) {
-	data := livekit.UpdateRoomMetadataRequest{
-		Room:     roomId,
-		Metadata: metadata,
-	}
-
-	room, err := s.lkc.UpdateRoomMetadata(s.ctx, &data)
-	if err != nil {
-		return nil, err
-	}
-
-	// we'll always update our own redis
-	_, err = s.rs.ManageActiveRoomsWithMetadata(roomId, "add", metadata)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: update here
-	// temporarily we'll update metadata manually
-	// because livekit propagated quite lately now
-	//m := datamsgmodel.New(nil, nil, nil, nil)
-	//err = m.SendUpdatedMetadata(roomId, metadata)
-	//if err != nil {
-	//	return nil, err
-	//}
-
-	return room, nil
-}
-
-// UpdateRoomMetadataByStruct to update metadata by providing formatted metadata
-func (s *LivekitService) UpdateRoomMetadataByStruct(roomId string, meta *plugnmeet.RoomMetadata) (*livekit.Room, error) {
-	metadata, err := s.MarshalRoomMetadata(meta)
-	if err != nil {
-		return nil, err
-	}
-	room, err := s.UpdateRoomMetadata(roomId, metadata)
-	if err != nil {
-		return nil, err
-	}
-
-	return room, nil
-}
+//// UpdateRoomMetadata will directly send request to livekit to update metadata
+//func (s *LivekitService) UpdateRoomMetadata(roomId string, metadata string) (*livekit.Room, error) {
+//	data := livekit.UpdateRoomMetadataRequest{
+//		Room:     roomId,
+//		Metadata: metadata,
+//	}
+//
+//	room, err := s.lkc.UpdateRoomMetadata(s.ctx, &data)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	// we'll always update our own redis
+//	_, err = s.rs.ManageActiveRoomsWithMetadata(roomId, "add", metadata)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	// TODO: update here
+//	// temporarily we'll update metadata manually
+//	// because livekit propagated quite lately now
+//	//m := datamsgmodel.New(nil, nil, nil, nil)
+//	//err = m.SendUpdatedMetadata(roomId, metadata)
+//	//if err != nil {
+//	//	return nil, err
+//	//}
+//
+//	return room, nil
+//}
+//
+//// UpdateRoomMetadataByStruct to update metadata by providing formatted metadata
+//func (s *LivekitService) UpdateRoomMetadataByStruct(roomId string, meta *plugnmeet.RoomMetadata) (*livekit.Room, error) {
+//	metadata, err := s.MarshalRoomMetadata(meta)
+//	if err != nil {
+//		return nil, err
+//	}
+//	room, err := s.UpdateRoomMetadata(roomId, metadata)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return room, nil
+//}
 
 // LoadRoomInfo will room information from livekit
 func (s *LivekitService) LoadRoomInfo(roomId string) (*livekit.Room, error) {

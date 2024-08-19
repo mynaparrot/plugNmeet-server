@@ -8,6 +8,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/analytics"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	log "github.com/sirupsen/logrus"
 )
@@ -19,6 +20,7 @@ type RecordingModel struct {
 	lk              *livekitservice.LivekitService
 	analyticsModel  *analyticsmodel.AnalyticsModel
 	webhookNotifier *helpers.WebhookNotifier
+	natsService     *natsservice.NatsService
 }
 
 func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService) *RecordingModel {
@@ -42,6 +44,7 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 		lk:              lk,
 		analyticsModel:  analyticsmodel.New(app, ds, rs, lk),
 		webhookNotifier: helpers.GetWebhookNotifier(app, ds, rs),
+		natsService:     natsservice.New(app),
 	}
 }
 

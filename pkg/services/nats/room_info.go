@@ -42,6 +42,22 @@ func (s *NatsService) GetRoomInfo(roomId string) (*plugnmeet.NatsKvRoomInfo, err
 	return info, nil
 }
 
+func (s *NatsService) GetRoomInfoWithMetadata(roomId string) (*plugnmeet.NatsKvRoomInfo, *plugnmeet.RoomMetadata, error) {
+	info, err := s.GetRoomInfo(roomId)
+	if err != nil {
+		return nil, nil, err
+	}
+	if info == nil {
+		return nil, nil, nil
+	}
+	metadata, err := s.UnmarshalRoomMetadata(info.Metadata)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return info, metadata, nil
+}
+
 func (s *NatsService) GetRoomKeyValue(roomId, key string) (jetstream.KeyValueEntry, error) {
 	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomInfoBucket, roomId))
 	switch {

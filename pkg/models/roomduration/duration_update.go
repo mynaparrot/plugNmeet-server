@@ -20,7 +20,7 @@ func (m *RoomDurationModel) IncreaseRoomDuration(roomId string, duration uint64)
 	}
 
 	// increase room duration
-	_, meta, err := m.lk.LoadRoomWithMetadata(roomId)
+	meta, err := m.natsService.GetRoomMetadataStruct(roomId)
 	if err != nil {
 		return 0, err
 	}
@@ -46,7 +46,7 @@ func (m *RoomDurationModel) IncreaseRoomDuration(roomId string, duration uint64)
 	d := uint64(result)
 
 	meta.RoomFeatures.RoomDuration = &d
-	_, err = m.lk.UpdateRoomMetadataByStruct(roomId, meta)
+	err = m.natsService.UpdateAndBroadcastRoomMetadata(roomId, meta)
 
 	if err != nil {
 		// if error then we'll fall back to set previous duration

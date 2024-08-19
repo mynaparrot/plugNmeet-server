@@ -3,7 +3,7 @@ package filemodel
 import log "github.com/sirupsen/logrus"
 
 func (m *FileModel) updateRoomMetadataWithOfficeFile(f *ConvertWhiteboardFileRes) error {
-	_, roomMeta, err := m.lk.LoadRoomWithMetadata(m.req.RoomId)
+	roomMeta, err := m.natsService.GetRoomMetadataStruct(m.req.RoomId)
 	if err != nil {
 		return err
 	}
@@ -13,7 +13,7 @@ func (m *FileModel) updateRoomMetadataWithOfficeFile(f *ConvertWhiteboardFileRes
 	roomMeta.RoomFeatures.WhiteboardFeatures.FilePath = f.FilePath
 	roomMeta.RoomFeatures.WhiteboardFeatures.TotalPages = uint32(f.TotalPages)
 
-	_, err = m.lk.UpdateRoomMetadataByStruct(m.req.RoomId, roomMeta)
+	err = m.natsService.UpdateAndBroadcastRoomMetadata(m.req.RoomId, roomMeta)
 	if err != nil {
 		log.Errorln(err)
 	}

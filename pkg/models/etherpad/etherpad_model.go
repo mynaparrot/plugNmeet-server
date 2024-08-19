@@ -5,6 +5,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/analytics"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 )
 
@@ -40,6 +41,7 @@ type EtherpadModel struct {
 	rs             *redisservice.RedisService
 	lk             *livekitservice.LivekitService
 	analyticsModel *analyticsmodel.AnalyticsModel
+	natsService    *natsservice.NatsService
 }
 
 func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService) *EtherpadModel {
@@ -62,5 +64,6 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 		rs:             rs,
 		lk:             lk,
 		analyticsModel: analyticsmodel.New(app, ds, rs, lk),
+		natsService:    natsservice.New(app),
 	}
 }

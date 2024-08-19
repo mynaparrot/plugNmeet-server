@@ -9,13 +9,20 @@ import (
 )
 
 func (m *NatsModel) OnAfterUserJoined(roomId, userId string) {
-	// now update status back to online
-	err := m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserOnline)
+	status, err := m.natsService.GetRoomUserStatus(roomId, userId)
+	if err != nil {
+		return
+	}
+	if status == natsservice.UserOnline {
+		// no need
+		return
+	}
+
+	err = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserOnline)
 	if err != nil {
 		log.Warnln(err)
 	}
 
-	// get old value first
 	if userInfo, err := m.natsService.GetUserInfo(userId); err == nil && userInfo != nil {
 		// broadcast this user to everyone
 		err := m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_JOINED, roomId, userInfo, userId)
@@ -52,18 +59,16 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) {
 	}
 	_ = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_DISCONNECTED, roomId, userInfo, userId)
 
-	// we'll wait 10 seconds before declare this user as offline
+	// we'll wait 5 seconds before declare this user as offline
 	// 2. remove from the online list but not delete as user may reconnect again
-	for i := 0; i < 10; i++ {
-		time.Sleep(1 * time.Second)
-		if status, err := m.natsService.GetRoomUserStatus(roomId, userId); err == nil {
-			if status == natsservice.UserOnline {
-				// we do not need to do anything
-				return
-			}
+	time.Sleep(5 * time.Second)
+
+	if status, err := m.natsService.GetRoomUserStatus(roomId, userId); err == nil {
+		if status == natsservice.UserOnline {
+			// we do not need to do anything
+			return
 		}
 	}
-
 	err = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserOffline)
 	if err != nil {
 		log.Warnln(err)
@@ -75,13 +80,11 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) {
 	// we'll wait another 30 seconds & delete this consumer,
 	// but we'll keep user's information in the bucket
 	// everything will be clean when the session ends.
-	for i := 0; i < 30; i++ {
-		time.Sleep(1 * time.Second)
-		if status, err := m.natsService.GetRoomUserStatus(roomId, userId); err == nil {
-			if status == natsservice.UserOnline {
-				// we do not need to do anything
-				return
-			}
+	time.Sleep(30 * time.Second)
+	if status, err := m.natsService.GetRoomUserStatus(roomId, userId); err == nil {
+		if status == natsservice.UserOnline {
+			// we do not need to do anything
+			return
 		}
 	}
 

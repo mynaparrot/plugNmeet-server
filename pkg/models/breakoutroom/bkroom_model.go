@@ -5,15 +5,17 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/room"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 )
 
 type BreakoutRoomModel struct {
-	app *config.AppConfig
-	ds  *dbservice.DatabaseService
-	rs  *redisservice.RedisService
-	lk  *livekitservice.LivekitService
-	rm  *roommodel.RoomModel
+	app         *config.AppConfig
+	ds          *dbservice.DatabaseService
+	rs          *redisservice.RedisService
+	lk          *livekitservice.LivekitService
+	rm          *roommodel.RoomModel
+	natsService *natsservice.NatsService
 }
 
 func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService) *BreakoutRoomModel {
@@ -31,10 +33,11 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 	}
 
 	return &BreakoutRoomModel{
-		app: app,
-		ds:  ds,
-		rs:  rs,
-		lk:  lk,
-		rm:  roommodel.New(app, ds, rs, lk),
+		app:         app,
+		ds:          ds,
+		rs:          rs,
+		lk:          lk,
+		rm:          roommodel.New(app, ds, rs, lk),
+		natsService: natsservice.New(app),
 	}
 }

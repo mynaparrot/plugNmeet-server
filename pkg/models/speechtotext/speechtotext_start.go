@@ -11,7 +11,7 @@ func (m *SpeechToTextModel) SpeechToTextTranslationServiceStart(r *plugnmeet.Spe
 		return errors.New("speech service disabled")
 	}
 
-	_, meta, err := m.lk.LoadRoomWithMetadata(r.RoomId)
+	meta, err := m.natsService.GetRoomMetadataStruct(r.RoomId)
 	if err != nil {
 		return err
 	}
@@ -26,7 +26,7 @@ func (m *SpeechToTextModel) SpeechToTextTranslationServiceStart(r *plugnmeet.Spe
 	f.AllowedTransLangs = r.AllowedTransLangs
 	f.DefaultSubtitleLang = r.DefaultSubtitleLang
 
-	_, err = m.lk.UpdateRoomMetadataByStruct(r.RoomId, meta)
+	err = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, meta)
 	if err != nil {
 		return err
 	}

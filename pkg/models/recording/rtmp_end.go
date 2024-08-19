@@ -14,13 +14,13 @@ func (m *RecordingModel) rtmpEnded(r *plugnmeet.RecorderToPlugNmeet) {
 	}
 
 	// update room metadata
-	_, roomMeta, err := m.lk.LoadRoomWithMetadata(r.RoomId)
+	roomMeta, err := m.natsService.GetRoomMetadataStruct(r.RoomId)
 	if err != nil {
 		return
 	}
 
 	roomMeta.IsActiveRtmp = false
-	_, _ = m.lk.UpdateRoomMetadataByStruct(r.RoomId, roomMeta)
+	_ = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, roomMeta)
 
 	msg := "notifications.rtmp-ended"
 	msgType := plugnmeet.DataMsgBodyType_INFO

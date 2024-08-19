@@ -4,14 +4,16 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 )
 
 type IngressModel struct {
-	app *config.AppConfig
-	ds  *dbservice.DatabaseService
-	rs  *redisservice.RedisService
-	lk  *livekitservice.LivekitService
+	app         *config.AppConfig
+	ds          *dbservice.DatabaseService
+	rs          *redisservice.RedisService
+	lk          *livekitservice.LivekitService
+	natsService *natsservice.NatsService
 }
 
 func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService) *IngressModel {
@@ -29,9 +31,10 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 	}
 
 	return &IngressModel{
-		app: app,
-		ds:  ds,
-		rs:  rs,
-		lk:  lk,
+		app:         app,
+		ds:          ds,
+		rs:          rs,
+		lk:          lk,
+		natsService: natsservice.New(app),
 	}
 }

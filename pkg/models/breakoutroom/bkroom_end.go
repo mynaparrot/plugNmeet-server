@@ -111,12 +111,12 @@ func (m *BreakoutRoomModel) performPostHookTask(roomId string) error {
 	_ = m.rs.DeleteAllBreakoutRoomsByParentRoomId(roomId)
 
 	// if no rooms left, then we can update metadata
-	_, meta, err := m.lk.LoadRoomWithMetadata(roomId)
+	meta, err := m.natsService.GetRoomMetadataStruct(roomId)
 	if err != nil {
 		return err
 	}
 	meta.RoomFeatures.BreakoutRoomFeatures.IsActive = false
-	_, err = m.lk.UpdateRoomMetadataByStruct(roomId, meta)
+	err = m.natsService.UpdateAndBroadcastRoomMetadata(roomId, meta)
 	if err != nil {
 		return err
 	}

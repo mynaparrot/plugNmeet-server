@@ -12,7 +12,7 @@ import (
 )
 
 func (m *BreakoutRoomModel) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRoomsReq) error {
-	mainRoom, meta, err := m.lk.LoadRoomWithMetadata(r.RoomId)
+	mainRoom, meta, err := m.natsService.GetRoomInfoWithMetadata(r.RoomId)
 	if err != nil {
 		return err
 	}
@@ -95,12 +95,12 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRooms
 	}
 
 	// again here for update
-	origMeta, err := m.lk.UnmarshalRoomMetadata(mainRoom.Metadata)
+	origMeta, err := m.natsService.UnmarshalRoomMetadata(mainRoom.Metadata)
 	if err != nil {
 		return err
 	}
 	origMeta.RoomFeatures.BreakoutRoomFeatures.IsActive = true
-	_, err = m.lk.UpdateRoomMetadataByStruct(r.RoomId, origMeta)
+	err = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, origMeta)
 
 	// send analytics
 	analyticsModel := analyticsmodel.New(m.app, m.ds, m.rs, m.lk)

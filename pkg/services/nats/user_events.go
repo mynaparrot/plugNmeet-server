@@ -23,12 +23,16 @@ func (s *NatsService) BroadcastUserMetadata(roomId string, userId string, metada
 }
 
 // UpdateAndBroadcastUserMetadata will update metadata & broadcast to everyone
-func (s *NatsService) UpdateAndBroadcastUserMetadata(roomId, userId string, meta *plugnmeet.UserMetadata) error {
+func (s *NatsService) UpdateAndBroadcastUserMetadata(roomId, userId string, meta interface{}, toUserId *string) error {
+	if meta == nil {
+		return errors.New("metadata cannot be nil")
+	}
+
 	mt, err := s.UpdateUserMetadata(userId, meta)
 	if err != nil {
 		return err
 	}
-	return s.BroadcastUserMetadata(roomId, userId, &mt, nil)
+	return s.BroadcastUserMetadata(roomId, userId, &mt, toUserId)
 }
 
 func (s *NatsService) BroadcastUserInfoToRoom(event plugnmeet.NatsMsgServerToClientEvents, roomId, userId string, userInfo *plugnmeet.NatsKvUserInfo) {

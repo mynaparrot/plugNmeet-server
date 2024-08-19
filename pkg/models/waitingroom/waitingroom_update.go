@@ -45,13 +45,13 @@ func (m *WaitingRoomModel) approveUser(roomId, userId, metadata string) error {
 }
 
 func (m *WaitingRoomModel) UpdateWaitingRoomMessage(r *plugnmeet.UpdateWaitingRoomMessageReq) error {
-	_, roomMeta, err := m.lk.LoadRoomWithMetadata(r.RoomId)
+	roomMeta, err := m.natsService.GetRoomMetadataStruct(r.RoomId)
 	if err != nil {
 		return err
 	}
 
 	roomMeta.RoomFeatures.WaitingRoomFeatures.WaitingRoomMsg = r.Msg
-	_, err = m.lk.UpdateRoomMetadataByStruct(r.RoomId, roomMeta)
+	err = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, roomMeta)
 
 	return err
 }

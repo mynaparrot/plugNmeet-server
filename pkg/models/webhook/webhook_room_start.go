@@ -68,7 +68,7 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 	}
 
 	if event.Room.GetMetadata() != "" {
-		info, err := m.lk.UnmarshalRoomMetadata(event.Room.Metadata)
+		info, err := m.natsService.UnmarshalRoomMetadata(event.Room.Metadata)
 		if err == nil {
 			info.StartedAt = uint64(time.Now().Unix())
 			if info.RoomFeatures.GetRoomDuration() > 0 {
@@ -89,13 +89,13 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 					log.Errorln(err)
 				}
 			}
-			lk, err := m.lk.UpdateRoomMetadataByStruct(event.Room.Name, info)
+			err := m.natsService.UpdateAndBroadcastRoomMetadata(event.Room.Name, info)
 			if err != nil {
 				log.Errorln(err)
 			}
-			if lk.GetMetadata() != "" {
+			if roomInfo, err := m.natsService.GetRoomInfo(event.Room.Name); err == nil && roomInfo != nil {
 				// use updated metadata
-				event.Room.Metadata = lk.GetMetadata()
+				event.Room.Metadata = roomInfo.Metadata
 			}
 		}
 	}

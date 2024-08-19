@@ -49,19 +49,19 @@ func (u *UserModel) updateLockSettingsAllUsers(r *plugnmeet.UpdateUserLockSettin
 
 	// now we'll require updating room settings
 	// so that future users can be applied same lock settings
-	info, err := u.lk.LoadRoomInfo(r.RoomId)
+	info, err := u.natsService.GetRoomInfo(r.RoomId)
 	if err != nil {
 		return err
 	}
 	meta := make([]byte, len(info.Metadata))
 	copy(meta, info.Metadata)
 
-	m, _ := u.lk.UnmarshalRoomMetadata(string(meta))
+	m, _ := u.natsService.UnmarshalRoomMetadata(string(meta))
 
 	l := u.changeLockSettingsMetadata(r.Service, r.Direction, m.DefaultLockSettings)
 	m.DefaultLockSettings = l
 
-	_, err = u.lk.UpdateRoomMetadataByStruct(r.RoomId, m)
+	err = u.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, m)
 
 	return err
 }

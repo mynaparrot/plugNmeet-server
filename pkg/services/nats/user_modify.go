@@ -54,7 +54,7 @@ func (s *NatsService) AddUser(roomId, userId, sid, name string, isAdmin, isPrese
 		return err
 	}
 
-	mt, err := s.MarshalParticipantMetadata(metadata)
+	mt, err := s.MarshalUserMetadata(metadata)
 	if err != nil {
 		return err
 	}
@@ -124,21 +124,38 @@ func (s *NatsService) UpdateUserStatus(roomId, userId string, status string) err
 	return nil
 }
 
-// UpdateUserMetadata will basically update metadata only
-// because normally we do not need to update other info
-func (s *NatsService) UpdateUserMetadata(userId string, metadata *plugnmeet.UserMetadata) (string, error) {
-	// is will update during marshaling
-	mt, err := s.MarshalParticipantMetadata(metadata)
+// UpdateUserMetadata will properly update user metadata
+func (s *NatsService) UpdateUserMetadata(userId string, metadata interface{}) (string, error) {
+	var mt *plugnmeet.UserMetadata
+	var err error
+
+	switch v := metadata.(type) {
+	case string:
+		// because we'll need to update id
+		mt, err = s.UnmarshalUserMetadata(v)
+		if err != nil {
+			return "", err
+		}
+	case plugnmeet.UserMetadata:
+		mt = &v
+	case *plugnmeet.UserMetadata:
+		mt = v
+	default:
+		return "", errors.New("invalid metadata data type")
+	}
+
+	// id will update during marshaling
+	marshal, err := s.MarshalUserMetadata(mt)
 	if err != nil {
 		return "", err
 	}
 
-	err = s.UpdateUserKeyValue(userId, UserMetadataKey, mt)
+	err = s.UpdateUserKeyValue(userId, UserMetadataKey, marshal)
 	if err != nil {
 		return "", err
 	}
 
-	return mt, nil
+	return marshal, nil
 }
 
 func (s *NatsService) DeleteUser(roomId, userId string) {

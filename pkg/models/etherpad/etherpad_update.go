@@ -14,13 +14,13 @@ import (
 )
 
 func (m *EtherpadModel) ChangeEtherpadStatus(r *plugnmeet.ChangeEtherpadStatusReq) error {
-	_, meta, err := m.lk.LoadRoomWithMetadata(r.RoomId)
+	meta, err := m.natsService.GetRoomMetadataStruct(r.RoomId)
 	if err != nil {
 		return err
 	}
 
 	meta.RoomFeatures.SharedNotePadFeatures.IsActive = r.IsActive
-	_, err = m.lk.UpdateRoomMetadataByStruct(r.RoomId, meta)
+	err = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, meta)
 	if err != nil {
 		log.Errorln(err)
 	}
@@ -44,7 +44,7 @@ func (m *EtherpadModel) ChangeEtherpadStatus(r *plugnmeet.ChangeEtherpadStatusRe
 }
 
 func (m *EtherpadModel) addPadToRoomMetadata(roomId string, c *plugnmeet.CreateEtherpadSessionRes) error {
-	_, meta, err := m.lk.LoadRoomWithMetadata(roomId)
+	meta, err := m.natsService.GetRoomMetadataStruct(roomId)
 	if err != nil {
 		return err
 	}
@@ -59,7 +59,7 @@ func (m *EtherpadModel) addPadToRoomMetadata(roomId string, c *plugnmeet.CreateE
 	}
 	meta.RoomFeatures.SharedNotePadFeatures = f
 
-	_, err = m.lk.UpdateRoomMetadataByStruct(roomId, meta)
+	err = m.natsService.UpdateAndBroadcastRoomMetadata(roomId, meta)
 	if err != nil {
 		log.Errorln(err)
 	}
