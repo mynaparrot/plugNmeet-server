@@ -51,13 +51,13 @@ func (u *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
 		meta := make([]byte, len(p.Metadata))
 		copy(meta, p.Metadata)
 
-		m, _ := u.lk.UnmarshalParticipantMetadata(string(meta))
+		m, _ := u.natsService.UnmarshalUserMetadata(string(meta))
 
 		if r.Task == plugnmeet.SwitchPresenterTask_PROMOTE {
 			if m.IsPresenter {
 				// demote current presenter from presenter
 				m.IsPresenter = false
-				_, err = u.lk.UpdateParticipantMetadataByStruct(r.RoomId, p.Identity, m)
+				err = u.natsService.UpdateAndBroadcastUserMetadata(r.RoomId, p.Identity, m, nil)
 				if err != nil {
 					return errors.New(config.CanNotDemotePresenter)
 				}
@@ -67,7 +67,7 @@ func (u *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
 				// we'll update requested user as presenter
 				// otherwise in the session there won't have any presenter
 				m.IsPresenter = true
-				_, err = u.lk.UpdateParticipantMetadataByStruct(r.RoomId, p.Identity, m)
+				err = u.natsService.UpdateAndBroadcastUserMetadata(r.RoomId, p.Identity, m, nil)
 				if err != nil {
 					return errors.New(config.CanNotChangeAlternativePresenter)
 				}
@@ -83,17 +83,17 @@ func (u *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
 	meta := make([]byte, len(p.Metadata))
 	copy(meta, p.Metadata)
 
-	m, _ := u.lk.UnmarshalParticipantMetadata(string(meta))
+	m, _ := u.natsService.UnmarshalUserMetadata(string(meta))
 
 	if r.Task == plugnmeet.SwitchPresenterTask_PROMOTE {
 		m.IsPresenter = true
-		_, err = u.lk.UpdateParticipantMetadataByStruct(r.RoomId, p.Identity, m)
+		err = u.natsService.UpdateAndBroadcastUserMetadata(r.RoomId, p.Identity, m, nil)
 		if err != nil {
 			return errors.New(config.CanNotPromoteToPresenter)
 		}
 	} else if r.Task == plugnmeet.SwitchPresenterTask_DEMOTE {
 		m.IsPresenter = false
-		_, err = u.lk.UpdateParticipantMetadataByStruct(r.RoomId, p.Identity, m)
+		err = u.natsService.UpdateAndBroadcastUserMetadata(r.RoomId, p.Identity, m, nil)
 		if err != nil {
 			return errors.New(config.CanNotDemotePresenter)
 		}

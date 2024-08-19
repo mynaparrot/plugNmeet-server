@@ -78,11 +78,11 @@ func (u *UserModel) updateParticipantLockMetadata(um updateParticipantLockMetada
 		meta := make([]byte, len(um.participantInfo.Metadata))
 		copy(meta, um.participantInfo.Metadata)
 
-		m, _ := u.lk.UnmarshalParticipantMetadata(string(meta))
+		m, _ := u.natsService.UnmarshalUserMetadata(string(meta))
 		l := u.changeLockSettingsMetadata(um.service, um.direction, m.LockSettings)
 		m.LockSettings = l
 
-		_, err := u.lk.UpdateParticipantMetadataByStruct(um.roomId, um.participantInfo.Identity, m)
+		err := u.natsService.UpdateAndBroadcastUserMetadata(um.roomId, um.participantInfo.Identity, m, nil)
 		return err
 	}
 

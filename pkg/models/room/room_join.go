@@ -24,7 +24,7 @@ func (m *RoomModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, erro
 		g.UserInfo.UserMetadata.RecordWebcam = &recordWebcam
 	}
 
-	metadata, err := m.lk.MarshalParticipantMetadata(g.UserInfo.UserMetadata)
+	metadata, err := m.natsService.MarshalUserMetadata(g.UserInfo.UserMetadata)
 	if err != nil {
 		return "", err
 	}
@@ -82,7 +82,7 @@ func (m *RoomModel) assignLockSettings(g *plugnmeet.GenerateTokenReq) {
 		return
 	}
 
-	_, meta, err := m.lk.LoadRoomWithMetadata(g.RoomId)
+	meta, err := m.natsService.GetRoomMetadataStruct(g.RoomId)
 	if err != nil {
 		g.UserInfo.UserMetadata.LockSettings = l
 	}
@@ -165,7 +165,7 @@ func (m *RoomModel) makePresenter(g *plugnmeet.GenerateTokenReq) {
 			meta := make([]byte, len(p.Metadata))
 			copy(meta, p.Metadata)
 
-			mm, _ := m.lk.UnmarshalParticipantMetadata(string(meta))
+			mm, _ := m.natsService.UnmarshalUserMetadata(string(meta))
 			if mm.IsAdmin && mm.IsPresenter {
 				hasPresenter = true
 				break

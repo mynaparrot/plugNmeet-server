@@ -33,10 +33,10 @@ func (m *WaitingRoomModel) approveUser(roomId, userId, metadata string) error {
 	meta := make([]byte, len(metadata))
 	copy(meta, metadata)
 
-	mm, _ := m.lk.UnmarshalParticipantMetadata(string(meta))
+	mm, _ := m.natsService.UnmarshalUserMetadata(string(meta))
 	mm.WaitForApproval = false // this mean doesn't need to wait anymore
 
-	_, err := m.lk.UpdateParticipantMetadataByStruct(roomId, userId, mm)
+	err := m.natsService.UpdateAndBroadcastUserMetadata(roomId, userId, mm, nil)
 	if err != nil {
 		return errors.New("can't approve user. try again")
 	}

@@ -10,7 +10,7 @@ import (
 func (m *AnalyticsModel) handleFirstTimeUserJoined(key string) {
 	umeta := new(plugnmeet.UserMetadata)
 	if m.data.ExtraData != nil && *m.data.ExtraData != "" {
-		umeta, _ = m.lk.UnmarshalParticipantMetadata(*m.data.ExtraData)
+		umeta, _ = m.natsService.UnmarshalUserMetadata(*m.data.ExtraData)
 	}
 
 	uInfo := &plugnmeet.AnalyticsRedisUserInfo{

@@ -12,7 +12,7 @@ func (m *DataMsgModel) raiseHand(r *plugnmeet.DataMessageReq) error {
 
 	var ids []string
 	for _, participant := range participants {
-		meta, err := m.lk.UnmarshalParticipantMetadata(participant.Metadata)
+		meta, err := m.natsService.UnmarshalUserMetadata(participant.Metadata)
 		if err != nil {
 			continue
 		}
@@ -21,12 +21,11 @@ func (m *DataMsgModel) raiseHand(r *plugnmeet.DataMessageReq) error {
 		}
 	}
 
-	reqPar, metadata, _ := m.lk.LoadParticipantWithMetadata(r.RoomId, r.RequestedUserId)
-
+	reqPar, metadata, _ := m.natsService.GetUserWithMetadata(r.RequestedUserId)
 	// now update user's metadata
 	metadata.RaisedHand = true
 
-	_, err := m.lk.UpdateParticipantMetadataByStruct(r.RoomId, r.RequestedUserId, metadata)
+	err := m.natsService.UpdateAndBroadcastUserMetadata(r.RoomId, r.RequestedUserId, metadata, nil)
 	if err != nil {
 		return err
 	}
@@ -54,7 +53,7 @@ func (m *DataMsgModel) raiseHand(r *plugnmeet.DataMessageReq) error {
 			Time: &tm,
 			From: &plugnmeet.DataMsgReqFrom{
 				Sid:    r.UserId,
-				UserId: reqPar.Identity,
+				UserId: reqPar.UserId,
 			},
 			Msg: r.Msg,
 		},
@@ -66,7 +65,7 @@ func (m *DataMsgModel) raiseHand(r *plugnmeet.DataMessageReq) error {
 }
 
 func (m *DataMsgModel) lowerHand(r *plugnmeet.DataMessageReq) error {
-	_, metadata, err := m.lk.LoadParticipantWithMetadata(r.RoomId, r.RequestedUserId)
+	metadata, err := m.natsService.GetUserMetadataStruct(r.RequestedUserId)
 	if err != nil {
 		return err
 	}
@@ -74,7 +73,7 @@ func (m *DataMsgModel) lowerHand(r *plugnmeet.DataMessageReq) error {
 	// now update user's metadata
 	metadata.RaisedHand = false
 
-	_, err = m.lk.UpdateParticipantMetadataByStruct(r.RoomId, r.RequestedUserId, metadata)
+	err = m.natsService.UpdateAndBroadcastUserMetadata(r.RoomId, r.RequestedUserId, metadata, nil)
 	if err != nil {
 		return err
 	}
@@ -88,7 +87,7 @@ func (m *DataMsgModel) otherUserLowerHand(r *plugnmeet.DataMessageReq) error {
 	}
 	userId := r.Msg
 
-	_, metadata, err := m.lk.LoadParticipantWithMetadata(r.RoomId, userId)
+	metadata, err := m.natsService.GetUserMetadataStruct(userId)
 	if err != nil {
 		return err
 	}
@@ -96,7 +95,7 @@ func (m *DataMsgModel) otherUserLowerHand(r *plugnmeet.DataMessageReq) error {
 	// now update user's metadata
 	metadata.RaisedHand = false
 
-	_, err = m.lk.UpdateParticipantMetadataByStruct(r.RoomId, userId, metadata)
+	err = m.natsService.UpdateAndBroadcastUserMetadata(r.RoomId, userId, metadata, nil)
 	if err != nil {
 		return err
 	}

@@ -19,7 +19,12 @@ func (s *NatsService) BroadcastUserMetadata(roomId string, userId string, metada
 		metadata = &result.Metadata
 	}
 
-	return s.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_USER_METADATA_UPDATE, roomId, *metadata, toUser)
+	data := &plugnmeet.NatsUserMetadataUpdate{
+		Metadata: *metadata,
+		UserId:   userId,
+	}
+
+	return s.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_USER_METADATA_UPDATE, roomId, data, toUser)
 }
 
 // UpdateAndBroadcastUserMetadata will update metadata & broadcast to everyone

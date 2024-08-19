@@ -32,7 +32,7 @@ func (m *SpeechToTextModel) GenerateAzureToken(r *plugnmeet.GenerateAzureTokenRe
 		return errors.New("speech-services.already-using-service")
 	}
 
-	_, meta, err := m.lk.LoadRoomWithMetadata(r.RoomId)
+	meta, err := m.natsService.GetRoomMetadataStruct(r.RoomId)
 	if err != nil {
 		return err
 	}

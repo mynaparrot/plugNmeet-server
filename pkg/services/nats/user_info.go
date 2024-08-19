@@ -196,6 +196,23 @@ func (s *NatsService) GetUserMetadataStruct(userId string) (*plugnmeet.UserMetad
 	return s.UnmarshalUserMetadata(string(metadata.Value()))
 }
 
+func (s *NatsService) GetUserWithMetadata(userId string) (*plugnmeet.NatsKvUserInfo, *plugnmeet.UserMetadata, error) {
+	info, err := s.GetUserInfo(userId)
+	if err != nil {
+		return nil, nil, err
+	}
+	if info == nil {
+		return nil, nil, nil
+	}
+
+	metadata, err := s.UnmarshalUserMetadata(info.Metadata)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return info, metadata, nil
+}
+
 func (s *NatsService) GetUserLastPing(userId string) int64 {
 	if lastPing, err := s.GetUserKeyValue(userId, UserLastPingAt); err == nil && lastPing != nil {
 		if parseUint, err := strconv.ParseInt(string(lastPing.Value()), 10, 64); err == nil {
