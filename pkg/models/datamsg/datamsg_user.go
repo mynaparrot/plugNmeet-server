@@ -8,7 +8,7 @@ import (
 )
 
 func (m *DataMsgModel) raiseHand(r *plugnmeet.DataMessageReq) error {
-	participants, _ := m.lk.LoadParticipants(r.RoomId)
+	participants, _ := m.natsService.GetOnlineUsersList(r.RoomId)
 
 	var ids []string
 	for _, participant := range participants {
@@ -16,12 +16,12 @@ func (m *DataMsgModel) raiseHand(r *plugnmeet.DataMessageReq) error {
 		if err != nil {
 			continue
 		}
-		if meta.IsAdmin && (r.RequestedUserId != participant.Identity) {
-			ids = append(ids, participant.Identity)
+		if meta.IsAdmin && (r.RequestedUserId != participant.UserId) {
+			ids = append(ids, participant.UserId)
 		}
 	}
 
-	reqPar, metadata, _ := m.natsService.GetUserWithMetadata(r.RequestedUserId)
+	reqPar, metadata, _ := m.natsService.GetUserWithMetadata(r.RoomId, r.RequestedUserId)
 	// now update user's metadata
 	metadata.RaisedHand = true
 
@@ -65,7 +65,7 @@ func (m *DataMsgModel) raiseHand(r *plugnmeet.DataMessageReq) error {
 }
 
 func (m *DataMsgModel) lowerHand(r *plugnmeet.DataMessageReq) error {
-	metadata, err := m.natsService.GetUserMetadataStruct(r.RequestedUserId)
+	metadata, err := m.natsService.GetUserMetadataStruct(r.RoomId, r.RequestedUserId)
 	if err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func (m *DataMsgModel) otherUserLowerHand(r *plugnmeet.DataMessageReq) error {
 	}
 	userId := r.Msg
 
-	metadata, err := m.natsService.GetUserMetadataStruct(userId)
+	metadata, err := m.natsService.GetUserMetadataStruct(r.RoomId, userId)
 	if err != nil {
 		return err
 	}

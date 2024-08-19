@@ -40,7 +40,7 @@ func (m *NatsModel) HandleClientPing(roomId, userId string) {
 	// as user has sent ping request, this indicates the user is online
 	m.OnAfterUserJoined(roomId, userId)
 
-	err := m.natsService.UpdateUserKeyValue(userId, natsservice.UserLastPingAt, fmt.Sprintf("%d", time.Now().UnixMilli()))
+	err := m.natsService.UpdateUserKeyValue(roomId, userId, natsservice.UserLastPingAt, fmt.Sprintf("%d", time.Now().UnixMilli()))
 	if err != nil {
 		log.Errorln(err)
 	}

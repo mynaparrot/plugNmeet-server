@@ -18,7 +18,7 @@ func (m *NatsModel) HandleInitialData(roomId, userId string) {
 	}
 
 	// send this user's info
-	userInfo, err := m.natsService.GetUserInfo(userId)
+	userInfo, err := m.natsService.GetUserInfo(roomId, userId)
 	if err != nil {
 		log.Errorln(err)
 		_ = m.natsService.NotifyErrorMsg(roomId, err.Error(), &userId)

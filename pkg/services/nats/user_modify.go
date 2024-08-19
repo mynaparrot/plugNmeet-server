@@ -48,7 +48,7 @@ func (s *NatsService) AddUser(roomId, userId, sid, name string, isAdmin, isPrese
 
 	// now we'll create different bucket for info
 	kv, err = s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
-		Bucket: fmt.Sprintf("%s-%s", UserInfoBucket, userId),
+		Bucket: fmt.Sprintf("%s-r_%s-u_%s", UserInfoBucket, roomId, userId),
 	})
 	if err != nil {
 		return err
@@ -125,7 +125,7 @@ func (s *NatsService) UpdateUserStatus(roomId, userId string, status string) err
 }
 
 // UpdateUserMetadata will properly update user metadata
-func (s *NatsService) UpdateUserMetadata(userId string, metadata interface{}) (string, error) {
+func (s *NatsService) UpdateUserMetadata(roomId, userId string, metadata interface{}) (string, error) {
 	var mt *plugnmeet.UserMetadata
 	var err error
 
@@ -150,7 +150,7 @@ func (s *NatsService) UpdateUserMetadata(userId string, metadata interface{}) (s
 		return "", err
 	}
 
-	err = s.UpdateUserKeyValue(userId, UserMetadataKey, marshal)
+	err = s.UpdateUserKeyValue(roomId, userId, UserMetadataKey, marshal)
 	if err != nil {
 		return "", err
 	}
@@ -192,8 +192,8 @@ func (s *NatsService) DeleteAllRoomUsers(roomId string) error {
 	return nil
 }
 
-func (s *NatsService) UpdateUserKeyValue(userId, key, val string) error {
-	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", UserInfoBucket, userId))
+func (s *NatsService) UpdateUserKeyValue(roomId, userId, key, val string) error {
+	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-r_%s-u_%s", UserInfoBucket, roomId, userId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
 		return errors.New(fmt.Sprintf("no user found with userId: %s", userId))

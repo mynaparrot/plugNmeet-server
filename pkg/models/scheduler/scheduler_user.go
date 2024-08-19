@@ -19,7 +19,7 @@ func (m *SchedulerModel) checkOnlineUsersStatus() {
 			roomId := strings.ReplaceAll(s, natsservice.RoomUsersBucket+"-", "")
 			if users, err := m.natsService.GetOlineUsersId(roomId); err == nil && users != nil && len(users) > 0 {
 				for _, u := range users {
-					lastPing := m.natsService.GetUserLastPing(u)
+					lastPing := m.natsService.GetUserLastPing(roomId, u)
 					if lastPing == 0 {
 						// this user should be offline
 						_ = m.natsService.UpdateUserStatus(roomId, u, natsservice.UserOffline)

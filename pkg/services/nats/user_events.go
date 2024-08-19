@@ -8,7 +8,7 @@ import (
 
 func (s *NatsService) BroadcastUserMetadata(roomId string, userId string, metadata, toUser *string) error {
 	if metadata == nil {
-		result, err := s.GetUserInfo(userId)
+		result, err := s.GetUserInfo(roomId, userId)
 		if err != nil {
 			return err
 		}
@@ -33,7 +33,7 @@ func (s *NatsService) UpdateAndBroadcastUserMetadata(roomId, userId string, meta
 		return errors.New("metadata cannot be nil")
 	}
 
-	mt, err := s.UpdateUserMetadata(userId, meta)
+	mt, err := s.UpdateUserMetadata(roomId, userId, meta)
 	if err != nil {
 		return err
 	}
@@ -42,7 +42,7 @@ func (s *NatsService) UpdateAndBroadcastUserMetadata(roomId, userId string, meta
 
 func (s *NatsService) BroadcastUserInfoToRoom(event plugnmeet.NatsMsgServerToClientEvents, roomId, userId string, userInfo *plugnmeet.NatsKvUserInfo) {
 	if userInfo == nil {
-		info, err := s.GetUserInfo(userId)
+		info, err := s.GetUserInfo(roomId, userId)
 		if err != nil {
 			return
 		}

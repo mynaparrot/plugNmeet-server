@@ -66,7 +66,7 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 	roomId := data.GetRoomId()
 	userId := data.GetUserId()
 
-	userInfo, err := s.natsService.GetUserInfo(userId)
+	userInfo, err := s.natsService.GetUserInfo(roomId, userId)
 	if err != nil {
 		return nil, err
 	}

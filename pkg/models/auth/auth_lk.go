@@ -8,7 +8,7 @@ import (
 )
 
 func (m *AuthModel) GenerateLivekitToken(c *plugnmeet.PlugNmeetTokenClaims) (string, error) {
-	info, err := m.natsService.GetUserInfo(c.UserId)
+	info, err := m.natsService.GetUserInfo(c.RoomId, c.UserId)
 	if err != nil {
 		return "", err
 	}

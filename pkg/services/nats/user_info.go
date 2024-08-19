@@ -26,8 +26,8 @@ func (s *NatsService) GetRoomUserStatus(roomId, userId string) (string, error) {
 	return string(status.Value()), nil
 }
 
-func (s *NatsService) GetUserInfo(userId string) (*plugnmeet.NatsKvUserInfo, error) {
-	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", UserInfoBucket, userId))
+func (s *NatsService) GetUserInfo(roomId, userId string) (*plugnmeet.NatsKvUserInfo, error) {
+	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-r_%s-u_%s", UserInfoBucket, roomId, userId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
 		return nil, nil
@@ -137,7 +137,7 @@ func (s *NatsService) GetOnlineUsersList(roomId string) ([]*plugnmeet.NatsKvUser
 
 	var users []*plugnmeet.NatsKvUserInfo
 	for _, id := range userIds {
-		if info, err := s.GetUserInfo(id); err == nil && info != nil {
+		if info, err := s.GetUserInfo(roomId, id); err == nil && info != nil {
 			users = append(users, info)
 		}
 	}
@@ -166,8 +166,8 @@ func (s *NatsService) GetOnlineUsersListAsJson(roomId string) ([]byte, error) {
 	return json.Marshal(raw)
 }
 
-func (s *NatsService) GetUserKeyValue(userId, key string) (jetstream.KeyValueEntry, error) {
-	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", UserInfoBucket, userId))
+func (s *NatsService) GetUserKeyValue(roomId, userId, key string) (jetstream.KeyValueEntry, error) {
+	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-r_%s-u_%s", UserInfoBucket, roomId, userId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
 		return nil, nil
@@ -183,8 +183,8 @@ func (s *NatsService) GetUserKeyValue(userId, key string) (jetstream.KeyValueEnt
 	return val, nil
 }
 
-func (s *NatsService) GetUserMetadataStruct(userId string) (*plugnmeet.UserMetadata, error) {
-	metadata, err := s.GetUserKeyValue(userId, UserMetadataKey)
+func (s *NatsService) GetUserMetadataStruct(roomId, userId string) (*plugnmeet.UserMetadata, error) {
+	metadata, err := s.GetUserKeyValue(roomId, userId, UserMetadataKey)
 	if err != nil {
 		return nil, err
 	}
@@ -196,8 +196,8 @@ func (s *NatsService) GetUserMetadataStruct(userId string) (*plugnmeet.UserMetad
 	return s.UnmarshalUserMetadata(string(metadata.Value()))
 }
 
-func (s *NatsService) GetUserWithMetadata(userId string) (*plugnmeet.NatsKvUserInfo, *plugnmeet.UserMetadata, error) {
-	info, err := s.GetUserInfo(userId)
+func (s *NatsService) GetUserWithMetadata(roomId, userId string) (*plugnmeet.NatsKvUserInfo, *plugnmeet.UserMetadata, error) {
+	info, err := s.GetUserInfo(roomId, userId)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -213,8 +213,8 @@ func (s *NatsService) GetUserWithMetadata(userId string) (*plugnmeet.NatsKvUserI
 	return info, metadata, nil
 }
 
-func (s *NatsService) GetUserLastPing(userId string) int64 {
-	if lastPing, err := s.GetUserKeyValue(userId, UserLastPingAt); err == nil && lastPing != nil {
+func (s *NatsService) GetUserLastPing(roomId, userId string) int64 {
+	if lastPing, err := s.GetUserKeyValue(roomId, userId, UserLastPingAt); err == nil && lastPing != nil {
 		if parseUint, err := strconv.ParseInt(string(lastPing.Value()), 10, 64); err == nil {
 			return parseUint
 		}

@@ -23,7 +23,7 @@ func (m *BreakoutRoomModel) JoinBreakoutRoom(r *plugnmeet.JoinBreakoutRoomReq) (
 		}
 	}
 
-	p, meta, err := m.natsService.GetUserWithMetadata(r.UserId)
+	p, meta, err := m.natsService.GetUserWithMetadata(r.RoomId, r.UserId)
 	if err != nil {
 		return "", err
 	}
