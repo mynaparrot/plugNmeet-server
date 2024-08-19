@@ -21,10 +21,7 @@ func (m *SchedulerModel) checkOnlineUsersStatus() {
 				for _, u := range users {
 					lastPing := m.natsService.GetUserLastPing(roomId, u)
 					if lastPing == 0 {
-						// this user should be offline
-						_ = m.natsService.UpdateUserStatus(roomId, u, natsservice.UserOffline)
-						// notify to the room
-						m.natsService.BroadcastUserInfoToRoom(plugnmeet.NatsMsgServerToClientEvents_USER_OFFLINE, roomId, u, nil)
+						m.changeUserStatus(roomId, u)
 						continue
 					}
 
@@ -32,13 +29,20 @@ func (m *SchedulerModel) checkOnlineUsersStatus() {
 					lastPing += natsservice.UserOnlineMaxPingDiff.Milliseconds()
 					if time.Now().UnixMilli() > lastPing {
 						fmt.Println("user should be offline", lastPing, time.Now().UnixMilli())
-						_ = m.natsService.UpdateUserStatus(roomId, u, natsservice.UserOffline)
-
-						// notify to the room
-						m.natsService.BroadcastUserInfoToRoom(plugnmeet.NatsMsgServerToClientEvents_USER_OFFLINE, roomId, u, nil)
+						m.changeUserStatus(roomId, u)
 					}
 				}
 			}
 		}
+	}
+}
+
+func (m *SchedulerModel) changeUserStatus(roomId, userId string) {
+	// this user should be offline
+	_ = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserOffline)
+
+	if info, err := m.natsService.GetUserInfo(roomId, userId); err == nil && info != nil {
+		// notify to the room
+		m.natsService.BroadcastUserInfoToRoom(plugnmeet.NatsMsgServerToClientEvents_USER_OFFLINE, roomId, userId, nil)
 	}
 }
