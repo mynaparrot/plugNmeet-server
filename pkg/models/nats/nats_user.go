@@ -88,8 +88,8 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) {
 		}
 	}
 
-	// otherwise, clean user
-	m.onAfterUserLoggedOut(roomId, userId)
+	// do not need to delete the user as user may come to online again
+	// when the session is ended, we'll do proper clean up
 }
 
 func (m *NatsModel) onAfterUserLoggedOut(roomId, userId string) {

@@ -27,7 +27,7 @@ func (s *NatsService) GetRoomUserStatus(roomId, userId string) (string, error) {
 }
 
 func (s *NatsService) GetUserInfo(roomId, userId string) (*plugnmeet.NatsKvUserInfo, error) {
-	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-r_%s-u_%s", UserInfoBucket, roomId, userId))
+	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf(UserInfoBucket, roomId, userId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
 		return nil, nil
@@ -167,7 +167,7 @@ func (s *NatsService) GetOnlineUsersListAsJson(roomId string) ([]byte, error) {
 }
 
 func (s *NatsService) GetUserKeyValue(roomId, userId, key string) (jetstream.KeyValueEntry, error) {
-	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-r_%s-u_%s", UserInfoBucket, roomId, userId))
+	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf(UserInfoBucket, roomId, userId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
 		return nil, nil

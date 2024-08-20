@@ -92,7 +92,8 @@ func (s *NatsService) CreateSystemPrivateConsumer(roomId, userId string) (jwt.St
 
 func (s *NatsService) CreateWhiteboardConsumer(roomId, userId string) (jwt.StringList, error) {
 	_, err := s.js.CreateOrUpdateConsumer(s.ctx, roomId, jetstream.ConsumerConfig{
-		Durable: fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.Whiteboard, userId),
+		Durable:       fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.Whiteboard, userId),
+		DeliverPolicy: jetstream.DeliverNewPolicy,
 		FilterSubjects: []string{
 			fmt.Sprintf("%s:%s.>", roomId, s.app.NatsInfo.Subjects.Whiteboard),
 		},
@@ -113,7 +114,8 @@ func (s *NatsService) CreateWhiteboardConsumer(roomId, userId string) (jwt.Strin
 
 func (s *NatsService) CreateDataChannelConsumer(roomId, userId string) (jwt.StringList, error) {
 	_, err := s.js.CreateOrUpdateConsumer(s.ctx, roomId, jetstream.ConsumerConfig{
-		Durable: fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.DataChannel, userId),
+		Durable:       fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.DataChannel, userId),
+		DeliverPolicy: jetstream.DeliverNewPolicy,
 		FilterSubjects: []string{
 			fmt.Sprintf("%s:%s.>", roomId, s.app.NatsInfo.Subjects.DataChannel),
 		},

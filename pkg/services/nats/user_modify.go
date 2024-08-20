@@ -11,7 +11,8 @@ import (
 
 const (
 	RoomUsersBucket       = Prefix + "roomUsers"
-	UserInfoBucket        = Prefix + "userInfo"
+	userInfoPrefix        = Prefix + "userInfo"
+	UserInfoBucket        = userInfoPrefix + "-r_%s-u_%s"
 	UserOnlineMaxPingDiff = time.Second * 30 // after 30 seconds we'll treat user as offline
 
 	UserIdKey          = "id"
@@ -48,7 +49,7 @@ func (s *NatsService) AddUser(roomId, userId, sid, name string, isAdmin, isPrese
 
 	// now we'll create different bucket for info
 	kv, err = s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
-		Bucket: fmt.Sprintf("%s-r_%s-u_%s", UserInfoBucket, roomId, userId),
+		Bucket: fmt.Sprintf(UserInfoBucket, roomId, userId),
 	})
 	if err != nil {
 		return err
@@ -94,7 +95,7 @@ func (s *NatsService) UpdateUserStatus(roomId, userId string, status string) err
 		return err
 	}
 
-	kv, err = s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", UserInfoBucket, userId))
+	kv, err = s.js.KeyValue(s.ctx, fmt.Sprintf(UserInfoBucket, roomId, userId))
 	if err != nil {
 		return err
 	}
@@ -163,7 +164,7 @@ func (s *NatsService) DeleteUser(roomId, userId string) {
 		_ = kv.Delete(s.ctx, userId)
 	}
 
-	_ = s.js.DeleteKeyValue(s.ctx, fmt.Sprintf("%s-%s", UserInfoBucket, userId))
+	_ = s.js.DeleteKeyValue(s.ctx, fmt.Sprintf(UserInfoBucket, roomId, userId))
 }
 
 func (s *NatsService) DeleteAllRoomUsers(roomId string) error {
@@ -183,7 +184,7 @@ func (s *NatsService) DeleteAllRoomUsers(roomId string) error {
 
 	for u := range kl.Keys() {
 		// delete bucket of the user info
-		_ = s.js.DeleteKeyValue(s.ctx, fmt.Sprintf("%s-%s", UserInfoBucket, u))
+		_ = s.js.DeleteKeyValue(s.ctx, fmt.Sprintf(UserInfoBucket, roomId, u))
 	}
 
 	// now delete room users bucket
@@ -193,7 +194,7 @@ func (s *NatsService) DeleteAllRoomUsers(roomId string) error {
 }
 
 func (s *NatsService) UpdateUserKeyValue(roomId, userId, key, val string) error {
-	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-r_%s-u_%s", UserInfoBucket, roomId, userId))
+	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf(UserInfoBucket, roomId, userId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
 		return errors.New(fmt.Sprintf("no user found with userId: %s", userId))
