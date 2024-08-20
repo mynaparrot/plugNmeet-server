@@ -179,6 +179,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 			ChatPublic:    natsSubjs.ChatPublic,
 			ChatPrivate:   natsSubjs.ChatPrivate,
 			Whiteboard:    natsSubjs.Whiteboard,
+			DataChannel:   natsSubjs.DataChannel,
 		},
 	}
 	if rr.GetIsActive() && meta != nil {

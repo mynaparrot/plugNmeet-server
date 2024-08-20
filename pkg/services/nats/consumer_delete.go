@@ -25,4 +25,8 @@ func (s *NatsService) DeleteConsumer(roomId, userId string) {
 	if err := s.js.DeleteConsumer(s.ctx, roomId, fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.Whiteboard, userId)); err != nil {
 		log.Errorln(err)
 	}
+
+	if err := s.js.DeleteConsumer(s.ctx, roomId, fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.DataChannel, userId)); err != nil {
+		log.Errorln(err)
+	}
 }

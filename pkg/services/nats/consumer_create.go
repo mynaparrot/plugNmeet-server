@@ -104,6 +104,28 @@ func (s *NatsService) CreateWhiteboardConsumer(roomId, userId string) (jwt.Strin
 	permission := jwt.StringList{
 		fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.Whiteboard, userId),
 		fmt.Sprintf("$JS.API.CONSUMER.MSG.NEXT.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.Whiteboard, userId),
+		fmt.Sprintf("%s:%s.%s", roomId, s.app.NatsInfo.Subjects.Whiteboard, userId),
+		fmt.Sprintf("$JS.ACK.%s.%s:%s.>", roomId, s.app.NatsInfo.Subjects.Whiteboard, userId),
+	}
+
+	return permission, nil
+}
+
+func (s *NatsService) CreateDataChannelConsumer(roomId, userId string) (jwt.StringList, error) {
+	_, err := s.js.CreateOrUpdateConsumer(s.ctx, roomId, jetstream.ConsumerConfig{
+		Durable: fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.DataChannel, userId),
+		FilterSubjects: []string{
+			fmt.Sprintf("%s:%s.>", roomId, s.app.NatsInfo.Subjects.DataChannel),
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	permission := jwt.StringList{
+		fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.DataChannel, userId),
+		fmt.Sprintf("$JS.API.CONSUMER.MSG.NEXT.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.DataChannel, userId),
+		fmt.Sprintf("%s:%s.%s", roomId, s.app.NatsInfo.Subjects.DataChannel, userId),
 		fmt.Sprintf("$JS.ACK.%s.%s:%s.>", roomId, s.app.NatsInfo.Subjects.Whiteboard, userId),
 	}
 

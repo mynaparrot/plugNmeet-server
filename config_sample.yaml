@@ -86,6 +86,7 @@ nats_info:
     chat_public: "chatPublic"
     chat_private: "chatPrivate"
     whiteboard: "whiteboard"
+    dataChannel: "dataChannel"
 upload_file_settings:
   path: "./upload"
   # file size in MB. Default 10MB

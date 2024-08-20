@@ -111,6 +111,12 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 	}
 	allow.Add(whiteboardPermission...)
 
+	dataChannelPermission, err := s.natsService.CreateDataChannelConsumer(roomId, userId)
+	if err != nil {
+		return nil, err
+	}
+	allow.Add(dataChannelPermission...)
+
 	// put name in proper format
 	claims.Name = fmt.Sprintf("%s:%s", roomId, userId)
 	// Assign Permissions

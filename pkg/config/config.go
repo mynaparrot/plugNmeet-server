@@ -155,6 +155,7 @@ type NatsSubjects struct {
 	ChatPublic    string `yaml:"chat_public"`
 	ChatPrivate   string `yaml:"chat_private"`
 	Whiteboard    string `yaml:"whiteboard"`
+	DataChannel   string `yaml:"data_channel"`
 }
 
 var appCnf *AppConfig
