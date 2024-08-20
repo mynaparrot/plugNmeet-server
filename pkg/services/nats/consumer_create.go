@@ -128,7 +128,7 @@ func (s *NatsService) CreateDataChannelConsumer(roomId, userId string) (jwt.Stri
 		fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.DataChannel, userId),
 		fmt.Sprintf("$JS.API.CONSUMER.MSG.NEXT.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.DataChannel, userId),
 		fmt.Sprintf("%s:%s.%s", roomId, s.app.NatsInfo.Subjects.DataChannel, userId),
-		fmt.Sprintf("$JS.ACK.%s.%s:%s.>", roomId, s.app.NatsInfo.Subjects.Whiteboard, userId),
+		fmt.Sprintf("$JS.ACK.%s.%s:%s.>", roomId, s.app.NatsInfo.Subjects.DataChannel, userId),
 	}
 
 	return permission, nil
