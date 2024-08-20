@@ -152,8 +152,7 @@ type NatsSubjects struct {
 	SystemWorker  string `yaml:"system_worker"`
 	SystemPublic  string `yaml:"system_public"`
 	SystemPrivate string `yaml:"system_private"`
-	ChatPublic    string `yaml:"chat_public"`
-	ChatPrivate   string `yaml:"chat_private"`
+	Chat          string `yaml:"chat"`
 	Whiteboard    string `yaml:"whiteboard"`
 	DataChannel   string `yaml:"data_channel"`
 }

@@ -168,7 +168,7 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *livek
 		log.Errorln(err)
 	}
 	// now create room bucket
-	err = nsts.AddRoom(r.RoomId, room.Sid, r.Metadata)
+	err = nsts.AddRoom(r.RoomId, room.Sid, r.EmptyTimeout, r.Metadata)
 	if err != nil {
 		log.Errorln(err)
 	}

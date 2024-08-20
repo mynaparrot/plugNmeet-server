@@ -10,20 +10,25 @@ import (
 )
 
 const (
-	RoomInfoBucket     = Prefix + "roomInfo"
-	RoomIdKey          = "id"
-	RoomSidKey         = "sid"
-	RoomEnabledE2EEKey = "enabled_e2ee"
-	RoomMetadataKey    = "metadata"
-	RoomCreatedKey     = "created_at"
+	RoomInfoBucket      = Prefix + "roomInfo"
+	RoomIdKey           = "id"
+	RoomSidKey          = "sid"
+	RoomEmptyTimeoutKey = "empty_timeout"
+	RoomEnabledE2EEKey  = "enabled_e2ee"
+	RoomMetadataKey     = "metadata"
+	RoomCreatedKey      = "created_at"
 )
 
-func (s *NatsService) AddRoom(roomId, roomSid string, metadata *plugnmeet.RoomMetadata) error {
+func (s *NatsService) AddRoom(roomId, roomSid string, emptyTimeout *uint32, metadata *plugnmeet.RoomMetadata) error {
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
 		Bucket: fmt.Sprintf("%s-%s", RoomInfoBucket, roomId),
 	})
 	if err != nil {
 		return err
+	}
+	if emptyTimeout == nil {
+		var et uint32 = 1800 // 1800 seconds = 30 minutes
+		emptyTimeout = &et
 	}
 
 	mt, err := s.MarshalRoomMetadata(metadata)
@@ -32,11 +37,12 @@ func (s *NatsService) AddRoom(roomId, roomSid string, metadata *plugnmeet.RoomMe
 	}
 
 	data := map[string]string{
-		RoomIdKey:          roomId,
-		RoomSidKey:         roomSid,
-		RoomEnabledE2EEKey: fmt.Sprintf("%v", metadata.RoomFeatures.EndToEndEncryptionFeatures.IsEnabled),
-		RoomCreatedKey:     fmt.Sprintf("%d", time.Now().UnixMilli()),
-		RoomMetadataKey:    mt,
+		RoomIdKey:           roomId,
+		RoomSidKey:          roomSid,
+		RoomEmptyTimeoutKey: fmt.Sprintf("%d", *emptyTimeout),
+		RoomEnabledE2EEKey:  fmt.Sprintf("%v", metadata.RoomFeatures.EndToEndEncryptionFeatures.IsEnabled),
+		RoomCreatedKey:      fmt.Sprintf("%d", time.Now().UTC().Unix()), // in seconds
+		RoomMetadataKey:     mt,
 	}
 
 	for k, v := range data {

@@ -21,6 +21,7 @@ func (m *RoomModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoo
 	}
 
 	// let's make sure room actually active
+	// TODO: think a way to check if room is active or not
 	_, meta, err := m.lk.LoadRoomWithMetadata(r.RoomId)
 	if err != nil {
 		// Room isn't active. Change status

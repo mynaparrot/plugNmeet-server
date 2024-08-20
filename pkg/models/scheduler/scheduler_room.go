@@ -2,6 +2,7 @@ package schedulermodel
 
 import (
 	"context"
+	"fmt"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
@@ -91,9 +92,17 @@ func (m *SchedulerModel) checkRoomActiveUsersForRoomStatus() {
 				continue
 			}
 			if users == nil || len(users) == 0 {
-				// TODO: this room should be ended
-				// or may be it was ended, but proper cleaning was not possible
-				log.Infoln("TODO: this room should be ended or clean up")
+				info, err := m.natsService.GetRoomInfo(roomId)
+				if err != nil {
+					continue
+				}
+				valid := info.CreatedAt + info.EmptyTimeout
+				if uint64(time.Now().UTC().Unix()) > valid {
+					fmt.Println(uint64(time.Now().UTC().Unix()) - valid)
+					// TODO: this room should be ended
+					// or may be it was ended, but proper cleaning was not possible
+					log.Infoln("TODO: this room should be ended or clean up")
+				}
 			}
 		}
 	}

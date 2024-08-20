@@ -83,8 +83,7 @@ nats_info:
     system_worker: "systemWorker"
     system_public: "sysPublic"
     system_private: "sysPrivate"
-    chat_public: "chatPublic"
-    chat_private: "chatPrivate"
+    chat: "chat"
     whiteboard: "whiteboard"
     dataChannel: "dataChannel"
 upload_file_settings:

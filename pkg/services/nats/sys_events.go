@@ -46,7 +46,7 @@ func (s *NatsService) BroadcastSystemEventToRoom(event plugnmeet.NatsMsgServerTo
 		sub = fmt.Sprintf("%s:%s.%s.system", roomId, s.app.NatsInfo.Subjects.SystemPrivate, *toUserId)
 	}
 
-	_, err = s.app.JetStream.Publish(s.ctx, sub, message)
+	_, err = s.js.Publish(s.ctx, sub, message)
 	if err != nil {
 		return err
 	}

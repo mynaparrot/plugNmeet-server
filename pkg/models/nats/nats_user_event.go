@@ -3,6 +3,7 @@ package natsmodel
 import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	log "github.com/sirupsen/logrus"
+	"strings"
 )
 
 func (m *NatsModel) HandleInitialData(roomId, userId string) {
@@ -36,12 +37,13 @@ func (m *NatsModel) HandleInitialData(roomId, userId string) {
 		_ = m.natsService.NotifyErrorMsg(roomId, err.Error(), &userId)
 		return
 	}
+	lkHost := strings.Replace(m.app.LivekitInfo.Host, "host.docker.internal", "localhost", 1) // without this you won't be able to connect
 
 	initial := &plugnmeet.NatsInitialData{
 		Room:      rInfo,
 		LocalUser: userInfo,
 		MediaServerInfo: &plugnmeet.MediaServerConnInfo{
-			Url:         m.app.LivekitInfo.Host,
+			Url:         lkHost,
 			Token:       token,
 			EnabledE2Ee: rInfo.EnabledE2Ee,
 		},

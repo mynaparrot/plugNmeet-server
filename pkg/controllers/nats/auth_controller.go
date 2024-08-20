@@ -81,17 +81,11 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 		fmt.Sprintf("%s.%s.%s", s.app.NatsInfo.Subjects.SystemWorker, roomId, userId),
 	}
 
-	publicChatPermission, err := s.natsService.CreatePublicChatConsumer(roomId, userId)
+	chatPermission, err := s.natsService.CreateChatConsumer(roomId, userId)
 	if err != nil {
 		return nil, err
 	}
-	allow.Add(publicChatPermission...)
-
-	privateChatPermission, err := s.natsService.CreatePrivateChatConsumer(roomId, userId)
-	if err != nil {
-		return nil, err
-	}
-	allow.Add(privateChatPermission...)
+	allow.Add(chatPermission...)
 
 	sysPublicPermission, err := s.natsService.CreateSystemPublicConsumer(roomId, userId)
 	if err != nil {

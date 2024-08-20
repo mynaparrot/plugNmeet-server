@@ -6,11 +6,11 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 )
 
-func (s *NatsService) CreatePublicChatConsumer(roomId, userId string) (jwt.StringList, error) {
+func (s *NatsService) CreateChatConsumer(roomId, userId string) (jwt.StringList, error) {
 	_, err := s.js.CreateOrUpdateConsumer(s.ctx, roomId, jetstream.ConsumerConfig{
-		Durable: fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.ChatPublic, userId),
+		Durable: fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.Chat, userId),
 		FilterSubjects: []string{
-			fmt.Sprintf("%s:%s.>", roomId, s.app.NatsInfo.Subjects.ChatPublic),
+			fmt.Sprintf("%s:%s.>", roomId, s.app.NatsInfo.Subjects.Chat),
 		},
 	})
 	if err != nil {
@@ -18,31 +18,10 @@ func (s *NatsService) CreatePublicChatConsumer(roomId, userId string) (jwt.Strin
 	}
 
 	permission := jwt.StringList{
-		fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.ChatPublic, userId),
-		fmt.Sprintf("$JS.API.CONSUMER.MSG.NEXT.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.ChatPublic, userId),
-		fmt.Sprintf("%s:%s.%s", roomId, s.app.NatsInfo.Subjects.ChatPublic, userId),
-		fmt.Sprintf("$JS.ACK.%s.%s:%s.>", roomId, s.app.NatsInfo.Subjects.ChatPublic, userId),
-	}
-
-	return permission, nil
-}
-
-func (s *NatsService) CreatePrivateChatConsumer(roomId, userId string) (jwt.StringList, error) {
-	_, err := s.js.CreateOrUpdateConsumer(s.ctx, roomId, jetstream.ConsumerConfig{
-		Durable: fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.ChatPrivate, userId),
-		FilterSubjects: []string{
-			fmt.Sprintf("%s:%s.%s.>", roomId, s.app.NatsInfo.Subjects.ChatPrivate, userId),
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	permission := jwt.StringList{
-		fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.ChatPrivate, userId),
-		fmt.Sprintf("$JS.API.CONSUMER.MSG.NEXT.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.ChatPrivate, userId),
-		fmt.Sprintf("%s:%s.*.%s", roomId, s.app.NatsInfo.Subjects.ChatPrivate, userId),
-		fmt.Sprintf("$JS.ACK.%s.%s:%s.>", roomId, s.app.NatsInfo.Subjects.ChatPrivate, userId),
+		fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.Chat, userId),
+		fmt.Sprintf("$JS.API.CONSUMER.MSG.NEXT.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.Chat, userId),
+		fmt.Sprintf("%s:%s.%s", roomId, s.app.NatsInfo.Subjects.Chat, userId),
+		fmt.Sprintf("$JS.ACK.%s.%s:%s.>", roomId, s.app.NatsInfo.Subjects.Chat, userId),
 	}
 
 	return permission, nil

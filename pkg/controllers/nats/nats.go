@@ -105,7 +105,9 @@ func (c *NatsController) subscribeToUsersConnEvents() {
 				return
 			}
 			p := strings.Split(e.Client["user"].(string), ":")
-			c.natsModel.OnAfterUserJoined(p[0], p[1])
+			if len(p) == 2 {
+				c.natsModel.OnAfterUserJoined(p[0], p[1])
+			}
 		} else if strings.Contains(msg.Subject, ".DISCONNECT") {
 			e := new(NatsEvents)
 			err := json.Unmarshal(msg.Data, e)
@@ -113,7 +115,9 @@ func (c *NatsController) subscribeToUsersConnEvents() {
 				return
 			}
 			p := strings.Split(e.Client["user"].(string), ":")
-			c.natsModel.OnAfterUserDisconnected(p[0], p[1])
+			if len(p) == 2 {
+				c.natsModel.OnAfterUserDisconnected(p[0], p[1])
+			}
 		}
 	})
 	if err != nil {

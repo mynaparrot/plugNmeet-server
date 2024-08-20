@@ -25,6 +25,11 @@ func (s *NatsService) GetRoomInfo(roomId string) (*plugnmeet.NatsKvRoomInfo, err
 	if sid, err := kv.Get(s.ctx, RoomSidKey); err == nil && sid != nil {
 		info.RoomSid = string(sid.Value())
 	}
+	if emptyTimeout, err := kv.Get(s.ctx, RoomEmptyTimeoutKey); err == nil && emptyTimeout != nil {
+		if parseUint, err := strconv.ParseUint(string(emptyTimeout.Value()), 10, 64); err == nil {
+			info.EmptyTimeout = parseUint
+		}
+	}
 	if enabledE2EE, err := kv.Get(s.ctx, RoomEnabledE2EEKey); err == nil && enabledE2EE != nil {
 		if val, err := strconv.ParseBool(string(enabledE2EE.Value())); err == nil {
 			info.EnabledE2Ee = val
@@ -35,7 +40,7 @@ func (s *NatsService) GetRoomInfo(roomId string) (*plugnmeet.NatsKvRoomInfo, err
 	}
 	if createdAt, err := kv.Get(s.ctx, RoomCreatedKey); err == nil && createdAt != nil {
 		if parseUint, err := strconv.ParseUint(string(createdAt.Value()), 10, 64); err == nil {
-			info.CreatedAt = parseUint
+			info.CreatedAt = parseUint // in seconds
 		}
 	}
 

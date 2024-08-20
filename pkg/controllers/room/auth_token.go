@@ -13,6 +13,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/auth"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/room"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/mynaparrot/plugnmeet-server/version"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -113,6 +114,14 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	requestedUserId := c.Locals("requestedUserId")
 	app := config.GetConfig()
 
+	// check for duplicate join
+	nts := natsservice.New(app)
+	if status, err := nts.GetRoomUserStatus(roomId.(string), requestedUserId.(string)); err == nil {
+		if status == natsservice.UserOnline {
+			return utils.SendCommonProtobufResponse(c, false, "notifications.room-disconnected-duplicate-entry")
+		}
+	}
+
 	rs := redisservice.New(app.RDS)
 	exist := rs.IsUserExistInBlockList(roomId.(string), requestedUserId.(string))
 	if exist {
@@ -128,15 +137,6 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	cm := c.Locals("claims")
 	if cm == nil {
 		return utils.SendCommonProtobufResponse(c, false, "invalid request")
-	}
-	claims := cm.(*plugnmeet.PlugNmeetTokenClaims)
-	// after usage, we can make it null as we don't need this value again.
-	c.Locals("claims", nil)
-
-	au := authmodel.New(nil, nil)
-	token, err := au.GenerateLivekitToken(claims)
-	if err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
 	// if nil then assume production
@@ -158,7 +158,6 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 		return utils.SendProtoJsonResponse(c, rr)
 	}
 
-	livekitHost := strings.Replace(config.GetConfig().LivekitInfo.Host, "host.docker.internal", "localhost", 1) // without this you won't be able to connect
 	v := version.Version
 	rId := roomId.(string)
 	uId := requestedUserId.(string)
@@ -166,8 +165,6 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	res := &plugnmeet.VerifyTokenRes{
 		Status:        true,
 		Msg:           "token is valid",
-		LivekitHost:   &livekitHost,
-		Token:         &token,
 		ServerVersion: &v,
 		EnabledE2Ee:   false,
 		RoomId:        &rId,
@@ -176,8 +173,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 			SystemWorker:  natsSubjs.SystemWorker,
 			SystemPublic:  natsSubjs.SystemPublic,
 			SystemPrivate: natsSubjs.SystemPrivate,
-			ChatPublic:    natsSubjs.ChatPublic,
-			ChatPrivate:   natsSubjs.ChatPrivate,
+			Chat:          natsSubjs.Chat,
 			Whiteboard:    natsSubjs.Whiteboard,
 			DataChannel:   natsSubjs.DataChannel,
 		},
