@@ -6,7 +6,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models/datamsg"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 	"os"
@@ -29,13 +28,7 @@ func (m *RecordingModel) recordingStarted(r *plugnmeet.RecorderToPlugNmeet) {
 	_ = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, roomMeta)
 
 	// send message to room
-	dm := datamsgmodel.New(m.app, m.ds, m.rs, m.lk)
-	err = dm.SendDataMessage(&plugnmeet.DataMessageReq{
-		MsgBodyType: plugnmeet.DataMsgBodyType_INFO,
-		Msg:         "notifications.recording-started",
-		RoomId:      r.RoomId,
-	})
-
+	err = m.natsService.NotifyInfoMsg(r.RoomId, "notifications.recording-started", nil)
 	if err != nil {
 		log.Errorln(err)
 	}

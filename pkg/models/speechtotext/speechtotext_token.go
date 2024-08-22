@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models/datamsg"
-	"google.golang.org/protobuf/encoding/protojson"
 	"io"
 	"net/http"
 	"sort"
@@ -57,20 +55,7 @@ func (m *SpeechToTextModel) GenerateAzureToken(r *plugnmeet.GenerateAzureTokenRe
 		return err
 	}
 
-	// send token by data channel
-	marshal, err := protojson.Marshal(res)
-	if err != nil {
-		return err
-	}
-
-	dm := datamsgmodel.New(m.app, m.ds, m.rs, m.lk)
-	return dm.SendDataMessage(&plugnmeet.DataMessageReq{
-		RoomId:      r.RoomId,
-		UserSid:     "system",
-		MsgBodyType: plugnmeet.DataMsgBodyType_AZURE_COGNITIVE_SERVICE_SPEECH_TOKEN,
-		Msg:         string(marshal),
-		SendTo:      []string{requestedUserId},
-	})
+	return m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_AZURE_COGNITIVE_SERVICE_SPEECH_TOKEN, r.RoomId, res, &requestedUserId)
 }
 
 func (m *SpeechToTextModel) RenewAzureToken(r *plugnmeet.AzureTokenRenewReq, requestedUserId string) error {
@@ -102,19 +87,7 @@ func (m *SpeechToTextModel) RenewAzureToken(r *plugnmeet.AzureTokenRenewReq, req
 
 	// send token by data channel
 	res.Renew = true
-	marshal, err := protojson.Marshal(res)
-	if err != nil {
-		return err
-	}
-
-	dm := datamsgmodel.New(m.app, m.ds, m.rs, m.lk)
-	return dm.SendDataMessage(&plugnmeet.DataMessageReq{
-		RoomId:      r.RoomId,
-		UserSid:     "system",
-		MsgBodyType: plugnmeet.DataMsgBodyType_AZURE_COGNITIVE_SERVICE_SPEECH_TOKEN,
-		Msg:         string(marshal),
-		SendTo:      []string{requestedUserId},
-	})
+	return m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_AZURE_COGNITIVE_SERVICE_SPEECH_TOKEN, r.RoomId, res, &requestedUserId)
 }
 
 func (m *SpeechToTextModel) sendRequestToAzureForToken(subscriptionKey, serviceRegion, keyId string) (*plugnmeet.GenerateAzureTokenRes, error) {
@@ -147,6 +120,7 @@ func (m *SpeechToTextModel) sendRequestToAzureForToken(subscriptionKey, serviceR
 
 func (m *SpeechToTextModel) selectAzureKey() (*config.AzureSubscriptionKey, error) {
 	sub := m.app.AzureCognitiveServicesSpeech.SubscriptionKeys
+
 	if len(sub) == 0 {
 		return nil, errors.New("no key found")
 	} else if len(sub) == 1 {
@@ -155,17 +129,21 @@ func (m *SpeechToTextModel) selectAzureKey() (*config.AzureSubscriptionKey, erro
 
 	var keys []config.AzureSubscriptionKey
 	for _, k := range sub {
+		var err error
 		conns, err := m.rs.SpeechToTextGetConnectionsByKeyId(k.Id)
 		if err != nil {
 			continue
 		}
 
-		c, err := strconv.Atoi(conns)
-		if err != nil {
-			continue
+		var count int
+		if conns != "" {
+			count, err = strconv.Atoi(conns)
+			if err != nil {
+				continue
+			}
 		}
 
-		k.MaxConnection = k.MaxConnection - int64(c)
+		k.MaxConnection = k.MaxConnection - int64(count)
 		keys = append(keys, k)
 	}
 

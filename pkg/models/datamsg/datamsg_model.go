@@ -56,8 +56,7 @@ func (m *DataMsgModel) SendDataMessage(r *plugnmeet.DataMessageReq) error {
 	case plugnmeet.DataMsgBodyType_OTHER_USER_LOWER_HAND:
 		return m.otherUserLowerHand(r)
 	case plugnmeet.DataMsgBodyType_INFO,
-		plugnmeet.DataMsgBodyType_ALERT,
-		plugnmeet.DataMsgBodyType_AZURE_COGNITIVE_SERVICE_SPEECH_TOKEN:
+		plugnmeet.DataMsgBodyType_ALERT:
 		return m.sendNotification(r)
 	default:
 		return errors.New(r.MsgBodyType.String() + " yet not ready")
