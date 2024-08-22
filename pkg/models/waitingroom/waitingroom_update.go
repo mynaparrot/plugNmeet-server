@@ -8,7 +8,7 @@ import (
 
 func (m *WaitingRoomModel) ApproveWaitingUsers(r *plugnmeet.ApproveWaitingUsersReq) error {
 	if r.UserId == "all" {
-		participants, err := m.lk.LoadParticipants(r.RoomId)
+		participants, err := m.natsService.GetOnlineUsersList(r.RoomId)
 		if err != nil {
 			return err
 		}
@@ -21,7 +21,7 @@ func (m *WaitingRoomModel) ApproveWaitingUsers(r *plugnmeet.ApproveWaitingUsersR
 		return nil
 	}
 
-	p, err := m.lk.LoadParticipantInfo(r.RoomId, r.UserId)
+	p, err := m.natsService.GetUserInfo(r.RoomId, r.UserId)
 	if err != nil {
 		return err
 	}
@@ -30,13 +30,13 @@ func (m *WaitingRoomModel) ApproveWaitingUsers(r *plugnmeet.ApproveWaitingUsersR
 }
 
 func (m *WaitingRoomModel) approveUser(roomId, userId, metadata string) error {
-	meta := make([]byte, len(metadata))
-	copy(meta, metadata)
+	mt, err := m.natsService.UnmarshalUserMetadata(metadata)
+	if err != nil {
+		return err
+	}
+	mt.WaitForApproval = false // this mean doesn't need to wait anymore
 
-	mm, _ := m.natsService.UnmarshalUserMetadata(string(meta))
-	mm.WaitForApproval = false // this mean doesn't need to wait anymore
-
-	err := m.natsService.UpdateAndBroadcastUserMetadata(roomId, userId, mm, nil)
+	err = m.natsService.UpdateAndBroadcastUserMetadata(roomId, userId, mt, nil)
 	if err != nil {
 		return errors.New("can't approve user. try again")
 	}

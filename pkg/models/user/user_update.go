@@ -20,7 +20,7 @@ func (m *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 		return errors.New(config.UserNotActive)
 	}
 
-	// send message to user first
+	// send a message to user first
 	dm := datamsgmodel.New(m.app, m.ds, m.rs, m.lk)
 	_ = dm.SendDataMessage(&plugnmeet.DataMessageReq{
 		MsgBodyType: plugnmeet.DataMsgBodyType_ALERT,
@@ -35,70 +35,9 @@ func (m *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 		return err
 	}
 
-	// finally check if requested to block as well as
+	// finally, check if requested to block as well as
 	if r.BlockUser {
 		_, _ = m.rs.AddUserToBlockList(r.RoomId, r.UserId)
-	}
-
-	return nil
-}
-
-func (m *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
-	participants, err := m.lk.LoadParticipants(r.RoomId)
-	if err != nil {
-		return err
-	}
-
-	for _, p := range participants {
-		meta := make([]byte, len(p.Metadata))
-		copy(meta, p.Metadata)
-
-		mt, _ := m.natsService.UnmarshalUserMetadata(string(meta))
-
-		if r.Task == plugnmeet.SwitchPresenterTask_PROMOTE {
-			if mt.IsPresenter {
-				// demote current presenter from presenter
-				mt.IsPresenter = false
-				err = m.natsService.UpdateAndBroadcastUserMetadata(r.RoomId, p.Identity, m, nil)
-				if err != nil {
-					return errors.New(config.CanNotDemotePresenter)
-				}
-			}
-		} else if r.Task == plugnmeet.SwitchPresenterTask_DEMOTE {
-			if p.Identity == r.RequestedUserId {
-				// we'll update requested mt as presenter
-				// otherwise in the session there won't have any presenter
-				mt.IsPresenter = true
-				err = m.natsService.UpdateAndBroadcastUserMetadata(r.RoomId, p.Identity, m, nil)
-				if err != nil {
-					return errors.New(config.CanNotChangeAlternativePresenter)
-				}
-			}
-		}
-	}
-
-	// if everything goes well in top then we'll go ahead
-	p, err := m.lk.LoadParticipantInfo(r.RoomId, r.UserId)
-	if err != nil {
-		return err
-	}
-	meta := make([]byte, len(p.Metadata))
-	copy(meta, p.Metadata)
-
-	mt, _ := m.natsService.UnmarshalUserMetadata(string(meta))
-
-	if r.Task == plugnmeet.SwitchPresenterTask_PROMOTE {
-		mt.IsPresenter = true
-		err = m.natsService.UpdateAndBroadcastUserMetadata(r.RoomId, p.Identity, m, nil)
-		if err != nil {
-			return errors.New(config.CanNotPromoteToPresenter)
-		}
-	} else if r.Task == plugnmeet.SwitchPresenterTask_DEMOTE {
-		mt.IsPresenter = false
-		err = m.natsService.UpdateAndBroadcastUserMetadata(r.RoomId, p.Identity, m, nil)
-		if err != nil {
-			return errors.New(config.CanNotDemotePresenter)
-		}
 	}
 
 	return nil
