@@ -167,7 +167,7 @@ func (s *NatsService) DeleteUser(roomId, userId string) {
 	_ = s.js.DeleteKeyValue(s.ctx, fmt.Sprintf(UserInfoBucket, roomId, userId))
 }
 
-func (s *NatsService) DeleteAllRoomUsers(roomId string) error {
+func (s *NatsService) DeleteAllRoomUsersWithConsumer(roomId string) error {
 	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomUsersBucket, roomId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
@@ -185,6 +185,8 @@ func (s *NatsService) DeleteAllRoomUsers(roomId string) error {
 	for u := range kl.Keys() {
 		// delete bucket of the user info
 		_ = s.js.DeleteKeyValue(s.ctx, fmt.Sprintf(UserInfoBucket, roomId, u))
+		// delete consumer
+		s.DeleteConsumer(roomId, u)
 	}
 
 	// now delete room users bucket

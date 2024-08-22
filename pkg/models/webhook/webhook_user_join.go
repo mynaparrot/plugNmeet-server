@@ -14,7 +14,15 @@ func (m *WebhookModel) participantJoined(event *livekit.WebhookEvent) {
 		return
 	}
 
-	_, err := m.ds.IncrementOrDecrementNumParticipants(event.Room.Sid, "+")
+	rInfo, err := m.natsService.GetRoomInfo(event.Room.Name)
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+	event.Room.Sid = rInfo.RoomSid
+	event.Room.Metadata = rInfo.Metadata
+
+	_, err = m.ds.IncrementOrDecrementNumParticipants(rInfo.RoomSid, "+")
 	if err != nil {
 		log.Errorln(err)
 	}

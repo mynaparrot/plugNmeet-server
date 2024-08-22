@@ -51,10 +51,10 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRooms
 		bRoom.RoomId = fmt.Sprintf("%s-%s", r.RoomId, room.Id)
 		meta.RoomTitle = room.Title
 		bRoom.Metadata = meta
-		status, msg, _ := m.rm.CreateRoom(bRoom)
+		_, err := m.rm.CreateRoom(bRoom)
 
-		if !status {
-			log.Error(msg)
+		if err != nil {
+			log.Errorln(err)
 			e[bRoom.RoomId] = true
 			continue
 		}

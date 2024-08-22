@@ -108,3 +108,20 @@ func (s *NatsService) DeleteRoom(roomId string) error {
 
 	return nil
 }
+
+func (s *NatsService) OnAfterSessionCleanup(roomId string) {
+	err := s.DeleteRoom(roomId)
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	err = s.DeleteAllRoomUsersWithConsumer(roomId)
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	err = s.DeleteRoomNatsStream(roomId)
+	if err != nil {
+		log.Errorln(err)
+	}
+}

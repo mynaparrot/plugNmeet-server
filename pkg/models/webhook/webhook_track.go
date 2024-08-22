@@ -11,6 +11,15 @@ func (m *WebhookModel) trackPublished(event *livekit.WebhookEvent) {
 		log.Errorln("empty roomInfo", event)
 		return
 	}
+
+	rInfo, err := m.natsService.GetRoomInfo(event.Room.Name)
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+	event.Room.Sid = rInfo.RoomSid
+	event.Room.Metadata = rInfo.Metadata
+
 	// webhook notification
 	go m.sendToWebhookNotifier(event)
 
@@ -43,6 +52,14 @@ func (m *WebhookModel) trackUnpublished(event *livekit.WebhookEvent) {
 		log.Errorln("empty roomInfo", event)
 		return
 	}
+	rInfo, err := m.natsService.GetRoomInfo(event.Room.Name)
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+	event.Room.Sid = rInfo.RoomSid
+	event.Room.Metadata = rInfo.Metadata
+
 	// webhook notification
 	go m.sendToWebhookNotifier(event)
 

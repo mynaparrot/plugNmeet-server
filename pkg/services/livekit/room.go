@@ -10,27 +10,27 @@ import (
 )
 
 // CreateRoom will create room in livekit
-func (s *LivekitService) CreateRoom(roomId string, emptyTimeout *uint32, maxParticipants *uint32, metadata string) (*livekit.Room, error) {
-	req := &livekit.CreateRoomRequest{
-		Name: roomId,
-	}
-	if emptyTimeout != nil && *emptyTimeout > 0 {
-		req.EmptyTimeout = *emptyTimeout
-	}
-	if maxParticipants != nil && *maxParticipants > 0 {
-		req.MaxParticipants = *maxParticipants
-	}
-	if metadata != "" {
-		req.Metadata = metadata
-	}
-
-	room, err := s.lkc.CreateRoom(s.ctx, req)
-	if err != nil {
-		return nil, err
-	}
-
-	return room, nil
-}
+//func (s *LivekitService) CreateRoom(roomId string, emptyTimeout *uint32, maxParticipants *uint32, metadata string) (*livekit.Room, error) {
+//	req := &livekit.CreateRoomRequest{
+//		Name: roomId,
+//	}
+//	if emptyTimeout != nil && *emptyTimeout > 0 {
+//		req.EmptyTimeout = *emptyTimeout
+//	}
+//	if maxParticipants != nil && *maxParticipants > 0 {
+//		req.MaxParticipants = *maxParticipants
+//	}
+//	if metadata != "" {
+//		req.Metadata = metadata
+//	}
+//
+//	room, err := s.lkc.CreateRoom(s.ctx, req)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return room, nil
+//}
 
 //// UpdateRoomMetadata will directly send request to livekit to update metadata
 //func (s *LivekitService) UpdateRoomMetadata(roomId string, metadata string) (*livekit.Room, error) {

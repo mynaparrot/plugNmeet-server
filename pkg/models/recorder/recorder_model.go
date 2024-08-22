@@ -62,7 +62,7 @@ func (m *RecorderModel) SendMsgToRecorder(req *plugnmeet.RecordingReq) error {
 		// in this case we'll try to fetch the room info
 		rmInfo, _ := m.ds.GetRoomInfoBySid(req.Sid, nil)
 		if rmInfo == nil || rmInfo.IsRecording == 0 {
-			return errors.New("room is not active")
+			return nil
 		}
 		req.RoomTableId = int64(rmInfo.ID)
 		req.RoomId = rmInfo.RoomId

@@ -143,23 +143,23 @@ func HandleBBBCreate(c *fiber.Ctx) error {
 	}
 
 	m := roommodel.New(nil, nil, nil, nil)
-	status, msg, room := m.CreateRoom(pnmReq)
+	room, err := m.CreateRoom(pnmReq)
 
-	if !status {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", msg))
+	if err != nil {
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 	}
 
 	return c.XML(bbbapiwrapper.CreateMeetingResp{
 		ReturnCode:        "SUCCESS",
 		MessageKey:        "success",
-		Message:           msg,
+		Message:           "success",
 		MeetingID:         q.MeetingID,
-		InternalMeetingID: room.Sid,
+		InternalMeetingID: room.RoomSid,
 		ParentMeetingID:   "bbb-none",
 		AttendeePW:        q.AttendeePW,
 		ModeratorPW:       q.ModeratorPW,
-		CreateTime:        room.GetCreationTime() * 1000,
-		CreateDate:        time.Unix(room.GetCreationTime(), 0).Format(time.RFC1123),
+		CreateTime:        int64(room.CreatedAt * 1000),
+		CreateDate:        time.Unix(int64(room.CreatedAt), 0).Format(time.RFC1123),
 		VoiceBridge:       q.VoiceBridge,
 		DialNumber:        q.DialNumber,
 	})

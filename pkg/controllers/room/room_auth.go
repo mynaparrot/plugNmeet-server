@@ -30,11 +30,14 @@ func HandleRoomCreate(c *fiber.Ctx) error {
 	}
 
 	m := roommodel.New(nil, nil, nil, nil)
-	status, msg, room := m.CreateRoom(req)
+	room, err := m.CreateRoom(req)
+	if err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
 
 	r := &plugnmeet.CreateRoomRes{
-		Status:   status,
-		Msg:      msg,
+		Status:   true,
+		Msg:      "success",
 		RoomInfo: room,
 	}
 

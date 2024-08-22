@@ -1,16 +1,16 @@
 package roommodel
 
 import (
+	"errors"
 	"fmt"
 	"github.com/cavaliergopher/grab/v3"
 	"github.com/gabriel-vasile/mimetype"
-	"github.com/livekit/protocol/livekit"
+	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/file"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"os"
@@ -18,42 +18,36 @@ import (
 	"time"
 )
 
-func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *livekit.Room) {
+func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.NatsKvRoomInfo, error) {
 	// some pre-creation tasks
 	m.preRoomCreationTasks(r)
-
 	// in preRoomCreationTasks we've added this room in progress list
 	// so, we'll just use deferring to clean this room at the end of this function
 	defer m.rs.RoomCreationProgressList(r.RoomId, "del")
 
-	var err error
-	roomDbInfo := new(dbmodels.RoomInfo)
-
-	if roomDbInfo, err = m.ds.GetRoomInfoByRoomId(r.RoomId, 1); err == nil &&
-		roomDbInfo != nil && roomDbInfo.ID > 0 {
-		rf, err := m.lk.LoadRoomInfo(r.RoomId)
-		if err != nil && err.Error() != config.RequestedRoomNotExist {
-			return false, "can't create room. try again", nil
-		}
-
-		if rf != nil && rf.Sid != "" {
-			if roomDbInfo.Sid == "" {
-				roomDbInfo.Sid = rf.Sid
-				// we can just update
-				_, err = m.ds.InsertOrUpdateRoomInfo(roomDbInfo)
-				if err != nil {
-					return false, err.Error(), nil
-				}
-				return true, "room already exists", rf
-			} else if rf.Sid == roomDbInfo.Sid {
-				return true, "room already exists", rf
-			}
-		}
-
-		// We'll allow creating room again & use the same DB row
-		// we can just update the DB row.
-		// No need to create a new one
+	// check if room already exists in db or not
+	roomDbInfo, err := m.ds.GetRoomInfoByRoomId(r.RoomId, 1)
+	if err != nil {
+		return nil, err
 	}
+	if roomDbInfo != nil && roomDbInfo.Sid != "" {
+		// this room was created before
+		// so, we'll check our kv
+		rInfo, err := m.natsService.GetRoomInfo(r.RoomId)
+		if err != nil {
+			return nil, err
+		}
+		if rInfo != nil && rInfo.RoomSid == roomDbInfo.Sid {
+			// want to make sure our stream was created properly
+			err := m.natsService.CreateRoomNatsStreams(r.RoomId)
+			if err != nil {
+				return nil, err
+			}
+			return rInfo, errors.New("room already exists")
+		}
+	}
+	// otherwise, we're good to continue
+	// we can reuse this same db table as no sid had been assigned.
 
 	// we'll set default values otherwise the client got confused if data is missing
 	utils.PrepareDefaultRoomFeatures(r)
@@ -102,82 +96,54 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (bool, string, *livek
 		r.Metadata.RoomFeatures.EnableAnalytics = false
 	}
 
-	meta, err := m.lk.MarshalRoomMetadata(r.Metadata)
-	if err != nil {
-		return false, "Error: " + err.Error(), nil
-	}
-
-	room, err := m.lk.CreateRoom(r.RoomId, r.EmptyTimeout, r.MaxParticipants, meta)
-	if err != nil {
-		log.Errorln(fmt.Sprintf("room creation error in livekit for %s with error: %s", r.RoomId, err.Error()))
-		return false, "Error: " + err.Error(), nil
-	}
-
-	if room.Sid == "" {
-		log.Errorln(fmt.Sprintf("got empty SID for %s", r.RoomId))
-		// without SID, it is hard to manage, if empty then we won't continue
-		// in this case we'll end the room to clean up
-		_, err = m.lk.EndRoom(r.RoomId)
-		if err != nil {
-			log.Errorln(err)
-		}
-		return false, "Error: can't create room with empty SID", nil
-	}
-
 	isBreakoutRoom := 0
+	sId := uuid.New().String()
 	if r.Metadata.IsBreakoutRoom {
 		isBreakoutRoom = 1
-	} else {
-		// at present, we'll fetch file for the main room only
-		go m.prepareWhiteboardPreloadFile(r, room)
 	}
 
-	updateTable := false
-	ri := &dbmodels.RoomInfo{
-		RoomTitle:          r.Metadata.RoomTitle,
-		RoomId:             room.Name,
-		Sid:                room.Sid,
-		JoinedParticipants: 0,
-		IsRunning:          1,
-		CreationTime:       room.CreationTime,
-		WebhookUrl:         "",
-		IsBreakoutRoom:     isBreakoutRoom,
-		ParentRoomID:       r.Metadata.ParentRoomId,
+	if roomDbInfo == nil {
+		roomDbInfo = &dbmodels.RoomInfo{
+			RoomTitle:          r.Metadata.RoomTitle,
+			RoomId:             r.RoomId,
+			Sid:                sId,
+			JoinedParticipants: 0,
+			IsRunning:          1,
+			WebhookUrl:         "",
+			IsBreakoutRoom:     isBreakoutRoom,
+			ParentRoomID:       r.Metadata.ParentRoomId,
+		}
+	} else {
+		// we found the room, we'll just update few info
+		roomDbInfo.Sid = sId
 	}
 	if r.Metadata.WebhookUrl != nil {
-		ri.WebhookUrl = *r.Metadata.WebhookUrl
+		roomDbInfo.WebhookUrl = *r.Metadata.WebhookUrl
 	}
 
-	if roomDbInfo != nil && roomDbInfo.ID > 0 {
-		log.Infoln(fmt.Sprintf("running room found for %s, tableId: %d, tableSid: %s, new sid: %s, not creating new db record again", r.RoomId, roomDbInfo.ID, roomDbInfo.Sid, room.Sid))
-
-		updateTable = true
-		ri.ID = roomDbInfo.ID
-	}
-
-	_, err = m.ds.InsertOrUpdateRoomInfo(ri)
+	// save info to db
+	_, err = m.ds.InsertOrUpdateRoomInfo(roomDbInfo)
 	if err != nil {
-		log.Errorln(fmt.Sprintf("error during data saving in db for %s, updateDb: %v, error: %s", r.RoomId, updateTable, err.Error()))
-		return false, "Error: " + err.Error(), nil
+		return nil, err
 	}
 
-	nsts := natsservice.New(m.app)
-	// create streams
-	err = nsts.CreateRoomNatsStreams(r.RoomId)
-	if err != nil {
-		log.Errorln(err)
-	}
 	// now create room bucket
-	err = nsts.AddRoom(r.RoomId, room.Sid, r.EmptyTimeout, r.Metadata)
+	err = m.natsService.AddRoom(r.RoomId, sId, r.EmptyTimeout, r.Metadata)
 	if err != nil {
-		log.Errorln(err)
+		return nil, err
 	}
 
-	// we'll silently add metadata into our redis
-	// we can avoid errors (if occur) because it will update from webhook too
-	_, _ = m.rs.ManageActiveRoomsWithMetadata(r.RoomId, "add", meta)
+	if !r.Metadata.IsBreakoutRoom {
+		go m.prepareWhiteboardPreloadFile(r, sId)
+	}
 
-	return true, "room created", room
+	// create streams
+	err = m.natsService.CreateRoomNatsStreams(r.RoomId)
+	if err != nil {
+		return nil, err
+	}
+
+	return m.natsService.GetRoomInfo(r.RoomId)
 }
 
 func (m *RoomModel) preRoomCreationTasks(r *plugnmeet.CreateRoomReq) {
@@ -199,7 +165,7 @@ func (m *RoomModel) preRoomCreationTasks(r *plugnmeet.CreateRoomReq) {
 	}
 }
 
-func (m *RoomModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomReq, room *livekit.Room) {
+func (m *RoomModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomReq, roomSid string) {
 	if !req.Metadata.RoomFeatures.WhiteboardFeatures.AllowedWhiteboard || req.Metadata.RoomFeatures.WhiteboardFeatures.PreloadFile == nil {
 		return
 	}
@@ -235,7 +201,7 @@ func (m *RoomModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomReq, r
 		return
 	}
 
-	downloadDir := fmt.Sprintf("%s/%s", config.GetConfig().UploadFileSettings.Path, room.Sid)
+	downloadDir := fmt.Sprintf("%s/%s", config.GetConfig().UploadFileSettings.Path, roomSid)
 	if _, err = os.Stat(downloadDir); os.IsNotExist(err) {
 		err = os.MkdirAll(downloadDir, os.ModePerm)
 		if err != nil {
@@ -268,9 +234,9 @@ func (m *RoomModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomReq, r
 
 	ms := strings.SplitN(gres.Filename, "/", -1)
 	fm.AddRequest(&filemodel.FileUploadReq{
-		Sid:      room.Sid,
-		RoomId:   room.Name,
-		FilePath: fmt.Sprintf("%s/%s", room.Sid, ms[len(ms)-1]),
+		Sid:      roomSid,
+		RoomId:   req.RoomId,
+		FilePath: fmt.Sprintf("%s/%s", roomSid, ms[len(ms)-1]),
 	})
 
 	_, err = fm.ConvertWhiteboardFile()

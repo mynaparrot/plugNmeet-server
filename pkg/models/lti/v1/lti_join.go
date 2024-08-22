@@ -2,7 +2,6 @@ package ltiv1model
 
 import (
 	"errors"
-	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	usermodel "github.com/mynaparrot/plugnmeet-server/pkg/models/user"
@@ -14,9 +13,9 @@ func (m *LtiV1Model) LTIV1JoinRoom(c *plugnmeet.LtiClaims) (string, error) {
 	})
 
 	if !res.GetIsActive() {
-		status, msg, _ := m.createRoomSession(c)
-		if !status {
-			return "", errors.New(msg)
+		_, err := m.createRoomSession(c)
+		if err != nil {
+			return "", errors.New(err.Error())
 		}
 	}
 
@@ -28,7 +27,7 @@ func (m *LtiV1Model) LTIV1JoinRoom(c *plugnmeet.LtiClaims) (string, error) {
 	return token, nil
 }
 
-func (m *LtiV1Model) createRoomSession(c *plugnmeet.LtiClaims) (bool, string, *livekit.Room) {
+func (m *LtiV1Model) createRoomSession(c *plugnmeet.LtiClaims) (*plugnmeet.NatsKvRoomInfo, error) {
 	req := utils.PrepareLTIV1RoomCreateReq(c)
 	return m.rm.CreateRoom(req)
 }

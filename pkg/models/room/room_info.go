@@ -15,15 +15,25 @@ func (m *RoomModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoo
 		Msg:    "room is not active",
 	}
 
-	roomDbInfo, _ := m.ds.GetRoomInfoByRoomId(r.RoomId, 1)
+	roomDbInfo, err := m.ds.GetRoomInfoByRoomId(r.RoomId, 1)
+	if err != nil {
+		res.Status = false
+		res.Msg = err.Error()
+		return res, nil
+	}
 	if roomDbInfo == nil || roomDbInfo.ID == 0 {
 		return res, nil
 	}
 
 	// let's make sure room actually active
-	// TODO: think a way to check if room is active or not
-	_, meta, err := m.lk.LoadRoomWithMetadata(r.RoomId)
+	rInfo, meta, err := m.natsService.GetRoomInfoWithMetadata(r.RoomId)
 	if err != nil {
+		res.Status = false
+		res.Msg = err.Error()
+		return res, nil
+	}
+
+	if rInfo == nil || meta == nil {
 		// Room isn't active. Change status
 		_, _ = m.ds.UpdateRoomStatus(&dbmodels.RoomInfo{
 			RoomId:    r.RoomId,

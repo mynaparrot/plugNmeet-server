@@ -3,6 +3,7 @@ package roommodel
 import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
+	log "github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -15,9 +16,16 @@ func (m *RoomModel) EndRoom(r *plugnmeet.RoomEndReq) (bool, string) {
 		return false, "room not active"
 	}
 
-	_, err := m.lk.EndRoom(r.GetRoomId())
+	err := m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SESSION_ENDED, r.GetRoomId(), "SESSION_ENDED_ON_REQUEST", nil)
 	if err != nil {
-		return false, "can't end room"
+		// we'll just log error
+		log.Errorln(err)
+	}
+
+	_, err = m.lk.EndRoom(r.GetRoomId())
+	if err != nil {
+		// we'll just log error
+		log.Errorln(err)
 	}
 
 	_, _ = m.ds.UpdateRoomStatus(&dbmodels.RoomInfo{
