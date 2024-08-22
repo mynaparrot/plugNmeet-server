@@ -87,11 +87,8 @@ func (m *SchedulerModel) checkRoomActiveUsersForRoomStatus() {
 	for s := range kl.Name() {
 		if strings.HasPrefix(s, natsservice.RoomInfoBucket) {
 			roomId := strings.ReplaceAll(s, natsservice.RoomInfoBucket+"-", "")
-			users, err := m.natsService.GetOlineUsersId(roomId)
-			if err != nil {
-				continue
-			}
-			if users == nil || len(users) == 0 {
+			hasOnlineUser := m.natsService.HasOnlineUser(roomId)
+			if !hasOnlineUser {
 				info, err := m.natsService.GetRoomInfo(roomId)
 				if err != nil {
 					continue

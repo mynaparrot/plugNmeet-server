@@ -221,3 +221,21 @@ func (s *NatsService) GetUserLastPing(roomId, userId string) int64 {
 	}
 	return 0
 }
+
+func (s *NatsService) HasOnlineUser(roomId string) bool {
+	users, err := s.GetRoomAllUsersFromStatusBucket(roomId)
+	if err != nil {
+		return false
+	}
+	if users == nil || len(users) == 0 {
+		return false
+	}
+
+	for _, entry := range users {
+		if string(entry.Value()) == UserOnline {
+			return true
+		}
+	}
+
+	return false
+}
