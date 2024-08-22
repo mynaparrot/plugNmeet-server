@@ -4,7 +4,6 @@ import (
 	"errors"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/auth"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 )
 
 func (m *UserModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, error) {
@@ -52,8 +51,7 @@ func (m *UserModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, erro
 	}
 
 	// update our bucket
-	nsts := natsservice.New(m.app)
-	err = nsts.AddUser(g.RoomId, g.UserInfo.UserId, "", g.UserInfo.Name, g.UserInfo.IsAdmin, g.UserInfo.UserMetadata.IsPresenter, g.UserInfo.UserMetadata)
+	err = m.natsService.AddUser(g.RoomId, g.UserInfo.UserId, "", g.UserInfo.Name, g.UserInfo.IsAdmin, g.UserInfo.UserMetadata.IsPresenter, g.UserInfo.UserMetadata)
 	if err != nil {
 		return "", err
 	}
