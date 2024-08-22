@@ -60,7 +60,6 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 	// check the info first
 	data, err := s.authModel.VerifyPlugNmeetAccessToken(req.ConnectOptions.Token)
 	if err != nil {
-		log.Errorln(err)
 		return nil, err
 	}
 
@@ -129,7 +128,6 @@ func (s *NatsAuthController) Respond(req micro.Request, userNKey, serverId, user
 	rc.Audience = serverId
 	rc.Jwt = userJWT
 	if err != nil {
-		fmt.Println(err)
 		rc.Error = err.Error()
 	}
 
