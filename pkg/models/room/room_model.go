@@ -2,6 +2,7 @@ package roommodel
 
 import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	usermodel "github.com/mynaparrot/plugnmeet-server/pkg/models/user"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
@@ -15,6 +16,7 @@ type RoomModel struct {
 	ds          *dbservice.DatabaseService
 	rs          *redisservice.RedisService
 	lk          *livekitservice.LivekitService
+	userModel   *usermodel.UserModel
 	natsService *natsservice.NatsService
 }
 
@@ -37,6 +39,7 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 		ds:          ds,
 		rs:          rs,
 		lk:          lk,
+		userModel:   usermodel.New(app, ds, rs, lk),
 		natsService: natsservice.New(app),
 	}
 }

@@ -1,95 +1,134 @@
 package usermodel
 
 import (
-	"errors"
-	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	log "github.com/sirupsen/logrus"
 )
 
-func (m *UserModel) UpdateUserLockSettings(r *plugnmeet.UpdateUserLockSettingsReq) error {
-	if r.UserId == "all" {
-		err := m.updateLockSettingsAllUsers(r)
-		return err
+// AssignLockSettingsToUser will assign lock to no-admin user
+// it will consider default room lock settings too
+func (m *UserModel) AssignLockSettingsToUser(meta *plugnmeet.RoomMetadata, g *plugnmeet.GenerateTokenReq) {
+	if g.UserInfo.UserMetadata.LockSettings == nil {
+		g.UserInfo.UserMetadata.LockSettings = new(plugnmeet.LockSettings)
+	}
+	l := new(plugnmeet.LockSettings)
+
+	// if no lock settings were sent,
+	// then we'll use default room lock settings
+	dl := meta.DefaultLockSettings
+	ul := g.UserInfo.UserMetadata.LockSettings
+
+	if ul.LockWebcam == nil && dl.LockWebcam != nil {
+		l.LockWebcam = dl.LockWebcam
+	} else if ul.LockWebcam != nil {
+		l.LockWebcam = ul.LockWebcam
 	}
 
-	p, err := m.lk.LoadParticipantInfo(r.RoomId, r.UserId)
+	if ul.LockMicrophone == nil && dl.LockMicrophone != nil {
+		l.LockMicrophone = dl.LockMicrophone
+	} else if ul.LockMicrophone != nil {
+		l.LockMicrophone = ul.LockMicrophone
+	}
+
+	if ul.LockScreenSharing == nil && dl.LockScreenSharing != nil {
+		l.LockScreenSharing = dl.LockScreenSharing
+	} else if ul.LockScreenSharing != nil {
+		l.LockScreenSharing = ul.LockScreenSharing
+	}
+
+	if ul.LockChat == nil && dl.LockChat != nil {
+		l.LockChat = dl.LockChat
+	} else if ul.LockChat != nil {
+		l.LockChat = ul.LockChat
+	}
+
+	if ul.LockChatSendMessage == nil && dl.LockChatSendMessage != nil {
+		l.LockChatSendMessage = dl.LockChatSendMessage
+	} else if ul.LockChatSendMessage != nil {
+		l.LockChatSendMessage = ul.LockChatSendMessage
+	}
+
+	if ul.LockChatFileShare == nil && dl.LockChatFileShare != nil {
+		l.LockChatFileShare = dl.LockChatFileShare
+	} else if ul.LockChatFileShare != nil {
+		l.LockChatFileShare = ul.LockChatFileShare
+	}
+
+	if ul.LockPrivateChat == nil && dl.LockPrivateChat != nil {
+		l.LockPrivateChat = dl.LockPrivateChat
+	} else if ul.LockPrivateChat != nil {
+		l.LockPrivateChat = ul.LockPrivateChat
+	}
+
+	if ul.LockWhiteboard == nil && dl.LockWhiteboard != nil {
+		l.LockWhiteboard = dl.LockWhiteboard
+	} else if ul.LockWhiteboard != nil {
+		l.LockWhiteboard = ul.LockWhiteboard
+	}
+
+	if ul.LockSharedNotepad == nil && dl.LockSharedNotepad != nil {
+		l.LockSharedNotepad = dl.LockSharedNotepad
+	} else if ul.LockSharedNotepad != nil {
+		l.LockSharedNotepad = ul.LockSharedNotepad
+	}
+
+	g.UserInfo.UserMetadata.LockSettings = l
+}
+
+// UpdateUserLockSettings will handle request to update user lock settings
+// if user id was sent "all" then it will update all the users
+func (m *UserModel) UpdateUserLockSettings(r *plugnmeet.UpdateUserLockSettingsReq) error {
+	if r.UserId == "all" {
+		return m.updateRoomUsersLockSettings(r)
+	}
+
+	p, err := m.natsService.GetUserInfo(r.RoomId, r.UserId)
 	if err != nil {
 		return err
 	}
 
-	um := updateParticipantLockMetadata{
-		participantInfo: p,
-		roomId:          r.RoomId,
-		service:         r.Service,
-		direction:       r.Direction,
-	}
-	err = m.updateParticipantLockMetadata(um)
-
-	return err
+	return m.updateUserLockMetadata(r.RoomId, r.UserId, r.Service, r.Direction, p.Metadata)
 }
 
-func (m *UserModel) updateLockSettingsAllUsers(r *plugnmeet.UpdateUserLockSettingsReq) error {
-	participants, err := m.lk.LoadParticipants(r.RoomId)
+// updateRoomUsersLockSettings will update lock settings for all existing users
+// and room default lock settings for future users
+func (m *UserModel) updateRoomUsersLockSettings(r *plugnmeet.UpdateUserLockSettingsReq) error {
+	participants, err := m.natsService.GetOnlineUsersList(r.RoomId)
 	if err != nil {
 		return err
 	}
 
 	for _, p := range participants {
-		if r.RequestedUserId != p.Identity {
-			um := updateParticipantLockMetadata{
-				participantInfo: p,
-				roomId:          r.RoomId,
-				service:         r.Service,
-				direction:       r.Direction,
-			}
-			_ = m.updateParticipantLockMetadata(um)
+		if p.IsAdmin {
+			continue
+		}
+		err := m.updateUserLockMetadata(r.RoomId, p.UserId, r.Service, r.Direction, p.Metadata)
+		if err != nil {
+			log.Errorln(err)
 		}
 	}
 
 	// now we'll require updating room settings
 	// so that future users can be applied same lock settings
-	info, err := m.natsService.GetRoomInfo(r.RoomId)
+	mt, err := m.natsService.GetRoomMetadataStruct(r.RoomId)
 	if err != nil {
 		return err
 	}
-	meta := make([]byte, len(info.Metadata))
-	copy(meta, info.Metadata)
 
-	mt, _ := m.natsService.UnmarshalRoomMetadata(string(meta))
-
-	l := m.changeLockSettingsMetadata(r.Service, r.Direction, mt.DefaultLockSettings)
-	mt.DefaultLockSettings = l
-
-	err = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, m)
-
-	return err
+	m.assignNewLockSetting(r.Service, r.Direction, mt.DefaultLockSettings)
+	return m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, mt)
 }
 
-type updateParticipantLockMetadata struct {
-	participantInfo *livekit.ParticipantInfo
-	roomId          string
-	service         string
-	direction       string
-}
-
-func (m *UserModel) updateParticipantLockMetadata(um updateParticipantLockMetadata) error {
-	if um.participantInfo.State == livekit.ParticipantInfo_ACTIVE {
-		meta := make([]byte, len(um.participantInfo.Metadata))
-		copy(meta, um.participantInfo.Metadata)
-
-		mt, _ := m.natsService.UnmarshalUserMetadata(string(meta))
-		l := m.changeLockSettingsMetadata(um.service, um.direction, mt.LockSettings)
-		mt.LockSettings = l
-
-		err := m.natsService.UpdateAndBroadcastUserMetadata(um.roomId, um.participantInfo.Identity, m, nil)
+func (m *UserModel) updateUserLockMetadata(roomId, userId, service, direction, metadata string) error {
+	mt, err := m.natsService.UnmarshalUserMetadata(metadata)
+	if err != nil {
 		return err
 	}
-
-	return errors.New(config.UserNotActive)
+	m.assignNewLockSetting(service, direction, mt.LockSettings)
+	return m.natsService.UpdateAndBroadcastUserMetadata(roomId, userId, mt, nil)
 }
 
-func (m *UserModel) changeLockSettingsMetadata(service string, direction string, l *plugnmeet.LockSettings) *plugnmeet.LockSettings {
+func (m *UserModel) assignNewLockSetting(service string, direction string, l *plugnmeet.LockSettings) *plugnmeet.LockSettings {
 	lock := new(bool)
 	if direction == "lock" {
 		*lock = true
