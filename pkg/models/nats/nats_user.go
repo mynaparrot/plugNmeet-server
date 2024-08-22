@@ -89,7 +89,9 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) {
 	}
 
 	// do not need to delete the user as user may come to online again
-	// when the session is ended, we'll do proper clean up
+	// when the session is ended, we'll do proper clean up.
+	// delete consumer only
+	m.natsService.DeleteConsumer(roomId, userId)
 }
 
 func (m *NatsModel) onAfterUserLoggedOut(roomId, userId string) {

@@ -77,12 +77,13 @@ func (s *NatsService) BroadcastSystemEventToEveryoneExceptUserId(event plugnmeet
 	return nil
 }
 
-func (s *NatsService) BroadcastSystemNotificationToRoom(roomId, msg string, msgType plugnmeet.NatsSystemNotificationTypes, userId *string) error {
+func (s *NatsService) BroadcastSystemNotificationToRoom(roomId, msg string, msgType plugnmeet.NatsSystemNotificationTypes, withSound bool, userId *string) error {
 	data := &plugnmeet.NatsSystemNotification{
-		Id:     uuid.NewString(),
-		Type:   msgType,
-		Msg:    msg,
-		SentAt: time.Now().UnixMilli(),
+		Id:        uuid.NewString(),
+		Type:      msgType,
+		Msg:       msg,
+		SentAt:    time.Now().UnixMilli(),
+		WithSound: withSound,
 	}
 
 	marshal, err := protoJsonOpts.Marshal(data)
@@ -93,14 +94,14 @@ func (s *NatsService) BroadcastSystemNotificationToRoom(roomId, msg string, msgT
 	return s.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SYSTEM_NOTIFICATION, roomId, marshal, userId)
 }
 
-func (s *NatsService) NotifyInfoMsg(roomId, msg string, userId *string) error {
-	return s.BroadcastSystemNotificationToRoom(roomId, msg, plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_INFO, userId)
+func (s *NatsService) NotifyInfoMsg(roomId, msg string, withSound bool, userId *string) error {
+	return s.BroadcastSystemNotificationToRoom(roomId, msg, plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_INFO, withSound, userId)
 }
 
-func (s *NatsService) NotifyWarningMsg(roomId, msg string, userId *string) error {
-	return s.BroadcastSystemNotificationToRoom(roomId, msg, plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_WARNING, userId)
+func (s *NatsService) NotifyWarningMsg(roomId, msg string, withSound bool, userId *string) error {
+	return s.BroadcastSystemNotificationToRoom(roomId, msg, plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_WARNING, withSound, userId)
 }
 
 func (s *NatsService) NotifyErrorMsg(roomId, msg string, userId *string) error {
-	return s.BroadcastSystemNotificationToRoom(roomId, msg, plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_ERROR, userId)
+	return s.BroadcastSystemNotificationToRoom(roomId, msg, plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_ERROR, true, userId)
 }

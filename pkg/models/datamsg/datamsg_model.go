@@ -49,12 +49,12 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 
 func (m *DataMsgModel) SendDataMessage(r *plugnmeet.DataMessageReq) error {
 	switch r.MsgBodyType {
-	case plugnmeet.DataMsgBodyType_RAISE_HAND:
-		return m.raiseHand(r)
-	case plugnmeet.DataMsgBodyType_LOWER_HAND:
-		return m.lowerHand(r)
-	case plugnmeet.DataMsgBodyType_OTHER_USER_LOWER_HAND:
-		return m.otherUserLowerHand(r)
+	//case plugnmeet.DataMsgBodyType_RAISE_HAND:
+	//	return m.raiseHand(r)
+	//case plugnmeet.DataMsgBodyType_LOWER_HAND:
+	//	return m.lowerHand(r)
+	//case plugnmeet.DataMsgBodyType_OTHER_USER_LOWER_HAND:
+	//	return m.otherUserLowerHand(r)
 	case plugnmeet.DataMsgBodyType_INFO,
 		plugnmeet.DataMsgBodyType_ALERT:
 		return m.sendNotification(r)

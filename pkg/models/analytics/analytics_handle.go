@@ -77,8 +77,6 @@ func (m *AnalyticsModel) HandleWebSocketData(dataMsg *plugnmeet.DataMessage) {
 	case plugnmeet.DataMsgBodyType_USER_VISIBILITY_CHANGE:
 		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_INTERFACE_VISIBILITY
 		d.HsetValue = &dataMsg.Body.Msg
-	case plugnmeet.DataMsgBodyType_RAISE_HAND:
-		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_RAISE_HAND
 	}
 
 	m.HandleEvent(d)

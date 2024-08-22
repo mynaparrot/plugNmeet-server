@@ -41,7 +41,7 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 	}
 }
 
-func (u *UserModel) CommonValidation(c *fiber.Ctx) error {
+func (m *UserModel) CommonValidation(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 	if isAdmin != true {

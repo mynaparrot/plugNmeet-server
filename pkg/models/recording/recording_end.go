@@ -20,7 +20,7 @@ func (m *RecordingModel) recordingEnded(r *plugnmeet.RecorderToPlugNmeet) {
 	_ = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, roomMeta)
 
 	if r.Status {
-		err = m.natsService.NotifyInfoMsg(r.RoomId, "notifications.recording-ended", nil)
+		err = m.natsService.NotifyInfoMsg(r.RoomId, "notifications.recording-ended", false, nil)
 	} else {
 		err = m.natsService.NotifyErrorMsg(r.RoomId, "notifications.recording-ended-with-error", nil)
 	}

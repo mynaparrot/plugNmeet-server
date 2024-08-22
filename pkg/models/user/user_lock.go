@@ -7,13 +7,13 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
-func (u *UserModel) UpdateUserLockSettings(r *plugnmeet.UpdateUserLockSettingsReq) error {
+func (m *UserModel) UpdateUserLockSettings(r *plugnmeet.UpdateUserLockSettingsReq) error {
 	if r.UserId == "all" {
-		err := u.updateLockSettingsAllUsers(r)
+		err := m.updateLockSettingsAllUsers(r)
 		return err
 	}
 
-	p, err := u.lk.LoadParticipantInfo(r.RoomId, r.UserId)
+	p, err := m.lk.LoadParticipantInfo(r.RoomId, r.UserId)
 	if err != nil {
 		return err
 	}
@@ -24,13 +24,13 @@ func (u *UserModel) UpdateUserLockSettings(r *plugnmeet.UpdateUserLockSettingsRe
 		service:         r.Service,
 		direction:       r.Direction,
 	}
-	err = u.updateParticipantLockMetadata(um)
+	err = m.updateParticipantLockMetadata(um)
 
 	return err
 }
 
-func (u *UserModel) updateLockSettingsAllUsers(r *plugnmeet.UpdateUserLockSettingsReq) error {
-	participants, err := u.lk.LoadParticipants(r.RoomId)
+func (m *UserModel) updateLockSettingsAllUsers(r *plugnmeet.UpdateUserLockSettingsReq) error {
+	participants, err := m.lk.LoadParticipants(r.RoomId)
 	if err != nil {
 		return err
 	}
@@ -43,25 +43,25 @@ func (u *UserModel) updateLockSettingsAllUsers(r *plugnmeet.UpdateUserLockSettin
 				service:         r.Service,
 				direction:       r.Direction,
 			}
-			_ = u.updateParticipantLockMetadata(um)
+			_ = m.updateParticipantLockMetadata(um)
 		}
 	}
 
 	// now we'll require updating room settings
 	// so that future users can be applied same lock settings
-	info, err := u.natsService.GetRoomInfo(r.RoomId)
+	info, err := m.natsService.GetRoomInfo(r.RoomId)
 	if err != nil {
 		return err
 	}
 	meta := make([]byte, len(info.Metadata))
 	copy(meta, info.Metadata)
 
-	m, _ := u.natsService.UnmarshalRoomMetadata(string(meta))
+	mt, _ := m.natsService.UnmarshalRoomMetadata(string(meta))
 
-	l := u.changeLockSettingsMetadata(r.Service, r.Direction, m.DefaultLockSettings)
-	m.DefaultLockSettings = l
+	l := m.changeLockSettingsMetadata(r.Service, r.Direction, mt.DefaultLockSettings)
+	mt.DefaultLockSettings = l
 
-	err = u.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, m)
+	err = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, m)
 
 	return err
 }
@@ -73,23 +73,23 @@ type updateParticipantLockMetadata struct {
 	direction       string
 }
 
-func (u *UserModel) updateParticipantLockMetadata(um updateParticipantLockMetadata) error {
+func (m *UserModel) updateParticipantLockMetadata(um updateParticipantLockMetadata) error {
 	if um.participantInfo.State == livekit.ParticipantInfo_ACTIVE {
 		meta := make([]byte, len(um.participantInfo.Metadata))
 		copy(meta, um.participantInfo.Metadata)
 
-		m, _ := u.natsService.UnmarshalUserMetadata(string(meta))
-		l := u.changeLockSettingsMetadata(um.service, um.direction, m.LockSettings)
-		m.LockSettings = l
+		mt, _ := m.natsService.UnmarshalUserMetadata(string(meta))
+		l := m.changeLockSettingsMetadata(um.service, um.direction, mt.LockSettings)
+		mt.LockSettings = l
 
-		err := u.natsService.UpdateAndBroadcastUserMetadata(um.roomId, um.participantInfo.Identity, m, nil)
+		err := m.natsService.UpdateAndBroadcastUserMetadata(um.roomId, um.participantInfo.Identity, m, nil)
 		return err
 	}
 
 	return errors.New(config.UserNotActive)
 }
 
-func (u *UserModel) changeLockSettingsMetadata(service string, direction string, l *plugnmeet.LockSettings) *plugnmeet.LockSettings {
+func (m *UserModel) changeLockSettingsMetadata(service string, direction string, l *plugnmeet.LockSettings) *plugnmeet.LockSettings {
 	lock := new(bool)
 	if direction == "lock" {
 		*lock = true

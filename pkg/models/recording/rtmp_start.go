@@ -20,7 +20,7 @@ func (m *RecordingModel) rtmpStarted(r *plugnmeet.RecorderToPlugNmeet) {
 	roomMeta.IsActiveRtmp = true
 	_ = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, roomMeta)
 
-	err = m.natsService.NotifyInfoMsg(r.RoomId, "notifications.rtmp-started", nil)
+	err = m.natsService.NotifyInfoMsg(r.RoomId, "notifications.rtmp-started", false, nil)
 	if err != nil {
 		log.Errorln(err)
 	}

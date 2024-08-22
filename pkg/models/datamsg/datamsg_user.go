@@ -49,7 +49,7 @@ func (m *DataMsgModel) raiseHand(r *plugnmeet.DataMessageReq) error {
 		Type:      plugnmeet.DataMsgType_SYSTEM,
 		MessageId: &mId,
 		Body: &plugnmeet.DataMsgBody{
-			Type: plugnmeet.DataMsgBodyType_RAISE_HAND,
+			//Type: plugnmeet.DataMsgBodyType_RAISE_HAND,
 			Time: &tm,
 			From: &plugnmeet.DataMsgReqFrom{
 				Sid:    r.UserId,

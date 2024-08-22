@@ -28,7 +28,7 @@ func (m *RecordingModel) recordingStarted(r *plugnmeet.RecorderToPlugNmeet) {
 	_ = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, roomMeta)
 
 	// send message to room
-	err = m.natsService.NotifyInfoMsg(r.RoomId, "notifications.recording-started", nil)
+	err = m.natsService.NotifyInfoMsg(r.RoomId, "notifications.recording-started", false, nil)
 	if err != nil {
 		log.Errorln(err)
 	}

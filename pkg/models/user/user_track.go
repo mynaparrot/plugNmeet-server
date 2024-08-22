@@ -20,13 +20,13 @@ type MuteUnMuteTrackReq struct {
 // if track_sid wasn't send then it will find the microphone track & mute it
 // for unmute you'll require enabling "enable_remote_unmute: true" in livekit
 // under room settings. For privacy reason we aren't using it.
-func (u *UserModel) MuteUnMuteTrack(r *plugnmeet.MuteUnMuteTrackReq) error {
+func (m *UserModel) MuteUnMuteTrack(r *plugnmeet.MuteUnMuteTrackReq) error {
 	if r.UserId == "all" {
-		err := u.muteUnmuteAllMic(r)
+		err := m.muteUnmuteAllMic(r)
 		return err
 	}
 
-	p, err := u.lk.LoadParticipantInfo(r.RoomId, r.UserId)
+	p, err := m.lk.LoadParticipantInfo(r.RoomId, r.UserId)
 	if err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func (u *UserModel) MuteUnMuteTrack(r *plugnmeet.MuteUnMuteTrackReq) error {
 		}
 	}
 
-	_, err = u.lk.MuteUnMuteTrack(r.RoomId, r.UserId, trackSid, r.Muted)
+	_, err = m.lk.MuteUnMuteTrack(r.RoomId, r.UserId, trackSid, r.Muted)
 	if err != nil {
 		return err
 	}
@@ -53,8 +53,8 @@ func (u *UserModel) MuteUnMuteTrack(r *plugnmeet.MuteUnMuteTrackReq) error {
 	return nil
 }
 
-func (u *UserModel) muteUnmuteAllMic(r *plugnmeet.MuteUnMuteTrackReq) error {
-	participants, err := u.lk.LoadParticipants(r.RoomId)
+func (m *UserModel) muteUnmuteAllMic(r *plugnmeet.MuteUnMuteTrackReq) error {
+	participants, err := m.lk.LoadParticipants(r.RoomId)
 	if err != nil {
 		return err
 	}
@@ -70,7 +70,7 @@ func (u *UserModel) muteUnmuteAllMic(r *plugnmeet.MuteUnMuteTrackReq) error {
 			}
 
 			if trackSid != "" {
-				_, _ = u.lk.MuteUnMuteTrack(r.RoomId, p.Identity, trackSid, r.Muted)
+				_, _ = m.lk.MuteUnMuteTrack(r.RoomId, p.Identity, trackSid, r.Muted)
 			}
 		}
 	}
