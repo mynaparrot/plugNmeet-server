@@ -8,6 +8,8 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	log "github.com/sirupsen/logrus"
+	"time"
 )
 
 type UserModel struct {
@@ -52,4 +54,22 @@ func (m *UserModel) CommonValidation(c *fiber.Ctx) error {
 	}
 
 	return nil
+}
+
+// CheckAndWaitUntilRoomCreationInProgress will check the process & wait if needed
+func (m *UserModel) CheckAndWaitUntilRoomCreationInProgress(roomId string) {
+	for {
+		list, err := m.rs.RoomCreationProgressList(roomId, "exist")
+		if err != nil {
+			log.Errorln(err)
+			break
+		}
+		if list {
+			log.Println(roomId, "creation in progress, so waiting for", config.WaitDurationIfRoomInProgress)
+			// we'll wait
+			time.Sleep(config.WaitDurationIfRoomInProgress)
+		} else {
+			break
+		}
+	}
 }

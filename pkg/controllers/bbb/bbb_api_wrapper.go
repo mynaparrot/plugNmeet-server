@@ -13,6 +13,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/bbb"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/recording"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/room"
+	usermodel "github.com/mynaparrot/plugnmeet-server/pkg/models/user"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
@@ -244,7 +245,7 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 	}
 
 	ds := dbservice.New(app.ORM)
-	m := roommodel.New(app, ds, rs, lk)
+	m := usermodel.New(app, ds, rs, lk)
 	token, err := m.GetPNMJoinToken(req)
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))

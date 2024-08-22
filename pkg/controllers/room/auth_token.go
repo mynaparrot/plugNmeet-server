@@ -12,6 +12,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/auth"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/room"
+	usermodel "github.com/mynaparrot/plugnmeet-server/pkg/models/user"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
@@ -94,7 +95,7 @@ func HandleGenerateJoinToken(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, "room is not active. create room first")
 	}
 
-	m := roommodel.New(nil, nil, nil, nil)
+	m := usermodel.New(nil, nil, nil, nil)
 	token, err := m.GetPNMJoinToken(req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())

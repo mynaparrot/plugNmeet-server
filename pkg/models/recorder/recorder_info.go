@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models/room"
+	usermodel "github.com/mynaparrot/plugnmeet-server/pkg/models/user"
 	log "github.com/sirupsen/logrus"
 	"net/url"
 	"sort"
@@ -20,7 +20,6 @@ func (m *RecorderModel) addTokenAndRecorder(req *plugnmeet.RecordingReq, rq *plu
 		return errors.New("notifications.no-recorder-available")
 	}
 
-	rm := roommodel.New(m.app, m.ds, m.rs, m.lk)
 	gt := &plugnmeet.GenerateTokenReq{
 		RoomId: req.RoomId,
 		UserInfo: &plugnmeet.UserInfo{
@@ -29,7 +28,8 @@ func (m *RecorderModel) addTokenAndRecorder(req *plugnmeet.RecordingReq, rq *plu
 			IsAdmin:  true,
 		},
 	}
-	token, err := rm.GetPNMJoinToken(gt)
+	um := usermodel.New(m.app, m.ds, m.rs, m.lk)
+	token, err := um.GetPNMJoinToken(gt)
 	if err != nil {
 		log.Errorln(err)
 		return err

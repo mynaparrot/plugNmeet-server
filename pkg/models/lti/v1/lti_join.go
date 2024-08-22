@@ -5,6 +5,7 @@ import (
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
+	usermodel "github.com/mynaparrot/plugnmeet-server/pkg/models/user"
 )
 
 func (m *LtiV1Model) LTIV1JoinRoom(c *plugnmeet.LtiClaims) (string, error) {
@@ -33,7 +34,8 @@ func (m *LtiV1Model) createRoomSession(c *plugnmeet.LtiClaims) (bool, string, *l
 }
 
 func (m *LtiV1Model) joinRoom(c *plugnmeet.LtiClaims) (string, error) {
-	token, err := m.rm.GetPNMJoinToken(&plugnmeet.GenerateTokenReq{
+	um := usermodel.New(m.app, m.ds, m.rs, m.lk)
+	token, err := um.GetPNMJoinToken(&plugnmeet.GenerateTokenReq{
 		RoomId: c.RoomId,
 		UserInfo: &plugnmeet.UserInfo{
 			UserId:  c.UserId,

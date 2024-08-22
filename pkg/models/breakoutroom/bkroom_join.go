@@ -3,6 +3,7 @@ package breakoutroommodel
 import (
 	"errors"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	usermodel "github.com/mynaparrot/plugnmeet-server/pkg/models/user"
 )
 
 func (m *BreakoutRoomModel) JoinBreakoutRoom(r *plugnmeet.JoinBreakoutRoomReq) (string, error) {
@@ -37,8 +38,8 @@ func (m *BreakoutRoomModel) JoinBreakoutRoom(r *plugnmeet.JoinBreakoutRoomReq) (
 			UserMetadata: meta,
 		},
 	}
-
-	token, err := m.rm.GetPNMJoinToken(req)
+	um := usermodel.New(m.app, m.ds, m.rs, m.lk)
+	token, err := um.GetPNMJoinToken(req)
 	if err != nil {
 		return "", err
 	}

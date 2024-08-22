@@ -1,4 +1,4 @@
-package roommodel
+package usermodel
 
 import (
 	"errors"
@@ -7,7 +7,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 )
 
-func (m *RoomModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, error) {
+func (m *UserModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, error) {
 	// check first
 	m.CheckAndWaitUntilRoomCreationInProgress(g.GetRoomId())
 
@@ -21,7 +21,7 @@ func (m *RoomModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, erro
 		// no lock for admin
 		g.UserInfo.UserMetadata.LockSettings = new(plugnmeet.LockSettings)
 
-		err := m.userModel.CreateNewPresenter(g)
+		err := m.CreateNewPresenter(g)
 		if err != nil {
 			return "", err
 		}
@@ -33,7 +33,7 @@ func (m *RoomModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, erro
 		if meta == nil {
 			return "", errors.New("room metadata not found")
 		}
-		m.userModel.AssignLockSettingsToUser(meta, g)
+		m.AssignLockSettingsToUser(meta, g)
 
 		// if waiting room features active then we won't allow direct access
 		if meta.RoomFeatures.WaitingRoomFeatures.IsActive {
