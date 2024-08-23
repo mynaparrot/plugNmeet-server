@@ -2,6 +2,7 @@ package pollmodel
 
 import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	log "github.com/sirupsen/logrus"
 )
 
 func (m *PollModel) ClosePoll(r *plugnmeet.ClosePollReq, isAdmin bool) error {
@@ -10,8 +11,10 @@ func (m *PollModel) ClosePoll(r *plugnmeet.ClosePollReq, isAdmin bool) error {
 		return err
 	}
 
-	// TODO: update here
-	//_ = m.broadcastNotification(r.RoomId, r.UserId, r.PollId, plugnmeet.DataMsgBodyType_POLL_CLOSED, isAdmin)
+	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_POLL_CLOSED, r.RoomId, r.PollId, nil)
+	if err != nil {
+		log.Errorln(err)
+	}
 
 	// send analytics
 	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{

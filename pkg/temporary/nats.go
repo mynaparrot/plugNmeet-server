@@ -1,7 +1,6 @@
 package temporary
 
 import (
-	"fmt"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -10,10 +9,8 @@ import (
 
 func NewNatsConnection(appCnf *config.AppConfig) error {
 	info := appCnf.NatsInfo
-	url := strings.Join(info.NatsUrls, ",")
-	fmt.Println(url)
 
-	nc, err := nats.Connect(url, nats.UserInfo(info.User, info.Password))
+	nc, err := nats.Connect(strings.Join(info.NatsUrls, ","), nats.UserInfo(info.User, info.Password))
 	if err != nil {
 		return err
 	}

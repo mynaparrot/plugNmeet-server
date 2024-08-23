@@ -3,7 +3,6 @@ package routers
 import (
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/goccy/go-json"
-	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -28,9 +27,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/user"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/waitingroom"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/webhook"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/websocket"
 	"github.com/mynaparrot/plugnmeet-server/version"
-	log "github.com/sirupsen/logrus"
 )
 
 func New() *fiber.App {
@@ -208,23 +205,23 @@ func New() *fiber.App {
 	api.Post("/fileUpload", filecontroller.HandleFileUpload)
 
 	// websocket for chat
-	app.Use("/ws", func(c *fiber.Ctx) error {
-		if websocket.IsWebSocketUpgrade(c) {
-			c.Locals("allowed", true)
-			return c.Next()
-		}
-		return fiber.ErrUpgradeRequired
-	})
-
-	websocketcontroller.SetupSocketListeners()
-	cfg := websocket.Config{
-		RecoverHandler: func(conn *websocket.Conn) {
-			if err := recover(); err != nil {
-				log.Errorln("error occurred during recovery from websocket")
-			}
-		},
-	}
-	app.Get("/ws", websocketcontroller.HandleWebSocket(cfg))
+	//app.Use("/ws", func(c *fiber.Ctx) error {
+	//	if websocket.IsWebSocketUpgrade(c) {
+	//		c.Locals("allowed", true)
+	//		return c.Next()
+	//	}
+	//	return fiber.ErrUpgradeRequired
+	//})
+	//
+	//websocketcontroller.SetupSocketListeners()
+	//cfg := websocket.Config{
+	//	RecoverHandler: func(conn *websocket.Conn) {
+	//		if err := recover(); err != nil {
+	//			log.Errorln("error occurred during recovery from websocket")
+	//		}
+	//	},
+	//}
+	//app.Get("/ws", websocketcontroller.HandleWebSocket(cfg))
 
 	// last method
 	app.Use(func(c *fiber.Ctx) error {

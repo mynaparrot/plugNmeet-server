@@ -23,8 +23,7 @@ func (m *WebsocketModel) handleSystemMessages(payload *plugnmeet.DataMessage, ro
 	case plugnmeet.DataMsgBodyType_EXTERNAL_MEDIA_PLAYER_EVENTS:
 		m.handleExternalMediaPlayerEvents(payload, roomId)
 	case plugnmeet.DataMsgBodyType_POLL_CREATED,
-		plugnmeet.DataMsgBodyType_NEW_POLL_RESPONSE,
-		plugnmeet.DataMsgBodyType_POLL_CLOSED:
+		plugnmeet.DataMsgBodyType_NEW_POLL_RESPONSE:
 		m.handlePollsNotifications(payload, roomId)
 	case plugnmeet.DataMsgBodyType_JOIN_BREAKOUT_ROOM:
 		m.handleSendBreakoutRoomNotification(payload, roomId)
