@@ -4,11 +4,20 @@ import (
 	"errors"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/auth"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 )
 
 func (m *UserModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, error) {
 	// check first
 	m.CheckAndWaitUntilRoomCreationInProgress(g.GetRoomId())
+
+	status, err := m.natsService.GetRoomStatus(g.RoomId)
+	if err != nil {
+		return "", err
+	}
+	if status == natsservice.RoomStatusEnded {
+		return "", errors.New("room found in delete status, need to recreate it")
+	}
 
 	if g.UserInfo.UserMetadata == nil {
 		g.UserInfo.UserMetadata = new(plugnmeet.UserMetadata)
@@ -46,7 +55,7 @@ func (m *UserModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, erro
 	}
 
 	// add user to our bucket
-	err := m.natsService.AddUser(g.RoomId, g.UserInfo.UserId, g.UserInfo.Name, g.UserInfo.IsAdmin, g.UserInfo.UserMetadata.IsPresenter, g.UserInfo.UserMetadata)
+	err = m.natsService.AddUser(g.RoomId, g.UserInfo.UserId, g.UserInfo.Name, g.UserInfo.IsAdmin, g.UserInfo.UserMetadata.IsPresenter, g.UserInfo.UserMetadata)
 	if err != nil {
 		return "", err
 	}

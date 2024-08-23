@@ -4,6 +4,7 @@ import (
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/breakoutroom"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/roomduration"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	log "github.com/sirupsen/logrus"
 	"time"
 )
@@ -29,6 +30,14 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 			log.Errorln(err)
 		}
 		return
+	}
+
+	if rInfo.Status != natsservice.RoomStatusActive {
+		err = m.natsService.UpdateRoomStatus(rInfo.RoomId, natsservice.RoomStatusActive)
+		if err != nil {
+			log.Errorln(err)
+			return
+		}
 	}
 
 	meta.StartedAt = uint64(time.Now().Unix())

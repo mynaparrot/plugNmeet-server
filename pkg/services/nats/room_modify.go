@@ -17,9 +17,14 @@ const (
 	RoomIdKey           = "room_id"
 	RoomSidKey          = "room_sid"
 	RoomEmptyTimeoutKey = "empty_timeout"
+	RoomStatusKey       = "status"
 	RoomEnabledE2EEKey  = "enabled_e2ee"
 	RoomMetadataKey     = "metadata"
 	RoomCreatedKey      = "created_at"
+
+	RoomStatusCreated = "created"
+	RoomStatusActive  = "active"
+	RoomStatusEnded   = "ended"
 )
 
 func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeout *uint32, metadata *plugnmeet.RoomMetadata) error {
@@ -44,6 +49,7 @@ func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeo
 		RoomIdKey:           roomId,
 		RoomSidKey:          roomSid,
 		RoomEmptyTimeoutKey: fmt.Sprintf("%d", *emptyTimeout),
+		RoomStatusKey:       RoomStatusCreated,
 		RoomEnabledE2EEKey:  fmt.Sprintf("%v", metadata.RoomFeatures.EndToEndEncryptionFeatures.IsEnabled),
 		RoomCreatedKey:      fmt.Sprintf("%d", time.Now().UTC().Unix()), // in seconds
 		RoomMetadataKey:     mt,
@@ -107,6 +113,23 @@ func (s *NatsService) DeleteRoom(roomId string) error {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
 		return nil
 	case err != nil:
+		return err
+	}
+
+	return nil
+}
+
+func (s *NatsService) UpdateRoomStatus(roomId string, status string) error {
+	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf(RoomInfoBucket, roomId))
+	switch {
+	case errors.Is(err, jetstream.ErrBucketNotFound):
+		return errors.New(fmt.Sprintf("no room found with roomId: %s", roomId))
+	case err != nil:
+		return err
+	}
+
+	_, err = kv.PutString(s.ctx, RoomStatusKey, status)
+	if err != nil {
 		return err
 	}
 

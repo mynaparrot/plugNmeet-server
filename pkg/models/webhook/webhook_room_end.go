@@ -29,6 +29,10 @@ func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 		log.Errorln(err)
 		return
 	}
+	if rInfo == nil {
+		log.Errorln("empty roomInfo")
+		return
+	}
 
 	// update db table
 	room := &dbmodels.RoomInfo{

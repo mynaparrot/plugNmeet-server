@@ -115,6 +115,17 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	requestedUserId := c.Locals("requestedUserId")
 	app := config.GetConfig()
 
+	req := new(plugnmeet.VerifyTokenReq)
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	cm := c.Locals("claims")
+	if cm == nil {
+		return utils.SendCommonProtobufResponse(c, false, "invalid request")
+	}
+
 	// check for duplicate join
 	nts := natsservice.New(app)
 	if status, err := nts.GetRoomUserStatus(roomId.(string), requestedUserId.(string)); err == nil {
@@ -129,34 +140,14 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "notifications.you-are-blocked")
 	}
 
-	req := new(plugnmeet.VerifyTokenReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
-	}
-
-	cm := c.Locals("claims")
-	if cm == nil {
-		return utils.SendCommonProtobufResponse(c, false, "invalid request")
-	}
-
-	// if nil then assume production
-	if req.IsProduction == nil {
-		b := new(bool)
-		*b = true
-		req.IsProduction = b
-	}
-
 	m := roommodel.New(nil, nil, nil, nil)
 	rr, meta := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: roomId.(string),
 	})
 
-	// if production then we'll check if room is active or not
-	// if not active then we don't allow to join user
-	// livekit also don't allow but throw 500 error which make confused to user.
-	if !rr.GetIsActive() && *req.IsProduction {
-		return utils.SendProtoJsonResponse(c, rr)
+	if !rr.GetIsActive() {
+		// prevent joining if room status is not created or active
+		return utils.SendCommonProtobufResponse(c, false, rr.Msg)
 	}
 
 	v := version.Version

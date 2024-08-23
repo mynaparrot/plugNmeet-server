@@ -20,6 +20,11 @@ func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 		log.Errorln(err)
 		return
 	}
+	if rInfo == nil {
+		log.Errorln("empty roomInfo")
+		return
+	}
+
 	event.Room.Sid = rInfo.RoomSid
 	event.Room.Metadata = rInfo.Metadata
 

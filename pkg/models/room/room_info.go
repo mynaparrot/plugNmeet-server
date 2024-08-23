@@ -3,6 +3,7 @@ package roommodel
 import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"time"
 )
 
@@ -43,8 +44,11 @@ func (m *RoomModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoo
 		return res, nil
 	}
 
-	res.IsActive = true
-	res.Msg = "room is active"
+	if rInfo.Status == natsservice.RoomStatusCreated || rInfo.Status == natsservice.RoomStatusActive {
+		res.IsActive = true
+		res.Msg = "room is active"
+	}
+
 	return res, meta
 }
 

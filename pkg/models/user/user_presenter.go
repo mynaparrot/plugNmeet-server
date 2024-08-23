@@ -16,6 +16,7 @@ func (m *UserModel) CreateNewPresenter(r *plugnmeet.GenerateTokenReq) error {
 	}
 	if ids == nil || len(ids) == 0 {
 		// no user found
+		r.UserInfo.UserMetadata.IsPresenter = true
 		return nil
 	}
 

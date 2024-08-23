@@ -1,7 +1,6 @@
 package roommodel
 
 import (
-	"errors"
 	"fmt"
 	"github.com/cavaliergopher/grab/v3"
 	"github.com/gabriel-vasile/mimetype"
@@ -11,6 +10,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/file"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"os"
@@ -43,7 +43,11 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.NatsKvRoo
 			if err != nil {
 				return nil, err
 			}
-			return rInfo, errors.New("room already exists")
+			err = m.natsService.UpdateRoomStatus(r.RoomId, natsservice.RoomStatusActive)
+			if err != nil {
+				return nil, err
+			}
+			return rInfo, nil
 		}
 	}
 	// otherwise, we're good to continue

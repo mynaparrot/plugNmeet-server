@@ -30,6 +30,9 @@ func (s *NatsService) GetRoomInfo(roomId string) (*plugnmeet.NatsKvRoomInfo, err
 	if sid, err := kv.Get(s.ctx, RoomSidKey); err == nil && sid != nil {
 		info.RoomSid = string(sid.Value())
 	}
+	if status, err := kv.Get(s.ctx, RoomStatusKey); err == nil && status != nil {
+		info.Status = string(status.Value())
+	}
 	if emptyTimeout, err := kv.Get(s.ctx, RoomEmptyTimeoutKey); err == nil && emptyTimeout != nil {
 		if parseUint, err := strconv.ParseUint(string(emptyTimeout.Value()), 10, 64); err == nil {
 			info.EmptyTimeout = parseUint
@@ -96,4 +99,15 @@ func (s *NatsService) GetRoomMetadataStruct(roomId string) (*plugnmeet.RoomMetad
 	}
 
 	return s.UnmarshalRoomMetadata(string(metadata.Value()))
+}
+
+func (s *NatsService) GetRoomStatus(roomId string) (string, error) {
+	value, err := s.GetRoomKeyValue(roomId, RoomStatusKey)
+	if err != nil {
+		return "", err
+	}
+	if value == nil {
+		return "", nil
+	}
+	return string(value.Value()), nil
 }
