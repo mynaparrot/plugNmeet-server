@@ -16,7 +16,7 @@ func (m *RoomModel) EndRoom(r *plugnmeet.RoomEndReq) (bool, string) {
 		return false, "room not active"
 	}
 
-	err := m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SESSION_ENDED, r.GetRoomId(), "SESSION_ENDED_ON_REQUEST", nil)
+	err := m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SESSION_ENDED, r.GetRoomId(), "room-disconnected-room-ended", nil)
 	if err != nil {
 		// we'll just log error
 		log.Errorln(err)
