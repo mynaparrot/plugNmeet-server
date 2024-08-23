@@ -139,9 +139,9 @@ func (m *WebhookModel) onAfterRoomFinishedTasks(roomId, roomSid, metadata string
 		log.Errorln(err)
 	}
 
+	// now clean up session
+	m.natsService.OnAfterSessionEndCleanup(roomId)
+
 	// finally, create the analytics file
 	m.analyticsModel.PrepareToExportAnalytics(roomId, roomSid, metadata)
-
-	// now clean up session
-	m.natsService.OnAfterSessionCleanup(roomId)
 }

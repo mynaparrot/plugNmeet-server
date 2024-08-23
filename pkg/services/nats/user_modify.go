@@ -3,6 +3,7 @@ package natsservice
 import (
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/nats-io/nats.go/jetstream"
 	log "github.com/sirupsen/logrus"
@@ -10,9 +11,12 @@ import (
 )
 
 const (
-	RoomUsersBucket       = Prefix + "roomUsers"
-	userInfoPrefix        = Prefix + "userInfo"
-	UserInfoBucket        = userInfoPrefix + "-r_%s-u_%s"
+	RoomUsersBucketPrefix = Prefix + "roomUsers-"
+	RoomUsersBucket       = RoomUsersBucketPrefix + "%s"
+
+	userInfoPrefix = Prefix + "userInfo-"
+	UserInfoBucket = userInfoPrefix + "r_%s-u_%s"
+
 	UserOnlineMaxPingDiff = time.Second * 30 // after 30 seconds we'll treat user as offline
 
 	UserIdKey          = "id"
@@ -33,10 +37,10 @@ const (
 	UserOffline      = "offline"
 )
 
-func (s *NatsService) AddUser(roomId, userId, sid, name string, isAdmin, isPresenter bool, metadata *plugnmeet.UserMetadata) error {
+func (s *NatsService) AddUser(roomId, userId, name string, isAdmin, isPresenter bool, metadata *plugnmeet.UserMetadata) error {
 	// first add user to room
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
-		Bucket: fmt.Sprintf("%s-%s", RoomUsersBucket, roomId),
+		Bucket: fmt.Sprintf(RoomUsersBucket, roomId),
 	})
 	if err != nil {
 		return err
@@ -62,7 +66,7 @@ func (s *NatsService) AddUser(roomId, userId, sid, name string, isAdmin, isPrese
 
 	data := map[string]string{
 		UserIdKey:          userId,
-		UserSidKey:         sid,
+		UserSidKey:         uuid.NewString(),
 		UserNameKey:        name,
 		UserRoomIdKey:      roomId,
 		UserIsAdminKey:     fmt.Sprintf("%v", isAdmin),
@@ -82,7 +86,7 @@ func (s *NatsService) AddUser(roomId, userId, sid, name string, isAdmin, isPrese
 }
 
 func (s *NatsService) UpdateUserStatus(roomId, userId string, status string) error {
-	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomUsersBucket, roomId))
+	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf(RoomUsersBucket, roomId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
 		return errors.New(fmt.Sprintf("no user found with userId: %s", userId))
@@ -160,7 +164,7 @@ func (s *NatsService) UpdateUserMetadata(roomId, userId string, metadata interfa
 }
 
 func (s *NatsService) DeleteUser(roomId, userId string) {
-	if kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomUsersBucket, roomId)); err == nil {
+	if kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf(RoomUsersBucket, roomId)); err == nil {
 		_ = kv.Delete(s.ctx, userId)
 	}
 
@@ -168,7 +172,7 @@ func (s *NatsService) DeleteUser(roomId, userId string) {
 }
 
 func (s *NatsService) DeleteAllRoomUsersWithConsumer(roomId string) error {
-	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomUsersBucket, roomId))
+	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf(RoomUsersBucket, roomId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
 		// nothing found
@@ -190,7 +194,7 @@ func (s *NatsService) DeleteAllRoomUsersWithConsumer(roomId string) error {
 	}
 
 	// now delete room users bucket
-	_ = s.js.DeleteKeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomUsersBucket, roomId))
+	_ = s.js.DeleteKeyValue(s.ctx, fmt.Sprintf(RoomUsersBucket, roomId))
 
 	return nil
 }

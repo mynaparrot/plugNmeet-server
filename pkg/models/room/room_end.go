@@ -24,6 +24,8 @@ func (m *RoomModel) EndRoom(r *plugnmeet.RoomEndReq) (bool, string) {
 
 	_, err = m.lk.EndRoom(r.GetRoomId())
 	if err != nil {
+		// TODO: need think how to handle
+		// because room may not cleaned up properly
 		// we'll just log error
 		log.Errorln(err)
 	}

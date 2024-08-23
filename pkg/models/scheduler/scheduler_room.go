@@ -1,13 +1,9 @@
 package schedulermodel
 
 import (
-	"context"
-	"fmt"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
-	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	log "github.com/sirupsen/logrus"
-	"strings"
 	"time"
 )
 
@@ -41,66 +37,47 @@ func (m *SchedulerModel) activeRoomChecker() {
 			continue
 		}
 
-		lkRoom, err := m.lk.LoadRoomInfo(room.RoomId)
-		if lkRoom == nil && err.Error() == config.RequestedRoomNotExist {
-			_, _ = m.ds.UpdateRoomStatus(&dbmodels.RoomInfo{
-				Sid:       room.Sid,
+		rInfo, err := m.natsService.GetRoomInfo(room.RoomId)
+		if err != nil {
+			log.Errorln(err)
+			continue
+		}
+
+		// we did not find the room,
+		// so, we're closing it
+		if rInfo == nil {
+			_, err = m.ds.UpdateRoomStatus(&dbmodels.RoomInfo{
+				ID:        room.ID,
 				IsRunning: 0,
 				Ended:     time.Now().UTC(),
 			})
-			continue
-		} else if lkRoom == nil {
+			if err != nil {
+				log.Errorln(err)
+			}
 			continue
 		}
 
-		pp, err := m.lk.LoadParticipants(room.RoomId)
+		userIds, err := m.natsService.GetOlineUsersId(room.RoomId)
 		if err != nil {
+			log.Errorln(err)
 			continue
 		}
-		var count int64 = 0
-		for _, p := range pp {
-			if p.Identity == config.RecorderBot || p.Identity == config.RtmpBot {
+
+		if userIds == nil || len(userIds) == 0 {
+			// no user online
+			valid := rInfo.CreatedAt + rInfo.EmptyTimeout
+			if uint64(time.Now().UTC().Unix()) > valid {
+				log.Infoln("EmptyTimeout for roomId:", room.RoomId, "passed: ", uint64(time.Now().UTC().Unix())-valid)
+
+				// end room by proper channel
+				m.rm.EndRoom(&plugnmeet.RoomEndReq{RoomId: room.RoomId})
 				continue
 			}
-			count++
 		}
+
+		var count = int64(len(userIds))
 		if room.JoinedParticipants != count {
 			_, _ = m.ds.UpdateNumParticipants(room.Sid, count)
-		} else if room.JoinedParticipants == 0 {
-			// this room doesn't have any user
-			// we'll check if room was created long before then we can end it
-			// here we can check if room was created more than 24 hours ago
-			expire := time.Unix(room.CreationTime, 0).Add(time.Hour * 24)
-			if time.Now().UTC().After(expire) {
-				// we can close the room
-				_, _ = m.lk.EndRoom(room.RoomId)
-			}
-		}
-	}
-}
-
-// checkRoomActiveUsersForRoomStatus will count online users
-// if none then will end the session
-func (m *SchedulerModel) checkRoomActiveUsersForRoomStatus() {
-	kl := m.app.JetStream.KeyValueStoreNames(context.Background())
-
-	for s := range kl.Name() {
-		if strings.HasPrefix(s, natsservice.RoomInfoBucket) {
-			roomId := strings.ReplaceAll(s, natsservice.RoomInfoBucket+"-", "")
-			hasOnlineUser := m.natsService.HasOnlineUser(roomId)
-			if !hasOnlineUser {
-				info, err := m.natsService.GetRoomInfo(roomId)
-				if err != nil {
-					continue
-				}
-				valid := info.CreatedAt + info.EmptyTimeout
-				if uint64(time.Now().UTC().Unix()) > valid {
-					fmt.Println(uint64(time.Now().UTC().Unix()) - valid)
-					// TODO: this room should be ended
-					// or may be it was ended, but proper cleaning was not possible
-					log.Infoln("TODO: this room should be ended or clean up")
-				}
-			}
 		}
 	}
 }

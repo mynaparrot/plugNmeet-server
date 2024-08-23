@@ -166,17 +166,19 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	res := &plugnmeet.VerifyTokenRes{
 		Status:        true,
 		Msg:           "token is valid",
+		NatsWsUrl:     &app.NatsInfo.NatsWSUrl,
 		ServerVersion: &v,
 		EnabledE2Ee:   false,
 		RoomId:        &rId,
 		UserId:        &uId,
 		NatsSubjects: &plugnmeet.NatsSubjects{
-			SystemWorker:  natsSubjs.SystemWorker,
-			SystemPublic:  natsSubjs.SystemPublic,
-			SystemPrivate: natsSubjs.SystemPrivate,
-			Chat:          natsSubjs.Chat,
-			Whiteboard:    natsSubjs.Whiteboard,
-			DataChannel:   natsSubjs.DataChannel,
+			SystemApiWorker: natsSubjs.SystemApiWorker,
+			SystemJsWorker:  natsSubjs.SystemJsWorker,
+			SystemPublic:    natsSubjs.SystemPublic,
+			SystemPrivate:   natsSubjs.SystemPrivate,
+			Chat:            natsSubjs.Chat,
+			Whiteboard:      natsSubjs.Whiteboard,
+			DataChannel:     natsSubjs.DataChannel,
 		},
 	}
 	if rr.GetIsActive() && meta != nil {

@@ -27,12 +27,6 @@ func (m *WebhookModel) participantJoined(event *livekit.WebhookEvent) {
 		log.Errorln(err)
 	}
 
-	// now we'll add this user to active users list for this room
-	_, err = m.rs.ManageActiveUsersList(event.Room.Name, event.Participant.Identity, "add", event.Participant.JoinedAt)
-	if err != nil {
-		log.Errorln(err)
-	}
-
 	// webhook notification
 	go m.sendToWebhookNotifier(event)
 

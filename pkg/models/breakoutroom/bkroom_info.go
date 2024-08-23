@@ -3,6 +3,7 @@ package breakoutroommodel
 import (
 	"errors"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -69,8 +70,8 @@ func (m *BreakoutRoomModel) fetchBreakoutRooms(roomId string) ([]*plugnmeet.Brea
 		room.Id = i
 		for _, u := range room.Users {
 			if room.Started {
-				joined, err := m.rs.ManageActiveUsersList(room.Id, u.Id, "get", 0)
-				if err == nil && len(joined) > 0 {
+				status, err := m.natsService.GetRoomUserStatus(room.Id, u.Id)
+				if err == nil && status == natsservice.UserOnline {
 					u.Joined = true
 				}
 			}

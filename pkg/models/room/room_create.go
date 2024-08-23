@@ -37,7 +37,7 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.NatsKvRoo
 		if err != nil {
 			return nil, err
 		}
-		if rInfo != nil && rInfo.RoomSid == roomDbInfo.Sid {
+		if rInfo != nil && rInfo.DbTableId == roomDbInfo.ID {
 			// want to make sure our stream was created properly
 			err := m.natsService.CreateRoomNatsStreams(r.RoomId)
 			if err != nil {
@@ -128,7 +128,7 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.NatsKvRoo
 	}
 
 	// now create room bucket
-	err = m.natsService.AddRoom(r.RoomId, sId, r.EmptyTimeout, r.Metadata)
+	err = m.natsService.AddRoom(roomDbInfo.ID, r.RoomId, sId, r.EmptyTimeout, r.Metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +147,7 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.NatsKvRoo
 }
 
 func (m *RoomModel) preRoomCreationTasks(r *plugnmeet.CreateRoomReq) {
-	exist, err := m.rs.ManageActiveRoomsWithMetadata(r.GetRoomId(), "get", "")
+	exist, err := m.natsService.GetRoomInfo(r.GetRoomId())
 	if err == nil && exist != nil {
 		// maybe this room was ended just now, so we'll wait until clean up done
 		waitFor := config.WaitBeforeTriggerOnAfterRoomEnded + (1 * time.Second)

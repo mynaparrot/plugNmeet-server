@@ -66,12 +66,6 @@ func (s *LivekitService) UpdateParticipantMetadata(roomId string, userId string,
 		return nil, err
 	}
 
-	// we'll update our redis everytime
-	_, err = s.rs.ManageRoomWithUsersMetadata(roomId, userId, "add", metadata)
-	if err != nil {
-		return nil, err
-	}
-
 	return participant, nil
 }
 

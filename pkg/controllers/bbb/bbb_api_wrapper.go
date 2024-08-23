@@ -15,7 +15,8 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/room"
 	usermodel "github.com/mynaparrot/plugnmeet-server/pkg/models/user"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
+	livekitservice "github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"google.golang.org/protobuf/encoding/protojson"
 	"net/url"
@@ -181,8 +182,9 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 	app := config.GetConfig()
 	rs := redisservice.New(app.RDS)
 	lk := livekitservice.New(app, rs)
+	nts := natsservice.New(app)
 
-	metadata, err := rs.ManageActiveRoomsWithMetadata(roomId, "get", "")
+	metadata, err := nts.GetRoomMetadataStruct(roomId)
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 	}
@@ -191,15 +193,10 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", "meeting is not active"))
 	}
 
-	roomMetadata, err := lk.UnmarshalRoomMetadata(metadata[roomId])
-	if err != nil {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
-	}
-
 	ex := new(bbbapiwrapper.CreateMeetingDefaultExtraData)
 	customDesign := new(plugnmeet.CustomDesignParams)
-	if roomMetadata.ExtraData != nil {
-		err = json.Unmarshal([]byte(*roomMetadata.ExtraData), ex)
+	if metadata.ExtraData != nil {
+		err = json.Unmarshal([]byte(*metadata.ExtraData), ex)
 		if err != nil {
 			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 		}
@@ -221,7 +218,7 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 		if q.Password == "" {
 			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", "password missing"))
 		}
-		if roomMetadata.ExtraData == nil {
+		if metadata.ExtraData == nil {
 			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", "did not found extra data"))
 		}
 		if subtle.ConstantTimeCompare([]byte(q.Password), []byte(ex.ModeratorPW)) == 1 {

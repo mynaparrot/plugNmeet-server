@@ -2,6 +2,7 @@ package schedulermodel
 
 import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	roommodel "github.com/mynaparrot/plugnmeet-server/pkg/models/room"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/roomduration"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
@@ -16,6 +17,7 @@ type SchedulerModel struct {
 	rs          *redisservice.RedisService
 	lk          *livekitservice.LivekitService
 	natsService *natsservice.NatsService
+	rm          *roommodel.RoomModel
 
 	rmDuration  *roomdurationmodel.RoomDurationModel
 	closeTicker chan bool
@@ -40,6 +42,7 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 		ds:          ds,
 		rs:          rs,
 		lk:          lk,
+		rm:          roommodel.New(app, ds, rs, lk),
 		rmDuration:  roomdurationmodel.New(app, rs, lk),
 		natsService: natsservice.New(app),
 	}
@@ -62,7 +65,6 @@ func (m *SchedulerModel) StartScheduler() {
 			m.checkOnlineUsersStatus()
 		case <-roomChecker.C:
 			m.activeRoomChecker()
-			m.checkRoomActiveUsersForRoomStatus()
 		}
 	}
 }

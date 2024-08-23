@@ -141,6 +141,7 @@ type CopyrightConf struct {
 
 type NatsInfo struct {
 	NatsUrl                  string       `yaml:"nats_url"`
+	NatsWSUrl                string       `yaml:"nats_ws_url"`
 	Account                  string       `yaml:"account"`
 	User                     string       `yaml:"user"`
 	Password                 string       `yaml:"password"`
@@ -149,12 +150,13 @@ type NatsInfo struct {
 }
 
 type NatsSubjects struct {
-	SystemWorker  string `yaml:"system_worker"`
-	SystemPublic  string `yaml:"system_public"`
-	SystemPrivate string `yaml:"system_private"`
-	Chat          string `yaml:"chat"`
-	Whiteboard    string `yaml:"whiteboard"`
-	DataChannel   string `yaml:"data_channel"`
+	SystemApiWorker string `yaml:"system_api_worker"`
+	SystemJsWorker  string `yaml:"system_js_worker"`
+	SystemPublic    string `yaml:"system_public"`
+	SystemPrivate   string `yaml:"system_private"`
+	Chat            string `yaml:"chat"`
+	Whiteboard      string `yaml:"whiteboard"`
+	DataChannel     string `yaml:"data_channel"`
 }
 
 var appCnf *AppConfig

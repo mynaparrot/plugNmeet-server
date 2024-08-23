@@ -27,11 +27,6 @@ func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 	if err != nil {
 		log.Errorln(err)
 	}
-	// now we'll delete this user from active users list for this room
-	_, err = m.rs.ManageActiveUsersList(rInfo.RoomId, event.Participant.Identity, "del", event.CreatedAt)
-	if err != nil {
-		log.Errorln(err)
-	}
 
 	// webhook notification
 	go m.sendToWebhookNotifier(event)

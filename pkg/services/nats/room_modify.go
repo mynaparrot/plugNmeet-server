@@ -10,18 +10,21 @@ import (
 )
 
 const (
-	RoomInfoBucket      = Prefix + "roomInfo"
-	RoomIdKey           = "id"
-	RoomSidKey          = "sid"
+	RoomInfoBucketPrefix = Prefix + "roomInfo-"
+	RoomInfoBucket       = RoomInfoBucketPrefix + "%s"
+
+	RoomDbTableIdKey    = "id"
+	RoomIdKey           = "room_id"
+	RoomSidKey          = "room_sid"
 	RoomEmptyTimeoutKey = "empty_timeout"
 	RoomEnabledE2EEKey  = "enabled_e2ee"
 	RoomMetadataKey     = "metadata"
 	RoomCreatedKey      = "created_at"
 )
 
-func (s *NatsService) AddRoom(roomId, roomSid string, emptyTimeout *uint32, metadata *plugnmeet.RoomMetadata) error {
+func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeout *uint32, metadata *plugnmeet.RoomMetadata) error {
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
-		Bucket: fmt.Sprintf("%s-%s", RoomInfoBucket, roomId),
+		Bucket: fmt.Sprintf(RoomInfoBucket, roomId),
 	})
 	if err != nil {
 		return err
@@ -37,6 +40,7 @@ func (s *NatsService) AddRoom(roomId, roomSid string, emptyTimeout *uint32, meta
 	}
 
 	data := map[string]string{
+		RoomDbTableIdKey:    fmt.Sprintf("%d", tableId),
 		RoomIdKey:           roomId,
 		RoomSidKey:          roomSid,
 		RoomEmptyTimeoutKey: fmt.Sprintf("%d", *emptyTimeout),
@@ -75,7 +79,7 @@ func (s *NatsService) updateRoomMetadata(roomId string, metadata interface{}) (s
 		return "", errors.New("invalid metadata data type")
 	}
 
-	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomInfoBucket, roomId))
+	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf(RoomInfoBucket, roomId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
 		return "", errors.New(fmt.Sprintf("no room found with roomId: %s", roomId))
@@ -98,7 +102,7 @@ func (s *NatsService) updateRoomMetadata(roomId string, metadata interface{}) (s
 }
 
 func (s *NatsService) DeleteRoom(roomId string) error {
-	err := s.js.DeleteKeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomInfoBucket, roomId))
+	err := s.js.DeleteKeyValue(s.ctx, fmt.Sprintf(RoomInfoBucket, roomId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
 		return nil
@@ -109,7 +113,7 @@ func (s *NatsService) DeleteRoom(roomId string) error {
 	return nil
 }
 
-func (s *NatsService) OnAfterSessionCleanup(roomId string) {
+func (s *NatsService) OnAfterSessionEndCleanup(roomId string) {
 	err := s.DeleteRoom(roomId)
 	if err != nil {
 		log.Errorln(err)

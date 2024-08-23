@@ -10,7 +10,7 @@ import (
 )
 
 func (s *NatsService) GetRoomUserStatus(roomId, userId string) (string, error) {
-	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomUsersBucket, roomId))
+	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf(RoomUsersBucket, roomId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
 		return "", nil
@@ -82,7 +82,7 @@ func (s *NatsService) GetUserInfo(roomId, userId string) (*plugnmeet.NatsKvUserI
 }
 
 func (s *NatsService) GetRoomAllUsersFromStatusBucket(roomId string) (map[string]jetstream.KeyValueEntry, error) {
-	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomUsersBucket, roomId))
+	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf(RoomUsersBucket, roomId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
 		return nil, nil

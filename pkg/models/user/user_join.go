@@ -45,19 +45,8 @@ func (m *UserModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, erro
 		g.UserInfo.UserMetadata.RecordWebcam = &recordWebcam
 	}
 
-	metadata, err := m.natsService.MarshalUserMetadata(g.UserInfo.UserMetadata)
-	if err != nil {
-		return "", err
-	}
-
-	// update our bucket
-	err = m.natsService.AddUser(g.RoomId, g.UserInfo.UserId, "", g.UserInfo.Name, g.UserInfo.IsAdmin, g.UserInfo.UserMetadata.IsPresenter, g.UserInfo.UserMetadata)
-	if err != nil {
-		return "", err
-	}
-
-	// let's update our redis
-	_, err = m.rs.ManageRoomWithUsersMetadata(g.RoomId, g.UserInfo.UserId, "add", metadata)
+	// add user to our bucket
+	err := m.natsService.AddUser(g.RoomId, g.UserInfo.UserId, g.UserInfo.Name, g.UserInfo.IsAdmin, g.UserInfo.UserMetadata.IsPresenter, g.UserInfo.UserMetadata)
 	if err != nil {
 		return "", err
 	}

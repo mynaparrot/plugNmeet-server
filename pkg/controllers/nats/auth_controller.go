@@ -78,7 +78,7 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 		"$JS.API.INFO",
 		fmt.Sprintf("$JS.API.STREAM.INFO.%s", roomId),
 		// allow sending messages to the system
-		fmt.Sprintf("%s.%s.%s", s.app.NatsInfo.Subjects.SystemWorker, roomId, userId),
+		fmt.Sprintf("%s.%s.%s", s.app.NatsInfo.Subjects.SystemJsWorker, roomId, userId),
 	}
 
 	chatPermission, err := s.natsService.CreateChatConsumer(roomId, userId)

@@ -38,9 +38,9 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 
 	// we'll check if the room is still active or not.
 	// this may happen when we closed the room & re-created it instantly
-	exist, err := m.rs.ManageActiveRoomsWithMetadata(roomId, "get", "")
+	exist, err := m.natsService.GetRoomInfo(roomId)
 	if err == nil && exist != nil {
-		log.Infoln("this room:", roomId, "still active, so we won't process to export analytics")
+		log.Infoln("this room:", roomId, "still active or created again, so we won't process to export analytics")
 		return
 	}
 

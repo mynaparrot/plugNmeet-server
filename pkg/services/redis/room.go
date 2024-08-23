@@ -3,52 +3,12 @@ package redisservice
 import (
 	"errors"
 	"fmt"
-	"github.com/redis/go-redis/v9"
 	"time"
 )
 
 const (
-	ActiveRoomsWithMetadataKey = Prefix + "activeRoomsWithMetadata"
-	RoomCreationProgressKey    = Prefix + "roomCreationProgressList"
+	RoomCreationProgressKey = Prefix + "roomCreationProgressList"
 )
-
-// ManageActiveRoomsWithMetadata will use redis sorted active rooms with their metadata
-// task = add | del | get | fetchAll
-func (s *RedisService) ManageActiveRoomsWithMetadata(roomId, task, metadata string) (map[string]string, error) {
-	var out map[string]string
-	var err error
-
-	switch task {
-	case "add":
-		_, err = s.rc.HSet(s.ctx, ActiveRoomsWithMetadataKey, roomId, metadata).Result()
-		if err != nil {
-			return nil, err
-		}
-	case "del":
-		_, err = s.rc.HDel(s.ctx, ActiveRoomsWithMetadataKey, roomId).Result()
-		if err != nil {
-			return nil, err
-		}
-	case "get":
-		result, err := s.rc.HGet(s.ctx, ActiveRoomsWithMetadataKey, roomId).Result()
-		switch {
-		case errors.Is(err, redis.Nil):
-			return nil, nil
-		case err != nil:
-			return nil, err
-		}
-		out = map[string]string{
-			roomId: result,
-		}
-	case "fetchAll":
-		out, err = s.rc.HGetAll(s.ctx, ActiveRoomsWithMetadataKey).Result()
-		if err != nil {
-			return out, err
-		}
-	}
-
-	return out, nil
-}
 
 // RoomCreationProgressList can be used during a room creation
 // we have seen that during create room in livekit an instant webhook sent

@@ -58,10 +58,10 @@ func (c *NatsController) StartUp() {
 
 	// system receiver as worker
 	_, err := c.app.JetStream.CreateOrUpdateStream(c.ctx, jetstream.StreamConfig{
-		Name:      fmt.Sprintf("%s", c.app.NatsInfo.Subjects.SystemWorker),
+		Name:      fmt.Sprintf("%s", c.app.NatsInfo.Subjects.SystemJsWorker),
 		Retention: jetstream.WorkQueuePolicy, // to become a worker
 		Subjects: []string{
-			fmt.Sprintf("%s.*.*", c.app.NatsInfo.Subjects.SystemWorker),
+			fmt.Sprintf("%s.*.*", c.app.NatsInfo.Subjects.SystemJsWorker),
 		},
 	})
 	if err != nil {
@@ -132,10 +132,10 @@ func (c *NatsController) subscribeToUsersConnEvents() {
 func (c *NatsController) subscribeToSystemWorker() {
 	ip := c.getOutboundIP()
 
-	cons, err := c.app.JetStream.CreateOrUpdateConsumer(c.ctx, fmt.Sprintf("%s", c.app.NatsInfo.Subjects.SystemWorker), jetstream.ConsumerConfig{
+	cons, err := c.app.JetStream.CreateOrUpdateConsumer(c.ctx, fmt.Sprintf("%s", c.app.NatsInfo.Subjects.SystemJsWorker), jetstream.ConsumerConfig{
 		Name: strings.ReplaceAll(ip.String(), ".", ":"),
 		FilterSubjects: []string{
-			fmt.Sprintf("%s.*.*", c.app.NatsInfo.Subjects.SystemWorker),
+			fmt.Sprintf("%s.*.*", c.app.NatsInfo.Subjects.SystemJsWorker),
 		},
 	})
 	if err != nil {

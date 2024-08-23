@@ -9,7 +9,7 @@ import (
 )
 
 func (s *NatsService) GetRoomInfo(roomId string) (*plugnmeet.NatsKvRoomInfo, error) {
-	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomInfoBucket, roomId))
+	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf(RoomInfoBucket, roomId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
 		return nil, nil
@@ -19,6 +19,11 @@ func (s *NatsService) GetRoomInfo(roomId string) (*plugnmeet.NatsKvRoomInfo, err
 
 	info := new(plugnmeet.NatsKvRoomInfo)
 
+	if tableId, err := kv.Get(s.ctx, RoomDbTableIdKey); err == nil && tableId != nil {
+		if parseUint, err := strconv.ParseUint(string(tableId.Value()), 10, 64); err == nil {
+			info.DbTableId = parseUint
+		}
+	}
 	if id, err := kv.Get(s.ctx, RoomIdKey); err == nil && id != nil {
 		info.RoomId = string(id.Value())
 	}
@@ -64,7 +69,7 @@ func (s *NatsService) GetRoomInfoWithMetadata(roomId string) (*plugnmeet.NatsKvR
 }
 
 func (s *NatsService) GetRoomKeyValue(roomId, key string) (jetstream.KeyValueEntry, error) {
-	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", RoomInfoBucket, roomId))
+	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf(RoomInfoBucket, roomId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
 		return nil, nil

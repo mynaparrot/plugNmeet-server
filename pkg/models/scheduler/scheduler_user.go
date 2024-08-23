@@ -16,7 +16,7 @@ func (m *SchedulerModel) checkOnlineUsersStatus() {
 
 	for s := range kl.Name() {
 		if strings.HasPrefix(s, natsservice.RoomUsersBucket) {
-			roomId := strings.ReplaceAll(s, natsservice.RoomUsersBucket+"-", "")
+			roomId := strings.ReplaceAll(s, natsservice.RoomUsersBucket, "")
 			if users, err := m.natsService.GetOlineUsersId(roomId); err == nil && users != nil && len(users) > 0 {
 				for _, u := range users {
 					lastPing := m.natsService.GetUserLastPing(roomId, u)
