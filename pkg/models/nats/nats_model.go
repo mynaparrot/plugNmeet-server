@@ -1,19 +1,24 @@
 package natsmodel
 
 import (
+	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	analyticsmodel "github.com/mynaparrot/plugnmeet-server/pkg/models/analytics"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/auth"
 	usermodel "github.com/mynaparrot/plugnmeet-server/pkg/models/user"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type NatsModel struct {
 	app         *config.AppConfig
 	ds          *dbservice.DatabaseService
 	rs          *redisservice.RedisService
+	analytics   *analyticsmodel.AnalyticsModel
 	authModel   *authmodel.AuthModel
 	natsService *natsservice.NatsService
 	userModel   *usermodel.UserModel
@@ -35,6 +40,7 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 		app:         app,
 		ds:          ds,
 		rs:          rs,
+		analytics:   analyticsmodel.New(app, ds, rs, nil),
 		authModel:   authmodel.New(app, natsService),
 		natsService: natsService,
 		userModel:   usermodel.New(app, ds, rs, nil),
@@ -55,5 +61,14 @@ func (m *NatsModel) HandleFromClientToServerReq(roomId, userId string, req *plug
 		m.userModel.LowerHand(roomId, userId)
 	case plugnmeet.NatsMsgClientToServerEvents_REQ_LOWER_OTHER_USER_HAND:
 		m.userModel.LowerHand(roomId, req.Msg)
+	case plugnmeet.NatsMsgClientToServerEvents_PUSH_ANALYTICS_DATA:
+		ad := new(plugnmeet.AnalyticsDataMsg)
+		err := protojson.Unmarshal([]byte(req.Msg), ad)
+		if err != nil {
+			log.Errorln(err)
+			return
+		}
+		fmt.Println(fmt.Sprintf("%+v", ad))
+		m.analytics.HandleEvent(ad)
 	}
 }
