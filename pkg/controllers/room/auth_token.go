@@ -157,7 +157,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	res := &plugnmeet.VerifyTokenRes{
 		Status:        true,
 		Msg:           "token is valid",
-		NatsWsUrl:     &app.NatsInfo.NatsWSUrl,
+		NatsWsUrls:    app.NatsInfo.NatsWSUrls,
 		ServerVersion: &v,
 		EnabledE2Ee:   false,
 		RoomId:        &rId,

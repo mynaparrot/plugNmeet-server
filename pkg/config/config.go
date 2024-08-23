@@ -140,8 +140,8 @@ type CopyrightConf struct {
 }
 
 type NatsInfo struct {
-	NatsUrl                  string       `yaml:"nats_url"`
-	NatsWSUrl                string       `yaml:"nats_ws_url"`
+	NatsUrls                 []string     `yaml:"nats_urls"`
+	NatsWSUrls               []string     `yaml:"nats_ws_urls"`
 	Account                  string       `yaml:"account"`
 	User                     string       `yaml:"user"`
 	Password                 string       `yaml:"password"`

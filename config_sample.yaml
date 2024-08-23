@@ -74,10 +74,12 @@ database_info:
   db: "plugnmeet"
   prefix: "pnm_"
 nats_info:
-  nats_url: "nats://127.0.0.1:4222"
+  nats_urls:
+    - "nats://127.0.0.1:4222"
   # nats websocket will be required for the pnm client to connect
   # if the pnm client can't connect with this URL then user won't be able to join
-  nats_ws_url: "http://localhost:8222"
+  nats_ws_urls:
+    - "http://localhost:8222"
   account: PNM
   user: auth
   password: "LM(jTdsUGbB7M9y8^dNta1"
