@@ -12,16 +12,16 @@ services:
       - ./mariadb-data:/var/lib/mysql
       - ./sql_dump/install.sql:/docker-entrypoint-initdb.d/install.sql
   nats:
-    image: nats:latest
+    image: nats:alpine
     command:
       - "-DVV"
       - "-config"
-      - "/etc/nats/nats-server.conf"
+      - "/nats-server.conf"
     ports:
       - "4222:4222/tcp" # clients
       - "8222:8222/tcp" # websockets
     volumes:
-      - ./nats_server.conf:/etc/nats/nats-server.conf
+      - ./nats_server.conf:/nats-server.conf
       - ./etc/tmp/nats-data:/data/jetstream
   livekit:
     image: livekit/livekit-server
