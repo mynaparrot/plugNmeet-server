@@ -204,25 +204,6 @@ func New() *fiber.App {
 	api.Get("/fileUpload", filecontroller.HandleFileUpload)
 	api.Post("/fileUpload", filecontroller.HandleFileUpload)
 
-	// websocket for chat
-	//app.Use("/ws", func(c *fiber.Ctx) error {
-	//	if websocket.IsWebSocketUpgrade(c) {
-	//		c.Locals("allowed", true)
-	//		return c.Next()
-	//	}
-	//	return fiber.ErrUpgradeRequired
-	//})
-	//
-	//websocketcontroller.SetupSocketListeners()
-	//cfg := websocket.Config{
-	//	RecoverHandler: func(conn *websocket.Conn) {
-	//		if err := recover(); err != nil {
-	//			log.Errorln("error occurred during recovery from websocket")
-	//		}
-	//	},
-	//}
-	//app.Get("/ws", websocketcontroller.HandleWebSocket(cfg))
-
 	// last method
 	app.Use(func(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).SendString("not found")
