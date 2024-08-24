@@ -32,7 +32,7 @@ func (s *DatabaseService) GetRoomInfoBySid(sId string, isRunning *int) (*dbmodel
 		cond.IsRunning = *isRunning
 	}
 
-	result := s.db.Where("sid = ? OR sid = CONCAT(?, '-', id)", sId, sId).Where(cond).Take(info)
+	result := s.db.Where("sid = ?", sId).Where(cond).Take(info)
 	switch {
 	case errors.Is(result.Error, gorm.ErrRecordNotFound):
 		return nil, nil
@@ -149,7 +149,7 @@ func (s *DatabaseService) UpdateRoomStatus(info *dbmodels.RoomInfo) (int64, erro
 			"roomId": info.RoomId,
 		}
 	} else {
-		cond = gorm.Expr("sid = ? OR sid = CONCAT(?, '-', id)", info.Sid, info.Sid)
+		cond = gorm.Expr("sid = ?", info.Sid)
 	}
 
 	result := s.db.Model(&dbmodels.RoomInfo{}).Where(cond).Not("is_running = ?", info.IsRunning).Updates(update)
@@ -205,7 +205,7 @@ func (s *DatabaseService) UpdateNumParticipants(sId string, num int64) (int64, e
 		"joined_participants": num,
 	}
 
-	result := s.db.Model(&dbmodels.RoomInfo{}).Where("sid = ? OR sid = CONCAT(?, '-', id)", sId, sId).Updates(update)
+	result := s.db.Model(&dbmodels.RoomInfo{}).Where("sid = ?", sId).Updates(update)
 	if result.Error != nil {
 		return 0, result.Error
 	}
@@ -219,7 +219,7 @@ func (s *DatabaseService) IncrementOrDecrementNumParticipants(sId, operator stri
 		"joined_participants": gorm.Expr("joined_participants " + operator + "1"),
 	}
 
-	result := s.db.Model(&dbmodels.RoomInfo{}).Where("sid = ? OR sid = CONCAT(?, '-', id)", sId, sId).Updates(update)
+	result := s.db.Model(&dbmodels.RoomInfo{}).Where("sid = ?", sId).Updates(update)
 	if result.Error != nil {
 		return 0, result.Error
 	}
