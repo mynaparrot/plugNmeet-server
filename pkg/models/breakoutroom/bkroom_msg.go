@@ -2,7 +2,7 @@ package breakoutroommodel
 
 import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	log "github.com/sirupsen/logrus"
 )
 
 type SendBreakoutRoomMsgReq struct {
@@ -17,38 +17,11 @@ func (m *BreakoutRoomModel) SendBreakoutRoomMsg(r *plugnmeet.BroadcastBreakoutRo
 	}
 
 	for _, rr := range rooms {
-		err = m.broadcastNotification(rr.Id, "system", "", r.Msg, plugnmeet.DataMsgType_USER, plugnmeet.DataMsgBodyType_CHAT, true)
+		err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SYSTEM_CHAT_MSG, rr.Id, r.Msg, nil)
 		if err != nil {
-			continue
+			log.Errorln(err)
 		}
 	}
-
-	return nil
-}
-
-func (m *BreakoutRoomModel) broadcastNotification(roomId, fromUserId, toUserId, broadcastMsg string, typeMsg plugnmeet.DataMsgType, mType plugnmeet.DataMsgBodyType, isAdmin bool) error {
-	payload := &plugnmeet.DataMessage{
-		Type:   typeMsg,
-		RoomId: roomId,
-		Body: &plugnmeet.DataMsgBody{
-			Type: mType,
-			From: &plugnmeet.DataMsgReqFrom{
-				UserId: fromUserId,
-			},
-			Msg: broadcastMsg,
-		},
-	}
-	if toUserId != "" {
-		payload.To = &toUserId
-	}
-
-	msg := &redisservice.WebsocketToRedis{
-		Type:    "sendMsg",
-		DataMsg: payload,
-		RoomId:  roomId,
-		IsAdmin: isAdmin,
-	}
-	m.rs.DistributeWebsocketMsgToRedisChannel(msg)
 
 	return nil
 }

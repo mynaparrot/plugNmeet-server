@@ -24,14 +24,14 @@ func (s *RedisService) SubscribeToWebsocketChannel(channel string) (*redis.PubSu
 	return pubSub, nil
 }
 
-type WebsocketToRedis struct {
+type websocketToRedis struct {
 	Type    string                 `json:"type,omitempty"`
 	DataMsg *plugnmeet.DataMessage `json:"data_msg,omitempty"`
 	RoomId  string                 `json:"room_id,omitempty"`
 	IsAdmin bool                   `json:"is_admin,omitempty"`
 }
 
-func (s *RedisService) DistributeWebsocketMsgToRedisChannel(payload *WebsocketToRedis) error {
+func (s *RedisService) DistributeWebsocketMsgToRedisChannel(payload *websocketToRedis) error {
 	msg, err := json.Marshal(payload)
 	if err != nil {
 		return err

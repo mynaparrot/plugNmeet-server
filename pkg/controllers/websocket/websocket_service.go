@@ -116,7 +116,7 @@ func SetupSocketListeners() {
 		}
 
 		roomId := ep.Kws.GetStringAttribute("roomId")
-		payload := &redisservice.WebsocketToRedis{
+		payload := &redisservice.websocketToRedis{
 			Type:    "sendMsg",
 			DataMsg: dataMsg,
 			RoomId:  roomId,

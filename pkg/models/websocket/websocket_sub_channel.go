@@ -31,7 +31,7 @@ func (m *WebsocketModel) SubscribeToUserWebsocketChannel() {
 	ch := pubsub.Channel()
 	for msg := range ch {
 		worker.Submit(func() {
-			res := new(redisservice.WebsocketToRedis)
+			res := new(redisservice.websocketToRedis)
 			err = json.Unmarshal([]byte(msg.Payload), res)
 			if err != nil {
 				log.Errorln(err)
@@ -67,7 +67,7 @@ func (m *WebsocketModel) SubscribeToWhiteboardWebsocketChannel() {
 	ch := pubsub.Channel()
 	for msg := range ch {
 		worker.Submit(func() {
-			res := new(redisservice.WebsocketToRedis)
+			res := new(redisservice.websocketToRedis)
 			err = json.Unmarshal([]byte(msg.Payload), res)
 			if err != nil {
 				log.Errorln(err)
@@ -99,7 +99,7 @@ func (m *WebsocketModel) SubscribeToSystemWebsocketChannel() {
 	ch := pubsub.Channel()
 	for msg := range ch {
 		worker.Submit(func() {
-			res := new(redisservice.WebsocketToRedis)
+			res := new(redisservice.websocketToRedis)
 			err = json.Unmarshal([]byte(msg.Payload), res)
 			if err != nil {
 				log.Errorln(err)

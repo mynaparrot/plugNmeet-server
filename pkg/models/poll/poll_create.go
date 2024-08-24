@@ -24,7 +24,10 @@ func (m *PollModel) CreatePoll(r *plugnmeet.CreatePollReq, isAdmin bool) (string
 		return "", err
 	}
 
-	_ = m.broadcastNotification(r.RoomId, r.UserId, r.PollId, plugnmeet.DataMsgBodyType_POLL_CREATED, isAdmin)
+	err = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_POLL_CREATED, r.RoomId, r.PollId, r.UserId)
+	if err != nil {
+		log.Errorln(err)
+	}
 
 	// send analytics
 	toRecord := struct {
