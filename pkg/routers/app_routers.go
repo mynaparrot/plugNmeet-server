@@ -13,7 +13,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/bbb"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/bkroom"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/common"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/datamsg"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/etherpad"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/exdisplay"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/exmedia"
@@ -142,7 +141,6 @@ func New() *fiber.App {
 
 	api.Post("/recording", recordingcontroller.HandleRecording)
 	api.Post("/rtmp", recordingcontroller.HandleRTMP)
-	api.Post("/dataMessage", datamsgcontroller.HandleDataMessage)
 	api.Post("/endRoom", roomcontroller.HandleEndRoomForAPI)
 	api.Post("/changeVisibility", roomcontroller.HandleChangeVisibilityForAPI)
 	api.Post("/convertWhiteboardFile", filecontroller.HandleConvertWhiteboardFile)

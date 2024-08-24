@@ -6,7 +6,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	analyticsmodel "github.com/mynaparrot/plugnmeet-server/pkg/models/analytics"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models/datamsg"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -20,14 +19,10 @@ func (m *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 		return errors.New(config.UserNotActive)
 	}
 
-	// send a message to user first
-	dm := datamsgmodel.New(m.app, m.ds, m.rs, m.lk)
-	_ = dm.SendDataMessage(&plugnmeet.DataMessageReq{
-		MsgBodyType: plugnmeet.DataMsgBodyType_ALERT,
-		Msg:         r.Msg,
-		RoomId:      r.RoomId,
-		SendTo:      []string{p.Identity},
-	})
+	err = m.natsService.NotifyErrorMsg(r.RoomId, r.Msg, &p.Identity)
+	if err != nil {
+		log.Errorln(err)
+	}
 
 	// now remove
 	_, err = m.lk.RemoveParticipant(r.RoomId, r.UserId)
