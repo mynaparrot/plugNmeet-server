@@ -85,12 +85,13 @@ nats_info:
   password: "LM(jTdsUGbB7M9y8^dNta1"
   auth_callout_issuer_private: "SAAMTMBUANSRW3XDXZBIBF4JYRRUMWGV2GZT5MQ54VNWNRPN2Y4J46NQSA"
   subjects:
-    system_api_worker: "systemApiWorker"
-    system_js_worker: "systemJsWorker"
+    system_api_worker: "sysApiWorker"
+    system_js_worker: "sysJsWorker"
     system_public: "sysPublic"
     system_private: "sysPrivate"
     chat: "chat"
     whiteboard: "whiteboard"
+    # to exchange data of pnm client with each other
     dataChannel: "dataChannel"
 upload_file_settings:
   path: "./upload"

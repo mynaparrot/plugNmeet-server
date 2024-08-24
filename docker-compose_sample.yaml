@@ -18,8 +18,8 @@ services:
       - "-config"
       - "/etc/nats/nats-server.conf"
     ports:
-      - "4222:4222" # clients
-      - "8222:8222" # websockets
+      - "4222:4222/tcp" # clients
+      - "8222:8222/tcp" # websockets
     volumes:
       - ./nats_server.conf:/etc/nats/nats-server.conf
       - ./etc/tmp/nats-data:/data/jetstream
@@ -74,6 +74,7 @@ services:
 #      - /usr/share/fontconfig/:/usr/share/fontconfig/:ro
 #      - /var/cache/fontconfig/:/var/cache/fontconfig/:ro
     depends_on:
+      - nats
       - redis
       - db
       - livekit
