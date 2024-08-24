@@ -129,7 +129,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	// check for duplicate join
 	nts := natsservice.New(app)
 	if status, err := nts.GetRoomUserStatus(roomId.(string), requestedUserId.(string)); err == nil {
-		if status == natsservice.UserOnline {
+		if status == natsservice.UserStatusOnline {
 			return utils.SendCommonProtobufResponse(c, false, "notifications.room-disconnected-duplicate-entry")
 		}
 	}

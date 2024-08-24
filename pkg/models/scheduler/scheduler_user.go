@@ -39,7 +39,7 @@ func (m *SchedulerModel) checkOnlineUsersStatus() {
 
 func (m *SchedulerModel) changeUserStatus(roomId, userId string) {
 	// this user should be offline
-	_ = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserOffline)
+	_ = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusOffline)
 
 	if info, err := m.natsService.GetUserInfo(roomId, userId); err == nil && info != nil {
 		// notify to the room

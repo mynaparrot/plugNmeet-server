@@ -14,8 +14,8 @@ const (
 	RoomUsersBucketPrefix = Prefix + "roomUsers-"
 	RoomUsersBucket       = RoomUsersBucketPrefix + "%s"
 
-	userInfoPrefix = Prefix + "userInfo-"
-	UserInfoBucket = userInfoPrefix + "r_%s-u_%s"
+	userInfoBucketPrefix = Prefix + "userInfo-"
+	UserInfoBucket       = userInfoBucketPrefix + "r_%s-u_%s"
 
 	UserOnlineMaxPingDiff = time.Second * 30 // after 30 seconds we'll treat user as offline
 
@@ -31,10 +31,10 @@ const (
 	UserDisconnectedAt = "disconnected_at"
 	UserLastPingAt     = "last_ping_at"
 
-	UserAdded        = "added"
-	UserOnline       = "online"
-	UserDisconnected = "disconnected"
-	UserOffline      = "offline"
+	UserStatusAdded        = "added"
+	UserStatusOnline       = "online"
+	UserStatusDisconnected = "disconnected"
+	UserStatusOffline      = "offline"
 )
 
 func (s *NatsService) AddUser(roomId, userId, name string, isAdmin, isPresenter bool, metadata *plugnmeet.UserMetadata) error {
@@ -46,7 +46,7 @@ func (s *NatsService) AddUser(roomId, userId, name string, isAdmin, isPresenter 
 		return err
 	}
 	// format of user, userid & value is the status
-	_, err = kv.PutString(s.ctx, userId, UserAdded)
+	_, err = kv.PutString(s.ctx, userId, UserStatusAdded)
 	if err != nil {
 		return err
 	}
@@ -105,7 +105,7 @@ func (s *NatsService) UpdateUserStatus(roomId, userId string, status string) err
 	}
 
 	// update user info for
-	if status == UserOnline {
+	if status == UserStatusOnline {
 		// first check if data exist
 		joined, _ := kv.Get(s.ctx, UserJoinedAt)
 		if joined != nil && len(joined.Value()) > 0 {
@@ -119,7 +119,7 @@ func (s *NatsService) UpdateUserStatus(roomId, userId string, status string) err
 				return err
 			}
 		}
-	} else if status == UserDisconnected || status == UserOffline {
+	} else if status == UserStatusDisconnected || status == UserStatusOffline {
 		_, err = kv.PutString(s.ctx, UserDisconnectedAt, fmt.Sprintf("%d", time.Now().UnixMilli()))
 		if err != nil {
 			return err

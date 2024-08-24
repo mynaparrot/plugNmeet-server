@@ -13,12 +13,12 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId string) {
 	if err != nil {
 		return
 	}
-	if status == natsservice.UserOnline {
+	if status == natsservice.UserStatusOnline {
 		// no need
 		return
 	}
 
-	err = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserOnline)
+	err = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusOnline)
 	if err != nil {
 		log.Warnln(err)
 	}
@@ -40,7 +40,7 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) {
 	// if ended, then we do not need to do anything else.
 
 	// now change the user's status
-	err := m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserDisconnected)
+	err := m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusDisconnected)
 	if err != nil {
 		log.Warnln(err)
 	}
@@ -64,12 +64,12 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) {
 	time.Sleep(5 * time.Second)
 
 	if status, err := m.natsService.GetRoomUserStatus(roomId, userId); err == nil {
-		if status == natsservice.UserOnline {
+		if status == natsservice.UserStatusOnline {
 			// we do not need to do anything
 			return
 		}
 	}
-	err = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserOffline)
+	err = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusOffline)
 	if err != nil {
 		log.Warnln(err)
 	}
@@ -82,7 +82,7 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) {
 	// everything will be clean when the session ends.
 	time.Sleep(30 * time.Second)
 	if status, err := m.natsService.GetRoomUserStatus(roomId, userId); err == nil {
-		if status == natsservice.UserOnline {
+		if status == natsservice.UserStatusOnline {
 			// we do not need to do anything
 			return
 		}

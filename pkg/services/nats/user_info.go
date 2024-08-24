@@ -118,7 +118,7 @@ func (s *NatsService) GetOlineUsersId(roomId string) ([]string, error) {
 
 	var userIds []string
 	for id, entry := range users {
-		if string(entry.Value()) == UserOnline {
+		if string(entry.Value()) == UserStatusOnline {
 			userIds = append(userIds, id)
 		}
 	}
@@ -232,7 +232,7 @@ func (s *NatsService) HasOnlineUser(roomId string) bool {
 	}
 
 	for _, entry := range users {
-		if string(entry.Value()) == UserOnline {
+		if string(entry.Value()) == UserStatusOnline {
 			return true
 		}
 	}

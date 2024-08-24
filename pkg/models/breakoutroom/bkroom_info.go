@@ -71,7 +71,7 @@ func (m *BreakoutRoomModel) fetchBreakoutRooms(roomId string) ([]*plugnmeet.Brea
 		for _, u := range room.Users {
 			if room.Started {
 				status, err := m.natsService.GetRoomUserStatus(room.Id, u.Id)
-				if err == nil && status == natsservice.UserOnline {
+				if err == nil && status == natsservice.UserStatusOnline {
 					u.Joined = true
 				}
 			}
