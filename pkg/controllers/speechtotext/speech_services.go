@@ -22,7 +22,7 @@ func HandleSpeechToTextTranslationServiceStatus(c *fiber.Ctx) error {
 	}
 
 	req.RoomId = roomId.(string)
-	m := speechtotextmodel.New(nil, nil, nil, nil)
+	m := speechtotextmodel.New(nil, nil, nil)
 	err = m.SpeechToTextTranslationServiceStart(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -42,7 +42,7 @@ func HandleGenerateAzureToken(c *fiber.Ctx) error {
 	}
 	req.RoomId = roomId.(string)
 
-	m := speechtotextmodel.New(nil, nil, nil, nil)
+	m := speechtotextmodel.New(nil, nil, nil)
 	err = m.GenerateAzureToken(req, requestedUserId.(string))
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -67,7 +67,7 @@ func HandleSpeechServiceUserStatus(c *fiber.Ctx) error {
 	req.RoomId = roomId.(string)
 	req.UserId = requestedUserId.(string)
 
-	m := speechtotextmodel.New(nil, nil, nil, nil)
+	m := speechtotextmodel.New(nil, nil, nil)
 	err = m.SpeechServiceUserStatus(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -87,7 +87,7 @@ func HandleRenewAzureToken(c *fiber.Ctx) error {
 	}
 	req.RoomId = roomId.(string)
 
-	m := speechtotextmodel.New(nil, nil, nil, nil)
+	m := speechtotextmodel.New(nil, nil, nil)
 	err = m.RenewAzureToken(req, requestedUserId.(string))
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())

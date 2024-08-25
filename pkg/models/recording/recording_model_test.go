@@ -41,7 +41,7 @@ func init() {
 		panic(err)
 	}
 
-	m = New(nil, nil, nil, nil)
+	m = New(nil, nil, nil)
 	info := &dbmodels.RoomInfo{
 		RoomId:       roomId,
 		RoomTitle:    "Testing",

@@ -40,7 +40,7 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 		app:         app,
 		ds:          ds,
 		rs:          rs,
-		analytics:   analyticsmodel.New(app, ds, rs, nil),
+		analytics:   analyticsmodel.New(app, ds, rs),
 		authModel:   authmodel.New(app, natsService),
 		natsService: natsService,
 		userModel:   usermodel.New(app, ds, rs, nil),

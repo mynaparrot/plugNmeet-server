@@ -28,7 +28,7 @@ func HandleExternalMediaPlayer(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, true, err.Error())
 	}
 
-	m := exmediamodel.New(nil, nil, nil, nil)
+	m := exmediamodel.New(nil, nil, nil)
 	req.RoomId = rid
 	req.UserId = requestedUserId.(string)
 	err = m.HandleTask(req)

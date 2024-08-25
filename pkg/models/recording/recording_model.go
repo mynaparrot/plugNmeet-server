@@ -23,7 +23,7 @@ type RecordingModel struct {
 	natsService     *natsservice.NatsService
 }
 
-func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService) *RecordingModel {
+func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *RecordingModel {
 	if app == nil {
 		app = config.GetConfig()
 	}
@@ -33,16 +33,12 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 	if rs == nil {
 		rs = redisservice.New(app.RDS)
 	}
-	if lk == nil {
-		lk = livekitservice.New(app, rs)
-	}
 
 	return &RecordingModel{
 		app:             app,
 		ds:              ds,
 		rs:              rs,
-		lk:              lk,
-		analyticsModel:  analyticsmodel.New(app, ds, rs, lk),
+		analyticsModel:  analyticsmodel.New(app, ds, rs),
 		webhookNotifier: helpers.GetWebhookNotifier(app, ds, rs),
 		natsService:     natsservice.New(app),
 	}

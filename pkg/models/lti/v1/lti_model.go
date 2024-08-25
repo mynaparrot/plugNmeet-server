@@ -4,7 +4,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/room"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 )
 
@@ -12,7 +11,6 @@ type LtiV1Model struct {
 	app *config.AppConfig
 	ds  *dbservice.DatabaseService
 	rs  *redisservice.RedisService
-	lk  *livekitservice.LivekitService
 	rm  *roommodel.RoomModel
 }
 
@@ -51,7 +49,7 @@ type LTIV1FetchRecordingsReq struct {
 	OrderBy string `json:"order_by"`
 }
 
-func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService) *LtiV1Model {
+func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *LtiV1Model {
 	if app == nil {
 		app = config.GetConfig()
 	}
@@ -61,15 +59,11 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 	if rs == nil {
 		rs = redisservice.New(app.RDS)
 	}
-	if lk == nil {
-		lk = livekitservice.New(app, rs)
-	}
 
 	return &LtiV1Model{
 		app: app,
 		ds:  ds,
 		rs:  rs,
-		lk:  lk,
-		rm:  roommodel.New(app, ds, rs, lk),
+		rm:  roommodel.New(app, ds, rs, nil),
 	}
 }

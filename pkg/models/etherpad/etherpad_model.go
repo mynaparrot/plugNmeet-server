@@ -44,7 +44,7 @@ type EtherpadModel struct {
 	natsService    *natsservice.NatsService
 }
 
-func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService) *EtherpadModel {
+func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *EtherpadModel {
 	if app == nil {
 		app = config.GetConfig()
 	}
@@ -54,16 +54,12 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 	if rs == nil {
 		rs = redisservice.New(app.RDS)
 	}
-	if lk == nil {
-		lk = livekitservice.New(app, rs)
-	}
 
 	return &EtherpadModel{
 		app:            app,
 		ds:             ds,
 		rs:             rs,
-		lk:             lk,
-		analyticsModel: analyticsmodel.New(app, ds, rs, lk),
+		analyticsModel: analyticsmodel.New(app, ds, rs),
 		natsService:    natsservice.New(app),
 	}
 }

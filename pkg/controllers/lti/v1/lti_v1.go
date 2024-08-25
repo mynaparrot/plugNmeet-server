@@ -26,7 +26,7 @@ func HandleLTIV1Landing(c *fiber.Ctx) error {
 	}
 	signingURL := fmt.Sprintf("%s://%s%s", proto, c.Hostname(), c.Path())
 
-	m := ltiv1model.New(nil, nil, nil, nil)
+	m := ltiv1model.New(nil, nil, nil)
 	err := m.LTIV1Landing(c, string(b), signingURL)
 	if err != nil {
 		return err
@@ -51,7 +51,7 @@ func HandleLTIV1VerifyHeaderToken(c *fiber.Ctx) error {
 		})
 	}
 
-	m := ltiv1model.New(nil, nil, nil, nil)
+	m := ltiv1model.New(nil, nil, nil)
 	auth, err := m.LTIV1VerifyHeaderToken(authToken)
 	if err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -89,7 +89,7 @@ func HandleLTIV1IsRoomActive(c *fiber.Ctx) error {
 }
 
 func HandleLTIV1JoinRoom(c *fiber.Ctx) error {
-	m := ltiv1model.New(nil, nil, nil, nil)
+	m := ltiv1model.New(nil, nil, nil)
 	customParams := c.Locals("customParams").([]byte)
 
 	claim := &plugnmeet.LtiClaims{
@@ -157,7 +157,7 @@ func HandleLTIV1FetchRecordings(c *fiber.Ctx) error {
 		})
 	}
 
-	m := recordingmodel.New(nil, nil, nil, nil)
+	m := recordingmodel.New(nil, nil, nil)
 	req.RoomIds = []string{roomId.(string)}
 	result, err := m.FetchRecordings(req)
 
@@ -185,7 +185,7 @@ func HandleLTIV1GetRecordingDownloadToken(c *fiber.Ctx) error {
 		})
 	}
 
-	m := recordingmodel.New(nil, nil, nil, nil)
+	m := recordingmodel.New(nil, nil, nil)
 	token, err := m.GetDownloadToken(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -220,7 +220,7 @@ func HandleLTIV1DeleteRecordings(c *fiber.Ctx) error {
 		})
 	}
 
-	m := recordingmodel.New(nil, nil, nil, nil)
+	m := recordingmodel.New(nil, nil, nil)
 	err = m.DeleteRecording(req)
 	if err != nil {
 		return c.JSON(fiber.Map{

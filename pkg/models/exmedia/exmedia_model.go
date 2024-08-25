@@ -24,7 +24,7 @@ type updateRoomMetadataOpts struct {
 	url      *string
 }
 
-func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService) *ExMediaModel {
+func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *ExMediaModel {
 	if app == nil {
 		app = config.GetConfig()
 	}
@@ -34,15 +34,11 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 	if rs == nil {
 		rs = redisservice.New(app.RDS)
 	}
-	if lk == nil {
-		lk = livekitservice.New(app, rs)
-	}
 
 	return &ExMediaModel{
 		app:         app,
 		ds:          ds,
 		rs:          rs,
-		lk:          lk,
 		natsService: natsservice.New(app),
 	}
 }

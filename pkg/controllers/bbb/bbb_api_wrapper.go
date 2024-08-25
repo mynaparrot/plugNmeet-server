@@ -389,7 +389,7 @@ func HandleBBBGetRecordings(c *fiber.Ctx) error {
 	}
 
 	host := fmt.Sprintf("%s://%s", c.Protocol(), c.Hostname())
-	m := bbbmodel.New(nil, nil, nil, nil)
+	m := bbbmodel.New(nil, nil, nil)
 	recordings, pagination, err := m.GetRecordings(host, q)
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
@@ -418,7 +418,7 @@ func HandleBBBDeleteRecordings(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
 
-	m := recordingmodel.New(nil, nil, nil, nil)
+	m := recordingmodel.New(nil, nil, nil)
 	err = m.DeleteRecording(&plugnmeet.DeleteRecordingReq{
 		RecordId: q.RecordID,
 	})

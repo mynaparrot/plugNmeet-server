@@ -45,7 +45,7 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 		rs:              rs,
 		lk:              lk,
 		rm:              roommodel.New(app, ds, rs, lk),
-		analyticsModel:  analyticsmodel.New(app, ds, rs, lk),
+		analyticsModel:  analyticsmodel.New(app, ds, rs),
 		webhookNotifier: helpers.GetWebhookNotifier(app, ds, rs),
 		natsService:     natsservice.New(app),
 	}

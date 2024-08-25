@@ -16,7 +16,7 @@ func HandleApproveUsers(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	m := waitingroommodel.New(nil, nil, nil)
+	m := waitingroommodel.New(nil, nil)
 	req := new(plugnmeet.ApproveWaitingUsersReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
@@ -40,7 +40,7 @@ func HandleUpdateWaitingRoomMessage(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	m := waitingroommodel.New(nil, nil, nil)
+	m := waitingroommodel.New(nil, nil)
 	req := new(plugnmeet.UpdateWaitingRoomMessageReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {

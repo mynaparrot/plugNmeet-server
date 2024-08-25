@@ -35,7 +35,7 @@ func HandleCreateEtherpad(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "room isn't active")
 	}
 
-	m := etherpadmodel.New(nil, nil, nil, nil)
+	m := etherpadmodel.New(nil, nil, nil)
 	res, err := m.CreateSession(rid, requestedUserId.(string))
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -56,7 +56,7 @@ func HandleCleanPad(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	m := etherpadmodel.New(nil, nil, nil, nil)
+	m := etherpadmodel.New(nil, nil, nil)
 	err = m.CleanPad(req.RoomId, req.NodeId, req.PadId)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -77,7 +77,7 @@ func HandleChangeEtherpadStatus(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	m := etherpadmodel.New(nil, nil, nil, nil)
+	m := etherpadmodel.New(nil, nil, nil)
 	err = m.ChangeEtherpadStatus(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())

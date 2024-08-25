@@ -66,7 +66,7 @@ func HandleRecording(c *fiber.Ctx) error {
 	req.RoomId = room.RoomId
 	req.RoomTableId = int64(room.ID)
 
-	m := recordermodel.New(nil, nil, nil, nil)
+	m := recordermodel.New(nil, nil, nil)
 	err = m.SendMsgToRecorder(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -132,7 +132,7 @@ func HandleRTMP(c *fiber.Ctx) error {
 	req.RoomId = room.RoomId
 	req.RoomTableId = int64(room.ID)
 
-	m := recordermodel.New(nil, nil, nil, nil)
+	m := recordermodel.New(nil, nil, nil)
 	err = m.SendMsgToRecorder(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -160,7 +160,7 @@ func HandleRecorderEvents(c *fiber.Ctx) error {
 			return c.SendStatus(fiber.StatusNotFound)
 		}
 
-		m := recordingmodel.New(app, ds, nil, nil)
+		m := recordingmodel.New(app, ds, nil)
 		req.RoomId = roomInfo.RoomId
 		req.RoomSid = roomInfo.Sid
 		m.HandleRecorderResp(req, roomInfo)

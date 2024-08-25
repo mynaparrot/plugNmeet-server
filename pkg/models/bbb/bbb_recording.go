@@ -91,7 +91,7 @@ func (m *BBBApiWrapperModel) GetRecordings(host string, r *bbbapiwrapper.GetReco
 }
 
 func (m *BBBApiWrapperModel) createPlayBackURL(host, path string) (string, error) {
-	auth := recordingmodel.New(m.app, m.ds, m.rs, m.lk)
+	auth := recordingmodel.New(m.app, m.ds, m.rs)
 	token, err := auth.CreateTokenForDownload(path)
 	if err != nil {
 		return "", err

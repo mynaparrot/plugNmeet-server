@@ -43,7 +43,7 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 		rs:          rs,
 		lk:          lk,
 		rm:          roommodel.New(app, ds, rs, lk),
-		rmDuration:  roomdurationmodel.New(app, rs, lk),
+		rmDuration:  roomdurationmodel.New(app, rs),
 		natsService: natsservice.New(app),
 	}
 }

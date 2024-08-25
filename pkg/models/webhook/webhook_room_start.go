@@ -43,7 +43,7 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 	meta.StartedAt = uint64(time.Now().Unix())
 	if meta.RoomFeatures.GetRoomDuration() > 0 {
 		// we'll add room info in map
-		rmDuration := roomdurationmodel.New(m.app, m.rs, m.lk)
+		rmDuration := roomdurationmodel.New(m.app, m.rs)
 		err := rmDuration.AddRoomWithDurationInfo(rInfo.RoomId, &roomdurationmodel.RoomDurationInfo{
 			Duration:  meta.RoomFeatures.GetRoomDuration(),
 			StartedAt: meta.StartedAt,
@@ -54,7 +54,7 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 	}
 
 	if meta.IsBreakoutRoom {
-		bm := breakoutroommodel.New(m.app, m.ds, m.rs, m.lk)
+		bm := breakoutroommodel.New(m.app, m.ds, m.rs)
 		err := bm.PostTaskAfterRoomStartWebhook(rInfo.RoomId, meta)
 		if err != nil {
 			log.Errorln(err)

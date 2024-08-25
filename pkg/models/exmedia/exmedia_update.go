@@ -36,7 +36,7 @@ func (m *ExMediaModel) updateRoomMetadata(roomId string, opts *updateRoomMetadat
 		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_EXTERNAL_MEDIA_PLAYER_STATUS
 		d.HsetValue = &val
 	}
-	analyticsModel := analyticsmodel.New(m.app, m.ds, m.rs, m.lk)
+	analyticsModel := analyticsmodel.New(m.app, m.ds, m.rs)
 	analyticsModel.HandleEvent(d)
 
 	return err

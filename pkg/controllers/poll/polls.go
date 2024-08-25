@@ -31,7 +31,7 @@ func HandleCreatePoll(c *fiber.Ctx) error {
 
 	req.RoomId = roomId.(string)
 	req.UserId = requestedUserId.(string)
-	m := pollmodel.New(nil, nil, nil, nil)
+	m := pollmodel.New(nil, nil, nil)
 	pollId, err := m.CreatePoll(req, isAdmin.(bool))
 	if err != nil {
 		res.Msg = err.Error()
@@ -49,7 +49,7 @@ func HandleListPolls(c *fiber.Ctx) error {
 	res := new(plugnmeet.PollResponse)
 	res.Status = false
 
-	m := pollmodel.New(nil, nil, nil, nil)
+	m := pollmodel.New(nil, nil, nil)
 	polls, err := m.ListPolls(roomId.(string))
 	if err != nil {
 		res.Msg = err.Error()
@@ -106,7 +106,7 @@ func HandleUserSelectedOption(c *fiber.Ctx) error {
 		return SendPollResponse(c, res)
 	}
 
-	m := pollmodel.New(nil, nil, nil, nil)
+	m := pollmodel.New(nil, nil, nil)
 	voted, _ := m.UserSelectedOption(roomId.(string), pollId, userId)
 
 	res.Status = true
@@ -130,7 +130,7 @@ func HandleUserSubmitResponse(c *fiber.Ctx) error {
 	}
 
 	req.RoomId = roomId.(string)
-	m := pollmodel.New(nil, nil, nil, nil)
+	m := pollmodel.New(nil, nil, nil)
 	err = m.UserSubmitResponse(req, isAdmin.(bool))
 	if err != nil {
 		res.Msg = err.Error()
@@ -155,7 +155,7 @@ func HandleClosePoll(c *fiber.Ctx) error {
 		return SendPollResponse(c, res)
 	}
 
-	m := pollmodel.New(nil, nil, nil, nil)
+	m := pollmodel.New(nil, nil, nil)
 	req := new(plugnmeet.ClosePollReq)
 
 	err := proto.Unmarshal(c.Body(), req)
@@ -195,7 +195,7 @@ func HandleGetPollResponsesDetails(c *fiber.Ctx) error {
 		return SendPollResponse(c, res)
 	}
 
-	m := pollmodel.New(nil, nil, nil, nil)
+	m := pollmodel.New(nil, nil, nil)
 	responses, err := m.GetPollResponsesDetails(roomId.(string), pollId)
 	if err != nil {
 		res.Msg = err.Error()
@@ -215,7 +215,7 @@ func HandleGetResponsesResult(c *fiber.Ctx) error {
 	res := new(plugnmeet.PollResponse)
 	res.Status = false
 
-	m := pollmodel.New(nil, nil, nil, nil)
+	m := pollmodel.New(nil, nil, nil)
 	result, err := m.GetResponsesResult(roomId.(string), pollId)
 	if err != nil {
 		res.Msg = err.Error()
@@ -234,7 +234,7 @@ func HandleGetPollsStats(c *fiber.Ctx) error {
 	res := new(plugnmeet.PollResponse)
 	res.Status = false
 
-	m := pollmodel.New(nil, nil, nil, nil)
+	m := pollmodel.New(nil, nil, nil)
 	stats, err := m.GetPollsStats(roomId.(string))
 	if err != nil {
 		res.Msg = err.Error()

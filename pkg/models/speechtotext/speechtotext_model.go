@@ -6,7 +6,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models/analytics"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	log "github.com/sirupsen/logrus"
@@ -18,13 +17,12 @@ type SpeechToTextModel struct {
 	app             *config.AppConfig
 	ds              *dbservice.DatabaseService
 	rs              *redisservice.RedisService
-	lk              *livekitservice.LivekitService
 	analyticsModel  *analyticsmodel.AnalyticsModel
 	webhookNotifier *helpers.WebhookNotifier
 	natsService     *natsservice.NatsService
 }
 
-func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService) *SpeechToTextModel {
+func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *SpeechToTextModel {
 	if app == nil {
 		app = config.GetConfig()
 	}
@@ -34,16 +32,12 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 	if rs == nil {
 		rs = redisservice.New(app.RDS)
 	}
-	if lk == nil {
-		lk = livekitservice.New(app, rs)
-	}
 
 	return &SpeechToTextModel{
 		app:             app,
 		ds:              ds,
 		rs:              rs,
-		lk:              lk,
-		analyticsModel:  analyticsmodel.New(app, ds, rs, lk),
+		analyticsModel:  analyticsmodel.New(app, ds, rs),
 		webhookNotifier: helpers.GetWebhookNotifier(app, ds, rs),
 		natsService:     natsservice.New(app),
 	}

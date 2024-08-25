@@ -57,7 +57,7 @@ func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 	m.rm.OnAfterRoomClosed(rInfo.RoomId)
 
 	//we'll send a message to the recorder to stop
-	recorderModel := recordermodel.New(m.app, m.ds, m.rs, m.lk)
+	recorderModel := recordermodel.New(m.app, m.ds, m.rs)
 	err = recorderModel.SendMsgToRecorder(&plugnmeet.RecordingReq{
 		Task:   plugnmeet.RecordingTasks_STOP,
 		Sid:    rInfo.RoomSid,
@@ -96,32 +96,32 @@ func (m *WebhookModel) onAfterRoomFinishedTasks(roomId, roomSid, metadata string
 	}
 
 	// notify to clean room from room duration
-	rmDuration := roomdurationmodel.New(m.app, m.rs, m.lk)
+	rmDuration := roomdurationmodel.New(m.app, m.rs)
 	err := rmDuration.DeleteRoomWithDuration(roomId)
 	if err != nil {
 		log.Errorln(err)
 	}
 
 	// clean shared note
-	em := etherpadmodel.New(m.app, m.ds, m.rs, m.lk)
+	em := etherpadmodel.New(m.app, m.ds, m.rs)
 	_ = em.CleanAfterRoomEnd(roomId, metadata)
 
 	// clean polls
-	pm := pollmodel.New(m.app, m.ds, m.rs, m.lk)
+	pm := pollmodel.New(m.app, m.ds, m.rs)
 	err = pm.CleanUpPolls(roomId)
 	if err != nil {
 		log.Errorln(err)
 	}
 
 	// remove all breakout rooms
-	bm := breakoutroommodel.New(m.app, m.ds, m.rs, m.lk)
+	bm := breakoutroommodel.New(m.app, m.ds, m.rs)
 	err = bm.PostTaskAfterRoomEndWebhook(roomId, metadata)
 	if err != nil {
 		log.Errorln(err)
 	}
 
 	// speech service clean up
-	sm := speechtotextmodel.New(m.app, m.ds, m.rs, m.lk)
+	sm := speechtotextmodel.New(m.app, m.ds, m.rs)
 	// don't need to worry about room sid changes, because we'll compare both
 	err = sm.OnAfterRoomEnded(roomId, roomSid)
 	if err != nil {

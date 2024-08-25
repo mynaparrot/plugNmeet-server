@@ -36,9 +36,6 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId string) {
 // we'll wait for 5 seconds before declare user as offline
 // but will broadcast as disconnected
 func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) {
-	// TODO: need to check if the session was ended or not
-	// if ended, then we do not need to do anything else.
-
 	// now change the user's status
 	err := m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusDisconnected)
 	if err != nil {

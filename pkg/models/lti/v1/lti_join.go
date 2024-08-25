@@ -33,7 +33,7 @@ func (m *LtiV1Model) createRoomSession(c *plugnmeet.LtiClaims) (*plugnmeet.NatsK
 }
 
 func (m *LtiV1Model) joinRoom(c *plugnmeet.LtiClaims) (string, error) {
-	um := usermodel.New(m.app, m.ds, m.rs, m.lk)
+	um := usermodel.New(m.app, m.ds, m.rs, nil)
 	token, err := um.GetPNMJoinToken(&plugnmeet.GenerateTokenReq{
 		RoomId: c.RoomId,
 		UserInfo: &plugnmeet.UserInfo{

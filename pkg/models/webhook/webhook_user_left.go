@@ -38,7 +38,7 @@ func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 
 	// if we missed calculating this user's speech service usage stat
 	// for sudden disconnection
-	sm := speechtotextmodel.New(m.app, m.ds, m.rs, m.lk)
+	sm := speechtotextmodel.New(m.app, m.ds, m.rs)
 	_ = sm.SpeechServiceUsersUsage(rInfo.RoomId, rInfo.RoomSid, event.Participant.Identity, plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED)
 
 	// send analytics
