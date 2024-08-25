@@ -39,7 +39,7 @@ func (m *EtherpadModel) CleanAfterRoomEnd(roomId, metadata string) error {
 		return nil
 	}
 
-	roomMeta, _ := m.lk.UnmarshalRoomMetadata(metadata)
+	roomMeta, _ := m.natsService.UnmarshalRoomMetadata(metadata)
 	if roomMeta.GetRoomFeatures() == nil || roomMeta.GetRoomFeatures().GetSharedNotePadFeatures() == nil {
 		return nil
 	}

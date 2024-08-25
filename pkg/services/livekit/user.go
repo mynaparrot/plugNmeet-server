@@ -2,10 +2,7 @@ package livekitservice
 
 import (
 	"errors"
-	"github.com/google/uuid"
 	"github.com/livekit/protocol/livekit"
-	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // LoadParticipants will load all the participant info from livekit
@@ -38,68 +35,7 @@ func (s *LivekitService) LoadParticipantInfo(roomId string, identity string) (*l
 	return participant, nil
 }
 
-// LoadParticipantWithMetadata to load participant with proper formatted metadata
-func (s *LivekitService) LoadParticipantWithMetadata(roomId, userId string) (*livekit.ParticipantInfo, *plugnmeet.UserMetadata, error) {
-	p, err := s.LoadParticipantInfo(roomId, userId)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	meta, err := s.UnmarshalParticipantMetadata(p.Metadata)
-	if err != nil {
-		return p, nil, err
-	}
-
-	return p, meta, nil
-}
-
-// UpdateParticipantMetadata will directly send request to livekit to update metadata
-func (s *LivekitService) UpdateParticipantMetadata(roomId string, userId string, metadata string) (*livekit.ParticipantInfo, error) {
-	data := livekit.UpdateParticipantRequest{
-		Room:     roomId,
-		Identity: userId,
-		Metadata: metadata,
-	}
-
-	participant, err := s.lkc.UpdateParticipant(s.ctx, &data)
-	if err != nil {
-		return nil, err
-	}
-
-	return participant, nil
-}
-
-// UpdateParticipantMetadataByStruct will update user's medata by provided formatted metadata
-func (s *LivekitService) UpdateParticipantMetadataByStruct(roomId, userId string, meta *plugnmeet.UserMetadata) (*livekit.ParticipantInfo, error) {
-	metadata, err := s.MarshalParticipantMetadata(meta)
-	if err != nil {
-		return nil, err
-	}
-	p, err := s.UpdateParticipantMetadata(roomId, userId, metadata)
-	if err != nil {
-		return nil, err
-	}
-
-	return p, nil
-}
-
-// UpdateParticipantPermission will change user's permission by sending request to livekit
-func (s *LivekitService) UpdateParticipantPermission(roomId string, userId string, permission *livekit.ParticipantPermission) (*livekit.ParticipantInfo, error) {
-	data := livekit.UpdateParticipantRequest{
-		Room:       roomId,
-		Identity:   userId,
-		Permission: permission,
-	}
-
-	participant, err := s.lkc.UpdateParticipant(s.ctx, &data)
-	if err != nil {
-		return nil, err
-	}
-
-	return participant, nil
-}
-
-// RemoveParticipant will send request to livekit to remove user
+// RemoveParticipant will send a request to livekit to remove user
 func (s *LivekitService) RemoveParticipant(roomId string, userId string) (*livekit.RemoveParticipantResponse, error) {
 	data := livekit.RoomParticipantIdentity{
 		Room:     roomId,
@@ -112,32 +48,4 @@ func (s *LivekitService) RemoveParticipant(roomId string, userId string) (*livek
 	}
 
 	return res, err
-}
-
-// MarshalParticipantMetadata will create proper json string of user's metadata
-func (s *LivekitService) MarshalParticipantMetadata(meta *plugnmeet.UserMetadata) (string, error) {
-	mId := uuid.NewString()
-	meta.MetadataId = &mId
-
-	op := protojson.MarshalOptions{
-		EmitUnpopulated: true,
-		UseProtoNames:   true,
-	}
-	marshal, err := op.Marshal(meta)
-	if err != nil {
-		return "", err
-	}
-
-	return string(marshal), nil
-}
-
-// UnmarshalParticipantMetadata will create proper formatted medata from json string
-func (s *LivekitService) UnmarshalParticipantMetadata(metadata string) (*plugnmeet.UserMetadata, error) {
-	m := new(plugnmeet.UserMetadata)
-	err := protojson.Unmarshal([]byte(metadata), m)
-	if err != nil {
-		return nil, err
-	}
-
-	return m, nil
 }

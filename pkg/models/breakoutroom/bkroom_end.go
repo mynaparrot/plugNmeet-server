@@ -78,7 +78,7 @@ func (m *BreakoutRoomModel) PostTaskAfterRoomEndWebhook(roomId, metadata string)
 	if metadata == "" {
 		return nil
 	}
-	meta, err := m.lk.UnmarshalRoomMetadata(metadata)
+	meta, err := m.natsService.UnmarshalRoomMetadata(metadata)
 	if err != nil {
 		return err
 	}

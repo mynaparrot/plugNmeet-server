@@ -2,21 +2,23 @@ client:
   port: 8080
   debug: true
   path: "/app/client/dist"
-  ## this will require during authentication. Use random secret.
-  # openssl rand -hex 32
+  ## This will require during authentication. Use random secret.
+  # Openssl rand -hex 32
   # OR
   # cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 36 | head -n 1
   api_key: "plugnmeet"
   secret: "zumyyYWqv7KR2kUqvYdq4z4sXg7XTBD2ljT6"
+  # Value in minutes. Default 10 minutes. Client will renew token automatically
+  token_validity: 10m
   webhook_conf:
-    # enable webhook. This will post response for different events
+    # Enable webhook. This will post response for different events
     enable: false
-    # set url bellow. This will be use as global.
-    # this is optional
+    # Set url bellow, this will be used as global.
+    # This is optional
     url: ""
-    # During create room you can set custom hook URL too.
-    # if you set enable_for_per_meeting: true
-    # then extra post response will send in that address too
+    # During creation room, you can set custom hook URL too.
+    # If you set enable_for_per_meeting: true
+    # then extra post-response will send in that address too
     enable_for_per_meeting: false
   prometheus:
     enable: false
@@ -41,14 +43,12 @@ log_settings:
   # maxsize of log file in MB
   maxsize: 20
   maxbackups: 4
-  # max age of log before rotate in days
+  # max age of log before rotates in days
   maxage: 2
 livekit_info:
   host: "http://host.docker.internal:7880"
   api_key: "APIiYAA5w37Cfo2"
   secret: "6aNur7qqupeZhFYNOJVUyeXxXhVw8f4lm13pEDUx8SgB"
-  # value in minutes. Default 10 minutes. Client will renew token automatically
-  token_validity: 10m
 redis_info:
   host: redis:6379
   username: ""
@@ -87,6 +87,7 @@ nats_info:
   subjects:
     system_api_worker: "sysApiWorker"
     system_js_worker: "sysJsWorker"
+    recorder_js_worker: "recorderJsWorker"
     system_public: "sysPublic"
     system_private: "sysPrivate"
     chat: "chat"

@@ -28,7 +28,7 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 		return
 	}
 
-	metadata, err := m.lk.UnmarshalRoomMetadata(meta)
+	metadata, err := m.natsService.UnmarshalRoomMetadata(meta)
 	if err != nil {
 		return
 	}

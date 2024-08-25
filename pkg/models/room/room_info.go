@@ -61,9 +61,12 @@ func (m *RoomModel) GetActiveRoomInfo(r *plugnmeet.GetActiveRoomInfoReq) (bool, 
 		return false, "no room found", nil
 	}
 
-	rrr, err := m.lk.LoadRoomInfo(r.RoomId)
+	rrr, err := m.natsService.GetRoomInfo(r.RoomId)
 	if err != nil {
 		return false, err.Error(), nil
+	}
+	if rrr == nil {
+		return false, "no room found", nil
 	}
 
 	res := new(plugnmeet.ActiveRoomWithParticipant)
@@ -81,7 +84,17 @@ func (m *RoomModel) GetActiveRoomInfo(r *plugnmeet.GetActiveRoomInfoReq) (bool, 
 		CreationTime:       roomDbInfo.CreationTime,
 		Metadata:           rrr.Metadata,
 	}
-	res.ParticipantsInfo, _ = m.lk.LoadParticipants(roomDbInfo.RoomId)
+
+	if participants, err := m.lk.LoadParticipants(roomDbInfo.RoomId); err == nil && participants != nil && len(participants) > 0 {
+		for _, participant := range participants {
+			entry, err := m.natsService.GetUserKeyValue(roomDbInfo.RoomId, participant.Identity, natsservice.UserMetadataKey)
+			if err != nil || entry == nil {
+				continue
+			}
+			participant.Metadata = string(entry.Value())
+			res.ParticipantsInfo = append(res.ParticipantsInfo, participant)
+		}
+	}
 
 	return true, "success", res
 }
@@ -117,14 +130,21 @@ func (m *RoomModel) GetActiveRoomsInfo() (bool, string, []*plugnmeet.ActiveRoomW
 			},
 		}
 
-		participants, err := m.lk.LoadParticipants(r.RoomId)
-		if err == nil {
-			i.ParticipantsInfo = participants
+		rri, err := m.natsService.GetRoomInfo(r.RoomId)
+		if err != nil || rri == nil {
+			continue
 		}
+		i.RoomInfo.Metadata = rri.Metadata
 
-		rri, err := m.lk.LoadRoomInfo(r.RoomId)
-		if err == nil {
-			i.RoomInfo.Metadata = rri.Metadata
+		if participants, err := m.lk.LoadParticipants(r.RoomId); err == nil && participants != nil && len(participants) > 0 {
+			for _, participant := range participants {
+				entry, err := m.natsService.GetUserKeyValue(r.RoomId, participant.Identity, natsservice.UserMetadataKey)
+				if err != nil || entry == nil {
+					continue
+				}
+				participant.Metadata = string(entry.Value())
+				i.ParticipantsInfo = append(i.ParticipantsInfo, participant)
+			}
 		}
 
 		res = append(res, i)

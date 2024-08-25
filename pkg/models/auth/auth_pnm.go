@@ -7,7 +7,7 @@ import (
 )
 
 func (m *AuthModel) GeneratePNMJoinToken(c *plugnmeet.PlugNmeetTokenClaims) (string, error) {
-	return auth.GeneratePlugNmeetJWTAccessToken(m.app.Client.ApiKey, m.app.Client.Secret, c.UserId, m.app.LivekitInfo.TokenValidity, c)
+	return auth.GeneratePlugNmeetJWTAccessToken(m.app.Client.ApiKey, m.app.Client.Secret, c.UserId, *m.app.Client.TokenValidity, c)
 }
 
 func (m *AuthModel) VerifyPlugNmeetAccessToken(token string) (*plugnmeet.PlugNmeetTokenClaims, error) {
@@ -33,5 +33,5 @@ func (m *AuthModel) RenewPNMToken(token string) (string, error) {
 		return "", errors.New("user not found")
 	}
 
-	return auth.GeneratePlugNmeetJWTAccessToken(m.app.Client.ApiKey, m.app.Client.Secret, claims.UserId, m.app.LivekitInfo.TokenValidity, claims)
+	return auth.GeneratePlugNmeetJWTAccessToken(m.app.Client.ApiKey, m.app.Client.Secret, claims.UserId, *m.app.Client.TokenValidity, claims)
 }

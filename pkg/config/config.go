@@ -49,6 +49,7 @@ type ClientInfo struct {
 	Path           string         `yaml:"path"`
 	ApiKey         string         `yaml:"api_key"`
 	Secret         string         `yaml:"secret"`
+	TokenValidity  *time.Duration `yaml:"token_validity"`
 	WebhookConf    WebhookConf    `yaml:"webhook_conf"`
 	PrometheusConf PrometheusConf `yaml:"prometheus"`
 	ProxyHeader    string         `yaml:"proxy_header"`
@@ -74,10 +75,9 @@ type LogSettings struct {
 }
 
 type LivekitInfo struct {
-	Host          string        `yaml:"host"`
-	ApiKey        string        `yaml:"api_key"`
-	Secret        string        `yaml:"secret"`
-	TokenValidity time.Duration `yaml:"token_validity"`
+	Host   string `yaml:"host"`
+	ApiKey string `yaml:"api_key"`
+	Secret string `yaml:"secret"`
 }
 
 type UploadFileSettings struct {
@@ -150,13 +150,14 @@ type NatsInfo struct {
 }
 
 type NatsSubjects struct {
-	SystemApiWorker string `yaml:"system_api_worker"`
-	SystemJsWorker  string `yaml:"system_js_worker"`
-	SystemPublic    string `yaml:"system_public"`
-	SystemPrivate   string `yaml:"system_private"`
-	Chat            string `yaml:"chat"`
-	Whiteboard      string `yaml:"whiteboard"`
-	DataChannel     string `yaml:"data_channel"`
+	SystemApiWorker  string `yaml:"system_api_worker"`
+	SystemJsWorker   string `yaml:"system_js_worker"`
+	RecorderJsWorker string `yaml:"recorder_js_worker"`
+	SystemPublic     string `yaml:"system_public"`
+	SystemPrivate    string `yaml:"system_private"`
+	Chat             string `yaml:"chat"`
+	Whiteboard       string `yaml:"whiteboard"`
+	DataChannel      string `yaml:"data_channel"`
 }
 
 var appCnf *AppConfig
@@ -171,6 +172,12 @@ func New(a *AppConfig) {
 	// now set the config
 	appCnf = a
 	appCnf.chatRooms = make(map[string]map[string]ChatParticipant)
+
+	// default validation of token is 10 minutes
+	if appCnf.Client.TokenValidity == nil || *appCnf.Client.TokenValidity < 0 {
+		validity := time.Minute * 10
+		appCnf.Client.TokenValidity = &validity
+	}
 
 	// set default values
 	if appCnf.AnalyticsSettings != nil {

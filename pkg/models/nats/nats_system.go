@@ -30,7 +30,7 @@ func (m *NatsModel) GenerateLivekitToken(roomId string, userInfo *plugnmeet.Nats
 		IsAdmin: userInfo.IsAdmin,
 	}
 
-	return auth.GenerateLivekitAccessToken(m.app.LivekitInfo.ApiKey, m.app.LivekitInfo.Secret, m.app.LivekitInfo.TokenValidity, c, userInfo.Metadata)
+	return auth.GenerateLivekitAccessToken(m.app.LivekitInfo.ApiKey, m.app.LivekitInfo.Secret, 3*time.Minute, c)
 }
 
 func (m *NatsModel) HandleClientPing(roomId, userId string) {
