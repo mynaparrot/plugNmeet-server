@@ -141,7 +141,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	}
 
 	m := roommodel.New(nil, nil, nil, nil)
-	rr, meta := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
+	rr, _ := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: roomId.(string),
 	})
 
@@ -159,7 +159,6 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 		Msg:           "token is valid",
 		NatsWsUrls:    app.NatsInfo.NatsWSUrls,
 		ServerVersion: &v,
-		EnabledE2Ee:   false,
 		RoomId:        &rId,
 		UserId:        &uId,
 		NatsSubjects: &plugnmeet.NatsSubjects{
@@ -171,9 +170,6 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 			Whiteboard:      natsSubjs.Whiteboard,
 			DataChannel:     natsSubjs.DataChannel,
 		},
-	}
-	if rr.GetIsActive() && meta != nil {
-		res.EnabledE2Ee = meta.RoomFeatures.EndToEndEncryptionFeatures.IsEnabled
 	}
 
 	return utils.SendProtobufResponse(c, res)

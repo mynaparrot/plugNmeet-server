@@ -38,11 +38,6 @@ func (s *NatsService) GetRoomInfo(roomId string) (*plugnmeet.NatsKvRoomInfo, err
 			info.EmptyTimeout = parseUint
 		}
 	}
-	if enabledE2EE, err := kv.Get(s.ctx, RoomEnabledE2EEKey); err == nil && enabledE2EE != nil {
-		if val, err := strconv.ParseBool(string(enabledE2EE.Value())); err == nil {
-			info.EnabledE2Ee = val
-		}
-	}
 	if metadata, err := kv.Get(s.ctx, RoomMetadataKey); err == nil && metadata != nil {
 		info.Metadata = string(metadata.Value())
 	}

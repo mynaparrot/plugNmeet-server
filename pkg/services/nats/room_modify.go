@@ -18,7 +18,6 @@ const (
 	RoomSidKey          = "room_sid"
 	RoomEmptyTimeoutKey = "empty_timeout"
 	RoomStatusKey       = "status"
-	RoomEnabledE2EEKey  = "enabled_e2ee"
 	RoomMetadataKey     = "metadata"
 	RoomCreatedKey      = "created_at"
 
@@ -50,7 +49,6 @@ func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeo
 		RoomSidKey:          roomSid,
 		RoomEmptyTimeoutKey: fmt.Sprintf("%d", *emptyTimeout),
 		RoomStatusKey:       RoomStatusCreated,
-		RoomEnabledE2EEKey:  fmt.Sprintf("%v", metadata.RoomFeatures.EndToEndEncryptionFeatures.IsEnabled),
 		RoomCreatedKey:      fmt.Sprintf("%d", time.Now().UTC().Unix()), // in seconds
 		RoomMetadataKey:     mt,
 	}

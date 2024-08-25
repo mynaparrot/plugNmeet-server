@@ -43,14 +43,13 @@ func (m *NatsModel) HandleInitialData(roomId, userId string) {
 		Room:      rInfo,
 		LocalUser: userInfo,
 		MediaServerInfo: &plugnmeet.MediaServerConnInfo{
-			Url:         lkHost,
-			Token:       token,
-			EnabledE2Ee: rInfo.EnabledE2Ee,
+			Url:   lkHost,
+			Token: token,
 		},
 	}
 
 	// send important info first
-	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_INITIAL_DATA, roomId, initial, &userId)
+	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_RES_INITIAL_DATA, roomId, initial, &userId)
 	if err != nil {
 		log.Warnln(err)
 	}
