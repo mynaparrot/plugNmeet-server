@@ -4,9 +4,18 @@ import (
 	"errors"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	usermodel "github.com/mynaparrot/plugnmeet-server/pkg/models/user"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 )
 
 func (m *BreakoutRoomModel) JoinBreakoutRoom(r *plugnmeet.JoinBreakoutRoomReq) (string, error) {
+	status, err := m.natsService.GetRoomUserStatus(r.BreakoutRoomId, r.UserId)
+	if err != nil {
+		return "", err
+	}
+	if status == natsservice.UserStatusOnline {
+		return "", errors.New("user has already been joined")
+	}
+
 	room, err := m.fetchBreakoutRoom(r.RoomId, r.BreakoutRoomId)
 	if err != nil {
 		return "", err

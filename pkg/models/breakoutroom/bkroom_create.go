@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+const BreakoutRoomFormat = "%s-%s"
+
 func (m *BreakoutRoomModel) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRoomsReq) error {
 	mainRoom, meta, err := m.natsService.GetRoomInfoWithMetadata(r.RoomId)
 	if err != nil {
@@ -48,7 +50,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRooms
 
 	for _, room := range r.Rooms {
 		bRoom := new(plugnmeet.CreateRoomReq)
-		bRoom.RoomId = fmt.Sprintf("%s-%s", r.RoomId, room.Id)
+		bRoom.RoomId = fmt.Sprintf(BreakoutRoomFormat, r.RoomId, room.Id)
 		meta.RoomTitle = room.Title
 		bRoom.Metadata = meta
 		_, err := m.rm.CreateRoom(bRoom)
