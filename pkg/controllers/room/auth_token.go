@@ -208,31 +208,3 @@ func HandleVerifyHeaderToken(c *fiber.Ctx) error {
 
 	return c.Next()
 }
-
-// HandleRenewToken renew token only possible if it remains valid. This mean you'll require to renew it before expire.
-func HandleRenewToken(c *fiber.Ctx) error {
-	info := new(authmodel.RenewTokenReq)
-	m := authmodel.New(nil, nil)
-
-	err := c.BodyParser(info)
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
-	}
-
-	if info.Token == "" {
-		return utils.SendCommonProtoJsonResponse(c, false, "missing required fields")
-	}
-
-	token, err := m.RenewPNMToken(info.Token)
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
-	}
-
-	r := &plugnmeet.GenerateTokenRes{
-		Status: true,
-		Msg:    "token renewed",
-		Token:  &token,
-	}
-
-	return utils.SendProtoJsonResponse(c, r)
-}

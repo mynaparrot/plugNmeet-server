@@ -14,10 +14,6 @@ func (m *AuthModel) VerifyPlugNmeetAccessToken(token string) (*plugnmeet.PlugNme
 	return auth.VerifyPlugNmeetAccessToken(m.app.Client.ApiKey, m.app.Client.Secret, token)
 }
 
-type RenewTokenReq struct {
-	Token string `json:"token"`
-}
-
 // RenewPNMToken we'll renew token
 func (m *AuthModel) RenewPNMToken(token string) (string, error) {
 	claims, err := m.VerifyPlugNmeetAccessToken(token)

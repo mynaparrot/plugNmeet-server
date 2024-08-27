@@ -137,7 +137,6 @@ func New() *fiber.App {
 	// api group will require sending token as Authorization header value
 	api := app.Group("/api", roomcontroller.HandleVerifyHeaderToken)
 	api.Post("/verifyToken", roomcontroller.HandleVerifyToken)
-	api.Post("/renewToken", roomcontroller.HandleRenewToken)
 
 	api.Post("/recording", recordingcontroller.HandleRecording)
 	api.Post("/rtmp", recordingcontroller.HandleRTMP)
