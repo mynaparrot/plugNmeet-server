@@ -6,6 +6,12 @@ import (
 )
 
 func (m *AnalyticsModel) FetchAnalytics(r *plugnmeet.FetchAnalyticsReq) (*plugnmeet.FetchAnalyticsResult, error) {
+	if r.Limit <= 0 {
+		r.Limit = 20
+	}
+	if r.OrderBy == "" {
+		r.OrderBy = "DESC"
+	}
 	data, total, err := m.ds.GetAnalytics(r.RoomIds, uint64(r.From), uint64(r.Limit), &r.OrderBy)
 	if err != nil {
 		return nil, err

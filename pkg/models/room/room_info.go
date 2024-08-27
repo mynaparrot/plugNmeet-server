@@ -104,11 +104,7 @@ func (m *RoomModel) GetActiveRoomsInfo() (bool, string, []*plugnmeet.ActiveRoomW
 	if err != nil {
 		return false, err.Error(), nil
 	}
-	if roomsInfo != nil || len(roomsInfo) == 0 {
-		return false, "no active room found", nil
-	}
-
-	if len(roomsInfo) == 0 {
+	if roomsInfo == nil || len(roomsInfo) == 0 {
 		return false, "no active room found", nil
 	}
 
@@ -154,6 +150,12 @@ func (m *RoomModel) GetActiveRoomsInfo() (bool, string, []*plugnmeet.ActiveRoomW
 }
 
 func (m *RoomModel) FetchPastRooms(r *plugnmeet.FetchPastRoomsReq) (*plugnmeet.FetchPastRoomsResult, error) {
+	if r.Limit <= 0 {
+		r.Limit = 20
+	}
+	if r.OrderBy == "" {
+		r.OrderBy = "DESC"
+	}
 	rooms, total, err := m.ds.GetPastRooms(r.RoomIds, uint64(r.From), uint64(r.Limit), &r.OrderBy)
 	if err != nil {
 		return nil, err

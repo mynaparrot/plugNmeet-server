@@ -6,6 +6,13 @@ import (
 )
 
 func (m *RecordingModel) FetchRecordings(r *plugnmeet.FetchRecordingsReq) (*plugnmeet.FetchRecordingsResult, error) {
+	if r.Limit <= 0 {
+		r.Limit = 20
+	}
+	if r.OrderBy == "" {
+		r.OrderBy = "DESC"
+	}
+
 	data, total, err := m.ds.GetRecordings(r.RoomIds, uint64(r.From), uint64(r.Limit), &r.OrderBy)
 	if err != nil {
 		return nil, err
