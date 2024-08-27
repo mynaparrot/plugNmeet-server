@@ -1,21 +1,4 @@
 services:
-  livekit:
-    image: livekit/livekit-server
-    restart: always
-    ports:
-      - "7880:7880/tcp"
-      - "7881:7881/tcp"
-      - "7882:7882/udp"
-    volumes:
-      - ./livekit.yaml:/app/livekit.yaml
-    command: --config "/app/livekit.yaml"
-    healthcheck:
-      test: wget --no-verbose --tries=5 --spider http://localhost:7880 || exit 1
-      interval: 20s
-      timeout: 1s
-      retries: 5
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
   nats:
     image: nats:alpine
     command:
