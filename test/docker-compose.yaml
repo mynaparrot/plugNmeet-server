@@ -26,7 +26,7 @@ services:
       - "8222:8222/tcp" # websockets
     volumes:
       - ./nats_server.conf:/nats-server.conf
-      - ./nats-data:/data/jetstream
+      - /tmp/nats-data:/data/jetstream
   etherpad:
     image: mynaparrot/plugnmeet-etherpad
     restart: always
