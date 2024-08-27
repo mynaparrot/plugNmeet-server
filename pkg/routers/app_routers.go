@@ -3,34 +3,30 @@ package routers
 import (
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/goccy/go-json"
-	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	rr "github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/template/html/v2"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/analyticscontroller"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/bbbcontroller"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/bkroomcontroller"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/commoncontroller"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/datamsgcontroller"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/etherpadcontroller"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/exdisplaycontroller"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/exmediacontroller"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/filecontroller"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/ingresscontroller"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/lticontroller/ltiv1controller"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/pollcontroller"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/recordingcontroller"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/roomcontroller"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/speechtotextcontroller"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/usercontroller"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/waitingroomcontroller"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/webhookcontroller"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/websocketcontroller"
+	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/analytics"
+	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/bbb"
+	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/bkroom"
+	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/common"
+	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/etherpad"
+	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/exdisplay"
+	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/exmedia"
+	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/file"
+	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/ingress"
+	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/lti/v1"
+	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/poll"
+	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/recording"
+	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/room"
+	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/speechtotext"
+	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/user"
+	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/waitingroom"
+	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/webhook"
 	"github.com/mynaparrot/plugnmeet-server/version"
-	log "github.com/sirupsen/logrus"
 )
 
 func New() *fiber.App {
@@ -145,7 +141,6 @@ func New() *fiber.App {
 
 	api.Post("/recording", recordingcontroller.HandleRecording)
 	api.Post("/rtmp", recordingcontroller.HandleRTMP)
-	api.Post("/dataMessage", datamsgcontroller.HandleDataMessage)
 	api.Post("/endRoom", roomcontroller.HandleEndRoomForAPI)
 	api.Post("/changeVisibility", roomcontroller.HandleChangeVisibilityForAPI)
 	api.Post("/convertWhiteboardFile", filecontroller.HandleConvertWhiteboardFile)
@@ -206,25 +201,6 @@ func New() *fiber.App {
 	// https://github.com/23/resumable.js#how-do-i-set-it-up-with-my-server
 	api.Get("/fileUpload", filecontroller.HandleFileUpload)
 	api.Post("/fileUpload", filecontroller.HandleFileUpload)
-
-	// websocket for chat
-	app.Use("/ws", func(c *fiber.Ctx) error {
-		if websocket.IsWebSocketUpgrade(c) {
-			c.Locals("allowed", true)
-			return c.Next()
-		}
-		return fiber.ErrUpgradeRequired
-	})
-
-	websocketcontroller.SetupSocketListeners()
-	cfg := websocket.Config{
-		RecoverHandler: func(conn *websocket.Conn) {
-			if err := recover(); err != nil {
-				log.Errorln("error occurred during recovery from websocket")
-			}
-		},
-	}
-	app.Get("/ws", websocketcontroller.HandleWebSocket(cfg))
 
 	// last method
 	app.Use(func(c *fiber.Ctx) error {

@@ -1,81 +1,117 @@
 client:
   port: 8080
   debug: true
-  path: "../client/dist"
-  ## this will require during authentication. Use random secret.
-  # openssl rand -hex 32
+  path: "/app/client/dist"
+  ## This will require during authentication. Use random secret.
+  # Openssl rand -hex 32
   # OR
   # cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 36 | head -n 1
-  api_key: plugnmeet
-  secret: zumyyYWqv7KR2kUqvYdq4z4sXg7XTBD2ljT6
+  api_key: "plugnmeet"
+  secret: "zumyyYWqv7KR2kUqvYdq4z4sXg7XTBD2ljT6"
+  # Value in minutes. Default 10 minutes. Client will renew token automatically
+  token_validity: 10m
   webhook_conf:
-    # enable webhook. This will post response for different events
+    # Enable webhook. This will post response for different events
     enable: false
-    # set url bellow. This will be use as global.
-    # this is optional
+    # Set url bellow, this will be used as global.
+    # This is optional
     url: ""
-    # During create room you can set custom hook URL too.
-    # if you set enable_for_per_meeting: true
-    # then extra post response will send in that address too
+    # During creation room, you can set custom hook URL too.
+    # If you set enable_for_per_meeting: true
+    # then extra post-response will send in that address too
     enable_for_per_meeting: false
   prometheus:
     enable: false
     metrics_path: "/metrics"
-  proxy_header: ""
+  proxy_header: "" ## you can set X-Forwarded-For
+  copyright_conf:
+    # if true then user will be able to change copyright info by API
+    allow_override: false
+    # if true then copyright text will display
+    display: true
+    # do not make the text longer, not all html tags are supported
+    # 'b', 'i', 'em', 'strong', 'a'
+    text: 'Powered by <a href="https://www.plugnmeet.org" target="_blank">plugNmeet</a>'
 room_default_settings:
   max_duration: 0 # Duration in minutes. 0 = no limit
   max_participants: 0 # 0 = no limit
-  max_num_breakout_rooms: 2
+  # here you can limit the maximum number of breakout rooms
+  # default will be 6 & max 16
+  max_num_breakout_rooms: 6
 log_settings:
-  log_file: "../log/plugNmeet.log"
+  log_file: "./log/plugNmeet.log"
   # maxsize of log file in MB
   maxsize: 20
   maxbackups: 4
-  # max age of log before rotate in days
+  # max age of log before rotates in days
   maxage: 2
 livekit_info:
-  host: http://localhost:7880
-  api_key: APIiYAA5w37Cfo2
-  secret: 6aNur7qqupeZhFYNOJVUyeXxXhVw8f4lm13pEDUx8SgB
-  # value in minutes. Default 10 minutes. Client will renew token automatically
-  token_validity: 10m
+  host: "http://host.docker.internal:7880"
+  api_key: "APIiYAA5w37Cfo2"
+  secret: "6aNur7qqupeZhFYNOJVUyeXxXhVw8f4lm13pEDUx8SgB"
 redis_info:
-  host: localhost:6379
+  host: redis:6379
   username: ""
   password: ""
   db: 0
+#  use_tls: false
+#  To use sentinel remove the host key above and add the following
+#  sentinel_master_name: plugnmeet
+#  sentinel_addresses:
+#    - redis-sentinel-host-1:26379
+#    - redis-sentinel-host-2:26379
+#    - redis-sentinel-host-3:26379
+#  If you use a different set of credentials for sentinel add
+#  sentinel_username: user
+#  sentinel_password: pass
 database_info:
+  # at present, we support only mysql/mariadb, in future we'll add more
   driver_name: mysql
-  host: localhost
+  host: db
   port: 3306
-  username: root
-  password: 12345
-  db: plugnmeet
-  prefix: pnm_
+  username: "root"
+  password: "12345"
+  db: "plugnmeet"
+  prefix: "pnm_"
+nats_info:
+  nats_urls:
+    - "nats://127.0.0.1:4222"
+  # nats websocket will be required for the pnm client to connect
+  # if the pnm client can't connect with this URL then user won't be able to join
+  nats_ws_urls:
+    - "http://localhost:8222"
+  account: PNM
+  user: auth
+  password: "LM(jTdsUGbB7M9y8^dNta1"
+  auth_callout_issuer_private: "SAAMTMBUANSRW3XDXZBIBF4JYRRUMWGV2GZT5MQ54VNWNRPN2Y4J46NQSA"
+  subjects:
+    system_api_worker: "sysApiWorker"
+    system_js_worker: "sysJsWorker"
+    recorder_js_worker: "recorderJsWorker"
+    system_public: "sysPublic"
+    system_private: "sysPrivate"
+    chat: "chat"
+    whiteboard: "whiteboard"
+    # to exchange data of pnm client with each other
+    dataChannel: "dataChannel"
 upload_file_settings:
   path: "./upload"
-  # file size in MB. Default 50MB
-  max_size: 50
+  # file size in MB. Default 10MB
+  max_size: 10
   # By default, files will be deleted as soon as the session will be finish.
   # You can set it true to disable deleting files.
   keep_forever: false
   allowed_types:
     - "jpg"
-    - "png"
     - "jpeg"
+    - "png"
     - "svg"
     - "pdf"
     - "docx"
-    - "txt"
-    - "xlsx"
-    - "pptx"
     - "zip"
-    - "mp4"
-    - "webm"
-    - "mp3"
 recorder_info:
   # this value should be same as recorder's copy_to_dir path
-  recording_files_path: "../recording_files"
+  recording_files_path: "/app/recording_files"
   token_validity: 30m
 shared_notepad:
   enabled: true
@@ -83,7 +119,29 @@ shared_notepad:
   # server will be selected based on load
   # the value of id should be unique
   etherpad_hosts:
-    - id: "node_01"
-      host: "http://localhost:9001"
+    -
+      id: "node_01"
+      host: "http://host.docker.internal:9001"
       client_id: "plugNmeet"
       client_secret: "lmpGEH0MxrBg7ymsbSh9TU1d6VHRMk"
+azure_cognitive_services_speech:
+  enabled: false
+  # The Maximum number of translation languages allows selecting. Default: 2
+  # The pricing will be different if allow more languages. Please check azure pricing.
+  max_num_tran_langs: 2
+  subscription_keys:
+    -
+      id: "key_1"
+      # https://learn.microsoft.com/en-us/azure/cognitive-services/speech-service/get-started-text-to-speech?pivots=programming-language-go&tabs=linux%2Cterminal#prerequisites
+      subscription_key: "your_key_here"
+      service_region: westus2
+      # Azure has limit to max concurrent connection for single key.
+      # you should communicate with azure to know your limit. Default 20
+      max_connection: 20
+analytics_settings:
+  enabled: true
+  # if you've multiple plugNmeet servers then make sure that
+  # all plugNmeet servers can access this directory
+  # otherwise it may fail to fetch file. This path can be NSF or other network path
+  files_store_path: ./analytics
+  token_validity: 30m

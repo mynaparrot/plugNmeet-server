@@ -11,15 +11,15 @@ livekit.yaml
 ingress.yaml
 
 .idea
-build/
-dist/
-mariadb-data/
-upload/
-recording_files/
-client/
-recorder/
-etc/tmp/
-tmp/
-analytics/
+/build/
+/dist/
+/mariadb-data/
+/upload/
+/recording_files/
+/client/
+/etc/tmp/
+/tmp/
+/recorder/
+/analytics/
 
 !test/*

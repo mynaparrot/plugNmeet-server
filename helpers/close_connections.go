@@ -11,13 +11,16 @@ func HandleCloseConnections() {
 	}
 
 	// handle to close DB connection
-	db, err := config.GetConfig().ORM.DB()
+	db, err := config.GetConfig().DB.DB()
 	if err == nil {
 		_ = db.Close()
 	}
 
 	// close redis
 	_ = config.GetConfig().RDS.Close()
+
+	// close nats
+	config.GetConfig().NatsConn.Close()
 
 	// close logger
 	logrus.Exit(0)
