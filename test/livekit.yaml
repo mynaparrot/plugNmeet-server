@@ -4,7 +4,7 @@ rtc:
   stun_servers:
     - stun.l.google.com:19302
 redis:
-  address: redis:6379
+  address: host.docker.internal:6379
   username: ""
   password: ""
   db: 0

@@ -50,7 +50,7 @@ livekit_info:
   api_key: "APIiYAA5w37Cfo2"
   secret: "6aNur7qqupeZhFYNOJVUyeXxXhVw8f4lm13pEDUx8SgB"
 redis_info:
-  host: redis:6379
+  host: localhost:6379
   username: ""
   password: ""
   db: 0
@@ -67,7 +67,7 @@ redis_info:
 database_info:
   # at present, we support only mysql/mariadb, in future we'll add more
   driver_name: mysql
-  host: db
+  host: localhost
   port: 3306
   username: "root"
   password: "12345"
@@ -75,7 +75,7 @@ database_info:
   prefix: "pnm_"
 nats_info:
   nats_urls:
-    - "nats://127.0.0.1:4222"
+    - "nats://localhost:4222"
   # nats websocket will be required for the pnm client to connect
   # if the pnm client can't connect with this URL then user won't be able to join
   nats_ws_urls:
