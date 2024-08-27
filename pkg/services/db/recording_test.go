@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-var recordId = fmt.Sprintf("%d", time.Now().UnixMilli())
+var recordId = fmt.Sprintf("%d", time.Now().UnixNano())
 
 func TestDatabaseService_InsertRecordingData(t *testing.T) {
 	v := sql.NullString{

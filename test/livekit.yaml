@@ -1,0 +1,49 @@
+rtc:
+  tcp_port: 7881
+  udp_port: 7882
+  stun_servers:
+    - stun.l.google.com:19302
+redis:
+  address: redis:6379
+  username: ""
+  password: ""
+  db: 0
+#  use_tls: false
+#  To use sentinel remove the host key above and add the following
+#  sentinel_master_name: plugnmeet
+#  sentinel_addresses:
+#    - redis-sentinel-host-1:26379
+#    - redis-sentinel-host-2:26379
+#    - redis-sentinel-host-3:26379
+#  If you use a different set of credentials for sentinel add
+#  sentinel_username: user
+#  sentinel_password: pass
+room:
+  enable_remote_unmute: true
+  enabled_codecs:
+    - mime: audio/opus
+    - mime: audio/red
+    - mime: video/vp8
+    - mime: video/vp9
+    - mime: video/av1
+    - mime: video/h264
+logging:
+  # log level, valid values: debug, info, warn, error
+  level: info
+  # log level for pion, default error
+  # pion_level: error
+  # when set to true, emit json fields
+  # json: false
+  # for production setups, enables sampling algorithm
+  # https://github.com/uber-go/zap/blob/master/FAQ.md#why-sample-application-logs
+  sample: false
+keys:
+  APIiYAA5w37Cfo2: 6aNur7qqupeZhFYNOJVUyeXxXhVw8f4lm13pEDUx8SgB
+webhook:
+  api_key: APIiYAA5w37Cfo2
+  urls:
+    - "http://plugnmeet-api:8080/webhook"
+    #- "http://host.docker.internal:8080/webhook"
+ingress:
+  rtmp_base_url: rtmp://localhost/live
+  whip_base_url: http://localhost:8089/whip

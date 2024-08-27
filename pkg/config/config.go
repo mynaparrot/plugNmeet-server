@@ -25,7 +25,6 @@ type AppConfig struct {
 	RootWorkingDir string
 
 	sync.RWMutex
-	chatRooms   map[string]map[string]ChatParticipant
 	ClientFiles map[string][]string
 
 	Client                       ClientInfo                   `yaml:"client"`
@@ -192,7 +191,6 @@ func New(a *AppConfig) {
 	appCnf = new(AppConfig) // otherwise will give error
 	// now set the config
 	appCnf = a
-	appCnf.chatRooms = make(map[string]map[string]ChatParticipant)
 
 	// default validation of token is 10 minutes
 	if appCnf.Client.TokenValidity == nil || *appCnf.Client.TokenValidity < 0 {
@@ -271,41 +269,6 @@ func (a *AppConfig) FormatDBTable(table string) string {
 		return a.DatabaseInfo.Prefix + table
 	}
 	return table
-}
-
-func (a *AppConfig) AddChatUser(roomId string, participant ChatParticipant) {
-	a.Lock()
-	defer a.Unlock()
-
-	if _, ok := a.chatRooms[roomId]; !ok {
-		a.chatRooms[roomId] = make(map[string]ChatParticipant)
-	}
-	a.chatRooms[roomId][participant.UserId] = participant
-}
-
-func (a *AppConfig) GetChatParticipants(roomId string) map[string]ChatParticipant {
-	// we don't need to lock implementation
-	// as we'll require locking before looping over anyway
-
-	return a.chatRooms[roomId]
-}
-
-func (a *AppConfig) RemoveChatParticipant(roomId, userId string) {
-	a.Lock()
-	defer a.Unlock()
-
-	if _, ok := a.chatRooms[roomId]; ok {
-		delete(a.chatRooms[roomId], userId)
-	}
-}
-
-func (a *AppConfig) DeleteChatRoom(roomId string) {
-	a.Lock()
-	defer a.Unlock()
-
-	if _, ok := a.chatRooms[roomId]; ok {
-		delete(a.chatRooms, roomId)
-	}
 }
 
 func (a *AppConfig) readClientFiles() {
