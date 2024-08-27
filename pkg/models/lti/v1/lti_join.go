@@ -27,7 +27,7 @@ func (m *LtiV1Model) LTIV1JoinRoom(c *plugnmeet.LtiClaims) (string, error) {
 	return token, nil
 }
 
-func (m *LtiV1Model) createRoomSession(c *plugnmeet.LtiClaims) (*plugnmeet.NatsKvRoomInfo, error) {
+func (m *LtiV1Model) createRoomSession(c *plugnmeet.LtiClaims) (*plugnmeet.ActiveRoomInfo, error) {
 	req := utils.PrepareLTIV1RoomCreateReq(c)
 	return m.rm.CreateRoom(req)
 }

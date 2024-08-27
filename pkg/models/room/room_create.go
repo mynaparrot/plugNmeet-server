@@ -1,6 +1,7 @@
 package roommodel
 
 import (
+	"errors"
 	"fmt"
 	"github.com/cavaliergopher/grab/v3"
 	"github.com/gabriel-vasile/mimetype"
@@ -18,7 +19,7 @@ import (
 	"time"
 )
 
-func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.NatsKvRoomInfo, error) {
+func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoomInfo, error) {
 	// some pre-creation tasks
 	m.preRoomCreationTasks(r)
 	// in preRoomCreationTasks we've added this room in progress list
@@ -47,7 +48,15 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.NatsKvRoo
 			if err != nil {
 				return nil, err
 			}
-			return rInfo, nil
+			return &plugnmeet.ActiveRoomInfo{
+				RoomId:       rInfo.RoomId,
+				Sid:          rInfo.RoomSid,
+				RoomTitle:    roomDbInfo.RoomTitle,
+				IsRunning:    1,
+				CreationTime: roomDbInfo.CreationTime,
+				WebhookUrl:   roomDbInfo.WebhookUrl,
+				Metadata:     rInfo.Metadata,
+			}, nil
 		}
 	}
 	// otherwise, we're good to continue
@@ -147,7 +156,23 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.NatsKvRoo
 		return nil, err
 	}
 
-	return m.natsService.GetRoomInfo(r.RoomId)
+	rInfo, err := m.natsService.GetRoomInfo(r.RoomId)
+	if err != nil {
+		return nil, err
+	}
+	if rInfo == nil {
+		return nil, errors.New("room not found in KV")
+	}
+
+	return &plugnmeet.ActiveRoomInfo{
+		RoomId:       rInfo.RoomId,
+		Sid:          rInfo.RoomSid,
+		RoomTitle:    roomDbInfo.RoomTitle,
+		IsRunning:    1,
+		CreationTime: roomDbInfo.CreationTime,
+		WebhookUrl:   roomDbInfo.WebhookUrl,
+		Metadata:     rInfo.Metadata,
+	}, nil
 }
 
 func (m *RoomModel) preRoomCreationTasks(r *plugnmeet.CreateRoomReq) {
