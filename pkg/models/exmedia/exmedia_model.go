@@ -29,7 +29,7 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 		app = config.GetConfig()
 	}
 	if ds == nil {
-		ds = dbservice.New(app.ORM)
+		ds = dbservice.New(app.DB)
 	}
 	if rs == nil {
 		rs = redisservice.New(app.RDS)

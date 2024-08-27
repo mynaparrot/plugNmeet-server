@@ -1,9 +1,8 @@
 package helpers
 
 import (
-	"github.com/mynaparrot/plugnmeet-protocol/factory"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/temporary"
+	"github.com/mynaparrot/plugnmeet-server/pkg/factory"
 	"gopkg.in/yaml.v3"
 	"os"
 )
@@ -34,20 +33,19 @@ func ReadYamlConfigFile(file string) (*config.AppConfig, error) {
 
 func PrepareServer(appCnf *config.AppConfig) error {
 	// orm
-	err := temporary.NewDatabaseConnection(appCnf)
+	err := factory.NewDatabaseConnection(appCnf)
 	if err != nil {
 		return err
 	}
 
 	// set redis connection
-	rds, err := factory.NewRedisConnection(appCnf.RedisInfo)
+	err = factory.NewRedisConnection(appCnf)
 	if err != nil {
 		return err
 	}
-	appCnf.RDS = rds
 
-	// orm
-	err = temporary.NewNatsConnection(appCnf)
+	// nats
+	err = factory.NewNatsConnection(appCnf)
 	if err != nil {
 		return err
 	}

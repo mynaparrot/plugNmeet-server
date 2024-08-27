@@ -36,7 +36,7 @@ func HandleRecording(c *fiber.Ctx) error {
 	}
 
 	// now need to check if meeting is running or not
-	rm := dbservice.New(config.GetConfig().ORM)
+	rm := dbservice.New(config.GetConfig().DB)
 	isRunning := 1
 	room, err := rm.GetRoomInfoBySid(req.Sid, &isRunning)
 	if err != nil {
@@ -108,7 +108,7 @@ func HandleRTMP(c *fiber.Ctx) error {
 	}
 
 	// now need to check if meeting is running or not
-	rm := dbservice.New(config.GetConfig().ORM)
+	rm := dbservice.New(config.GetConfig().DB)
 	isRunning := 1
 	room, err := rm.GetRoomInfoBySid(req.Sid, &isRunning)
 	if err != nil {
@@ -154,7 +154,7 @@ func HandleRecorderEvents(c *fiber.Ctx) error {
 
 	if req.From == "recorder" {
 		app := config.GetConfig()
-		ds := dbservice.New(app.ORM)
+		ds := dbservice.New(app.DB)
 		roomInfo, _ := ds.GetRoomInfoByTableId(uint64(req.RoomTableId))
 		if roomInfo == nil {
 			return c.SendStatus(fiber.StatusNotFound)

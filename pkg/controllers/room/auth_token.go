@@ -89,7 +89,7 @@ func HandleGenerateJoinToken(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, "this user is blocked to join this session")
 	}
 
-	ds := dbservice.New(config.GetConfig().ORM)
+	ds := dbservice.New(config.GetConfig().DB)
 	ri, _ := ds.GetRoomInfoByRoomId(req.RoomId, 1)
 	if ri == nil || ri.ID == 0 {
 		return utils.SendCommonProtoJsonResponse(c, false, "room is not active. create room first")

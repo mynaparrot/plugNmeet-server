@@ -7,7 +7,7 @@ import (
 )
 
 func HandleHealthCheck(c *fiber.Ctx) error {
-	db, err := config.GetConfig().ORM.DB()
+	db, err := config.GetConfig().DB.DB()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString("DB connection error")
 	}

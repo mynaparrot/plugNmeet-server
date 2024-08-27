@@ -1,7 +1,6 @@
 package natsmodel
 
 import (
-	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	analyticsmodel "github.com/mynaparrot/plugnmeet-server/pkg/models/analytics"
@@ -29,7 +28,7 @@ func New(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.
 		app = config.GetConfig()
 	}
 	if ds == nil {
-		ds = dbservice.New(app.ORM)
+		ds = dbservice.New(app.DB)
 	}
 	if rs == nil {
 		rs = redisservice.New(app.RDS)
@@ -68,7 +67,6 @@ func (m *NatsModel) HandleFromClientToServerReq(roomId, userId string, req *plug
 			log.Errorln(err)
 			return
 		}
-		fmt.Println(fmt.Sprintf("%+v", ad))
 		m.analytics.HandleEvent(ad)
 	}
 }

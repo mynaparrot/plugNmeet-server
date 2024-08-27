@@ -1,7 +1,6 @@
 package config
 
 import (
-	"github.com/mynaparrot/plugnmeet-protocol/factory"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -19,7 +18,7 @@ import (
 
 type AppConfig struct {
 	RDS       *redis.Client
-	ORM       *gorm.DB
+	DB        *gorm.DB
 	NatsConn  *nats.Conn
 	JetStream jetstream.JetStream
 
@@ -33,8 +32,8 @@ type AppConfig struct {
 	RoomDefaultSettings          *utils.RoomDefaultSettings   `yaml:"room_default_settings"`
 	LogSettings                  LogSettings                  `yaml:"log_settings"`
 	LivekitInfo                  LivekitInfo                  `yaml:"livekit_info"`
-	RedisInfo                    *factory.RedisInfo           `yaml:"redis_info"`
-	DatabaseInfo                 *factory.DatabaseInfo        `yaml:"database_info"`
+	RedisInfo                    RedisInfo                    `yaml:"redis_info"`
+	DatabaseInfo                 DatabaseInfo                 `yaml:"database_info"`
 	UploadFileSettings           UploadFileSettings           `yaml:"upload_file_settings"`
 	RecorderInfo                 RecorderInfo                 `yaml:"recorder_info"`
 	SharedNotePad                SharedNotePad                `yaml:"shared_notepad"`
@@ -137,6 +136,28 @@ type CopyrightConf struct {
 	Display       bool   `yaml:"display"`
 	AllowOverride bool   `yaml:"allow_override"`
 	Text          string `yaml:"text"`
+}
+
+type DatabaseInfo struct {
+	DriverName string `yaml:"driver_name"`
+	Host       string `yaml:"host"`
+	Port       int32  `yaml:"port"`
+	Username   string `yaml:"username"`
+	Password   string `yaml:"password"`
+	DBName     string `yaml:"db"`
+	Prefix     string `yaml:"prefix"`
+}
+
+type RedisInfo struct {
+	Host              string   `yaml:"host"`
+	Username          string   `yaml:"username"`
+	Password          string   `yaml:"password"`
+	DBName            int      `yaml:"db"`
+	UseTLS            bool     `yaml:"use_tls"`
+	MasterName        string   `yaml:"sentinel_master_name"`
+	SentinelUsername  string   `yaml:"sentinel_username"`
+	SentinelPassword  string   `yaml:"sentinel_password"`
+	SentinelAddresses []string `yaml:"sentinel_addresses"`
 }
 
 type NatsInfo struct {

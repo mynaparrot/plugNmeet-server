@@ -40,7 +40,7 @@ func NewNatsController() *NatsController {
 		log.Fatal(err)
 	}
 
-	ds := dbservice.New(app.ORM)
+	ds := dbservice.New(app.DB)
 	rs := redisservice.New(app.RDS)
 
 	rm := authmodel.New(app, nil)

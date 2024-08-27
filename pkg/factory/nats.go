@@ -1,4 +1,4 @@
-package temporary
+package factory
 
 import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"

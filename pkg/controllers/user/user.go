@@ -31,7 +31,7 @@ func HandleUpdateUserLockSetting(c *fiber.Ctx) error {
 
 	// now need to check if meeting is running or not
 	app := config.GetConfig()
-	ds := dbservice.New(app.ORM)
+	ds := dbservice.New(app.DB)
 	isRunning := 1
 	room, _ := ds.GetRoomInfoBySid(req.RoomSid, &isRunning)
 
@@ -59,7 +59,7 @@ func HandleMuteUnMuteTrack(c *fiber.Ctx) error {
 	}
 
 	app := config.GetConfig()
-	ds := dbservice.New(app.ORM)
+	ds := dbservice.New(app.DB)
 	m := usermodel.New(app, ds, nil, nil)
 
 	err := m.CommonValidation(c)
@@ -103,7 +103,7 @@ func HandleRemoveParticipant(c *fiber.Ctx) error {
 	}
 
 	app := config.GetConfig()
-	ds := dbservice.New(app.ORM)
+	ds := dbservice.New(app.DB)
 	m := usermodel.New(app, ds, nil, nil)
 	err := m.CommonValidation(c)
 	if err != nil {

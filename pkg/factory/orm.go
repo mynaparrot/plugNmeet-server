@@ -1,4 +1,4 @@
-package temporary
+package factory
 
 import (
 	"fmt"
@@ -48,6 +48,6 @@ func NewDatabaseConnection(appCnf *config.AppConfig) error {
 	d.SetConnMaxLifetime(time.Minute * 4)
 	d.SetMaxOpenConns(100)
 
-	appCnf.ORM = db
+	appCnf.DB = db
 	return nil
 }

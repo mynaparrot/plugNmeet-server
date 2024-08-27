@@ -11,7 +11,7 @@ func HandleCloseConnections() {
 	}
 
 	// handle to close DB connection
-	db, err := config.GetConfig().ORM.DB()
+	db, err := config.GetConfig().DB.DB()
 	if err == nil {
 		_ = db.Close()
 	}
