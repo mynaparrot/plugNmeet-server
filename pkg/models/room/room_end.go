@@ -43,5 +43,9 @@ func (m *RoomModel) EndRoom(r *plugnmeet.RoomEndReq) (bool, string) {
 		Ended:     time.Now().UTC(),
 	})
 
+	// delete from room duration
+	_ = m.rs.DeleteRoomWithDuration(r.GetRoomId())
+	// TODO: process everything to clean up the room
+
 	return true, "success"
 }

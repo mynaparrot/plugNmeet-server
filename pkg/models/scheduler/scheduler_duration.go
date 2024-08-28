@@ -1,7 +1,7 @@
 package schedulermodel
 
 import (
-	log "github.com/sirupsen/logrus"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"time"
 )
 
@@ -22,10 +22,9 @@ func (m *SchedulerModel) checkRoomWithDuration() {
 		now := uint64(time.Now().Unix())
 		valid := r.StartedAt + (r.Duration * 60)
 		if now > valid {
-			_, err := m.lk.EndRoom(i)
-			if err != nil {
-				log.Errorln(err)
-			}
+			_, _ = m.rm.EndRoom(&plugnmeet.RoomEndReq{
+				RoomId: i,
+			})
 		}
 	}
 }
