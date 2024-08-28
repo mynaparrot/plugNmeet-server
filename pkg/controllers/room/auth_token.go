@@ -42,13 +42,11 @@ func HandleAuthHeaderCheck(c *fiber.Ctx) error {
 	}
 
 	status := false
-	if signature != "" {
-		mac := hmac.New(sha256.New, []byte(config.GetConfig().Client.Secret))
-		mac.Write(body)
-		expectedSignature := hex.EncodeToString(mac.Sum(nil))
-		if subtle.ConstantTimeCompare([]byte(expectedSignature), []byte(signature)) == 1 {
-			status = true
-		}
+	mac := hmac.New(sha256.New, []byte(config.GetConfig().Client.Secret))
+	mac.Write(body)
+	expectedSignature := hex.EncodeToString(mac.Sum(nil))
+	if subtle.ConstantTimeCompare([]byte(expectedSignature), []byte(signature)) == 1 {
+		status = true
 	}
 
 	if !status {
