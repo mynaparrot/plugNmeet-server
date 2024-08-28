@@ -6,8 +6,7 @@ import (
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models/auth"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models/nats"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/mynaparrot/plugnmeet-server/version"
@@ -28,8 +27,8 @@ type NatsController struct {
 	ctx       context.Context
 	app       *config.AppConfig
 	kp        nkeys.KeyPair
-	authModel *authmodel.AuthModel
-	natsModel *natsmodel.NatsModel
+	authModel *models.AuthModel
+	natsModel *models.NatsModel
 }
 
 func NewNatsController() *NatsController {
@@ -43,13 +42,13 @@ func NewNatsController() *NatsController {
 	ds := dbservice.New(app.DB)
 	rs := redisservice.New(app.RDS)
 
-	rm := authmodel.New(app, nil)
+	rm := models.NewAuthModel(app, nil)
 	return &NatsController{
 		ctx:       context.Background(),
 		app:       app,
 		kp:        kp,
 		authModel: rm,
-		natsModel: natsmodel.New(app, ds, rs),
+		natsModel: models.NewNatsModel(app, ds, rs),
 	}
 }
 

@@ -9,23 +9,7 @@ import (
 	rr "github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/template/html/v2"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/analytics"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/bbb"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/bkroom"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/common"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/etherpad"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/exdisplay"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/exmedia"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/file"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/ingress"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/lti/v1"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/poll"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/recording"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/room"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/speechtotext"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/user"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/waitingroom"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/webhook"
+	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
 	"github.com/mynaparrot/plugnmeet-server/version"
 )
 
@@ -72,134 +56,134 @@ func New() *fiber.App {
 	app.Get("/login*", func(c *fiber.Ctx) error {
 		return c.Render("login", nil)
 	})
-	app.Post("/webhook", webhookcontroller.HandleWebhook)
-	app.Get("/download/uploadedFile/:sid/*", filecontroller.HandleDownloadUploadedFile)
-	app.Get("/download/recording/:token", recordingcontroller.HandleDownloadRecording)
-	app.Get("/download/analytics/:token", analyticscontroller.HandleDownloadAnalytics)
-	app.Get("/healthCheck", commoncontroller.HandleHealthCheck)
+	app.Post("/webhook", controllers.HandleWebhook)
+	app.Get("/download/uploadedFile/:sid/*", controllers.HandleDownloadUploadedFile)
+	app.Get("/download/recording/:token", controllers.HandleDownloadRecording)
+	app.Get("/download/analytics/:token", controllers.HandleDownloadAnalytics)
+	app.Get("/healthCheck", controllers.HandleHealthCheck)
 
 	// lti group
 	lti := app.Group("/lti")
-	lti.Get("/v1", ltiv1controller.HandleLTIV1GETREQUEST)
-	lti.Post("/v1", ltiv1controller.HandleLTIV1Landing)
-	ltiV1API := lti.Group("/v1/api", ltiv1controller.HandleLTIV1VerifyHeaderToken)
-	ltiV1API.Post("/room/join", ltiv1controller.HandleLTIV1JoinRoom)
-	ltiV1API.Post("/room/isActive", ltiv1controller.HandleLTIV1IsRoomActive)
-	ltiV1API.Post("/room/end", ltiv1controller.HandleLTIV1EndRoom)
-	ltiV1API.Post("/recording/fetch", ltiv1controller.HandleLTIV1FetchRecordings)
-	ltiV1API.Post("/recording/download", ltiv1controller.HandleLTIV1GetRecordingDownloadToken)
-	ltiV1API.Post("/recording/delete", ltiv1controller.HandleLTIV1DeleteRecordings)
+	lti.Get("/v1", controllers.HandleLTIV1GETREQUEST)
+	lti.Post("/v1", controllers.HandleLTIV1Landing)
+	ltiV1API := lti.Group("/v1/api", controllers.HandleLTIV1VerifyHeaderToken)
+	ltiV1API.Post("/room/join", controllers.HandleLTIV1JoinRoom)
+	ltiV1API.Post("/room/isActive", controllers.HandleLTIV1IsRoomActive)
+	ltiV1API.Post("/room/end", controllers.HandleLTIV1EndRoom)
+	ltiV1API.Post("/recording/fetch", controllers.HandleLTIV1FetchRecordings)
+	ltiV1API.Post("/recording/download", controllers.HandleLTIV1GetRecordingDownloadToken)
+	ltiV1API.Post("/recording/delete", controllers.HandleLTIV1DeleteRecordings)
 
-	auth := app.Group("/auth", roomcontroller.HandleAuthHeaderCheck)
-	auth.Post("/getClientFiles", filecontroller.HandleGetClientFiles)
+	auth := app.Group("/auth", controllers.HandleAuthHeaderCheck)
+	auth.Post("/getClientFiles", controllers.HandleGetClientFiles)
 
 	// for room
 	room := auth.Group("/room")
-	room.Post("/create", roomcontroller.HandleRoomCreate)
-	room.Post("/getJoinToken", roomcontroller.HandleGenerateJoinToken)
-	room.Post("/isRoomActive", roomcontroller.HandleIsRoomActive)
-	room.Post("/getActiveRoomInfo", roomcontroller.HandleGetActiveRoomInfo)
-	room.Post("/getActiveRoomsInfo", roomcontroller.HandleGetActiveRoomsInfo)
-	room.Post("/endRoom", roomcontroller.HandleEndRoom)
-	room.Post("/fetchPastRooms", roomcontroller.HandleFetchPastRooms)
+	room.Post("/create", controllers.HandleRoomCreate)
+	room.Post("/getJoinToken", controllers.HandleGenerateJoinToken)
+	room.Post("/isRoomActive", controllers.HandleIsRoomActive)
+	room.Post("/getActiveRoomInfo", controllers.HandleGetActiveRoomInfo)
+	room.Post("/getActiveRoomsInfo", controllers.HandleGetActiveRoomsInfo)
+	room.Post("/endRoom", controllers.HandleEndRoom)
+	room.Post("/fetchPastRooms", controllers.HandleFetchPastRooms)
 
 	// for recording
 	recording := auth.Group("/recording")
-	recording.Post("/fetch", recordingcontroller.HandleFetchRecordings)
-	recording.Post("/recordingInfo", recordingcontroller.HandleRecordingInfo)
-	recording.Post("/delete", recordingcontroller.HandleDeleteRecording)
-	recording.Post("/getDownloadToken", recordingcontroller.HandleGetDownloadToken)
+	recording.Post("/fetch", controllers.HandleFetchRecordings)
+	recording.Post("/recordingInfo", controllers.HandleRecordingInfo)
+	recording.Post("/delete", controllers.HandleDeleteRecording)
+	recording.Post("/getDownloadToken", controllers.HandleGetDownloadToken)
 
 	// for analytics
 	analytics := auth.Group("/analytics")
-	analytics.Post("/fetch", analyticscontroller.HandleFetchAnalytics)
-	analytics.Post("/delete", analyticscontroller.HandleDeleteAnalytics)
-	analytics.Post("/getDownloadToken", analyticscontroller.HandleGetAnalyticsDownloadToken)
+	analytics.Post("/fetch", controllers.HandleFetchAnalytics)
+	analytics.Post("/delete", controllers.HandleDeleteAnalytics)
+	analytics.Post("/getDownloadToken", controllers.HandleGetAnalyticsDownloadToken)
 
 	// to handle different events from recorder
 	recorder := auth.Group("/recorder")
-	recorder.Post("/notify", recordingcontroller.HandleRecorderEvents)
+	recorder.Post("/notify", controllers.HandleRecorderEvents)
 
 	// for convert BBB request to PlugNmeet
-	bbb := app.Group("/:apiKey/bigbluebutton/api", bbbcontroller.HandleVerifyApiRequest)
-	bbb.All("/create", bbbcontroller.HandleBBBCreate)
-	bbb.All("/join", bbbcontroller.HandleBBBJoin)
-	bbb.All("/isMeetingRunning", bbbcontroller.HandleBBBIsMeetingRunning)
-	bbb.All("/getMeetingInfo", bbbcontroller.HandleBBBGetMeetingInfo)
-	bbb.All("/getMeetings", bbbcontroller.HandleBBBGetMeetings)
-	bbb.All("/end", bbbcontroller.HandleBBBEndMeetings)
-	bbb.All("/getRecordings", bbbcontroller.HandleBBBGetRecordings)
-	bbb.All("/deleteRecordings", bbbcontroller.HandleBBBDeleteRecordings)
+	bbb := app.Group("/:apiKey/bigbluebutton/api", controllers.HandleVerifyApiRequest)
+	bbb.All("/create", controllers.HandleBBBCreate)
+	bbb.All("/join", controllers.HandleBBBJoin)
+	bbb.All("/isMeetingRunning", controllers.HandleBBBIsMeetingRunning)
+	bbb.All("/getMeetingInfo", controllers.HandleBBBGetMeetingInfo)
+	bbb.All("/getMeetings", controllers.HandleBBBGetMeetings)
+	bbb.All("/end", controllers.HandleBBBEndMeetings)
+	bbb.All("/getRecordings", controllers.HandleBBBGetRecordings)
+	bbb.All("/deleteRecordings", controllers.HandleBBBDeleteRecordings)
 	// TO-DO: in the future
-	bbb.All("/updateRecordings", bbbcontroller.HandleBBBUpdateRecordings)
-	bbb.All("/publishRecordings", bbbcontroller.HandleBBBPublishRecordings)
+	bbb.All("/updateRecordings", controllers.HandleBBBUpdateRecordings)
+	bbb.All("/publishRecordings", controllers.HandleBBBPublishRecordings)
 
 	// api group will require sending token as Authorization header value
-	api := app.Group("/api", roomcontroller.HandleVerifyHeaderToken)
-	api.Post("/verifyToken", roomcontroller.HandleVerifyToken)
+	api := app.Group("/api", controllers.HandleVerifyHeaderToken)
+	api.Post("/verifyToken", controllers.HandleVerifyToken)
 
-	api.Post("/recording", recordingcontroller.HandleRecording)
-	api.Post("/rtmp", recordingcontroller.HandleRTMP)
-	api.Post("/endRoom", roomcontroller.HandleEndRoomForAPI)
-	api.Post("/changeVisibility", roomcontroller.HandleChangeVisibilityForAPI)
-	api.Post("/convertWhiteboardFile", filecontroller.HandleConvertWhiteboardFile)
-	api.Post("/externalMediaPlayer", exmediacontroller.HandleExternalMediaPlayer)
-	api.Post("/externalDisplayLink", exdisplaycontroller.HandleExternalDisplayLink)
+	api.Post("/recording", controllers.HandleRecording)
+	api.Post("/rtmp", controllers.HandleRTMP)
+	api.Post("/endRoom", controllers.HandleEndRoomForAPI)
+	api.Post("/changeVisibility", controllers.HandleChangeVisibilityForAPI)
+	api.Post("/convertWhiteboardFile", controllers.HandleConvertWhiteboardFile)
+	api.Post("/externalMediaPlayer", controllers.HandleExternalMediaPlayer)
+	api.Post("/externalDisplayLink", controllers.HandleExternalDisplayLink)
 
-	api.Post("/updateLockSettings", usercontroller.HandleUpdateUserLockSetting)
-	api.Post("/muteUnmuteTrack", usercontroller.HandleMuteUnMuteTrack)
-	api.Post("/removeParticipant", usercontroller.HandleRemoveParticipant)
-	api.Post("/switchPresenter", usercontroller.HandleSwitchPresenter)
+	api.Post("/updateLockSettings", controllers.HandleUpdateUserLockSetting)
+	api.Post("/muteUnmuteTrack", controllers.HandleMuteUnMuteTrack)
+	api.Post("/removeParticipant", controllers.HandleRemoveParticipant)
+	api.Post("/switchPresenter", controllers.HandleSwitchPresenter)
 
 	// etherpad group
 	etherpad := api.Group("/etherpad")
-	etherpad.Post("/create", etherpadcontroller.HandleCreateEtherpad)
-	etherpad.Post("/cleanPad", etherpadcontroller.HandleCleanPad)
-	etherpad.Post("/changeStatus", etherpadcontroller.HandleChangeEtherpadStatus)
+	etherpad.Post("/create", controllers.HandleCreateEtherpad)
+	etherpad.Post("/cleanPad", controllers.HandleCleanPad)
+	etherpad.Post("/changeStatus", controllers.HandleChangeEtherpadStatus)
 
 	// waiting room group
 	waitingRoom := api.Group("/waitingRoom")
-	waitingRoom.Post("/approveUsers", waitingroomcontroller.HandleApproveUsers)
-	waitingRoom.Post("/updateMsg", waitingroomcontroller.HandleUpdateWaitingRoomMessage)
+	waitingRoom.Post("/approveUsers", controllers.HandleApproveUsers)
+	waitingRoom.Post("/updateMsg", controllers.HandleUpdateWaitingRoomMessage)
 
 	// polls group
 	polls := api.Group("/polls")
-	polls.Post("/create", pollcontroller.HandleCreatePoll)
-	polls.Get("/listPolls", pollcontroller.HandleListPolls)
-	polls.Get("/pollsStats", pollcontroller.HandleGetPollsStats)
-	polls.Get("/countTotalResponses/:pollId", pollcontroller.HandleCountPollTotalResponses)
-	polls.Get("/userSelectedOption/:pollId/:userId", pollcontroller.HandleUserSelectedOption)
-	polls.Get("/pollResponsesDetails/:pollId", pollcontroller.HandleGetPollResponsesDetails)
-	polls.Get("/pollResponsesResult/:pollId", pollcontroller.HandleGetResponsesResult)
-	polls.Post("/submitResponse", pollcontroller.HandleUserSubmitResponse)
-	polls.Post("/closePoll", pollcontroller.HandleClosePoll)
+	polls.Post("/create", controllers.HandleCreatePoll)
+	polls.Get("/listPolls", controllers.HandleListPolls)
+	polls.Get("/pollsStats", controllers.HandleGetPollsStats)
+	polls.Get("/countTotalResponses/:pollId", controllers.HandleCountPollTotalResponses)
+	polls.Get("/userSelectedOption/:pollId/:userId", controllers.HandleUserSelectedOption)
+	polls.Get("/pollResponsesDetails/:pollId", controllers.HandleGetPollResponsesDetails)
+	polls.Get("/pollResponsesResult/:pollId", controllers.HandleGetResponsesResult)
+	polls.Post("/submitResponse", controllers.HandleUserSubmitResponse)
+	polls.Post("/closePoll", controllers.HandleClosePoll)
 
 	// breakout room group
 	breakoutRoom := api.Group("/breakoutRoom")
-	breakoutRoom.Post("/create", bkroomcontroller.HandleCreateBreakoutRooms)
-	breakoutRoom.Post("/join", bkroomcontroller.HandleJoinBreakoutRoom)
-	breakoutRoom.Get("/listRooms", bkroomcontroller.HandleGetBreakoutRooms)
-	breakoutRoom.Get("/myRooms", bkroomcontroller.HandleGetMyBreakoutRooms)
-	breakoutRoom.Post("/increaseDuration", bkroomcontroller.HandleIncreaseBreakoutRoomDuration)
-	breakoutRoom.Post("/sendMsg", bkroomcontroller.HandleSendBreakoutRoomMsg)
-	breakoutRoom.Post("/endRoom", bkroomcontroller.HandleEndBreakoutRoom)
-	breakoutRoom.Post("/endAllRooms", bkroomcontroller.HandleEndBreakoutRooms)
+	breakoutRoom.Post("/create", controllers.HandleCreateBreakoutRooms)
+	breakoutRoom.Post("/join", controllers.HandleJoinBreakoutRoom)
+	breakoutRoom.Get("/listRooms", controllers.HandleGetBreakoutRooms)
+	breakoutRoom.Get("/myRooms", controllers.HandleGetMyBreakoutRooms)
+	breakoutRoom.Post("/increaseDuration", controllers.HandleIncreaseBreakoutRoomDuration)
+	breakoutRoom.Post("/sendMsg", controllers.HandleSendBreakoutRoomMsg)
+	breakoutRoom.Post("/endRoom", controllers.HandleEndBreakoutRoom)
+	breakoutRoom.Post("/endAllRooms", controllers.HandleEndBreakoutRooms)
 
 	// Ingress
 	ingress := api.Group("/ingress")
-	ingress.Post("/create", ingresscontroller.HandleCreateIngress)
+	ingress.Post("/create", controllers.HandleCreateIngress)
 
 	// Speech services
 	speech := api.Group("/speechServices")
-	speech.Post("/serviceStatus", speechtotextcontroller.HandleSpeechToTextTranslationServiceStatus)
-	speech.Post("/azureToken", speechtotextcontroller.HandleGenerateAzureToken)
-	speech.Post("/userStatus", speechtotextcontroller.HandleSpeechServiceUserStatus)
-	speech.Post("/renewToken", speechtotextcontroller.HandleRenewAzureToken)
+	speech.Post("/serviceStatus", controllers.HandleSpeechToTextTranslationServiceStatus)
+	speech.Post("/azureToken", controllers.HandleGenerateAzureToken)
+	speech.Post("/userStatus", controllers.HandleSpeechServiceUserStatus)
+	speech.Post("/renewToken", controllers.HandleRenewAzureToken)
 
 	// for resumable.js need both methods.
 	// https://github.com/23/resumable.js#how-do-i-set-it-up-with-my-server
-	api.Get("/fileUpload", filecontroller.HandleFileUpload)
-	api.Post("/fileUpload", filecontroller.HandleFileUpload)
+	api.Get("/fileUpload", controllers.HandleFileUpload)
+	api.Post("/fileUpload", controllers.HandleFileUpload)
 
 	// last method
 	app.Use(func(c *fiber.Ctx) error {

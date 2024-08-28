@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/models/auth"
+	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nats.go/jetstream"
@@ -17,13 +17,13 @@ import (
 type NatsAuthController struct {
 	ctx           context.Context
 	app           *config.AppConfig
-	authModel     *authmodel.AuthModel
+	authModel     *models.AuthModel
 	natsService   *natsservice.NatsService
 	js            jetstream.JetStream
 	issuerKeyPair nkeys.KeyPair
 }
 
-func NewNatsAuthController(app *config.AppConfig, authModel *authmodel.AuthModel, kp nkeys.KeyPair, js jetstream.JetStream) *NatsAuthController {
+func NewNatsAuthController(app *config.AppConfig, authModel *models.AuthModel, kp nkeys.KeyPair, js jetstream.JetStream) *NatsAuthController {
 	return &NatsAuthController{
 		ctx:           context.Background(),
 		app:           app,

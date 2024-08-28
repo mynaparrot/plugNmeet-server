@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-server/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/nats"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/scheduler"
 	"github.com/mynaparrot/plugnmeet-server/pkg/routers"
 	"github.com/mynaparrot/plugnmeet-server/version"
 	log "github.com/sirupsen/logrus"
@@ -60,7 +60,7 @@ func startServer(c *cli.Context) error {
 	go nts.StartUp()
 
 	// start scheduler
-	go schedulercontroller.StartScheduler()
+	go controllers.StartScheduler()
 
 	// defer close connections
 	defer helpers.HandleCloseConnections()
