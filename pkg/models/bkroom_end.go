@@ -3,7 +3,6 @@ package models
 import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 	"time"
@@ -14,16 +13,7 @@ func (m *BreakoutRoomModel) EndBreakoutRoom(r *plugnmeet.EndBreakoutRoomReq) err
 	if err != nil {
 		return err
 	}
-	_, err = m.lk.EndRoom(r.BreakoutRoomId)
-	if err != nil {
-		log.Error(err)
-	}
-
-	_, _ = m.ds.UpdateRoomStatus(&dbmodels.RoomInfo{
-		RoomId:    r.BreakoutRoomId,
-		IsRunning: 0,
-		Ended:     time.Now().UTC(),
-	})
+	_, _ = m.rm.EndRoom(&plugnmeet.RoomEndReq{RoomId: r.BreakoutRoomId})
 
 	_ = m.rs.DeleteBreakoutRoom(r.RoomId, r.BreakoutRoomId)
 	_ = m.performPostHookTask(r.RoomId)

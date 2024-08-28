@@ -14,6 +14,9 @@ func (s *LivekitService) EndRoom(roomId string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if res == nil {
+		return "no response received", nil
+	}
 
 	return res.String(), nil
 }

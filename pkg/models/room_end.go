@@ -23,6 +23,14 @@ func (m *RoomModel) EndRoom(r *plugnmeet.RoomEndReq) (bool, string) {
 		log.Errorln(err)
 	}
 
+	info, err := m.natsService.GetRoomInfo(r.GetRoomId())
+	if err != nil {
+		return false, ""
+	}
+	if info == nil {
+		return false, "room not active"
+	}
+
 	// change room status to delete
 	err = m.natsService.UpdateRoomStatus(r.GetRoomId(), natsservice.RoomStatusEnded)
 	if err != nil {
