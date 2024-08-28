@@ -34,7 +34,7 @@ func HandleFileUpload(c *fiber.Ctx) error {
 		})
 	}
 
-	m := filemodel.New(nil, nil, nil, nil)
+	m := filemodel.New(nil, nil, nil)
 	m.AddRequest(req)
 	err = m.CommonValidation(c)
 	if err != nil {
@@ -119,7 +119,7 @@ func HandleConvertWhiteboardFile(c *fiber.Ctx) error {
 		})
 	}
 
-	m := filemodel.New(nil, nil, nil, nil)
+	m := filemodel.New(nil, nil, nil)
 	m.AddRequest(req)
 	res, err := m.ConvertWhiteboardFile()
 	if err != nil {

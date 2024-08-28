@@ -215,7 +215,7 @@ func (m *RoomModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomReq, r
 		return
 	}
 
-	fm := filemodel.New(m.app, m.ds, m.rs, m.lk)
+	fm := filemodel.New(m.app, m.ds, m.rs)
 	cType := resp.Header.Get("Content-Type")
 	if cType == "" {
 		log.Errorln("invalid Content-Type")
