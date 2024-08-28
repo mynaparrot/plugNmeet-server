@@ -60,14 +60,3 @@ func (m *RoomModel) CheckAndWaitUntilRoomCreationInProgress(roomId string) {
 		}
 	}
 }
-
-func (m *RoomModel) OnAfterRoomClosed(roomId string) {
-	// delete blocked users list
-	_, err := m.rs.DeleteRoomBlockList(roomId)
-	if err != nil {
-		log.Errorln(err)
-	}
-
-	// remove from progress, if existed. no need to log if error
-	_, _ = m.rs.RoomCreationProgressList(roomId, "del")
-}
