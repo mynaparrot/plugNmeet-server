@@ -1,4 +1,4 @@
-package natscontroller
+package controllers
 
 import (
 	"context"

@@ -5,7 +5,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/routers"
 	"github.com/mynaparrot/plugnmeet-server/version"
 	log "github.com/sirupsen/logrus"
@@ -56,7 +55,7 @@ func startServer(c *cli.Context) error {
 	}
 
 	// start nats services
-	nts := natscontroller.NewNatsController()
+	nts := controllers.NewNatsController()
 	go nts.StartUp()
 
 	// start scheduler
