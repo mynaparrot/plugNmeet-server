@@ -93,7 +93,7 @@ nats_info:
     chat: "chat"
     whiteboard: "whiteboard"
     # to exchange data of pnm client with each other
-    dataChannel: "dataChannel"
+    data_channel: "dataChannel"
 upload_file_settings:
   path: "./upload"
   # file size in MB. Default 10MB

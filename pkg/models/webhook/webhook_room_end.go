@@ -85,7 +85,7 @@ func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 func (m *WebhookModel) onAfterRoomFinishedTasks(roomId, roomSid, metadata string) {
 	// Delete all the files those may upload during session
 	if !m.app.UploadFileSettings.KeepForever {
-		fileM := filemodel.New(m.app, m.ds, m.rs, m.lk)
+		fileM := filemodel.New(m.app, m.ds, m.rs)
 		fileM.AddRequest(&filemodel.FileUploadReq{
 			Sid: roomSid,
 		})
