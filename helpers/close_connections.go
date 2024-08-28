@@ -24,6 +24,4 @@ func HandleCloseConnections() {
 
 	// close logger
 	logrus.Exit(0)
-
-	return
 }

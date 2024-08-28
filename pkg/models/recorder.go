@@ -1,11 +1,14 @@
 package models
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 	"strconv"
 	"time"
@@ -86,5 +89,11 @@ func (m *RecorderModel) SendMsgToRecorder(req *plugnmeet.RecordingReq) error {
 	}
 
 	payload, _ := protojson.Marshal(toSend)
-	return m.rs.PublishToRecorderChannel(string(payload))
+	_, err := m.app.JetStream.Publish(context.Background(), fmt.Sprintf("%s.%s", m.app.NatsInfo.Subjects.RecorderJsWorker, "node_01"), payload)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return nil
+	//return m.rs.PublishToRecorderChannel(string(payload))
 }

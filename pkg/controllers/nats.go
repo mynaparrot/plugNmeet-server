@@ -67,6 +67,22 @@ func (c *NatsController) StartUp() {
 		log.Fatal(err)
 	}
 
+	// recorder worker
+	_, err = c.app.JetStream.CreateOrUpdateStream(c.ctx, jetstream.StreamConfig{
+		Name: fmt.Sprintf("%s", c.app.NatsInfo.Subjects.RecorderJsWorker),
+		Subjects: []string{
+			fmt.Sprintf("%s.*", c.app.NatsInfo.Subjects.RecorderJsWorker),
+		},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	/*_, err = c.app.JetStream.Publish(c.ctx, fmt.Sprintf("%s.%s", c.app.NatsInfo.Subjects.RecorderJsWorker, "node_01"), []byte("test"))
+	if err != nil {
+		log.Fatal(err)
+	}*/
+
 	// now subscribe
 	go c.subscribeToSystemWorker()
 
