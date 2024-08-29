@@ -160,24 +160,29 @@ type RedisInfo struct {
 }
 
 type NatsInfo struct {
-	NatsUrls                 []string     `yaml:"nats_urls"`
-	NatsWSUrls               []string     `yaml:"nats_ws_urls"`
-	Account                  string       `yaml:"account"`
-	User                     string       `yaml:"user"`
-	Password                 string       `yaml:"password"`
-	AuthCalloutIssuerPrivate string       `yaml:"auth_callout_issuer_private"`
-	Subjects                 NatsSubjects `yaml:"subjects"`
+	NatsUrls                 []string         `yaml:"nats_urls"`
+	NatsWSUrls               []string         `yaml:"nats_ws_urls"`
+	Account                  string           `yaml:"account"`
+	User                     string           `yaml:"user"`
+	Password                 string           `yaml:"password"`
+	AuthCalloutIssuerPrivate string           `yaml:"auth_callout_issuer_private"`
+	Subjects                 NatsSubjects     `yaml:"subjects"`
+	Recorder                 NatsInfoRecorder `yaml:"recorder"`
 }
 
 type NatsSubjects struct {
-	SystemApiWorker  string `yaml:"system_api_worker"`
-	SystemJsWorker   string `yaml:"system_js_worker"`
-	RecorderJsWorker string `yaml:"recorder_js_worker"`
-	SystemPublic     string `yaml:"system_public"`
-	SystemPrivate    string `yaml:"system_private"`
-	Chat             string `yaml:"chat"`
-	Whiteboard       string `yaml:"whiteboard"`
-	DataChannel      string `yaml:"data_channel"`
+	SystemApiWorker string `yaml:"system_api_worker"`
+	SystemJsWorker  string `yaml:"system_js_worker"`
+	SystemPublic    string `yaml:"system_public"`
+	SystemPrivate   string `yaml:"system_private"`
+	Chat            string `yaml:"chat"`
+	Whiteboard      string `yaml:"whiteboard"`
+	DataChannel     string `yaml:"data_channel"`
+}
+
+type NatsInfoRecorder struct {
+	RecorderChannel string `yaml:"recorder_channel"`
+	RecorderInfoKv  string `yaml:"recorder_info_kv"`
 }
 
 var appCnf *AppConfig

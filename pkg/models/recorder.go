@@ -1,23 +1,23 @@
 package models
 
 import (
-	"context"
 	"errors"
-	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
-	log "github.com/sirupsen/logrus"
+	"github.com/nats-io/nats.go"
 	"google.golang.org/protobuf/encoding/protojson"
 	"strconv"
 	"time"
 )
 
 type RecorderModel struct {
-	app *config.AppConfig
-	ds  *dbservice.DatabaseService
-	rs  *redisservice.RedisService
+	app         *config.AppConfig
+	ds          *dbservice.DatabaseService
+	rs          *redisservice.RedisService
+	natsService *natsservice.NatsService
 }
 
 func NewRecorderModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *RecorderModel {
@@ -32,9 +32,10 @@ func NewRecorderModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *
 	}
 
 	return &RecorderModel{
-		app: app,
-		ds:  ds,
-		rs:  rs,
+		app:         app,
+		ds:          ds,
+		rs:          rs,
+		natsService: natsservice.New(app),
 	}
 }
 
@@ -89,11 +90,10 @@ func (m *RecorderModel) SendMsgToRecorder(req *plugnmeet.RecordingReq) error {
 	}
 
 	payload, _ := protojson.Marshal(toSend)
-	_, err := m.app.JetStream.Publish(context.Background(), fmt.Sprintf("%s.%s", m.app.NatsInfo.Subjects.RecorderJsWorker, "node_01"), payload)
-	if err != nil {
-		log.Fatal(err)
-	}
+	_, err := m.app.NatsConn.RequestMsg(&nats.Msg{
+		Subject: m.app.NatsInfo.Recorder.RecorderChannel,
+		Data:    payload,
+	}, time.Second*1)
 
-	return nil
-	//return m.rs.PublishToRecorderChannel(string(payload))
+	return err
 }

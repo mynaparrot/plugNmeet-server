@@ -1,20 +1,15 @@
 package models
 
 import (
-	"encoding/json"
 	"errors"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	log "github.com/sirupsen/logrus"
 	"net/url"
 	"sort"
-	"time"
 )
 
 func (m *RecorderModel) addTokenAndRecorder(req *plugnmeet.RecordingReq, rq *plugnmeet.PlugNmeetToRecorder, userId string) error {
-	recorderId, err := m.selectRecorder()
-	if err != nil {
-		return err
-	}
+	recorderId := m.selectRecorder()
 	if recorderId == "" {
 		return errors.New("notifications.no-recorder-available")
 	}
@@ -46,47 +41,11 @@ func (m *RecorderModel) addTokenAndRecorder(req *plugnmeet.RecordingReq, rq *plu
 	return nil
 }
 
-type recorderInfo struct {
-	RecorderId      string
-	MaxLimit        int   `json:"maxLimit"`
-	CurrentProgress int   `json:"currentProgress"`
-	LastPing        int64 `json:"lastPing"`
-}
+func (m *RecorderModel) selectRecorder() string {
+	recorders := m.natsService.GetAllActiveRecorders()
 
-func (m *RecorderModel) getAllRecorders() ([]*recorderInfo, error) {
-	result, err := m.rs.GetAllRecorders()
-	if err != nil {
-		return nil, err
-	}
-	if result == nil {
-		return nil, errors.New("no recorder found")
-	}
-
-	var recorders []*recorderInfo
-	valid := time.Now().Unix() - 8 // we can think maximum 8 seconds delay for valid node
-
-	for id, data := range result {
-		recorder := new(recorderInfo)
-		err = json.Unmarshal([]byte(data), recorder)
-		if err != nil {
-			continue
-		}
-		if recorder.LastPing >= valid {
-			recorder.RecorderId = id
-			recorders = append(recorders, recorder)
-		}
-	}
-
-	return recorders, err
-}
-
-func (m *RecorderModel) selectRecorder() (string, error) {
-	recorders, err := m.getAllRecorders()
-	if err != nil {
-		return "", err
-	}
 	if len(recorders) < 1 {
-		return "", nil
+		return ""
 	}
 	// let's sort it based on active processes & max limit.
 	sort.Slice(recorders, func(i int, j int) bool {
@@ -96,5 +55,5 @@ func (m *RecorderModel) selectRecorder() (string, error) {
 	})
 
 	// we'll return the first one
-	return recorders[0].RecorderId, nil
+	return recorders[0].RecorderId
 }
