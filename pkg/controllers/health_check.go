@@ -11,7 +11,6 @@ func HandleHealthCheck(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString("DB connection error")
 	}
-
 	err = db.Ping()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString("DB connection error")
@@ -20,6 +19,10 @@ func HandleHealthCheck(c *fiber.Ctx) error {
 	_, err = config.GetConfig().RDS.Ping(context.Background()).Result()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString("Redis connection error")
+	}
+
+	if !config.GetConfig().NatsConn.IsConnected() {
+		return c.Status(fiber.StatusInternalServerError).SendString("Nats connection error")
 	}
 
 	return c.Status(fiber.StatusOK).SendString("Healthy")
