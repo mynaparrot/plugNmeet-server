@@ -87,13 +87,15 @@ nats_info:
   subjects:
     system_api_worker: "sysApiWorker"
     system_js_worker: "sysJsWorker"
-    recorder_js_worker: "recorderJsWorker"
     system_public: "sysPublic"
     system_private: "sysPrivate"
     chat: "chat"
     whiteboard: "whiteboard"
     # to exchange data of pnm client with each other
     data_channel: "dataChannel"
+  recorder:
+    recorder_channel: "recorderChannel"
+    recorder_info_kv: "pnm-recorderInfo"
 upload_file_settings:
   path: "./upload"
   # file size in MB. Default 10MB

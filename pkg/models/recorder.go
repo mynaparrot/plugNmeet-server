@@ -5,16 +5,19 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/nats-io/nats.go"
 	"google.golang.org/protobuf/encoding/protojson"
 	"strconv"
 	"time"
 )
 
 type RecorderModel struct {
-	app *config.AppConfig
-	ds  *dbservice.DatabaseService
-	rs  *redisservice.RedisService
+	app         *config.AppConfig
+	ds          *dbservice.DatabaseService
+	rs          *redisservice.RedisService
+	natsService *natsservice.NatsService
 }
 
 func NewRecorderModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *RecorderModel {
@@ -29,9 +32,10 @@ func NewRecorderModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *
 	}
 
 	return &RecorderModel{
-		app: app,
-		ds:  ds,
-		rs:  rs,
+		app:         app,
+		ds:          ds,
+		rs:          rs,
+		natsService: natsservice.New(app),
 	}
 }
 
@@ -86,5 +90,10 @@ func (m *RecorderModel) SendMsgToRecorder(req *plugnmeet.RecordingReq) error {
 	}
 
 	payload, _ := protojson.Marshal(toSend)
-	return m.rs.PublishToRecorderChannel(string(payload))
+	_, err := m.app.NatsConn.RequestMsg(&nats.Msg{
+		Subject: m.app.NatsInfo.Recorder.RecorderChannel,
+		Data:    payload,
+	}, time.Second*1)
+
+	return err
 }
