@@ -67,11 +67,6 @@ func (c *NatsController) StartUp() {
 		log.Fatal(err)
 	}
 
-	/*_, err = c.app.JetStream.Publish(c.ctx, fmt.Sprintf("%s.%s", c.app.NatsInfo.Subjects.RecorderJsWorker, "node_01"), []byte("test"))
-	if err != nil {
-		log.Fatal(err)
-	}*/
-
 	// now subscribe
 	go c.subscribeToSystemWorker()
 
