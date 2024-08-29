@@ -12,8 +12,17 @@ import (
 // checkOnlineUsersStatus will compare last ping result
 // and take the decision to update user's status
 func (m *SchedulerModel) checkOnlineUsersStatus() {
-	kl := m.app.JetStream.KeyValueStoreNames(context.Background())
+	locked, _ := m.rs.ManageSchedulerLock("exist", "checkOnlineUsersStatus", 0)
+	if locked {
+		// if lock then we will not perform here
+		return
+	}
+	// now set lock
+	_, _ = m.rs.ManageSchedulerLock("add", "checkOnlineUsersStatus", time.Minute*1)
+	// clean at the end
+	defer m.rs.ManageSchedulerLock("del", "checkOnlineUsersStatus", 0)
 
+	kl := m.app.JetStream.KeyValueStoreNames(context.Background())
 	for s := range kl.Name() {
 		if strings.HasPrefix(s, natsservice.RoomUsersBucket) {
 			roomId := strings.ReplaceAll(s, natsservice.RoomUsersBucket, "")

@@ -13,7 +13,7 @@ func (m *SchedulerModel) checkRoomWithDuration() {
 	}
 
 	// now set lock
-	_, _ = m.rs.ManageSchedulerLock("add", "checkRoomWithDuration", time.Minute*4)
+	_, _ = m.rs.ManageSchedulerLock("add", "checkRoomWithDuration", time.Minute*1)
 	// clean at the end
 	defer m.rs.ManageSchedulerLock("del", "checkRoomWithDuration", 0)
 
