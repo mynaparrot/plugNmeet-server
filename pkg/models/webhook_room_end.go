@@ -4,7 +4,7 @@ import (
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	log "github.com/sirupsen/logrus"
 	"time"
 )
@@ -25,17 +25,6 @@ func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 		return
 	}
 
-	// update db table
-	room := &dbmodels.RoomInfo{
-		Sid:       rInfo.RoomId,
-		IsRunning: 0,
-		Ended:     time.Now().UTC(),
-	}
-	_, err = m.ds.UpdateRoomStatus(room)
-	if err != nil {
-		log.Errorln(err)
-	}
-
 	event.Room.Metadata = rInfo.Metadata
 	event.Room.Sid = rInfo.RoomSid
 
@@ -45,85 +34,29 @@ func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 		m.sendCustomTypeWebhook(event, "session_ended")
 	}()
 
+	if rInfo.Status != natsservice.RoomStatusEnded {
+		// so, this session was not ended by API call
+		// may be for some reason room was ended by livekit
+
+		// change status to ended
+		err = m.natsService.UpdateRoomStatus(rInfo.RoomId, natsservice.RoomStatusEnded)
+		if err != nil {
+			log.Errorln(err)
+		}
+		// end the room in proper way
+		m.rm.EndRoom(&plugnmeet.RoomEndReq{RoomId: rInfo.RoomId})
+	}
+
 	// now we'll perform a few service related tasks
 	time.Sleep(config.WaitBeforeTriggerOnAfterRoomEnded)
-	m.rm.OnAfterRoomClosed(rInfo.RoomId)
-
-	//we'll send a message to the recorder to stop
-	recorderModel := NewRecorderModel(m.app, m.ds, m.rs)
-	err = recorderModel.SendMsgToRecorder(&plugnmeet.RecordingReq{
-		Task:   plugnmeet.RecordingTasks_STOP,
-		Sid:    rInfo.RoomSid,
-		RoomId: rInfo.RoomId,
-	})
-	if err != nil {
-		log.Errorln(err)
-	}
-
-	// few related task can be done in separate goroutine
-	go m.onAfterRoomFinishedTasks(rInfo.RoomId, rInfo.RoomSid, rInfo.Metadata)
 
 	// at the end we'll handle event notification
-	go func() {
-		// send first
-		m.sendToWebhookNotifier(event)
-		// now clean up
-		err := m.webhookNotifier.DeleteWebhook(rInfo.RoomSid)
-		if err != nil {
-			log.Errorln(err)
-		}
-	}()
-}
+	// send it first
+	m.sendToWebhookNotifier(event)
 
-func (m *WebhookModel) onAfterRoomFinishedTasks(roomId, roomSid, metadata string) {
-	// Delete all the files those may upload during session
-	if !m.app.UploadFileSettings.KeepForever {
-		fileM := NewFileModel(m.app, m.ds, m.rs)
-		fileM.AddRequest(&FileUploadReq{
-			Sid: roomSid,
-		})
-		err := fileM.DeleteRoomUploadedDir()
-		if err != nil {
-			log.Errorln(err)
-		}
-	}
-
-	// notify to clean room from room duration
-	rmDuration := NewRoomDurationModel(m.app, m.rs)
-	err := rmDuration.DeleteRoomWithDuration(roomId)
+	// now clean up webhook for this room
+	err = m.webhookNotifier.DeleteWebhook(rInfo.RoomSid)
 	if err != nil {
 		log.Errorln(err)
 	}
-
-	// clean shared note
-	em := NewEtherpadModel(m.app, m.ds, m.rs)
-	_ = em.CleanAfterRoomEnd(roomId, metadata)
-
-	// clean polls
-	pm := NewPollModel(m.app, m.ds, m.rs)
-	err = pm.CleanUpPolls(roomId)
-	if err != nil {
-		log.Errorln(err)
-	}
-
-	// remove all breakout rooms
-	bm := NewBreakoutRoomModel(m.app, m.ds, m.rs)
-	err = bm.PostTaskAfterRoomEndWebhook(roomId, metadata)
-	if err != nil {
-		log.Errorln(err)
-	}
-
-	// speech service clean up
-	sm := NewSpeechToTextModel(m.app, m.ds, m.rs)
-	// don't need to worry about room sid changes, because we'll compare both
-	err = sm.OnAfterRoomEnded(roomId, roomSid)
-	if err != nil {
-		log.Errorln(err)
-	}
-
-	// now clean up session
-	m.natsService.OnAfterSessionEndCleanup(roomId)
-
-	// finally, create the analytics file
-	m.analyticsModel.PrepareToExportAnalytics(roomId, roomSid, metadata)
 }
