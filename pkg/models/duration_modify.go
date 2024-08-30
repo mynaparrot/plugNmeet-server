@@ -2,9 +2,32 @@ package models
 
 import (
 	"errors"
+	log "github.com/sirupsen/logrus"
 	"reflect"
 	"time"
 )
+
+type RoomDurationInfo struct {
+	Duration  uint64 `redis:"duration"`
+	StartedAt uint64 `redis:"startedAt"`
+}
+
+func (m *RoomDurationModel) AddRoomWithDurationInfo(roomId string, r *RoomDurationInfo) error {
+	err := m.rs.AddRoomWithDurationInfo(roomId, r)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	return nil
+}
+
+func (m *RoomDurationModel) DeleteRoomWithDuration(roomId string) error {
+	err := m.rs.DeleteRoomWithDuration(roomId)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 func (m *RoomDurationModel) IncreaseRoomDuration(roomId string, duration uint64) (uint64, error) {
 	tm := &RoomDurationInfo{}
