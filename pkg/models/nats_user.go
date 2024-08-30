@@ -29,6 +29,16 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId string) {
 		if err != nil {
 			log.Warnln(err)
 		}
+		now := fmt.Sprintf("%d", time.Now().UnixMilli())
+		m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
+			EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
+			EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_JOINED,
+			RoomId:    roomId,
+			UserId:    &userId,
+			UserName:  &userInfo.Name,
+			ExtraData: &userInfo.Metadata,
+			HsetValue: &now,
+		})
 	}
 }
 
@@ -73,6 +83,15 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) {
 
 	// now broadcast to everyone
 	_ = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_OFFLINE, roomId, userInfo, userId)
+
+	now := fmt.Sprintf("%d", time.Now().UnixMilli())
+	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
+		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
+		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_LEFT,
+		RoomId:    roomId,
+		UserId:    &userInfo.UserId,
+		HsetValue: &now,
+	})
 
 	// we'll wait another 30 seconds & delete this consumer,
 	// but we'll keep user's information in the bucket

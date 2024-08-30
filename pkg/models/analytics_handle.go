@@ -54,31 +54,3 @@ func (m *AnalyticsModel) handleUserTypeEvents() {
 	key := fmt.Sprintf(analyticsUserKey, m.data.RoomId, m.data.GetUserId())
 	m.insertEventData(key)
 }
-
-// TODO: fix it
-//func (analyticsModel *AnalyticsModel) HandleWebSocketData(dataMsg *plugnmeet.DataMessage) {
-//	d := &plugnmeet.AnalyticsDataMsg{
-//		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
-//		RoomId:    dataMsg.RoomId,
-//		UserId:    &dataMsg.Body.From.UserId,
-//	}
-//	var val int64 = 1
-//
-//	switch dataMsg.Body.GetType() {
-//	case plugnmeet.DataMsgBodyType_CHAT:
-//		if dataMsg.Body.IsPrivate != nil && *dataMsg.Body.IsPrivate == 1 {
-//			d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_PRIVATE_CHAT
-//		} else {
-//			d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_PUBLIC_CHAT
-//		}
-//		d.EventValueInteger = &val
-//	case plugnmeet.DataMsgBodyType_SCENE_UPDATE:
-//		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_WHITEBOARD_ANNOTATED
-//		d.EventValueInteger = &val
-//	case plugnmeet.DataMsgBodyType_USER_VISIBILITY_CHANGE:
-//		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_INTERFACE_VISIBILITY
-//		d.HsetValue = &dataMsg.Body.Msg
-//	}
-//
-//	analyticsModel.HandleEvent(d)
-//}

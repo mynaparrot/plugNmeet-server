@@ -11,13 +11,14 @@ import (
 )
 
 type NatsModel struct {
-	app         *config.AppConfig
-	ds          *dbservice.DatabaseService
-	rs          *redisservice.RedisService
-	analytics   *AnalyticsModel
-	authModel   *AuthModel
-	natsService *natsservice.NatsService
-	userModel   *UserModel
+	app            *config.AppConfig
+	ds             *dbservice.DatabaseService
+	rs             *redisservice.RedisService
+	analytics      *AnalyticsModel
+	authModel      *AuthModel
+	natsService    *natsservice.NatsService
+	userModel      *UserModel
+	analyticsModel *AnalyticsModel
 }
 
 func NewNatsModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *NatsModel {
@@ -33,13 +34,14 @@ func NewNatsModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redi
 	natsService := natsservice.New(app)
 
 	return &NatsModel{
-		app:         app,
-		ds:          ds,
-		rs:          rs,
-		analytics:   NewAnalyticsModel(app, ds, rs),
-		authModel:   NewAuthModel(app, natsService),
-		natsService: natsService,
-		userModel:   NewUserModel(app, ds, rs, nil),
+		app:            app,
+		ds:             ds,
+		rs:             rs,
+		analytics:      NewAnalyticsModel(app, ds, rs),
+		authModel:      NewAuthModel(app, natsService),
+		natsService:    natsService,
+		userModel:      NewUserModel(app, ds, rs, nil),
+		analyticsModel: NewAnalyticsModel(app, ds, rs),
 	}
 }
 
