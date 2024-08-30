@@ -255,7 +255,7 @@ func (m *AnalyticsModel) buildEventInfo(ekey string, eventInfo *plugnmeet.Analyt
 }
 
 func (m *AnalyticsModel) sendToWebhookNotifier(roomId, roomSid, task, fileId string) {
-	n := helpers.GetWebhookNotifier(m.app, m.ds, m.rs)
+	n := helpers.GetWebhookNotifier(m.app)
 	if n != nil {
 		msg := &plugnmeet.CommonNotifyEvent{
 			Event: &task,

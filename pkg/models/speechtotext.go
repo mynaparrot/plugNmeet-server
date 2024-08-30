@@ -37,7 +37,7 @@ func NewSpeechToTextModel(app *config.AppConfig, ds *dbservice.DatabaseService, 
 		ds:              ds,
 		rs:              rs,
 		analyticsModel:  NewAnalyticsModel(app, ds, rs),
-		webhookNotifier: helpers.GetWebhookNotifier(app, ds, rs),
+		webhookNotifier: helpers.GetWebhookNotifier(app),
 		natsService:     natsservice.New(app),
 	}
 }

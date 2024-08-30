@@ -13,7 +13,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/mynaparrot/plugnmeet-server/version"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -79,8 +78,8 @@ func HandleGenerateJoinToken(c *fiber.Ctx) error {
 	}
 
 	// don't generate token if user is blocked
-	rs := redisservice.New(config.GetConfig().RDS)
-	exist := rs.IsUserExistInBlockList(req.RoomId, req.UserInfo.UserId)
+	nts := natsservice.New(config.GetConfig())
+	exist := nts.IsUserExistInBlockList(req.RoomId, req.UserInfo.UserId)
 	if exist {
 		return utils.SendCommonProtoJsonResponse(c, false, "this user is blocked to join this session")
 	}
@@ -130,8 +129,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 		}
 	}
 
-	rs := redisservice.New(app.RDS)
-	exist := rs.IsUserExistInBlockList(roomId.(string), requestedUserId.(string))
+	exist := nts.IsUserExistInBlockList(roomId.(string), requestedUserId.(string))
 	if exist {
 		return utils.SendCommonProtobufResponse(c, false, "notifications.you-are-blocked")
 	}

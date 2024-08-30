@@ -17,6 +17,8 @@ const (
 	userInfoBucketPrefix = Prefix + "userInfo-"
 	UserInfoBucket       = userInfoBucketPrefix + "r_%s-u_%s"
 
+	RoomUsersBlockList = Prefix + "usersBlockList-%s"
+
 	UserOnlineMaxPingDiff = time.Second * 30 // after 30 seconds we'll treat user as offline
 
 	UserIdKey          = "id"
@@ -214,4 +216,18 @@ func (s *NatsService) UpdateUserKeyValue(roomId, userId, key, val string) error 
 	}
 
 	return nil
+}
+
+func (s *NatsService) AddUserToBlockList(roomId, userId string) (uint64, error) {
+	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
+		Bucket: fmt.Sprintf(RoomUsersBlockList, roomId),
+	})
+	if err != nil {
+		return 0, err
+	}
+	return kv.PutString(s.ctx, userId, fmt.Sprintf("%d", time.Now().UnixMilli()))
+}
+
+func (s *NatsService) DeleteRoomUsersBlockList(roomId string) {
+	_ = s.js.DeleteKeyValue(s.ctx, fmt.Sprintf(RoomUsersBlockList, roomId))
 }

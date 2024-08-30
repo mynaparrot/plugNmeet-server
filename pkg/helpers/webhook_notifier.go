@@ -6,6 +6,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/webhook"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	log "github.com/sirupsen/logrus"
 	"time"
@@ -15,6 +16,7 @@ type WebhookNotifier struct {
 	ds                   *dbservice.DatabaseService
 	rs                   *redisservice.RedisService
 	app                  *config.AppConfig
+	natsService          *natsservice.NatsService
 	isEnabled            bool
 	enabledForPerMeeting bool
 	defaultUrl           string
@@ -26,13 +28,13 @@ type webhookRedisFields struct {
 	PerformDeleting bool     `json:"perform_deleting"`
 }
 
-func newWebhookNotifier(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *WebhookNotifier {
+func newWebhookNotifier(app *config.AppConfig) *WebhookNotifier {
 	notifier := webhook.GetWebhookNotifier(config.DefaultWebhookQueueSize, app.Client.Debug, config.GetLogger())
 
 	w := &WebhookNotifier{
-		ds:                   ds,
-		rs:                   rs,
 		app:                  app,
+		ds:                   dbservice.New(app.DB),
+		natsService:          natsservice.New(app),
 		isEnabled:            app.Client.WebhookConf.Enable,
 		enabledForPerMeeting: app.Client.WebhookConf.EnableForPerMeeting,
 		defaultUrl:           app.Client.WebhookConf.Url,
@@ -84,16 +86,16 @@ func (w *WebhookNotifier) DeleteWebhook(roomId string) error {
 		return err
 	}
 	if d == nil {
-		// this meeting do not have any webhook url
+		// this meeting does not have any webhook url
 		return nil
 	}
 
 	if !d.PerformDeleting {
-		// this mean may be new session has been started for same room
+		// this mean may be new session has been started for the same room
 		return nil
 	}
 
-	return w.rs.DeleteWebhookData(roomId)
+	return w.natsService.DeleteWebhookData(roomId)
 }
 
 func (w *WebhookNotifier) SendWebhookEvent(event *plugnmeet.CommonNotifyEvent) error {
@@ -135,7 +137,8 @@ func (w *WebhookNotifier) SendWebhookEvent(event *plugnmeet.CommonNotifyEvent) e
 }
 
 // ForceToPutInQueue can be used to force checking meeting table to get url
-// this method will not do further validation. We should not use this method always because fetching data mysql will be slower than redis
+// this method will not do further validation.
+// We should not use this method always because fetching data mysql will be slower than redis
 func (w *WebhookNotifier) ForceToPutInQueue(event *plugnmeet.CommonNotifyEvent) {
 	if !w.isEnabled {
 		return
@@ -171,7 +174,7 @@ func (w *WebhookNotifier) saveData(roomId string, d *webhookRedisFields) error {
 	}
 
 	// we'll simply override any existing value & put new
-	err = w.rs.AddWebhookData(roomId, marshal)
+	err = w.natsService.AddWebhookData(roomId, marshal)
 	if err != nil {
 		return err
 	}
@@ -180,17 +183,17 @@ func (w *WebhookNotifier) saveData(roomId string, d *webhookRedisFields) error {
 }
 
 func (w *WebhookNotifier) getData(roomId string) (*webhookRedisFields, error) {
-	result, err := w.rs.GetWebhookData(roomId)
+	data, err := w.natsService.GetWebhookData(roomId)
 	if err != nil {
 		return nil, err
 	}
 
-	if result == "" {
+	if data == nil {
 		return nil, nil
 	}
 
 	d := new(webhookRedisFields)
-	err = json.Unmarshal([]byte(result), d)
+	err = json.Unmarshal(data, d)
 	if err != nil {
 		return nil, err
 	}
@@ -200,11 +203,11 @@ func (w *WebhookNotifier) getData(roomId string) (*webhookRedisFields, error) {
 
 var webhookNotifier *WebhookNotifier
 
-func GetWebhookNotifier(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *WebhookNotifier {
+func GetWebhookNotifier(app *config.AppConfig) *WebhookNotifier {
 	if webhookNotifier != nil {
 		return webhookNotifier
 	}
-	webhookNotifier = newWebhookNotifier(app, ds, rs)
+	webhookNotifier = newWebhookNotifier(app)
 
 	return webhookNotifier
 }

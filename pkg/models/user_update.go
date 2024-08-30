@@ -31,7 +31,7 @@ func (m *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 
 	// finally, check if requested to block as well as
 	if r.BlockUser {
-		_, _ = m.rs.AddUserToBlockList(r.RoomId, r.UserId)
+		_, _ = m.natsService.AddUserToBlockList(r.RoomId, r.UserId)
 	}
 
 	return nil

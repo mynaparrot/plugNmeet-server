@@ -239,3 +239,18 @@ func (s *NatsService) HasOnlineUser(roomId string) bool {
 
 	return false
 }
+
+func (s *NatsService) IsUserExistInBlockList(roomId, userId string) bool {
+	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf(RoomUsersBlockList, roomId))
+	if err != nil {
+		return false
+	}
+	get, err := kv.Get(s.ctx, userId)
+	if err != nil {
+		return false
+	}
+	if get != nil {
+		return true
+	}
+	return false
+}

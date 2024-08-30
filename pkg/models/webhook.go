@@ -44,7 +44,7 @@ func NewWebhookModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *r
 		lk:              lk,
 		rm:              NewRoomModel(app, ds, rs, lk),
 		analyticsModel:  NewAnalyticsModel(app, ds, rs),
-		webhookNotifier: helpers.GetWebhookNotifier(app, ds, rs),
+		webhookNotifier: helpers.GetWebhookNotifier(app),
 		natsService:     natsservice.New(app),
 	}
 }

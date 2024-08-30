@@ -55,7 +55,7 @@ func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 	m.sendToWebhookNotifier(event)
 
 	// now clean up webhook for this room
-	err = m.webhookNotifier.DeleteWebhook(rInfo.RoomSid)
+	err = m.webhookNotifier.DeleteWebhook(rInfo.RoomId)
 	if err != nil {
 		log.Errorln(err)
 	}

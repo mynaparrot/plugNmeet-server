@@ -233,7 +233,7 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", err.Error()))
 	}
 
-	exist := rs.IsUserExistInBlockList(req.RoomId, req.UserInfo.UserId)
+	exist := nts.IsUserExistInBlockList(req.RoomId, req.UserInfo.UserId)
 	if exist {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", "this user is blocked to join this session"))
 	}
