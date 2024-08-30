@@ -98,9 +98,6 @@ func (m *PollModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq, isAdm
 		return err
 	}
 
-	// TODO: update here
-	//_ = analyticsModel.broadcastNotification(r.RoomId, r.UserId, r.PollId, plugnmeet.DataMsgBodyType_NEW_POLL_RESPONSE, isAdmin)
-
 	// send analytics
 	toRecord := struct {
 		PollId         string `json:"poll_id"`
