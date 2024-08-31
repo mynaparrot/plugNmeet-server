@@ -105,6 +105,11 @@ func (m *BreakoutRoomModel) performPostHookTask(roomId string) error {
 	if err != nil {
 		return err
 	}
+	if meta == nil {
+		// indicating room was ended
+		return nil
+	}
+
 	meta.RoomFeatures.BreakoutRoomFeatures.IsActive = false
 	err = m.natsService.UpdateAndBroadcastRoomMetadata(roomId, meta)
 	if err != nil {
