@@ -67,7 +67,6 @@ func (m *RoomModel) OnAfterRoomEnded(roomId, roomSid, metadata string) {
 	_, err = m.ds.UpdateRoomStatus(&dbmodels.RoomInfo{
 		RoomId:    roomId,
 		IsRunning: 0,
-		Ended:     time.Now().UTC(),
 	})
 	if err != nil {
 		log.Errorln(err)

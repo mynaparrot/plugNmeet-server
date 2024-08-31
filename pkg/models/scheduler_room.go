@@ -49,7 +49,6 @@ func (m *SchedulerModel) activeRoomChecker() {
 			_, err = m.ds.UpdateRoomStatus(&dbmodels.RoomInfo{
 				ID:        room.ID,
 				IsRunning: 0,
-				Ended:     time.Now().UTC(),
 			})
 			if err != nil {
 				log.Errorln(err)

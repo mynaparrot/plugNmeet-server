@@ -17,7 +17,12 @@ func NewDatabaseConnection(appCnf *config.AppConfig) error {
 		DSN: dsn, // data source name
 	}
 
-	cnf := new(gorm.Config)
+	cnf := &gorm.Config{
+		NowFunc: func() time.Time {
+			return time.Now().In(time.UTC)
+		},
+	}
+
 	if !appCnf.Client.Debug {
 		newLogger := logger.New(
 			config.GetLogger(),

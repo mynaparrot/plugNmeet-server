@@ -4,7 +4,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
-	"time"
 )
 
 func (m *RoomModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoomActiveRes, *plugnmeet.RoomMetadata) {
@@ -39,7 +38,6 @@ func (m *RoomModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoo
 		_, _ = m.ds.UpdateRoomStatus(&dbmodels.RoomInfo{
 			RoomId:    r.RoomId,
 			IsRunning: 0,
-			Ended:     time.Now().UTC(),
 		})
 		return res, nil
 	}

@@ -92,7 +92,7 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *dbmodels.RoomInfo, path str
 	roomInfo := &plugnmeet.AnalyticsRoomInfo{
 		RoomId:       room.RoomId,
 		RoomTitle:    room.RoomTitle,
-		RoomCreation: room.CreationTime,
+		RoomCreation: room.Created.Unix(),
 		RoomEnded:    room.Ended.Unix(),
 		EnabledE2Ee:  metadata.GetRoomFeatures().GetEndToEndEncryptionFeatures().GetIsEnabled(),
 		Events:       []*plugnmeet.AnalyticsEventData{},
