@@ -1,71 +1,19 @@
 package models
 
 import (
-	"database/sql"
 	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/helpers"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"testing"
 	"time"
 )
 
-var m *RecordingModel
-var recordId = fmt.Sprintf("rec-%d", time.Now().UnixMilli())
-
-func init() {
-	appCnf, err := helpers.ReadYamlConfigFile(root + "/config.yaml")
-	if err != nil {
-		panic(err)
-	}
-
-	appCnf.RootWorkingDir = root
-	// set this config for global usage
-	config.New(appCnf)
-
-	// now prepare server
-	err = helpers.PrepareServer(config.GetConfig())
-	if err != nil {
-		panic(err)
-	}
-
-	m = NewRecordingModel(nil, nil, nil)
-	info := &dbmodels.RoomInfo{
-		RoomId:       roomId,
-		RoomTitle:    "Testing",
-		Sid:          sid,
-		IsRunning:    1,
-		IsRecording:  0,
-		IsActiveRtmp: 0,
-	}
-
-	_, err = m.ds.InsertOrUpdateRoomInfo(info)
-	if err != nil {
-		panic(err)
-	}
-
-	v := sql.NullString{
-		String: sid,
-		Valid:  true,
-	}
-	data := &dbmodels.Recording{
-		RecordID:         recordId,
-		RoomID:           roomId,
-		RoomSid:          v,
-		Size:             10.10,
-		RoomCreationTime: roomCreationTime,
-	}
-
-	_, err = m.ds.InsertRecordingData(data)
-	if err != nil {
-		panic(err)
-	}
-}
+var recordingModel *RecordingModel
 
 func TestAuthRecording_FetchRecordings(t *testing.T) {
-	result, err := m.FetchRecordings(&plugnmeet.FetchRecordingsReq{
+	recordingModel = NewRecordingModel(nil, nil, nil)
+
+	result, err := recordingModel.FetchRecordings(&plugnmeet.FetchRecordingsReq{
 		RoomIds: []string{roomId},
 	})
 	if err != nil {
@@ -80,7 +28,7 @@ func TestAuthRecording_FetchRecordings(t *testing.T) {
 }
 
 func TestAnalyticsAuthModel_FetchRecording(t *testing.T) {
-	result, err := m.FetchRecording(recordId)
+	result, err := recordingModel.FetchRecording(recordId)
 	if err != nil {
 		t.Error(err)
 	}
@@ -91,14 +39,14 @@ func TestAnalyticsAuthModel_FetchRecording(t *testing.T) {
 
 	t.Logf("%+v", result)
 
-	_, err = m.FetchRecording(fmt.Sprintf("%d", time.Now().UnixMilli()))
+	_, err = recordingModel.FetchRecording(fmt.Sprintf("%d", time.Now().UnixMilli()))
 	if err == nil {
 		t.Error("should got not found error")
 	}
 }
 
 func TestAnalyticsAuthModel_RecordingInfo(t *testing.T) {
-	result, err := m.RecordingInfo(&plugnmeet.RecordingInfoReq{
+	result, err := recordingModel.RecordingInfo(&plugnmeet.RecordingInfoReq{
 		RecordId: recordId,
 	})
 	if err != nil {
@@ -116,7 +64,7 @@ func TestAnalyticsAuthModel_RecordingInfo(t *testing.T) {
 }
 
 func TestAnalyticsAuthModel_DeleteRecording(t *testing.T) {
-	err := m.DeleteRecording(&plugnmeet.DeleteRecordingReq{
+	err := recordingModel.DeleteRecording(&plugnmeet.DeleteRecordingReq{
 		RecordId: recordId,
 	})
 	if err != nil {
@@ -125,11 +73,11 @@ func TestAnalyticsAuthModel_DeleteRecording(t *testing.T) {
 }
 
 func TestAnalyticsAuthModel_CreateAndVerifyToken(t *testing.T) {
-	token, err := m.CreateTokenForDownload("test.mp4")
+	token, err := recordingModel.CreateTokenForDownload("test.mp4")
 	if err != nil {
 		t.Error(err)
 	}
-	_, res, err := m.VerifyRecordingToken(token)
+	_, res, err := recordingModel.VerifyRecordingToken(token)
 	if err == nil {
 		t.Error("should not found the file")
 		return

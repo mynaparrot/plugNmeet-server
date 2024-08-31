@@ -4,70 +4,25 @@ import (
 	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/helpers"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"os"
-	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 )
 
-var (
-	_, b, _, _ = runtime.Caller(0)
-	root       = filepath.Join(filepath.Dir(b), "../..")
-)
-
-var roomTableId uint64
-var sid = fmt.Sprintf("%d", time.Now().UnixNano())
-var roomId = "test01"
-var roomCreationTime int64
-var fileId = fmt.Sprintf("%d", time.Now().Unix())
-
 var analyticsModel *AnalyticsModel
+var fileId = fmt.Sprintf("%d", time.Now().UnixNano())
 
 func init() {
-	appCnf, err := helpers.ReadYamlConfigFile(root + "/config.yaml")
-	if err != nil {
-		panic(err)
-	}
-
-	appCnf.RootWorkingDir = root
-	// set this config for global usage
-	config.New(appCnf)
-
-	// now prepare server
-	err = helpers.PrepareServer(config.GetConfig())
-	if err != nil {
-		panic(err)
-	}
 	analyticsModel = NewAnalyticsModel(nil, nil, nil)
 }
 
 func TestAnalyticsAuthModel_AddAnalyticsFileToDB(t *testing.T) {
-	info := &dbmodels.RoomInfo{
-		RoomId:       roomId,
-		RoomTitle:    "Testing",
-		Sid:          sid,
-		IsRunning:    1,
-		IsRecording:  0,
-		IsActiveRtmp: 0,
-	}
-
-	_, err := analyticsModel.ds.InsertOrUpdateRoomInfo(info)
-	if err != nil {
-		t.Error(err)
-	}
-
-	t.Logf("%+v", info)
-	roomTableId = info.ID
 	stat, err := os.Stat(root + "/config.yaml")
 	if err != nil {
 		t.Error(err)
 	}
 
-	_, err = analyticsModel.AddAnalyticsFileToDB(info.ID, info.CreationTime, info.RoomId, fileId, stat)
+	_, err = analyticsModel.AddAnalyticsFileToDB(roomTableId, roomCreationTime, roomId, fileId, stat)
 	if err != nil {
 		t.Error(err)
 	}
