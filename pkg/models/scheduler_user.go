@@ -20,7 +20,7 @@ func (m *SchedulerModel) checkOnlineUsersStatus() {
 	// now set lock
 	_ = m.natsService.LockSchedulerTask("checkOnlineUsersStatus", time.Minute*1)
 	// clean at the end
-	defer m.natsService.ReleaseSchedulerTaskLock("checkOnlineUsersStatus")
+	defer m.natsService.UnlockSchedulerTask("checkOnlineUsersStatus")
 
 	kl := m.app.JetStream.KeyValueStoreNames(context.Background())
 	for s := range kl.Name() {

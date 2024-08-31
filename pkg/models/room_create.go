@@ -24,7 +24,7 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 	m.preRoomCreationTasks(r)
 	// in preRoomCreationTasks we've added this room in progress list
 	// so, we'll just use deferring to clean this room at the end of this function
-	defer m.natsService.ReleaseRoomCreationLock(r.RoomId)
+	defer m.natsService.UnlockRoomCreation(r.RoomId)
 
 	// check if room already exists in db or not
 	roomDbInfo, err := m.ds.GetRoomInfoByRoomId(r.RoomId, 1)

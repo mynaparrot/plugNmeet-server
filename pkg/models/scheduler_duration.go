@@ -15,7 +15,7 @@ func (m *SchedulerModel) checkRoomWithDuration() {
 	// now set lock
 	_ = m.natsService.LockSchedulerTask("checkRoomWithDuration", time.Minute*1)
 	// clean at the end
-	defer m.natsService.ReleaseSchedulerTaskLock("checkRoomWithDuration")
+	defer m.natsService.UnlockSchedulerTask("checkRoomWithDuration")
 
 	rooms := m.rmDuration.GetRoomsWithDurationMap()
 	for i, r := range rooms {

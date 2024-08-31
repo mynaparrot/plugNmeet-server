@@ -18,7 +18,7 @@ func (m *SchedulerModel) activeRoomChecker() {
 	// now set lock
 	_ = m.natsService.LockSchedulerTask("activeRoomChecker", time.Minute*10)
 	// clean at the end
-	defer m.natsService.ReleaseSchedulerTaskLock("activeRoomChecker")
+	defer m.natsService.UnlockSchedulerTask("activeRoomChecker")
 
 	activeRooms, err := m.ds.GetActiveRoomsInfo()
 	if err != nil {

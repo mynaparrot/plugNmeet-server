@@ -44,6 +44,11 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 		return
 	}
 
+	// lock to prevent this room re-creation until process finish
+	// otherwise will give an unexpected result
+	_ = m.natsService.LockRoomCreation(roomId, time.Second*5)
+	defer m.natsService.UnlockRoomCreation(roomId)
+
 	if _, err := os.Stat(*m.app.AnalyticsSettings.FilesStorePath); os.IsNotExist(err) {
 		err = os.MkdirAll(*m.app.AnalyticsSettings.FilesStorePath, os.ModePerm)
 		if err != nil {
@@ -79,7 +84,7 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 			log.Errorln(err)
 		}
 		// notify
-		m.sendToWebhookNotifier(room.RoomId, room.Sid, "analytics_proceeded", fileId)
+		go m.sendToWebhookNotifier(room.RoomId, room.Sid, "analytics_proceeded", fileId)
 	}
 }
 

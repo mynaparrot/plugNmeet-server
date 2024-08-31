@@ -33,7 +33,7 @@ func (s *NatsService) IsRoomCreationLock(roomId string) bool {
 	return false
 }
 
-func (s *NatsService) ReleaseRoomCreationLock(roomId string) {
+func (s *NatsService) UnlockRoomCreation(roomId string) {
 	_ = s.js.DeleteKeyValue(s.ctx, fmt.Sprintf(RoomCreationLockBucket, roomId))
 }
 
@@ -59,6 +59,6 @@ func (s *NatsService) IsSchedulerTaskLock(task string) bool {
 	return false
 }
 
-func (s *NatsService) ReleaseSchedulerTaskLock(task string) {
+func (s *NatsService) UnlockSchedulerTask(task string) {
 	_ = s.js.DeleteKeyValue(s.ctx, fmt.Sprintf(SchedulerLockBucket, task))
 }
