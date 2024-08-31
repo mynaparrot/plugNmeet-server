@@ -2,36 +2,45 @@ package models
 
 import (
 	"errors"
-	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	log "github.com/sirupsen/logrus"
 )
 
 func (m *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
-	p, err := m.lk.LoadParticipantInfo(r.RoomId, r.UserId)
+	status, err := m.natsService.GetRoomUserStatus(r.RoomId, r.UserId)
 	if err != nil {
 		return err
 	}
 
-	if p.State != livekit.ParticipantInfo_ACTIVE {
+	if status != natsservice.UserStatusOnline {
 		return errors.New(config.UserNotActive)
 	}
 
-	err = m.natsService.NotifyErrorMsg(r.RoomId, r.Msg, &p.Identity)
+	err = m.natsService.NotifyErrorMsg(r.RoomId, r.Msg, &r.UserId)
 	if err != nil {
 		log.Errorln(err)
 	}
 
-	// now remove
+	// send notification to be disconnected
+	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SESSION_ENDED, r.GetRoomId(), "notifications.room-disconnected-participant-removed", &r.UserId)
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	// now remove from lk
 	_, err = m.lk.RemoveParticipant(r.RoomId, r.UserId)
 	if err != nil {
-		return err
+		log.Errorln(err)
 	}
 
 	// finally, check if requested to block as well as
 	if r.BlockUser {
-		_, _ = m.natsService.AddUserToBlockList(r.RoomId, r.UserId)
+		_, err = m.natsService.AddUserToBlockList(r.RoomId, r.UserId)
+		if err != nil {
+			log.Errorln(err)
+		}
 	}
 
 	return nil
