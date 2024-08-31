@@ -9,16 +9,16 @@ import (
 
 // activeRoomChecker will check & do reconciliation between DB & livekit
 func (m *SchedulerModel) activeRoomChecker() {
-	locked, _ := m.rs.ManageSchedulerLock("exist", "activeRoomChecker", 0)
+	locked := m.natsService.IsSchedulerTaskLock("activeRoomChecker")
 	if locked {
 		// if lock then we will not perform here
 		return
 	}
 
 	// now set lock
-	_, _ = m.rs.ManageSchedulerLock("add", "activeRoomChecker", time.Minute*10)
+	_ = m.natsService.LockSchedulerTask("activeRoomChecker", time.Minute*10)
 	// clean at the end
-	defer m.rs.ManageSchedulerLock("del", "activeRoomChecker", 0)
+	defer m.natsService.ReleaseSchedulerTaskLock("activeRoomChecker")
 
 	activeRooms, err := m.ds.GetActiveRoomsInfo()
 	if err != nil {

@@ -33,7 +33,10 @@ func (s *NatsService) GetWebhookData(roomId string) ([]byte, error) {
 	}
 
 	entry, err := kv.Get(s.ctx, roomId)
-	if err != nil {
+	switch {
+	case errors.Is(err, jetstream.ErrKeyNotFound):
+		return nil, nil
+	case err != nil:
 		return nil, err
 	}
 

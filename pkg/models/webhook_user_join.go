@@ -17,7 +17,6 @@ func (m *WebhookModel) participantJoined(event *livekit.WebhookEvent) {
 		return
 	}
 	if rInfo == nil {
-		log.Errorln("empty roomInfo")
 		return
 	}
 

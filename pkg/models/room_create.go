@@ -10,6 +10,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	log "github.com/sirupsen/logrus"
 	"net/http"
@@ -23,7 +24,7 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 	m.preRoomCreationTasks(r)
 	// in preRoomCreationTasks we've added this room in progress list
 	// so, we'll just use deferring to clean this room at the end of this function
-	defer m.rs.RoomCreationProgressList(r.RoomId, "del")
+	defer m.natsService.ReleaseRoomCreationLock(r.RoomId)
 
 	// check if room already exists in db or not
 	roomDbInfo, err := m.ds.GetRoomInfoByRoomId(r.RoomId, 1)
@@ -163,7 +164,7 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 		return nil, errors.New("room not found in KV")
 	}
 
-	return &plugnmeet.ActiveRoomInfo{
+	ari := &plugnmeet.ActiveRoomInfo{
 		RoomId:       rInfo.RoomId,
 		Sid:          rInfo.RoomSid,
 		RoomTitle:    roomDbInfo.RoomTitle,
@@ -171,23 +172,23 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 		CreationTime: roomDbInfo.CreationTime,
 		WebhookUrl:   roomDbInfo.WebhookUrl,
 		Metadata:     rInfo.Metadata,
-	}, nil
+	}
+
+	// create & send room_created webhook
+	go m.sendRoomCreatedWebhook(ari)
+
+	return ari, nil
 }
 
 func (m *RoomModel) preRoomCreationTasks(r *plugnmeet.CreateRoomReq) {
-	exist, err := m.natsService.GetRoomInfo(r.GetRoomId())
-	if err == nil && exist != nil {
-		// maybe this room was ended just now, so we'll wait until clean up done
-		waitFor := config.WaitBeforeTriggerOnAfterRoomEnded + (1 * time.Second)
-		log.Infoln("this room:", r.GetRoomId(), "still active, we'll wait for:", waitFor, "before recreating it again.")
-		time.Sleep(waitFor)
-	}
-
 	// check & wait
 	m.CheckAndWaitUntilRoomCreationInProgress(r.GetRoomId())
 
-	// we'll add this room in the processing list
-	_, err = m.rs.RoomCreationProgressList(r.GetRoomId(), "add")
+	// we'll lock this room to be created again before this process ended
+	// set maximum 1 minute as TTL
+	// this way we can ensure that there will not be any deadlock
+	// otherwise in various reason key may stay in kv & create deadlock
+	err := m.natsService.LockRoomCreation(r.GetRoomId(), time.Minute*1)
 	if err != nil {
 		log.Errorln(err)
 	}
@@ -273,4 +274,30 @@ func (m *RoomModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomReq, r
 	}
 	// finally, delete the file
 	_ = os.RemoveAll(gres.Filename)
+}
+
+func (m *RoomModel) sendRoomCreatedWebhook(info *plugnmeet.ActiveRoomInfo) {
+	n := helpers.GetWebhookNotifier(m.app)
+	if n != nil {
+		// register for event first
+		n.RegisterWebhook(info.RoomId, info.Sid)
+
+		// now send first event
+		e := "room_created"
+		cr := uint64(info.CreationTime)
+		msg := &plugnmeet.CommonNotifyEvent{
+			Event: &e,
+			Room: &plugnmeet.NotifyEventRoom{
+				RoomId:       &info.RoomId,
+				Sid:          &info.Sid,
+				CreationTime: &cr,
+				Metadata:     &info.Metadata,
+			},
+		}
+
+		err := n.SendWebhookEvent(msg)
+		if err != nil {
+			log.Errorln(err)
+		}
+	}
 }

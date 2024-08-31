@@ -46,15 +46,10 @@ func NewRoomModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redi
 // CheckAndWaitUntilRoomCreationInProgress will check the process & wait if needed
 func (m *RoomModel) CheckAndWaitUntilRoomCreationInProgress(roomId string) {
 	for {
-		list, err := m.rs.RoomCreationProgressList(roomId, "exist")
-		if err != nil {
-			log.Errorln(err)
-			break
-		}
-		if list {
-			log.Println(roomId, "creation in progress, so waiting for", config.WaitDurationIfRoomInProgress)
-			// we'll wait
-			time.Sleep(config.WaitDurationIfRoomInProgress)
+		locked := m.natsService.IsRoomCreationLock(roomId)
+		if locked {
+			log.Println(roomId, "room creation locked, waiting for:", config.WaitDurationIfRoomCreationLocked)
+			time.Sleep(config.WaitDurationIfRoomCreationLocked)
 		} else {
 			break
 		}

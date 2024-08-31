@@ -56,8 +56,15 @@ func (m *RoomModel) EndRoom(r *plugnmeet.RoomEndReq) (bool, string) {
 }
 
 func (m *RoomModel) OnAfterRoomEnded(roomId, roomSid, metadata string) {
+	// lock room creation otherwise may have an unexpected result
+	// if recreated before clean up completed
+	err := m.natsService.LockRoomCreation(roomId, config.WaitBeforeTriggerOnAfterRoomEnded+(time.Second+5))
+	if err != nil {
+		log.Errorln(err)
+	}
+
 	// update db status
-	_, err := m.ds.UpdateRoomStatus(&dbmodels.RoomInfo{
+	_, err = m.ds.UpdateRoomStatus(&dbmodels.RoomInfo{
 		RoomId:    roomId,
 		IsRunning: 0,
 		Ended:     time.Now().UTC(),
@@ -67,12 +74,12 @@ func (m *RoomModel) OnAfterRoomEnded(roomId, roomSid, metadata string) {
 	}
 
 	// now we'll perform a few service related tasks
+	// if we do not wait, then the result will be wrong
+	// because few of the services depend on all user disconnections
 	time.Sleep(config.WaitBeforeTriggerOnAfterRoomEnded)
+
 	// delete blocked users list
 	m.natsService.DeleteRoomUsersBlockList(roomId)
-
-	// remove from progress, if existed. no need to log if error
-	_, _ = m.rs.RoomCreationProgressList(roomId, "del")
 
 	//we'll send a message to the recorder to stop
 	recorderModel := NewRecorderModel(m.app, m.ds, m.rs)
@@ -133,9 +140,11 @@ func (m *RoomModel) OnAfterRoomEnded(roomId, roomSid, metadata string) {
 	// now clean up session
 	m.natsService.OnAfterSessionEndCleanup(roomId)
 
+	log.Infoln(fmt.Sprintf("roomId: %s has been cleaned properly", roomId))
+	// release the room
+	m.natsService.ReleaseRoomCreationLock(roomId)
+
 	// finally, create the analytics file
 	analyticsModel := NewAnalyticsModel(m.app, m.ds, m.rs)
 	analyticsModel.PrepareToExportAnalytics(roomId, roomSid, metadata)
-
-	log.Infoln(fmt.Sprintf("roomId: %s has been cleaned properly", roomId))
 }

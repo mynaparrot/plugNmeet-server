@@ -59,15 +59,10 @@ func (m *UserModel) CommonValidation(c *fiber.Ctx) error {
 // CheckAndWaitUntilRoomCreationInProgress will check the process & wait if needed
 func (m *UserModel) CheckAndWaitUntilRoomCreationInProgress(roomId string) {
 	for {
-		list, err := m.rs.RoomCreationProgressList(roomId, "exist")
-		if err != nil {
-			log.Errorln(err)
-			break
-		}
-		if list {
-			log.Println(roomId, "creation in progress, so waiting for", config.WaitDurationIfRoomInProgress)
-			// we'll wait
-			time.Sleep(config.WaitDurationIfRoomInProgress)
+		locked := m.natsService.IsRoomCreationLock(roomId)
+		if locked {
+			log.Println(roomId, "joining not possible because of room locked, waiting for:", config.WaitDurationIfRoomCreationLocked)
+			time.Sleep(config.WaitDurationIfRoomCreationLocked)
 		} else {
 			break
 		}
