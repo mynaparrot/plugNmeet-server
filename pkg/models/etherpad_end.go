@@ -29,7 +29,7 @@ func (m *EtherpadModel) CleanPad(roomId, nodeId, padId string) error {
 	}
 
 	// add roomId to redis for this node
-	_ = m.rs.RemoveRoomFromEtherpad(nodeId, roomId)
+	_ = m.natsService.RemoveRoomFromEtherpad(nodeId, roomId)
 
 	return nil
 }

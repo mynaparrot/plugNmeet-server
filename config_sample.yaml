@@ -1,3 +1,6 @@
+## Note: for any id should contain valid characters only
+## otherwise will be problem with nats (https://docs.nats.io/nats-concepts/subjects#characters-allowed-and-recommended-for-subject-names)
+## Allowed characters: (a - z),(A - Z), (0 - 9), - and _
 client:
   port: 8080
   debug: true
@@ -122,6 +125,7 @@ shared_notepad:
   # the value of id should be unique
   etherpad_hosts:
     -
+      # please check the note from the top of this file
       id: "node_01"
       host: "http://host.docker.internal:9001"
       client_id: "plugNmeet"
@@ -133,6 +137,7 @@ azure_cognitive_services_speech:
   max_num_tran_langs: 2
   subscription_keys:
     -
+      # please check the note from the top of this file
       id: "key_1"
       # https://learn.microsoft.com/en-us/azure/cognitive-services/speech-service/get-started-text-to-speech?pivots=programming-language-go&tabs=linux%2Cterminal#prerequisites
       subscription_key: "your_key_here"

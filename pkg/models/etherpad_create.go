@@ -45,7 +45,7 @@ func (m *EtherpadModel) CreateSession(roomId, requestedUserId string) (*plugnmee
 	res.ReadonlyPadId = &r.Data.ReadOnlyID
 
 	// add roomId to redis for this node
-	err = m.rs.AddRoomInEtherpad(m.NodeId, roomId)
+	err = m.natsService.AddRoomInEtherpad(m.NodeId, roomId)
 	if err != nil {
 		log.Errorln(err)
 	}
@@ -98,7 +98,7 @@ func (m *EtherpadModel) selectHost() error {
 	for i, h := range m.app.SharedNotePad.EtherpadHosts {
 		ok := m.checkStatus(h)
 		if ok {
-			c, _ := m.rs.GetEtherpadActiveRoomsNum(h.Id)
+			c, _ := m.natsService.GetEtherpadActiveRoomsNum(h.Id)
 			hosts = append(hosts, host{
 				i:      i,
 				id:     h.Id,

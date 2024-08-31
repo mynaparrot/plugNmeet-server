@@ -121,7 +121,7 @@ func (m *EtherpadModel) postToEtherpad(method string, vals url.Values) (*Etherpa
 }
 
 func (m *EtherpadModel) getAccessToken() (string, error) {
-	token, _ := m.rs.GetEtherpadToken(m.NodeId)
+	token, _ := m.natsService.GetEtherpadToken(m.NodeId)
 	if token != "" {
 		return token, nil
 	}
@@ -164,7 +164,7 @@ func (m *EtherpadModel) getAccessToken() (string, error) {
 	}
 
 	// we'll store the value with expiry of 30-minute max
-	err = m.rs.AddEtherpadToken(m.NodeId, vals.AccessToken, time.Minute*30)
+	err = m.natsService.AddEtherpadToken(m.NodeId, vals.AccessToken, time.Minute*30)
 	if err != nil {
 		log.Errorln(err)
 	}
