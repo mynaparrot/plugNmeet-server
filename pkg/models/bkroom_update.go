@@ -11,23 +11,19 @@ func (m *BreakoutRoomModel) IncreaseBreakoutRoomDuration(r *plugnmeet.IncreaseBr
 		return err
 	}
 
-	// update in room duration checker
+	// update in a room duration checker
 	rd := NewRoomDurationModel(m.app, m.rs)
 	newDuration, err := rd.IncreaseRoomDuration(r.BreakoutRoomId, r.Duration)
 	if err != nil {
 		return err
 	}
 
-	// now update redis
+	// now update nats
 	room.Duration = newDuration
 	marshal, err := protojson.Marshal(room)
 	if err != nil {
 		return err
 	}
-	val := map[string]string{
-		r.BreakoutRoomId: string(marshal),
-	}
-	err = m.rs.InsertOrUpdateBreakoutRoom(r.RoomId, val)
 
-	return err
+	return m.natsService.InsertOrUpdateBreakoutRoom(r.RoomId, r.BreakoutRoomId, marshal)
 }

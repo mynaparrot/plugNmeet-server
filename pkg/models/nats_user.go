@@ -54,14 +54,10 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) {
 
 	// notify to everyone of the room &
 	// 1. pause all the media but not from the list
-	userInfo, err := m.natsService.GetUserInfo(roomId, userId)
-	if err != nil {
-		log.Warnln(err)
-	}
+	userInfo, _ := m.natsService.GetUserInfo(roomId, userId)
 	if userInfo == nil {
-		log.Warnln(fmt.Sprintf("no user info found with id: %s, which should not happen", userId))
+		log.Warnln(fmt.Sprintf("no user info found with id: %s, which may happend if room had ended before user left", userId))
 		// no way to continue
-		// but this should not happen
 		return
 	}
 	_ = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_DISCONNECTED, roomId, userInfo, userId)

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 	"time"
@@ -69,11 +70,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRooms
 			continue
 		}
 
-		val := map[string]string{
-			bRoom.RoomId: string(marshal),
-		}
-
-		err = m.rs.InsertOrUpdateBreakoutRoom(r.RoomId, val)
+		err = m.natsService.InsertOrUpdateBreakoutRoom(r.RoomId, bRoom.RoomId, marshal)
 		if err != nil {
 			log.Error(err)
 			e[bRoom.RoomId] = true
@@ -111,4 +108,30 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRooms
 	})
 
 	return err
+}
+
+func (m *BreakoutRoomModel) PostTaskAfterRoomStartWebhook(roomId string, metadata *plugnmeet.RoomMetadata) error {
+	// now in livekit rooms are created almost instantly & sending webhook response
+	// if this happened then we'll have to wait few seconds otherwise room info can't be found
+	time.Sleep(config.WaitBeforeBreakoutRoomOnAfterRoomStart)
+
+	room, err := m.fetchBreakoutRoom(metadata.ParentRoomId, roomId)
+	if err != nil {
+		return err
+	}
+	room.Created = metadata.StartedAt
+	room.Started = true
+
+	marshal, err := protojson.Marshal(room)
+	if err != nil {
+		return err
+	}
+
+	err = m.natsService.InsertOrUpdateBreakoutRoom(metadata.ParentRoomId, roomId, marshal)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+
+	return nil
 }

@@ -194,7 +194,7 @@ func HandleEndBreakoutRooms(c *fiber.Ctx) error {
 	}
 
 	m := models.NewBreakoutRoomModel(nil, nil, nil)
-	err := m.EndBreakoutRooms(roomId.(string))
+	err := m.EndAllBreakoutRoomsByParentRoomId(roomId.(string))
 	if err != nil {
 		res.Msg = err.Error()
 		return SendBreakoutRoomResponse(c, res)

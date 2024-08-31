@@ -1,13 +1,8 @@
 package redisservice
 
-import (
-	"errors"
-	"github.com/redis/go-redis/v9"
-)
-
 const breakoutRoomKey = Prefix + "breakoutRoom:"
 
-func (s *RedisService) InsertOrUpdateBreakoutRoom(roomId string, val map[string]string) error {
+/*func (s *RedisService) InsertOrUpdateBreakoutRoom(roomId string, val map[string]string) error {
 	pp := s.rc.Pipeline()
 	pp.HSet(s.ctx, breakoutRoomKey+roomId, val)
 	_, err := pp.Exec(s.ctx)
@@ -52,3 +47,4 @@ func (s *RedisService) DeleteAllBreakoutRoomsByParentRoomId(roomId string) error
 	}
 	return nil
 }
+*/

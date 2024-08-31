@@ -2,10 +2,6 @@ package models
 
 import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	log "github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/encoding/protojson"
-	"time"
 )
 
 func (m *BreakoutRoomModel) EndBreakoutRoom(r *plugnmeet.EndBreakoutRoomReq) error {
@@ -15,49 +11,56 @@ func (m *BreakoutRoomModel) EndBreakoutRoom(r *plugnmeet.EndBreakoutRoomReq) err
 	}
 	_, _ = m.rm.EndRoom(&plugnmeet.RoomEndReq{RoomId: r.BreakoutRoomId})
 
-	_ = m.rs.DeleteBreakoutRoom(r.RoomId, r.BreakoutRoomId)
-	_ = m.performPostHookTask(r.RoomId)
+	_ = m.natsService.DeleteBreakoutRoom(r.RoomId, r.BreakoutRoomId)
+	m.performPostHookTask(r.RoomId)
 	return nil
 }
 
-func (m *BreakoutRoomModel) EndBreakoutRooms(roomId string) error {
-	rooms, err := m.fetchBreakoutRooms(roomId)
+func (m *BreakoutRoomModel) EndAllBreakoutRoomsByParentRoomId(parentRoomId string) error {
+	rooms, err := m.fetchBreakoutRooms(parentRoomId)
 	if err != nil {
 		return err
+	}
+
+	if rooms == nil || len(rooms) == 0 {
+		return m.updateParentRoomMetadata(parentRoomId)
 	}
 
 	for _, r := range rooms {
 		_ = m.EndBreakoutRoom(&plugnmeet.EndBreakoutRoomReq{
 			BreakoutRoomId: r.Id,
-			RoomId:         roomId,
+			RoomId:         parentRoomId,
 		})
 	}
 	return nil
 }
 
-func (m *BreakoutRoomModel) PostTaskAfterRoomStartWebhook(roomId string, metadata *plugnmeet.RoomMetadata) error {
-	// now in livekit rooms are created almost instantly & sending webhook response
-	// if this happened then we'll have to wait few seconds otherwise room info can't be found
-	time.Sleep(config.WaitBeforeBreakoutRoomOnAfterRoomStart)
+func (m *BreakoutRoomModel) performPostHookTask(roomId string) {
+	if c, err := m.natsService.CountBreakoutRooms(roomId); err == nil && c == 0 {
+		// no room left so, delete breakoutRoomKey key for this room
+		m.natsService.DeleteAllBreakoutRoomsByParentRoomId(roomId)
+		_ = m.updateParentRoomMetadata(roomId)
+	}
+}
 
-	room, err := m.fetchBreakoutRoom(metadata.ParentRoomId, roomId)
+func (m *BreakoutRoomModel) updateParentRoomMetadata(parentRoomId string) error {
+	// if no rooms left, then we can update metadata
+	meta, err := m.natsService.GetRoomMetadataStruct(parentRoomId)
 	if err != nil {
 		return err
 	}
-	room.Created = metadata.StartedAt
-	room.Started = true
-
-	marshal, err := protojson.Marshal(room)
-	if err != nil {
-		return err
+	if meta == nil {
+		// indicating room was ended
+		return nil
 	}
 
-	val := map[string]string{
-		roomId: string(marshal),
+	if !meta.RoomFeatures.BreakoutRoomFeatures.IsActive {
+		return nil
 	}
-	err = m.rs.InsertOrUpdateBreakoutRoom(metadata.ParentRoomId, val)
+
+	meta.RoomFeatures.BreakoutRoomFeatures.IsActive = false
+	err = m.natsService.UpdateAndBroadcastRoomMetadata(parentRoomId, meta)
 	if err != nil {
-		log.Error(err)
 		return err
 	}
 
@@ -74,46 +77,13 @@ func (m *BreakoutRoomModel) PostTaskAfterRoomEndWebhook(roomId, metadata string)
 	}
 
 	if meta.IsBreakoutRoom {
-		_ = m.rs.DeleteBreakoutRoom(meta.ParentRoomId, roomId)
-		_ = m.performPostHookTask(meta.ParentRoomId)
+		_ = m.natsService.DeleteBreakoutRoom(meta.ParentRoomId, roomId)
+		m.performPostHookTask(meta.ParentRoomId)
 	} else {
-		err = m.EndBreakoutRooms(roomId)
+		err = m.EndAllBreakoutRoomsByParentRoomId(roomId)
 		if err != nil {
 			return err
 		}
-	}
-
-	return nil
-}
-
-func (m *BreakoutRoomModel) performPostHookTask(roomId string) error {
-	c, err := m.rs.CountBreakoutRooms(roomId)
-	if err != nil {
-		log.Error(err)
-		return err
-	}
-
-	if c != 0 {
-		return nil
-	}
-
-	// no room left so, delete breakoutRoomKey key for this room
-	_ = m.rs.DeleteAllBreakoutRoomsByParentRoomId(roomId)
-
-	// if no rooms left, then we can update metadata
-	meta, err := m.natsService.GetRoomMetadataStruct(roomId)
-	if err != nil {
-		return err
-	}
-	if meta == nil {
-		// indicating room was ended
-		return nil
-	}
-
-	meta.RoomFeatures.BreakoutRoomFeatures.IsActive = false
-	err = m.natsService.UpdateAndBroadcastRoomMetadata(roomId, meta)
-	if err != nil {
-		return err
 	}
 
 	return nil

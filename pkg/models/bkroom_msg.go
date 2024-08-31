@@ -16,6 +16,10 @@ func (m *BreakoutRoomModel) SendBreakoutRoomMsg(r *plugnmeet.BroadcastBreakoutRo
 		return err
 	}
 
+	if rooms == nil || len(rooms) == 0 {
+		return nil
+	}
+
 	for _, rr := range rooms {
 		err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SYSTEM_CHAT_MSG, rr.Id, r.Msg, nil)
 		if err != nil {

@@ -13,6 +13,10 @@ func (m *BreakoutRoomModel) GetBreakoutRooms(roomId string) ([]*plugnmeet.Breako
 		return nil, err
 	}
 
+	if breakoutRooms == nil || len(breakoutRooms) == 0 {
+		return nil, errors.New("no breakout rooms found")
+	}
+
 	return breakoutRooms, nil
 }
 
@@ -20,6 +24,10 @@ func (m *BreakoutRoomModel) GetMyBreakoutRooms(roomId, userId string) (*plugnmee
 	breakoutRooms, err := m.fetchBreakoutRooms(roomId)
 	if err != nil {
 		return nil, err
+	}
+
+	if breakoutRooms == nil || len(breakoutRooms) == 0 {
+		return nil, errors.New("no breakout rooms found")
 	}
 
 	for _, rr := range breakoutRooms {
@@ -34,16 +42,16 @@ func (m *BreakoutRoomModel) GetMyBreakoutRooms(roomId, userId string) (*plugnmee
 }
 
 func (m *BreakoutRoomModel) fetchBreakoutRoom(roomId, breakoutRoomId string) (*plugnmeet.BreakoutRoom, error) {
-	result, err := m.rs.GetBreakoutRoom(roomId, breakoutRoomId)
+	result, err := m.natsService.GetBreakoutRoom(roomId, breakoutRoomId)
 	if err != nil {
 		return nil, err
 	}
-	if result == "" {
+	if result == nil {
 		return nil, errors.New("not info found")
 	}
 
 	room := new(plugnmeet.BreakoutRoom)
-	err = protojson.Unmarshal([]byte(result), room)
+	err = protojson.Unmarshal(result, room)
 	if err != nil {
 		return nil, err
 	}
@@ -52,18 +60,18 @@ func (m *BreakoutRoomModel) fetchBreakoutRoom(roomId, breakoutRoomId string) (*p
 }
 
 func (m *BreakoutRoomModel) fetchBreakoutRooms(roomId string) ([]*plugnmeet.BreakoutRoom, error) {
-	rooms, err := m.rs.GetAllBreakoutRoomsByParentRoomId(roomId)
+	rooms, err := m.natsService.GetAllBreakoutRoomsByParentRoomId(roomId)
 	if err != nil {
 		return nil, err
 	}
-	if rooms == nil {
-		return nil, errors.New("no breakout room found")
+	if rooms == nil || len(rooms) == 0 {
+		return nil, nil
 	}
 
 	var breakoutRooms []*plugnmeet.BreakoutRoom
 	for i, r := range rooms {
 		room := new(plugnmeet.BreakoutRoom)
-		err := protojson.Unmarshal([]byte(r), room)
+		err := protojson.Unmarshal(r, room)
 		if err != nil {
 			continue
 		}
