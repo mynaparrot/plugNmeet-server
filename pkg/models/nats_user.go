@@ -47,19 +47,15 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId string) {
 // but will broadcast as disconnected
 func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) {
 	// now change the user's status
-	err := m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusDisconnected)
-	if err != nil {
-		log.Warnln(err)
-	}
+	_ = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusDisconnected)
 
-	// notify to everyone of the room &
-	// 1. pause all the media but not from the list
 	userInfo, _ := m.natsService.GetUserInfo(roomId, userId)
 	if userInfo == nil {
-		log.Warnln(fmt.Sprintf("no user info found with id: %s, which may happend if room had ended before user left", userId))
-		// no way to continue
+		// if we do not get data, then we'll just update analytics
+		m.updateUserLeftAnalytics(roomId, userId)
 		return
 	}
+
 	_ = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_DISCONNECTED, roomId, userInfo, userId)
 
 	// we'll wait 5 seconds before declare this user as offline
@@ -72,22 +68,16 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) {
 			return
 		}
 	}
-	err = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusOffline)
+	err := m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusOffline)
 	if err != nil {
 		log.Warnln(err)
 	}
 
+	// analytics
+	m.updateUserLeftAnalytics(roomId, userId)
+
 	// now broadcast to everyone
 	_ = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_OFFLINE, roomId, userInfo, userId)
-
-	now := fmt.Sprintf("%d", time.Now().UnixMilli())
-	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
-		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
-		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_LEFT,
-		RoomId:    roomId,
-		UserId:    &userInfo.UserId,
-		HsetValue: &now,
-	})
 
 	// we'll wait another 30 seconds & delete this consumer,
 	// but we'll keep user's information in the bucket
@@ -106,9 +96,13 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) {
 	m.natsService.DeleteConsumer(roomId, userId)
 }
 
-func (m *NatsModel) onAfterUserLoggedOut(roomId, userId string) {
-	// delete consumer
-	m.natsService.DeleteConsumer(roomId, userId)
-	// now delete from the room users list & bucket
-	m.natsService.DeleteUser(roomId, userId)
+func (m *NatsModel) updateUserLeftAnalytics(roomId, userId string) {
+	now := fmt.Sprintf("%d", time.Now().UnixMilli())
+	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
+		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
+		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_LEFT,
+		RoomId:    roomId,
+		UserId:    &userId,
+		HsetValue: &now,
+	})
 }

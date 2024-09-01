@@ -8,10 +8,10 @@ const (
 	MaxPreloadedWhiteboardFileSize int64 = 5 * 1000000 // limit to 5MB
 
 	// all the time.Sleep() values
-	WaitBeforeTriggerOnAfterRoomEnded        = 5 * time.Second
+	WaitBeforeTriggerOnAfterRoomEnded        = 20 * time.Second
 	WaitBeforeSpeechServicesOnAfterRoomEnded = 3 * time.Second
 	WaitBeforeBreakoutRoomOnAfterRoomStart   = 2 * time.Second
-	WaitBeforeAnalyticsStartProcessing       = 30 * time.Second
+	WaitBeforeAnalyticsStartProcessing       = 1 * time.Minute
 	MaxDurationWaitBeforeCleanRoomWebhook    = 1 * time.Minute
 	WaitDurationIfRoomCreationLocked         = 1 * time.Second
 
