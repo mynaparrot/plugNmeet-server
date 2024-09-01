@@ -23,6 +23,10 @@ func (m *RecordingModel) recordingStarted(r *plugnmeet.RecorderToPlugNmeet) {
 	if err != nil {
 		return
 	}
+	if roomMeta == nil {
+		log.Errorln("invalid nil room metadata information")
+		return
+	}
 
 	roomMeta.IsRecording = true
 	_ = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, roomMeta)

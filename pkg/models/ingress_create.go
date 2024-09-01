@@ -14,6 +14,10 @@ func (m *IngressModel) CreateIngress(r *plugnmeet.CreateIngressReq) (*livekit.In
 	if err != nil {
 		return nil, err
 	}
+	if metadata == nil {
+		return nil, errors.New("invalid nil room metadata information")
+	}
+
 	ingressFeatures := metadata.RoomFeatures.IngressFeatures
 	if !ingressFeatures.IsAllow {
 		return nil, errors.New("ingress feature isn't allow")

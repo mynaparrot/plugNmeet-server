@@ -18,6 +18,9 @@ func (m *EtherpadModel) ChangeEtherpadStatus(r *plugnmeet.ChangeEtherpadStatusRe
 	if err != nil {
 		return err
 	}
+	if meta == nil {
+		return errors.New("invalid nil room metadata information")
+	}
 
 	meta.RoomFeatures.SharedNotePadFeatures.IsActive = r.IsActive
 	err = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, meta)
@@ -47,6 +50,9 @@ func (m *EtherpadModel) addPadToRoomMetadata(roomId string, c *plugnmeet.CreateE
 	meta, err := m.natsService.GetRoomMetadataStruct(roomId)
 	if err != nil {
 		return err
+	}
+	if meta == nil {
+		return errors.New("invalid room information")
 	}
 
 	f := &plugnmeet.SharedNotePadFeatures{

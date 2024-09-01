@@ -14,7 +14,7 @@ func (s *NatsService) BroadcastUserMetadata(roomId string, userId string, metada
 		}
 
 		if result == nil {
-			return errors.New("did not found the user")
+			return errors.New("user not found")
 		}
 		metadata = &result.Metadata
 	}

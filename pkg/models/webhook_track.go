@@ -1,24 +1,20 @@
 package models
 
 import (
+	"fmt"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	log "github.com/sirupsen/logrus"
 )
 
 func (m *WebhookModel) trackPublished(event *livekit.WebhookEvent) {
-	if event.Room == nil {
-		log.Errorln("empty roomInfo", event)
+	if event.Room == nil || event.Track == nil {
+		log.Warnln(fmt.Sprintf("invalid webhook info received: %+v", event))
 		return
 	}
 
 	rInfo, err := m.natsService.GetRoomInfo(event.Room.Name)
-	if err != nil {
-		log.Errorln(err)
-		return
-	}
-	if rInfo == nil {
-		log.Errorln("empty roomInfo")
+	if err != nil || rInfo == nil {
 		return
 	}
 
@@ -53,15 +49,21 @@ func (m *WebhookModel) trackPublished(event *livekit.WebhookEvent) {
 }
 
 func (m *WebhookModel) trackUnpublished(event *livekit.WebhookEvent) {
-	if event.Room == nil {
-		log.Errorln("empty roomInfo", event)
+	if event.Room == nil || event.Track == nil {
+		log.Warnln(fmt.Sprintf("invalid webhook info received: %+v", event))
 		return
 	}
+
 	rInfo, err := m.natsService.GetRoomInfo(event.Room.Name)
 	if err != nil {
 		log.Errorln(err)
 		return
 	}
+	if rInfo == nil {
+		log.Errorln("empty roomInfo")
+		return
+	}
+
 	event.Room.Sid = rInfo.RoomSid
 	event.Room.Metadata = rInfo.Metadata
 

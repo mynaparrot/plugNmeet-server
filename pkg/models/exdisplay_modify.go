@@ -35,6 +35,9 @@ func (m *ExDisplayModel) updateRoomMetadata(roomId string, opts *updateRoomMetad
 	if err != nil {
 		return err
 	}
+	if roomMeta == nil {
+		return errors.New("invalid nil room metadata information")
+	}
 
 	if opts.isActive != nil {
 		roomMeta.RoomFeatures.DisplayExternalLinkFeatures.IsActive = *opts.isActive

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"github.com/livekit/protocol/livekit"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	log "github.com/sirupsen/logrus"
@@ -9,14 +10,13 @@ import (
 
 func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 	if event.Room == nil {
-		log.Errorln("empty roomInfo")
+		log.Warnln(fmt.Sprintf("invalid webhook info received: %+v", event))
 		return
 	}
 
 	// we'll check the room from kv
 	rInfo, meta, err := m.natsService.GetRoomInfoWithMetadata(event.Room.Name)
 	if err != nil {
-		log.Errorln(err)
 		return
 	}
 

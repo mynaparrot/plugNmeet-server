@@ -1,11 +1,16 @@
 package models
 
-import "github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+import (
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+)
 
 func (m *RoomModel) ChangeVisibility(r *plugnmeet.ChangeVisibilityRes) (bool, string) {
 	roomMeta, err := m.natsService.GetRoomMetadataStruct(r.RoomId)
 	if err != nil {
 		return false, err.Error()
+	}
+	if roomMeta == nil {
+		return false, "invalid nil room metadata information"
 	}
 
 	if r.VisibleWhiteBoard != nil {

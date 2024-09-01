@@ -25,6 +25,9 @@ func (m *WaitingRoomModel) ApproveWaitingUsers(r *plugnmeet.ApproveWaitingUsersR
 	if err != nil {
 		return err
 	}
+	if p == nil {
+		return errors.New("user not found")
+	}
 
 	return m.approveUser(r.RoomId, r.UserId, p.Metadata)
 }
@@ -48,6 +51,9 @@ func (m *WaitingRoomModel) UpdateWaitingRoomMessage(r *plugnmeet.UpdateWaitingRo
 	roomMeta, err := m.natsService.GetRoomMetadataStruct(r.RoomId)
 	if err != nil {
 		return err
+	}
+	if roomMeta == nil {
+		return errors.New("invalid nil room metadata information")
 	}
 
 	roomMeta.RoomFeatures.WaitingRoomFeatures.WaitingRoomMsg = r.Msg

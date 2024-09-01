@@ -35,6 +35,10 @@ func (m *ExMediaModel) updateRoomMetadata(roomId string, opts *updateRoomMetadat
 		return err
 	}
 
+	if roomMeta == nil {
+		return errors.New("invalid nil room metadata information")
+	}
+
 	if opts.isActive != nil {
 		roomMeta.RoomFeatures.ExternalMediaPlayerFeatures.IsActive = *opts.isActive
 	}

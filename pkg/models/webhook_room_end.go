@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -11,16 +12,12 @@ import (
 
 func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 	if event.Room == nil {
-		log.Errorln("empty roomInfo")
+		log.Warnln(fmt.Sprintf("invalid webhook info received: %+v", event))
 		return
 	}
 
 	rInfo, err := m.natsService.GetRoomInfo(event.Room.Name)
-	if err != nil {
-		log.Errorln(err)
-		return
-	}
-	if rInfo == nil {
+	if err != nil || rInfo == nil {
 		return
 	}
 

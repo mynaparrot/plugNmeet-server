@@ -15,6 +15,9 @@ func (m *SpeechToTextModel) SpeechToTextTranslationServiceStart(r *plugnmeet.Spe
 	if err != nil {
 		return err
 	}
+	if meta == nil {
+		return errors.New("invalid nil room metadata information")
+	}
 
 	f := meta.RoomFeatures.SpeechToTextTranslationFeatures
 

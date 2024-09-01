@@ -16,6 +16,10 @@ func (m *RecordingModel) rtmpStarted(r *plugnmeet.RecorderToPlugNmeet) {
 	if err != nil {
 		return
 	}
+	if roomMeta == nil {
+		log.Errorln("invalid nil room metadata information")
+		return
+	}
 
 	roomMeta.IsActiveRtmp = true
 	_ = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, roomMeta)

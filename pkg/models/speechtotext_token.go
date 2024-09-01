@@ -34,6 +34,9 @@ func (m *SpeechToTextModel) GenerateAzureToken(r *plugnmeet.GenerateAzureTokenRe
 	if err != nil {
 		return err
 	}
+	if meta == nil {
+		return errors.New("invalid nil room metadata information")
+	}
 	f := meta.RoomFeatures.SpeechToTextTranslationFeatures
 
 	if !m.app.AzureCognitiveServicesSpeech.Enabled || !f.IsEnabled {

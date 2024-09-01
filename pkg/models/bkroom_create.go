@@ -18,6 +18,10 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRooms
 		return err
 	}
 
+	if mainRoom == nil || meta == nil {
+		return errors.New("invalid parent room information")
+	}
+
 	// let's check if the parent room has a duration set or not
 	if meta.RoomFeatures.RoomDuration != nil && *meta.RoomFeatures.RoomDuration > 0 {
 		rDuration := NewRoomDurationModel(m.app, m.rs)

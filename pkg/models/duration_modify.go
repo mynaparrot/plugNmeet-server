@@ -48,6 +48,10 @@ func (m *RoomDurationModel) IncreaseRoomDuration(roomId string, duration uint64)
 		return 0, err
 	}
 
+	if meta == nil {
+		return 0, errors.New("invalid nil room metadata information")
+	}
+
 	// check if this is a breakout room
 	if meta.IsBreakoutRoom && info != nil {
 		// need to check how long time left for this room

@@ -1,11 +1,17 @@
 package models
 
-import log "github.com/sirupsen/logrus"
+import (
+	"errors"
+	log "github.com/sirupsen/logrus"
+)
 
 func (m *FileModel) updateRoomMetadataWithOfficeFile(f *ConvertWhiteboardFileRes) error {
 	roomMeta, err := m.natsService.GetRoomMetadataStruct(m.req.RoomId)
 	if err != nil {
 		return err
+	}
+	if roomMeta == nil {
+		return errors.New("invalid nil room metadata information")
 	}
 
 	roomMeta.RoomFeatures.WhiteboardFeatures.WhiteboardFileId = f.FileId

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
+	log "github.com/sirupsen/logrus"
 	"strings"
 	"time"
 )
@@ -37,7 +38,7 @@ func (m *SchedulerModel) checkOnlineUsersStatus() {
 					// we'll compare
 					lastPing += natsservice.UserOnlineMaxPingDiff.Milliseconds()
 					if time.Now().UnixMilli() > lastPing {
-						fmt.Println("user should be offline", lastPing, time.Now().UnixMilli())
+						log.Infoln(fmt.Sprintf("userId:%s should be offline, lastPing: %d, now: %d", u, lastPing, time.Now().UnixMilli()))
 						m.changeUserStatus(roomId, u)
 					}
 				}

@@ -18,12 +18,11 @@ func (s *NatsService) GetRoomUserStatus(roomId, userId string) (string, error) {
 		return "", err
 	}
 
-	status, err := kv.Get(s.ctx, userId)
-	if err != nil {
-		return "", err
+	if status, err := kv.Get(s.ctx, userId); err == nil && status != nil {
+		return string(status.Value()), nil
 	}
 
-	return string(status.Value()), nil
+	return "", nil
 }
 
 func (s *NatsService) GetUserInfo(roomId, userId string) (*plugnmeet.NatsKvUserInfo, error) {

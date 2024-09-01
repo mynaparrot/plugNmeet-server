@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	log "github.com/sirupsen/logrus"
 )
@@ -86,6 +87,9 @@ func (m *UserModel) UpdateUserLockSettings(r *plugnmeet.UpdateUserLockSettingsRe
 	if err != nil {
 		return err
 	}
+	if p == nil {
+		return errors.New("user not found")
+	}
 
 	return m.updateUserLockMetadata(r.RoomId, r.UserId, r.Service, r.Direction, p.Metadata)
 }
@@ -113,6 +117,9 @@ func (m *UserModel) updateRoomUsersLockSettings(r *plugnmeet.UpdateUserLockSetti
 	mt, err := m.natsService.GetRoomMetadataStruct(r.RoomId)
 	if err != nil {
 		return err
+	}
+	if mt == nil {
+		return errors.New("invalid nil room metadata information")
 	}
 
 	m.assignNewLockSetting(r.Service, r.Direction, mt.DefaultLockSettings)
