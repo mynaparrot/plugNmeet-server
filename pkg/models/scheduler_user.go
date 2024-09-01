@@ -13,15 +13,15 @@ import (
 // checkOnlineUsersStatus will compare last ping result
 // and take the decision to update user's status
 func (m *SchedulerModel) checkOnlineUsersStatus() {
-	locked := m.natsService.IsSchedulerTaskLock("checkOnlineUsersStatus")
+	locked := m.rs.IsSchedulerTaskLock("checkOnlineUsersStatus")
 	if locked {
 		// if lock then we will not perform here
 		return
 	}
 	// now set lock
-	_ = m.natsService.LockSchedulerTask("checkOnlineUsersStatus", time.Minute*1)
+	_ = m.rs.LockSchedulerTask("checkOnlineUsersStatus", time.Minute*1)
 	// clean at the end
-	defer m.natsService.UnlockSchedulerTask("checkOnlineUsersStatus")
+	defer m.rs.UnlockSchedulerTask("checkOnlineUsersStatus")
 
 	kl := m.app.JetStream.KeyValueStoreNames(context.Background())
 	for s := range kl.Name() {

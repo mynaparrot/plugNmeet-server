@@ -58,7 +58,7 @@ func (m *RoomModel) EndRoom(r *plugnmeet.RoomEndReq) (bool, string) {
 func (m *RoomModel) OnAfterRoomEnded(roomId, roomSid, metadata string) {
 	// lock room creation otherwise may have an unexpected result
 	// if recreated before clean up completed
-	err := m.natsService.LockRoomCreation(roomId, config.WaitBeforeTriggerOnAfterRoomEnded+(time.Second*5))
+	err := m.rs.LockRoomCreation(roomId, config.WaitBeforeTriggerOnAfterRoomEnded+(time.Second*5))
 	if err != nil {
 		log.Errorln(err)
 	}
@@ -141,7 +141,7 @@ func (m *RoomModel) OnAfterRoomEnded(roomId, roomSid, metadata string) {
 
 	log.Infoln(fmt.Sprintf("roomId: %s has been cleaned properly", roomId))
 	// release the room
-	m.natsService.UnlockRoomCreation(roomId)
+	m.rs.UnlockRoomCreation(roomId)
 
 	// finally, create the analytics file
 	analyticsModel := NewAnalyticsModel(m.app, m.ds, m.rs)

@@ -24,7 +24,7 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 	m.preRoomCreationTasks(r)
 	// in preRoomCreationTasks we've added this room in progress list
 	// so, we'll just use deferring to clean this room at the end of this function
-	defer m.natsService.UnlockRoomCreation(r.RoomId)
+	defer m.rs.UnlockRoomCreation(r.RoomId)
 
 	// check if room already exists in db or not
 	roomDbInfo, err := m.ds.GetRoomInfoByRoomId(r.RoomId, 1)
@@ -188,7 +188,7 @@ func (m *RoomModel) preRoomCreationTasks(r *plugnmeet.CreateRoomReq) {
 	// set maximum 1 minute as TTL
 	// this way we can ensure that there will not be any deadlock
 	// otherwise in various reason key may stay in kv & create deadlock
-	err := m.natsService.LockRoomCreation(r.GetRoomId(), time.Minute*1)
+	err := m.rs.LockRoomCreation(r.GetRoomId(), time.Minute*1)
 	if err != nil {
 		log.Errorln(err)
 	}
