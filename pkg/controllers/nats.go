@@ -156,12 +156,10 @@ func (c *NatsController) subscribeToSystemWorker() {
 			return
 		}
 
-		go func(sub string) {
-			p := strings.Split(sub, ".")
-			roomId := p[1]
-			userId := p[2]
-			c.natsModel.HandleFromClientToServerReq(roomId, userId, req)
-		}(msg.Subject())
+		p := strings.Split(msg.Subject(), ".")
+		roomId := p[1]
+		userId := p[2]
+		c.natsModel.HandleFromClientToServerReq(roomId, userId, req)
 
 	}, jetstream.ConsumeErrHandler(func(consumeCtx jetstream.ConsumeContext, err error) {
 		log.Errorln(err)
