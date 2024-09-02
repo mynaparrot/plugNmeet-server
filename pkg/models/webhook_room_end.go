@@ -15,6 +15,7 @@ func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 		log.Warnln(fmt.Sprintf("invalid webhook info received: %+v", event))
 		return
 	}
+	time.Sleep(time.Second * 1)
 
 	rInfo, err := m.natsService.GetRoomInfo(event.Room.Name)
 	if err != nil || rInfo == nil {
