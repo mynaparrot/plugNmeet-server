@@ -103,20 +103,25 @@ func (c *NatsController) subscribeToUsersConnEvents() {
 			if err != nil {
 				return
 			}
-			p := strings.Split(e.Client["user"].(string), ":")
-			if len(p) == 2 {
-				c.natsModel.OnAfterUserJoined(p[0], p[1])
-			}
+			go func(user string) {
+				p := strings.Split(user, ":")
+				if len(p) == 2 {
+					c.natsModel.OnAfterUserJoined(p[0], p[1])
+				}
+			}(e.Client["user"].(string))
+
 		} else if strings.Contains(msg.Subject, ".DISCONNECT") {
 			e := new(NatsEvents)
 			err := json.Unmarshal(msg.Data, e)
 			if err != nil {
 				return
 			}
-			p := strings.Split(e.Client["user"].(string), ":")
-			if len(p) == 2 {
-				c.natsModel.OnAfterUserDisconnected(p[0], p[1])
-			}
+			go func(user string) {
+				p := strings.Split(user, ":")
+				if len(p) == 2 {
+					c.natsModel.OnAfterUserDisconnected(p[0], p[1])
+				}
+			}(e.Client["user"].(string))
 		}
 	})
 	if err != nil {
@@ -142,18 +147,22 @@ func (c *NatsController) subscribeToSystemWorker() {
 	}
 
 	cc, err := cons.Consume(func(msg jetstream.Msg) {
+		defer msg.Ack()
+
 		req := new(plugnmeet.NatsMsgClientToServer)
 		err := proto.Unmarshal(msg.Data(), req)
 		if err != nil {
 			log.Errorln(err)
 			return
 		}
-		p := strings.Split(msg.Subject(), ".")
-		roomId := p[1]
-		userId := p[2]
-		c.natsModel.HandleFromClientToServerReq(roomId, userId, req)
 
-		msg.Ack()
+		go func(sub string) {
+			p := strings.Split(sub, ".")
+			roomId := p[1]
+			userId := p[2]
+			c.natsModel.HandleFromClientToServerReq(roomId, userId, req)
+		}(msg.Subject())
+
 	}, jetstream.ConsumeErrHandler(func(consumeCtx jetstream.ConsumeContext, err error) {
 		log.Errorln(err)
 	}))
