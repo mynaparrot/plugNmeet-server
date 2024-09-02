@@ -149,17 +149,19 @@ func (c *NatsController) subscribeToSystemWorker() {
 	cc, err := cons.Consume(func(msg jetstream.Msg) {
 		defer msg.Ack()
 
-		req := new(plugnmeet.NatsMsgClientToServer)
-		err := proto.Unmarshal(msg.Data(), req)
-		if err != nil {
-			log.Errorln(err)
-			return
-		}
+		go func(sub string, data []byte) {
+			req := new(plugnmeet.NatsMsgClientToServer)
+			err := proto.Unmarshal(data, req)
+			if err != nil {
+				log.Errorln(err)
+				return
+			}
 
-		p := strings.Split(msg.Subject(), ".")
-		roomId := p[1]
-		userId := p[2]
-		c.natsModel.HandleFromClientToServerReq(roomId, userId, req)
+			p := strings.Split(sub, ".")
+			roomId := p[1]
+			userId := p[2]
+			c.natsModel.HandleFromClientToServerReq(roomId, userId, req)
+		}(msg.Subject(), msg.Data())
 
 	}, jetstream.ConsumeErrHandler(func(consumeCtx jetstream.ConsumeContext, err error) {
 		log.Errorln(err)
