@@ -21,9 +21,9 @@ func (m *UserModel) CreateNewPresenter(r *plugnmeet.GenerateTokenReq) error {
 		return nil
 	}
 
-	for id := range ids {
+	for id, status := range ids {
 		if entry, err := m.natsService.GetUserKeyValue(r.RoomId, id, natsservice.UserIsPresenterKey); err == nil && entry != nil {
-			if string(entry.Value()) == "true" {
+			if string(entry.Value()) == "true" && string(status.Value()) == natsservice.UserStatusOnline {
 				// session already has presenter
 				return nil
 			}
