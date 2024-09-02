@@ -14,14 +14,15 @@ func (m *UserModel) CreateNewPresenter(r *plugnmeet.GenerateTokenReq) error {
 	if err != nil {
 		return err
 	}
+
 	if ids == nil || len(ids) == 0 {
 		// no user found
 		r.UserInfo.UserMetadata.IsPresenter = true
 		return nil
 	}
 
-	for _, id := range ids {
-		if entry, err := m.natsService.GetUserKeyValue(r.RoomId, string(id.Value()), natsservice.UserIsPresenterKey); err == nil && entry != nil {
+	for id := range ids {
+		if entry, err := m.natsService.GetUserKeyValue(r.RoomId, id, natsservice.UserIsPresenterKey); err == nil && entry != nil {
 			if string(entry.Value()) == "true" {
 				// session already has presenter
 				return nil

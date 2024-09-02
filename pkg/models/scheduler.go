@@ -51,8 +51,11 @@ func (m *SchedulerModel) StartScheduler() {
 	checkRoomDuration := time.NewTicker(5 * time.Second)
 	defer checkRoomDuration.Stop()
 
-	roomChecker := time.NewTicker(5 * time.Minute)
-	defer roomChecker.Stop()
+	fiveMinutesChecker := time.NewTicker(5 * time.Minute)
+	defer fiveMinutesChecker.Stop()
+
+	oneMinuteChecker := time.NewTicker(1 * time.Minute)
+	defer oneMinuteChecker.Stop()
 
 	for {
 		select {
@@ -60,8 +63,9 @@ func (m *SchedulerModel) StartScheduler() {
 			return
 		case <-checkRoomDuration.C:
 			m.checkRoomWithDuration()
+		case <-oneMinuteChecker.C:
 			m.checkOnlineUsersStatus()
-		case <-roomChecker.C:
+		case <-fiveMinutesChecker.C:
 			m.activeRoomChecker()
 		}
 	}

@@ -19,7 +19,7 @@ const (
 
 	RoomUsersBlockList = Prefix + "usersBlockList-%s"
 
-	UserOnlineMaxPingDiff = time.Second * 30 // after 30 seconds we'll treat user as offline
+	UserOnlineMaxPingDiff = time.Minute * 2 // after 2 minutes we'll treat user as offline
 
 	UserIdKey          = "id"
 	UserSidKey         = "sid"
