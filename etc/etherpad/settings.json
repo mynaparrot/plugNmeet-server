@@ -611,7 +611,7 @@
     ],
     "right": [
       ["importexport"],
-      [],
+      ["settings"],
       ["showusers"]
     ],
     "timeslider": []
