@@ -13,7 +13,7 @@ require (
 	github.com/gofiber/template/html/v2 v2.1.2
 	github.com/google/uuid v1.6.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/protocol v1.20.0
+	github.com/livekit/protocol v1.21.0
 	github.com/livekit/server-sdk-go/v2 v2.2.1
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240830093159-0b47c3e71ae7
 	github.com/nats-io/jwt/v2 v2.5.8
