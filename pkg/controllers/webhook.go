@@ -9,21 +9,16 @@ import (
 
 func HandleWebhook(c *fiber.Ctx) error {
 	data := c.Body()
-	body := make([]byte, len(data))
-	copy(body, data)
-
 	token := c.Request().Header.Peek("Authorization")
-	authToken := make([]byte, len(token))
-	copy(authToken, token)
 
-	if len(authToken) == 0 {
+	if len(token) == 0 {
 		return c.SendStatus(fiber.StatusForbidden)
 	}
 
 	m := models.NewAuthModel(nil, nil)
-	// here request is coming from livekit
-	// so, we'll use livekit secret to validate
-	_, err := m.ValidateLivekitWebhookToken(body, string(authToken))
+	// here request is coming from livekit, so
+	// we'll use livekit secret to validate
+	_, err := m.ValidateLivekitWebhookToken(data, string(token))
 	if err != nil {
 		return c.SendStatus(fiber.StatusForbidden)
 	}
@@ -32,12 +27,12 @@ func HandleWebhook(c *fiber.Ctx) error {
 		DiscardUnknown: true,
 	}
 	event := new(livekit.WebhookEvent)
-	if err = op.Unmarshal(body, event); err != nil {
+	if err = op.Unmarshal(data, event); err != nil {
 		return c.SendStatus(fiber.StatusForbidden)
 	}
 
 	mm := models.NewWebhookModel(nil, nil, nil, nil)
-	mm.HandleWebhookEvents(event)
+	go mm.HandleWebhookEvents(event)
 
 	return c.SendStatus(fiber.StatusOK)
 }
