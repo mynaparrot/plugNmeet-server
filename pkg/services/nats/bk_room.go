@@ -32,7 +32,7 @@ func (s *NatsService) DeleteBreakoutRoom(parentRoomId, bkRoomId string) error {
 		return err
 	}
 
-	_ = kv.Delete(s.ctx, bkRoomId)
+	_ = kv.Purge(s.ctx, bkRoomId)
 	return nil
 }
 

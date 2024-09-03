@@ -52,7 +52,7 @@ func (s *NatsService) RemoveRoomFromEtherpad(nodeId, roomId string) error {
 	case err != nil:
 		return err
 	}
-	err = kv.Delete(s.ctx, roomId)
+	err = kv.Purge(s.ctx, roomId)
 	if err != nil {
 		return err
 	}

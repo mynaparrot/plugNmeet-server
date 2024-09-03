@@ -167,7 +167,7 @@ func (s *NatsService) UpdateUserMetadata(roomId, userId string, metadata interfa
 
 func (s *NatsService) DeleteUser(roomId, userId string) {
 	if kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf(RoomUsersBucket, roomId)); err == nil {
-		_ = kv.Delete(s.ctx, userId)
+		_ = kv.Purge(s.ctx, userId)
 	}
 
 	_ = s.js.DeleteKeyValue(s.ctx, fmt.Sprintf(UserInfoBucket, roomId, userId))

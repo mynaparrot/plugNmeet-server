@@ -56,5 +56,5 @@ func (s *NatsService) DeleteWebhookData(roomId string) error {
 		return err
 	}
 
-	return kv.Delete(s.ctx, roomId)
+	return kv.Purge(s.ctx, roomId)
 }
