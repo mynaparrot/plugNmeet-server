@@ -10,7 +10,6 @@ import (
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	log "github.com/sirupsen/logrus"
-	"time"
 )
 
 type WebhookModel struct {
@@ -51,10 +50,6 @@ func NewWebhookModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *r
 }
 
 func (m *WebhookModel) HandleWebhookEvents(e *livekit.WebhookEvent) {
-	// wait 1 second before start processing
-	// otherwise services may not be ready &
-	// give unexpected results
-	time.Sleep(time.Second * 1)
 
 	switch e.GetEvent() {
 	case "room_started":
