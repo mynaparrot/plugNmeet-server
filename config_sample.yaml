@@ -78,7 +78,7 @@ database_info:
   prefix: "pnm_"
 nats_info:
   nats_urls:
-    - "nats://127.0.0.1:4222"
+    - "nats://host.docker.internal:4222"
   # nats websocket will be required for the pnm client to connect
   # if the pnm client can't connect with this URL then user won't be able to join
   nats_ws_urls:
