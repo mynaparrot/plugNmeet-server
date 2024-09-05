@@ -31,7 +31,7 @@ func (m *RecordingModel) recordingStarted(r *plugnmeet.RecorderToPlugNmeet) {
 	roomMeta.IsRecording = true
 	_ = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, roomMeta)
 
-	// send message to room
+	// send a notification message to room
 	err = m.natsService.NotifyInfoMsg(r.RoomId, "notifications.recording-started", false, nil)
 	if err != nil {
 		log.Errorln(err)
@@ -62,7 +62,7 @@ func (m *RecordingModel) addRecordingInfoToDB(r *plugnmeet.RecorderToPlugNmeet, 
 	return data.CreationTime, nil
 }
 
-// addRecordingInfoFile will add information about recording file
+// addRecordingInfoFile will add information about the recording file
 // there have a certain case that our DB may have a problem
 // using this recording info file we can import those recordings
 // or will get an idea about the recording

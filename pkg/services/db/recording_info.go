@@ -6,15 +6,6 @@ import (
 	"gorm.io/gorm"
 )
 
-func (s *DatabaseService) InsertRecordingData(info *dbmodels.Recording) (int64, error) {
-	result := s.db.Create(info)
-	if result.Error != nil {
-		return 0, result.Error
-	}
-
-	return result.RowsAffected, nil
-}
-
 func (s *DatabaseService) GetRecordings(roomIds []string, offset, limit uint64, direction *string) ([]dbmodels.Recording, int64, error) {
 	var recordings []dbmodels.Recording
 
@@ -67,22 +58,6 @@ func (s *DatabaseService) GetRecording(recordId string) (*dbmodels.Recording, er
 	}
 
 	return info, nil
-}
-
-func (s *DatabaseService) DeleteRecording(recordId string) (int64, error) {
-	cond := &dbmodels.Recording{
-		RecordID: recordId,
-	}
-
-	result := s.db.Where(cond).Delete(&dbmodels.Recording{})
-	switch {
-	case errors.Is(result.Error, gorm.ErrRecordNotFound):
-		return 0, nil
-	case result.Error != nil:
-		return 0, result.Error
-	}
-
-	return result.RowsAffected, nil
 }
 
 func (s *DatabaseService) GetRecordingsForBBB(recordIds, meetingIds []string, offset, limit uint64) ([]dbmodels.Recording, int64, error) {

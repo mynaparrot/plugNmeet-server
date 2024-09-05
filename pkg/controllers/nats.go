@@ -98,30 +98,25 @@ type NatsEvents struct {
 func (c *NatsController) subscribeToUsersConnEvents() {
 	_, err := c.app.NatsConn.QueueSubscribe(fmt.Sprintf("$SYS.ACCOUNT.%s.>", c.app.NatsInfo.Account), "pnm-conn-event", func(msg *nats.Msg) {
 		if strings.Contains(msg.Subject, ".CONNECT") {
-			e := new(NatsEvents)
-			err := json.Unmarshal(msg.Data, e)
-			if err != nil {
-				return
-			}
-			go func(user string) {
-				p := strings.Split(user, ":")
-				if len(p) == 2 {
-					c.natsModel.OnAfterUserJoined(p[0], p[1])
+			go func(data []byte) {
+				e := new(NatsEvents)
+				if err := json.Unmarshal(data, e); err == nil {
+					p := strings.Split(e.Client["user"].(string), ":")
+					if len(p) == 2 {
+						c.natsModel.OnAfterUserJoined(p[0], p[1])
+					}
 				}
-			}(e.Client["user"].(string))
-
+			}(msg.Data)
 		} else if strings.Contains(msg.Subject, ".DISCONNECT") {
-			e := new(NatsEvents)
-			err := json.Unmarshal(msg.Data, e)
-			if err != nil {
-				return
-			}
-			go func(user string) {
-				p := strings.Split(user, ":")
-				if len(p) == 2 {
-					c.natsModel.OnAfterUserDisconnected(p[0], p[1])
+			go func(data []byte) {
+				e := new(NatsEvents)
+				if err := json.Unmarshal(data, e); err == nil {
+					p := strings.Split(e.Client["user"].(string), ":")
+					if len(p) == 2 {
+						c.natsModel.OnAfterUserDisconnected(p[0], p[1])
+					}
 				}
-			}(e.Client["user"].(string))
+			}(msg.Data)
 		}
 	})
 	if err != nil {
@@ -148,24 +143,19 @@ func (c *NatsController) subscribeToSystemWorker() {
 
 	cc, err := cons.Consume(func(msg jetstream.Msg) {
 		defer msg.Ack()
-
 		go func(sub string, data []byte) {
 			req := new(plugnmeet.NatsMsgClientToServer)
-			err := proto.Unmarshal(data, req)
-			if err != nil {
-				log.Errorln(err)
-				return
+			if err := proto.Unmarshal(data, req); err == nil {
+				p := strings.Split(sub, ".")
+				roomId := p[1]
+				userId := p[2]
+				c.natsModel.HandleFromClientToServerReq(roomId, userId, req)
 			}
-
-			p := strings.Split(sub, ".")
-			roomId := p[1]
-			userId := p[2]
-			c.natsModel.HandleFromClientToServerReq(roomId, userId, req)
 		}(msg.Subject(), msg.Data())
-
 	}, jetstream.ConsumeErrHandler(func(consumeCtx jetstream.ConsumeContext, err error) {
 		log.Errorln(err)
 	}))
+
 	if err != nil {
 		log.Fatal(err)
 	}
