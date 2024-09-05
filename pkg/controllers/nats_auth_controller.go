@@ -71,7 +71,7 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 		return nil, err
 	}
 	if userInfo == nil {
-		return nil, errors.New("user not found in the list")
+		return nil, errors.New(fmt.Sprintf("User info not found for userId: %s, roomId: %s", userId, roomId))
 	}
 
 	allow := jwt.StringList{
