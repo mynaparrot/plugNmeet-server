@@ -36,6 +36,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20.x"
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        with:
+          version: 9
       - name: setup go
         uses: actions/setup-go@v5
         with:
@@ -45,7 +49,7 @@ jobs:
           mysql -u root -p12345 -h 127.0.0.1 -P 3306 -D plugnmeet < sql_dump/install.sql
           git clone https://github.com/mynaparrot/plugNmeet-client client
           cd client
-          npm install && npm run build
+          pnpm install && pnpm run build
       - name: Run docker-compose
         uses: isbang/compose-action@v2.0.1
         with:
