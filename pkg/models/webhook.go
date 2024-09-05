@@ -50,7 +50,6 @@ func NewWebhookModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *r
 }
 
 func (m *WebhookModel) HandleWebhookEvents(e *livekit.WebhookEvent) {
-
 	switch e.GetEvent() {
 	case "room_started":
 		m.roomStarted(e)
