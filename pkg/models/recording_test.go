@@ -54,6 +54,7 @@ func TestAnalyticsAuthModel_RecordingInfo(t *testing.T) {
 	}
 	if result == nil {
 		t.Error("should contains some data but got empty")
+		return
 	}
 
 	if result.RoomInfo.RoomSid != sid {

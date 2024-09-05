@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func (m *PollModel) CreatePoll(r *plugnmeet.CreatePollReq, isAdmin bool) (string, error) {
+func (m *PollModel) CreatePoll(r *plugnmeet.CreatePollReq) (string, error) {
 	r.PollId = uuid.NewString()
 
 	// first add to room
@@ -92,7 +92,7 @@ func (m *PollModel) createRespondentHash(r *plugnmeet.CreatePollReq) error {
 	return m.rs.CreatePollResponseHash(r.RoomId, r.PollId, v)
 }
 
-func (m *PollModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq, isAdmin bool) error {
+func (m *PollModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq) error {
 	err := m.rs.AddPollResponse(r)
 	if err != nil {
 		return err

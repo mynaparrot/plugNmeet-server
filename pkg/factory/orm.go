@@ -49,7 +49,6 @@ func NewDatabaseConnection(appCnf *config.AppConfig) error {
 		return err
 	}
 
-	// in maxscale it's 5 minutes
 	d.SetConnMaxLifetime(time.Minute * 4)
 	d.SetMaxOpenConns(100)
 

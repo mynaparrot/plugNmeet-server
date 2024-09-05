@@ -23,7 +23,6 @@ import (
 // It will accept 2 header values: API-KEY & HASH-SIGNATURE
 // HASH-SIGNATURE will require to calculated hmac sha256 using
 // body + Secret key
-// Deprecated API-SECRET will be removed in next release
 func HandleAuthHeaderCheck(c *fiber.Ctx) error {
 	apiKey := c.Get("API-KEY", "")
 	signature := c.Get("HASH-SIGNATURE", "")

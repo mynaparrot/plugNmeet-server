@@ -32,7 +32,7 @@ func HandleCreatePoll(c *fiber.Ctx) error {
 	req.RoomId = roomId.(string)
 	req.UserId = requestedUserId.(string)
 	m := models.NewPollModel(nil, nil, nil)
-	pollId, err := m.CreatePoll(req, isAdmin.(bool))
+	pollId, err := m.CreatePoll(req)
 	if err != nil {
 		res.Msg = err.Error()
 		return SendPollResponse(c, res)
@@ -118,7 +118,6 @@ func HandleUserSelectedOption(c *fiber.Ctx) error {
 
 func HandleUserSubmitResponse(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
-	isAdmin := c.Locals("isAdmin")
 	res := new(plugnmeet.PollResponse)
 	res.Status = false
 
@@ -131,7 +130,7 @@ func HandleUserSubmitResponse(c *fiber.Ctx) error {
 
 	req.RoomId = roomId.(string)
 	m := models.NewPollModel(nil, nil, nil)
-	err = m.UserSubmitResponse(req, isAdmin.(bool))
+	err = m.UserSubmitResponse(req)
 	if err != nil {
 		res.Msg = err.Error()
 		return SendPollResponse(c, res)
@@ -166,7 +165,7 @@ func HandleClosePoll(c *fiber.Ctx) error {
 
 	req.RoomId = roomId.(string)
 	req.UserId = requestedUserId.(string)
-	err = m.ClosePoll(req, isAdmin.(bool))
+	err = m.ClosePoll(req)
 	if err != nil {
 		res.Msg = err.Error()
 		return SendPollResponse(c, res)

@@ -5,7 +5,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func (m *PollModel) ClosePoll(r *plugnmeet.ClosePollReq, isAdmin bool) error {
+func (m *PollModel) ClosePoll(r *plugnmeet.ClosePollReq) error {
 	err := m.rs.ClosePoll(r)
 	if err != nil {
 		return err

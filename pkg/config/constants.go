@@ -11,7 +11,7 @@ const (
 	WaitBeforeTriggerOnAfterRoomEnded        = 10 * time.Second
 	WaitBeforeSpeechServicesOnAfterRoomEnded = 3 * time.Second
 	WaitBeforeBreakoutRoomOnAfterRoomStart   = 2 * time.Second
-	WaitBeforeAnalyticsStartProcessing       = 1 * time.Minute
+	WaitBeforeAnalyticsStartProcessing       = 40 * time.Second
 	MaxDurationWaitBeforeCleanRoomWebhook    = 1 * time.Minute
 	WaitDurationIfRoomCreationLocked         = 1 * time.Second
 
