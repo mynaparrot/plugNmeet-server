@@ -12,18 +12,6 @@ type FileModel struct {
 	ds          *dbservice.DatabaseService
 	rs          *redisservice.RedisService
 	natsService *natsservice.NatsService
-
-	fileExtension string
-	fileMimeType  string
-}
-
-type UploadedFileResponse struct {
-	Status        bool   `json:"status"`
-	Msg           string `json:"msg"`
-	FilePath      string `json:"filePath"`
-	FileName      string `json:"fileName"`
-	FileExtension string `json:"fileExtension"`
-	FileMimeType  string `json:"fileMimeType"`
 }
 
 func NewFileModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *FileModel {

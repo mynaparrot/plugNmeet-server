@@ -19,7 +19,6 @@ func HandleFileUpload(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
 
-	// FileProcessReq will hold basic information regarding room, user, file etc.
 	// this will be used to verify regarding file origin only
 	req := new(models.ResumableUploadReq)
 	err := c.QueryParser(req)

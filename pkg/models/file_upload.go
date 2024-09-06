@@ -23,6 +23,15 @@ type ResumableUploadReq struct {
 	ResumableCurrentChunkSize int64  `query:"resumableCurrentChunkSize"`
 }
 
+type UploadedFileResponse struct {
+	Status        bool   `json:"status"`
+	Msg           string `json:"msg"`
+	FilePath      string `json:"filePath"`
+	FileName      string `json:"fileName"`
+	FileExtension string `json:"fileExtension"`
+	FileMimeType  string `json:"fileMimeType"`
+}
+
 // ResumableFileUpload method can only be use if you are using resumable.js as your frontend.
 // Library link: https://github.com/23/resumable.js
 func (m *FileModel) ResumableFileUpload(c *fiber.Ctx) (*UploadedFileResponse, error) {
