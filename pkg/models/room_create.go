@@ -201,6 +201,7 @@ func (m *RoomModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomReq, r
 	err := fm.DownloadAndProcessPreUploadWBfile(req.RoomId, roomSid, *wbf.PreloadFile)
 	if err != nil {
 		log.Errorln(err)
+		_ = m.natsService.NotifyErrorMsg(req.RoomId, "notifications.preloaded-whiteboard-file-processing-error", nil)
 		return
 	}
 
