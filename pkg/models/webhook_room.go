@@ -5,6 +5,7 @@ import (
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	livekitservice "github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	log "github.com/sirupsen/logrus"
 	"time"
@@ -25,7 +26,8 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 	if rInfo == nil || meta == nil {
 		// we did not find this room to our kv
 		// we'll force to remove it
-		_, err := m.lk.EndRoom(event.Room.Name)
+		lk := livekitservice.New(m.app, m.rs)
+		_, err := lk.EndRoom(event.Room.Name)
 		if err != nil {
 			log.Errorln(err)
 		}

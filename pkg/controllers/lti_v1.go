@@ -78,7 +78,7 @@ func HandleLTIV1VerifyHeaderToken(c *fiber.Ctx) error {
 func HandleLTIV1IsRoomActive(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 
-	m := models.NewRoomModel(nil, nil, nil, nil)
+	m := models.NewRoomModel(nil, nil, nil)
 	res, _ := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: roomId.(string),
 	})
@@ -132,7 +132,7 @@ func HandleLTIV1EndRoom(c *fiber.Ctx) error {
 		})
 	}
 
-	m := models.NewRoomModel(nil, nil, nil, nil)
+	m := models.NewRoomModel(nil, nil, nil)
 	status, msg := m.EndRoom(&plugnmeet.RoomEndReq{
 		RoomId: roomId.(string),
 	})

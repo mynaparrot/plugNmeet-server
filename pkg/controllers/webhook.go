@@ -31,7 +31,7 @@ func HandleWebhook(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusForbidden)
 	}
 
-	mm := models.NewWebhookModel(nil, nil, nil, nil)
+	mm := models.NewWebhookModel(nil, nil, nil)
 	go mm.HandleWebhookEvents(event)
 
 	return c.SendStatus(fiber.StatusOK)

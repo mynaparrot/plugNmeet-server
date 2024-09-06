@@ -20,7 +20,7 @@ type UserModel struct {
 	natsService *natsservice.NatsService
 }
 
-func NewUserModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService) *UserModel {
+func NewUserModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *UserModel {
 	if app == nil {
 		app = config.GetConfig()
 	}
@@ -30,15 +30,12 @@ func NewUserModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redi
 	if rs == nil {
 		rs = redisservice.New(app.RDS)
 	}
-	if lk == nil {
-		lk = livekitservice.New(app, rs)
-	}
 
 	return &UserModel{
 		app:         app,
 		ds:          ds,
 		rs:          rs,
-		lk:          lk,
+		lk:          livekitservice.New(app, rs),
 		natsService: natsservice.New(app),
 	}
 }

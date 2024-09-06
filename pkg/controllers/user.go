@@ -49,7 +49,7 @@ func HandleGenerateJoinToken(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, "room is not active. create room first")
 	}
 
-	m := models.NewUserModel(nil, nil, nil, nil)
+	m := models.NewUserModel(nil, nil, nil)
 	token, err := m.GetPNMJoinToken(req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
@@ -94,7 +94,7 @@ func HandleUpdateUserLockSetting(c *fiber.Ctx) error {
 	}
 
 	req.RequestedUserId = requestedUserId.(string)
-	m := models.NewUserModel(nil, nil, nil, nil)
+	m := models.NewUserModel(nil, nil, nil)
 	err = m.UpdateUserLockSettings(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -114,7 +114,7 @@ func HandleMuteUnMuteTrack(c *fiber.Ctx) error {
 
 	app := config.GetConfig()
 	ds := dbservice.New(app.DB)
-	m := models.NewUserModel(app, ds, nil, nil)
+	m := models.NewUserModel(app, ds, nil)
 
 	err := m.CommonValidation(c)
 	if err != nil {
@@ -158,7 +158,7 @@ func HandleRemoveParticipant(c *fiber.Ctx) error {
 
 	app := config.GetConfig()
 	ds := dbservice.New(app.DB)
-	m := models.NewUserModel(app, ds, nil, nil)
+	m := models.NewUserModel(app, ds, nil)
 	err := m.CommonValidation(c)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -207,7 +207,7 @@ func HandleSwitchPresenter(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	m := models.NewUserModel(nil, nil, nil, nil)
+	m := models.NewUserModel(nil, nil, nil)
 	req.RoomId = roomId.(string)
 	req.RequestedUserId = requestedUserId.(string)
 	err = m.SwitchPresenter(req)

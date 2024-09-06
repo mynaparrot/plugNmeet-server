@@ -142,7 +142,7 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 	}
 
 	if !r.Metadata.IsBreakoutRoom {
-		go m.prepareWhiteboardPreloadFile(r, sId)
+		go m.prepareWhiteboardPreloadFile(r.Metadata.RoomFeatures.WhiteboardFeatures, r.RoomId, sId)
 	}
 
 	// create streams
@@ -189,23 +189,22 @@ func (m *RoomModel) preRoomCreationTasks(r *plugnmeet.CreateRoomReq) {
 	}
 }
 
-func (m *RoomModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomReq, roomSid string) {
-	wbf := req.Metadata.RoomFeatures.WhiteboardFeatures
-	if !wbf.AllowedWhiteboard || wbf.PreloadFile == nil {
+func (m *RoomModel) prepareWhiteboardPreloadFile(wbf *plugnmeet.WhiteboardFeatures, roomId, roomSid string) {
+	if wbf == nil || !wbf.AllowedWhiteboard || wbf.PreloadFile == nil || *wbf.PreloadFile == "" {
 		return
 	}
 
-	log.Infoln(fmt.Sprintf("roomId: %s has preloadFile: %s for whiteboard so, preparing it", req.RoomId, *wbf.PreloadFile))
+	log.Infoln(fmt.Sprintf("roomId: %s has preloadFile: %s for whiteboard so, preparing it", roomId, *wbf.PreloadFile))
 
-	fm := NewFileModel(m.app, m.ds, m.rs)
-	err := fm.DownloadAndProcessPreUploadWBfile(req.RoomId, roomSid, *wbf.PreloadFile)
+	fm := NewFileModel(m.app, m.ds, m.natsService)
+	err := fm.DownloadAndProcessPreUploadWBfile(roomId, roomSid, *wbf.PreloadFile)
 	if err != nil {
 		log.Errorln(err)
-		_ = m.natsService.NotifyErrorMsg(req.RoomId, "notifications.preloaded-whiteboard-file-processing-error", nil)
+		_ = m.natsService.NotifyErrorMsg(roomId, "notifications.preloaded-whiteboard-file-processing-error", nil)
 		return
 	}
 
-	log.Infoln(fmt.Sprintf("preloadFile: %s for roomId: %s had been processed successfully", *wbf.PreloadFile, req.RoomId))
+	log.Infoln(fmt.Sprintf("preloadFile: %s for roomId: %s had been processed successfully", *wbf.PreloadFile, roomId))
 }
 
 func (m *RoomModel) sendRoomCreatedWebhook(info *plugnmeet.ActiveRoomInfo) {

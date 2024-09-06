@@ -6,7 +6,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	log "github.com/sirupsen/logrus"
@@ -16,14 +15,13 @@ type WebhookModel struct {
 	app             *config.AppConfig
 	ds              *dbservice.DatabaseService
 	rs              *redisservice.RedisService
-	lk              *livekitservice.LivekitService
 	rm              *RoomModel
 	analyticsModel  *AnalyticsModel
 	webhookNotifier *helpers.WebhookNotifier
 	natsService     *natsservice.NatsService
 }
 
-func NewWebhookModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService) *WebhookModel {
+func NewWebhookModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *WebhookModel {
 	if app == nil {
 		app = config.GetConfig()
 	}
@@ -33,16 +31,12 @@ func NewWebhookModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *r
 	if rs == nil {
 		rs = redisservice.New(app.RDS)
 	}
-	if lk == nil {
-		lk = livekitservice.New(app, rs)
-	}
 
 	return &WebhookModel{
 		app:             app,
 		ds:              ds,
 		rs:              rs,
-		lk:              lk,
-		rm:              NewRoomModel(app, ds, rs, lk),
+		rm:              NewRoomModel(app, ds, rs),
 		analyticsModel:  NewAnalyticsModel(app, ds, rs),
 		webhookNotifier: helpers.GetWebhookNotifier(app),
 		natsService:     natsservice.New(app),

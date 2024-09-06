@@ -63,6 +63,6 @@ func NewLtiV1Model(app *config.AppConfig, ds *dbservice.DatabaseService, rs *red
 		app: app,
 		ds:  ds,
 		rs:  rs,
-		rm:  NewRoomModel(app, ds, rs, nil),
+		rm:  NewRoomModel(app, ds, rs),
 	}
 }

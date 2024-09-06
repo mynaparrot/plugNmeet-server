@@ -79,7 +79,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "notifications.you-are-blocked")
 	}
 
-	m := models.NewRoomModel(nil, nil, nil, nil)
+	m := models.NewRoomModel(nil, nil, nil)
 	rr, _ := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: roomId.(string),
 	})

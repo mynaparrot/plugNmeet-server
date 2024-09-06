@@ -75,7 +75,7 @@ func (m *FileModel) ResumableFileUpload(c *fiber.Ctx) (*UploadedFileResponse, er
 			room, _ := m.ds.GetRoomInfoBySid(req.RoomSid, nil)
 			if room == nil || room.ID == 0 {
 				_ = c.SendStatus(fiber.StatusBadRequest)
-				return nil, errors.New("room isn't running")
+				return nil, errors.New("room is not active")
 			}
 
 			// check if the file size is OK

@@ -12,7 +12,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
-	livekitservice "github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -140,7 +139,7 @@ func HandleBBBCreate(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", err.Error()))
 	}
 
-	m := models.NewRoomModel(nil, nil, nil, nil)
+	m := models.NewRoomModel(nil, nil, nil)
 	room, err := m.CreateRoom(pnmReq)
 
 	if err != nil {
@@ -178,7 +177,6 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 	roomId := bbbapiwrapper.CheckMeetingIdToMatchFormat(q.MeetingID)
 	app := config.GetConfig()
 	rs := redisservice.New(app.RDS)
-	lk := livekitservice.New(app, rs)
 	nts := natsservice.New(app)
 
 	metadata, err := nts.GetRoomMetadataStruct(roomId)
@@ -239,7 +237,7 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 	}
 
 	ds := dbservice.New(app.DB)
-	m := models.NewUserModel(app, ds, rs, lk)
+	m := models.NewUserModel(app, ds, rs)
 	token, err := m.GetPNMJoinToken(req)
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
@@ -284,7 +282,7 @@ func HandleBBBIsMeetingRunning(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
 
-	m := models.NewRoomModel(nil, nil, nil, nil)
+	m := models.NewRoomModel(nil, nil, nil)
 	res, _ := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: q.MeetingID,
 	})
@@ -307,7 +305,7 @@ func HandleBBBGetMeetingInfo(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
 
-	m := models.NewRoomModel(nil, nil, nil, nil)
+	m := models.NewRoomModel(nil, nil, nil)
 	status, msg, res := m.GetActiveRoomInfo(&plugnmeet.GetActiveRoomInfoReq{
 		RoomId: bbbapiwrapper.CheckMeetingIdToMatchFormat(q.MeetingID),
 	})
@@ -330,7 +328,7 @@ func HandleBBBGetMeetingInfo(c *fiber.Ctx) error {
 }
 
 func HandleBBBGetMeetings(c *fiber.Ctx) error {
-	m := models.NewRoomModel(nil, nil, nil, nil)
+	m := models.NewRoomModel(nil, nil, nil)
 	_, _, rooms := m.GetActiveRoomsInfo()
 
 	if rooms == nil {
@@ -362,7 +360,7 @@ func HandleBBBEndMeetings(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
 
-	m := models.NewRoomModel(nil, nil, nil, nil)
+	m := models.NewRoomModel(nil, nil, nil)
 	status, msg := m.EndRoom(&plugnmeet.RoomEndReq{
 		RoomId: bbbapiwrapper.CheckMeetingIdToMatchFormat(q.MeetingID),
 	})

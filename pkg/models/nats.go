@@ -40,7 +40,7 @@ func NewNatsModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redi
 		analytics:      NewAnalyticsModel(app, ds, rs),
 		authModel:      NewAuthModel(app, natsService),
 		natsService:    natsService,
-		userModel:      NewUserModel(app, ds, rs, nil),
+		userModel:      NewUserModel(app, ds, rs),
 		analyticsModel: NewAnalyticsModel(app, ds, rs),
 	}
 }

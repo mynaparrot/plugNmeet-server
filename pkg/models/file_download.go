@@ -13,6 +13,8 @@ import (
 )
 
 // DownloadAndProcessPreUploadWBfile will download and process pre upload whiteboard file
+// if process success then it will update metadata & broadcast
+// this should be called in a separate goroutine as the process will be longer
 func (m *FileModel) DownloadAndProcessPreUploadWBfile(roomId, roomSid, fileUrl string) error {
 	// get file info
 	httpClient := &http.Client{Timeout: 5 * time.Second}
@@ -52,7 +54,7 @@ func (m *FileModel) DownloadAndProcessPreUploadWBfile(roomId, roomSid, fileUrl s
 	if err != nil {
 		return err
 	}
-	// remove file at the end
+	// remove the file at the end
 	defer os.RemoveAll(gres.Filename)
 
 	// double check to make sure that dangerous file wasn't uploaded

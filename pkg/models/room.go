@@ -19,7 +19,7 @@ type RoomModel struct {
 	natsService *natsservice.NatsService
 }
 
-func NewRoomModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService) *RoomModel {
+func NewRoomModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *RoomModel {
 	if app == nil {
 		app = config.GetConfig()
 	}
@@ -29,16 +29,13 @@ func NewRoomModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redi
 	if rs == nil {
 		rs = redisservice.New(app.RDS)
 	}
-	if lk == nil {
-		lk = livekitservice.New(app, rs)
-	}
 
 	return &RoomModel{
 		app:         app,
 		ds:          ds,
 		rs:          rs,
-		lk:          lk,
-		userModel:   NewUserModel(app, ds, rs, lk),
+		lk:          livekitservice.New(app, rs),
+		userModel:   NewUserModel(app, ds, rs),
 		natsService: natsservice.New(app),
 	}
 }
