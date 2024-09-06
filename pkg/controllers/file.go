@@ -16,7 +16,12 @@ import (
 // HandleFileUpload method can only be use if you are using resumable.js as your frontend.
 // Library link: https://github.com/23/resumable.js
 func HandleFileUpload(c *fiber.Ctx) error {
-	req := new(models.FileUploadReq)
+	roomId := c.Locals("roomId")
+	requestedUserId := c.Locals("requestedUserId")
+
+	// FileProcessReq will hold basic information regarding room, user, file etc.
+	// this will be used to verify regarding file origin only
+	req := new(models.ResumableUploadReq)
 	err := c.QueryParser(req)
 	if err != nil {
 		_ = c.SendStatus(fiber.StatusBadRequest)
@@ -26,53 +31,33 @@ func HandleFileUpload(c *fiber.Ctx) error {
 		})
 	}
 
-	if req.Sid == "" || req.RoomId == "" || req.UserId == "" {
-		_ = c.SendStatus(fiber.StatusBadRequest)
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "missing required fields",
-		})
+	if req.RoomSid == "" || req.RoomId == "" || req.UserId == "" {
+		return commonFileErrorResponse(c, "missing required fields")
+	}
+	if roomId != req.RoomId {
+		return commonFileErrorResponse(c, "token roomId & requested roomId didn't matched")
+	}
+	if requestedUserId != req.UserId {
+		return commonFileErrorResponse(c, "token roomId & requested roomId didn't matched")
 	}
 
 	m := models.NewFileModel(nil, nil, nil)
-	m.AddRequest(req)
-	err = m.CommonValidation(c)
+	res, err := m.ResumableFileUpload(c)
 	if err != nil {
-		_ = c.SendStatus(fiber.StatusBadRequest)
 		return c.JSON(fiber.Map{
 			"status": false,
 			"msg":    err.Error(),
 		})
 	}
 
-	if req.Resumable {
-		res, err := m.ResumableFileUpload(c)
-		if err != nil {
-			return c.JSON(fiber.Map{
-				"status": false,
-				"msg":    err.Error(),
-			})
-		}
-
-		if res.FilePath == "part_uploaded" {
-			_ = c.SendStatus(fiber.StatusOK)
-			return c.SendString(res.FilePath)
-		} else {
-			return c.JSON(fiber.Map{
-				"status":        true,
-				"msg":           "file uploaded successfully",
-				"filePath":      res.FilePath,
-				"fileName":      res.FileName,
-				"fileExtension": res.FileExtension,
-				"fileMimeType":  res.FileMimeType,
-			})
-		}
+	if res.FilePath == "part_uploaded" {
+		_ = c.SendStatus(fiber.StatusOK)
+		return c.SendString(res.FilePath)
+	} else {
+		res.Status = true
+		res.Msg = "file uploaded successfully"
+		return c.JSON(res)
 	}
-
-	return c.JSON(fiber.Map{
-		"status": false,
-		"msg":    "upload method not supported",
-	})
 }
 
 func HandleDownloadUploadedFile(c *fiber.Ctx) error {
@@ -95,7 +80,7 @@ func HandleDownloadUploadedFile(c *fiber.Ctx) error {
 }
 
 func HandleConvertWhiteboardFile(c *fiber.Ctx) error {
-	req := new(models.FileUploadReq)
+	req := new(models.ConvertWhiteboardFileReq)
 	err := c.BodyParser(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -104,7 +89,7 @@ func HandleConvertWhiteboardFile(c *fiber.Ctx) error {
 		})
 	}
 
-	if req.Sid == "" || req.RoomId == "" || req.UserId == "" {
+	if req.RoomSid == "" || req.RoomId == "" {
 		_ = c.SendStatus(fiber.StatusBadRequest)
 		return c.JSON(fiber.Map{
 			"status": false,
@@ -120,8 +105,7 @@ func HandleConvertWhiteboardFile(c *fiber.Ctx) error {
 	}
 
 	m := models.NewFileModel(nil, nil, nil)
-	m.AddRequest(req)
-	res, err := m.ConvertWhiteboardFile()
+	res, err := m.ConvertAndBroadcastWhiteboardFile(req.RoomId, req.RoomSid, req.FilePath)
 	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
@@ -129,14 +113,7 @@ func HandleConvertWhiteboardFile(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.JSON(fiber.Map{
-		"status":      true,
-		"msg":         "success",
-		"file_id":     res.FileId,
-		"file_name":   res.FileName,
-		"file_path":   res.FilePath,
-		"total_pages": res.TotalPages,
-	})
+	return c.JSON(res)
 }
 
 func HandleGetClientFiles(c *fiber.Ctx) error {
@@ -163,5 +140,12 @@ func HandleGetClientFiles(c *fiber.Ctx) error {
 		"msg":    "success",
 		"css":    css,
 		"js":     js,
+	})
+}
+
+func commonFileErrorResponse(c *fiber.Ctx, msg string) error {
+	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+		"status": false,
+		"msg":    msg,
 	})
 }

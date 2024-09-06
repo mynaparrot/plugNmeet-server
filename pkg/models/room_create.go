@@ -3,8 +3,6 @@ package models
 import (
 	"errors"
 	"fmt"
-	"github.com/cavaliergopher/grab/v3"
-	"github.com/gabriel-vasile/mimetype"
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
@@ -13,9 +11,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	log "github.com/sirupsen/logrus"
-	"net/http"
-	"os"
-	"strings"
 	"time"
 )
 
@@ -195,85 +190,21 @@ func (m *RoomModel) preRoomCreationTasks(r *plugnmeet.CreateRoomReq) {
 }
 
 func (m *RoomModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomReq, roomSid string) {
-	if !req.Metadata.RoomFeatures.WhiteboardFeatures.AllowedWhiteboard || req.Metadata.RoomFeatures.WhiteboardFeatures.PreloadFile == nil {
+	wbf := req.Metadata.RoomFeatures.WhiteboardFeatures
+	if !wbf.AllowedWhiteboard || wbf.PreloadFile == nil {
 		return
 	}
 
-	// get file info
-	httpClient := &http.Client{Timeout: 5 * time.Second}
-	resp, err := httpClient.Head(*req.Metadata.RoomFeatures.WhiteboardFeatures.PreloadFile)
-	if err != nil {
-		log.Errorln(err)
-		return
-	}
-
-	if resp.ContentLength < 1 {
-		log.Errorf("invalid file type")
-		return
-	} else if resp.ContentLength > config.MaxPreloadedWhiteboardFileSize {
-		log.Errorf("Allowd %d but given %d", config.MaxPreloadedWhiteboardFileSize, resp.ContentLength)
-		return
-	}
+	log.Infoln(fmt.Sprintf("roomId: %s has PreloadFile: %s for whiteboard so, preparing it", req.RoomId, *wbf.PreloadFile))
 
 	fm := NewFileModel(m.app, m.ds, m.rs)
-	cType := resp.Header.Get("Content-Type")
-	if cType == "" {
-		log.Errorln("invalid Content-Type")
-		return
-	}
-
-	// validate file type
-	mtype := mimetype.Lookup(cType)
-	err = fm.ValidateMimeType(mtype)
+	err := fm.DownloadAndProcessPreUploadWBfile(req.RoomId, roomSid, *wbf.PreloadFile)
 	if err != nil {
 		log.Errorln(err)
 		return
 	}
 
-	downloadDir := fmt.Sprintf("%s/%s", config.GetConfig().UploadFileSettings.Path, roomSid)
-	if _, err = os.Stat(downloadDir); os.IsNotExist(err) {
-		err = os.MkdirAll(downloadDir, os.ModePerm)
-		if err != nil {
-			log.Errorln(err)
-			return
-		}
-	}
-
-	// now download the file
-	gres, err := grab.Get(downloadDir, *req.Metadata.RoomFeatures.WhiteboardFeatures.PreloadFile)
-	if err != nil {
-		log.Errorln(err)
-		return
-	}
-	// double check to make sure that dangerous file wasn't uploaded
-	mtype, err = mimetype.DetectFile(gres.Filename)
-	if err != nil {
-		log.Errorln(err)
-		// remove the file if have problem
-		_ = os.RemoveAll(gres.Filename)
-		return
-	}
-	err = fm.ValidateMimeType(mtype)
-	if err != nil {
-		log.Errorln(err)
-		// remove the file if validation not passed
-		_ = os.RemoveAll(gres.Filename)
-		return
-	}
-
-	ms := strings.SplitN(gres.Filename, "/", -1)
-	fm.AddRequest(&FileUploadReq{
-		Sid:      roomSid,
-		RoomId:   req.RoomId,
-		FilePath: fmt.Sprintf("%s/%s", roomSid, ms[len(ms)-1]),
-	})
-
-	_, err = fm.ConvertWhiteboardFile()
-	if err != nil {
-		log.Errorln(err)
-	}
-	// finally, delete the file
-	_ = os.RemoveAll(gres.Filename)
+	log.Infoln(fmt.Sprintf("the PreloadFile: %s for roomId: %s had been processed successfully", *wbf.PreloadFile, req.RoomId))
 }
 
 func (m *RoomModel) sendRoomCreatedWebhook(info *plugnmeet.ActiveRoomInfo) {

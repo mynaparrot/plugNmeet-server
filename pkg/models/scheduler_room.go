@@ -31,7 +31,7 @@ func (m *SchedulerModel) activeRoomChecker() {
 
 	for _, room := range activeRooms {
 		if room.Sid == "" {
-			// if room Sid is empty then we won't do anything
+			// if room RoomSid is empty then we won't do anything
 			// because may be the session is creating
 			// if we don't consider this, then it will unnecessarily create empty field
 			continue

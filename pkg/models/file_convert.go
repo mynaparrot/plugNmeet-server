@@ -17,39 +17,49 @@ type convertStatus struct {
 	err    error
 }
 
-type ConvertWhiteboardFileRes struct {
-	FileName   string `json:"file_name"`
-	FileId     string `json:"file_id"`
-	FilePath   string `json:"file_path"`
-	TotalPages int    `json:"total_pages"`
+type ConvertWhiteboardFileReq struct {
+	RoomSid  string `json:"roomSid" query:"roomSid"`
+	RoomId   string `json:"roomId" query:"roomId"`
+	UserId   string `json:"userId" query:"userId"`
+	FilePath string `json:"filePath" query:"filePath"`
 }
 
-func (m *FileModel) ConvertWhiteboardFile() (*ConvertWhiteboardFileRes, error) {
-	if m.req == nil || m.req.RoomId == "" || m.req.Sid == "" {
-		return nil, errors.New("RoomId or Sid is empty")
+type ConvertWhiteboardFileRes struct {
+	Status     bool   `json:"status"`
+	Msg        string `json:"msg"`
+	FileName   string `json:"fileName"`
+	FileId     string `json:"fileId"`
+	FilePath   string `json:"filePath"`
+	TotalPages int    `json:"totalPages"`
+}
+
+// ConvertAndBroadcastWhiteboardFile will convert & broadcast files for whiteboard
+func (m *FileModel) ConvertAndBroadcastWhiteboardFile(roomId, roomSid, filePath string) (*ConvertWhiteboardFileRes, error) {
+	if roomId == "" || filePath == "" {
+		return nil, errors.New("roomId or file path is empty")
 	}
 
-	// check if mutool installed in correct path
+	// check if mutool installed in the correct path
 	if _, err := os.Stat("/usr/bin/mutool"); err != nil {
 		log.Errorln(err)
 		return nil, err
 	}
 
-	file := fmt.Sprintf("%s/%s", m.app.UploadFileSettings.Path, m.req.FilePath)
+	file := fmt.Sprintf("%s/%s", m.app.UploadFileSettings.Path, filePath)
 	info, err := os.Stat(file)
 	if err != nil {
 		log.Errorln(err)
 		return nil, err
 	}
 
-	mtype, err := mimetype.DetectFile(file)
+	mType, err := mimetype.DetectFile(file)
 	if err != nil {
 		log.Errorln(err)
 		return nil, err
 	}
 
 	fileId := uuid.NewString()
-	outputDir := fmt.Sprintf("%s/%s/%s", m.app.UploadFileSettings.Path, m.req.Sid, fileId)
+	outputDir := fmt.Sprintf("%s/%s/%s", m.app.UploadFileSettings.Path, roomSid, fileId)
 	err = os.MkdirAll(outputDir, os.ModePerm)
 	if err != nil {
 		log.Errorln(err)
@@ -58,7 +68,7 @@ func (m *FileModel) ConvertWhiteboardFile() (*ConvertWhiteboardFileRes, error) {
 
 	needConvertToPdf := false
 	variant := "pdf:writer_pdf_Export"
-	switch mtype.Extension() {
+	switch mType.Extension() {
 	case ".docx", ".doc", ".odt", ".txt", ".rtf", ".xml":
 		needConvertToPdf = true
 	case ".xlsx", ".xls", ".ods", ".csv":
@@ -76,13 +86,13 @@ func (m *FileModel) ConvertWhiteboardFile() (*ConvertWhiteboardFileRes, error) {
 	}
 
 	if needConvertToPdf {
-		// check if soffice installed in correct path
+		// check if soffice installed in the correct path
 		if _, err = os.Stat("/usr/bin/soffice"); err != nil {
 			log.Errorln(err)
 			return nil, err
 		}
 
-		newFile := strings.Replace(info.Name(), mtype.Extension(), ".pdf", 1)
+		newFile := strings.Replace(info.Name(), mType.Extension(), ".pdf", 1)
 		status := make(chan convertStatus)
 
 		go func(file, variant, outputDir string) {
@@ -126,14 +136,16 @@ func (m *FileModel) ConvertWhiteboardFile() (*ConvertWhiteboardFileRes, error) {
 	totalPages, _ := filepath.Glob(pattern)
 
 	res := &ConvertWhiteboardFileRes{
+		Status:     true,
+		Msg:        "success",
 		FileName:   info.Name(),
-		FilePath:   fmt.Sprintf("%s/%s", m.req.Sid, fileId),
+		FilePath:   fmt.Sprintf("%s/%s", roomSid, fileId),
 		FileId:     fileId,
 		TotalPages: len(totalPages),
 	}
 
 	// update metadata with info
-	err = m.updateRoomMetadataWithOfficeFile(res)
+	err = m.updateRoomMetadataWithOfficeFile(roomId, res)
 	if err != nil {
 		log.Errorln(err)
 	}

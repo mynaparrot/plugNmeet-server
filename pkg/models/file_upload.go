@@ -11,44 +11,39 @@ import (
 	"strings"
 )
 
-type resumableUploadReq struct {
-	ResumableChunkNumber      int
-	ResumableTotalChunks      int
-	ResumableTotalSize        int64
-	ResumableIdentifier       string
-	ResumableFilename         string
-	ResumableCurrentChunkSize int64
-}
-
-type UploadedFileResponse struct {
-	FilePath      string
-	FileName      string
-	FileExtension string
-	FileMimeType  string
+type ResumableUploadReq struct {
+	RoomSid                   string `json:"roomSid" query:"roomSid"`
+	RoomId                    string `json:"roomId" query:"roomId"`
+	UserId                    string `json:"userId" query:"userId"`
+	ResumableChunkNumber      int    `query:"resumableChunkNumber"`
+	ResumableTotalChunks      int    `query:"resumableTotalChunks"`
+	ResumableTotalSize        int64  `query:"resumableChunkSize"`
+	ResumableIdentifier       string `query:"resumableIdentifier"`
+	ResumableFilename         string `query:"resumableFilename"`
+	ResumableCurrentChunkSize int64  `query:"resumableCurrentChunkSize"`
 }
 
 // ResumableFileUpload method can only be use if you are using resumable.js as your frontend.
 // Library link: https://github.com/23/resumable.js
 func (m *FileModel) ResumableFileUpload(c *fiber.Ctx) (*UploadedFileResponse, error) {
-	if m.req == nil || m.req.RoomId == "" || m.req.Sid == "" {
-		return nil, errors.New("RoomId or Sid is empty")
-	}
-
-	req := new(resumableUploadReq)
+	req := new(ResumableUploadReq)
 	res := new(UploadedFileResponse)
 	err := c.QueryParser(req)
 	if err != nil {
 		log.Errorln(err)
 		return nil, err
 	}
+	if req == nil || req.RoomId == "" || req.RoomSid == "" {
+		return nil, errors.New("RoomId or RoomSid is empty")
+	}
 
 	tempFolder := os.TempDir()
-	path := fmt.Sprintf("%s/%s", tempFolder, req.ResumableIdentifier)
+	chunkDir := fmt.Sprintf("%s/%s", tempFolder, req.ResumableIdentifier)
 
 	switch c.Method() {
 	case "GET":
 		// we'll check status of chunk part
-		relativeChunk := fmt.Sprintf("%s%s%s%d", path, "/", "part", req.ResumableChunkNumber)
+		relativeChunk := fmt.Sprintf("%s%s%s%d", chunkDir, "/", "part", req.ResumableChunkNumber)
 
 		if _, err = os.Stat(relativeChunk); os.IsNotExist(err) {
 			_ = c.SendStatus(fiber.StatusNoContent)
@@ -68,7 +63,7 @@ func (m *FileModel) ResumableFileUpload(c *fiber.Ctx) (*UploadedFileResponse, er
 	default:
 		if req.ResumableChunkNumber == 1 {
 			// we'll check if the meeting is already running or not
-			room, _ := m.ds.GetRoomInfoBySid(m.req.Sid, nil)
+			room, _ := m.ds.GetRoomInfoBySid(req.RoomSid, nil)
 			if room == nil || room.ID == 0 {
 				_ = c.SendStatus(fiber.StatusBadRequest)
 				return nil, errors.New("room isn't running")
@@ -107,8 +102,8 @@ func (m *FileModel) ResumableFileUpload(c *fiber.Ctx) (*UploadedFileResponse, er
 		}
 
 		// create path, if problem then cancel full process.
-		if _, err = os.Stat(path); os.IsNotExist(err) {
-			err = os.MkdirAll(path, os.ModePerm)
+		if _, err = os.Stat(chunkDir); os.IsNotExist(err) {
+			err = os.MkdirAll(chunkDir, os.ModePerm)
 			if err != nil {
 				_ = c.SendStatus(fiber.StatusInternalServerError)
 				log.Errorln(err)
@@ -116,7 +111,7 @@ func (m *FileModel) ResumableFileUpload(c *fiber.Ctx) (*UploadedFileResponse, er
 			}
 		}
 
-		relativeChunk := fmt.Sprintf("%s%s%s%d", path, "/", "part", req.ResumableChunkNumber)
+		relativeChunk := fmt.Sprintf("%s%s%s%d", chunkDir, "/", "part", req.ResumableChunkNumber)
 
 		f, err := os.OpenFile(relativeChunk, os.O_WRONLY|os.O_CREATE, 0666)
 		if err != nil {
@@ -134,12 +129,12 @@ func (m *FileModel) ResumableFileUpload(c *fiber.Ctx) (*UploadedFileResponse, er
 
 		if req.ResumableChunkNumber == req.ResumableTotalChunks {
 			// combining chunks into one file
-			path, err = m.combineResumableFiles(path, req.ResumableFilename, req.ResumableTotalChunks)
+			combinedFile, err := m.combineResumableFiles(chunkDir, req.ResumableFilename, req.RoomSid, req.ResumableTotalChunks)
 			if err != nil {
 				return nil, err
 			}
 			// we'll detect mime type again for sending data
-			mtype, err := mimetype.DetectFile(path)
+			mtype, err := mimetype.DetectFile(combinedFile)
 			if err != nil {
 				return nil, err
 			}
@@ -151,16 +146,16 @@ func (m *FileModel) ResumableFileUpload(c *fiber.Ctx) (*UploadedFileResponse, er
 		}
 	}
 
-	finalPath := fmt.Sprintf("%s/%s", m.req.Sid, req.ResumableFilename)
+	finalPath := fmt.Sprintf("%s/%s", req.RoomSid, req.ResumableFilename)
 	res.FilePath = finalPath
 	res.FileName = req.ResumableFilename
 
 	return res, nil
 }
 
-func (m *FileModel) combineResumableFiles(chunksDir string, fileName string, totalParts int) (string, error) {
+func (m *FileModel) combineResumableFiles(chunksDir, fileName, roomSid string, totalParts int) (string, error) {
 	chunkSizeInBytes := 1048576
-	uploadDir := fmt.Sprintf("%s/%s", m.app.UploadFileSettings.Path, m.req.Sid)
+	uploadDir := fmt.Sprintf("%s/%s", m.app.UploadFileSettings.Path, roomSid)
 
 	if _, err := os.Stat(uploadDir); os.IsNotExist(err) {
 		err = os.MkdirAll(uploadDir, os.ModePerm)
@@ -169,8 +164,8 @@ func (m *FileModel) combineResumableFiles(chunksDir string, fileName string, tot
 		}
 	}
 
-	path := fmt.Sprintf("%s/%s", uploadDir, fileName)
-	f, err := os.Create(path)
+	combinedFile := fmt.Sprintf("%s/%s", uploadDir, fileName)
+	f, err := os.Create(combinedFile)
 	if err != nil {
 		log.Errorf("Error: %s", err)
 		return "", err
@@ -198,5 +193,5 @@ func (m *FileModel) combineResumableFiles(chunksDir string, fileName string, tot
 		return "", err
 	}
 
-	return path, nil
+	return combinedFile, nil
 }

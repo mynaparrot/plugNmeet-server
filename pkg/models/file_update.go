@@ -5,8 +5,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func (m *FileModel) updateRoomMetadataWithOfficeFile(f *ConvertWhiteboardFileRes) error {
-	roomMeta, err := m.natsService.GetRoomMetadataStruct(m.req.RoomId)
+func (m *FileModel) updateRoomMetadataWithOfficeFile(roomId string, f *ConvertWhiteboardFileRes) error {
+	roomMeta, err := m.natsService.GetRoomMetadataStruct(roomId)
 	if err != nil {
 		return err
 	}
@@ -14,12 +14,13 @@ func (m *FileModel) updateRoomMetadataWithOfficeFile(f *ConvertWhiteboardFileRes
 		return errors.New("invalid nil room metadata information")
 	}
 
-	roomMeta.RoomFeatures.WhiteboardFeatures.WhiteboardFileId = f.FileId
-	roomMeta.RoomFeatures.WhiteboardFeatures.FileName = f.FileName
-	roomMeta.RoomFeatures.WhiteboardFeatures.FilePath = f.FilePath
-	roomMeta.RoomFeatures.WhiteboardFeatures.TotalPages = uint32(f.TotalPages)
+	wbf := roomMeta.RoomFeatures.WhiteboardFeatures
+	wbf.WhiteboardFileId = f.FileId
+	wbf.FileName = f.FileName
+	wbf.FilePath = f.FilePath
+	wbf.TotalPages = uint32(f.TotalPages)
 
-	err = m.natsService.UpdateAndBroadcastRoomMetadata(m.req.RoomId, roomMeta)
+	err = m.natsService.UpdateAndBroadcastRoomMetadata(roomId, roomMeta)
 	if err != nil {
 		log.Errorln(err)
 	}

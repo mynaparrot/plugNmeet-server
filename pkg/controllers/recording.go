@@ -1,169 +1,152 @@
 package controllers
 
 import (
+	"github.com/bufbuild/protovalidate-go"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
-	log "github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
-func HandleRecording(c *fiber.Ctx) error {
-	isAdmin := c.Locals("isAdmin")
-	roomId := c.Locals("roomId")
-
-	if isAdmin != true {
-		return utils.SendCommonProtobufResponse(c, false, "only admin can start recording")
+func HandleFetchRecordings(c *fiber.Ctx) error {
+	req := new(plugnmeet.FetchRecordingsReq)
+	op := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
 	}
-
-	if roomId == "" {
-		return utils.SendCommonProtobufResponse(c, false, "no roomId in token")
-	}
-
-	req := new(plugnmeet.RecordingReq)
-	err := proto.Unmarshal(c.Body(), req)
+	err := op.Unmarshal(c.Body(), req)
 	if err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
-
-	err = req.Validate()
+	v, err := protovalidate.New()
 	if err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
+		return utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
 	}
 
-	// now need to check if meeting is running or not
-	rm := dbservice.New(config.GetConfig().DB)
-	isRunning := 1
-	room, err := rm.GetRoomInfoBySid(req.Sid, &isRunning)
+	if err = v.Validate(req); err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
+
+	m := models.NewRecordingModel(nil, nil, nil)
+	result, err := m.FetchRecordings(req)
+
 	if err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
+	if result.GetTotalRecordings() == 0 {
+		return utils.SendCommonProtoJsonResponse(c, false, "no recordings found")
 	}
 
-	if room == nil || room.ID == 0 {
-		return utils.SendCommonProtobufResponse(c, false, "notifications.room-not-active")
+	r := &plugnmeet.FetchRecordingsRes{
+		Status: true,
+		Msg:    "success",
+		Result: result,
 	}
-
-	if room.RoomId != roomId {
-		return utils.SendCommonProtobufResponse(c, false, "roomId in token mismatched")
-	}
-
-	if room.IsRecording == 1 && req.Task == plugnmeet.RecordingTasks_START_RECORDING {
-		return utils.SendCommonProtobufResponse(c, false, "notifications.recording-already-running")
-	} else if room.IsRecording == 0 && req.Task == plugnmeet.RecordingTasks_STOP_RECORDING {
-		return utils.SendCommonProtobufResponse(c, false, "notifications.recording-not-running")
-	}
-
-	if room.IsActiveRtmp == 1 && req.Task == plugnmeet.RecordingTasks_START_RTMP {
-		return utils.SendCommonProtobufResponse(c, false, "notifications.rtmp-already-running")
-	} else if room.IsActiveRtmp == 0 && req.Task == plugnmeet.RecordingTasks_STOP_RTMP {
-		return utils.SendCommonProtobufResponse(c, false, "notifications.rtmp-not-running")
-	}
-
-	req.RoomId = room.RoomId
-	req.RoomTableId = int64(room.ID)
-
-	m := models.NewRecorderModel(nil, nil, nil)
-	err = m.SendMsgToRecorder(req)
-	if err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
-	}
-
-	return utils.SendCommonProtobufResponse(c, true, "success")
+	return utils.SendProtoJsonResponse(c, r)
 }
 
-func HandleRTMP(c *fiber.Ctx) error {
-	isAdmin := c.Locals("isAdmin")
-	roomId := c.Locals("roomId")
-
-	if isAdmin != true {
-		return utils.SendCommonProtobufResponse(c, false, "only admin can start recording")
+func HandleRecordingInfo(c *fiber.Ctx) error {
+	req := new(plugnmeet.RecordingInfoReq)
+	op := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
 	}
-
-	if roomId == "" {
-		return utils.SendCommonProtobufResponse(c, false, "no roomId in token")
-	}
-
-	// we can use same as RecordingReq
-	req := new(plugnmeet.RecordingReq)
-	err := proto.Unmarshal(c.Body(), req)
+	err := op.Unmarshal(c.Body(), req)
 	if err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	err = req.Validate()
+	v, err := protovalidate.New()
 	if err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
+		return utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
 	}
 
-	if req.Task == plugnmeet.RecordingTasks_START_RTMP {
-		if req.RtmpUrl == nil {
-			return utils.SendCommonProtobufResponse(c, false, "rtmp url require")
-		} else if *req.RtmpUrl == "" {
-			return utils.SendCommonProtobufResponse(c, false, "rtmp url require")
-		}
+	if err = v.Validate(req); err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	// now need to check if meeting is running or not
-	rm := dbservice.New(config.GetConfig().DB)
-	isRunning := 1
-	room, err := rm.GetRoomInfoBySid(req.Sid, &isRunning)
+	m := models.NewRecordingModel(nil, nil, nil)
+	result, err := m.RecordingInfo(req)
 	if err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	if room == nil || room.ID == 0 {
-		return utils.SendCommonProtobufResponse(c, false, "notifications.room-not-active")
-	}
-
-	if room.RoomId != roomId {
-		return utils.SendCommonProtobufResponse(c, false, "roomId in token mismatched")
-	}
-
-	if room.IsActiveRtmp == 1 && req.Task == plugnmeet.RecordingTasks_START_RTMP {
-		return utils.SendCommonProtobufResponse(c, false, "RTMP broadcasting already running")
-	} else if room.IsActiveRtmp == 0 && req.Task == plugnmeet.RecordingTasks_STOP_RTMP {
-		return utils.SendCommonProtobufResponse(c, false, "RTMP broadcasting not running")
-	}
-
-	req.RoomId = room.RoomId
-	req.RoomTableId = int64(room.ID)
-
-	m := models.NewRecorderModel(nil, nil, nil)
-	err = m.SendMsgToRecorder(req)
-	if err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
-	}
-
-	return utils.SendCommonProtobufResponse(c, true, "success")
+	return utils.SendProtoJsonResponse(c, result)
 }
 
-func HandleRecorderEvents(c *fiber.Ctx) error {
-	req := new(plugnmeet.RecorderToPlugNmeet)
-	err := proto.Unmarshal(c.Body(), req)
+func HandleDeleteRecording(c *fiber.Ctx) error {
+	req := new(plugnmeet.DeleteRecordingReq)
+	op := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
+	err := op.Unmarshal(c.Body(), req)
 	if err != nil {
-		log.Errorln(err)
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
+	v, err := protovalidate.New()
+	if err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
 	}
 
-	if req.From == "recorder" {
-		app := config.GetConfig()
-		ds := dbservice.New(app.DB)
-		roomInfo, _ := ds.GetRoomInfoByTableId(uint64(req.RoomTableId))
-		if roomInfo == nil {
-			return c.SendStatus(fiber.StatusNotFound)
-		}
-
-		m := models.NewRecordingModel(app, ds, nil)
-		req.RoomId = roomInfo.RoomId
-		req.RoomSid = roomInfo.Sid
-		m.HandleRecorderResp(req, roomInfo)
+	if err = v.Validate(req); err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	return c.SendStatus(fiber.StatusOK)
+	m := models.NewRecordingModel(nil, nil, nil)
+	err = m.DeleteRecording(req)
+	if err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
+
+	return utils.SendCommonProtoJsonResponse(c, true, "success")
+}
+
+func HandleGetDownloadToken(c *fiber.Ctx) error {
+	req := new(plugnmeet.GetDownloadTokenReq)
+	op := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
+	err := op.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
+	v, err := protovalidate.New()
+	if err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
+	}
+
+	if err = v.Validate(req); err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
+
+	m := models.NewRecordingModel(nil, nil, nil)
+	token, err := m.GetDownloadToken(req)
+
+	if err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
+
+	r := &plugnmeet.GetDownloadTokenRes{
+		Status: true,
+		Msg:    "success",
+		Token:  &token,
+	}
+	return utils.SendProtoJsonResponse(c, r)
+}
+
+func HandleDownloadRecording(c *fiber.Ctx) error {
+	token := c.Params("token")
+
+	if len(token) == 0 {
+		return c.Status(fiber.StatusUnauthorized).SendString("token require or invalid url")
+	}
+
+	m := models.NewRecordingModel(nil, nil, nil)
+	file, status, err := m.VerifyRecordingToken(token)
+
+	if err != nil {
+		return c.Status(status).SendString(err.Error())
+	}
+
+	c.Attachment(file)
+	return c.SendFile(file, false)
 }

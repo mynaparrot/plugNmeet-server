@@ -1,14 +1,68 @@
 package controllers
 
 import (
+	"github.com/bufbuild/protovalidate-go"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
+
+func HandleGenerateJoinToken(c *fiber.Ctx) error {
+	op := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
+	req := new(plugnmeet.GenerateTokenReq)
+	err := op.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
+
+	v, err := protovalidate.New()
+	if err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
+	}
+
+	if err = v.Validate(req); err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
+
+	if req.UserInfo == nil {
+		return utils.SendCommonProtoJsonResponse(c, false, "UserInfo required")
+	}
+
+	// don't generate token if user is blocked
+	nts := natsservice.New(config.GetConfig())
+	exist := nts.IsUserExistInBlockList(req.RoomId, req.UserInfo.UserId)
+	if exist {
+		return utils.SendCommonProtoJsonResponse(c, false, "this user is blocked to join this session")
+	}
+
+	ds := dbservice.New(config.GetConfig().DB)
+	ri, _ := ds.GetRoomInfoByRoomId(req.RoomId, 1)
+	if ri == nil || ri.ID == 0 {
+		return utils.SendCommonProtoJsonResponse(c, false, "room is not active. create room first")
+	}
+
+	m := models.NewUserModel(nil, nil, nil, nil)
+	token, err := m.GetPNMJoinToken(req)
+	if err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
+
+	r := &plugnmeet.GenerateTokenRes{
+		Status: true,
+		Msg:    "success",
+		Token:  &token,
+	}
+
+	return utils.SendProtoJsonResponse(c, r)
+}
 
 func HandleUpdateUserLockSetting(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")

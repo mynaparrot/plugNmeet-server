@@ -13,17 +13,17 @@ type FileModel struct {
 	rs          *redisservice.RedisService
 	natsService *natsservice.NatsService
 
-	req           *FileUploadReq
 	fileExtension string
 	fileMimeType  string
 }
 
-type FileUploadReq struct {
-	Sid       string `json:"sid"`
-	RoomId    string `json:"roomId"`
-	UserId    string `json:"userId"`
-	FilePath  string `json:"file_path"`
-	Resumable bool   `json:"resumable"`
+type UploadedFileResponse struct {
+	Status        bool   `json:"status"`
+	Msg           string `json:"msg"`
+	FilePath      string `json:"filePath"`
+	FileName      string `json:"fileName"`
+	FileExtension string `json:"fileExtension"`
+	FileMimeType  string `json:"fileMimeType"`
 }
 
 func NewFileModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *FileModel {
@@ -43,8 +43,4 @@ func NewFileModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redi
 		rs:          rs,
 		natsService: natsservice.New(app),
 	}
-}
-
-func (m *FileModel) AddRequest(req *FileUploadReq) {
-	m.req = req
 }

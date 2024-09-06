@@ -94,10 +94,7 @@ func (m *RoomModel) OnAfterRoomEnded(roomId, roomSid, metadata string) {
 	// Delete all the files those may upload during session
 	if !m.app.UploadFileSettings.KeepForever {
 		fileM := NewFileModel(m.app, m.ds, m.rs)
-		fileM.AddRequest(&FileUploadReq{
-			Sid: roomSid,
-		})
-		err = fileM.DeleteRoomUploadedDir()
+		err = fileM.DeleteRoomUploadedDir(roomSid)
 		if err != nil {
 			log.Errorln(err)
 		}
