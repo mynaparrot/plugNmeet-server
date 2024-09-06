@@ -195,7 +195,7 @@ func (m *RoomModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomReq, r
 		return
 	}
 
-	log.Infoln(fmt.Sprintf("roomId: %s has PreloadFile: %s for whiteboard so, preparing it", req.RoomId, *wbf.PreloadFile))
+	log.Infoln(fmt.Sprintf("roomId: %s has preloadFile: %s for whiteboard so, preparing it", req.RoomId, *wbf.PreloadFile))
 
 	fm := NewFileModel(m.app, m.ds, m.rs)
 	err := fm.DownloadAndProcessPreUploadWBfile(req.RoomId, roomSid, *wbf.PreloadFile)
@@ -205,7 +205,7 @@ func (m *RoomModel) prepareWhiteboardPreloadFile(req *plugnmeet.CreateRoomReq, r
 		return
 	}
 
-	log.Infoln(fmt.Sprintf("the PreloadFile: %s for roomId: %s had been processed successfully", *wbf.PreloadFile, req.RoomId))
+	log.Infoln(fmt.Sprintf("preloadFile: %s for roomId: %s had been processed successfully", *wbf.PreloadFile, req.RoomId))
 }
 
 func (m *RoomModel) sendRoomCreatedWebhook(info *plugnmeet.ActiveRoomInfo) {

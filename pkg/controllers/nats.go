@@ -82,10 +82,6 @@ func (c *NatsController) StartUp() {
 			Handler: micro.HandlerFunc(authService.Handle),
 		},
 	})
-
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	<-sig
 }
 
 type NatsEvents struct {
@@ -121,6 +117,7 @@ func (c *NatsController) subscribeToUsersConnEvents() {
 	})
 	if err != nil {
 		log.Fatal(err)
+		return
 	}
 
 	sig := make(chan os.Signal, 1)
@@ -139,6 +136,7 @@ func (c *NatsController) subscribeToSystemWorker() {
 	})
 	if err != nil {
 		log.Fatalln(err)
+		return
 	}
 
 	cc, err := cons.Consume(func(msg jetstream.Msg) {
@@ -158,6 +156,7 @@ func (c *NatsController) subscribeToSystemWorker() {
 
 	if err != nil {
 		log.Fatal(err)
+		return
 	}
 	defer cc.Stop()
 
