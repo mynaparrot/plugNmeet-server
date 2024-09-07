@@ -7,7 +7,8 @@ import (
 
 func (s *NatsService) CreateRoomNatsStreams(roomId string) error {
 	_, err := s.js.CreateOrUpdateStream(s.ctx, jetstream.StreamConfig{
-		Name: roomId,
+		Name:     roomId,
+		Replicas: s.app.NatsInfo.NumReplicas,
 		Subjects: []string{
 			fmt.Sprintf("%s:%s.*", roomId, s.app.NatsInfo.Subjects.Chat),
 			fmt.Sprintf("%s:%s.*", roomId, s.app.NatsInfo.Subjects.SystemPublic),

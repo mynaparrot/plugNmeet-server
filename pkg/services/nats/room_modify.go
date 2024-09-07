@@ -28,7 +28,8 @@ const (
 
 func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeout *uint32, metadata *plugnmeet.RoomMetadata) error {
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
-		Bucket: fmt.Sprintf(RoomInfoBucket, roomId),
+		Replicas: s.app.NatsInfo.NumReplicas,
+		Bucket:   fmt.Sprintf(RoomInfoBucket, roomId),
 	})
 	if err != nil {
 		return err

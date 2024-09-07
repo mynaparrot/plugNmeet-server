@@ -10,7 +10,8 @@ const breakoutRoomBucket = Prefix + "breakoutRoom-%s"
 
 func (s *NatsService) InsertOrUpdateBreakoutRoom(parentRoomId, bkRoomId string, val []byte) error {
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
-		Bucket: fmt.Sprintf(breakoutRoomBucket, parentRoomId),
+		Replicas: s.app.NatsInfo.NumReplicas,
+		Bucket:   fmt.Sprintf(breakoutRoomBucket, parentRoomId),
 	})
 	if err != nil {
 		return err

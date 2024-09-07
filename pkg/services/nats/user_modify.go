@@ -42,7 +42,8 @@ const (
 func (s *NatsService) AddUser(roomId, userId, name string, isAdmin, isPresenter bool, metadata *plugnmeet.UserMetadata) error {
 	// first add user to room
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
-		Bucket: fmt.Sprintf(RoomUsersBucket, roomId),
+		Replicas: s.app.NatsInfo.NumReplicas,
+		Bucket:   fmt.Sprintf(RoomUsersBucket, roomId),
 	})
 	if err != nil {
 		return err

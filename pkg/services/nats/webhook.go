@@ -9,7 +9,8 @@ const WebhookKvKey = Prefix + "webhookData"
 
 func (s *NatsService) AddWebhookData(roomId string, val []byte) error {
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
-		Bucket: WebhookKvKey,
+		Replicas: s.app.NatsInfo.NumReplicas,
+		Bucket:   WebhookKvKey,
 	})
 	if err != nil {
 		return err

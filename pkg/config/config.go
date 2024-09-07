@@ -166,6 +166,7 @@ type NatsInfo struct {
 	User                     string           `yaml:"user"`
 	Password                 string           `yaml:"password"`
 	AuthCalloutIssuerPrivate string           `yaml:"auth_callout_issuer_private"`
+	NumReplicas              int              `yaml:"num_replicas"`
 	Subjects                 NatsSubjects     `yaml:"subjects"`
 	Recorder                 NatsInfoRecorder `yaml:"recorder"`
 }

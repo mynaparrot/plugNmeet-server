@@ -14,7 +14,8 @@ const (
 
 func (s *NatsService) AddRoomInEtherpad(nodeId, roomId string) error {
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
-		Bucket: fmt.Sprintf(EtherpadKvKey, nodeId),
+		Replicas: s.app.NatsInfo.NumReplicas,
+		Bucket:   fmt.Sprintf(EtherpadKvKey, nodeId),
 	})
 	if err != nil {
 		return err
@@ -61,8 +62,9 @@ func (s *NatsService) RemoveRoomFromEtherpad(nodeId, roomId string) error {
 
 func (s *NatsService) AddEtherpadToken(nodeId, token string, expiration time.Duration) error {
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
-		Bucket: fmt.Sprintf(EtherpadTokenKvKey, nodeId),
-		TTL:    expiration,
+		Replicas: s.app.NatsInfo.NumReplicas,
+		Bucket:   fmt.Sprintf(EtherpadTokenKvKey, nodeId),
+		TTL:      expiration,
 	})
 	if err != nil {
 		return err
