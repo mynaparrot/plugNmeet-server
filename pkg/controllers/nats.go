@@ -150,7 +150,9 @@ func (c *NatsController) subscribeToSystemWorker() {
 				c.natsModel.HandleFromClientToServerReq(roomId, userId, req)
 			}
 		}(msg.Subject(), msg.Data())
-	})
+	}, jetstream.ConsumeErrHandler(func(consumeCtx jetstream.ConsumeContext, err error) {
+		log.Errorln(err)
+	}))
 
 	if err != nil {
 		log.Fatal(err)
