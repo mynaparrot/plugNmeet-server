@@ -129,7 +129,7 @@ func (c *NatsController) subscribeToSystemWorker() {
 	ip := c.getOutboundIP()
 
 	cons, err := c.app.JetStream.CreateOrUpdateConsumer(c.ctx, fmt.Sprintf("%s", c.app.NatsInfo.Subjects.SystemJsWorker), jetstream.ConsumerConfig{
-		Name: strings.ReplaceAll(ip.String(), ".", ":"),
+		Durable: strings.ReplaceAll(ip.String(), ".", ":"),
 		FilterSubjects: []string{
 			fmt.Sprintf("%s.*.*", c.app.NatsInfo.Subjects.SystemJsWorker),
 		},
@@ -150,9 +150,7 @@ func (c *NatsController) subscribeToSystemWorker() {
 				c.natsModel.HandleFromClientToServerReq(roomId, userId, req)
 			}
 		}(msg.Subject(), msg.Data())
-	}, jetstream.ConsumeErrHandler(func(consumeCtx jetstream.ConsumeContext, err error) {
-		log.Errorln(err)
-	}))
+	})
 
 	if err != nil {
 		log.Fatal(err)
