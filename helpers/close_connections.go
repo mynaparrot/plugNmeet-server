@@ -11,8 +11,7 @@ func HandleCloseConnections() {
 	}
 
 	// handle to close DB connection
-	db, err := config.GetConfig().DB.DB()
-	if err == nil {
+	if db, err := config.GetConfig().DB.DB(); err == nil {
 		_ = db.Close()
 	}
 
@@ -20,6 +19,7 @@ func HandleCloseConnections() {
 	_ = config.GetConfig().RDS.Close()
 
 	// close nats
+	_ = config.GetConfig().NatsConn.Drain()
 	config.GetConfig().NatsConn.Close()
 
 	// close logger

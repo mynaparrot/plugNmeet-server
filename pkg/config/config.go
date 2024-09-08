@@ -12,21 +12,17 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 )
 
 type AppConfig struct {
-	RDS       *redis.Client
-	DB        *gorm.DB
-	NatsConn  *nats.Conn
-	JetStream jetstream.JetStream
-
-	RootWorkingDir string
-
-	sync.RWMutex
+	RDS         *redis.Client
+	DB          *gorm.DB
+	NatsConn    *nats.Conn
+	JetStream   jetstream.JetStream
 	ClientFiles map[string][]string
 
+	RootWorkingDir               string
 	Client                       ClientInfo                   `yaml:"client"`
 	RoomDefaultSettings          *utils.RoomDefaultSettings   `yaml:"room_default_settings"`
 	LogSettings                  LogSettings                  `yaml:"log_settings"`

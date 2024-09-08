@@ -52,7 +52,7 @@ func NewNatsController() *NatsController {
 	}
 }
 
-func (c *NatsController) StartUp() {
+func (c *NatsController) BootUp() {
 	go c.subscribeToUsersConnEvents()
 
 	// system receiver as worker

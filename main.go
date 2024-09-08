@@ -56,7 +56,7 @@ func startServer(c *cli.Context) error {
 
 	// start nats services
 	nts := controllers.NewNatsController()
-	go nts.StartUp()
+	go nts.BootUp()
 
 	// start scheduler
 	go controllers.StartScheduler()
@@ -74,5 +74,5 @@ func startServer(c *cli.Context) error {
 		_ = rt.Shutdown()
 	}()
 
-	return rt.Listen(fmt.Sprintf(":%d", config.GetConfig().Client.Port))
+	return rt.Listen(fmt.Sprintf(":%d", appCnf.Client.Port))
 }

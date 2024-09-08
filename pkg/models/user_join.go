@@ -28,8 +28,7 @@ func (m *UserModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, erro
 		// no lock for admin
 		g.UserInfo.UserMetadata.LockSettings = new(plugnmeet.LockSettings)
 
-		err := m.CreateNewPresenter(g)
-		if err != nil {
+		if err := m.CreateNewPresenter(g); err != nil {
 			return "", err
 		}
 	} else {
@@ -67,6 +66,6 @@ func (m *UserModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, erro
 		IsHidden: g.UserInfo.IsHidden,
 	}
 
-	am := NewAuthModel(m.app, nil)
+	am := NewAuthModel(m.app, m.natsService)
 	return am.GeneratePNMJoinToken(c)
 }

@@ -6,7 +6,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
@@ -59,13 +58,13 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 
 	// we'll set default values otherwise the client got confused if data is missing
 	utils.PrepareDefaultRoomFeatures(r)
-	utils.SetCreateRoomDefaultValues(r, config.GetConfig().UploadFileSettings.MaxSize, config.GetConfig().UploadFileSettings.AllowedTypes, config.GetConfig().SharedNotePad.Enabled)
+	utils.SetCreateRoomDefaultValues(r, m.app.UploadFileSettings.MaxSize, m.app.UploadFileSettings.AllowedTypes, m.app.SharedNotePad.Enabled)
 	utils.SetRoomDefaultLockSettings(r)
 	// set default room settings
-	utils.SetDefaultRoomSettings(config.GetConfig().RoomDefaultSettings, r)
+	utils.SetDefaultRoomSettings(m.app.RoomDefaultSettings, r)
 
 	// copyright
-	copyrightConf := config.GetConfig().Client.CopyrightConf
+	copyrightConf := m.app.Client.CopyrightConf
 	if copyrightConf == nil {
 		r.Metadata.CopyrightConf = &plugnmeet.CopyrightConf{
 			Display: true,
@@ -88,7 +87,7 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 	}
 
 	// Azure cognitive services
-	azu := config.GetConfig().AzureCognitiveServicesSpeech
+	azu := m.app.AzureCognitiveServicesSpeech
 	if !azu.Enabled {
 		r.Metadata.RoomFeatures.SpeechToTextTranslationFeatures.IsAllow = false
 	} else {
