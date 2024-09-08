@@ -2,14 +2,14 @@ package models
 
 import (
 	"errors"
+	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/nats-io/nats.go"
-	"google.golang.org/protobuf/encoding/protojson"
-	"strconv"
+	"google.golang.org/protobuf/proto"
 	"time"
 )
 
@@ -57,7 +57,7 @@ func (m *RecorderModel) SendMsgToRecorder(req *plugnmeet.RecordingReq) error {
 		if req.Sid == "" {
 			return errors.New("empty sid")
 		}
-		// in this case we'll try to fetch the room info
+		// in this case, we'll try to fetch the room info
 		rmInfo, _ := m.ds.GetRoomInfoBySid(req.Sid, nil)
 		if rmInfo == nil || rmInfo.IsRecording == 0 {
 			return nil
@@ -72,7 +72,7 @@ func (m *RecorderModel) SendMsgToRecorder(req *plugnmeet.RecordingReq) error {
 		RoomId:      req.RoomId,
 		RoomSid:     req.Sid,
 		Task:        req.Task,
-		RecordingId: req.Sid + "-" + strconv.Itoa(int(recordId)),
+		RecordingId: fmt.Sprintf("%s-%d", req.Sid, recordId),
 	}
 
 	switch req.Task {
@@ -89,8 +89,12 @@ func (m *RecorderModel) SendMsgToRecorder(req *plugnmeet.RecordingReq) error {
 		}
 	}
 
-	payload, _ := protojson.Marshal(toSend)
-	_, err := m.app.NatsConn.RequestMsg(&nats.Msg{
+	payload, err := proto.Marshal(toSend)
+	if err != nil {
+		return err
+	}
+
+	_, err = m.app.NatsConn.RequestMsg(&nats.Msg{
 		Subject: m.app.NatsInfo.Recorder.RecorderChannel,
 		Data:    payload,
 	}, time.Second*1)

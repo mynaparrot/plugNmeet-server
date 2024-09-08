@@ -32,8 +32,8 @@ func (m *RecorderModel) addTokenAndRecorder(req *plugnmeet.RecordingReq, rq *plu
 	rq.RecorderId = recorderId
 	rq.AccessToken = token
 
-	// if we have custom design then we'll set custom design with token
-	// don't need to change anything in recorder.
+	// if we have custom design, then we'll set custom design with token
+	// don't need to change anything in the recorder.
 	if req.CustomDesign != nil && *req.CustomDesign != "" {
 		rq.AccessToken += "&custom_design=" + url.QueryEscape(*req.CustomDesign)
 	}
