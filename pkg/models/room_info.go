@@ -64,6 +64,13 @@ func (m *RoomModel) GetActiveRoomInfo(r *plugnmeet.GetActiveRoomInfoReq) (bool, 
 		return false, err.Error(), nil
 	}
 	if rrr == nil {
+		// we did not find this room in kv, so
+		// we should change the status of the room to end
+		roomDbInfo.IsRunning = 0
+		_, err := m.ds.UpdateRoomStatus(roomDbInfo)
+		if err != nil {
+			return false, err.Error(), nil
+		}
 		return false, "no room found", nil
 	}
 
