@@ -16,7 +16,7 @@ require (
 	github.com/livekit/protocol v1.20.0
 	github.com/livekit/server-sdk-go/v2 v2.2.1
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240911192830-9f82f6a30ab8
-	github.com/nats-io/jwt/v2 v2.5.8
+	github.com/nats-io/jwt/v2 v2.6.0
 	github.com/nats-io/nats.go v1.37.0
 	github.com/nats-io/nkeys v0.4.7
 	github.com/redis/go-redis/v9 v9.6.1
@@ -26,7 +26,7 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/mysql v1.5.7
-	gorm.io/gorm v1.25.11
+	gorm.io/gorm v1.25.12
 )
 
 require (
