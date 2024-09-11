@@ -16,7 +16,6 @@ import (
 	"github.com/nats-io/nkeys"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
-	"net"
 	"os"
 	"os/signal"
 	"strings"
@@ -126,10 +125,8 @@ func (c *NatsController) subscribeToUsersConnEvents() {
 }
 
 func (c *NatsController) subscribeToSystemWorker() {
-	ip := c.getOutboundIP()
-
 	cons, err := c.app.JetStream.CreateOrUpdateConsumer(c.ctx, fmt.Sprintf("%s", c.app.NatsInfo.Subjects.SystemJsWorker), jetstream.ConsumerConfig{
-		Durable: strings.ReplaceAll(ip.String(), ".", ":"),
+		Durable: fmt.Sprintf("pnm-%s", c.app.NatsInfo.Subjects.SystemJsWorker),
 	})
 	if err != nil {
 		log.Fatalln(err)
@@ -160,15 +157,4 @@ func (c *NatsController) subscribeToSystemWorker() {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	<-sig
-}
-
-func (c *NatsController) getOutboundIP() net.IP {
-	conn, err := net.Dial("udp", "8.8.8.8:80")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer conn.Close()
-
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
-	return localAddr.IP
 }
