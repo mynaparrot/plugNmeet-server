@@ -130,9 +130,6 @@ func (c *NatsController) subscribeToSystemWorker() {
 
 	cons, err := c.app.JetStream.CreateOrUpdateConsumer(c.ctx, fmt.Sprintf("%s", c.app.NatsInfo.Subjects.SystemJsWorker), jetstream.ConsumerConfig{
 		Durable: strings.ReplaceAll(ip.String(), ".", ":"),
-		FilterSubjects: []string{
-			fmt.Sprintf("%s.*.*", c.app.NatsInfo.Subjects.SystemJsWorker),
-		},
 	})
 	if err != nil {
 		log.Fatalln(err)
