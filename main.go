@@ -74,5 +74,9 @@ func startServer(c *cli.Context) error {
 		_ = rt.Shutdown()
 	}()
 
-	return rt.Listen(fmt.Sprintf(":%d", appCnf.Client.Port))
+	err = rt.Listen(fmt.Sprintf(":%d", appCnf.Client.Port))
+	if err != nil {
+		log.Fatalln(err)
+	}
+	return nil
 }
