@@ -199,7 +199,6 @@ func (m *FileModel) combineResumableFiles(chunksDir, fileName, roomSid string, t
 	err = os.RemoveAll(chunksDir)
 	if err != nil {
 		log.Errorln(err)
-		return "", err
 	}
 
 	return combinedFile, nil
