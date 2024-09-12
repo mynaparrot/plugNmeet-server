@@ -69,7 +69,7 @@ func (c *NatsController) BootUp() {
 	go c.subscribeToUsersConnEvents()
 
 	// auth service
-	authService := NewNatsAuthController(c.app, c.authModel, c.kp, c.app.JetStream)
+	authService := NewNatsAuthController(c.app, c.authModel, c.kp)
 	_, err = micro.AddService(c.app.NatsConn, micro.Config{
 		Name:        "pnm-auth",
 		Version:     version.Version,
