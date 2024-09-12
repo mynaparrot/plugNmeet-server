@@ -32,31 +32,28 @@ type NatsController struct {
 
 func NewNatsController() *NatsController {
 	app := config.GetConfig()
+	ds := dbservice.New(app.DB)
+	rs := redisservice.New(app.RDS)
 
 	kp, err := nkeys.FromSeed([]byte(app.NatsInfo.AuthCalloutIssuerPrivate))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	ds := dbservice.New(app.DB)
-	rs := redisservice.New(app.RDS)
-
-	rm := models.NewAuthModel(app, nil)
 	return &NatsController{
 		ctx:       context.Background(),
 		app:       app,
 		kp:        kp,
-		authModel: rm,
+		authModel: models.NewAuthModel(app, nil),
 		natsModel: models.NewNatsModel(app, ds, rs),
 	}
 }
 
 func (c *NatsController) BootUp() {
-	go c.subscribeToUsersConnEvents()
-
 	// system receiver as worker
-	_, err := c.app.JetStream.CreateOrUpdateStream(c.ctx, jetstream.StreamConfig{
+	stream, err := c.app.JetStream.CreateOrUpdateStream(c.ctx, jetstream.StreamConfig{
 		Name:      fmt.Sprintf("%s", c.app.NatsInfo.Subjects.SystemJsWorker),
+		Replicas:  c.app.NatsInfo.NumReplicas,
 		Retention: jetstream.WorkQueuePolicy, // to become a worker
 		Subjects: []string{
 			fmt.Sprintf("%s.*.*", c.app.NatsInfo.Subjects.SystemJsWorker),
@@ -67,7 +64,9 @@ func (c *NatsController) BootUp() {
 	}
 
 	// now subscribe
-	go c.subscribeToSystemWorker()
+	go c.subscribeToSystemWorker(stream)
+	// subscribe to connection events
+	go c.subscribeToUsersConnEvents()
 
 	// auth service
 	authService := NewNatsAuthController(c.app, c.authModel, c.kp, c.app.JetStream)
@@ -81,6 +80,10 @@ func (c *NatsController) BootUp() {
 			Handler: micro.HandlerFunc(authService.Handle),
 		},
 	})
+
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 type NatsEvents struct {
@@ -124,13 +127,12 @@ func (c *NatsController) subscribeToUsersConnEvents() {
 	<-sig
 }
 
-func (c *NatsController) subscribeToSystemWorker() {
-	cons, err := c.app.JetStream.CreateOrUpdateConsumer(c.ctx, fmt.Sprintf("%s", c.app.NatsInfo.Subjects.SystemJsWorker), jetstream.ConsumerConfig{
+func (c *NatsController) subscribeToSystemWorker(stream jetstream.Stream) {
+	cons, err := stream.CreateOrUpdateConsumer(c.ctx, jetstream.ConsumerConfig{
 		Durable: fmt.Sprintf("pnm-%s", c.app.NatsInfo.Subjects.SystemJsWorker),
 	})
 	if err != nil {
 		log.Fatalln(err)
-		return
 	}
 
 	cc, err := cons.Consume(func(msg jetstream.Msg) {
