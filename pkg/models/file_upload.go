@@ -46,7 +46,7 @@ func (m *FileModel) ResumableFileUpload(c *fiber.Ctx) (*UploadedFileResponse, er
 		return nil, errors.New("RoomId or RoomSid is empty")
 	}
 
-	tempFolder := fmt.Sprintf("%s/tmp", m.app.UploadFileSettings.Path)
+	tempFolder := fmt.Sprintf("%s/%s/tmp", m.app.UploadFileSettings.Path, req.RoomSid)
 	chunkDir := fmt.Sprintf("%s/%s", tempFolder, req.ResumableIdentifier)
 
 	switch c.Method() {
