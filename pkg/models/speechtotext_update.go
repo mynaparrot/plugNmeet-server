@@ -23,29 +23,27 @@ func (m *SpeechToTextModel) SpeechServiceUsersUsage(roomId, rSid, userId string,
 			HsetValue: &val,
 		})
 	case plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED:
-		usage, err := m.rs.SpeechToTextUsersUsage(roomId, userId, task)
-		if err != nil {
-			return err
+		if usage, err := m.rs.SpeechToTextUsersUsage(roomId, userId, task); err == nil && usage > 0 {
+			// send webhook
+			m.sendToWebhookNotifier(roomId, rSid, &userId, task, usage)
+			// send analytics
+			val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()
+			m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
+				EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
+				EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_SPEECH_SERVICES_STATUS,
+				RoomId:    roomId,
+				UserId:    &userId,
+				HsetValue: &val,
+			})
+			// another to record total usage
+			m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
+				EventType:         plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
+				EventName:         plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_SPEECH_SERVICES_USAGE,
+				RoomId:            roomId,
+				UserId:            &userId,
+				EventValueInteger: &usage,
+			})
 		}
-		// send webhook
-		m.sendToWebhookNotifier(roomId, rSid, &userId, task, usage)
-		// send analytics
-		val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()
-		m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
-			EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
-			EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_SPEECH_SERVICES_STATUS,
-			RoomId:    roomId,
-			UserId:    &userId,
-			HsetValue: &val,
-		})
-		// another to record total usage
-		m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
-			EventType:         plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
-			EventName:         plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_SPEECH_SERVICES_USAGE,
-			RoomId:            roomId,
-			UserId:            &userId,
-			EventValueInteger: &usage,
-		})
 	}
 
 	// now remove this user from the request list
