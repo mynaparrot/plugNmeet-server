@@ -184,6 +184,10 @@ func New() *fiber.App {
 	// https://github.com/23/resumable.js#how-do-i-set-it-up-with-my-server
 	api.Get("/fileUpload", controllers.HandleFileUpload)
 	api.Post("/fileUpload", controllers.HandleFileUpload)
+	// as resumable.js will upload multiple parts of the file in different request
+	// merging request should be sent from another request
+	// otherwise hard to do it concurrently
+	api.Post("/uploadedFileMerge", controllers.HandleUploadedFileMerge)
 
 	// last method
 	app.Use(func(c *fiber.Ctx) error {

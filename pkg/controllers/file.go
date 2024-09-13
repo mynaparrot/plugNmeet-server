@@ -43,10 +43,7 @@ func HandleFileUpload(c *fiber.Ctx) error {
 	m := models.NewFileModel(nil, nil, nil)
 	res, err := m.ResumableFileUpload(c)
 	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return commonFileErrorResponse(c, err.Error())
 	}
 
 	if res.FilePath == "part_uploaded" {
@@ -57,6 +54,26 @@ func HandleFileUpload(c *fiber.Ctx) error {
 		res.Msg = "file uploaded successfully"
 		return c.JSON(res)
 	}
+}
+
+func HandleUploadedFileMerge(c *fiber.Ctx) error {
+	req := new(models.ResumableUploadedFileMergeReq)
+	err := c.BodyParser(req)
+	if err != nil {
+		return commonFileErrorResponse(c, err.Error())
+	}
+
+	if req.RoomSid == "" || req.RoomId == "" {
+		return commonFileErrorResponse(c, "missing required fields")
+	}
+
+	m := models.NewFileModel(nil, nil, nil)
+	res, err := m.UploadedFileMerge(req)
+	if err != nil {
+		return commonFileErrorResponse(c, err.Error())
+	}
+
+	return c.JSON(res)
 }
 
 func HandleDownloadUploadedFile(c *fiber.Ctx) error {

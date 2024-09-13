@@ -23,6 +23,14 @@ type ResumableUploadReq struct {
 	ResumableCurrentChunkSize int64  `query:"resumableCurrentChunkSize"`
 }
 
+type ResumableUploadedFileMergeReq struct {
+	RoomSid              string `json:"roomSid" query:"roomSid"`
+	RoomId               string `json:"roomId" query:"roomId"`
+	ResumableIdentifier  string `json:"resumableIdentifier" query:"resumableIdentifier"`
+	ResumableFilename    string `json:"resumableFilename" query:"resumableFilename"`
+	ResumableTotalChunks int    `json:"resumableTotalChunks" query:"resumableTotalChunks"`
+}
+
 type UploadedFileResponse struct {
 	Status        bool   `json:"status"`
 	Msg           string `json:"msg"`
@@ -135,29 +143,42 @@ func (m *FileModel) ResumableFileUpload(c *fiber.Ctx) (*UploadedFileResponse, er
 			_ = c.SendStatus(fiber.StatusServiceUnavailable)
 			return nil, err
 		}
+		res.FilePath = "part_uploaded"
+		return res, err
+	}
 
-		if req.ResumableChunkNumber == req.ResumableTotalChunks {
-			// combining chunks into one file
-			combinedFile, err := m.combineResumableFiles(chunkDir, req.ResumableFilename, req.RoomSid, req.ResumableTotalChunks)
-			if err != nil {
-				return nil, err
-			}
-			// we'll detect mime type again for sending data
-			mtype, err := mimetype.DetectFile(combinedFile)
-			if err != nil {
-				return nil, err
-			}
-			res.FileMimeType = mtype.String()
-			res.FileExtension = strings.Replace(mtype.Extension(), ".", "", 1)
-		} else {
-			res.FilePath = "part_uploaded"
-			return res, err
-		}
+	return res, nil
+}
+
+// UploadedFileMerge will combine all the parts & create final file
+func (m *FileModel) UploadedFileMerge(req *ResumableUploadedFileMergeReq) (*UploadedFileResponse, error) {
+	tempFolder := fmt.Sprintf("%s/%s/tmp", m.app.UploadFileSettings.Path, req.RoomSid)
+	chunkDir := fmt.Sprintf("%s/%s", tempFolder, req.ResumableIdentifier)
+
+	if _, err := os.Stat(chunkDir); os.IsNotExist(err) {
+		return nil, errors.New("requested file's chunks not found, make sure those were uploaded")
+	}
+
+	// combining chunks into one file
+	combinedFile, err := m.combineResumableFiles(chunkDir, req.ResumableFilename, req.RoomSid, req.ResumableTotalChunks)
+	if err != nil {
+		return nil, err
+	}
+	// we'll detect mime type again for sending data
+	mtype, err := mimetype.DetectFile(combinedFile)
+	if err != nil {
+		return nil, err
 	}
 
 	finalPath := fmt.Sprintf("%s/%s", req.RoomSid, req.ResumableFilename)
-	res.FilePath = finalPath
-	res.FileName = req.ResumableFilename
+	res := &UploadedFileResponse{
+		Status:        true,
+		Msg:           "file uploaded successfully",
+		FileMimeType:  mtype.String(),
+		FilePath:      finalPath,
+		FileName:      req.ResumableFilename,
+		FileExtension: strings.Replace(mtype.Extension(), ".", "", 1),
+	}
 
 	return res, nil
 }
