@@ -58,10 +58,6 @@ func (s *RedisService) SpeechToTextCheckUserUsage(roomId, userId string) (string
 
 func (s *RedisService) SpeechToTextUsersUsage(roomId, userId string, task plugnmeet.SpeechServiceUserStatusTasks) (int64, error) {
 	key := fmt.Sprintf("%s:%s:usage", SpeechServiceRedisKey, roomId)
-	ss, err := s.SpeechToTextCheckUserUsage(roomId, userId)
-	if err != nil {
-		return 0, err
-	}
 
 	switch task {
 	case plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_STARTED:
@@ -70,17 +66,18 @@ func (s *RedisService) SpeechToTextUsersUsage(roomId, userId string, task plugnm
 			return 0, err
 		}
 	case plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED:
-		start, err := strconv.Atoi(ss)
-		if err != nil {
-			return 0, err
-		}
-		now := time.Now().Unix()
 		var usage int64
-		err = s.rc.Watch(s.ctx, func(tx *redis.Tx) error {
-			_, err := tx.Pipelined(s.ctx, func(pipeliner redis.Pipeliner) error {
-				usage = now - int64(start)
-				pipeliner.HIncrBy(s.ctx, key, "total_usage", usage).Result()
-				pipeliner.HDel(s.ctx, key, userId).Result()
+		err := s.rc.Watch(s.ctx, func(tx *redis.Tx) error {
+			_, err := tx.TxPipelined(s.ctx, func(pipe redis.Pipeliner) error {
+				var start int64
+				if ss, err := tx.HGet(s.ctx, key, userId).Result(); err == nil && ss != "" {
+					start, _ = strconv.ParseInt(ss, 10, 64)
+				}
+				if start > 0 {
+					usage = time.Now().Unix() - start
+					_, _ = pipe.HIncrBy(s.ctx, key, "total_usage", usage).Result()
+				}
+				_, _ = pipe.HDel(s.ctx, key, userId).Result()
 				return nil
 			})
 			return err
