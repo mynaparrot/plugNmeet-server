@@ -143,10 +143,11 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *dbmodels.RoomInfo, path str
 		uf := new(plugnmeet.AnalyticsRedisUserInfo)
 		_ = protojson.Unmarshal([]byte(n), uf)
 		userInfo := &plugnmeet.AnalyticsUserInfo{
-			UserId:  i,
-			Name:    *uf.Name,
-			IsAdmin: uf.IsAdmin,
-			Events:  []*plugnmeet.AnalyticsEventData{},
+			UserId:   i,
+			Name:     *uf.Name,
+			IsAdmin:  uf.IsAdmin,
+			ExUserId: uf.ExUserId,
+			Events:   []*plugnmeet.AnalyticsEventData{},
 		}
 
 		for _, ev := range userRedisKeys {

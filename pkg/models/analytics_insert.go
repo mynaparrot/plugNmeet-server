@@ -14,9 +14,11 @@ func (m *AnalyticsModel) handleFirstTimeUserJoined(key string) {
 	}
 
 	uInfo := &plugnmeet.AnalyticsRedisUserInfo{
-		Name:    m.data.UserName,
-		IsAdmin: umeta.IsAdmin,
+		Name:     m.data.UserName,
+		IsAdmin:  umeta.IsAdmin,
+		ExUserId: umeta.ExUserId,
 	}
+
 	op := protojson.MarshalOptions{
 		EmitUnpopulated: true,
 		UseProtoNames:   true,
