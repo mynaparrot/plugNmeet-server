@@ -28,6 +28,15 @@ func (m *UserModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, erro
 		return "", errors.New("room found in delete status, need to recreate it")
 	}
 
+	if g.UserInfo.UserMetadata == nil {
+		g.UserInfo.UserMetadata = new(plugnmeet.UserMetadata)
+	}
+
+	if g.UserInfo.UserMetadata.ExUserId == nil || *g.UserInfo.UserMetadata.ExUserId == "" {
+		// if empty, then we'll use the default user id
+		g.UserInfo.UserMetadata.ExUserId = &g.UserInfo.UserId
+	}
+
 	if meta.RoomFeatures.AutoGenUserId != nil && *meta.RoomFeatures.AutoGenUserId {
 		if g.UserInfo.UserId != config.RecorderBot && g.UserInfo.UserId != config.RtmpBot {
 			// we'll auto generate user id no matter what sent
@@ -40,10 +49,6 @@ func (m *UserModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, erro
 	valid, _ := regexp.MatchString("^[a-zA-Z0-9-_]+$", g.UserInfo.UserId)
 	if !valid {
 		return "", errors.New("user_id should only contain letters, digits or -_")
-	}
-
-	if g.UserInfo.UserMetadata == nil {
-		g.UserInfo.UserMetadata = new(plugnmeet.UserMetadata)
 	}
 
 	if g.UserInfo.IsAdmin {
