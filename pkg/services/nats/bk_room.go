@@ -33,8 +33,7 @@ func (s *NatsService) DeleteBreakoutRoom(parentRoomId, bkRoomId string) error {
 		return err
 	}
 
-	_ = kv.Purge(s.ctx, bkRoomId)
-	return nil
+	return kv.Purge(s.ctx, bkRoomId)
 }
 
 func (s *NatsService) GetBreakoutRoom(parentRoomId, bkRoomId string) ([]byte, error) {
@@ -71,12 +70,14 @@ func (s *NatsService) CountBreakoutRooms(parentRoomId string) (int64, error) {
 	}
 
 	keys, err := kv.ListKeys(s.ctx)
-	defer keys.Stop()
 	if err != nil {
 		return 0, err
 	}
-
-	return int64(len(keys.Keys())), nil
+	var count int64
+	for range keys.Keys() {
+		count++
+	}
+	return count, nil
 }
 
 func (s *NatsService) GetAllBreakoutRoomsByParentRoomId(parentRoomId string) (map[string][]byte, error) {
@@ -105,4 +106,26 @@ func (s *NatsService) GetAllBreakoutRoomsByParentRoomId(parentRoomId string) (ma
 
 func (s *NatsService) DeleteAllBreakoutRoomsByParentRoomId(parentRoomId string) {
 	_ = s.js.DeleteKeyValue(s.ctx, fmt.Sprintf(breakoutRoomBucket, parentRoomId))
+}
+
+func (s *NatsService) GetBreakoutRoomIdsByParentRoomId(parentRoomId string) ([]string, error) {
+	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf(breakoutRoomBucket, parentRoomId))
+	switch {
+	case errors.Is(err, jetstream.ErrBucketNotFound):
+		return nil, nil
+	case err != nil:
+		return nil, err
+	}
+
+	keys, err := kv.ListKeys(s.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var ids []string
+	for k := range keys.Keys() {
+		ids = append(ids, k)
+	}
+
+	return ids, nil
 }

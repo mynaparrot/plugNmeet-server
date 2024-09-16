@@ -37,12 +37,16 @@ func (s *NatsService) GetEtherpadActiveRoomsNum(nodeId string) (int64, error) {
 	}
 
 	keys, err := kv.ListKeys(s.ctx)
-	defer keys.Stop()
 	if err != nil {
 		return 0, err
 	}
 
-	return int64(len(keys.Keys())), nil
+	var count int64
+	for range keys.Keys() {
+		count++
+	}
+
+	return count, nil
 }
 
 func (s *NatsService) RemoveRoomFromEtherpad(nodeId, roomId string) error {
