@@ -2,13 +2,12 @@ package models
 
 import (
 	"errors"
-	"fmt"
+	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	log "github.com/sirupsen/logrus"
 	"regexp"
-	"time"
 )
 
 func (m *UserModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, error) {
@@ -40,7 +39,7 @@ func (m *UserModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, erro
 	if meta.RoomFeatures.AutoGenUserId != nil && *meta.RoomFeatures.AutoGenUserId {
 		if g.UserInfo.UserId != config.RecorderBot && g.UserInfo.UserId != config.RtmpBot {
 			// we'll auto generate user id no matter what sent
-			g.UserInfo.UserId = fmt.Sprintf("%d", time.Now().UnixMicro())
+			g.UserInfo.UserId = uuid.NewString()
 			log.Infoln("setting up auto generated user_id:", g.UserInfo.UserId, "for name:", g.UserInfo.Name)
 		}
 	}

@@ -45,17 +45,17 @@ func (m *BreakoutRoomModel) proceedToEndBkRoom(bkRoomId, parentRoomId string) {
 		log.Errorln(err)
 	}
 
-	m.onAfterBkRoomEnded(parentRoomId)
-	// notify to the room for updating list
-	_ = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_BREAKOUT_ROOM_ENDED, parentRoomId, bkRoomId, nil)
+	m.onAfterBkRoomEnded(parentRoomId, bkRoomId)
 }
 
-func (m *BreakoutRoomModel) onAfterBkRoomEnded(roomId string) {
-	if c, err := m.natsService.CountBreakoutRooms(roomId); err == nil && c == 0 {
+func (m *BreakoutRoomModel) onAfterBkRoomEnded(parentRoomId, bkRoomId string) {
+	if c, err := m.natsService.CountBreakoutRooms(parentRoomId); err == nil && c == 0 {
 		// no room left so, delete breakoutRoomKey key for this room
-		m.natsService.DeleteAllBreakoutRoomsByParentRoomId(roomId)
-		_ = m.updateParentRoomMetadata(roomId)
+		m.natsService.DeleteAllBreakoutRoomsByParentRoomId(parentRoomId)
+		_ = m.updateParentRoomMetadata(parentRoomId)
 	}
+	// notify to the room for updating list
+	_ = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_BREAKOUT_ROOM_ENDED, parentRoomId, bkRoomId, nil)
 }
 
 func (m *BreakoutRoomModel) updateParentRoomMetadata(parentRoomId string) error {
@@ -93,7 +93,7 @@ func (m *BreakoutRoomModel) PostTaskAfterRoomEndWebhook(roomId, metadata string)
 
 	if meta.IsBreakoutRoom {
 		_ = m.natsService.DeleteBreakoutRoom(meta.ParentRoomId, roomId)
-		m.onAfterBkRoomEnded(meta.ParentRoomId)
+		m.onAfterBkRoomEnded(meta.ParentRoomId, roomId)
 	} else {
 		err = m.EndAllBreakoutRoomsByParentRoomId(roomId)
 		if err != nil {
