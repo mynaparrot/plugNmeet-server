@@ -27,7 +27,7 @@ func NewIngressModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *r
 		rs = redisservice.New(app.RDS)
 	}
 	if lk == nil {
-		lk = livekitservice.New(app, rs)
+		lk = livekitservice.New(app)
 	}
 
 	return &IngressModel{

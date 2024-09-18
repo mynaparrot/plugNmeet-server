@@ -35,7 +35,7 @@ func NewUserModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redi
 		app:         app,
 		ds:          ds,
 		rs:          rs,
-		lk:          livekitservice.New(app, rs),
+		lk:          livekitservice.New(app),
 		natsService: natsservice.New(app),
 	}
 }

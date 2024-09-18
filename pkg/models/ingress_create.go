@@ -43,6 +43,9 @@ func (m *IngressModel) CreateIngress(r *plugnmeet.CreateIngressReq) (*livekit.In
 	if err != nil {
 		return nil, err
 	}
+	if f == nil {
+		return nil, errors.New("invalid nil create ingress response")
+	}
 
 	ingressFeatures.InputType = r.InputType
 	ingressFeatures.Url = f.Url

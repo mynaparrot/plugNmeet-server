@@ -34,7 +34,7 @@ func NewRoomModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redi
 		app:         app,
 		ds:          ds,
 		rs:          rs,
-		lk:          livekitservice.New(app, rs),
+		lk:          livekitservice.New(app),
 		userModel:   NewUserModel(app, ds, rs),
 		natsService: natsservice.New(app),
 	}

@@ -58,6 +58,9 @@ func (m *UserModel) muteUnmuteAllMic(r *plugnmeet.MuteUnMuteTrackReq) error {
 	if err != nil {
 		return err
 	}
+	if participants == nil {
+		return errors.New("no active users found")
+	}
 
 	for _, p := range participants {
 		if p.State == livekit.ParticipantInfo_ACTIVE && p.Identity != r.RequestedUserId {

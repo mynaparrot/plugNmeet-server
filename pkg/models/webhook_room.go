@@ -26,7 +26,7 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 	if rInfo == nil || meta == nil {
 		// we did not find this room to our kv
 		// we'll force to remove it
-		lk := livekitservice.New(m.app, m.rs)
+		lk := livekitservice.New(m.app)
 		_, err := lk.EndRoom(event.Room.Name)
 		if err != nil {
 			log.Errorln(err)

@@ -14,6 +14,9 @@ func (s *LivekitService) LoadParticipants(roomId string) ([]*livekit.Participant
 	if err != nil {
 		return nil, err
 	}
+	if res == nil {
+		return nil, nil
+	}
 	return res.Participants, nil
 }
 
