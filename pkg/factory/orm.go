@@ -11,17 +11,13 @@ import (
 
 func NewDatabaseConnection(appCnf *config.AppConfig) error {
 	info := appCnf.DatabaseInfo
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local", info.Username, info.Password, info.Host, info.Port, info.DBName)
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=UTC", info.Username, info.Password, info.Host, info.Port, info.DBName)
 
 	mysqlCnf := mysql.Config{
 		DSN: dsn, // data source name
 	}
 
-	cnf := &gorm.Config{
-		NowFunc: func() time.Time {
-			return time.Now().In(time.UTC)
-		},
-	}
+	cnf := &gorm.Config{}
 
 	if !appCnf.Client.Debug {
 		newLogger := logger.New(

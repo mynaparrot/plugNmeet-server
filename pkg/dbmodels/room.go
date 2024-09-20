@@ -20,9 +20,9 @@ type RoomInfo struct {
 	IsBreakoutRoom     int       `gorm:"column:is_breakout_room;default:0;NOT NULL"`
 	ParentRoomID       string    `gorm:"column:parent_room_id;NOT NULL"`
 	CreationTime       int64     `gorm:"column:creation_time;autoCreateTime;NOT NULL"`
-	Created            time.Time `gorm:"column:created;default:CURRENT_TIMESTAMP;NOT NULL"`
+	Created            time.Time `gorm:"column:created;autoCreateTime;NOT NULL"`
 	Ended              time.Time `gorm:"column:ended;default:0000-00-00 00:00:00;NOT NULL"`
-	Modified           time.Time `gorm:"column:modified;default:0000-00-00 00:00:00;NOT NULL"`
+	Modified           time.Time `gorm:"column:modified;autoCreateTime;NOT NULL"`
 }
 
 func (m *RoomInfo) TableName() string {
