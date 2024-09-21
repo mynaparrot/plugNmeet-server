@@ -6,17 +6,26 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+	"strings"
 	"time"
 )
 
 func NewDatabaseConnection(appCnf *config.AppConfig) error {
 	info := appCnf.DatabaseInfo
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=UTC", info.Username, info.Password, info.Host, info.Port, info.DBName)
+	charset := "utf8mb4"
+	loc := "UTC"
+
+	if info.Charset != nil && *info.Charset != "" {
+		charset = *info.Charset
+	}
+	if info.Loc != nil && *info.Loc != "" {
+		loc = strings.ReplaceAll(*info.Loc, "/", "%2F")
+	}
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s&parseTime=True&loc=%s", info.Username, info.Password, info.Host, info.Port, info.DBName, charset, loc)
 
 	mysqlCnf := mysql.Config{
 		DSN: dsn, // data source name
 	}
-
 	cnf := &gorm.Config{}
 
 	if !appCnf.Client.Debug {
@@ -45,8 +54,19 @@ func NewDatabaseConnection(appCnf *config.AppConfig) error {
 		return err
 	}
 
-	d.SetConnMaxLifetime(time.Minute * 4)
-	d.SetMaxOpenConns(100)
+	connMaxLifetime := time.Minute * 4
+	if info.ConnMaxLifetime != nil && *info.ConnMaxLifetime > 0 {
+		connMaxLifetime = *info.ConnMaxLifetime
+	}
+	maxOpenConns := 10
+	if info.MaxOpenConns != nil && *info.MaxOpenConns > 0 {
+		maxOpenConns = *info.MaxOpenConns
+	}
+
+	// https://github.com/go-sql-driver/mysql?tab=readme-ov-file#important-settings
+	d.SetConnMaxLifetime(connMaxLifetime)
+	d.SetMaxOpenConns(maxOpenConns)
+	d.SetMaxIdleConns(maxOpenConns)
 
 	appCnf.DB = db
 	return nil

@@ -134,13 +134,17 @@ type CopyrightConf struct {
 }
 
 type DatabaseInfo struct {
-	DriverName string `yaml:"driver_name"`
-	Host       string `yaml:"host"`
-	Port       int32  `yaml:"port"`
-	Username   string `yaml:"username"`
-	Password   string `yaml:"password"`
-	DBName     string `yaml:"db"`
-	Prefix     string `yaml:"prefix"`
+	DriverName      string         `yaml:"driver_name"`
+	Host            string         `yaml:"host"`
+	Port            int32          `yaml:"port"`
+	Username        string         `yaml:"username"`
+	Password        string         `yaml:"password"`
+	DBName          string         `yaml:"db"`
+	Prefix          string         `yaml:"prefix"`
+	Charset         *string        `yaml:"charset"`
+	Loc             *string        `yaml:"loc"`
+	ConnMaxLifetime *time.Duration `yaml:"conn_max_lifetime"`
+	MaxOpenConns    *int           `yaml:"max_open_conns"`
 }
 
 type RedisInfo struct {
