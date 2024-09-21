@@ -132,6 +132,8 @@ github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240916153048-d72bf01c12fc h1:V
 github.com/mynaparrot/plugnmeet-protocol v0.0.0-20240916153048-d72bf01c12fc/go.mod h1:oXYXVoAr5AQAO785GGRZdaF2Pn1t8PZsjoIs3cGcSJY=
 github.com/nats-io/jwt/v2 v2.6.0 h1:yXoBTdEotZw3NujMT+Nnu1UPNlFWdKQ3d0JJF/+pJag=
 github.com/nats-io/jwt/v2 v2.6.0/go.mod h1:ZdWS1nZa6WMZfFwwgpEaqBV8EPGVgOTDHN/wTbz0Y5A=
+github.com/nats-io/jwt/v2 v2.7.0 h1:J+ZnaaMGQi3xSB8iOhVM5ipiWCDrQvgEoitTwWFyOYw=
+github.com/nats-io/jwt/v2 v2.7.0/go.mod h1:ZdWS1nZa6WMZfFwwgpEaqBV8EPGVgOTDHN/wTbz0Y5A=
 github.com/nats-io/nats.go v1.37.0 h1:07rauXbVnnJvv1gfIyghFEo6lUcYRY0WXc3x7x0vUxE=
 github.com/nats-io/nats.go v1.37.0/go.mod h1:Ubdu4Nh9exXdSz0RVWRFBbRfrbSxOYd26oF0wkWclB8=
 github.com/nats-io/nkeys v0.4.7 h1:RwNJbbIdYCoClSDNY7QVKZlyb/wfT6ugvFCiKy6vDvI=
