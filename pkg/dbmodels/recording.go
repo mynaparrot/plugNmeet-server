@@ -17,8 +17,8 @@ type Recording struct {
 	Published        int64          `gorm:"column:published;default:1;NOT NULL"`
 	CreationTime     int64          `gorm:"column:creation_time;autoCreateTime;NOT NULL"`
 	RoomCreationTime int64          `gorm:"column:room_creation_time;default:0;NOT NULL"`
-	Created          time.Time      `gorm:"column:created;default:CURRENT_TIMESTAMP;NOT NULL"`
-	Modified         time.Time      `gorm:"column:modified;default:0000-00-00 00:00:00;NOT NULL"`
+	Created          time.Time      `gorm:"column:created;autoCreateTime;NOT NULL"`
+	Modified         time.Time      `gorm:"column:modified;autoUpdateTime;NOT NULL"`
 }
 
 func (m *Recording) TableName() string {

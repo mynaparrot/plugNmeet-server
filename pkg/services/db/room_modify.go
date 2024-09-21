@@ -25,9 +25,7 @@ func (s *DatabaseService) UpdateRoomStatus(info *dbmodels.RoomInfo) (int64, erro
 	if info.IsRunning == 0 {
 		update["is_recording"] = 0
 		update["is_active_rtmp"] = 0
-		// important to set a proper format
-		// otherwise will have a timezone problem
-		update["ended"] = time.Now().UTC().Format("2006-01-02 15:04:05")
+		update["ended"] = time.Now()
 	}
 
 	var cond interface{}
