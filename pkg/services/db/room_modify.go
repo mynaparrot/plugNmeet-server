@@ -28,17 +28,13 @@ func (s *DatabaseService) UpdateRoomStatus(info *dbmodels.RoomInfo) (int64, erro
 		update["ended"] = time.Now()
 	}
 
-	var cond interface{}
+	cond := new(dbmodels.RoomInfo)
 	if info.ID > 0 {
-		cond = map[string]interface{}{
-			"id": info.ID,
-		}
+		cond.ID = info.ID
 	} else if info.RoomId != "" {
-		cond = map[string]interface{}{
-			"roomId": info.RoomId,
-		}
+		cond.RoomId = info.RoomId
 	} else {
-		cond = gorm.Expr("sid = ?", info.Sid)
+		cond.Sid = info.Sid
 	}
 
 	result := s.db.Model(&dbmodels.RoomInfo{}).Where(cond).Not("is_running = ?", info.IsRunning).Updates(update)

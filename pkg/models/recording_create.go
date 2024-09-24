@@ -6,6 +6,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 	"os"
@@ -49,7 +50,7 @@ func (m *RecordingModel) addRecordingInfoToDB(r *plugnmeet.RecorderToPlugNmeet, 
 		RoomID:           r.RoomId,
 		RoomSid:          v,
 		RecorderID:       r.RecorderId,
-		Size:             float64(r.FileSize),
+		Size:             helpers.ToFixed(float64(r.FileSize), 2),
 		FilePath:         r.FilePath,
 		RoomCreationTime: roomCreationTime,
 	}
