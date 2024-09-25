@@ -39,6 +39,10 @@ func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeo
 		var et uint32 = 1800 // 1800 seconds = 30 minutes
 		emptyTimeout = &et
 	}
+	if maxParticipants == nil {
+		var pts uint32 = 0 // 0 = no limit
+		maxParticipants = &pts
+	}
 
 	mt, err := s.MarshalRoomMetadata(metadata)
 	if err != nil {
