@@ -79,7 +79,7 @@ func HandleLTIV1IsRoomActive(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 
 	m := models.NewRoomModel(nil, nil, nil)
-	res, _ := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
+	res, _, _, _ := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: roomId.(string),
 	})
 

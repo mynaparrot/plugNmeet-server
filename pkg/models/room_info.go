@@ -6,7 +6,7 @@ import (
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 )
 
-func (m *RoomModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoomActiveRes, *plugnmeet.RoomMetadata) {
+func (m *RoomModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoomActiveRes, *dbmodels.RoomInfo, *plugnmeet.NatsKvRoomInfo, *plugnmeet.RoomMetadata) {
 	// check first
 	m.CheckAndWaitUntilRoomCreationInProgress(r.GetRoomId())
 
@@ -19,10 +19,10 @@ func (m *RoomModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoo
 	if err != nil {
 		res.Status = false
 		res.Msg = err.Error()
-		return res, nil
+		return res, nil, nil, nil
 	}
 	if roomDbInfo == nil || roomDbInfo.ID == 0 {
-		return res, nil
+		return res, nil, nil, nil
 	}
 
 	// let's make sure room actually active
@@ -30,7 +30,7 @@ func (m *RoomModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoo
 	if err != nil {
 		res.Status = false
 		res.Msg = err.Error()
-		return res, nil
+		return res, nil, nil, nil
 	}
 
 	if rInfo == nil || meta == nil {
@@ -39,7 +39,7 @@ func (m *RoomModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoo
 			RoomId:    r.RoomId,
 			IsRunning: 0,
 		})
-		return res, nil
+		return res, nil, nil, nil
 	}
 
 	if rInfo.Status == natsservice.RoomStatusCreated || rInfo.Status == natsservice.RoomStatusActive {
@@ -47,7 +47,7 @@ func (m *RoomModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoo
 		res.Msg = "room is active"
 	}
 
-	return res, meta
+	return res, roomDbInfo, rInfo, meta
 }
 
 func (m *RoomModel) GetActiveRoomInfo(r *plugnmeet.GetActiveRoomInfoReq) (bool, string, *plugnmeet.ActiveRoomWithParticipant) {

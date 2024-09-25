@@ -80,13 +80,17 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	}
 
 	m := models.NewRoomModel(nil, nil, nil)
-	rr, _ := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
+	rr, roomDbInfo, rInfo, _ := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: roomId.(string),
 	})
 
 	if !rr.GetIsActive() {
 		// prevent joining if room status is not created or active
 		return utils.SendCommonProtobufResponse(c, false, rr.Msg)
+	}
+	// now check MaxParticipants configuration
+	if rInfo.MaxParticipants > 0 && roomDbInfo.JoinedParticipants >= int64(rInfo.MaxParticipants) {
+		return utils.SendCommonProtobufResponse(c, false, "notifications.max-num-participates-exceeded")
 	}
 
 	v := version.Version

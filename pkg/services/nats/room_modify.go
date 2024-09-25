@@ -17,6 +17,7 @@ const (
 	RoomIdKey           = "room_id"
 	RoomSidKey          = "room_sid"
 	RoomEmptyTimeoutKey = "empty_timeout"
+	RoomMaxParticipants = "max_participants"
 	RoomStatusKey       = "status"
 	RoomMetadataKey     = "metadata"
 	RoomCreatedKey      = "created_at"
@@ -26,7 +27,7 @@ const (
 	RoomStatusEnded   = "ended"
 )
 
-func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeout *uint32, metadata *plugnmeet.RoomMetadata) error {
+func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeout, maxParticipants *uint32, metadata *plugnmeet.RoomMetadata) error {
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
 		Replicas: s.app.NatsInfo.NumReplicas,
 		Bucket:   fmt.Sprintf(RoomInfoBucket, roomId),
@@ -49,6 +50,7 @@ func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeo
 		RoomIdKey:           roomId,
 		RoomSidKey:          roomSid,
 		RoomEmptyTimeoutKey: fmt.Sprintf("%d", *emptyTimeout),
+		RoomMaxParticipants: fmt.Sprintf("%d", *maxParticipants),
 		RoomStatusKey:       RoomStatusCreated,
 		RoomCreatedKey:      fmt.Sprintf("%d", time.Now().UTC().Unix()), // in seconds
 		RoomMetadataKey:     mt,

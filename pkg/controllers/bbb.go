@@ -283,7 +283,7 @@ func HandleBBBIsMeetingRunning(c *fiber.Ctx) error {
 	}
 
 	m := models.NewRoomModel(nil, nil, nil)
-	res, _ := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
+	res, _, _, _ := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: q.MeetingID,
 	})
 

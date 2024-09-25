@@ -38,6 +38,11 @@ func (s *NatsService) GetRoomInfo(roomId string) (*plugnmeet.NatsKvRoomInfo, err
 			info.EmptyTimeout = parseUint
 		}
 	}
+	if maxParticipants, err := kv.Get(s.ctx, RoomMaxParticipants); err == nil && maxParticipants != nil {
+		if parseUint, err := strconv.ParseUint(string(maxParticipants.Value()), 10, 64); err == nil {
+			info.MaxParticipants = parseUint
+		}
+	}
 	if metadata, err := kv.Get(s.ctx, RoomMetadataKey); err == nil && metadata != nil {
 		info.Metadata = string(metadata.Value())
 	}

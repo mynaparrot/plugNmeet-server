@@ -64,7 +64,7 @@ func HandleIsRoomActive(c *fiber.Ctx) error {
 	}
 
 	m := models.NewRoomModel(nil, nil, nil)
-	res, _ := m.IsRoomActive(req)
+	res, _, _, _ := m.IsRoomActive(req)
 	return utils.SendProtoJsonResponse(c, res)
 }
 

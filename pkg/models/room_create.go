@@ -135,7 +135,7 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 	}
 
 	// now create room bucket
-	err = m.natsService.AddRoom(roomDbInfo.ID, r.RoomId, sId, r.EmptyTimeout, r.Metadata)
+	err = m.natsService.AddRoom(roomDbInfo.ID, r.RoomId, sId, r.EmptyTimeout, r.MaxParticipants, r.Metadata)
 	if err != nil {
 		return nil, err
 	}

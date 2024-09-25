@@ -7,7 +7,7 @@ import (
 )
 
 func (m *LtiV1Model) LTIV1JoinRoom(c *plugnmeet.LtiClaims) (string, error) {
-	res, _ := m.rm.IsRoomActive(&plugnmeet.IsRoomActiveReq{
+	res, _, _, _ := m.rm.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: c.RoomId,
 	})
 
