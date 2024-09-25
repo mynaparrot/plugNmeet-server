@@ -4,6 +4,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
+	"time"
 )
 
 func (m *RoomModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoomActiveRes, *dbmodels.RoomInfo, *plugnmeet.NatsKvRoomInfo, *plugnmeet.RoomMetadata) {
@@ -174,8 +175,8 @@ func (m *RoomModel) FetchPastRooms(r *plugnmeet.FetchPastRoomsReq) (*plugnmeet.F
 			RoomSid:            rr.Sid,
 			JoinedParticipants: rr.JoinedParticipants,
 			WebhookUrl:         rr.WebhookUrl,
-			Created:            rr.Created.Format("2006-01-02 15:04:05"),
-			Ended:              rr.Ended.Format("2006-01-02 15:04:05"),
+			Created:            rr.Created.Format(time.RFC3339),
+			Ended:              rr.Ended.Format(time.RFC3339),
 		}
 		if an, err := m.ds.GetAnalyticByRoomTableId(rr.ID); err == nil && an != nil {
 			room.AnalyticsFileId = an.FileID
