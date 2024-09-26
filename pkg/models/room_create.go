@@ -140,10 +140,6 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 		return nil, err
 	}
 
-	if !r.Metadata.IsBreakoutRoom {
-		go m.prepareWhiteboardPreloadFile(r.Metadata.RoomFeatures.WhiteboardFeatures, r.RoomId, sId)
-	}
-
 	// create streams
 	err = m.natsService.CreateRoomNatsStreams(r.RoomId)
 	if err != nil {
@@ -158,6 +154,11 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 		return nil, errors.New("room not found in KV")
 	}
 
+	if !r.Metadata.IsBreakoutRoom {
+		// now start processing if whiteboard has any preloaded file
+		go m.prepareWhiteboardPreloadFile(r.Metadata, r.RoomId, sId)
+	}
+
 	ari := &plugnmeet.ActiveRoomInfo{
 		RoomId:       rInfo.RoomId,
 		Sid:          rInfo.RoomSid,
@@ -168,7 +169,7 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 		Metadata:     rInfo.Metadata,
 	}
 
-	// create & send room_created webhook
+	// create and send room_created webhook
 	go m.sendRoomCreatedWebhook(ari)
 
 	return ari, nil
@@ -188,7 +189,8 @@ func (m *RoomModel) preRoomCreationTasks(r *plugnmeet.CreateRoomReq) {
 	}
 }
 
-func (m *RoomModel) prepareWhiteboardPreloadFile(wbf *plugnmeet.WhiteboardFeatures, roomId, roomSid string) {
+func (m *RoomModel) prepareWhiteboardPreloadFile(meta *plugnmeet.RoomMetadata, roomId, roomSid string) {
+	wbf := meta.RoomFeatures.WhiteboardFeatures
 	if wbf == nil || !wbf.AllowedWhiteboard || wbf.PreloadFile == nil || *wbf.PreloadFile == "" {
 		return
 	}
@@ -200,6 +202,10 @@ func (m *RoomModel) prepareWhiteboardPreloadFile(wbf *plugnmeet.WhiteboardFeatur
 	if err != nil {
 		log.Errorln(err)
 		_ = m.natsService.NotifyErrorMsg(roomId, "notifications.preloaded-whiteboard-file-processing-error", nil)
+
+		// we'll remove this file as have error
+		meta.RoomFeatures.WhiteboardFeatures.PreloadFile = nil
+		_ = m.natsService.UpdateAndBroadcastRoomMetadata(roomId, meta)
 		return
 	}
 
