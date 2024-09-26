@@ -47,7 +47,7 @@ func (m *UserModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, erro
 	// we'll validate user id
 	valid, _ := regexp.MatchString("^[a-zA-Z0-9-_]+$", g.UserInfo.UserId)
 	if !valid {
-		return "", errors.New("user_id should only contain letters, digits or -_")
+		return "", errors.New("user_id should only contain ASCII letters (a-z A-Z), digits (0-9) or -_")
 	}
 
 	if g.UserInfo.IsAdmin {
