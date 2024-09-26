@@ -48,6 +48,7 @@ type ClientInfo struct {
 	PrometheusConf PrometheusConf `yaml:"prometheus"`
 	ProxyHeader    string         `yaml:"proxy_header"`
 	CopyrightConf  *CopyrightConf `yaml:"copyright_conf"`
+	BBBJoinHost    *string        `yaml:"bbb_join_host"`
 }
 
 type WebhookConf struct {

@@ -244,6 +244,10 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 	}
 
 	ul := fmt.Sprintf("%s://%s/?access_token=%s", c.Protocol(), c.Hostname(), token)
+	if app.Client.BBBJoinHost != nil && *app.Client.BBBJoinHost != "" {
+		// use host name from config
+		ul = fmt.Sprintf("%s/?access_token=%s", *app.Client.BBBJoinHost, token)
+	}
 	if customDesign != nil && customDesign.String() != "" {
 		op := protojson.MarshalOptions{
 			EmitUnpopulated: false,

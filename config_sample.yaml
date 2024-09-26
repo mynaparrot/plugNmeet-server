@@ -35,6 +35,8 @@ client:
     # do not make the text longer, not all html tags are supported
     # 'b', 'i', 'em', 'strong', 'a'
     text: 'Powered by <a href="https://www.plugnmeet.org" target="_blank">plugNmeet</a>'
+  # set host info so that BBB joining URL can be more accurate when behind LB
+  bbb_join_host: "http://localhost:3000"
 room_default_settings:
   max_duration: 0 # Duration in minutes. 0 = no limit
   max_participants: 0 # 0 = no limit
