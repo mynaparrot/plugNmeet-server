@@ -10,13 +10,13 @@ func (m *AuthModel) GeneratePNMJoinToken(c *plugnmeet.PlugNmeetTokenClaims) (str
 	return auth.GeneratePlugNmeetJWTAccessToken(m.app.Client.ApiKey, m.app.Client.Secret, c.UserId, *m.app.Client.TokenValidity, c)
 }
 
-func (m *AuthModel) VerifyPlugNmeetAccessToken(token string) (*plugnmeet.PlugNmeetTokenClaims, error) {
-	return auth.VerifyPlugNmeetAccessToken(m.app.Client.ApiKey, m.app.Client.Secret, token)
+func (m *AuthModel) VerifyPlugNmeetAccessToken(token string, withTime bool) (*plugnmeet.PlugNmeetTokenClaims, error) {
+	return auth.VerifyPlugNmeetAccessToken(m.app.Client.ApiKey, m.app.Client.Secret, token, withTime)
 }
 
 // RenewPNMToken we'll renew token
-func (m *AuthModel) RenewPNMToken(token string) (string, error) {
-	claims, err := m.VerifyPlugNmeetAccessToken(token)
+func (m *AuthModel) RenewPNMToken(token string, withTime bool) (string, error) {
+	claims, err := m.VerifyPlugNmeetAccessToken(token, withTime)
 	if err != nil {
 		return "", err
 	}

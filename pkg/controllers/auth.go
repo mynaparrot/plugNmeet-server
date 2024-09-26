@@ -133,7 +133,7 @@ func HandleVerifyHeaderToken(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, "Authorization header is missing")
 	}
 
-	claims, err := m.VerifyPlugNmeetAccessToken(authToken)
+	claims, err := m.VerifyPlugNmeetAccessToken(authToken, true)
 	if err != nil {
 		_ = c.SendStatus(errStatus)
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
