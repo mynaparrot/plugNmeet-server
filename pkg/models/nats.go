@@ -51,6 +51,8 @@ func (m *NatsModel) HandleFromClientToServerReq(roomId, userId string, req *plug
 		m.RenewPNMToken(roomId, userId, req.Msg)
 	case plugnmeet.NatsMsgClientToServerEvents_REQ_INITIAL_DATA:
 		m.HandleInitialData(roomId, userId)
+	case plugnmeet.NatsMsgClientToServerEvents_REQ_JOINED_USERS_LIST:
+		m.HandleSendUsersList(roomId, userId)
 	case plugnmeet.NatsMsgClientToServerEvents_PING:
 		m.HandleClientPing(roomId, userId)
 	case plugnmeet.NatsMsgClientToServerEvents_REQ_RAISE_HAND:

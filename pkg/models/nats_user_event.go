@@ -4,7 +4,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	log "github.com/sirupsen/logrus"
 	"strings"
-	"time"
 )
 
 func (m *NatsModel) HandleInitialData(roomId, userId string) {
@@ -54,11 +53,11 @@ func (m *NatsModel) HandleInitialData(roomId, userId string) {
 	if err != nil {
 		log.Warnln(err)
 	}
+}
 
-	// now send users' list
-	time.Sleep(time.Second * 1)
+func (m *NatsModel) HandleSendUsersList(roomId, userId string) {
 	if users, err := m.natsService.GetOnlineUsersListAsJson(roomId); err == nil && users != nil {
-		err := m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_JOINED_USERS_LIST, roomId, users, &userId)
+		err := m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_RES_JOINED_USERS_LIST, roomId, users, &userId)
 		if err != nil {
 			log.Warnln(err)
 		}
