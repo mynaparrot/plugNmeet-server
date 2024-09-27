@@ -8,6 +8,7 @@ import (
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	log "github.com/sirupsen/logrus"
 	"regexp"
+	"time"
 )
 
 func (m *UserModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, error) {
@@ -41,6 +42,24 @@ func (m *UserModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, erro
 			// we'll auto generate user id no matter what sent
 			g.UserInfo.UserId = uuid.NewString()
 			log.Infoln("setting up auto generated user_id:", g.UserInfo.UserId, "for name:", g.UserInfo.Name)
+		}
+	} else {
+		// check if this user is online, then we'll need to log out this user first
+		// otherwise will have problems during joining because of duplicate join
+		// as from API it was requested to generate a new token, so we won't prevent it
+		// and only send log-out signal to the user
+		status, err := m.natsService.GetRoomUserStatus(g.GetRoomId(), g.GetUserInfo().GetUserId())
+		if err != nil {
+			return "", err
+		}
+		if status == natsservice.UserStatusOnline {
+			_ = m.RemoveParticipant(&plugnmeet.RemoveParticipantReq{
+				RoomId: g.GetRoomId(),
+				UserId: g.GetUserInfo().GetUserId(),
+				Msg:    "notifications.room-disconnected-duplicate-entry",
+			})
+			// wait until clean up
+			time.Sleep(time.Second * 1)
 		}
 	}
 
