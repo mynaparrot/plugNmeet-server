@@ -50,8 +50,7 @@ func (s *NatsService) CreateSystemPublicConsumer(roomId, userId string) (jwt.Str
 
 func (s *NatsService) CreateSystemPrivateConsumer(roomId, userId string) (jwt.StringList, error) {
 	_, err := s.js.CreateOrUpdateConsumer(s.ctx, roomId, jetstream.ConsumerConfig{
-		Name:          fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.SystemPrivate, userId),
-		DeliverPolicy: jetstream.DeliverNewPolicy,
+		Name: fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.SystemPrivate, userId),
 		FilterSubjects: []string{
 			fmt.Sprintf("%s:%s.%s.>", roomId, s.app.NatsInfo.Subjects.SystemPrivate, userId),
 		},
