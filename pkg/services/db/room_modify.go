@@ -101,7 +101,7 @@ func (s *DatabaseService) UpdateNumParticipants(sId string, num int64) (int64, e
 // IncrementOrDecrementNumParticipants will increment or decrement the number of Participants
 func (s *DatabaseService) IncrementOrDecrementNumParticipants(sId, operator string) (int64, error) {
 	update := map[string]interface{}{
-		"joined_participants": gorm.Expr("joined_participants " + operator + "1"),
+		"joined_participants": gorm.Expr("GREATEST(CAST(joined_participants AS SIGNED)" + operator + " 1, 0)"),
 	}
 
 	result := s.db.Model(&dbmodels.RoomInfo{}).Where("sid = ?", sId).Updates(update)
