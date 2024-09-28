@@ -76,10 +76,11 @@ type LivekitInfo struct {
 }
 
 type UploadFileSettings struct {
-	Path         string   `yaml:"path"`
-	MaxSize      uint64   `yaml:"max_size"`
-	KeepForever  bool     `yaml:"keep_forever"`
-	AllowedTypes []string `yaml:"allowed_types"`
+	Path                  string   `yaml:"path"`
+	MaxSize               uint64   `yaml:"max_size"`
+	MaxSizeWhiteboardFile uint64   `yaml:"max_size_whiteboard_file"`
+	KeepForever           bool     `yaml:"keep_forever"`
+	AllowedTypes          []string `yaml:"allowed_types"`
 }
 
 type RecorderInfo struct {

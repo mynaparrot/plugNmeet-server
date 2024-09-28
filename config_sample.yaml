@@ -112,21 +112,29 @@ nats_info:
     recorder_info_kv: "pnm-recorderInfo"
 upload_file_settings:
   path: "./upload"
-  # file size in MB. Default 10MB
-  max_size: 10
-  # By default, files will be deleted as soon as the session will be finish.
+  # maximum file size in MB for chat. Default 50MB
+  max_size: 50
+  # maximum file size in MB for whiteboard upload. Default 30MB
+  max_size_whiteboard_file: 30
+  # By default, files will be deleted as soon as the session has finished.
   # You can set it true to disable deleting files.
   keep_forever: false
   allowed_types:
     - "jpg"
-    - "jpeg"
     - "png"
+    - "jpeg"
     - "svg"
     - "pdf"
     - "docx"
+    - "txt"
+    - "xlsx"
+    - "pptx"
     - "zip"
+    - "mp4"
+    - "webm"
+    - "mp3"
 recorder_info:
-  # this value should be same as recorder's copy_to_dir path
+  # this value should be the same as recorder's copy_to_dir path
   recording_files_path: "/app/recording_files"
   token_validity: 30m
 shared_notepad:

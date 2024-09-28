@@ -58,7 +58,7 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 
 	// we'll set default values otherwise the client got confused if data is missing
 	utils.PrepareDefaultRoomFeatures(r)
-	utils.SetCreateRoomDefaultValues(r, m.app.UploadFileSettings.MaxSize, m.app.UploadFileSettings.AllowedTypes, m.app.SharedNotePad.Enabled)
+	utils.SetCreateRoomDefaultValues(r, m.app.UploadFileSettings.MaxSize, m.app.UploadFileSettings.MaxSizeWhiteboardFile, m.app.UploadFileSettings.AllowedTypes, m.app.SharedNotePad.Enabled)
 	utils.SetRoomDefaultLockSettings(r)
 	// set default room settings
 	utils.SetDefaultRoomSettings(m.app.RoomDefaultSettings, r)
