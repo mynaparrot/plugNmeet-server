@@ -21,7 +21,7 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId string) {
 
 	err = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusOnline)
 	if err != nil {
-		log.Warnln(fmt.Sprintf("Error updating user status to %s; roomId: %s; msg: %s", userId, roomId, err.Error()))
+		log.Warnln(fmt.Sprintf("Error updating user status: %s for %s; roomId: %s; msg: %s", natsservice.UserStatusOnline, userId, roomId, err.Error()))
 	}
 
 	if userInfo, err := m.natsService.GetUserInfo(roomId, userId); err == nil && userInfo != nil {
@@ -71,7 +71,7 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) {
 	}
 	err := m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusOffline)
 	if err != nil {
-		log.Warnln(err)
+		log.Warnln(fmt.Sprintf("Error updating user status: %s for %s; roomId: %s; msg: %s", natsservice.UserStatusOffline, userId, roomId, err.Error()))
 	}
 
 	// analytics

@@ -11,7 +11,7 @@ func (m *NatsModel) HandleInitialData(roomId, userId string) {
 	// send room info
 	rInfo, err := m.natsService.GetRoomInfo(roomId)
 	if err != nil {
-		log.Errorln(fmt.Sprintf("error getting room info userId: %s, roomId: %s, msg: %s", userId, roomId, err.Error()))
+		log.Errorln(fmt.Sprintf("error getting room info for userId: %s, roomId: %s, msg: %s", userId, roomId, err.Error()))
 		_ = m.natsService.NotifyErrorMsg(roomId, err.Error(), &userId)
 		return
 	}
@@ -22,7 +22,7 @@ func (m *NatsModel) HandleInitialData(roomId, userId string) {
 	// send this user's info
 	userInfo, err := m.natsService.GetUserInfo(roomId, userId)
 	if err != nil {
-		log.Errorln(fmt.Sprintf("error getting user info userId: %s, roomId: %s, msg: %s", userId, roomId, err.Error()))
+		log.Errorln(fmt.Sprintf("error getting user info for userId: %s, roomId: %s, msg: %s", userId, roomId, err.Error()))
 		_ = m.natsService.NotifyErrorMsg(roomId, err.Error(), &userId)
 		return
 	}
