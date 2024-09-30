@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
@@ -11,6 +12,7 @@ import (
 func (m *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 	status, err := m.natsService.GetRoomUserStatus(r.RoomId, r.UserId)
 	if err != nil {
+		log.Errorln(fmt.Sprintf("error GetRoomUserStatus to %s; roomId: %s; msg: %s", r.GetRoomId(), r.GetUserId(), err))
 		return err
 	}
 
@@ -26,20 +28,20 @@ func (m *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 	// send notification to be disconnected
 	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SESSION_ENDED, r.GetRoomId(), "notifications.room-disconnected-participant-removed", &r.UserId)
 	if err != nil {
-		log.Errorln(err)
+		log.Errorln(fmt.Sprintf("error broadcasting SESSION_ENDED event to %s; roomId: %s; msg: %s", r.GetRoomId(), r.GetUserId(), err))
 	}
 
 	// now remove from lk
 	_, err = m.lk.RemoveParticipant(r.RoomId, r.UserId)
 	if err != nil {
-		log.Errorln(err)
+		log.Errorln(fmt.Sprintf("error removing user from lk to %s; roomId: %s; msg: %s", r.GetRoomId(), r.GetUserId(), err))
 	}
 
 	// finally, check if requested to block as well as
 	if r.BlockUser {
 		_, err = m.natsService.AddUserToBlockList(r.RoomId, r.UserId)
 		if err != nil {
-			log.Errorln(err)
+			log.Errorln(fmt.Sprintf("error AddUserToBlockList to %s; roomId: %s; msg: %s", r.GetRoomId(), r.GetUserId(), err))
 		}
 	}
 

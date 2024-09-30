@@ -11,6 +11,7 @@ import (
 func (m *NatsModel) OnAfterUserJoined(roomId, userId string) {
 	status, err := m.natsService.GetRoomUserStatus(roomId, userId)
 	if err != nil {
+		log.Errorln(fmt.Sprintf("error GetRoomUserStatus to %s; roomId: %s; msg: %s", roomId, userId, err))
 		return
 	}
 	if status == natsservice.UserStatusOnline {
@@ -20,7 +21,7 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId string) {
 
 	err = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusOnline)
 	if err != nil {
-		log.Warnln(err)
+		log.Warnln(fmt.Sprintf("Error updating user status to %s; roomId: %s; msg: %s", userId, roomId, err.Error()))
 	}
 
 	if userInfo, err := m.natsService.GetUserInfo(roomId, userId); err == nil && userInfo != nil {

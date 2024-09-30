@@ -22,7 +22,7 @@ func (m *NatsModel) RenewPNMToken(roomId, userId, token string) {
 
 	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_RESP_RENEW_PNM_TOKEN, roomId, token, &userId)
 	if err != nil {
-		log.Errorln(err)
+		log.Errorln(fmt.Errorf("error renewing pnm token to %s; roomId: %s; msg: %s", userId, roomId, err.Error()))
 	}
 }
 
@@ -46,6 +46,6 @@ func (m *NatsModel) HandleClientPing(roomId, userId string) {
 
 	err := m.natsService.UpdateUserKeyValue(roomId, userId, natsservice.UserLastPingAt, fmt.Sprintf("%d", time.Now().UnixMilli()))
 	if err != nil {
-		log.Errorln(err)
+		log.Errorln(fmt.Sprintf("error updating user last ping to %s; roomId: %s; msg: %s", userId, roomId, err.Error()))
 	}
 }
