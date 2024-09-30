@@ -9,6 +9,7 @@ import (
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	log "github.com/sirupsen/logrus"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -35,14 +36,15 @@ func (m *UserModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, erro
 
 	if g.UserInfo.UserMetadata.ExUserId == nil || *g.UserInfo.UserMetadata.ExUserId == "" {
 		// if empty, then we'll use the default user id
-		g.UserInfo.UserMetadata.ExUserId = &g.UserInfo.UserId
+		exId := strings.Clone(g.UserInfo.UserId)
+		g.UserInfo.UserMetadata.ExUserId = &exId
 	}
 
 	if meta.RoomFeatures.AutoGenUserId != nil && *meta.RoomFeatures.AutoGenUserId {
 		if g.UserInfo.UserId != config.RecorderBot && g.UserInfo.UserId != config.RtmpBot {
 			// we'll auto generate user id no matter what sent
 			g.UserInfo.UserId = uuid.NewString()
-			log.Infoln(fmt.Sprintf("setting up auto generated user_id:%s; ex_user_id: %s; name: %s; room_id: %s", g.UserInfo.GetUserId(), g.UserInfo.GetUserMetadata().GetExUserId(), g.UserInfo.GetName(), g.GetRoomId()))
+			log.Infoln(fmt.Sprintf("setting up auto generated user_id: %s for ex_user_id: %s; name: %s; room_id: %s", g.UserInfo.GetUserId(), g.UserInfo.GetUserMetadata().GetExUserId(), g.UserInfo.GetName(), g.GetRoomId()))
 		}
 	} else {
 		// check if this user is online, then we'll need to log out this user first
