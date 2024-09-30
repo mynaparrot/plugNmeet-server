@@ -16,13 +16,13 @@ func (m *NatsModel) RenewPNMToken(roomId, userId, token string) {
 	// as renew request is coming from nats, so it should be secure
 	token, err := m.authModel.RenewPNMToken(token, false)
 	if err != nil {
-		log.Errorln(err)
+		log.Errorln(fmt.Errorf("error renewing pnm token for %s; roomId: %s; msg: %s", userId, roomId, err.Error()))
 		return
 	}
 
 	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_RESP_RENEW_PNM_TOKEN, roomId, token, &userId)
 	if err != nil {
-		log.Errorln(fmt.Errorf("error renewing pnm token for %s; roomId: %s; msg: %s", userId, roomId, err.Error()))
+		log.Errorln(fmt.Errorf("error sending RESP_RENEW_PNM_TOKEN event for %s; roomId: %s; msg: %s", userId, roomId, err.Error()))
 	}
 }
 
