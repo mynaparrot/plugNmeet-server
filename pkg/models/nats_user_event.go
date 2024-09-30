@@ -52,7 +52,7 @@ func (m *NatsModel) HandleInitialData(roomId, userId string) {
 	// send important info first
 	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_RES_INITIAL_DATA, roomId, initial, &userId)
 	if err != nil {
-		log.Warnln("error sending RES_INITIAL_DATA event userId: %s, roomId: %s, msg: %s", userId, roomId, err.Error())
+		log.Warnln(fmt.Sprintf("error sending RES_INITIAL_DATA event userId: %s, roomId: %s, msg: %s", userId, roomId, err.Error()))
 	}
 }
 
@@ -60,7 +60,7 @@ func (m *NatsModel) HandleSendUsersList(roomId, userId string) {
 	if users, err := m.natsService.GetOnlineUsersListAsJson(roomId); err == nil && users != nil {
 		err := m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_RES_JOINED_USERS_LIST, roomId, users, &userId)
 		if err != nil {
-			log.Warnln("error sending RES_JOINED_USERS_LIST event userId: %s, roomId: %s, msg: %s", userId, roomId, err.Error())
+			log.Warnln(fmt.Sprintf("error sending RES_JOINED_USERS_LIST event userId: %s, roomId: %s, msg: %s", userId, roomId, err.Error()))
 		}
 	}
 }
