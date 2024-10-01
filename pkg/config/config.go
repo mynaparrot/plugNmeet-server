@@ -63,10 +63,11 @@ type PrometheusConf struct {
 }
 
 type LogSettings struct {
-	LogFile    string `yaml:"log_file"`
-	MaxSize    int    `yaml:"max_size"`
-	MaxBackups int    `yaml:"max_backups"`
-	MaxAge     int    `yaml:"max_age"`
+	LogFile    string  `yaml:"log_file"`
+	MaxSize    int     `yaml:"max_size"`
+	MaxBackups int     `yaml:"max_backups"`
+	MaxAge     int     `yaml:"max_age"`
+	LogLevel   *string `yaml:"log_level"`
 }
 
 type LivekitInfo struct {
@@ -239,6 +240,13 @@ func setLogger() {
 		p = filepath.Join(appCnf.RootWorkingDir, p)
 	}
 
+	logLevel := logrus.WarnLevel
+	if appCnf.LogSettings.LogLevel != nil && *appCnf.LogSettings.LogLevel != "" {
+		if lv, err := logrus.ParseLevel(strings.ToLower(*appCnf.LogSettings.LogLevel)); err == nil {
+			logLevel = lv
+		}
+	}
+
 	logWriter := &lumberjack.Logger{
 		Filename:   p,
 		MaxSize:    appCnf.LogSettings.MaxSize,
@@ -246,6 +254,7 @@ func setLogger() {
 		MaxAge:     appCnf.LogSettings.MaxAge,
 	}
 
+	logrus.SetLevel(logLevel)
 	logrus.SetReportCaller(true)
 	logrus.SetFormatter(&logrus.JSONFormatter{
 		PrettyPrint: true,

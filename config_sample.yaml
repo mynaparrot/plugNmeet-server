@@ -45,11 +45,13 @@ room_default_settings:
   max_num_breakout_rooms: 6
 log_settings:
   log_file: "./log/plugNmeet.log"
-  # maxsize of log file in MB
+  # maxsize of the log file in MB
   maxsize: 20
   maxbackups: 4
   # max age of log before rotates in days
   maxage: 2
+  # info, warn, error, fatal, debug or panic
+  log_level: "info"
 livekit_info:
   host: "http://host.docker.internal:7880"
   api_key: "APIiYAA5w37Cfo2"
