@@ -100,7 +100,7 @@ func (m *FileModel) ConvertAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 			_, err = cmd.Output()
 
 			if err != nil {
-				log.Errorln(err)
+				log.Errorln(fmt.Sprintf("soffice file conversion failed for roomId: %s; file: %s; mimeType: %s; variant: %s; msg: %s", roomId, file, mType.String(), variant, err.Error()))
 				status <- convertStatus{status: false, err: err}
 				return
 			}
@@ -120,7 +120,7 @@ func (m *FileModel) ConvertAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 		_, err = cmd.Output()
 
 		if err != nil {
-			log.Errorln(err)
+			log.Errorln(fmt.Sprintf("mutool file conversion failed for roomId: %s; file: %s; mimeType: %s; msg: %s", roomId, file, mType.String(), err.Error()))
 			status <- convertStatus{status: false, err: err}
 			return
 		}
