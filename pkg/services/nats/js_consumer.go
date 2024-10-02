@@ -8,7 +8,7 @@ import (
 
 func (s *NatsService) CreateChatConsumer(roomId, userId string) (jwt.StringList, error) {
 	_, err := s.js.CreateOrUpdateConsumer(s.ctx, roomId, jetstream.ConsumerConfig{
-		Name: fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.Chat, userId),
+		Durable: fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.Chat, userId),
 		FilterSubjects: []string{
 			fmt.Sprintf("%s:%s.>", roomId, s.app.NatsInfo.Subjects.Chat),
 		},
@@ -29,7 +29,7 @@ func (s *NatsService) CreateChatConsumer(roomId, userId string) (jwt.StringList,
 
 func (s *NatsService) CreateSystemPublicConsumer(roomId, userId string) (jwt.StringList, error) {
 	_, err := s.js.CreateOrUpdateConsumer(s.ctx, roomId, jetstream.ConsumerConfig{
-		Name:          fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.SystemPublic, userId),
+		Durable:       fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.SystemPublic, userId),
 		DeliverPolicy: jetstream.DeliverNewPolicy,
 		FilterSubjects: []string{
 			fmt.Sprintf("%s:%s.>", roomId, s.app.NatsInfo.Subjects.SystemPublic),
@@ -50,7 +50,7 @@ func (s *NatsService) CreateSystemPublicConsumer(roomId, userId string) (jwt.Str
 
 func (s *NatsService) CreateSystemPrivateConsumer(roomId, userId string) (jwt.StringList, error) {
 	_, err := s.js.CreateOrUpdateConsumer(s.ctx, roomId, jetstream.ConsumerConfig{
-		Name:          fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.SystemPrivate, userId),
+		Durable:       fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.SystemPrivate, userId),
 		DeliverPolicy: jetstream.DeliverNewPolicy,
 		FilterSubjects: []string{
 			fmt.Sprintf("%s:%s.%s.>", roomId, s.app.NatsInfo.Subjects.SystemPrivate, userId),
@@ -71,7 +71,7 @@ func (s *NatsService) CreateSystemPrivateConsumer(roomId, userId string) (jwt.St
 
 func (s *NatsService) CreateWhiteboardConsumer(roomId, userId string) (jwt.StringList, error) {
 	_, err := s.js.CreateOrUpdateConsumer(s.ctx, roomId, jetstream.ConsumerConfig{
-		Name:          fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.Whiteboard, userId),
+		Durable:       fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.Whiteboard, userId),
 		DeliverPolicy: jetstream.DeliverNewPolicy,
 		FilterSubjects: []string{
 			fmt.Sprintf("%s:%s.>", roomId, s.app.NatsInfo.Subjects.Whiteboard),
@@ -93,7 +93,7 @@ func (s *NatsService) CreateWhiteboardConsumer(roomId, userId string) (jwt.Strin
 
 func (s *NatsService) CreateDataChannelConsumer(roomId, userId string) (jwt.StringList, error) {
 	_, err := s.js.CreateOrUpdateConsumer(s.ctx, roomId, jetstream.ConsumerConfig{
-		Name:          fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.DataChannel, userId),
+		Durable:       fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.DataChannel, userId),
 		DeliverPolicy: jetstream.DeliverNewPolicy,
 		FilterSubjects: []string{
 			fmt.Sprintf("%s:%s.>", roomId, s.app.NatsInfo.Subjects.DataChannel),
