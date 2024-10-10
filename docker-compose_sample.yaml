@@ -12,7 +12,7 @@ services:
       - ./mariadb-data:/var/lib/mysql
       - ./sql_dump/install.sql:/docker-entrypoint-initdb.d/install.sql
   nats:
-    image: nats:alpine
+    image: nats:2.10-alpine
     command:
       - "-DVV"
       - "-config"
