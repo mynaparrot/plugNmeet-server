@@ -97,7 +97,7 @@ func (m *RecorderModel) SendMsgToRecorder(req *plugnmeet.RecordingReq) error {
 	_, err = m.app.NatsConn.RequestMsg(&nats.Msg{
 		Subject: m.app.NatsInfo.Recorder.RecorderChannel,
 		Data:    payload,
-	}, time.Second*1)
+	}, time.Second*3)
 
 	return err
 }
