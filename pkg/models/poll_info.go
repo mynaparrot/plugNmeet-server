@@ -101,7 +101,7 @@ func (m *PollModel) GetResponsesResult(roomId, pollId string) (*plugnmeet.PollRe
 	if err != nil {
 		return nil, err
 	}
-	if result != nil {
+	if result == nil {
 		return nil, nil
 	}
 
