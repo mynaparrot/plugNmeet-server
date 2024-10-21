@@ -20,6 +20,8 @@ func (m *WebhookModel) trackPublished(event *livekit.WebhookEvent) {
 
 	event.Room.Sid = rInfo.RoomSid
 	event.Room.Metadata = rInfo.Metadata
+	event.Room.MaxParticipants = uint32(rInfo.MaxParticipants)
+	event.Room.EmptyTimeout = uint32(rInfo.EmptyTimeout)
 
 	// webhook notification
 	go m.sendToWebhookNotifier(event)
@@ -66,6 +68,8 @@ func (m *WebhookModel) trackUnpublished(event *livekit.WebhookEvent) {
 
 	event.Room.Sid = rInfo.RoomSid
 	event.Room.Metadata = rInfo.Metadata
+	event.Room.MaxParticipants = uint32(rInfo.MaxParticipants)
+	event.Room.EmptyTimeout = uint32(rInfo.EmptyTimeout)
 
 	// webhook notification
 	go m.sendToWebhookNotifier(event)

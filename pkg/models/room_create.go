@@ -170,7 +170,7 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 	}
 
 	// create and send room_created webhook
-	go m.sendRoomCreatedWebhook(ari)
+	go m.sendRoomCreatedWebhook(ari, r.EmptyTimeout, r.MaxParticipants)
 
 	return ari, nil
 }
@@ -212,7 +212,7 @@ func (m *RoomModel) prepareWhiteboardPreloadFile(meta *plugnmeet.RoomMetadata, r
 	log.Infoln(fmt.Sprintf("preloadFile: %s for roomId: %s had been processed successfully", *wbf.PreloadFile, roomId))
 }
 
-func (m *RoomModel) sendRoomCreatedWebhook(info *plugnmeet.ActiveRoomInfo) {
+func (m *RoomModel) sendRoomCreatedWebhook(info *plugnmeet.ActiveRoomInfo, emptyTimeout, maxParticipants *uint32) {
 	n := helpers.GetWebhookNotifier(m.app)
 	if n != nil {
 		// register for event first
@@ -224,10 +224,12 @@ func (m *RoomModel) sendRoomCreatedWebhook(info *plugnmeet.ActiveRoomInfo) {
 		msg := &plugnmeet.CommonNotifyEvent{
 			Event: &e,
 			Room: &plugnmeet.NotifyEventRoom{
-				RoomId:       &info.RoomId,
-				Sid:          &info.Sid,
-				CreationTime: &cr,
-				Metadata:     &info.Metadata,
+				RoomId:          &info.RoomId,
+				Sid:             &info.Sid,
+				CreationTime:    &cr,
+				Metadata:        &info.Metadata,
+				EmptyTimeout:    emptyTimeout,
+				MaxParticipants: maxParticipants,
 			},
 		}
 

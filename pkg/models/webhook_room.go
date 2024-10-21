@@ -72,6 +72,8 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 	// otherwise some services may not be ready
 	event.Room.Metadata = rInfo.Metadata
 	event.Room.Sid = rInfo.RoomSid
+	event.Room.MaxParticipants = uint32(rInfo.MaxParticipants)
+	event.Room.EmptyTimeout = uint32(rInfo.EmptyTimeout)
 
 	// webhook notification
 	m.sendToWebhookNotifier(event)
@@ -90,6 +92,8 @@ func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 
 	event.Room.Metadata = rInfo.Metadata
 	event.Room.Sid = rInfo.RoomSid
+	event.Room.MaxParticipants = uint32(rInfo.MaxParticipants)
+	event.Room.EmptyTimeout = uint32(rInfo.EmptyTimeout)
 
 	// we are introducing a new event name here
 	// because for our case we still have remaining tasks

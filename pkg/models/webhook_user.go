@@ -20,6 +20,8 @@ func (m *WebhookModel) participantJoined(event *livekit.WebhookEvent) {
 
 	event.Room.Sid = rInfo.RoomSid
 	event.Room.Metadata = rInfo.Metadata
+	event.Room.MaxParticipants = uint32(rInfo.MaxParticipants)
+	event.Room.EmptyTimeout = uint32(rInfo.EmptyTimeout)
 
 	_, err = m.ds.IncrementOrDecrementNumParticipants(rInfo.RoomSid, "+")
 	if err != nil {
@@ -43,6 +45,8 @@ func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 
 	event.Room.Sid = rInfo.RoomSid
 	event.Room.Metadata = rInfo.Metadata
+	event.Room.MaxParticipants = uint32(rInfo.MaxParticipants)
+	event.Room.EmptyTimeout = uint32(rInfo.EmptyTimeout)
 
 	_, err = m.ds.IncrementOrDecrementNumParticipants(rInfo.RoomSid, "-")
 	if err != nil {
