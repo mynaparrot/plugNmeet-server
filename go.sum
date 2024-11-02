@@ -130,6 +130,8 @@ github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
 github.com/mynaparrot/plugnmeet-protocol v0.0.0-20241021133642-dcc51f1d220c h1:FyktHLFNkWngoBT2/mz+HfPosTD++6Ja1QUNqaddd+s=
 github.com/mynaparrot/plugnmeet-protocol v0.0.0-20241021133642-dcc51f1d220c/go.mod h1:eU5cr6DucIgiTtWnH4dsxVCdESwXnUOrcda71gyHnvI=
+github.com/mynaparrot/plugnmeet-protocol v0.0.0-20241102123617-cf4e53acdeaf h1:2T1QyK26+HdQsuocswFUQ2Gif5I3t9l+h73b9JoAzFg=
+github.com/mynaparrot/plugnmeet-protocol v0.0.0-20241102123617-cf4e53acdeaf/go.mod h1:eU5cr6DucIgiTtWnH4dsxVCdESwXnUOrcda71gyHnvI=
 github.com/nats-io/jwt/v2 v2.7.2 h1:SCRjfDLJ2q8naXp8YlGJJS5/yj3wGSODFYVi4nnwVMw=
 github.com/nats-io/jwt/v2 v2.7.2/go.mod h1:kB6QUmqHG6Wdrzj0KP2L+OX4xiTPBeV+NHVstFaATXU=
 github.com/nats-io/nats.go v1.37.0 h1:07rauXbVnnJvv1gfIyghFEo6lUcYRY0WXc3x7x0vUxE=
