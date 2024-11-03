@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.5](https://github.com/mynaparrot/plugNmeet-server/compare/v1.7.4...v1.7.5) (2024-11-03)
+
+
+### Bug Fixes
+
+* trigger the creation release workflow on tag push ([7b2f87a](https://github.com/mynaparrot/plugNmeet-server/commit/7b2f87a5ca4e93059e53b03d28db42a8fda552fe))
+
 ## [1.7.4](https://github.com/mynaparrot/plugNmeet-server/compare/v1.7.3...v1.7.4) (2024-11-03)
 
 
