@@ -17,3 +17,4 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           release-type: go
+          version-file: version/version.go
