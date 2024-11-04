@@ -65,7 +65,6 @@ jobs:
           docker ps
           docker compose logs
       - name: Run test
-        #run: go test -cover -race -v ./...
         run: |
           cp ./test/config.yaml config.yaml
           go test -timeout 2m -cover -race -v ./...
