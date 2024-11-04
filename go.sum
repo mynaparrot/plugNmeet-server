@@ -117,6 +117,8 @@ github.com/livekit/psrpc v0.6.1-0.20240924010758-9f0a4268a3b9 h1:33oBjGpVD9tYkDX
 github.com/livekit/psrpc v0.6.1-0.20240924010758-9f0a4268a3b9/go.mod h1:CQUBSPfYYAaevg1TNCc6/aYsa8DJH4jSRFdCeSZk5u0=
 github.com/livekit/server-sdk-go/v2 v2.2.1 h1:MK6H52X/k5FA3d613qAawAVvWPwyzxS5CLpxfKd/pD4=
 github.com/livekit/server-sdk-go/v2 v2.2.1/go.mod h1:Oqv4EYIqLWjdgWXw8HuxN79QDy77vws1vI9YMkBxSMM=
+github.com/livekit/server-sdk-go/v2 v2.3.0 h1:k6kpBwJNZYUypv9567hfmLpxQumL463dNGUBfoF0bzQ=
+github.com/livekit/server-sdk-go/v2 v2.3.0/go.mod h1:m2IukIyPCvJCdx04mdWIud9FoCBUAWc3526x3KgT8qY=
 github.com/magefile/mage v1.15.0 h1:BvGheCMAsG3bWUDbZ8AyXXpCNwU9u5CB6sM+HNb9HYg=
 github.com/magefile/mage v1.15.0/go.mod h1:z5UZb/iS3GoOSn0JgWuiw7dxlurVYTu+/jHXqQg881A=
 github.com/mattn/go-colorable v0.1.13 h1:fFA4WZxdEF4tXPZVKMLwD8oUnCTTo08duU7wxecdEvA=
