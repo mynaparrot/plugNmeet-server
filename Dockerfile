@@ -17,7 +17,7 @@ COPY helpers/ helpers/
 COPY pkg/ pkg/
 COPY version/ version/
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH GO111MODULE=on go build -ldflags '-w -s -buildid=' -a -o plugnmeet-server main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH GO111MODULE=on go build -trimpath -ldflags '-w -s -buildid=' -a -o plugnmeet-server main.go
 
 FROM debian:stable-slim
 
