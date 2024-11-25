@@ -14,7 +14,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.27.1
-	github.com/livekit/server-sdk-go/v2 v2.3.0
+	github.com/livekit/server-sdk-go/v2 v2.3.1
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20241116171040-4d9a8f622106
 	github.com/nats-io/jwt/v2 v2.7.2
 	github.com/nats-io/nats.go v1.37.0
@@ -108,7 +108,7 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	go.uber.org/zap/exp v0.3.0 // indirect
 	golang.org/x/crypto v0.29.0 // indirect
-	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c // indirect
+	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f // indirect
 	golang.org/x/net v0.31.0 // indirect
 	golang.org/x/sync v0.9.0 // indirect
 	golang.org/x/sys v0.27.0 // indirect

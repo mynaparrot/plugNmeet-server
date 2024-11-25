@@ -125,6 +125,8 @@ github.com/livekit/server-sdk-go/v2 v2.2.1 h1:MK6H52X/k5FA3d613qAawAVvWPwyzxS5CL
 github.com/livekit/server-sdk-go/v2 v2.2.1/go.mod h1:Oqv4EYIqLWjdgWXw8HuxN79QDy77vws1vI9YMkBxSMM=
 github.com/livekit/server-sdk-go/v2 v2.3.0 h1:k6kpBwJNZYUypv9567hfmLpxQumL463dNGUBfoF0bzQ=
 github.com/livekit/server-sdk-go/v2 v2.3.0/go.mod h1:m2IukIyPCvJCdx04mdWIud9FoCBUAWc3526x3KgT8qY=
+github.com/livekit/server-sdk-go/v2 v2.3.1 h1:KRjkFVAu6clX4o6Bdcov8jhLSy/itXtzZ5LU9i3wD64=
+github.com/livekit/server-sdk-go/v2 v2.3.1/go.mod h1:MWcdIsfXe0sTHCfZNjzaEx9R9v+eWW7vwBNpcPrBKRw=
 github.com/magefile/mage v1.15.0 h1:BvGheCMAsG3bWUDbZ8AyXXpCNwU9u5CB6sM+HNb9HYg=
 github.com/magefile/mage v1.15.0/go.mod h1:z5UZb/iS3GoOSn0JgWuiw7dxlurVYTu+/jHXqQg881A=
 github.com/mattn/go-colorable v0.1.13 h1:fFA4WZxdEF4tXPZVKMLwD8oUnCTTo08duU7wxecdEvA=
@@ -279,6 +281,8 @@ golang.org/x/crypto v0.29.0 h1:L5SG1JTTXupVV3n6sUqMTeWbjAyfPwoda2DLX8J8FrQ=
 golang.org/x/crypto v0.29.0/go.mod h1:+F4F4N5hv6v38hfeYwTdx20oUvLLc+QfrE9Ax9HtgRg=
 golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c h1:7dEasQXItcW1xKJ2+gg5VOiBnqWrJc+rq0DPKyvvdbY=
 golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c/go.mod h1:NQtJDoLvd6faHhE7m4T/1IY708gDefGGjR/iUW8yQQ8=
+golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f h1:XdNn9LlyWAhLVp6P/i8QYBW+hlyhrhei9uErw2B5GJo=
+golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f/go.mod h1:D5SMRVC3C2/4+F/DB1wZsLRnSNimn2Sp/NPsCrsv8ak=
 golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4/go.mod h1:jJ57K6gSWd91VN4djpZkiMVwK6gcyfeH4XE8wZrZaV4=
 golang.org/x/mod v0.8.0/go.mod h1:iBbtSCu2XBx23ZKBPSOrRkjjQPZFPuis4dIYUhu/chs=
 golang.org/x/net v0.0.0-20190620200207-3b0461eec859/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
