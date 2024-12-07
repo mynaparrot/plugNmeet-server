@@ -56,7 +56,8 @@ func (s *NatsService) AddUser(roomId, userId, name string, isAdmin, isPresenter 
 
 	// now we'll create different bucket for info
 	kv, err = s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
-		Bucket: fmt.Sprintf(UserInfoBucket, roomId, userId),
+		Replicas: s.app.NatsInfo.NumReplicas,
+		Bucket:   fmt.Sprintf(UserInfoBucket, roomId, userId),
 	})
 	if err != nil {
 		return err
