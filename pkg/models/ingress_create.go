@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"time"
 )
 
@@ -35,7 +36,7 @@ func (m *IngressModel) CreateIngress(r *plugnmeet.CreateIngressReq) (*livekit.In
 		InputType:           inputType,
 		Name:                fmt.Sprintf("%s:%d", r.RoomId, 1),
 		RoomName:            r.RoomId,
-		ParticipantIdentity: fmt.Sprintf("%d", time.Now().UnixMilli()),
+		ParticipantIdentity: fmt.Sprintf("%s%d", config.IngressUserIdPrefix, time.Now().UnixMilli()),
 		ParticipantName:     r.ParticipantName,
 	}
 
@@ -45,6 +46,23 @@ func (m *IngressModel) CreateIngress(r *plugnmeet.CreateIngressReq) (*livekit.In
 	}
 	if f == nil {
 		return nil, errors.New("invalid nil create ingress response")
+	}
+
+	// add this user in our bucket
+	tr := true
+	fl := false
+	mt := plugnmeet.UserMetadata{
+		IsAdmin:         true,
+		RecordWebcam:    &tr,
+		WaitForApproval: false,
+		LockSettings: &plugnmeet.LockSettings{
+			LockWebcam:     &fl,
+			LockMicrophone: &fl,
+		},
+	}
+	err = m.natsService.AddUser(r.RoomId, req.ParticipantIdentity, r.ParticipantName, true, false, &mt)
+	if err != nil {
+		return nil, err
 	}
 
 	ingressFeatures.InputType = r.InputType
