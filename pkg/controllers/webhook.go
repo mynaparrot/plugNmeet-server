@@ -4,7 +4,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func HandleWebhook(c *fiber.Ctx) error {
@@ -23,12 +22,9 @@ func HandleWebhook(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusForbidden)
 	}
 
-	op := protojson.UnmarshalOptions{
-		DiscardUnknown: true,
-	}
 	event := new(livekit.WebhookEvent)
 	if err = op.Unmarshal(data, event); err != nil {
-		return c.SendStatus(fiber.StatusForbidden)
+		return c.SendStatus(fiber.StatusUnprocessableEntity)
 	}
 
 	mm := models.NewWebhookModel(nil, nil, nil)

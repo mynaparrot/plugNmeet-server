@@ -6,14 +6,10 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
 func HandleRoomCreate(c *fiber.Ctx) error {
-	op := protojson.UnmarshalOptions{
-		DiscardUnknown: true,
-	}
 	req := new(plugnmeet.CreateRoomReq)
 	err := op.Unmarshal(c.Body(), req)
 	if err != nil {
@@ -46,9 +42,6 @@ func HandleRoomCreate(c *fiber.Ctx) error {
 
 func HandleIsRoomActive(c *fiber.Ctx) error {
 	req := new(plugnmeet.IsRoomActiveReq)
-	op := protojson.UnmarshalOptions{
-		DiscardUnknown: true,
-	}
 	err := op.Unmarshal(c.Body(), req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
@@ -70,9 +63,6 @@ func HandleIsRoomActive(c *fiber.Ctx) error {
 
 func HandleGetActiveRoomInfo(c *fiber.Ctx) error {
 	req := new(plugnmeet.GetActiveRoomInfoReq)
-	op := protojson.UnmarshalOptions{
-		DiscardUnknown: true,
-	}
 	err := op.Unmarshal(c.Body(), req)
 	if err != nil {
 		return c.JSON(fiber.Map{
@@ -115,9 +105,6 @@ func HandleGetActiveRoomsInfo(c *fiber.Ctx) error {
 
 func HandleEndRoom(c *fiber.Ctx) error {
 	req := new(plugnmeet.RoomEndReq)
-	op := protojson.UnmarshalOptions{
-		DiscardUnknown: true,
-	}
 	err := op.Unmarshal(c.Body(), req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
@@ -139,9 +126,6 @@ func HandleEndRoom(c *fiber.Ctx) error {
 
 func HandleFetchPastRooms(c *fiber.Ctx) error {
 	req := new(plugnmeet.FetchPastRoomsReq)
-	op := protojson.UnmarshalOptions{
-		DiscardUnknown: true,
-	}
 	err := op.Unmarshal(c.Body(), req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())

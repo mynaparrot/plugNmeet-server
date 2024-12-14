@@ -6,14 +6,10 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func HandleFetchRecordings(c *fiber.Ctx) error {
 	req := new(plugnmeet.FetchRecordingsReq)
-	op := protojson.UnmarshalOptions{
-		DiscardUnknown: true,
-	}
 	err := op.Unmarshal(c.Body(), req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
@@ -47,9 +43,6 @@ func HandleFetchRecordings(c *fiber.Ctx) error {
 
 func HandleRecordingInfo(c *fiber.Ctx) error {
 	req := new(plugnmeet.RecordingInfoReq)
-	op := protojson.UnmarshalOptions{
-		DiscardUnknown: true,
-	}
 	err := op.Unmarshal(c.Body(), req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
@@ -75,9 +68,6 @@ func HandleRecordingInfo(c *fiber.Ctx) error {
 
 func HandleDeleteRecording(c *fiber.Ctx) error {
 	req := new(plugnmeet.DeleteRecordingReq)
-	op := protojson.UnmarshalOptions{
-		DiscardUnknown: true,
-	}
 	err := op.Unmarshal(c.Body(), req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
@@ -102,9 +92,6 @@ func HandleDeleteRecording(c *fiber.Ctx) error {
 
 func HandleGetDownloadToken(c *fiber.Ctx) error {
 	req := new(plugnmeet.GetDownloadTokenReq)
-	op := protojson.UnmarshalOptions{
-		DiscardUnknown: true,
-	}
 	err := op.Unmarshal(c.Body(), req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())

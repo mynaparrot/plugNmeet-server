@@ -9,11 +9,12 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
+var op = protojson.UnmarshalOptions{
+	DiscardUnknown: true,
+}
+
 func HandleFetchAnalytics(c *fiber.Ctx) error {
 	req := new(plugnmeet.FetchAnalyticsReq)
-	op := protojson.UnmarshalOptions{
-		DiscardUnknown: true,
-	}
 	err := op.Unmarshal(c.Body(), req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
@@ -48,9 +49,6 @@ func HandleFetchAnalytics(c *fiber.Ctx) error {
 
 func HandleDeleteAnalytics(c *fiber.Ctx) error {
 	req := new(plugnmeet.DeleteAnalyticsReq)
-	op := protojson.UnmarshalOptions{
-		DiscardUnknown: true,
-	}
 	err := op.Unmarshal(c.Body(), req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
@@ -75,9 +73,6 @@ func HandleDeleteAnalytics(c *fiber.Ctx) error {
 
 func HandleGetAnalyticsDownloadToken(c *fiber.Ctx) error {
 	req := new(plugnmeet.GetAnalyticsDownloadTokenReq)
-	op := protojson.UnmarshalOptions{
-		DiscardUnknown: true,
-	}
 	err := op.Unmarshal(c.Body(), req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
