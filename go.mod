@@ -4,21 +4,21 @@ go 1.23
 
 require (
 	github.com/ansrivas/fiberprometheus/v2 v2.7.0
-	github.com/bufbuild/protovalidate-go v0.7.3
+	github.com/bufbuild/protovalidate-go v0.8.0
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/gabriel-vasile/mimetype v1.4.7
 	github.com/go-jose/go-jose/v4 v4.0.4
-	github.com/goccy/go-json v0.10.3
+	github.com/goccy/go-json v0.10.4
 	github.com/gofiber/fiber/v2 v2.52.5
 	github.com/gofiber/template/html/v2 v2.1.2
 	github.com/google/uuid v1.6.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/protocol v1.29.3
+	github.com/livekit/protocol v1.29.4
 	github.com/livekit/server-sdk-go/v2 v2.4.0
-	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20241207134313-3daff0540d9c
-	github.com/nats-io/jwt/v2 v2.7.2
+	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20241214094248-0c82a26fa56b
+	github.com/nats-io/jwt/v2 v2.7.3
 	github.com/nats-io/nats.go v1.37.0
-	github.com/nats-io/nkeys v0.4.8
+	github.com/nats-io/nkeys v0.4.9
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/urfave/cli/v2 v2.27.5
@@ -30,8 +30,8 @@ require (
 )
 
 require (
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.35.2-20240920164238-5a7b106cbb87.1 // indirect
-	buf.build/go/protoyaml v0.2.0 // indirect
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.35.2-20241127180247-a33202765966.1 // indirect
+	buf.build/go/protoyaml v0.3.0 // indirect
 	cel.dev/expr v0.18.0 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/andybalholm/brotli v1.1.1 // indirect
@@ -51,7 +51,7 @@ require (
 	github.com/go-sql-driver/mysql v1.8.1 // indirect
 	github.com/gofiber/template v1.8.3 // indirect
 	github.com/gofiber/utils v1.1.0 // indirect
-	github.com/google/cel-go v0.22.0 // indirect
+	github.com/google/cel-go v0.22.1 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.7 // indirect
