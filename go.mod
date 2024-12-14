@@ -18,7 +18,7 @@ require (
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20241207134313-3daff0540d9c
 	github.com/nats-io/jwt/v2 v2.7.2
 	github.com/nats-io/nats.go v1.37.0
-	github.com/nats-io/nkeys v0.4.8
+	github.com/nats-io/nkeys v0.4.9
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/urfave/cli/v2 v2.27.5
