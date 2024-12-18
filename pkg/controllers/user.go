@@ -9,14 +9,10 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
 func HandleGenerateJoinToken(c *fiber.Ctx) error {
-	op := protojson.UnmarshalOptions{
-		DiscardUnknown: true,
-	}
 	req := new(plugnmeet.GenerateTokenReq)
 	err := op.Unmarshal(c.Body(), req)
 	if err != nil {
