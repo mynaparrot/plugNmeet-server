@@ -56,6 +56,13 @@ jobs:
           git commit -m "bump beta version"
           git push
 
+      - name: To rebase again
+        uses: googleapis/release-please-action@v4
+        if: ${{ ! steps.release.outputs.release_created }}
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
       - name: Upload server files
         if: ${{ steps.release.outputs.release_created }}
         run: make -j upload
