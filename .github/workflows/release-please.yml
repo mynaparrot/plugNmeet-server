@@ -19,16 +19,43 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
       - name: Checkout
-        if: ${{ steps.release.outputs.release_created }}
         uses: actions/checkout@v4
       - name: Setup go
-        if: ${{ steps.release.outputs.release_created }}
         uses: actions/setup-go@v5
         with:
           go-version-file: "go.mod"
       - name: Download Go modules
-        if: ${{ steps.release.outputs.release_created }}
         run: go mod download
+      - name: Update beta version
+        if: ${{ ! steps.release.outputs.release_created }}
+        run: |
+          cp config_sample.yaml config.yaml
+          GOARCH=amd64 GOOS=linux CGO_ENABLED=0 go build -ldflags '-w -s -buildid=' -o plugnmeet-server main.go
+          CURRENT_VERSION=$(./plugnmeet-server --version)
+          IFS='-' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+  
+          if [ ! "${VERSION_PARTS[1]}" ]; then
+            # increment main part
+            NEXT_VERSION=$(echo "${VERSION_PARTS[0]}" | awk -F. -v OFS=. '{$NF += 1 ; print}')
+            NEXT_VERSION="${NEXT_VERSION}-0"
+          else
+            # it has seconds part, so we'll increment that only
+            NEW_BETA=$(echo "${VERSION_PARTS[1]}" | awk -F. -v OFS=. '{$NF += 1 ; print}')
+            NEXT_VERSION="${VERSION_PARTS[0]}-${NEW_BETA}"
+          fi
+        
+          echo "Changing version from: ${CURRENT_VERSION} To: ${NEXT_VERSION}"
+          sed -i "s/${CURRENT_VERSION}/${NEXT_VERSION}/" version/version.go
+          # now delete
+          rm -rf plugnmeet-server config.yaml
+          
+          # push changes
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add .
+          git commit -m "bump beta version"
+          git push
+
       - name: Upload server files
         if: ${{ steps.release.outputs.release_created }}
         run: make -j upload
