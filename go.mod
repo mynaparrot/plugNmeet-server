@@ -13,7 +13,7 @@ require (
 	github.com/gofiber/template/html/v2 v2.1.2
 	github.com/google/uuid v1.6.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/protocol v1.29.4
+	github.com/livekit/protocol v1.30.0
 	github.com/livekit/server-sdk-go/v2 v2.4.0
 	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20241214094248-0c82a26fa56b
 	github.com/nats-io/jwt/v2 v2.7.3
@@ -42,9 +42,9 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
-	github.com/frostbyte73/core v0.0.13 // indirect
+	github.com/frostbyte73/core v0.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
-	github.com/gammazero/deque v0.2.1 // indirect
+	github.com/gammazero/deque v1.0.0 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
