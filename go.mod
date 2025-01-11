@@ -10,7 +10,7 @@ require (
 	github.com/go-jose/go-jose/v4 v4.0.4
 	github.com/goccy/go-json v0.10.4
 	github.com/gofiber/fiber/v2 v2.52.6
-	github.com/gofiber/template/html/v2 v2.1.2
+	github.com/gofiber/template/html/v2 v2.1.3
 	github.com/google/uuid v1.6.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.30.0
