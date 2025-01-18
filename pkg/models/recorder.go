@@ -94,10 +94,19 @@ func (m *RecorderModel) SendMsgToRecorder(req *plugnmeet.RecordingReq) error {
 		return err
 	}
 
-	_, err = m.app.NatsConn.RequestMsg(&nats.Msg{
+	msg, err := m.app.NatsConn.RequestMsg(&nats.Msg{
 		Subject: m.app.NatsInfo.Recorder.RecorderChannel,
 		Data:    payload,
 	}, time.Second*3)
 
-	return err
+	if err != nil {
+		return err
+	}
+
+	res := new(plugnmeet.CommonResponse)
+	if err = proto.Unmarshal(msg.Data, res); err == nil && !res.Status {
+		return errors.New(res.GetMsg())
+	}
+
+	return nil
 }
