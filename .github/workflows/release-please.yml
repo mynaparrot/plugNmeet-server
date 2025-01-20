@@ -70,7 +70,6 @@ jobs:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/plugnmeet-server
           tags: |
             type=ref,event=tag
-            type=pep440,pattern=${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }},value=${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}
             type=semver,pattern=${{ steps.release.outputs.tag_name }},value=${{ steps.release.outputs.tag_name }}
             type=semver,pattern=v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }},value=${{ steps.release.outputs.tag_name }}
 
