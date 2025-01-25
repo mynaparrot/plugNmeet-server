@@ -7,6 +7,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
 	"io"
+	"io/fs"
 	"os"
 	"path"
 	"strings"
@@ -24,7 +25,8 @@ func (m *RecordingModel) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error 
 
 	f, err := os.Stat(filePath)
 	if err != nil {
-		if errors.Is(err, err.(*os.PathError)) {
+		var pathError *fs.PathError
+		if errors.As(err, &pathError) {
 			log.Errorln(filePath + " does not exist, so deleting from DB without stopping")
 			fileExist = false
 		} else {
@@ -33,8 +35,8 @@ func (m *RecordingModel) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error 
 		}
 	}
 
-	// if file not exists then will delete
-	// if not, we can just skip this & delete from DB
+	// if the file not exists then will delete
+	// if not, we can just skip this and delete from DB
 	if fileExist {
 		// if enabled backup
 		if m.app.RecorderInfo.EnableDelRecordingBackup {
