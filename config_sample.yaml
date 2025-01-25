@@ -146,7 +146,7 @@ recorder_info:
   # we can use a separate path for this backup
   # we'll use os.Rename just to change the path instated of delay on disk operation
   # if we're using remote disk then make sure both of recordings and del_backup are in the same disk
-  # otherwise it will give error
+  # otherwise it will give cross-device error
   del_recording_backup_path: "/app/recording_files/del_backup"
   # duration to keep the files as backup in hour, default: 72 hours (3 days)
   del_recording_backup_duration: 72h

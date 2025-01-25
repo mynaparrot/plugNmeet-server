@@ -8,9 +8,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	"io"
 	"os"
-	"os/exec"
 	"path"
 	"strings"
+	"time"
 )
 
 func (m *RecordingModel) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
@@ -46,13 +46,10 @@ func (m *RecordingModel) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error 
 				return err
 			}
 
-			// touch to change modified date
 			// otherwise during cleanup will be hard to detect
-			cmd := exec.Command("/usr/bin/touch", "-d", "2 minutes ago", toFile)
-			output, err := cmd.CombinedOutput()
-			if err != nil {
-				log.Errorln(fmt.Sprintf("Failed change modify time of the dir: %s with error: %s", toFile, string(output)))
-				return err
+			newTime := time.Now()
+			if err := os.Chtimes(toFile, newTime, newTime); err != nil {
+				log.Errorln("Failed to update file modification time:", err)
 			}
 
 			// now the JSON file
