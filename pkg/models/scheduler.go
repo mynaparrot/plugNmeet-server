@@ -51,6 +51,9 @@ func (m *SchedulerModel) StartScheduler() {
 	oneMinuteChecker := time.NewTicker(1 * time.Minute)
 	defer oneMinuteChecker.Stop()
 
+	hourlyChecker := time.NewTicker(1 * time.Hour)
+	defer hourlyChecker.Stop()
+
 	for {
 		select {
 		case <-m.closeTicker:
@@ -61,6 +64,8 @@ func (m *SchedulerModel) StartScheduler() {
 			m.checkOnlineUsersStatus()
 		case <-fiveMinutesChecker.C:
 			m.activeRoomChecker()
+		case <-hourlyChecker.C:
+			m.checkDelRecordingBackupPath()
 		}
 	}
 }
