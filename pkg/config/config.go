@@ -9,7 +9,9 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 	"gorm.io/gorm"
 	"io"
+	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -85,8 +87,11 @@ type UploadFileSettings struct {
 }
 
 type RecorderInfo struct {
-	RecordingFilesPath string        `yaml:"recording_files_path"`
-	TokenValidity      time.Duration `yaml:"token_validity"`
+	RecordingFilesPath         string        `yaml:"recording_files_path"`
+	TokenValidity              time.Duration `yaml:"token_validity"`
+	EnableDelRecordingBackup   bool          `yaml:"enable_del_recording_backup"`
+	DelRecordingBackupPath     string        `yaml:"del_recording_backup_path"`
+	DelRecordingBackupDuration time.Duration `yaml:"del_recording_backup_duration"`
 }
 
 type SharedNotePad struct {
@@ -223,6 +228,22 @@ func New(a *AppConfig) {
 
 		if _, err := os.Stat(p); os.IsNotExist(err) {
 			_ = os.MkdirAll(p, os.ModePerm)
+		}
+	}
+
+	// set default
+	if appCnf.RecorderInfo.EnableDelRecordingBackup {
+		if appCnf.RecorderInfo.DelRecordingBackupDuration == 0 {
+			appCnf.RecorderInfo.DelRecordingBackupDuration = time.Hour * 72
+		}
+
+		if appCnf.RecorderInfo.DelRecordingBackupPath == "" {
+			appCnf.RecorderInfo.DelRecordingBackupPath = path.Join(appCnf.RecorderInfo.RecordingFilesPath, "del_backup")
+		}
+
+		err := os.MkdirAll(appCnf.RecorderInfo.DelRecordingBackupPath, 0755)
+		if err != nil {
+			log.Fatal(err)
 		}
 	}
 
