@@ -25,8 +25,8 @@ func (m *SchedulerModel) checkOnlineUsersStatus() {
 
 	kl := m.app.JetStream.KeyValueStoreNames(context.Background())
 	for s := range kl.Name() {
-		if strings.HasPrefix(s, natsservice.RoomUsersBucket) {
-			roomId := strings.ReplaceAll(s, natsservice.RoomUsersBucket, "")
+		if strings.HasPrefix(s, natsservice.RoomUsersBucketPrefix) {
+			roomId := strings.ReplaceAll(s, natsservice.RoomUsersBucketPrefix, "")
 			if users, err := m.natsService.GetOlineUsersId(roomId); err == nil && users != nil && len(users) > 0 {
 				for _, u := range users {
 					lastPing := m.natsService.GetUserLastPing(roomId, u)
@@ -53,6 +53,6 @@ func (m *SchedulerModel) changeUserStatus(roomId, userId string) {
 
 	if info, err := m.natsService.GetUserInfo(roomId, userId); err == nil && info != nil {
 		// notify to the room
-		m.natsService.BroadcastUserInfoToRoom(plugnmeet.NatsMsgServerToClientEvents_USER_OFFLINE, roomId, userId, nil)
+		m.natsService.BroadcastUserInfoToRoom(plugnmeet.NatsMsgServerToClientEvents_USER_OFFLINE, roomId, userId, info)
 	}
 }
