@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.8.0](https://github.com/mynaparrot/plugNmeet-server/compare/v1.7.8...v1.8.0) (2025-02-01)
+
+
+### Features
+
+* option to keep deleted recordings in backup ([7d1ee5d](https://github.com/mynaparrot/plugNmeet-server/commit/7d1ee5db73d3689d7137233ba0dbe48294eb82a6))
+
+
+### Bug Fixes
+
+* deps update ([93fff85](https://github.com/mynaparrot/plugNmeet-server/commit/93fff85fe110fc79da5a602c51d2f91c8031e321))
+* **deps:** update module github.com/goccy/go-json to v0.10.5 ([93ef56e](https://github.com/mynaparrot/plugNmeet-server/commit/93ef56eeeb28292a1d0409684bc71a624bd414aa))
+* **deps:** update module github.com/livekit/server-sdk-go/v2 to v2.4.2 ([d689646](https://github.com/mynaparrot/plugNmeet-server/commit/d6896460b5184218044ba81fd4dfc7f6b9405235))
+* few updates ([3944420](https://github.com/mynaparrot/plugNmeet-server/commit/394442074371516ac16ccef00a4ad70aa6d08d72))
+* remove duplicate tag ([377903f](https://github.com/mynaparrot/plugNmeet-server/commit/377903f6347033da290c381c12540021259d201c))
+
 ## [1.7.8](https://github.com/mynaparrot/plugNmeet-server/compare/v1.7.7...v1.7.8) (2025-01-18)
 
 
