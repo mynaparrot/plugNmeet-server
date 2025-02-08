@@ -3,7 +3,7 @@ module github.com/mynaparrot/plugnmeet-server
 go 1.23
 
 require (
-	github.com/ansrivas/fiberprometheus/v2 v2.7.0
+	github.com/ansrivas/fiberprometheus/v2 v2.8.0
 	github.com/bufbuild/protovalidate-go v0.9.1
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/gabriel-vasile/mimetype v1.4.8
@@ -89,7 +89,7 @@ require (
 	github.com/pion/webrtc/v4 v4.0.8 // indirect
 	github.com/prometheus/client_golang v1.20.5 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
-	github.com/prometheus/common v0.60.0 // indirect
+	github.com/prometheus/common v0.60.1 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/puzpuzpuz/xsync/v3 v3.4.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
