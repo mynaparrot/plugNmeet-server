@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.1](https://github.com/mynaparrot/plugNmeet-server/compare/v1.8.0...v1.8.1) (2025-02-12)
+
+
+### Bug Fixes
+
+* some clean up ([2472ad3](https://github.com/mynaparrot/plugNmeet-server/commit/2472ad3ccabda7a7de0006a5deec60996675342f))
+
 ## [1.8.0](https://github.com/mynaparrot/plugNmeet-server/compare/v1.7.8...v1.8.0) (2025-02-01)
 
 
