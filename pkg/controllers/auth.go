@@ -17,9 +17,9 @@ import (
 )
 
 // HandleAuthHeaderCheck will check auth values
-// It will accept 2 header values: API-KEY & HASH-SIGNATURE
+// It will accept two header values: API-KEY & HASH-SIGNATURE
 // HASH-SIGNATURE will require to calculated hmac sha256 using
-// body + Secret key
+// body and Secret key
 func HandleAuthHeaderCheck(c *fiber.Ctx) error {
 	apiKey := c.Get("API-KEY", "")
 	signature := c.Get("HASH-SIGNATURE", "")

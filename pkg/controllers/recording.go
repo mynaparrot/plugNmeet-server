@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"github.com/bufbuild/protovalidate-go"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
@@ -14,12 +13,8 @@ func HandleFetchRecordings(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
-	v, err := protovalidate.New()
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
-	}
 
-	if err = v.Validate(req); err != nil {
+	if err = validateProtoRequest(req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
@@ -48,12 +43,7 @@ func HandleRecordingInfo(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	v, err := protovalidate.New()
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
-	}
-
-	if err = v.Validate(req); err != nil {
+	if err = validateProtoRequest(req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
@@ -72,12 +62,8 @@ func HandleDeleteRecording(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
-	v, err := protovalidate.New()
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
-	}
 
-	if err = v.Validate(req); err != nil {
+	if err = validateProtoRequest(req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
@@ -96,12 +82,8 @@ func HandleGetDownloadToken(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
-	v, err := protovalidate.New()
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
-	}
 
-	if err = v.Validate(req); err != nil {
+	if err = validateProtoRequest(req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 

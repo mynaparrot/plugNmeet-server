@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"github.com/bufbuild/protovalidate-go"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
@@ -16,12 +15,7 @@ func HandleRoomCreate(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	v, err := protovalidate.New()
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
-	}
-
-	if err = v.Validate(req); err != nil {
+	if err = validateProtoRequest(req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
@@ -47,12 +41,7 @@ func HandleIsRoomActive(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	v, err := protovalidate.New()
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
-	}
-
-	if err = v.Validate(req); err != nil {
+	if err = validateProtoRequest(req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
@@ -70,12 +59,8 @@ func HandleGetActiveRoomInfo(c *fiber.Ctx) error {
 			"msg":    err.Error(),
 		})
 	}
-	v, err := protovalidate.New()
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
-	}
 
-	if err = v.Validate(req); err != nil {
+	if err = validateProtoRequest(req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 	m := models.NewRoomModel(nil, nil, nil)
@@ -109,12 +94,8 @@ func HandleEndRoom(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
-	v, err := protovalidate.New()
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
-	}
 
-	if err = v.Validate(req); err != nil {
+	if err = validateProtoRequest(req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
@@ -130,12 +111,8 @@ func HandleFetchPastRooms(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
-	v, err := protovalidate.New()
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
-	}
 
-	if err = v.Validate(req); err != nil {
+	if err = validateProtoRequest(req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 

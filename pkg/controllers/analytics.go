@@ -7,10 +7,23 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 var op = protojson.UnmarshalOptions{
 	DiscardUnknown: true,
+}
+
+func validateProtoRequest(msg proto.Message) error {
+	v, err := protovalidate.New()
+	if err != nil {
+		return err
+	}
+
+	if err = v.Validate(msg); err != nil {
+		return err
+	}
+	return nil
 }
 
 func HandleFetchAnalytics(c *fiber.Ctx) error {
@@ -20,12 +33,7 @@ func HandleFetchAnalytics(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	v, err := protovalidate.New()
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
-	}
-
-	if err = v.Validate(req); err != nil {
+	if err = validateProtoRequest(req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
@@ -53,12 +61,8 @@ func HandleDeleteAnalytics(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
-	v, err := protovalidate.New()
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
-	}
 
-	if err = v.Validate(req); err != nil {
+	if err = validateProtoRequest(req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
@@ -77,12 +81,8 @@ func HandleGetAnalyticsDownloadToken(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
-	v, err := protovalidate.New()
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, "failed to initialize validator: "+err.Error())
-	}
 
-	if err = v.Validate(req); err != nil {
+	if err = validateProtoRequest(req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 

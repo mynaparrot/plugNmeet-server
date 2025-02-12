@@ -4,7 +4,6 @@ import (
 	"crypto/subtle"
 	"encoding/xml"
 	"fmt"
-	"github.com/bufbuild/protovalidate-go"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/bbbapiwrapper"
@@ -130,12 +129,7 @@ func HandleBBBCreate(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 	}
 
-	v, err := protovalidate.New()
-	if err != nil {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", "failed to initialize validator: "+err.Error()))
-	}
-
-	if err = v.Validate(pnmReq); err != nil {
+	if err = validateProtoRequest(pnmReq); err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", err.Error()))
 	}
 
@@ -222,12 +216,7 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 	}
 
 	req := bbbapiwrapper.ConvertJoinRequest(q, isAdmin)
-	v, err := protovalidate.New()
-	if err != nil {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", "failed to initialize validator: "+err.Error()))
-	}
-
-	if err = v.Validate(req); err != nil {
+	if err = validateProtoRequest(req); err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", err.Error()))
 	}
 
