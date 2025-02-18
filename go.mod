@@ -13,9 +13,9 @@ require (
 	github.com/gofiber/template/html/v2 v2.1.3
 	github.com/google/uuid v1.6.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/protocol v1.32.1
+	github.com/livekit/protocol v1.33.0
 	github.com/livekit/server-sdk-go/v2 v2.4.2
-	github.com/mynaparrot/plugnmeet-protocol v1.0.12
+	github.com/mynaparrot/plugnmeet-protocol v0.0.0-20250218201436-98eeeae4d8dd
 	github.com/nats-io/jwt/v2 v2.7.3
 	github.com/nats-io/nats.go v1.39.0
 	github.com/nats-io/nkeys v0.4.10
@@ -43,7 +43,7 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/dennwc/iters v1.0.1 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
-	github.com/frostbyte73/core v0.1.0 // indirect
+	github.com/frostbyte73/core v0.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/gammazero/deque v1.0.0 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
@@ -64,7 +64,7 @@ require (
 	github.com/lithammer/shortuuid/v4 v4.2.0 // indirect
 	github.com/livekit/mageutil v0.0.0-20230125210925-54e8a70427c1 // indirect
 	github.com/livekit/mediatransportutil v0.0.0-20241220010243-a2bdee945564 // indirect
-	github.com/livekit/psrpc v0.6.1-0.20241018124827-1efff3d113a8 // indirect
+	github.com/livekit/psrpc v0.6.1-0.20250205181828-a0beed2e4126 // indirect
 	github.com/magefile/mage v1.15.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -113,6 +113,6 @@ require (
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250127172529-29210b9bc287 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250127172529-29210b9bc287 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250204164813-702378808489 // indirect
 	google.golang.org/grpc v1.70.0 // indirect
 )
