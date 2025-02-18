@@ -173,6 +173,7 @@ type NatsInfo struct {
 	Account                  string           `yaml:"account"`
 	User                     string           `yaml:"user"`
 	Password                 string           `yaml:"password"`
+	Nkey                     *string          `yaml:"nkey"`
 	AuthCalloutIssuerPrivate string           `yaml:"auth_callout_issuer_private"`
 	AuthCalloutXkeyPrivate   *string          `yaml:"auth_callout_xkey_private"`
 	NumReplicas              int              `yaml:"num_replicas"`

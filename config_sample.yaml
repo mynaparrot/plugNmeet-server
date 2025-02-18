@@ -98,6 +98,8 @@ nats_info:
   account: PNM
   user: auth
   password: "LM(jTdsUGbB7M9y8^dNta1"
+  # If a nkey value is provided, user and password will not be used.
+  #nkey: SUAMARSEKK3CFTKQVCE5UP5HKXF7IEUXCTHRQXH4ROT3KO7UR3TTMC5AYM
   auth_callout_issuer_private: "SAAMTMBUANSRW3XDXZBIBF4JYRRUMWGV2GZT5MQ54VNWNRPN2Y4J46NQSA"
   # optional for encrypting the request payloads
   #auth_callout_xkey_private: "SXAC7MI3BUH4RIWVOP4JDVBV67BDSTIBZEBN56IATLCPQP4BB3TJIKUNDU"
