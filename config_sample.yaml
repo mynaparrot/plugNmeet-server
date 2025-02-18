@@ -99,6 +99,8 @@ nats_info:
   user: auth
   password: "LM(jTdsUGbB7M9y8^dNta1"
   auth_callout_issuer_private: "SAAMTMBUANSRW3XDXZBIBF4JYRRUMWGV2GZT5MQ54VNWNRPN2Y4J46NQSA"
+  # optional for encrypting the request payloads
+  #auth_callout_xkey_private: "SXAC7MI3BUH4RIWVOP4JDVBV67BDSTIBZEBN56IATLCPQP4BB3TJIKUNDU"
   num_replicas: 1 # 1,3,or 5
   subjects:
     system_api_worker: "sysApiWorker"

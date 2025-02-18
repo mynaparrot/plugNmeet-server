@@ -19,24 +19,49 @@ type NatsAuthController struct {
 	authModel     *models.AuthModel
 	natsService   *natsservice.NatsService
 	issuerKeyPair nkeys.KeyPair
+	curveKeyPair  nkeys.KeyPair
 }
 
-func NewNatsAuthController(app *config.AppConfig, authModel *models.AuthModel, kp nkeys.KeyPair) *NatsAuthController {
+func NewNatsAuthController(app *config.AppConfig, authModel *models.AuthModel, issuerKeyPair nkeys.KeyPair, curveKeyPair nkeys.KeyPair) *NatsAuthController {
 	return &NatsAuthController{
 		ctx:           context.Background(),
 		app:           app,
 		authModel:     authModel,
 		natsService:   natsservice.New(app),
-		issuerKeyPair: kp,
+		issuerKeyPair: issuerKeyPair,
+		curveKeyPair:  curveKeyPair,
 	}
 }
 
 func (s *NatsAuthController) Handle(r micro.Request) {
-	rc, err := jwt.DecodeAuthorizationRequestClaims(string(r.Data()))
-	if err != nil {
-		log.Println("Error", err)
-		_ = r.Error("500", err.Error(), nil)
+	var data []byte
+	var err error
+
+	xKey := r.Headers().Get("Nats-Server-Xkey")
+	if len(xKey) > 0 {
+		if s.curveKeyPair == nil {
+			log.Errorln("received encrypted data from nats server but curveKeyPair is nil")
+			_ = r.Error("500", "xKey not supported", nil)
+			return
+		}
+
+		data, err = s.curveKeyPair.Open(r.Data(), xKey)
+		if err != nil {
+			log.Errorln("error decrypting message from nats server", err)
+			_ = r.Error("500", err.Error(), nil)
+			return
+		}
+	} else {
+		data = r.Data()
 	}
+
+	rc, err := jwt.DecodeAuthorizationRequestClaims(string(data))
+	if err != nil {
+		log.Errorln(err)
+		_ = r.Error("500", err.Error(), nil)
+		return
+	}
+
 	userNkey := rc.UserNkey
 	serverId := rc.Server.ID
 
@@ -46,7 +71,7 @@ func (s *NatsAuthController) Handle(r micro.Request) {
 		return
 	}
 
-	token, err := ValidateAndSign(claims, s.issuerKeyPair)
+	token, err := s.validateAndSign(claims, s.issuerKeyPair)
 	s.Respond(r, userNkey, serverId, token, err)
 }
 
@@ -131,12 +156,26 @@ func (s *NatsAuthController) Respond(req micro.Request, userNKey, serverId, user
 	token, err := rc.Encode(s.issuerKeyPair)
 	if err != nil {
 		log.Errorln("error encoding response jwt:", err)
+		_ = req.Respond(nil)
+		return
+	}
+	data := []byte(token)
+
+	// Check if encryption is required.
+	xKey := req.Headers().Get("Nats-Server-Xkey")
+	if len(xKey) > 0 {
+		data, err = s.curveKeyPair.Seal(data, xKey)
+		if err != nil {
+			log.Errorln("error encrypting response JWT:", err)
+			_ = req.Respond(nil)
+			return
+		}
 	}
 
-	_ = req.Respond([]byte(token))
+	_ = req.Respond(data)
 }
 
-func ValidateAndSign(claims *jwt.UserClaims, kp nkeys.KeyPair) (string, error) {
+func (s *NatsAuthController) validateAndSign(claims *jwt.UserClaims, kp nkeys.KeyPair) (string, error) {
 	// Validate the claims.
 	vr := jwt.CreateValidationResults()
 	claims.Validate(vr)

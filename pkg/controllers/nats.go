@@ -23,11 +23,12 @@ import (
 )
 
 type NatsController struct {
-	ctx       context.Context
-	app       *config.AppConfig
-	kp        nkeys.KeyPair
-	authModel *models.AuthModel
-	natsModel *models.NatsModel
+	ctx           context.Context
+	app           *config.AppConfig
+	issuerKeyPair nkeys.KeyPair
+	curveKeyPair  nkeys.KeyPair
+	authModel     *models.AuthModel
+	natsModel     *models.NatsModel
 }
 
 func NewNatsController() *NatsController {
@@ -35,18 +36,27 @@ func NewNatsController() *NatsController {
 	ds := dbservice.New(app.DB)
 	rs := redisservice.New(app.RDS)
 
-	kp, err := nkeys.FromSeed([]byte(app.NatsInfo.AuthCalloutIssuerPrivate))
+	issuerKeyPair, err := nkeys.FromSeed([]byte(app.NatsInfo.AuthCalloutIssuerPrivate))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	return &NatsController{
-		ctx:       context.Background(),
-		app:       app,
-		kp:        kp,
-		authModel: models.NewAuthModel(app, nil),
-		natsModel: models.NewNatsModel(app, ds, rs),
+	c := &NatsController{
+		ctx:           context.Background(),
+		app:           app,
+		issuerKeyPair: issuerKeyPair,
+		authModel:     models.NewAuthModel(app, nil),
+		natsModel:     models.NewNatsModel(app, ds, rs),
 	}
+
+	if app.NatsInfo.AuthCalloutXkeyPrivate != nil && *app.NatsInfo.AuthCalloutXkeyPrivate != "" {
+		c.curveKeyPair, err = nkeys.FromSeed([]byte(*app.NatsInfo.AuthCalloutXkeyPrivate))
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	return c
 }
 
 func (c *NatsController) BootUp() {
@@ -69,7 +79,7 @@ func (c *NatsController) BootUp() {
 	go c.subscribeToUsersConnEvents()
 
 	// auth service
-	authService := NewNatsAuthController(c.app, c.authModel, c.kp)
+	authService := NewNatsAuthController(c.app, c.authModel, c.issuerKeyPair, c.curveKeyPair)
 	_, err = micro.AddService(c.app.NatsConn, micro.Config{
 		Name:        "pnm-auth",
 		Version:     version.Version,
