@@ -109,9 +109,15 @@ func (c *NatsController) subscribeToUsersConnEvents() {
 			go func(data []byte) {
 				e := new(NatsEvents)
 				if err := json.Unmarshal(data, e); err == nil {
-					p := strings.Split(e.Client["user"].(string), ":")
-					if len(p) == 2 {
-						c.natsModel.OnAfterUserJoined(p[0], p[1])
+					if user, ok := e.Client["user"].(string); ok {
+						claims, err := c.authModel.UnsafeClaimsWithoutVerification(user)
+						if err != nil {
+							log.Errorln(err)
+							return
+						}
+						if claims.GetName() != config.RecorderUserAuthName {
+							c.natsModel.OnAfterUserJoined(claims.GetRoomId(), claims.GetUserId())
+						}
 					}
 				}
 			}(msg.Data)
@@ -119,9 +125,15 @@ func (c *NatsController) subscribeToUsersConnEvents() {
 			go func(data []byte) {
 				e := new(NatsEvents)
 				if err := json.Unmarshal(data, e); err == nil {
-					p := strings.Split(e.Client["user"].(string), ":")
-					if len(p) == 2 {
-						c.natsModel.OnAfterUserDisconnected(p[0], p[1])
+					if user, ok := e.Client["user"].(string); ok {
+						claims, err := c.authModel.UnsafeClaimsWithoutVerification(user)
+						if err != nil {
+							log.Errorln(err)
+							return
+						}
+						if claims.GetName() != config.RecorderUserAuthName {
+							c.natsModel.OnAfterUserDisconnected(claims.GetRoomId(), claims.GetUserId())
+						}
 					}
 				}
 			}(msg.Data)

@@ -172,8 +172,6 @@ func (s *NatsAuthController) setPermissionForClient(data *plugnmeet.PlugNmeetTok
 	}
 	allowPub.Add(dataChannelPermission...)
 
-	// put name in proper format
-	claims.Name = fmt.Sprintf("%s:%s", roomId, userId)
 	// Assign Permissions
 	claims.Permissions = jwt.Permissions{
 		Pub: jwt.Permission{
