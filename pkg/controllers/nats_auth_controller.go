@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
@@ -21,6 +22,8 @@ type NatsAuthController struct {
 	issuerKeyPair nkeys.KeyPair
 	curveKeyPair  nkeys.KeyPair
 }
+
+const recorderUserName = "PLUGNMEET_RECORDER_AUTH"
 
 func NewNatsAuthController(app *config.AppConfig, authModel *models.AuthModel, issuerKeyPair nkeys.KeyPair, curveKeyPair nkeys.KeyPair) *NatsAuthController {
 	return &NatsAuthController{
@@ -67,12 +70,12 @@ func (s *NatsAuthController) Handle(r micro.Request) {
 
 	claims, err := s.handleClaims(rc)
 	if err != nil {
-		s.Respond(r, userNkey, serverId, "", err)
+		s.respond(r, userNkey, serverId, "", err)
 		return
 	}
 
 	token, err := s.validateAndSign(claims, s.issuerKeyPair)
-	s.Respond(r, userNkey, serverId, token, err)
+	s.respond(r, userNkey, serverId, token, err)
 }
 
 func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (*jwt.UserClaims, error) {
@@ -85,18 +88,56 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 		return nil, err
 	}
 
+	if data.GetName() == recorderUserName {
+		s.setPermissionForRecorder(data, claims)
+		return claims, nil
+	}
+
+	err = s.setPermissionForClient(data, claims)
+	if err != nil {
+		return nil, err
+	}
+
+	return claims, nil
+}
+
+func (s *NatsAuthController) setPermissionForRecorder(data *plugnmeet.PlugNmeetTokenClaims, claims *jwt.UserClaims) {
+	pubAllow := jwt.StringList{
+		"$JS.API.INFO",
+		"_INBOX.>", // otherwise won't be able to send respond msg
+		fmt.Sprintf("$JS.API.STREAM.INFO.KV_%s-%s", s.app.NatsInfo.Recorder.RecorderInfoKv, data.GetUserId()),
+		fmt.Sprintf("$JS.API.STREAM.UPDATE.KV_%s-%s", s.app.NatsInfo.Recorder.RecorderInfoKv, data.GetUserId()),
+		fmt.Sprintf("$JS.API.STREAM.CREATE.KV_%s-%s", s.app.NatsInfo.Recorder.RecorderInfoKv, data.GetUserId()),
+		fmt.Sprintf("$KV.%s-%s.>", s.app.NatsInfo.Recorder.RecorderInfoKv, data.GetUserId()),
+		fmt.Sprintf("$JS.API.DIRECT.GET.KV_%s-%s.>", s.app.NatsInfo.Recorder.RecorderInfoKv, data.GetUserId()),
+	}
+
+	claims.Permissions = jwt.Permissions{
+		Pub: jwt.Permission{
+			Allow: pubAllow,
+		},
+		Sub: jwt.Permission{
+			Allow: jwt.StringList{
+				s.app.NatsInfo.Recorder.RecorderChannel,
+				"_INBOX.>",
+			},
+		},
+	}
+}
+
+func (s *NatsAuthController) setPermissionForClient(data *plugnmeet.PlugNmeetTokenClaims, claims *jwt.UserClaims) error {
 	roomId := data.GetRoomId()
 	userId := data.GetUserId()
 
 	userInfo, err := s.natsService.GetUserInfo(roomId, userId)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if userInfo == nil {
-		return nil, errors.New(fmt.Sprintf("User info not found for userId: %s, roomId: %s", userId, roomId))
+		return errors.New(fmt.Sprintf("User info not found for userId: %s, roomId: %s", userId, roomId))
 	}
 
-	allow := jwt.StringList{
+	allowPub := jwt.StringList{
 		"$JS.API.INFO",
 		fmt.Sprintf("$JS.API.STREAM.INFO.%s", roomId),
 		// allow sending messages to the system
@@ -105,47 +146,52 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 
 	chatPermission, err := s.natsService.CreateChatConsumer(roomId, userId)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	allow.Add(chatPermission...)
+	allowPub.Add(chatPermission...)
 
 	sysPublicPermission, err := s.natsService.CreateSystemPublicConsumer(roomId, userId)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	allow.Add(sysPublicPermission...)
+	allowPub.Add(sysPublicPermission...)
 
 	sysPrivatePermission, err := s.natsService.CreateSystemPrivateConsumer(roomId, userId)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	allow.Add(sysPrivatePermission...)
+	allowPub.Add(sysPrivatePermission...)
 
 	whiteboardPermission, err := s.natsService.CreateWhiteboardConsumer(roomId, userId)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	allow.Add(whiteboardPermission...)
+	allowPub.Add(whiteboardPermission...)
 
 	dataChannelPermission, err := s.natsService.CreateDataChannelConsumer(roomId, userId)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	allow.Add(dataChannelPermission...)
+	allowPub.Add(dataChannelPermission...)
 
 	// put name in proper format
 	claims.Name = fmt.Sprintf("%s:%s", roomId, userId)
 	// Assign Permissions
 	claims.Permissions = jwt.Permissions{
 		Pub: jwt.Permission{
-			Allow: allow,
+			Allow: allowPub,
+		},
+		Sub: jwt.Permission{
+			Allow: jwt.StringList{
+				"_INBOX.>", // otherwise break request-reply patterns
+			},
 		},
 	}
 
-	return claims, nil
+	return nil
 }
 
-func (s *NatsAuthController) Respond(req micro.Request, userNKey, serverId, userJWT string, err error) {
+func (s *NatsAuthController) respond(req micro.Request, userNKey, serverId, userJWT string, err error) {
 	rc := jwt.NewAuthorizationResponseClaims(userNKey)
 	rc.Audience = serverId
 	rc.Jwt = userJWT
