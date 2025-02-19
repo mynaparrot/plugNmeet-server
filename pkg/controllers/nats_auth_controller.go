@@ -23,8 +23,6 @@ type NatsAuthController struct {
 	curveKeyPair  nkeys.KeyPair
 }
 
-const recorderUserName = "PLUGNMEET_RECORDER_AUTH"
-
 func NewNatsAuthController(app *config.AppConfig, authModel *models.AuthModel, issuerKeyPair nkeys.KeyPair, curveKeyPair nkeys.KeyPair) *NatsAuthController {
 	return &NatsAuthController{
 		ctx:           context.Background(),
@@ -88,7 +86,7 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 		return nil, err
 	}
 
-	if data.GetName() == recorderUserName {
+	if data.GetName() == config.RecorderUserAuthName {
 		s.setPermissionForRecorder(data, claims)
 		return claims, nil
 	}

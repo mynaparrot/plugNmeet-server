@@ -17,6 +17,10 @@ func (m *UserModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, erro
 	// check first
 	m.CheckAndWaitUntilRoomCreationInProgress(g.GetRoomId())
 
+	if g.GetUserInfo().GetName() == config.RecorderUserAuthName {
+		return "", errors.New(fmt.Sprintf("name: %s is reserved for internal use only", config.RecorderUserAuthName))
+	}
+
 	rInfo, meta, err := m.natsService.GetRoomInfoWithMetadata(g.GetRoomId())
 	if err != nil {
 		return "", err
