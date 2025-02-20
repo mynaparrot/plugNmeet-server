@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.8.1](https://github.com/mynaparrot/plugNmeet-server/compare/v1.8.0...v1.8.1) (2025-02-20)
+
+
+### Bug Fixes
+
+* bump proto ([9fcde46](https://github.com/mynaparrot/plugNmeet-server/commit/9fcde46144b7a0511dc77d218276b5f32f99e97b))
+* **deps:** update module github.com/bufbuild/protovalidate-go to v0.9.2 ([e924e7b](https://github.com/mynaparrot/plugNmeet-server/commit/e924e7b1f0bb481b367b62f794438b1e3b5098c1))
+* just for safety ([17ba8f4](https://github.com/mynaparrot/plugNmeet-server/commit/17ba8f4eafbfc40982d533743a8f6285176e03bc))
+* moved to proto for reusing ([517d3ad](https://github.com/mynaparrot/plugNmeet-server/commit/517d3ad38c3067964fda5318e9517a7380e4dfc7))
+* option to use nkey ([9bd1964](https://github.com/mynaparrot/plugNmeet-server/commit/9bd196401a8bb09c792f4b93496564a7404682d3))
+* optional for encrypting the nats request payloads ([4bfd3e9](https://github.com/mynaparrot/plugNmeet-server/commit/4bfd3e9d72982eb21f633a8682ac1056ee70125e))
+* prevent using reserved name ([e5b3b13](https://github.com/mynaparrot/plugNmeet-server/commit/e5b3b13ec04e5d70a399ac326d81d32fdbfad434))
+* recording server will authenticate with plugNmeet server for nats ([dee6082](https://github.com/mynaparrot/plugNmeet-server/commit/dee608242b7590e09d4a4c9a6515eb19e8c1167f))
+* replacing with nkey for new installations ([30e1463](https://github.com/mynaparrot/plugNmeet-server/commit/30e146336d63c78b85f043caabb6f1be8528a708))
+* some clean up ([2472ad3](https://github.com/mynaparrot/plugNmeet-server/commit/2472ad3ccabda7a7de0006a5deec60996675342f))
+* use proper format ([a20d0b6](https://github.com/mynaparrot/plugNmeet-server/commit/a20d0b6b99016483d5ebf32eb96a9cb2a8066cad))
+
 ## [1.8.0](https://github.com/mynaparrot/plugNmeet-server/compare/v1.7.8...v1.8.0) (2025-02-01)
 
 
