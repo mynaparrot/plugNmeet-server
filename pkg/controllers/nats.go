@@ -163,9 +163,11 @@ func (c *NatsController) subscribeToSystemWorker(stream jetstream.Stream) {
 			req := new(plugnmeet.NatsMsgClientToServer)
 			if err := proto.Unmarshal(data, req); err == nil {
 				p := strings.Split(sub, ".")
-				roomId := p[1]
-				userId := p[2]
-				c.natsModel.HandleFromClientToServerReq(roomId, userId, req)
+				if len(p) == 3 {
+					roomId := p[1]
+					userId := p[2]
+					c.natsModel.HandleFromClientToServerReq(roomId, userId, req)
+				}
 			}
 		}(msg.Subject(), msg.Data())
 	}, jetstream.ConsumeErrHandler(func(consumeCtx jetstream.ConsumeContext, err error) {
