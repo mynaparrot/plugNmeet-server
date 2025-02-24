@@ -7,7 +7,7 @@ require (
 	github.com/bufbuild/protovalidate-go v0.9.2
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/gabriel-vasile/mimetype v1.4.8
-	github.com/go-jose/go-jose/v4 v4.0.4
+	github.com/go-jose/go-jose/v4 v4.0.5
 	github.com/goccy/go-json v0.10.5
 	github.com/gofiber/fiber/v2 v2.52.6
 	github.com/gofiber/template/html/v2 v2.1.3
