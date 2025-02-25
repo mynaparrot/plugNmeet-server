@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.2](https://github.com/mynaparrot/plugNmeet-server/compare/v1.8.1...v1.8.2) (2025-02-25)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/go-jose/go-jose/v4 to v4.0.5 [security] ([084bc36](https://github.com/mynaparrot/plugNmeet-server/commit/084bc367dbf9ac2fa021ccf0fb42caa651cbd01d))
+* **deps:** update module github.com/redis/go-redis/v9 to v9.7.1 ([be23bbe](https://github.com/mynaparrot/plugNmeet-server/commit/be23bbe3e8efd00e5a20e00b2354cb6fc011a2f2))
+
 ## [1.8.1](https://github.com/mynaparrot/plugNmeet-server/compare/v1.8.0...v1.8.1) (2025-02-20)
 
 
