@@ -13,9 +13,9 @@ require (
 	github.com/gofiber/template/html/v2 v2.1.3
 	github.com/google/uuid v1.6.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/protocol v1.33.0
+	github.com/livekit/protocol v1.34.0
 	github.com/livekit/server-sdk-go/v2 v2.4.2
-	github.com/mynaparrot/plugnmeet-protocol v1.0.13
+	github.com/mynaparrot/plugnmeet-protocol v1.0.14
 	github.com/nats-io/jwt/v2 v2.7.3
 	github.com/nats-io/nats.go v1.39.1
 	github.com/nats-io/nkeys v0.4.10
@@ -30,7 +30,7 @@ require (
 )
 
 require (
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.5-20250130201111-63bb56e20495.1 // indirect
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.5-20250219170025-d39267d9df8f.1 // indirect
 	buf.build/go/protoyaml v0.3.1 // indirect
 	cel.dev/expr v0.19.2 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
@@ -46,7 +46,7 @@ require (
 	github.com/frostbyte73/core v0.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/gammazero/deque v1.0.0 // indirect
-	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
+	github.com/go-jose/go-jose/v3 v3.0.4 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-sql-driver/mysql v1.8.1 // indirect

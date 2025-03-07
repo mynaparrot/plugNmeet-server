@@ -82,7 +82,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	}
 
 	m := models.NewRoomModel(nil, nil, nil)
-	rr, roomDbInfo, rInfo, _ := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
+	rr, roomDbInfo, rInfo, meta := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: roomId.(string),
 	})
 
@@ -115,6 +115,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 			Whiteboard:      natsSubjs.Whiteboard,
 			DataChannel:     natsSubjs.DataChannel,
 		},
+		EnabledSelfInsertEncryptionKey: &meta.GetRoomFeatures().GetEndToEndEncryptionFeatures().EnabledSelfInsertEncryptionKey,
 	}
 
 	return utils.SendProtobufResponse(c, res)
