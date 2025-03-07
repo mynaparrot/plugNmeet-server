@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.8.2](https://github.com/mynaparrot/plugNmeet-server/compare/v1.8.1...v1.8.2) (2025-03-07)
+
+
+### Bug Fixes
+
+* added option to insert a self provided e2ee key ([386cbdd](https://github.com/mynaparrot/plugNmeet-server/commit/386cbdd1ce79e32ce206f18164fc7ed84abffc64))
+* **deps:** update module github.com/go-jose/go-jose/v4 to v4.0.5 [security] ([42be81b](https://github.com/mynaparrot/plugNmeet-server/commit/42be81ba43c996af7d0ee9bcb4cfe79b1c11fd21))
+* **deps:** update module github.com/go-jose/go-jose/v4 to v4.0.5 [security] ([084bc36](https://github.com/mynaparrot/plugNmeet-server/commit/084bc367dbf9ac2fa021ccf0fb42caa651cbd01d))
+* **deps:** update module github.com/redis/go-redis/v9 to v9.7.1 ([85b851b](https://github.com/mynaparrot/plugNmeet-server/commit/85b851baf731dbb9ac672750db36bdf59f2350a5))
+* **deps:** update module github.com/redis/go-redis/v9 to v9.7.1 ([be23bbe](https://github.com/mynaparrot/plugNmeet-server/commit/be23bbe3e8efd00e5a20e00b2354cb6fc011a2f2))
+
 ## [1.8.1](https://github.com/mynaparrot/plugNmeet-server/compare/v1.8.0...v1.8.1) (2025-02-20)
 
 
