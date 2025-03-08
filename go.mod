@@ -21,7 +21,7 @@ require (
 	github.com/nats-io/nkeys v0.4.10
 	github.com/redis/go-redis/v9 v9.7.1
 	github.com/sirupsen/logrus v1.9.3
-	github.com/urfave/cli/v2 v2.27.5
+	github.com/urfave/cli/v2 v2.27.6
 	google.golang.org/protobuf v1.36.5
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v3 v3.0.1
