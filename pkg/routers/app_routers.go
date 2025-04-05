@@ -148,6 +148,7 @@ func New() *fiber.App {
 
 	// polls group
 	polls := api.Group("/polls")
+	polls.Post("/activate", controllers.HandleActivatePolls)
 	polls.Post("/create", controllers.HandleCreatePoll)
 	polls.Get("/listPolls", controllers.HandleListPolls)
 	polls.Get("/pollsStats", controllers.HandleGetPollsStats)

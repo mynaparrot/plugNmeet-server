@@ -3,12 +3,40 @@ package controllers
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"google.golang.org/protobuf/proto"
 	"strconv"
 )
+
+func HandleActivatePolls(c *fiber.Ctx) error {
+	roomId := c.Locals("roomId")
+	isAdmin := c.Locals("isAdmin")
+
+	if !isAdmin.(bool) {
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
+	}
+
+	rid := roomId.(string)
+	if rid == "" {
+		return utils.SendCommonProtobufResponse(c, false, "roomId required")
+	}
+
+	req := new(plugnmeet.ActivatePollsReq)
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+	req.RoomId = roomId.(string)
+	m := models.NewPollModel(nil, nil, nil)
+	err = m.ManageActivation(req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+	return utils.SendCommonProtobufResponse(c, true, "success")
+}
 
 func HandleCreatePoll(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
