@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/gofiber/fiber/v2"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/proto"
 	"net/url"
 	"strconv"
 	"strings"
@@ -74,6 +76,25 @@ func HandleUploadedFileMerge(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(res)
+}
+
+func HandleUploadBase64EncodedData(c *fiber.Ctx) error {
+	roomId := c.Locals("roomId")
+
+	req := new(plugnmeet.UploadBase64EncodedDataReq)
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	req.RoomId = roomId.(string)
+	m := models.NewFileModel(nil, nil, nil)
+	res, err := m.UploadBase64EncodedData(req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	return utils.SendProtobufResponse(c, res)
 }
 
 func HandleDownloadUploadedFile(c *fiber.Ctx) error {

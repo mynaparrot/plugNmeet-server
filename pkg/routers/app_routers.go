@@ -189,6 +189,7 @@ func New() *fiber.App {
 	// merging request should be sent from another request
 	// otherwise hard to do it concurrently
 	api.Post("/uploadedFileMerge", controllers.HandleUploadedFileMerge)
+	api.Post("/uploadBase64EncodedData", controllers.HandleUploadBase64EncodedData)
 
 	// last method
 	app.Use(func(c *fiber.Ctx) error {
