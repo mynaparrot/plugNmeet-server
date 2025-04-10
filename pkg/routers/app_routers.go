@@ -11,6 +11,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
 	"github.com/mynaparrot/plugnmeet-server/version"
+	"runtime"
 )
 
 func New() *fiber.App {
@@ -25,7 +26,7 @@ func New() *fiber.App {
 		JSONEncoder: json.Marshal,
 		JSONDecoder: json.Unmarshal,
 		Views:       templateEngine,
-		AppName:     "plugNmeet version: " + version.Version,
+		AppName:     "plugNmeet version: " + version.Version + " runtime: " + runtime.Version(),
 	}
 
 	if config.GetConfig().Client.ProxyHeader != "" {
