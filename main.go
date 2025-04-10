@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-server/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -8,18 +9,18 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/routers"
 	"github.com/mynaparrot/plugnmeet-server/version"
 	log "github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"os"
 	"os/signal"
 	"syscall"
 )
 
 func main() {
-	cli.VersionPrinter = func(c *cli.Context) {
-		fmt.Printf("%s\n", c.App.Version)
+	cli.VersionPrinter = func(c *cli.Command) {
+		fmt.Printf("%s\n", c.Version)
 	}
 
-	app := &cli.App{
+	app := &cli.Command{
 		Name:        "plugnmeet-server",
 		Usage:       "Scalable, Open source web conference system",
 		Description: "without option will start server",
@@ -34,13 +35,13 @@ func main() {
 		Action:  startServer,
 		Version: version.Version,
 	}
-	err := app.Run(os.Args)
+	err := app.Run(context.Background(), os.Args)
 	if err != nil {
 		log.Fatalln(err)
 	}
 }
 
-func startServer(c *cli.Context) error {
+func startServer(ctx context.Context, c *cli.Command) error {
 	appCnf, err := helpers.ReadYamlConfigFile(c.String("config"))
 	if err != nil {
 		panic(err)
