@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	log "github.com/sirupsen/logrus"
 	"strings"
@@ -29,6 +30,11 @@ func (m *SchedulerModel) checkOnlineUsersStatus() {
 			roomId := strings.ReplaceAll(s, natsservice.RoomUsersBucketPrefix, "")
 			if users, err := m.natsService.GetOlineUsersId(roomId); err == nil && users != nil && len(users) > 0 {
 				for _, u := range users {
+					if strings.HasPrefix(u, config.IngressUserIdPrefix) {
+						// we won't get ping from ingress user
+						// so, we can't check from here.
+						continue
+					}
 					lastPing := m.natsService.GetUserLastPing(roomId, u)
 					if lastPing == 0 {
 						m.changeUserStatus(roomId, u)
