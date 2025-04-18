@@ -4,7 +4,7 @@ go 1.24
 
 require (
 	github.com/ansrivas/fiberprometheus/v2 v2.9.1
-	github.com/bufbuild/protovalidate-go v0.9.2
+	github.com/bufbuild/protovalidate-go v0.9.3
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/gabriel-vasile/mimetype v1.4.8
 	github.com/go-jose/go-jose/v4 v4.1.0
