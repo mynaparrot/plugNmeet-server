@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.3](https://github.com/mynaparrot/plugNmeet-server/compare/v1.8.2...v1.8.3) (2025-04-18)
+
+
+### Bug Fixes
+
+* **bug:** ingress was removing because of invalid inactivity checking ([c08ec4a](https://github.com/mynaparrot/plugNmeet-server/commit/c08ec4ab3f060183c328d0d40a692ab8ab455ce6))
+
 ## [1.8.2](https://github.com/mynaparrot/plugNmeet-server/compare/v1.8.1...v1.8.2) (2025-04-10)
 
 
