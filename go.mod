@@ -3,8 +3,8 @@ module github.com/mynaparrot/plugnmeet-server
 go 1.24
 
 require (
+	buf.build/go/protovalidate v0.12.0
 	github.com/ansrivas/fiberprometheus/v2 v2.9.1
-	github.com/bufbuild/protovalidate-go v0.10.0
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/gabriel-vasile/mimetype v1.4.9
 	github.com/go-jose/go-jose/v4 v4.1.0
@@ -17,11 +17,11 @@ require (
 	github.com/livekit/server-sdk-go/v2 v2.6.0
 	github.com/mynaparrot/plugnmeet-protocol v1.0.16-0.20250427033911-d71094002e64
 	github.com/nats-io/jwt/v2 v2.7.4
-	github.com/nats-io/nats.go v1.41.2
+	github.com/nats-io/nats.go v1.42.0
 	github.com/nats-io/nkeys v0.4.11
-	github.com/redis/go-redis/v9 v9.7.3
+	github.com/redis/go-redis/v9 v9.8.0
 	github.com/sirupsen/logrus v1.9.3
-	github.com/urfave/cli/v3 v3.2.0
+	github.com/urfave/cli/v3 v3.3.2
 	google.golang.org/protobuf v1.36.6
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v3 v3.0.1
@@ -39,6 +39,7 @@ require (
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
+	github.com/bufbuild/protovalidate-go v0.10.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dennwc/iters v1.0.1 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
