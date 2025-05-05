@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.8.3](https://github.com/mynaparrot/plugNmeet-server/compare/v1.8.2...v1.8.3) (2025-05-05)
+
+
+### Bug Fixes
+
+* **bug:** ingress was removing because of invalid inactivity checking ([c08ec4a](https://github.com/mynaparrot/plugNmeet-server/commit/c08ec4ab3f060183c328d0d40a692ab8ab455ce6))
+* **bug:** user's online status wasn't updated properly in the latest version of nats-server ([f9d9793](https://github.com/mynaparrot/plugNmeet-server/commit/f9d97932e902832455f7f4ce6e13bd8f702679ab))
+* **deps:** deps update ([90d40b3](https://github.com/mynaparrot/plugNmeet-server/commit/90d40b3a6faa84da20889687d286fa62acb13b0e))
+* **deps:** deps update ([a03f37e](https://github.com/mynaparrot/plugNmeet-server/commit/a03f37e3cc9efa3baf7c7866157460c27350c1b7))
+* user appropriate library where necessary ([dcb7e6e](https://github.com/mynaparrot/plugNmeet-server/commit/dcb7e6e4c866ffab512e8fef9afab7e9fb5205b6))
+
 ## [1.8.2](https://github.com/mynaparrot/plugNmeet-server/compare/v1.8.1...v1.8.2) (2025-04-10)
 
 
