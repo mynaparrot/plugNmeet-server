@@ -80,6 +80,11 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 	claims := jwt.NewUserClaims(req.UserNkey)
 	claims.Audience = s.app.NatsInfo.Account
 
+	// nats v2.10.28 & v2.11.2 (#6808) Auth tokens are now redacted
+	// but for our case it is necessary to have it, so we'll add here
+	// otherwise user CONNECT & DISCONNECT logics will be breaking
+	claims.Name = req.ConnectOptions.Token
+
 	// check the info first
 	data, err := s.authModel.VerifyPlugNmeetAccessToken(req.ConnectOptions.Token, true)
 	if err != nil {
