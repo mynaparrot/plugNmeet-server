@@ -1,11 +1,11 @@
 package redisservice
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/redis/go-redis/v9"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func (s *RedisService) ClosePoll(r *plugnmeet.ClosePollReq) error {
@@ -23,14 +23,14 @@ func (s *RedisService) ClosePoll(r *plugnmeet.ClosePollReq) error {
 		}
 
 		info := new(plugnmeet.PollInfo)
-		err = json.Unmarshal([]byte(result), info)
+		err = protojson.Unmarshal([]byte(result), info)
 		if err != nil {
 			return err
 		}
 
 		info.IsRunning = false
 		info.ClosedBy = r.UserId
-		marshal, err := json.Marshal(info)
+		marshal, err := protojson.Marshal(info)
 		if err != nil {
 			return err
 		}

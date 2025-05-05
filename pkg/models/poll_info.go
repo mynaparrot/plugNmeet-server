@@ -1,10 +1,11 @@
 package models
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/goccy/go-json"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"google.golang.org/protobuf/encoding/protojson"
 	"strconv"
 	"strings"
 )
@@ -24,7 +25,7 @@ func (m *PollModel) ListPolls(roomId string) ([]*plugnmeet.PollInfo, error) {
 
 	for _, pi := range result {
 		info := new(plugnmeet.PollInfo)
-		err = json.Unmarshal([]byte(pi), info)
+		err = protojson.Unmarshal([]byte(pi), info)
 		if err != nil {
 			continue
 		}
@@ -86,7 +87,7 @@ func (m *PollModel) GetResponsesResult(roomId, pollId string) (*plugnmeet.PollRe
 	}
 
 	info := new(plugnmeet.PollInfo)
-	err = json.Unmarshal([]byte(pi), info)
+	err = protojson.Unmarshal([]byte(pi), info)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +144,7 @@ func (m *PollModel) GetPollsStats(roomId string) (*plugnmeet.PollsStats, error) 
 
 	for _, pi := range result {
 		info := new(plugnmeet.PollInfo)
-		err = json.Unmarshal([]byte(pi), info)
+		err = protojson.Unmarshal([]byte(pi), info)
 		if err != nil {
 			continue
 		}

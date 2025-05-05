@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/encoding/protojson"
 	"time"
 )
 
@@ -66,7 +67,7 @@ func (m *PollModel) createRoomPollHash(r *plugnmeet.CreatePollReq) error {
 		CreatedBy: r.UserId,
 	}
 
-	marshal, err := json.Marshal(p)
+	marshal, err := protojson.Marshal(p)
 	if err != nil {
 		return err
 	}
