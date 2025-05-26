@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.8.4](https://github.com/mynaparrot/plugNmeet-server/compare/v1.8.3...v1.8.4) (2025-05-26)
+
+
+### Bug Fixes
+
+* **deps:** protocol update ([a321514](https://github.com/mynaparrot/plugNmeet-server/commit/a32151457d29ff33ca8fd5be7a27f9f12a731c50))
+* **deps:** update module github.com/ansrivas/fiberprometheus/v2 to v2.10.0 ([7364863](https://github.com/mynaparrot/plugNmeet-server/commit/7364863bad7628530fce3f17a8a40fca038a6ce0))
+* **deps:** update module github.com/ansrivas/fiberprometheus/v2 to v2.10.0 ([cfbb9f3](https://github.com/mynaparrot/plugNmeet-server/commit/cfbb9f336e38382a4802a700b194f0cc92b5e81c))
+* updated text ([4081b07](https://github.com/mynaparrot/plugNmeet-server/commit/4081b0751d680fe3e3c8cab50922f45873fc34c0))
+
 ## [1.8.3](https://github.com/mynaparrot/plugNmeet-server/compare/v1.8.2...v1.8.3) (2025-05-05)
 
 
