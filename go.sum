@@ -20,6 +20,8 @@ github.com/andybalholm/brotli v1.1.1 h1:PR2pgnyFznKEugtsUo0xLdDop5SKXd5Qf5ysW+7X
 github.com/andybalholm/brotli v1.1.1/go.mod h1:05ib4cKhjx3OQYUY22hTVd34Bc8upXjOLL2rKwwZBoA=
 github.com/ansrivas/fiberprometheus/v2 v2.10.0 h1:gzzJ2PSMjYEiZIfI9Ip0gVCOCRnM0CwongXB4+qNyks=
 github.com/ansrivas/fiberprometheus/v2 v2.10.0/go.mod h1:ujpKAV2VGNhjIBTkp5KEP/ICpSJtFq3tpm+9sJUktDs=
+github.com/ansrivas/fiberprometheus/v2 v2.11.0 h1:CLbxIvpmKPSqXnL26iJ2BmNPmcejmzxr/js8PIa0Pj4=
+github.com/ansrivas/fiberprometheus/v2 v2.11.0/go.mod h1:ujpKAV2VGNhjIBTkp5KEP/ICpSJtFq3tpm+9sJUktDs=
 github.com/antlr4-go/antlr/v4 v4.13.1 h1:SqQKkuVZ+zWkMMNkjy5FZe5mr5WURWnlpmOuzYWrPrQ=
 github.com/antlr4-go/antlr/v4 v4.13.1/go.mod h1:GKmUxMtwp6ZgGwZSva4eWPC5mS6vUAmOABFgjdkM7Nw=
 github.com/benbjohnson/clock v1.3.5 h1:VvXlSJBzZpA/zum6Sj74hxwYI2DIxRWuNIoXAzHZz5o=
