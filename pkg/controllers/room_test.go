@@ -40,7 +40,8 @@ func TestHandleRoomCreate(t *testing.T) {
 		},
 	}
 
-	bodyBytes, _ := protojson.Marshal(reqBody)
+	bodyBytes, err := protojson.Marshal(reqBody)
+	assert.NoError(t, err)
 	req := httptest.NewRequest("POST", "/room/create", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 
@@ -78,7 +79,8 @@ func TestHandleGetJoinToken(t *testing.T) {
 		},
 	}
 
-	bodyBytes, _ := protojson.Marshal(reqBody)
+	bodyBytes, err := protojson.Marshal(reqBody)
+	assert.NoError(t, err)
 	req := httptest.NewRequest("POST", "/room/getJoinToken", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 
@@ -107,7 +109,8 @@ func TestHandleValidateJoinToken(t *testing.T) {
 	app := setupApp()
 	reqBody := &plugnmeet.VerifyTokenReq{}
 
-	bodyBytes, _ := proto.Marshal(reqBody)
+	bodyBytes, err := protojson.Marshal(reqBody)
+	assert.NoError(t, err)
 	req := httptest.NewRequest("POST", "/api/verifyToken", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/octet-stream")
 	req.Header.Set("Authorization", joinToken)
@@ -137,7 +140,9 @@ func TestHandleIsRoomActive(t *testing.T) {
 	reqBody := &plugnmeet.IsRoomActiveReq{
 		RoomId: roomId,
 	}
-	bodyBytes, _ := protojson.Marshal(reqBody)
+
+	bodyBytes, err := protojson.Marshal(reqBody)
+	assert.NoError(t, err)
 	req := httptest.NewRequest("POST", "/room/isRoomActive", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 
@@ -165,7 +170,9 @@ func TestHandleGetActiveRoomInfo(t *testing.T) {
 	reqBody := &plugnmeet.GetActiveRoomInfoReq{
 		RoomId: roomId,
 	}
-	bodyBytes, _ := protojson.Marshal(reqBody)
+
+	bodyBytes, err := protojson.Marshal(reqBody)
+	assert.NoError(t, err)
 	req := httptest.NewRequest("POST", "/room/getActiveRoomInfo", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 
@@ -193,7 +200,9 @@ func TestHandleGetActiveRoomInfo(t *testing.T) {
 func TestHandleGetActiveRoomsInfo(t *testing.T) {
 	app := setupApp()
 	reqBody := &plugnmeet.GetActiveRoomsInfoRes{}
-	bodyBytes, _ := protojson.Marshal(reqBody)
+
+	bodyBytes, err := protojson.Marshal(reqBody)
+	assert.NoError(t, err)
 	req := httptest.NewRequest("POST", "/room/getActiveRoomsInfo", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 
@@ -221,7 +230,9 @@ func TestHandleEndRoom(t *testing.T) {
 	reqBody := &plugnmeet.RoomEndReq{
 		RoomId: roomId,
 	}
-	bodyBytes, _ := protojson.Marshal(reqBody)
+
+	bodyBytes, err := protojson.Marshal(reqBody)
+	assert.NoError(t, err)
 	req := httptest.NewRequest("POST", "/room/endRoom", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 
