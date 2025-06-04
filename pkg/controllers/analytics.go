@@ -19,7 +19,10 @@ func parseAndValidateRequest(data []byte, msg proto.Message) error {
 	if err != nil {
 		return err
 	}
+	return validateRequest(msg)
+}
 
+func validateRequest(msg proto.Message) error {
 	v, err := protovalidate.New()
 	if err != nil {
 		return err
