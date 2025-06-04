@@ -109,7 +109,7 @@ func TestHandleValidateJoinToken(t *testing.T) {
 	app := setupApp()
 	reqBody := &plugnmeet.VerifyTokenReq{}
 
-	bodyBytes, err := protojson.Marshal(reqBody)
+	bodyBytes, err := proto.Marshal(reqBody)
 	assert.NoError(t, err)
 	req := httptest.NewRequest("POST", "/api/verifyToken", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/octet-stream")
