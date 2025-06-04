@@ -128,8 +128,7 @@ func HandleBBBCreate(c *fiber.Ctx) error {
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 	}
-
-	if err = validateProtoRequest(pnmReq); err != nil {
+	if err := parseAndValidateRequest(c.Body(), pnmReq); err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", err.Error()))
 	}
 
@@ -216,7 +215,7 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 	}
 
 	req := bbbapiwrapper.ConvertJoinRequest(q, isAdmin)
-	if err = validateProtoRequest(req); err != nil {
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", err.Error()))
 	}
 

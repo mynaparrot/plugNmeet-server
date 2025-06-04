@@ -70,7 +70,7 @@ func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeo
 	// Store each key-value pair
 	for k, v := range data {
 		if _, err := kv.PutString(s.ctx, k, v); err != nil {
-			log.WithFields(log.Fields{"key": k, "value": v}).Errorf("failed to store room data: %v", err)
+			return fmt.Errorf("failed to store room data for key %s: %w", k, err)
 		}
 	}
 

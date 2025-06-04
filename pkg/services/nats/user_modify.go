@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/nats-io/nats.go/jetstream"
-	log "github.com/sirupsen/logrus"
 )
 
 // Constants for bucket naming and user metadata keys
@@ -87,7 +86,7 @@ func (s *NatsService) AddUser(roomId, userId, name string, isAdmin, isPresenter 
 	// Store user data in the key-value store
 	for k, v := range data {
 		if _, err := userKV.PutString(s.ctx, k, v); err != nil {
-			log.Errorln(err)
+			return fmt.Errorf("failed to add user to user bucket: %w", err)
 		}
 	}
 
@@ -236,7 +235,8 @@ func (s *NatsService) UpdateUserKeyValue(roomId, userId, key, val string) error 
 func (s *NatsService) AddUserToBlockList(roomId, userId string) (uint64, error) {
 	// Create or update the room users block list bucket
 	blockListKV, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
-		Bucket: fmt.Sprintf(RoomUsersBlockList, roomId),
+		Bucket:   fmt.Sprintf(RoomUsersBlockList, roomId),
+		Replicas: s.app.NatsInfo.NumReplicas,
 	})
 	if err != nil {
 		return 0, fmt.Errorf("failed to create block list bucket: %w", err)

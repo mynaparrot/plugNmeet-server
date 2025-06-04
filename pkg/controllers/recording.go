@@ -9,12 +9,7 @@ import (
 
 func HandleFetchRecordings(c *fiber.Ctx) error {
 	req := new(plugnmeet.FetchRecordingsReq)
-	err := op.Unmarshal(c.Body(), req)
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
-	}
-
-	if err = validateProtoRequest(req); err != nil {
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
@@ -38,12 +33,7 @@ func HandleFetchRecordings(c *fiber.Ctx) error {
 
 func HandleRecordingInfo(c *fiber.Ctx) error {
 	req := new(plugnmeet.RecordingInfoReq)
-	err := op.Unmarshal(c.Body(), req)
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
-	}
-
-	if err = validateProtoRequest(req); err != nil {
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
@@ -58,17 +48,12 @@ func HandleRecordingInfo(c *fiber.Ctx) error {
 
 func HandleDeleteRecording(c *fiber.Ctx) error {
 	req := new(plugnmeet.DeleteRecordingReq)
-	err := op.Unmarshal(c.Body(), req)
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
-	}
-
-	if err = validateProtoRequest(req); err != nil {
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
 	m := models.NewRecordingModel(nil, nil, nil)
-	err = m.DeleteRecording(req)
+	err := m.DeleteRecording(req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
@@ -78,12 +63,7 @@ func HandleDeleteRecording(c *fiber.Ctx) error {
 
 func HandleGetDownloadToken(c *fiber.Ctx) error {
 	req := new(plugnmeet.GetDownloadTokenReq)
-	err := op.Unmarshal(c.Body(), req)
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
-	}
-
-	if err = validateProtoRequest(req); err != nil {
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 

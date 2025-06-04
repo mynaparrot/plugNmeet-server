@@ -187,7 +187,7 @@ func (m *FileModel) combineResumableFiles(chunksDir, fileName, roomSid string, t
 		}
 
 		if _, err := f.WriteAt(dat, writeOffset); err != nil {
-			log.Errorln("failed to write chunk %d", i)
+			log.Errorf("failed to write chunk %d", i)
 			return "", errors.New("failed to write chunk")
 		}
 	}

@@ -25,7 +25,7 @@ func HandleWebhook(c *fiber.Ctx) error {
 
 	// Unmarshal the webhook event
 	event := new(livekit.WebhookEvent)
-	if err := op.Unmarshal(data, event); err != nil {
+	if err := unmarshalOpts.Unmarshal(data, event); err != nil {
 		return c.SendStatus(fiber.StatusUnprocessableEntity)
 	}
 

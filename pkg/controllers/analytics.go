@@ -10,11 +10,16 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-var op = protojson.UnmarshalOptions{
+var unmarshalOpts = protojson.UnmarshalOptions{
 	DiscardUnknown: true,
 }
 
-func validateProtoRequest(msg proto.Message) error {
+func parseAndValidateRequest(data []byte, msg proto.Message) error {
+	err := unmarshalOpts.Unmarshal(data, msg)
+	if err != nil {
+		return err
+	}
+
 	v, err := protovalidate.New()
 	if err != nil {
 		return err
@@ -28,12 +33,7 @@ func validateProtoRequest(msg proto.Message) error {
 
 func HandleFetchAnalytics(c *fiber.Ctx) error {
 	req := new(plugnmeet.FetchAnalyticsReq)
-	err := op.Unmarshal(c.Body(), req)
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
-	}
-
-	if err = validateProtoRequest(req); err != nil {
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
@@ -57,17 +57,12 @@ func HandleFetchAnalytics(c *fiber.Ctx) error {
 
 func HandleDeleteAnalytics(c *fiber.Ctx) error {
 	req := new(plugnmeet.DeleteAnalyticsReq)
-	err := op.Unmarshal(c.Body(), req)
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
-	}
-
-	if err = validateProtoRequest(req); err != nil {
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
 	m := models.NewAnalyticsModel(nil, nil, nil)
-	err = m.DeleteAnalytics(req)
+	err := m.DeleteAnalytics(req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
@@ -77,12 +72,7 @@ func HandleDeleteAnalytics(c *fiber.Ctx) error {
 
 func HandleGetAnalyticsDownloadToken(c *fiber.Ctx) error {
 	req := new(plugnmeet.GetAnalyticsDownloadTokenReq)
-	err := op.Unmarshal(c.Body(), req)
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
-	}
-
-	if err = validateProtoRequest(req); err != nil {
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
