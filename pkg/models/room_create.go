@@ -16,117 +16,31 @@ import (
 func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoomInfo, error) {
 	// some pre-creation tasks
 	m.preRoomCreationTasks(r)
-	// in preRoomCreationTasks we've added this room in progress list
-	// so, we'll just use deferring to clean this room at the end of this function
-	defer m.rs.UnlockRoomCreation(r.RoomId)
+	defer m.rs.UnlockRoomCreation(r.RoomId) // clean up lock
 
 	// check if room already exists in db or not
 	roomDbInfo, err := m.ds.GetRoomInfoByRoomId(r.RoomId, 1)
 	if err != nil {
 		return nil, err
 	}
+
+	// handle existing room logic
 	if roomDbInfo != nil && roomDbInfo.Sid != "" {
-		// this room was created before
-		// so, we'll check our kv
-		rInfo, err := m.natsService.GetRoomInfo(r.RoomId)
+		ari, err := m.handleExistingRoom(r, roomDbInfo)
 		if err != nil {
 			return nil, err
 		}
-		if rInfo != nil && rInfo.DbTableId == roomDbInfo.ID {
-			// want to make sure our stream was created properly
-			err := m.natsService.CreateRoomNatsStreams(r.RoomId)
-			if err != nil {
-				return nil, err
-			}
-			err = m.natsService.UpdateRoomStatus(r.RoomId, natsservice.RoomStatusActive)
-			if err != nil {
-				return nil, err
-			}
-			return &plugnmeet.ActiveRoomInfo{
-				RoomId:       rInfo.RoomId,
-				Sid:          rInfo.RoomSid,
-				RoomTitle:    roomDbInfo.RoomTitle,
-				IsRunning:    1,
-				CreationTime: roomDbInfo.CreationTime,
-				WebhookUrl:   roomDbInfo.WebhookUrl,
-				Metadata:     rInfo.Metadata,
-			}, nil
+		if ari != nil {
+			return ari, nil
 		}
-	}
-	// otherwise, we're good to continue
-	// we can reuse this same db table as no sid had been assigned.
-
-	// we'll set default values otherwise the client got confused if data is missing
-	utils.PrepareDefaultRoomFeatures(r)
-	utils.SetCreateRoomDefaultValues(r, m.app.UploadFileSettings.MaxSize, m.app.UploadFileSettings.MaxSizeWhiteboardFile, m.app.UploadFileSettings.AllowedTypes, m.app.SharedNotePad.Enabled)
-	utils.SetRoomDefaultLockSettings(r)
-	// set default room settings
-	utils.SetDefaultRoomSettings(m.app.RoomDefaultSettings, r)
-
-	// copyright
-	copyrightConf := m.app.Client.CopyrightConf
-	if copyrightConf == nil {
-		r.Metadata.CopyrightConf = &plugnmeet.CopyrightConf{
-			Display: true,
-			Text:    "Powered by <a href=\"https://www.plugnmeet.org\" target=\"_blank\">plugNmeet</a>",
-		}
-	} else {
-		d := &plugnmeet.CopyrightConf{
-			Display: copyrightConf.Display,
-			Text:    copyrightConf.Text,
-		}
-		// this mean user has set copyright info by API
-		if r.Metadata.CopyrightConf != nil {
-			// if not allow overriding, then we will simply use default
-			if !copyrightConf.AllowOverride {
-				r.Metadata.CopyrightConf = d
-			}
-		} else {
-			r.Metadata.CopyrightConf = d
-		}
+		// otherwise we'll keep going
 	}
 
-	// Azure cognitive services
-	azu := m.app.AzureCognitiveServicesSpeech
-	if !azu.Enabled {
-		r.Metadata.RoomFeatures.SpeechToTextTranslationFeatures.IsAllow = false
-	} else {
-		var maxAllow int32 = 2
-		if azu.MaxNumTranLangsAllowSelecting > 0 {
-			maxAllow = azu.MaxNumTranLangsAllowSelecting
-		}
-		r.Metadata.RoomFeatures.SpeechToTextTranslationFeatures.MaxNumTranLangsAllowSelecting = maxAllow
-	}
+	// initialize room defaults
+	m.setRoomDefaults(r)
 
-	if r.Metadata.IsBreakoutRoom && r.Metadata.RoomFeatures.EnableAnalytics {
-		// at present, we'll disable an analytic report for breakout rooms
-		r.Metadata.RoomFeatures.EnableAnalytics = false
-	}
-
-	isBreakoutRoom := 0
-	sId := uuid.New().String()
-	if r.Metadata.IsBreakoutRoom {
-		isBreakoutRoom = 1
-	}
-
-	if roomDbInfo == nil {
-		roomDbInfo = &dbmodels.RoomInfo{
-			RoomTitle:          r.Metadata.RoomTitle,
-			RoomId:             r.RoomId,
-			Sid:                sId,
-			JoinedParticipants: 0,
-			IsRunning:          1,
-			WebhookUrl:         "",
-			IsBreakoutRoom:     isBreakoutRoom,
-			ParentRoomID:       r.Metadata.ParentRoomId,
-		}
-	} else {
-		// we found the room, we'll just update few info
-		roomDbInfo.Sid = sId
-	}
-	if r.Metadata.WebhookUrl != nil {
-		roomDbInfo.WebhookUrl = *r.Metadata.WebhookUrl
-	}
+	// prepare DB model
+	roomDbInfo, sid := m.prepareRoomDbInfo(r, roomDbInfo)
 
 	// save info to db
 	_, err = m.ds.InsertOrUpdateRoomInfo(roomDbInfo)
@@ -135,7 +49,7 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 	}
 
 	// now create room bucket
-	err = m.natsService.AddRoom(roomDbInfo.ID, r.RoomId, sId, r.EmptyTimeout, r.MaxParticipants, r.Metadata)
+	err = m.natsService.AddRoom(roomDbInfo.ID, r.RoomId, sid, r.EmptyTimeout, r.MaxParticipants, r.Metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -147,16 +61,13 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 	}
 
 	rInfo, err := m.natsService.GetRoomInfo(r.RoomId)
-	if err != nil {
-		return nil, err
-	}
-	if rInfo == nil {
+	if err != nil || rInfo == nil {
 		return nil, errors.New("room not found in KV")
 	}
 
+	// preload whiteboard file if needed
 	if !r.Metadata.IsBreakoutRoom {
-		// now start processing if whiteboard has any preloaded file
-		go m.prepareWhiteboardPreloadFile(r.Metadata, r.RoomId, sId)
+		go m.prepareWhiteboardPreloadFile(r.Metadata, r.RoomId, sid)
 	}
 
 	ari := &plugnmeet.ActiveRoomInfo{
@@ -175,20 +86,117 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 	return ari, nil
 }
 
-func (m *RoomModel) preRoomCreationTasks(r *plugnmeet.CreateRoomReq) {
-	// check & wait
-	m.CheckAndWaitUntilRoomCreationInProgress(r.GetRoomId())
+// handleExistingRoom to handle logic if room already exists
+func (m *RoomModel) handleExistingRoom(r *plugnmeet.CreateRoomReq, roomDbInfo *dbmodels.RoomInfo) (*plugnmeet.ActiveRoomInfo, error) {
+	rInfo, err := m.natsService.GetRoomInfo(r.RoomId)
+	if err != nil {
+		return nil, err
+	}
+	if rInfo != nil && rInfo.DbTableId == roomDbInfo.ID {
+		// so, we found the same room
+		// in this case we'll just create streams for safety
+		err := m.natsService.CreateRoomNatsStreams(r.RoomId)
+		if err != nil {
+			return nil, err
+		}
+		err = m.natsService.UpdateRoomStatus(r.RoomId, natsservice.RoomStatusActive)
+		if err != nil {
+			return nil, err
+		}
+		return &plugnmeet.ActiveRoomInfo{
+			RoomId:       rInfo.RoomId,
+			Sid:          rInfo.RoomSid,
+			RoomTitle:    roomDbInfo.RoomTitle,
+			IsRunning:    1,
+			CreationTime: roomDbInfo.CreationTime,
+			WebhookUrl:   roomDbInfo.WebhookUrl,
+			Metadata:     rInfo.Metadata,
+		}, nil
+	}
+	return nil, nil
+}
 
-	// we'll lock this room to be created again before this process ended
-	// set maximum 1 minute as TTL
-	// this way we can ensure that there will not be any deadlock
-	// otherwise in various reason key may stay in kv & create deadlock
+// setRoomDefaults to Sets default values and metadata
+func (m *RoomModel) setRoomDefaults(r *plugnmeet.CreateRoomReq) {
+	utils.PrepareDefaultRoomFeatures(r)
+	utils.SetCreateRoomDefaultValues(r, m.app.UploadFileSettings.MaxSize, m.app.UploadFileSettings.MaxSizeWhiteboardFile, m.app.UploadFileSettings.AllowedTypes, m.app.SharedNotePad.Enabled)
+	utils.SetRoomDefaultLockSettings(r)
+	utils.SetDefaultRoomSettings(m.app.RoomDefaultSettings, r)
+
+	// copyright
+	copyrightConf := m.app.Client.CopyrightConf
+	if copyrightConf == nil {
+		r.Metadata.CopyrightConf = &plugnmeet.CopyrightConf{
+			Display: true,
+			Text:    "Powered by <a href=\"https://www.plugnmeet.org\" target=\"_blank\">plugNmeet</a>",
+		}
+	} else {
+		d := &plugnmeet.CopyrightConf{
+			Display: copyrightConf.Display,
+			Text:    copyrightConf.Text,
+		}
+		if r.Metadata.CopyrightConf != nil && !copyrightConf.AllowOverride {
+			r.Metadata.CopyrightConf = d
+		} else if r.Metadata.CopyrightConf == nil {
+			r.Metadata.CopyrightConf = d
+		}
+	}
+
+	// Azure cognitive services
+	azu := m.app.AzureCognitiveServicesSpeech
+	if !azu.Enabled {
+		r.Metadata.RoomFeatures.SpeechToTextTranslationFeatures.IsAllow = false
+	} else {
+		var maxAllow int32 = 2
+		if azu.MaxNumTranLangsAllowSelecting > 0 {
+			maxAllow = azu.MaxNumTranLangsAllowSelecting
+		}
+		r.Metadata.RoomFeatures.SpeechToTextTranslationFeatures.MaxNumTranLangsAllowSelecting = maxAllow
+	}
+
+	if r.Metadata.IsBreakoutRoom && r.Metadata.RoomFeatures.EnableAnalytics {
+		r.Metadata.RoomFeatures.EnableAnalytics = false
+	}
+}
+
+// prepareRoomDbInfo Prepares DB model for room
+func (m *RoomModel) prepareRoomDbInfo(r *plugnmeet.CreateRoomReq, existing *dbmodels.RoomInfo) (*dbmodels.RoomInfo, string) {
+	sId := uuid.New().String()
+	isBreakoutRoom := 0
+	if r.Metadata.IsBreakoutRoom {
+		isBreakoutRoom = 1
+	}
+
+	if existing == nil {
+		existing = &dbmodels.RoomInfo{
+			RoomTitle:          r.Metadata.RoomTitle,
+			RoomId:             r.RoomId,
+			Sid:                sId,
+			JoinedParticipants: 0,
+			IsRunning:          1,
+			WebhookUrl:         "",
+			IsBreakoutRoom:     isBreakoutRoom,
+			ParentRoomID:       r.Metadata.ParentRoomId,
+		}
+	} else {
+		existing.Sid = sId
+	}
+	if r.Metadata.WebhookUrl != nil {
+		existing.WebhookUrl = *r.Metadata.WebhookUrl
+	}
+	return existing, sId
+}
+
+// preRoomCreationTasks pre-room creation lock
+func (m *RoomModel) preRoomCreationTasks(r *plugnmeet.CreateRoomReq) {
+	m.CheckAndWaitUntilRoomCreationInProgress(r.GetRoomId())
 	err := m.rs.LockRoomCreation(r.GetRoomId(), time.Minute*1)
 	if err != nil {
 		log.Errorln(err)
 	}
 }
 
+// prepareWhiteboardPreloadFile preload whiteboard file
 func (m *RoomModel) prepareWhiteboardPreloadFile(meta *plugnmeet.RoomMetadata, roomId, roomSid string) {
 	wbf := meta.RoomFeatures.WhiteboardFeatures
 	if wbf == nil || !wbf.AllowedWhiteboard || wbf.PreloadFile == nil || *wbf.PreloadFile == "" {
@@ -202,8 +210,6 @@ func (m *RoomModel) prepareWhiteboardPreloadFile(meta *plugnmeet.RoomMetadata, r
 	if err != nil {
 		log.Errorln(err)
 		_ = m.natsService.NotifyErrorMsg(roomId, "notifications.preloaded-whiteboard-file-processing-error", nil)
-
-		// we'll remove this file as have error
 		meta.RoomFeatures.WhiteboardFeatures.PreloadFile = nil
 		_ = m.natsService.UpdateAndBroadcastRoomMetadata(roomId, meta)
 		return
@@ -212,13 +218,11 @@ func (m *RoomModel) prepareWhiteboardPreloadFile(meta *plugnmeet.RoomMetadata, r
 	log.Infoln(fmt.Sprintf("preloadFile: %s for roomId: %s had been processed successfully", *wbf.PreloadFile, roomId))
 }
 
+// sendRoomCreatedWebhook to send webhook
 func (m *RoomModel) sendRoomCreatedWebhook(info *plugnmeet.ActiveRoomInfo, emptyTimeout, maxParticipants *uint32) {
 	n := helpers.GetWebhookNotifier(m.app)
 	if n != nil {
-		// register for event first
 		n.RegisterWebhook(info.RoomId, info.Sid)
-
-		// now send first event
 		e := "room_created"
 		cr := uint64(info.CreationTime)
 		msg := &plugnmeet.CommonNotifyEvent{

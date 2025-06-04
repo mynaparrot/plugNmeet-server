@@ -26,27 +26,29 @@ func (m *SchedulerModel) checkOnlineUsersStatus() {
 
 	kl := m.app.JetStream.KeyValueStoreNames(context.Background())
 	for s := range kl.Name() {
-		if strings.HasPrefix(s, natsservice.RoomUsersBucketPrefix) {
-			roomId := strings.ReplaceAll(s, natsservice.RoomUsersBucketPrefix, "")
-			if users, err := m.natsService.GetOlineUsersId(roomId); err == nil && users != nil && len(users) > 0 {
-				for _, u := range users {
-					if strings.HasPrefix(u, config.IngressUserIdPrefix) {
-						// we won't get ping from ingress user
-						// so, we can't check from here.
-						continue
-					}
-					lastPing := m.natsService.GetUserLastPing(roomId, u)
-					if lastPing == 0 {
-						m.changeUserStatus(roomId, u)
-						continue
-					}
+		if !strings.HasPrefix(s, natsservice.RoomUsersBucketPrefix) {
+			continue
+		}
+		roomId := strings.ReplaceAll(s, natsservice.RoomUsersBucketPrefix, "")
+		if users, err := m.natsService.GetOnlineUsersId(roomId); err == nil && users != nil && len(users) > 0 {
+			for _, u := range users {
+				if strings.HasPrefix(u, config.IngressUserIdPrefix) {
+					// we won't get ping from ingress user
+					// so, we can't check from here.
+					continue
+				}
+				lastPing := m.natsService.GetUserLastPing(roomId, u)
+				if lastPing == 0 {
+					m.changeUserStatus(roomId, u)
+					continue
+				}
 
-					// we'll compare
-					lastPing += natsservice.UserOnlineMaxPingDiff.Milliseconds()
-					if time.Now().UnixMilli() > lastPing {
-						log.Infoln(fmt.Sprintf("userId:%s should be offline, lastPing: %d, now: %d", u, lastPing, time.Now().UnixMilli()))
-						m.changeUserStatus(roomId, u)
-					}
+				// we'll compare
+				lastPing += natsservice.UserOnlineMaxPingDiff.Milliseconds()
+				now := time.Now().UnixMilli()
+				if now > lastPing {
+					log.Infoln(fmt.Sprintf("userId:%s should be offline, lastPing: %d, now: %d", u, lastPing, now))
+					m.changeUserStatus(roomId, u)
 				}
 			}
 		}

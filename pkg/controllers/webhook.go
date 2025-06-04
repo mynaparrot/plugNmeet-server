@@ -6,29 +6,32 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 )
 
+// HandleWebhook processes incoming webhook events from LiveKit
 func HandleWebhook(c *fiber.Ctx) error {
+	// Read raw request body
 	data := c.Body()
-	token := c.Request().Header.Peek("Authorization")
 
-	if len(token) == 0 {
+	// Extract Authorization header
+	token := c.Get("Authorization")
+	if token == "" {
 		return c.SendStatus(fiber.StatusForbidden)
 	}
 
-	m := models.NewAuthModel(nil, nil)
-	// here request is coming from livekit, so
-	// we'll use livekit secret to validate
-	_, err := m.ValidateLivekitWebhookToken(data, string(token))
-	if err != nil {
+	// Validate the webhook token using LiveKit secret
+	authModel := models.NewAuthModel(nil, nil)
+	if _, err := authModel.ValidateLivekitWebhookToken(data, token); err != nil {
 		return c.SendStatus(fiber.StatusForbidden)
 	}
 
+	// Unmarshal the webhook event
 	event := new(livekit.WebhookEvent)
-	if err = op.Unmarshal(data, event); err != nil {
+	if err := op.Unmarshal(data, event); err != nil {
 		return c.SendStatus(fiber.StatusUnprocessableEntity)
 	}
 
-	mm := models.NewWebhookModel(nil, nil, nil)
-	go mm.HandleWebhookEvents(event)
+	// Handle the webhook event asynchronously
+	webhookModel := models.NewWebhookModel(nil, nil, nil)
+	go webhookModel.HandleWebhookEvents(event)
 
 	return c.SendStatus(fiber.StatusOK)
 }

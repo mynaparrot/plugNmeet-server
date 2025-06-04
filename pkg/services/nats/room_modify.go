@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+// Constants for room info bucket and keys
 const (
 	RoomInfoBucketPrefix = Prefix + "roomInfo-"
 	RoomInfoBucket       = RoomInfoBucketPrefix + "%s"
@@ -27,28 +28,34 @@ const (
 	RoomStatusEnded   = "ended"
 )
 
+// AddRoom creates a new room entry in the NATS JetStream Key-Value store
 func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeout, maxParticipants *uint32, metadata *plugnmeet.RoomMetadata) error {
+	// Create or update the key-value bucket for the room
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
 		Replicas: s.app.NatsInfo.NumReplicas,
 		Bucket:   fmt.Sprintf(RoomInfoBucket, roomId),
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create or update KV bucket: %w", err)
 	}
+
+	// Set default values if not provided
 	if emptyTimeout == nil {
-		var et uint32 = 1800 // 1800 seconds = 30 minutes
-		emptyTimeout = &et
+		defaultTimeout := uint32(1800) // 30 minutes
+		emptyTimeout = &defaultTimeout
 	}
 	if maxParticipants == nil {
-		var pts uint32 = 0 // 0 = no limit
-		maxParticipants = &pts
+		defaultMax := uint32(0) // 0 = unlimited
+		maxParticipants = &defaultMax
 	}
 
+	// Marshal metadata to string
 	mt, err := s.MarshalRoomMetadata(metadata)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal metadata: %w", err)
 	}
 
+	// Prepare room data
 	data := map[string]string{
 		RoomDbTableIdKey:    fmt.Sprintf("%d", tableId),
 		RoomIdKey:           roomId,
@@ -56,32 +63,28 @@ func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeo
 		RoomEmptyTimeoutKey: fmt.Sprintf("%d", *emptyTimeout),
 		RoomMaxParticipants: fmt.Sprintf("%d", *maxParticipants),
 		RoomStatusKey:       RoomStatusCreated,
-		RoomCreatedKey:      fmt.Sprintf("%d", time.Now().UTC().Unix()), // in seconds
+		RoomCreatedKey:      fmt.Sprintf("%d", time.Now().UTC().Unix()),
 		RoomMetadataKey:     mt,
 	}
 
+	// Store each key-value pair
 	for k, v := range data {
-		_, err = kv.PutString(s.ctx, k, v)
-		if err != nil {
-			log.Errorln(err)
+		if _, err := kv.PutString(s.ctx, k, v); err != nil {
+			log.WithFields(log.Fields{"key": k, "value": v}).Errorf("failed to store room data: %v", err)
 		}
 	}
 
 	return nil
 }
 
-// updateRoomMetadata should be internal only
+// updateRoomMetadata updates the metadata of an existing room
 func (s *NatsService) updateRoomMetadata(roomId string, metadata interface{}) (string, error) {
 	var mt *plugnmeet.RoomMetadata
 	var err error
-
+	// Handle different metadata input types
 	switch v := metadata.(type) {
 	case string:
-		// because we'll need to update id
 		mt, err = s.UnmarshalRoomMetadata(v)
-		if err != nil {
-			return "", err
-		}
 	case plugnmeet.RoomMetadata:
 		mt = &v
 	case *plugnmeet.RoomMetadata:
@@ -89,71 +92,67 @@ func (s *NatsService) updateRoomMetadata(roomId string, metadata interface{}) (s
 	default:
 		return "", errors.New("invalid metadata data type")
 	}
+	if err != nil {
+		return "", fmt.Errorf("failed to unmarshal metadata: %w", err)
+	}
 
+	// Retrieve the room's KV bucket
 	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf(RoomInfoBucket, roomId))
-	switch {
-	case errors.Is(err, jetstream.ErrBucketNotFound):
-		return "", errors.New(fmt.Sprintf("no room found with roomId: %s", roomId))
-	case err != nil:
+	if errors.Is(err, jetstream.ErrBucketNotFound) {
+		return "", fmt.Errorf("no room found with roomId: %s", roomId)
+	} else if err != nil {
 		return "", err
 	}
 
-	// id will be updated during Marshal
+	// Marshal and update metadata
 	ml, err := s.MarshalRoomMetadata(mt)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to marshal metadata: %w", err)
 	}
 
-	_, err = kv.PutString(s.ctx, RoomMetadataKey, ml)
-	if err != nil {
-		return "", err
+	if _, err := kv.PutString(s.ctx, RoomMetadataKey, ml); err != nil {
+		return "", fmt.Errorf("failed to update metadata: %w", err)
 	}
 
 	return ml, nil
 }
 
+// DeleteRoom removes the room's KV bucket
 func (s *NatsService) DeleteRoom(roomId string) error {
 	err := s.js.DeleteKeyValue(s.ctx, fmt.Sprintf(RoomInfoBucket, roomId))
-	switch {
-	case errors.Is(err, jetstream.ErrBucketNotFound):
-		return nil
-	case err != nil:
-		return err
+	if errors.Is(err, jetstream.ErrBucketNotFound) {
+		return nil // Room already deleted
 	}
-
-	return nil
+	return err
 }
 
+// UpdateRoomStatus changes the status of a room
 func (s *NatsService) UpdateRoomStatus(roomId string, status string) error {
 	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf(RoomInfoBucket, roomId))
-	switch {
-	case errors.Is(err, jetstream.ErrBucketNotFound):
-		return errors.New(fmt.Sprintf("no room found with roomId: %s", roomId))
-	case err != nil:
+	if errors.Is(err, jetstream.ErrBucketNotFound) {
+		return fmt.Errorf("no room found with roomId: %s", roomId)
+	} else if err != nil {
 		return err
 	}
 
-	_, err = kv.PutString(s.ctx, RoomStatusKey, status)
-	if err != nil {
-		return err
+	if _, err := kv.PutString(s.ctx, RoomStatusKey, status); err != nil {
+		return fmt.Errorf("failed to update room status: %w", err)
 	}
 
 	return nil
 }
 
+// OnAfterSessionEndCleanup performs cleanup after a session ends
 func (s *NatsService) OnAfterSessionEndCleanup(roomId string) {
-	err := s.DeleteRoom(roomId)
-	if err != nil {
-		log.Errorln(err)
+	if err := s.DeleteRoom(roomId); err != nil {
+		log.Errorf("failed to delete room %s with error: %v", roomId, err)
 	}
 
-	err = s.DeleteAllRoomUsersWithConsumer(roomId)
-	if err != nil {
-		log.Errorln(err)
+	if err := s.DeleteAllRoomUsersWithConsumer(roomId); err != nil {
+		log.Errorf("failed to delete room %s users: %v", roomId, err)
 	}
 
-	err = s.DeleteRoomNatsStream(roomId)
-	if err != nil {
-		log.Errorln(err)
+	if err := s.DeleteRoomNatsStream(roomId); err != nil {
+		log.Errorf("failed to delete room %s stream: %v", roomId, err)
 	}
 }

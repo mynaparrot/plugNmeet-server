@@ -56,7 +56,7 @@ func (m *SchedulerModel) activeRoomChecker() {
 			continue
 		}
 
-		userIds, err := m.natsService.GetOlineUsersId(room.RoomId)
+		userIds, err := m.natsService.GetOnlineUsersId(room.RoomId)
 		if err != nil {
 			log.Errorln(err)
 			continue

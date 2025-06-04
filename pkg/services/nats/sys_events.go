@@ -55,7 +55,7 @@ func (s *NatsService) BroadcastSystemEventToRoom(event plugnmeet.NatsMsgServerTo
 }
 
 func (s *NatsService) BroadcastSystemEventToEveryoneExceptUserId(event plugnmeet.NatsMsgServerToClientEvents, roomId string, data interface{}, exceptUserId string) error {
-	ids, err := s.GetOlineUsersId(roomId)
+	ids, err := s.GetOnlineUsersId(roomId)
 	if err != nil {
 		return err
 	}
