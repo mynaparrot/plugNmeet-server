@@ -17,7 +17,7 @@ var roomId = uuid.NewString()
 var userId = uuid.NewString()
 
 func init() {
-	appCnf, err := helpers.ReadYamlConfigFile(root + "/config_test.yaml")
+	appCnf, err := helpers.ReadYamlConfigFile(root + "/config.yaml")
 	if err != nil {
 		panic(err)
 	}
