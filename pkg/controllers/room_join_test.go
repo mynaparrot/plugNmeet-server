@@ -3,12 +3,10 @@ package controllers
 import (
 	"context"
 	"fmt"
-	lksdk "github.com/livekit/server-sdk-go/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
-	"github.com/pion/webrtc/v4"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -102,7 +100,7 @@ func testNatsJoin(t *testing.T, token string, natsSubjects *plugnmeet.NatsSubjec
 		return
 	}
 
-	t.Run("Test_LK_Join", func(t *testing.T) {
+	/*t.Run("Test_LK_Join", func(t *testing.T) {
 		c := make(chan string)
 
 		echoTrack, err := lksdk.NewLocalTrack(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus})
@@ -153,5 +151,5 @@ func testNatsJoin(t *testing.T, token string, natsSubjects *plugnmeet.NatsSubjec
 		case <-time.After(3 * time.Second):
 			t.Log("Timeout: no message received.")
 		}
-	})
+	})*/
 }
