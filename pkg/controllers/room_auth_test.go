@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 var joinToken string
@@ -141,6 +142,8 @@ func TestHandleValidateJoinToken(t *testing.T) {
 	nts := NewNatsController()
 	go nts.BootUp()
 
+	// wait until finish bootup
+	time.Sleep(time.Second * 1)
 	testNatsJoin(t, joinToken, respBody.NatsSubjects)
 }
 
