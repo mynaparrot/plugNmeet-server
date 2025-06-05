@@ -27,6 +27,9 @@ func setupApp() *fiber.App {
 	// some APIs
 	api := app.Group("/api", HandleVerifyHeaderToken)
 	api.Post("/verifyToken", HandleVerifyToken)
+
+	// others
+	app.Post("/webhook", HandleWebhook)
 	return app
 }
 
@@ -133,6 +136,12 @@ func TestHandleValidateJoinToken(t *testing.T) {
 	assert.True(t, respBody.Status)
 	assert.Equal(t, "token is valid", respBody.Msg)
 	assert.NotNil(t, respBody.NatsSubjects)
+
+	// now we can run some other test
+	nts := NewNatsController()
+	go nts.BootUp()
+
+	testNatsJoin(t, joinToken, respBody.NatsSubjects)
 }
 
 func TestHandleIsRoomActive(t *testing.T) {
