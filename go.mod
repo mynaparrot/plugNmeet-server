@@ -19,7 +19,7 @@ require (
 	github.com/nats-io/jwt/v2 v2.7.4
 	github.com/nats-io/nats.go v1.42.0
 	github.com/nats-io/nkeys v0.4.11
-	github.com/redis/go-redis/v9 v9.8.0
+	github.com/redis/go-redis/v9 v9.10.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/urfave/cli/v3 v3.3.3
 	google.golang.org/protobuf v1.36.6
