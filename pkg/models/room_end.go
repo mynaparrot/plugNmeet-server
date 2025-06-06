@@ -50,12 +50,12 @@ func (m *RoomModel) EndRoom(r *plugnmeet.RoomEndReq) (bool, string) {
 	}
 
 	// process further
-	go m.OnAfterRoomEnded(info.RoomId, info.RoomSid, info.Metadata)
+	go m.onAfterRoomEnded(info.RoomId, info.RoomSid, info.Metadata)
 
 	return true, "success"
 }
 
-func (m *RoomModel) OnAfterRoomEnded(roomId, roomSid, metadata string) {
+func (m *RoomModel) onAfterRoomEnded(roomId, roomSid, metadata string) {
 	// lock room creation otherwise may have an unexpected result
 	// if recreated before clean up completed
 	err := m.rs.LockRoomCreation(roomId, config.WaitBeforeTriggerOnAfterRoomEnded+(time.Second*5))
@@ -75,7 +75,25 @@ func (m *RoomModel) OnAfterRoomEnded(roomId, roomSid, metadata string) {
 	// now we'll perform a few service related tasks
 	// if we do not wait, then the result will be wrong
 	// because few of the services depend on all user disconnections
-	time.Sleep(config.WaitBeforeTriggerOnAfterRoomEnded)
+
+	done := make(chan struct{})
+
+	go func() {
+		for {
+			if m.areAllUsersDisconnected(roomId) {
+				close(done)
+				return
+			}
+			time.Sleep(1 * time.Second) // small polling interval
+		}
+	}()
+
+	select {
+	case <-done:
+		// proceed with cleanup
+	case <-time.After(config.WaitBeforeTriggerOnAfterRoomEnded): // timeout fallback
+		log.Warn("Timeout waiting for all users to disconnect")
+	}
 
 	// delete blocked users list
 	m.natsService.DeleteRoomUsersBlockList(roomId)
@@ -143,4 +161,13 @@ func (m *RoomModel) OnAfterRoomEnded(roomId, roomSid, metadata string) {
 	// finally, create the analytics file
 	analyticsModel := NewAnalyticsModel(m.app, m.ds, m.rs)
 	analyticsModel.PrepareToExportAnalytics(roomId, roomSid, metadata)
+}
+
+// Helper function to check if all users are disconnected
+func (m *RoomModel) areAllUsersDisconnected(roomId string) bool {
+	users, err := m.natsService.GetOnlineUsersId(roomId)
+	if err != nil || users == nil || len(users) == 0 {
+		return true
+	}
+	return false
 }

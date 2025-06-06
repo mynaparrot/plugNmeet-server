@@ -10,12 +10,7 @@ import (
 
 func HandleRoomCreate(c *fiber.Ctx) error {
 	req := new(plugnmeet.CreateRoomReq)
-	err := op.Unmarshal(c.Body(), req)
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
-	}
-
-	if err = validateProtoRequest(req); err != nil {
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
@@ -36,12 +31,7 @@ func HandleRoomCreate(c *fiber.Ctx) error {
 
 func HandleIsRoomActive(c *fiber.Ctx) error {
 	req := new(plugnmeet.IsRoomActiveReq)
-	err := op.Unmarshal(c.Body(), req)
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
-	}
-
-	if err = validateProtoRequest(req); err != nil {
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
@@ -52,17 +42,10 @@ func HandleIsRoomActive(c *fiber.Ctx) error {
 
 func HandleGetActiveRoomInfo(c *fiber.Ctx) error {
 	req := new(plugnmeet.GetActiveRoomInfoReq)
-	err := op.Unmarshal(c.Body(), req)
-	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
-	}
-
-	if err = validateProtoRequest(req); err != nil {
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
+
 	m := models.NewRoomModel(nil, nil, nil)
 	status, msg, res := m.GetActiveRoomInfo(req)
 
@@ -90,12 +73,7 @@ func HandleGetActiveRoomsInfo(c *fiber.Ctx) error {
 
 func HandleEndRoom(c *fiber.Ctx) error {
 	req := new(plugnmeet.RoomEndReq)
-	err := op.Unmarshal(c.Body(), req)
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
-	}
-
-	if err = validateProtoRequest(req); err != nil {
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
@@ -107,12 +85,7 @@ func HandleEndRoom(c *fiber.Ctx) error {
 
 func HandleFetchPastRooms(c *fiber.Ctx) error {
 	req := new(plugnmeet.FetchPastRoomsReq)
-	err := op.Unmarshal(c.Body(), req)
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
-	}
-
-	if err = validateProtoRequest(req); err != nil {
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 

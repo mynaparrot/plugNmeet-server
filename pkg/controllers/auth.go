@@ -61,11 +61,6 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	cm := c.Locals("claims")
-	if cm == nil {
-		return utils.SendCommonProtobufResponse(c, false, "invalid request")
-	}
-
 	// check for duplicate join
 	nts := natsservice.New(app)
 	status, err := nts.GetRoomUserStatus(roomId.(string), requestedUserId.(string))
@@ -140,12 +135,6 @@ func HandleVerifyHeaderToken(c *fiber.Ctx) error {
 	if err != nil {
 		_ = c.SendStatus(errStatus)
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
-	}
-
-	// we only need this during verify token
-	// because it will return livekit token, if success
-	if strings.Contains(c.Path(), "verifyToken") {
-		c.Locals("claims", claims)
 	}
 
 	c.Locals("isAdmin", claims.IsAdmin)

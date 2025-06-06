@@ -25,36 +25,30 @@ func HandleFileUpload(c *fiber.Ctx) error {
 	req := new(models.ResumableUploadReq)
 	err := c.QueryParser(req)
 	if err != nil {
-		_ = c.SendStatus(fiber.StatusBadRequest)
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return commonFileErrorResponse(c, err.Error(), fiber.StatusBadRequest)
 	}
 
 	if req.RoomSid == "" || req.RoomId == "" || req.UserId == "" {
-		return commonFileErrorResponse(c, "missing required fields")
+		return commonFileErrorResponse(c, "missing required fields", fiber.StatusBadRequest)
 	}
 	if roomId != req.RoomId {
-		return commonFileErrorResponse(c, "token roomId & requested roomId didn't matched")
+		return commonFileErrorResponse(c, "token roomId & requested roomId didn't matched", fiber.StatusBadRequest)
 	}
 	if requestedUserId != req.UserId {
-		return commonFileErrorResponse(c, "token roomId & requested roomId didn't matched")
+		return commonFileErrorResponse(c, "token roomId & requested roomId didn't matched", fiber.StatusBadRequest)
 	}
 
 	m := models.NewFileModel(nil, nil, nil)
-	res, err := m.ResumableFileUpload(c)
-	if err != nil {
-		return commonFileErrorResponse(c, err.Error())
+	res, fErr := m.ResumableFileUpload(c)
+	if fErr != nil {
+		return commonFileErrorResponse(c, fErr.Message, fErr.Code)
 	}
 
 	if res.FilePath == "part_uploaded" {
 		_ = c.SendStatus(fiber.StatusOK)
 		return c.SendString(res.FilePath)
 	} else {
-		res.Status = true
-		res.Msg = "file uploaded successfully"
-		return c.JSON(res)
+		return c.SendString(res.Msg)
 	}
 }
 
@@ -62,17 +56,17 @@ func HandleUploadedFileMerge(c *fiber.Ctx) error {
 	req := new(models.ResumableUploadedFileMergeReq)
 	err := c.BodyParser(req)
 	if err != nil {
-		return commonFileErrorResponse(c, err.Error())
+		return commonFileErrorResponse(c, err.Error(), fiber.StatusBadRequest)
 	}
 
 	if req.RoomSid == "" || req.RoomId == "" {
-		return commonFileErrorResponse(c, "missing required fields")
+		return commonFileErrorResponse(c, "missing required fields", fiber.StatusBadRequest)
 	}
 
 	m := models.NewFileModel(nil, nil, nil)
 	res, err := m.UploadedFileMerge(req)
 	if err != nil {
-		return commonFileErrorResponse(c, err.Error())
+		return commonFileErrorResponse(c, err.Error(), fiber.StatusBadRequest)
 	}
 
 	return c.JSON(res)
@@ -180,8 +174,11 @@ func HandleGetClientFiles(c *fiber.Ctx) error {
 	})
 }
 
-func commonFileErrorResponse(c *fiber.Ctx, msg string) error {
-	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+func commonFileErrorResponse(c *fiber.Ctx, msg string, status int) error {
+	if status > 0 {
+		_ = c.SendStatus(status)
+	}
+	return c.JSON(fiber.Map{
 		"status": false,
 		"msg":    msg,
 	})
