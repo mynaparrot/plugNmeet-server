@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -10,15 +11,54 @@ import (
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 )
 
-var lkJoinToken, lkUrl string
+func testValidateJoinToken(t *testing.T, token string) {
+	t.Run("Test_Validate_Join_Token", func(t *testing.T) {
+		app := setupApp()
+		reqBody := &plugnmeet.VerifyTokenReq{}
+
+		bodyBytes, err := proto.Marshal(reqBody)
+		assert.NoError(t, err)
+		req := httptest.NewRequest("POST", "/api/verifyToken", bytes.NewReader(bodyBytes))
+		req.Header.Set("Content-Type", "application/octet-stream")
+		req.Header.Set("Authorization", token)
+
+		// Send request
+		resp, err := app.Test(req)
+		assert.NoError(t, err)
+		assert.Equal(t, 200, resp.StatusCode)
+
+		buf := new(bytes.Buffer)
+		_, err = buf.ReadFrom(resp.Body)
+		assert.NoError(t, err)
+
+		// Read and unmarshal response
+		respBody := new(plugnmeet.VerifyTokenRes)
+		err = proto.Unmarshal(buf.Bytes(), respBody)
+		assert.NoError(t, err)
+
+		// Compare expected values
+		assert.True(t, respBody.Status)
+		assert.Equal(t, "token is valid", respBody.Msg)
+		assert.NotNil(t, respBody.NatsSubjects)
+
+		// now we can run some other test
+		nts := NewNatsController()
+		go nts.BootUp()
+
+		// wait until finish bootup
+		time.Sleep(time.Second * 1)
+		testNatsJoin(t, token, respBody.NatsSubjects)
+	})
+}
 
 func testNatsJoin(t *testing.T, token string, natsSubjects *plugnmeet.NatsSubjects) {
-	ok := t.Run("Test_Nats_Join", func(t *testing.T) {
+	t.Run("Test_Nats_Join", func(t *testing.T) {
 		nc, err := nats.Connect(strings.Join(config.GetConfig().NatsInfo.NatsUrls, ","), nats.Token(token))
 		if !assert.NoError(t, err) {
 			// not possible to continue
@@ -46,11 +86,13 @@ func testNatsJoin(t *testing.T, token string, natsSubjects *plugnmeet.NatsSubjec
 		done := make(chan struct{})
 		go func() {
 			cc, err := cons.Consume(func(msg jetstream.Msg) {
-				defer msg.Ack()
+				defer func() {
+					msg.Ack()
+					close(done)
+				}()
 				res := new(plugnmeet.NatsMsgServerToClient)
 				err := proto.Unmarshal(msg.Data(), res)
 				if !assert.NoError(t, err) {
-					close(done)
 					return
 				}
 				switch res.Event {
@@ -58,13 +100,9 @@ func testNatsJoin(t *testing.T, token string, natsSubjects *plugnmeet.NatsSubjec
 					data := new(plugnmeet.NatsInitialData)
 					err := protojson.Unmarshal([]byte(res.Msg), data)
 					if !assert.NoError(t, err) {
-						close(done)
 						return
 					}
 					assert.NotEmpty(t, data.MediaServerInfo.Token)
-					lkJoinToken = data.MediaServerInfo.Token
-					lkUrl = data.MediaServerInfo.Url
-					close(done)
 				}
 			})
 			assert.NoError(t, err)
@@ -95,61 +133,4 @@ func testNatsJoin(t *testing.T, token string, natsSubjects *plugnmeet.NatsSubjec
 			close(done)
 		}
 	})
-
-	if !ok {
-		return
-	}
-
-	/*t.Run("Test_LK_Join", func(t *testing.T) {
-		c := make(chan string)
-
-		echoTrack, err := lksdk.NewLocalTrack(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus})
-		if !assert.NoError(t, err) {
-			// not possible to continue
-			return
-		}
-
-		room := lksdk.NewRoom(&lksdk.RoomCallback{
-			OnParticipantConnected: func(p *lksdk.RemoteParticipant) {
-				t.Logf("participant connected: %v", p)
-				c <- "joined"
-			},
-			OnDisconnected: func() {
-				t.Log("Room disconnected")
-				c <- "disconnected"
-			},
-			ParticipantCallback: lksdk.ParticipantCallback{
-				OnTrackSubscribed: func(track *webrtc.TrackRemote, publication *lksdk.RemoteTrackPublication, rp *lksdk.RemoteParticipant) {
-					t.Log("Room received track event")
-					c <- "trackSubscribed"
-				},
-			},
-		})
-
-		err = room.JoinWithToken(lkUrl, lkJoinToken)
-		if !assert.NoError(t, err) {
-			// not possible to continue
-			return
-		}
-
-		_, err = room.LocalParticipant.PublishTrack(echoTrack, &lksdk.TrackPublicationOptions{
-			Name: "echo",
-		})
-		if !assert.NoError(t, err) {
-			// not possible to continue
-			return
-		}
-
-		select {
-		case msg := <-c:
-			t.Log("Received:", msg)
-			if msg == "joined" || msg == "trackSubscribed" {
-				room.Disconnect()
-			} else {
-				return
-			}
-		case <-time.After(3 * time.Second):
-			t.Log("Timeout: no message received.")
-		}
-	})*/
 }
