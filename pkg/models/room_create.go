@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
@@ -13,10 +14,22 @@ import (
 	"time"
 )
 
-func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoomInfo, error) {
-	// some pre-creation tasks
-	m.preRoomCreationTasks(r)
-	defer m.rs.UnlockRoomCreation(r.RoomId) // clean up lock
+func (m *RoomModel) CreateRoom(ctx context.Context, r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoomInfo, error) {
+	// we'll lock the same room creation until the room is created
+	lockValue, err := acquireRoomCreationLockWithRetry(ctx, m.rs, r.GetRoomId())
+	if err != nil {
+		return nil, err // Error already logged by helper
+	}
+
+	// Defer unlock using the obtained lockValue for safety.
+	defer func() {
+		unlockCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if unlockErr := m.rs.UnlockRoomCreation(unlockCtx, r.GetRoomId(), lockValue); unlockErr != nil {
+			// UnlockRoomCreation in RedisService should log details
+			log.Errorf("Error trying to clean up room creation lock for room %s : %v", r.GetRoomId(), unlockErr)
+		}
+	}()
 
 	// check if room already exists in db or not
 	roomDbInfo, err := m.ds.GetRoomInfoByRoomId(r.RoomId, 1)
@@ -185,15 +198,6 @@ func (m *RoomModel) prepareRoomDbInfo(r *plugnmeet.CreateRoomReq, existing *dbmo
 		existing.WebhookUrl = *r.Metadata.WebhookUrl
 	}
 	return existing, sId
-}
-
-// preRoomCreationTasks pre-room creation lock
-func (m *RoomModel) preRoomCreationTasks(r *plugnmeet.CreateRoomReq) {
-	m.CheckAndWaitUntilRoomCreationInProgress(r.GetRoomId())
-	err := m.rs.LockRoomCreation(r.GetRoomId(), time.Minute*1)
-	if err != nil {
-		log.Errorln(err)
-	}
 }
 
 // prepareWhiteboardPreloadFile preload whiteboard file

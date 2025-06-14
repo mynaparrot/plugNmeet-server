@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
@@ -13,9 +14,16 @@ import (
 	"time"
 )
 
-func (m *UserModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, error) {
+const (
+	waitForUserRemovalMaxWaitTime  = 5 * time.Second
+	waitForUserRemovalPollInterval = 200 * time.Millisecond
+)
+
+var validUserIDRegex = regexp.MustCompile("^[a-zA-Z0-9-_]+$")
+
+func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTokenReq) (string, error) {
 	// check first
-	m.CheckAndWaitUntilRoomCreationInProgress(g.GetRoomId())
+	_ = waitUntilRoomCreationCompletes(ctx, m.rs, g.GetRoomId())
 
 	if g.GetUserInfo().GetName() == config.RecorderUserAuthName {
 		return "", errors.New(fmt.Sprintf("name: %s is reserved for internal use only", config.RecorderUserAuthName))
@@ -67,14 +75,14 @@ func (m *UserModel) GetPNMJoinToken(g *plugnmeet.GenerateTokenReq) (string, erro
 				UserId: g.GetUserInfo().GetUserId(),
 				Msg:    "notifications.room-disconnected-duplicate-entry",
 			})
+
 			// wait until clean up
 			time.Sleep(time.Second * 1)
 		}
 	}
 
 	// we'll validate user id
-	valid, _ := regexp.MatchString("^[a-zA-Z0-9-_]+$", g.UserInfo.UserId)
-	if !valid {
+	if !validUserIDRegex.MatchString(g.UserInfo.UserId) {
 		return "", errors.New("user_id should only contain ASCII letters (a-z A-Z), digits (0-9) or -_")
 	}
 

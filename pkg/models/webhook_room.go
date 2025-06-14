@@ -109,7 +109,7 @@ func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 			log.Errorln(err)
 		}
 		// end the room in proper way
-		m.rm.EndRoom(&plugnmeet.RoomEndReq{RoomId: rInfo.RoomId})
+		m.rm.EndRoom(m.ctx, &plugnmeet.RoomEndReq{RoomId: rInfo.RoomId})
 	}
 
 	// now we'll perform a few service related tasks
