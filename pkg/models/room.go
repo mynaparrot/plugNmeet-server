@@ -6,8 +6,21 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
-	log "github.com/sirupsen/logrus"
 	"time"
+)
+
+const (
+	// Default for how long CreateRoom will try to acquire a lock
+	defaultRoomCreationMaxWaitTime = 30 * time.Second
+	// Default for how often CreateRoom polls for the lock
+	defaultRoomCreationLockPollInterval = 250 * time.Millisecond
+	// Default TTL for the Redis lock key itself during creation
+	defaultRoomCreationLockTTL = 60 * time.Second
+
+	// Default for how long other operations (EndRoom, GetInfo) wait for creation to complete
+	defaultWaitForRoomCreationMaxWaitTime = 30 * time.Second
+	// Default for how often other operations poll to see if creation lock is released
+	defaultWaitForRoomCreationPollInterval = 250 * time.Millisecond
 )
 
 type RoomModel struct {
@@ -37,18 +50,5 @@ func NewRoomModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redi
 		lk:          livekitservice.New(app),
 		userModel:   NewUserModel(app, ds, rs),
 		natsService: natsservice.New(app),
-	}
-}
-
-// CheckAndWaitUntilRoomCreationInProgress will check the process & wait if needed
-func (m *RoomModel) CheckAndWaitUntilRoomCreationInProgress(roomId string) {
-	for {
-		locked := m.rs.IsRoomCreationLock(roomId)
-		if locked {
-			log.Println(roomId, "room creation locked, waiting for:", config.WaitDurationIfRoomCreationLocked)
-			time.Sleep(config.WaitDurationIfRoomCreationLocked)
-		} else {
-			break
-		}
 	}
 }

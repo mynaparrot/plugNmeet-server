@@ -30,7 +30,7 @@ func HandleCreateBreakoutRooms(c *fiber.Ctx) error {
 	req.RequestedUserId = requestedUserId.(string)
 
 	m := models.NewBreakoutRoomModel(nil, nil, nil)
-	err = m.CreateBreakoutRooms(req)
+	err = m.CreateBreakoutRooms(c.Context(), req)
 	if err != nil {
 		res.Msg = err.Error()
 		return SendBreakoutRoomResponse(c, res)
@@ -58,7 +58,7 @@ func HandleJoinBreakoutRoom(c *fiber.Ctx) error {
 	req.RoomId = roomId.(string)
 	req.IsAdmin = isAdmin.(bool)
 	m := models.NewBreakoutRoomModel(nil, nil, nil)
-	token, err := m.JoinBreakoutRoom(req)
+	token, err := m.JoinBreakoutRoom(c.Context(), req)
 	if err != nil {
 		res.Msg = err.Error()
 		return SendBreakoutRoomResponse(c, res)
@@ -171,7 +171,7 @@ func HandleEndBreakoutRoom(c *fiber.Ctx) error {
 
 	req.RoomId = roomId.(string)
 	m := models.NewBreakoutRoomModel(nil, nil, nil)
-	err = m.EndBreakoutRoom(req)
+	err = m.EndBreakoutRoom(c.Context(), req)
 	if err != nil {
 		res.Msg = err.Error()
 		return SendBreakoutRoomResponse(c, res)
@@ -194,7 +194,7 @@ func HandleEndBreakoutRooms(c *fiber.Ctx) error {
 	}
 
 	m := models.NewBreakoutRoomModel(nil, nil, nil)
-	err := m.EndAllBreakoutRoomsByParentRoomId(roomId.(string))
+	err := m.EndAllBreakoutRoomsByParentRoomId(c.Context(), roomId.(string))
 	if err != nil {
 		res.Msg = err.Error()
 		return SendBreakoutRoomResponse(c, res)

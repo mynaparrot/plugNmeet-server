@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -12,7 +13,7 @@ import (
 
 const BreakoutRoomFormat = "%s-%s"
 
-func (m *BreakoutRoomModel) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRoomsReq) error {
+func (m *BreakoutRoomModel) CreateBreakoutRooms(ctx context.Context, r *plugnmeet.CreateBreakoutRoomsReq) error {
 	mainRoom, meta, err := m.natsService.GetRoomInfoWithMetadata(r.RoomId)
 	if err != nil {
 		return err
@@ -56,7 +57,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRooms
 		bRoom.RoomId = fmt.Sprintf(BreakoutRoomFormat, r.RoomId, room.Id)
 		meta.RoomTitle = room.Title
 		bRoom.Metadata = meta
-		_, err := m.rm.CreateRoom(bRoom)
+		_, err := m.rm.CreateRoom(ctx, bRoom)
 
 		if err != nil {
 			log.Errorln(err)

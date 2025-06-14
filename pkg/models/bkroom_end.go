@@ -1,12 +1,13 @@
 package models
 
 import (
+	"context"
 	"errors"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	log "github.com/sirupsen/logrus"
 )
 
-func (m *BreakoutRoomModel) EndBreakoutRoom(r *plugnmeet.EndBreakoutRoomReq) error {
+func (m *BreakoutRoomModel) EndBreakoutRoom(ctx context.Context, r *plugnmeet.EndBreakoutRoomReq) error {
 	rm, err := m.natsService.GetBreakoutRoom(r.RoomId, r.BreakoutRoomId)
 	if err != nil {
 		return err
@@ -14,11 +15,11 @@ func (m *BreakoutRoomModel) EndBreakoutRoom(r *plugnmeet.EndBreakoutRoomReq) err
 	if rm == nil {
 		return errors.New("room not found")
 	}
-	m.proceedToEndBkRoom(r.BreakoutRoomId, r.RoomId)
+	m.proceedToEndBkRoom(ctx, r.BreakoutRoomId, r.RoomId)
 	return nil
 }
 
-func (m *BreakoutRoomModel) EndAllBreakoutRoomsByParentRoomId(parentRoomId string) error {
+func (m *BreakoutRoomModel) EndAllBreakoutRoomsByParentRoomId(ctx context.Context, parentRoomId string) error {
 	ids, err := m.natsService.GetBreakoutRoomIdsByParentRoomId(parentRoomId)
 	if err != nil {
 		return err
@@ -29,13 +30,13 @@ func (m *BreakoutRoomModel) EndAllBreakoutRoomsByParentRoomId(parentRoomId strin
 	}
 
 	for _, i := range ids {
-		m.proceedToEndBkRoom(i, parentRoomId)
+		m.proceedToEndBkRoom(ctx, i, parentRoomId)
 	}
 	return nil
 }
 
-func (m *BreakoutRoomModel) proceedToEndBkRoom(bkRoomId, parentRoomId string) {
-	ok, msg := m.rm.EndRoom(&plugnmeet.RoomEndReq{RoomId: bkRoomId})
+func (m *BreakoutRoomModel) proceedToEndBkRoom(ctx context.Context, bkRoomId, parentRoomId string) {
+	ok, msg := m.rm.EndRoom(ctx, &plugnmeet.RoomEndReq{RoomId: bkRoomId})
 	if !ok {
 		log.Errorln(msg)
 	}
@@ -82,7 +83,7 @@ func (m *BreakoutRoomModel) updateParentRoomMetadata(parentRoomId string) error 
 	return nil
 }
 
-func (m *BreakoutRoomModel) PostTaskAfterRoomEndWebhook(roomId, metadata string) error {
+func (m *BreakoutRoomModel) PostTaskAfterRoomEndWebhook(ctx context.Context, roomId, metadata string) error {
 	if metadata == "" {
 		return nil
 	}
@@ -95,7 +96,7 @@ func (m *BreakoutRoomModel) PostTaskAfterRoomEndWebhook(roomId, metadata string)
 		_ = m.natsService.DeleteBreakoutRoom(meta.ParentRoomId, roomId)
 		m.onAfterBkRoomEnded(meta.ParentRoomId, roomId)
 	} else {
-		err = m.EndAllBreakoutRoomsByParentRoomId(roomId)
+		err = m.EndAllBreakoutRoomsByParentRoomId(ctx, roomId)
 		if err != nil {
 			return err
 		}

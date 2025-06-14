@@ -1,15 +1,16 @@
 package models
 
 import (
+	"context"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"time"
 )
 
-func (m *RoomModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoomActiveRes, *dbmodels.RoomInfo, *plugnmeet.NatsKvRoomInfo, *plugnmeet.RoomMetadata) {
+func (m *RoomModel) IsRoomActive(ctx context.Context, r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoomActiveRes, *dbmodels.RoomInfo, *plugnmeet.NatsKvRoomInfo, *plugnmeet.RoomMetadata) {
 	// check first
-	m.CheckAndWaitUntilRoomCreationInProgress(r.GetRoomId())
+	_ = waitUntilRoomCreationCompletes(ctx, m.rs, r.GetRoomId())
 
 	res := &plugnmeet.IsRoomActiveRes{
 		Status: true,
@@ -51,9 +52,9 @@ func (m *RoomModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoo
 	return res, roomDbInfo, rInfo, meta
 }
 
-func (m *RoomModel) GetActiveRoomInfo(r *plugnmeet.GetActiveRoomInfoReq) (bool, string, *plugnmeet.ActiveRoomWithParticipant) {
+func (m *RoomModel) GetActiveRoomInfo(ctx context.Context, r *plugnmeet.GetActiveRoomInfoReq) (bool, string, *plugnmeet.ActiveRoomWithParticipant) {
 	// check first
-	m.CheckAndWaitUntilRoomCreationInProgress(r.GetRoomId())
+	_ = waitUntilRoomCreationCompletes(ctx, m.rs, r.GetRoomId())
 
 	roomDbInfo, _ := m.ds.GetRoomInfoByRoomId(r.RoomId, 1)
 	if roomDbInfo == nil || roomDbInfo.ID == 0 {
