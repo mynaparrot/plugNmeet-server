@@ -8,12 +8,15 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// AddRoomWatcher will add a watcher for the given roomId in the NATS KV store.
+// each room will have its own watcher
 func (ncs *NatsCacheService) AddRoomWatcher(kv jetstream.KeyValue, bucket, roomId string) {
 	ncs.roomLock.Lock()
 	defer ncs.roomLock.Unlock()
 
 	_, ok := ncs.roomsInfoStore[roomId]
 	if ok {
+		//already watching this room
 		return
 	}
 
@@ -57,9 +60,7 @@ func (ncs *NatsCacheService) AddRoomWatcher(kv jetstream.KeyValue, bucket, roomI
 func (ncs *NatsCacheService) updateRoomCache(entry jetstream.KeyValueEntry, roomId string) {
 	ncs.roomLock.Lock()
 	defer ncs.roomLock.Unlock()
-
 	cacheEntry := ncs.roomsInfoStore[roomId]
-	cacheEntry.Revision = entry.Revision()
 
 	val := string(entry.Value())
 	switch entry.Key() {
@@ -84,14 +85,14 @@ func (ncs *NatsCacheService) updateRoomCache(entry jetstream.KeyValueEntry, room
 	ncs.roomsInfoStore[roomId] = cacheEntry
 }
 
-func (ncs *NatsCacheService) GetCachedRoomInfo(roomID string) (*plugnmeet.NatsKvRoomInfo, uint64) {
+func (ncs *NatsCacheService) GetCachedRoomInfo(roomID string) *plugnmeet.NatsKvRoomInfo {
 	ncs.roomLock.RLock()
 	defer ncs.roomLock.RUnlock()
 	if cachedEntry, found := ncs.roomsInfoStore[roomID]; found && cachedEntry.RoomInfo != nil {
-		metaCopy := proto.Clone(cachedEntry.RoomInfo).(*plugnmeet.NatsKvRoomInfo)
-		return metaCopy, cachedEntry.Revision
+		infoCopy := proto.Clone(cachedEntry.RoomInfo).(*plugnmeet.NatsKvRoomInfo)
+		return infoCopy
 	}
-	return nil, 0
+	return nil
 }
 
 func (ncs *NatsCacheService) cleanRoomCache(roomID string) {

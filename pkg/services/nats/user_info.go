@@ -31,7 +31,7 @@ func (s *NatsService) GetRoomUserStatus(roomId, userId string) (string, error) {
 // GetUserInfo retrieves detailed information about a user in a specific room.
 // Returns nil if the user or room is not found.
 func (s *NatsService) GetUserInfo(roomId, userId string) (*plugnmeet.NatsKvUserInfo, error) {
-	if info, _ := s.cs.GetUserInfo(roomId, userId); info != nil {
+	if info := s.cs.GetUserInfo(roomId, userId); info != nil {
 		return info, nil
 	}
 

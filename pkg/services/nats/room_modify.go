@@ -117,9 +117,6 @@ func (s *NatsService) updateRoomMetadata(roomId string, metadata interface{}) (s
 		return "", fmt.Errorf("failed to update metadata: %w", err)
 	}
 
-	// in case the server got cached, we can update the watcher
-	s.cs.AddRoomWatcher(kv, bucket, roomId)
-
 	return ml, nil
 }
 

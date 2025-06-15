@@ -16,7 +16,6 @@ var (
 
 type CachedRoomEntry struct {
 	RoomInfo *plugnmeet.NatsKvRoomInfo
-	Revision uint64
 }
 
 type CachedRoomUserStatusEntry struct {
@@ -27,7 +26,6 @@ type CachedRoomUserStatusEntry struct {
 type CachedUserInfoEntry struct {
 	UserInfo   *plugnmeet.NatsKvUserInfo
 	LastPingAt uint64
-	Revision   uint64
 }
 
 type NatsCacheService struct {
@@ -66,7 +64,7 @@ func InitNatsCacheService(app *config.AppConfig) {
 // GetNatsCacheService returns the singleton instance.
 func GetNatsCacheService() *NatsCacheService {
 	if defaultNatsCacheService == nil {
-		log.Fatal("NatsCacheService not initialized. Call InitNatsCacheService at startup.")
+		InitNatsCacheService(nil)
 	}
 	return defaultNatsCacheService
 }

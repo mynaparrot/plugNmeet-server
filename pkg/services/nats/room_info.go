@@ -8,7 +8,7 @@ import (
 // GetRoomInfo retrieves the room information for the given roomId
 func (s *NatsService) GetRoomInfo(roomId string) (*plugnmeet.NatsKvRoomInfo, error) {
 	// try to get cached room info first
-	if info, _ := s.cs.GetCachedRoomInfo(roomId); info != nil {
+	if info := s.cs.GetCachedRoomInfo(roomId); info != nil {
 		return info, nil
 	}
 

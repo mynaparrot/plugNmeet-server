@@ -18,7 +18,7 @@ func (ncs *NatsCacheService) AddRoomUserStatusWatcher(kv jetstream.KeyValue, buc
 
 	_, ok := ncs.roomUsersStatusStore[roomId]
 	if ok {
-		fmt.Println("already watching user status for", bucket)
+		//already watching this room
 		return
 	}
 
@@ -114,6 +114,7 @@ func (ncs *NatsCacheService) AddUserInfoWatcher(kv jetstream.KeyValue, bucket, r
 	}
 	_, ok = rm[userId]
 	if ok {
+		// already watching user info for this userId
 		return
 	}
 
@@ -157,9 +158,7 @@ func (ncs *NatsCacheService) AddUserInfoWatcher(kv jetstream.KeyValue, bucket, r
 func (ncs *NatsCacheService) updateUserInfoCache(entry jetstream.KeyValueEntry, roomId, userId string) {
 	ncs.userLock.Lock()
 	defer ncs.userLock.Unlock()
-
 	user := ncs.roomUsersInfoStore[roomId][userId]
-	user.Revision = entry.Revision()
 
 	val := string(entry.Value())
 	switch entry.Key() {
@@ -190,17 +189,17 @@ func (ncs *NatsCacheService) updateUserInfoCache(entry jetstream.KeyValueEntry, 
 	ncs.roomUsersInfoStore[roomId][userId] = user
 }
 
-func (ncs *NatsCacheService) GetUserInfo(roomId, userId string) (*plugnmeet.NatsKvUserInfo, uint64) {
+func (ncs *NatsCacheService) GetUserInfo(roomId, userId string) *plugnmeet.NatsKvUserInfo {
 	ncs.userLock.RLock()
 	defer ncs.userLock.RUnlock()
 	if rm, found := ncs.roomUsersInfoStore[roomId]; found {
 		if entry, ok := rm[userId]; ok && entry.UserInfo != nil {
 			// Return a copy to prevent modification of cached object if it's a pointer
 			infoCopy := proto.Clone(entry.UserInfo).(*plugnmeet.NatsKvUserInfo)
-			return infoCopy, entry.Revision
+			return infoCopy
 		}
 	}
-	return nil, 0
+	return nil
 }
 
 func (ncs *NatsCacheService) GetUserLastPingAt(roomId, userId string) int64 {
