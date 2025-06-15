@@ -43,9 +43,10 @@ const (
 // AddUser adds a new user to a room and stores their metadata
 func (s *NatsService) AddUser(roomId, userId, name string, isAdmin, isPresenter bool, metadata *plugnmeet.UserMetadata) error {
 	// Create or update the room users bucket
+	bucket := fmt.Sprintf(RoomUsersBucket, roomId)
 	roomKV, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
 		Replicas: s.app.NatsInfo.NumReplicas,
-		Bucket:   fmt.Sprintf(RoomUsersBucket, roomId),
+		Bucket:   bucket,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create room bucket: %w", err)
@@ -55,11 +56,14 @@ func (s *NatsService) AddUser(roomId, userId, name string, isAdmin, isPresenter 
 	if _, err := roomKV.PutString(s.ctx, userId, UserStatusAdded); err != nil {
 		return fmt.Errorf("failed to add user to room: %w", err)
 	}
+	// add watcher for user status bucket
+	s.cs.AddRoomUserStatusWatcher(roomKV, bucket, roomId, userId)
 
 	// Create or update the user info bucket
+	bucket = fmt.Sprintf(UserInfoBucket, roomId, userId)
 	userKV, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
 		Replicas: s.app.NatsInfo.NumReplicas,
-		Bucket:   fmt.Sprintf(UserInfoBucket, roomId, userId),
+		Bucket:   bucket,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create user info bucket: %w", err)
@@ -89,6 +93,9 @@ func (s *NatsService) AddUser(roomId, userId, name string, isAdmin, isPresenter 
 			return fmt.Errorf("failed to add user to user bucket: %w", err)
 		}
 	}
+
+	// add to user info watcher
+	s.cs.AddUserInfoWatcher(userKV, bucket, roomId, userId)
 
 	return nil
 }

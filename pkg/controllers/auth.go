@@ -77,7 +77,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	}
 
 	m := models.NewRoomModel(nil, nil, nil)
-	rr, roomDbInfo, rInfo, meta := m.IsRoomActive(c.Context(), &plugnmeet.IsRoomActiveReq{
+	rr, roomDbInfo, rInfo, meta := m.IsRoomActive(c.UserContext(), &plugnmeet.IsRoomActiveReq{
 		RoomId: roomId.(string),
 	})
 

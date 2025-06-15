@@ -11,17 +11,32 @@ import (
 // GetRoomUserStatus retrieves the status of a user in a specific room.
 // Returns an empty string if the user or room is not found.
 func (s *NatsService) GetRoomUserStatus(roomId, userId string) (string, error) {
-	kv, err := s.getKV(fmt.Sprintf(RoomUsersBucket, roomId))
+	var status string
+	if status, _ = s.cs.GetCachedRoomUserStatus(roomId, userId); status != "" {
+		return status, nil
+	}
+
+	bucket := fmt.Sprintf(RoomUsersBucket, roomId)
+	kv, err := s.getKV(bucket)
 	if err != nil || kv == nil {
 		return "", err
 	}
+
+	// So, for some reason, not found in cache, then may be user wasn't added to this room. So, we will start watching
+	s.cs.AddRoomUserStatusWatcher(kv, bucket, roomId, userId)
+
 	return s.getStringValue(kv, userId)
 }
 
 // GetUserInfo retrieves detailed information about a user in a specific room.
 // Returns nil if the user or room is not found.
 func (s *NatsService) GetUserInfo(roomId, userId string) (*plugnmeet.NatsKvUserInfo, error) {
-	kv, err := s.getKV(fmt.Sprintf(UserInfoBucket, roomId, userId))
+	if info, _ := s.cs.GetUserInfo(roomId, userId); info != nil {
+		return info, nil
+	}
+
+	bucket := fmt.Sprintf(UserInfoBucket, roomId, userId)
+	kv, err := s.getKV(bucket)
 	if err != nil || kv == nil {
 		return nil, err
 	}
@@ -37,6 +52,9 @@ func (s *NatsService) GetUserInfo(roomId, userId string) (*plugnmeet.NatsKvUserI
 	info.JoinedAt, _ = s.getUint64Value(kv, UserJoinedAt)
 	info.ReconnectedAt, _ = s.getUint64Value(kv, UserReconnectedAt)
 	info.DisconnectedAt, _ = s.getUint64Value(kv, UserDisconnectedAt)
+
+	// So, for some reason, not found in cache. So, we will start watching
+	s.cs.AddUserInfoWatcher(kv, bucket, roomId, userId)
 
 	return info, nil
 }
@@ -66,6 +84,11 @@ func (s *NatsService) GetRoomAllUsersFromStatusBucket(roomId string) (map[string
 // GetOnlineUsersId retrieves the IDs of users who are currently online in a specific room.
 // Returns nil if the room is not found or no users are online.
 func (s *NatsService) GetOnlineUsersId(roomId string) ([]string, error) {
+	if userIds := s.cs.GetUsersIdFromRoomStatusBucket(roomId, UserStatusOnline); len(userIds) > 0 {
+		return userIds, nil
+	}
+
+	// fallback to nats
 	users, err := s.GetRoomAllUsersFromStatusBucket(roomId)
 	if err != nil || users == nil {
 		return nil, err
@@ -78,6 +101,24 @@ func (s *NatsService) GetOnlineUsersId(roomId string) ([]string, error) {
 		}
 	}
 	return userIds, nil
+}
+
+func (s *NatsService) GetUsersIdFromRoomStatusBucket(roomId string) []string {
+	var userIds []string
+	if userIds = s.cs.GetUsersIdFromRoomStatusBucket(roomId, ""); len(userIds) > 0 {
+		return userIds
+	}
+
+	// fallback to nats
+	users, err := s.GetRoomAllUsersFromStatusBucket(roomId)
+	if err != nil || users == nil {
+		return userIds
+	}
+
+	for id := range users {
+		userIds = append(userIds, id)
+	}
+	return userIds
 }
 
 // GetOnlineUsersList retrieves detailed information about all online users in a specific room.
@@ -133,11 +174,15 @@ func (s *NatsService) GetUserKeyValue(roomId, userId, key string) (jetstream.Key
 // GetUserMetadataStruct retrieves the metadata for a user in a specific room as a structured object.
 // Returns nil if the user or room is not found.
 func (s *NatsService) GetUserMetadataStruct(roomId, userId string) (*plugnmeet.UserMetadata, error) {
-	metadata, err := s.GetUserKeyValue(roomId, userId, UserMetadataKey)
-	if err != nil || metadata == nil {
+	info, err := s.GetUserInfo(roomId, userId)
+	if err != nil {
 		return nil, err
 	}
-	return s.UnmarshalUserMetadata(string(metadata.Value()))
+	if len(info.Metadata) == 0 {
+		return nil, nil
+	}
+
+	return s.UnmarshalUserMetadata(info.Metadata)
 }
 
 // GetUserWithMetadata retrieves detailed information and metadata about a user in a specific room.
@@ -157,6 +202,10 @@ func (s *NatsService) GetUserWithMetadata(roomId, userId string) (*plugnmeet.Nat
 // GetUserLastPing retrieves the last ping timestamp for a user in a specific room.
 // Returns 0 if the user or room is not found or the timestamp cannot be parsed.
 func (s *NatsService) GetUserLastPing(roomId, userId string) int64 {
+	if val := s.cs.GetUserLastPingAt(roomId, userId); val > 0 {
+		return val
+	}
+
 	val, err := s.GetUserKeyValue(roomId, userId, UserLastPingAt)
 	if err != nil || val == nil {
 		return 0
@@ -165,21 +214,6 @@ func (s *NatsService) GetUserLastPing(roomId, userId string) int64 {
 		return ts
 	}
 	return 0
-}
-
-// HasOnlineUser checks if any user is currently online in a specific room.
-// Returns false if the room is not found or no users are online.
-func (s *NatsService) HasOnlineUser(roomId string) bool {
-	users, err := s.GetRoomAllUsersFromStatusBucket(roomId)
-	if err != nil || users == nil {
-		return false
-	}
-	for _, entry := range users {
-		if string(entry.Value()) == UserStatusOnline {
-			return true
-		}
-	}
-	return false
 }
 
 // IsUserExistInBlockList checks if a user is in the block list for a specific room.

@@ -55,9 +55,7 @@ func acquireRoomCreationLockWithRetry(ctx context.Context, rs *redisservice.Redi
 func waitUntilRoomCreationCompletes(ctx context.Context, rs *redisservice.RedisService, roomID string) error {
 	maxWaitTime := defaultWaitForRoomCreationMaxWaitTime
 	pollInterval := defaultWaitForRoomCreationPollInterval
-
 	loopStartTime := time.Now()
-	log.Infof("checking if room creation is in progress for room: '%s' and will wait if so.", roomID)
 
 	for {
 		select {
@@ -74,7 +72,6 @@ func waitUntilRoomCreationCompletes(ctx context.Context, rs *redisservice.RedisS
 		}
 
 		if !isLocked {
-			log.Infof("Room creation for room '%s' is not in progress. Can proceed after %v of waiting.", roomID, time.Since(loopStartTime))
 			return nil
 		}
 

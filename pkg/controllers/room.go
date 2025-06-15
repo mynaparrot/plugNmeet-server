@@ -15,7 +15,7 @@ func HandleRoomCreate(c *fiber.Ctx) error {
 	}
 
 	m := models.NewRoomModel(nil, nil, nil)
-	room, err := m.CreateRoom(c.Context(), req)
+	room, err := m.CreateRoom(c.UserContext(), req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
@@ -36,7 +36,7 @@ func HandleIsRoomActive(c *fiber.Ctx) error {
 	}
 
 	m := models.NewRoomModel(nil, nil, nil)
-	res, _, _, _ := m.IsRoomActive(c.Context(), req)
+	res, _, _, _ := m.IsRoomActive(c.UserContext(), req)
 	return utils.SendProtoJsonResponse(c, res)
 }
 
@@ -47,7 +47,7 @@ func HandleGetActiveRoomInfo(c *fiber.Ctx) error {
 	}
 
 	m := models.NewRoomModel(nil, nil, nil)
-	status, msg, res := m.GetActiveRoomInfo(c.Context(), req)
+	status, msg, res := m.GetActiveRoomInfo(c.UserContext(), req)
 
 	r := &plugnmeet.GetActiveRoomInfoRes{
 		Status: status,
@@ -78,7 +78,7 @@ func HandleEndRoom(c *fiber.Ctx) error {
 	}
 
 	m := models.NewRoomModel(nil, nil, nil)
-	status, msg := m.EndRoom(c.Context(), req)
+	status, msg := m.EndRoom(c.UserContext(), req)
 
 	return utils.SendCommonProtoJsonResponse(c, status, msg)
 }
@@ -126,7 +126,7 @@ func HandleEndRoomForAPI(c *fiber.Ctx) error {
 	}
 
 	m := models.NewRoomModel(nil, nil, nil)
-	status, msg := m.EndRoom(c.Context(), req)
+	status, msg := m.EndRoom(c.UserContext(), req)
 	return utils.SendCommonProtobufResponse(c, status, msg)
 }
 

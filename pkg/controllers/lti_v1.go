@@ -79,7 +79,7 @@ func HandleLTIV1IsRoomActive(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 
 	m := models.NewRoomModel(nil, nil, nil)
-	res, _, _, _ := m.IsRoomActive(c.Context(), &plugnmeet.IsRoomActiveReq{
+	res, _, _, _ := m.IsRoomActive(c.UserContext(), &plugnmeet.IsRoomActiveReq{
 		RoomId: roomId.(string),
 	})
 
@@ -106,7 +106,7 @@ func HandleLTIV1JoinRoom(c *fiber.Ctx) error {
 		}
 	}
 
-	token, err := m.LTIV1JoinRoom(c.Context(), claim)
+	token, err := m.LTIV1JoinRoom(c.UserContext(), claim)
 	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
@@ -133,7 +133,7 @@ func HandleLTIV1EndRoom(c *fiber.Ctx) error {
 	}
 
 	m := models.NewRoomModel(nil, nil, nil)
-	status, msg := m.EndRoom(c.Context(), &plugnmeet.RoomEndReq{
+	status, msg := m.EndRoom(c.UserContext(), &plugnmeet.RoomEndReq{
 		RoomId: roomId.(string),
 	})
 

@@ -31,9 +31,10 @@ const (
 // AddRoom creates a new room entry in the NATS JetStream Key-Value store
 func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeout, maxParticipants *uint32, metadata *plugnmeet.RoomMetadata) error {
 	// Create or update the key-value bucket for the room
+	bucket := fmt.Sprintf(RoomInfoBucket, roomId)
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
 		Replicas: s.app.NatsInfo.NumReplicas,
-		Bucket:   fmt.Sprintf(RoomInfoBucket, roomId),
+		Bucket:   bucket,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create or update KV bucket: %w", err)
@@ -73,7 +74,8 @@ func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeo
 			return fmt.Errorf("failed to store room data for key %s: %w", k, err)
 		}
 	}
-
+	// add room to watcher
+	s.cs.AddRoomWatcher(kv, bucket, roomId)
 	return nil
 }
 
@@ -97,7 +99,8 @@ func (s *NatsService) updateRoomMetadata(roomId string, metadata interface{}) (s
 	}
 
 	// Retrieve the room's KV bucket
-	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf(RoomInfoBucket, roomId))
+	bucket := fmt.Sprintf(RoomInfoBucket, roomId)
+	kv, err := s.js.KeyValue(s.ctx, bucket)
 	if errors.Is(err, jetstream.ErrBucketNotFound) {
 		return "", fmt.Errorf("no room found with roomId: %s", roomId)
 	} else if err != nil {
@@ -113,6 +116,9 @@ func (s *NatsService) updateRoomMetadata(roomId string, metadata interface{}) (s
 	if _, err := kv.PutString(s.ctx, RoomMetadataKey, ml); err != nil {
 		return "", fmt.Errorf("failed to update metadata: %w", err)
 	}
+
+	// in case the server got cached, we can update the watcher
+	s.cs.AddRoomWatcher(kv, bucket, roomId)
 
 	return ml, nil
 }

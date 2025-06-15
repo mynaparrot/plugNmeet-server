@@ -35,7 +35,7 @@ func HandleGenerateJoinToken(c *fiber.Ctx) error {
 	}
 
 	m := models.NewUserModel(nil, nil, nil)
-	token, err := m.GetPNMJoinToken(c.Context(), req)
+	token, err := m.GetPNMJoinToken(c.UserContext(), req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}

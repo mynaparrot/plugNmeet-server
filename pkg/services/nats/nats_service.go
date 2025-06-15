@@ -25,17 +25,20 @@ type NatsService struct {
 	app *config.AppConfig
 	nc  *nats.Conn
 	js  jetstream.JetStream
+	cs  *NatsCacheService
 }
 
 func New(app *config.AppConfig) *NatsService {
 	if app == nil {
 		app = config.GetConfig()
 	}
+
 	return &NatsService{
 		ctx: context.Background(),
 		app: app,
 		nc:  app.NatsConn,
 		js:  app.JetStream,
+		cs:  GetNatsCacheService(),
 	}
 }
 

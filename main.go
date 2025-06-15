@@ -7,6 +7,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/routers"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/version"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v3"
@@ -54,6 +55,9 @@ func startServer(ctx context.Context, c *cli.Command) error {
 	if err != nil {
 		log.Fatalln(err)
 	}
+
+	// initialize Nats Cache Service
+	natsservice.InitNatsCacheService(config.GetConfig())
 
 	// start nats services
 	nts := controllers.NewNatsController()

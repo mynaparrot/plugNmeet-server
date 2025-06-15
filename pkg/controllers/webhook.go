@@ -30,7 +30,7 @@ func HandleWebhook(c *fiber.Ctx) error {
 	}
 
 	// Handle the webhook event asynchronously
-	webhookModel := models.NewWebhookModel(c.Context(), nil, nil, nil)
+	webhookModel := models.NewWebhookModel(c.UserContext(), nil, nil, nil)
 	go webhookModel.HandleWebhookEvents(event)
 
 	return c.SendStatus(fiber.StatusOK)
