@@ -12,26 +12,26 @@ import (
 // each room will have its own watcher
 func (ncs *NatsCacheService) AddRoomWatcher(kv jetstream.KeyValue, bucket, roomId string) {
 	ncs.roomLock.Lock()
-	defer ncs.roomLock.Unlock()
-
 	_, ok := ncs.roomsInfoStore[roomId]
 	if ok {
 		//already watching this room
+		ncs.roomLock.Unlock()
 		return
 	}
+	ncs.roomsInfoStore[roomId] = CachedRoomEntry{
+		RoomInfo: new(plugnmeet.NatsKvRoomInfo),
+	}
+	ncs.roomLock.Unlock()
 
 	opts := []jetstream.WatchOpt{jetstream.IncludeHistory()}
 	watcher, err := kv.WatchAll(ncs.serviceCtx, opts...)
 	if err != nil {
 		log.Errorln(fmt.Sprintf("Error starting NATS KV watcher for %s: %v", bucket, err))
+		// fallback to clean cache as we've set it above
+		ncs.cleanRoomCache(roomId)
 		return
 	}
 	log.Infof("NATS KV watcher started for bucket: %s", bucket)
-
-	// need to create here before starting goroutine
-	ncs.roomsInfoStore[roomId] = CachedRoomEntry{
-		RoomInfo: new(plugnmeet.NatsKvRoomInfo),
-	}
 
 	go func() {
 		defer func() {

@@ -14,24 +14,24 @@ import (
 // in this bucket userId is key and status is value
 func (ncs *NatsCacheService) AddRoomUserStatusWatcher(kv jetstream.KeyValue, bucket, roomId string) {
 	ncs.userLock.Lock()
-	defer ncs.userLock.Unlock()
-
 	_, ok := ncs.roomUsersStatusStore[roomId]
 	if ok {
 		//already watching this room
+		ncs.userLock.Unlock()
 		return
 	}
+	ncs.roomUsersStatusStore[roomId] = make(map[string]CachedRoomUserStatusEntry)
+	ncs.userLock.Unlock()
 
 	opts := []jetstream.WatchOpt{jetstream.IncludeHistory()}
 	watcher, err := kv.WatchAll(ncs.serviceCtx, opts...)
 	if err != nil {
 		log.Errorln(fmt.Sprintf("Error starting NATS KV watcher for %s: %v", bucket, err))
+		// fallback to clean cache as we've set it above
+		ncs.cleanRoomUserStatusCache(roomId)
 		return
 	}
 	log.Infof("NATS KV watcher started for bucket: %s", bucket)
-
-	// need to create as soon as watcher is ready before starting goroutine
-	ncs.roomUsersStatusStore[roomId] = make(map[string]CachedRoomUserStatusEntry)
 
 	go func() {
 		defer func() {
@@ -105,8 +105,6 @@ func (ncs *NatsCacheService) cleanRoomUserStatusCache(roomId string) {
 // each user has its own bucket, so watch should be for each userId
 func (ncs *NatsCacheService) AddUserInfoWatcher(kv jetstream.KeyValue, bucket, roomId, userId string) {
 	ncs.userLock.Lock()
-	defer ncs.userLock.Unlock()
-
 	rm, ok := ncs.roomUsersInfoStore[roomId]
 	if !ok {
 		ncs.roomUsersInfoStore[roomId] = make(map[string]CachedUserInfoEntry)
@@ -115,21 +113,23 @@ func (ncs *NatsCacheService) AddUserInfoWatcher(kv jetstream.KeyValue, bucket, r
 	_, ok = rm[userId]
 	if ok {
 		// already watching user info for this userId
+		ncs.userLock.Unlock()
 		return
 	}
+	ncs.roomUsersInfoStore[roomId][userId] = CachedUserInfoEntry{
+		UserInfo: new(plugnmeet.NatsKvUserInfo),
+	}
+	ncs.userLock.Unlock()
 
 	opts := []jetstream.WatchOpt{jetstream.IncludeHistory()}
 	watcher, err := kv.WatchAll(ncs.serviceCtx, opts...)
 	if err != nil {
 		log.Errorln(fmt.Sprintf("Error starting NATS KV watcher for %s: %v", bucket, err))
+		// fallback to clean cache as we've set it above
+		ncs.cleanUserInfoCache(roomId, userId)
 		return
 	}
 	log.Infof("NATS KV watcher started for bucket: %s", bucket)
-
-	// need to create as soon as watcher is ready before starting goroutine
-	ncs.roomUsersInfoStore[roomId][userId] = CachedUserInfoEntry{
-		UserInfo: new(plugnmeet.NatsKvUserInfo),
-	}
 
 	go func() {
 		defer func() {
