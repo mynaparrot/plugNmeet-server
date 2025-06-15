@@ -9,21 +9,19 @@ import (
 	"strconv"
 )
 
-func (ncs *NatsCacheService) AddRoomUserStatusWatcher(kv jetstream.KeyValue, bucket, roomId, userId string) {
+// AddRoomUserStatusWatcher will start watching user status in a specific room.
+// remember each room has only one RoomUsersBucket bucket
+// in this bucket userId is key and status is value
+func (ncs *NatsCacheService) AddRoomUserStatusWatcher(kv jetstream.KeyValue, bucket, roomId string) {
 	ncs.userLock.Lock()
-	rm, ok := ncs.roomUsersStatusStore[roomId]
-	if !ok {
-		ncs.roomUsersStatusStore[roomId] = make(map[string]CachedRoomUserStatusEntry)
-		rm = ncs.roomUsersStatusStore[roomId]
-	}
-	_, ok = rm[userId]
+	defer ncs.userLock.Unlock()
+
+	_, ok := ncs.roomUsersStatusStore[roomId]
 	if ok {
-		ncs.userLock.Unlock()
+		fmt.Println("already watching user status for", bucket)
 		return
 	}
-	ncs.userLock.Unlock()
 
-	bucket += "." + userId
 	opts := []jetstream.WatchOpt{jetstream.IncludeHistory()}
 	watcher, err := kv.WatchAll(ncs.serviceCtx, opts...)
 	if err != nil {
@@ -32,11 +30,14 @@ func (ncs *NatsCacheService) AddRoomUserStatusWatcher(kv jetstream.KeyValue, buc
 	}
 	log.Infof("NATS KV watcher started for bucket: %s", bucket)
 
+	// need to create as soon as watcher is ready before starting goroutine
+	ncs.roomUsersStatusStore[roomId] = make(map[string]CachedRoomUserStatusEntry)
+
 	go func() {
 		defer func() {
 			log.Infof("NATS KV watcher for %s stopped.", bucket)
 			_ = watcher.Stop()
-			ncs.cleanRoomUserStatusCache(roomId, userId)
+			ncs.cleanRoomUserStatusCache(roomId)
 		}()
 
 		for {
@@ -48,10 +49,11 @@ func (ncs *NatsCacheService) AddRoomUserStatusWatcher(kv jetstream.KeyValue, buc
 					// channel closed may be bucket deleted
 					return
 				}
-				if entry != nil && len(entry.Value()) > 0 {
+				// here each user id is a separate key and status is the value
+				if entry != nil {
 					ncs.userLock.Lock()
 					// force push updated data
-					ncs.roomUsersStatusStore[roomId][userId] = CachedRoomUserStatusEntry{
+					ncs.roomUsersStatusStore[roomId][entry.Key()] = CachedRoomUserStatusEntry{
 						Status:   string(entry.Value()),
 						Revision: entry.Revision(),
 					}
@@ -91,14 +93,20 @@ func (ncs *NatsCacheService) GetUsersIdFromRoomStatusBucket(roomId, filterStatus
 	return usersIds
 }
 
-func (ncs *NatsCacheService) cleanRoomUserStatusCache(roomId, userId string) {
+// remember each room has only one RoomUsersBucket bucket
+// in this bucket userId is key and status is value
+func (ncs *NatsCacheService) cleanRoomUserStatusCache(roomId string) {
 	ncs.userLock.Lock()
 	defer ncs.userLock.Unlock()
-	delete(ncs.roomUsersStatusStore[roomId], userId)
+	delete(ncs.roomUsersStatusStore, roomId)
 }
 
+// AddUserInfoWatcher will start watching user info
+// each user has its own bucket, so watch should be for each userId
 func (ncs *NatsCacheService) AddUserInfoWatcher(kv jetstream.KeyValue, bucket, roomId, userId string) {
 	ncs.userLock.Lock()
+	defer ncs.userLock.Unlock()
+
 	rm, ok := ncs.roomUsersInfoStore[roomId]
 	if !ok {
 		ncs.roomUsersInfoStore[roomId] = make(map[string]CachedUserInfoEntry)
@@ -106,10 +114,8 @@ func (ncs *NatsCacheService) AddUserInfoWatcher(kv jetstream.KeyValue, bucket, r
 	}
 	_, ok = rm[userId]
 	if ok {
-		ncs.userLock.Unlock()
 		return
 	}
-	ncs.userLock.Unlock()
 
 	opts := []jetstream.WatchOpt{jetstream.IncludeHistory()}
 	watcher, err := kv.WatchAll(ncs.serviceCtx, opts...)
@@ -118,6 +124,11 @@ func (ncs *NatsCacheService) AddUserInfoWatcher(kv jetstream.KeyValue, bucket, r
 		return
 	}
 	log.Infof("NATS KV watcher started for bucket: %s", bucket)
+
+	// need to create as soon as watcher is ready before starting goroutine
+	ncs.roomUsersInfoStore[roomId][userId] = CachedUserInfoEntry{
+		UserInfo: new(plugnmeet.NatsKvUserInfo),
+	}
 
 	go func() {
 		defer func() {
@@ -147,11 +158,6 @@ func (ncs *NatsCacheService) updateUserInfoCache(entry jetstream.KeyValueEntry, 
 	ncs.userLock.Lock()
 	defer ncs.userLock.Unlock()
 
-	if _, ok := ncs.roomUsersInfoStore[roomId][userId]; !ok {
-		ncs.roomUsersInfoStore[roomId][userId] = CachedUserInfoEntry{
-			UserInfo: new(plugnmeet.NatsKvUserInfo),
-		}
-	}
 	user := ncs.roomUsersInfoStore[roomId][userId]
 	user.Revision = entry.Revision()
 

@@ -23,7 +23,7 @@ func (s *NatsService) GetRoomUserStatus(roomId, userId string) (string, error) {
 	}
 
 	// So, for some reason, not found in cache, then may be user wasn't added to this room. So, we will start watching
-	s.cs.AddRoomUserStatusWatcher(kv, bucket, roomId, userId)
+	s.cs.AddRoomUserStatusWatcher(kv, bucket, roomId)
 
 	return s.getStringValue(kv, userId)
 }

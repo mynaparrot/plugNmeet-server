@@ -57,7 +57,7 @@ func (s *NatsService) AddUser(roomId, userId, name string, isAdmin, isPresenter 
 		return fmt.Errorf("failed to add user to room: %w", err)
 	}
 	// add watcher for user status bucket
-	s.cs.AddRoomUserStatusWatcher(roomKV, bucket, roomId, userId)
+	s.cs.AddRoomUserStatusWatcher(roomKV, bucket, roomId)
 
 	// Create or update the user info bucket
 	bucket = fmt.Sprintf(UserInfoBucket, roomId, userId)
