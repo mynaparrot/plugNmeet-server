@@ -14,11 +14,6 @@ import (
 	"time"
 )
 
-const (
-	waitForUserRemovalMaxWaitTime  = 5 * time.Second
-	waitForUserRemovalPollInterval = 200 * time.Millisecond
-)
-
 var validUserIDRegex = regexp.MustCompile("^[a-zA-Z0-9-_]+$")
 
 func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTokenReq) (string, error) {

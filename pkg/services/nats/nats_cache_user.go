@@ -77,15 +77,18 @@ func (ncs *NatsCacheService) GetUsersIdFromRoomStatusBucket(roomId, filterStatus
 	ncs.userLock.RLock()
 	defer ncs.userLock.RUnlock()
 
-	var onlineUsers []string
+	var usersIds []string
 	if rm, found := ncs.roomUsersStatusStore[roomId]; found {
 		for userId, val := range rm {
 			if filterStatus != "" && val.Status == filterStatus {
-				onlineUsers = append(onlineUsers, userId)
+				usersIds = append(usersIds, userId)
+			} else if filterStatus == "" {
+				// if no filter, return all users
+				usersIds = append(usersIds, userId)
 			}
 		}
 	}
-	return onlineUsers
+	return usersIds
 }
 
 func (ncs *NatsCacheService) cleanRoomUserStatusCache(roomId, userId string) {
