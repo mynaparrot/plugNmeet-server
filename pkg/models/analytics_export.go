@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -46,8 +47,16 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 
 	// lock to prevent this room re-creation until process finish
 	// otherwise will give an unexpected result
-	_ = m.rs.LockRoomCreation(roomId, time.Second*5)
-	defer m.rs.UnlockRoomCreation(roomId)
+	if lockValue, err := acquireRoomCreationLockWithRetry(context.Background(), m.rs, roomId); err == nil {
+		defer func() {
+			unlockCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if unlockErr := m.rs.UnlockRoomCreation(unlockCtx, roomId, lockValue); unlockErr != nil {
+				// UnlockRoomCreation in RedisService should log details
+				log.Errorf("Error trying to clean up room creation lock for room %s : %v", roomId, unlockErr)
+			}
+		}()
+	}
 
 	if _, err := os.Stat(*m.app.AnalyticsSettings.FilesStorePath); os.IsNotExist(err) {
 		err = os.MkdirAll(*m.app.AnalyticsSettings.FilesStorePath, os.ModePerm)

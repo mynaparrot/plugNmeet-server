@@ -1,11 +1,8 @@
 package natsservice
 
 import (
-	"errors"
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/nats-io/nats.go/jetstream"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -38,33 +35,17 @@ func (s *NatsService) GetAllActiveRecorders() []*RecorderInfo {
 }
 
 func (s *NatsService) GetRecorderInfo(recorderId string) (*RecorderInfo, error) {
-	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf("%s-%s", s.app.NatsInfo.Recorder.RecorderInfoKv, recorderId))
-	switch {
-	case errors.Is(err, jetstream.ErrBucketNotFound):
-		return nil, nil
-	case err != nil:
+	kv, err := s.getKV(fmt.Sprintf("%s-%s", s.app.NatsInfo.Recorder.RecorderInfoKv, recorderId))
+	if err != nil || kv == nil {
 		return nil, err
 	}
 
 	info := &RecorderInfo{
 		RecorderId: recorderId,
 	}
-
-	if maxLimit, err := kv.Get(s.ctx, fmt.Sprintf("%d", plugnmeet.RecorderInfoKeys_RECORDER_INFO_MAX_LIMIT)); err == nil && maxLimit != nil {
-		if parseUint, err := strconv.ParseInt(string(maxLimit.Value()), 10, 64); err == nil {
-			info.MaxLimit = parseUint
-		}
-	}
-	if currentPro, err := kv.Get(s.ctx, fmt.Sprintf("%d", plugnmeet.RecorderInfoKeys_RECORDER_INFO_CURRENT_PROGRESS)); err == nil && currentPro != nil {
-		if parseUint, err := strconv.ParseInt(string(currentPro.Value()), 10, 64); err == nil {
-			info.CurrentProgress = parseUint
-		}
-	}
-	if lastPing, err := kv.Get(s.ctx, fmt.Sprintf("%d", plugnmeet.RecorderInfoKeys_RECORDER_INFO_LAST_PING)); err == nil && lastPing != nil {
-		if parseUint, err := strconv.ParseInt(string(lastPing.Value()), 10, 64); err == nil {
-			info.LastPing = parseUint
-		}
-	}
+	info.MaxLimit, _ = s.getInt64Value(kv, fmt.Sprintf("%d", plugnmeet.RecorderInfoKeys_RECORDER_INFO_MAX_LIMIT))
+	info.CurrentProgress, _ = s.getInt64Value(kv, fmt.Sprintf("%d", plugnmeet.RecorderInfoKeys_RECORDER_INFO_CURRENT_PROGRESS))
+	info.LastPing, _ = s.getInt64Value(kv, fmt.Sprintf("%d", plugnmeet.RecorderInfoKeys_RECORDER_INFO_LAST_PING))
 
 	return info, nil
 }

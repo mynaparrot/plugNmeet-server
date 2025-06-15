@@ -10,7 +10,7 @@ import (
 
 func (m *UserModel) CreateNewPresenter(r *plugnmeet.GenerateTokenReq) error {
 	// first, check if we've any presenter already assigned
-	ids, err := m.natsService.GetRoomAllUsersFromStatusBucket(r.RoomId)
+	ids, err := m.natsService.GetOnlineUsersId(r.RoomId)
 	if err != nil {
 		return err
 	}
@@ -21,10 +21,11 @@ func (m *UserModel) CreateNewPresenter(r *plugnmeet.GenerateTokenReq) error {
 		return nil
 	}
 
-	for id, status := range ids {
-		if entry, err := m.natsService.GetUserKeyValue(r.RoomId, id, natsservice.UserIsPresenterKey); err == nil && entry != nil {
-			if string(entry.Value()) == "true" && string(status.Value()) == natsservice.UserStatusOnline {
-				// session already has presenter
+	for _, id := range ids {
+		if info, err := m.natsService.GetUserInfo(r.RoomId, id); err == nil && info != nil {
+			if info.IsPresenter {
+				// we already have a presenter
+				r.UserInfo.UserMetadata.IsPresenter = false
 				return nil
 			}
 		}
@@ -37,15 +38,12 @@ func (m *UserModel) CreateNewPresenter(r *plugnmeet.GenerateTokenReq) error {
 }
 
 func (m *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
-	ids, err := m.natsService.GetRoomAllUsersFromStatusBucket(r.RoomId)
-	if err != nil {
-		return err
-	}
+	ids := m.natsService.GetUsersIdFromRoomStatusBucket(r.RoomId)
 	if ids == nil || len(ids) == 0 {
 		return errors.New("no users found")
 	}
 
-	for userId := range ids {
+	for _, userId := range ids {
 		uInfo, metadata, err := m.natsService.GetUserWithMetadata(r.RoomId, userId)
 		if err != nil {
 			log.Errorln(err)

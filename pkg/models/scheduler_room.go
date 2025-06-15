@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	log "github.com/sirupsen/logrus"
@@ -56,7 +57,7 @@ func (m *SchedulerModel) activeRoomChecker() {
 			continue
 		}
 
-		userIds, err := m.natsService.GetOlineUsersId(room.RoomId)
+		userIds, err := m.natsService.GetOnlineUsersId(room.RoomId)
 		if err != nil {
 			log.Errorln(err)
 			continue
@@ -69,7 +70,7 @@ func (m *SchedulerModel) activeRoomChecker() {
 				log.Infoln("EmptyTimeout for roomId:", room.RoomId, "passed: ", uint64(time.Now().UTC().Unix())-valid)
 
 				// end room by proper channel
-				m.rm.EndRoom(&plugnmeet.RoomEndReq{RoomId: room.RoomId})
+				m.rm.EndRoom(context.Background(), &plugnmeet.RoomEndReq{RoomId: room.RoomId})
 				continue
 			}
 		}

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -12,6 +13,7 @@ import (
 )
 
 type WebhookModel struct {
+	ctx             context.Context
 	app             *config.AppConfig
 	ds              *dbservice.DatabaseService
 	rs              *redisservice.RedisService
@@ -21,7 +23,7 @@ type WebhookModel struct {
 	natsService     *natsservice.NatsService
 }
 
-func NewWebhookModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *WebhookModel {
+func NewWebhookModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *WebhookModel {
 	if app == nil {
 		app = config.GetConfig()
 	}
@@ -33,6 +35,7 @@ func NewWebhookModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *r
 	}
 
 	return &WebhookModel{
+		ctx:             ctx,
 		app:             app,
 		ds:              ds,
 		rs:              rs,

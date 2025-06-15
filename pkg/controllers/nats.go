@@ -8,6 +8,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/mynaparrot/plugnmeet-server/version"
 	"github.com/nats-io/nats.go"
@@ -72,6 +73,9 @@ func (c *NatsController) BootUp() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// start cache service
+	natsservice.InitNatsCacheService(c.app)
 
 	// now subscribe
 	go c.subscribeToSystemWorker(stream)
