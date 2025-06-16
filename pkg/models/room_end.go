@@ -90,7 +90,7 @@ func (m *RoomModel) OnAfterRoomEnded(ctx context.Context, roomID, roomSID, metad
 	}
 
 	done := make(chan struct{})
-	waitCtx, cancelWait := context.WithTimeout(ctx, config.WaitBeforeTriggerOnAfterRoomEnded)
+	waitCtx, cancelWait := context.WithTimeout(ctx, 3*time.Second)
 	defer cancelWait()
 	go func() {
 		for {
@@ -111,7 +111,7 @@ func (m *RoomModel) OnAfterRoomEnded(ctx context.Context, roomID, roomSID, metad
 	}()
 	select {
 	case <-done:
-		log.WithFields(log.Fields{"roomId": roomID, "operation": "OnAfterRoomEnded"}).Info("Proceeding with cleanup after user disconnect/timeout.")
+		log.WithFields(log.Fields{"roomId": roomID, "operation": "OnAfterRoomEnded"}).Info("Proceeding with cleanup after user disconnect.")
 	case <-waitCtx.Done():
 		log.WithFields(log.Fields{"roomId": roomID, "operation": "OnAfterRoomEnded"}).Warn("Timeout waiting for all users to disconnect (fallback).")
 	}

@@ -9,6 +9,20 @@ import (
 	"time"
 )
 
+const (
+	// Default for how long CreateRoom will try to acquire a lock
+	defaultRoomCreationMaxWaitTime = 30 * time.Second
+	// Default for how often CreateRoom polls for the lock
+	defaultRoomCreationLockPollInterval = 250 * time.Millisecond
+	// Default TTL for the Redis lock key itself during creation
+	defaultRoomCreationLockTTL = 60 * time.Second
+
+	// Default for how long other operations (EndRoom, GetInfo) wait for creation to complete
+	defaultWaitForRoomCreationMaxWaitTime = 30 * time.Second
+	// Default for how often other operations poll to see if creation lock is released
+	defaultWaitForRoomCreationPollInterval = 250 * time.Millisecond
+)
+
 func acquireRoomCreationLockWithRetry(ctx context.Context, rs *redisservice.RedisService, roomID string) (string, error) {
 	maxWaitTime := defaultRoomCreationMaxWaitTime
 	pollInterval := defaultRoomCreationLockPollInterval

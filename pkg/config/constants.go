@@ -15,7 +15,6 @@ const (
 	WaitBeforeBreakoutRoomOnAfterRoomStart   = 2 * time.Second
 	WaitBeforeAnalyticsStartProcessing       = 40 * time.Second
 	MaxDurationWaitBeforeCleanRoomWebhook    = 1 * time.Minute
-	WaitDurationIfRoomCreationLocked         = 1 * time.Second
 
 	DefaultWebhookQueueSize = 200
 )
