@@ -13,12 +13,7 @@ import (
 
 func HandleGenerateJoinToken(c *fiber.Ctx) error {
 	req := new(plugnmeet.GenerateTokenReq)
-	err := op.Unmarshal(c.Body(), req)
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
-	}
-
-	if err = validateProtoRequest(req); err != nil {
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
@@ -40,7 +35,7 @@ func HandleGenerateJoinToken(c *fiber.Ctx) error {
 	}
 
 	m := models.NewUserModel(nil, nil, nil)
-	token, err := m.GetPNMJoinToken(req)
+	token, err := m.GetPNMJoinToken(c.UserContext(), req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}

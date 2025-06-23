@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"errors"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	log "github.com/sirupsen/logrus"
@@ -8,7 +9,7 @@ import (
 	"sort"
 )
 
-func (m *RecorderModel) addTokenAndRecorder(req *plugnmeet.RecordingReq, rq *plugnmeet.PlugNmeetToRecorder, userId string) error {
+func (m *RecorderModel) addTokenAndRecorder(ctx context.Context, req *plugnmeet.RecordingReq, rq *plugnmeet.PlugNmeetToRecorder, userId string) error {
 	recorderId := m.selectRecorder()
 	if recorderId == "" {
 		return errors.New("notifications.no-recorder-available")
@@ -23,7 +24,7 @@ func (m *RecorderModel) addTokenAndRecorder(req *plugnmeet.RecordingReq, rq *plu
 		},
 	}
 	um := NewUserModel(m.app, m.ds, m.rs)
-	token, err := um.GetPNMJoinToken(gt)
+	token, err := um.GetPNMJoinToken(ctx, gt)
 	if err != nil {
 		log.Errorln(err)
 		return err

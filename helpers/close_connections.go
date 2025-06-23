@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 )
 
@@ -19,6 +20,7 @@ func HandleCloseConnections() {
 	_ = config.GetConfig().RDS.Close()
 
 	// close nats
+	natsservice.GetNatsCacheService().Shutdown()
 	_ = config.GetConfig().NatsConn.Drain()
 	config.GetConfig().NatsConn.Close()
 

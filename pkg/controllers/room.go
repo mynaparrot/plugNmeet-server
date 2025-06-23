@@ -10,17 +10,12 @@ import (
 
 func HandleRoomCreate(c *fiber.Ctx) error {
 	req := new(plugnmeet.CreateRoomReq)
-	err := op.Unmarshal(c.Body(), req)
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
-	}
-
-	if err = validateProtoRequest(req); err != nil {
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
 	m := models.NewRoomModel(nil, nil, nil)
-	room, err := m.CreateRoom(req)
+	room, err := m.CreateRoom(c.UserContext(), req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
@@ -36,35 +31,23 @@ func HandleRoomCreate(c *fiber.Ctx) error {
 
 func HandleIsRoomActive(c *fiber.Ctx) error {
 	req := new(plugnmeet.IsRoomActiveReq)
-	err := op.Unmarshal(c.Body(), req)
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
-	}
-
-	if err = validateProtoRequest(req); err != nil {
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
 	m := models.NewRoomModel(nil, nil, nil)
-	res, _, _, _ := m.IsRoomActive(req)
+	res, _, _, _ := m.IsRoomActive(c.UserContext(), req)
 	return utils.SendProtoJsonResponse(c, res)
 }
 
 func HandleGetActiveRoomInfo(c *fiber.Ctx) error {
 	req := new(plugnmeet.GetActiveRoomInfoReq)
-	err := op.Unmarshal(c.Body(), req)
-	if err != nil {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
-	}
-
-	if err = validateProtoRequest(req); err != nil {
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
+
 	m := models.NewRoomModel(nil, nil, nil)
-	status, msg, res := m.GetActiveRoomInfo(req)
+	status, msg, res := m.GetActiveRoomInfo(c.UserContext(), req)
 
 	r := &plugnmeet.GetActiveRoomInfoRes{
 		Status: status,
@@ -90,29 +73,19 @@ func HandleGetActiveRoomsInfo(c *fiber.Ctx) error {
 
 func HandleEndRoom(c *fiber.Ctx) error {
 	req := new(plugnmeet.RoomEndReq)
-	err := op.Unmarshal(c.Body(), req)
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
-	}
-
-	if err = validateProtoRequest(req); err != nil {
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
 	m := models.NewRoomModel(nil, nil, nil)
-	status, msg := m.EndRoom(req)
+	status, msg := m.EndRoom(c.UserContext(), req)
 
 	return utils.SendCommonProtoJsonResponse(c, status, msg)
 }
 
 func HandleFetchPastRooms(c *fiber.Ctx) error {
 	req := new(plugnmeet.FetchPastRoomsReq)
-	err := op.Unmarshal(c.Body(), req)
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
-	}
-
-	if err = validateProtoRequest(req); err != nil {
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
@@ -153,7 +126,7 @@ func HandleEndRoomForAPI(c *fiber.Ctx) error {
 	}
 
 	m := models.NewRoomModel(nil, nil, nil)
-	status, msg := m.EndRoom(req)
+	status, msg := m.EndRoom(c.UserContext(), req)
 	return utils.SendCommonProtobufResponse(c, status, msg)
 }
 

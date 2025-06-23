@@ -81,19 +81,22 @@ nats_info:
   nats_ws_urls:
     - "http://localhost:8222"
   account: PNM
-  user: auth
-  password: "LM(jTdsUGbB7M9y8^dNta1"
+  nkey: "SUAGSRI6D537QEHEK7G5KAN4KINSL77FTRTAJGA2KTFRR7AIOMA43P4PRE"
   auth_callout_issuer_private: "SAAMTMBUANSRW3XDXZBIBF4JYRRUMWGV2GZT5MQ54VNWNRPN2Y4J46NQSA"
+  auth_callout_xkey_private: "SXAMBYY64TKXZCLFQGWDATGPIPURA4SIV3GDCSGG7A74USK6XDO6WQTIUU"
+  num_replicas: 1 # Acceptable values: 1, 3, or 5
   subjects:
     system_api_worker: "sysApiWorker"
     system_js_worker: "sysJsWorker"
-    recorder_js_worker: "recorderJsWorker"
     system_public: "sysPublic"
     system_private: "sysPrivate"
     chat: "chat"
     whiteboard: "whiteboard"
-    # to exchange data of pnm client with each other
-    dataChannel: "dataChannel"
+    # Used for data exchange between plugNmeet clients.
+    data_channel: "dataChannel"
+  recorder:
+    recorder_channel: "recorderChannel"
+    recorder_info_kv: "pnm-recorderInfo"
 upload_file_settings:
   path: "./upload"
   # file size in MB. Default 10MB

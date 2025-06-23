@@ -129,12 +129,12 @@ func HandleBBBCreate(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 	}
 
-	if err = validateProtoRequest(pnmReq); err != nil {
+	if err = validateRequest(pnmReq); err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", err.Error()))
 	}
 
 	m := models.NewRoomModel(nil, nil, nil)
-	room, err := m.CreateRoom(pnmReq)
+	room, err := m.CreateRoom(c.UserContext(), pnmReq)
 
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
@@ -216,7 +216,7 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 	}
 
 	req := bbbapiwrapper.ConvertJoinRequest(q, isAdmin)
-	if err = validateProtoRequest(req); err != nil {
+	if err = validateRequest(req); err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", err.Error()))
 	}
 
@@ -227,7 +227,7 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 
 	ds := dbservice.New(app.DB)
 	m := models.NewUserModel(app, ds, rs)
-	token, err := m.GetPNMJoinToken(req)
+	token, err := m.GetPNMJoinToken(c.UserContext(), req)
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 	}
@@ -276,7 +276,7 @@ func HandleBBBIsMeetingRunning(c *fiber.Ctx) error {
 	}
 
 	m := models.NewRoomModel(nil, nil, nil)
-	res, _, _, _ := m.IsRoomActive(&plugnmeet.IsRoomActiveReq{
+	res, _, _, _ := m.IsRoomActive(c.UserContext(), &plugnmeet.IsRoomActiveReq{
 		RoomId: q.MeetingID,
 	})
 
@@ -299,7 +299,7 @@ func HandleBBBGetMeetingInfo(c *fiber.Ctx) error {
 	}
 
 	m := models.NewRoomModel(nil, nil, nil)
-	status, msg, res := m.GetActiveRoomInfo(&plugnmeet.GetActiveRoomInfoReq{
+	status, msg, res := m.GetActiveRoomInfo(c.UserContext(), &plugnmeet.GetActiveRoomInfoReq{
 		RoomId: bbbapiwrapper.CheckMeetingIdToMatchFormat(q.MeetingID),
 	})
 
@@ -354,7 +354,7 @@ func HandleBBBEndMeetings(c *fiber.Ctx) error {
 	}
 
 	m := models.NewRoomModel(nil, nil, nil)
-	status, msg := m.EndRoom(&plugnmeet.RoomEndReq{
+	status, msg := m.EndRoom(c.UserContext(), &plugnmeet.RoomEndReq{
 		RoomId: bbbapiwrapper.CheckMeetingIdToMatchFormat(q.MeetingID),
 	})
 

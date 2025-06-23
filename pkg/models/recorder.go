@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -77,13 +78,13 @@ func (m *RecorderModel) SendMsgToRecorder(req *plugnmeet.RecordingReq) error {
 
 	switch req.Task {
 	case plugnmeet.RecordingTasks_START_RECORDING:
-		err := m.addTokenAndRecorder(req, toSend, config.RecorderBot)
+		err := m.addTokenAndRecorder(context.Background(), req, toSend, config.RecorderBot)
 		if err != nil {
 			return err
 		}
 	case plugnmeet.RecordingTasks_START_RTMP:
 		toSend.RtmpUrl = req.RtmpUrl
-		err := m.addTokenAndRecorder(req, toSend, config.RtmpBot)
+		err := m.addTokenAndRecorder(context.Background(), req, toSend, config.RtmpBot)
 		if err != nil {
 			return err
 		}
