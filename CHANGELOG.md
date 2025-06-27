@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.8.4](https://github.com/mynaparrot/plugNmeet-server/compare/v1.8.3...v1.8.4) (2025-06-27)
+
+
+### Bug Fixes
+
+* bug + clean up ([45bca50](https://github.com/mynaparrot/plugNmeet-server/commit/45bca50d19638a3f7e273d2a38f6d7fdd05f8bbc))
+* bump proto ([acb2bbf](https://github.com/mynaparrot/plugNmeet-server/commit/acb2bbf9a0d80041483313c3404189a813795f1e))
+* **deps:** protocol update ([a321514](https://github.com/mynaparrot/plugNmeet-server/commit/a32151457d29ff33ca8fd5be7a27f9f12a731c50))
+* **deps:** update module github.com/ansrivas/fiberprometheus/v2 to v2.10.0 ([7364863](https://github.com/mynaparrot/plugNmeet-server/commit/7364863bad7628530fce3f17a8a40fca038a6ce0))
+* **deps:** update module github.com/ansrivas/fiberprometheus/v2 to v2.10.0 ([cfbb9f3](https://github.com/mynaparrot/plugNmeet-server/commit/cfbb9f336e38382a4802a700b194f0cc92b5e81c))
+* few more improvements + clean up ([689d676](https://github.com/mynaparrot/plugNmeet-server/commit/689d6762807e7e356da69c3a1d3b3df14578e882))
+* few optimization and code clean up ([bb7eb7e](https://github.com/mynaparrot/plugNmeet-server/commit/bb7eb7ebfa7542d4a1bcaba03f75f2c14df6422d))
+* **improve:** added better room creation lock system ([4353828](https://github.com/mynaparrot/plugNmeet-server/commit/4353828429cc23fde29fa66c6b4315c92096be9f))
+* **improve:** added few more tests ([4893ebe](https://github.com/mynaparrot/plugNmeet-server/commit/4893ebe6c701028a203e2d64c24f2abe78564952))
+* **improve:** added nats data cache feature ([7760b08](https://github.com/mynaparrot/plugNmeet-server/commit/7760b08fde40035fd0c6423c6c3cbea8a5f8a84b))
+* **improve:** added nats data cache feature ([5502704](https://github.com/mynaparrot/plugNmeet-server/commit/5502704e69d64f5475a3c80a5475b19b80f1e6e8))
+* updated text ([4081b07](https://github.com/mynaparrot/plugNmeet-server/commit/4081b0751d680fe3e3c8cab50922f45873fc34c0))
+
 ## [1.8.3](https://github.com/mynaparrot/plugNmeet-server/compare/v1.8.2...v1.8.3) (2025-05-05)
 
 
