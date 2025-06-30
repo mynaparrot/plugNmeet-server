@@ -31,18 +31,22 @@ func (m *UserModel) MuteUnMuteTrack(r *plugnmeet.MuteUnMuteTrackReq) error {
 		return err
 	}
 
-	if p.State != livekit.ParticipantInfo_ACTIVE {
+	if p == nil || p.State != livekit.ParticipantInfo_ACTIVE {
 		return errors.New(config.UserNotActive)
 	}
 	trackSid := r.TrackSid
 
 	if trackSid == "" {
 		for _, t := range p.Tracks {
-			if t.Source.String() == livekit.TrackSource_MICROPHONE.String() {
+			if t.Source == livekit.TrackSource_MICROPHONE {
 				trackSid = t.Sid
 				break
 			}
 		}
+	}
+
+	if trackSid == "" {
+		return errors.New("no track found")
 	}
 
 	_, err = m.lk.MuteUnMuteTrack(r.RoomId, r.UserId, trackSid, r.Muted)
@@ -64,16 +68,11 @@ func (m *UserModel) muteUnmuteAllMic(r *plugnmeet.MuteUnMuteTrackReq) error {
 
 	for _, p := range participants {
 		if p.State == livekit.ParticipantInfo_ACTIVE && p.Identity != r.RequestedUserId {
-			trackSid := ""
 			for _, t := range p.Tracks {
-				if t.Source.String() == livekit.TrackSource_MICROPHONE.String() {
-					trackSid = t.Sid
+				if t.Source == livekit.TrackSource_MICROPHONE {
+					_, _ = m.lk.MuteUnMuteTrack(r.RoomId, p.Identity, t.Sid, r.Muted)
 					break
 				}
-			}
-
-			if trackSid != "" {
-				_, _ = m.lk.MuteUnMuteTrack(r.RoomId, p.Identity, trackSid, r.Muted)
 			}
 		}
 	}
