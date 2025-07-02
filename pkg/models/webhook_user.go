@@ -66,11 +66,11 @@ func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 		// if user was ingress user then we'll have to do it manually
 		// because that user did not use plugNmeet client interface
 		nm := NewNatsModel(m.app, m.ds, m.rs)
-		go nm.OnAfterUserDisconnected(event.Room.Name, event.Participant.Identity)
+		nm.OnAfterUserDisconnected(event.Room.Name, event.Participant.Identity)
 	}
 
 	// webhook notification
-	go m.sendToWebhookNotifier(event)
+	m.sendToWebhookNotifier(event)
 
 	// if we missed calculating this user's speech service usage stat
 	// for sudden disconnection

@@ -97,7 +97,7 @@ func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 
 	// we are introducing a new event name here
 	// because for our case we still have remaining tasks
-	go m.sendCustomTypeWebhook(event, "session_ended")
+	m.sendCustomTypeWebhook(event, "session_ended")
 
 	if rInfo.Status != natsservice.RoomStatusEnded {
 		// so, this session was not ended by API call

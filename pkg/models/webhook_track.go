@@ -24,7 +24,7 @@ func (m *WebhookModel) trackPublished(event *livekit.WebhookEvent) {
 	event.Room.EmptyTimeout = uint32(rInfo.EmptyTimeout)
 
 	// webhook notification
-	go m.sendToWebhookNotifier(event)
+	m.sendToWebhookNotifier(event)
 
 	// send analytics
 	var val string
@@ -72,7 +72,7 @@ func (m *WebhookModel) trackUnpublished(event *livekit.WebhookEvent) {
 	event.Room.EmptyTimeout = uint32(rInfo.EmptyTimeout)
 
 	// webhook notification
-	go m.sendToWebhookNotifier(event)
+	m.sendToWebhookNotifier(event)
 
 	// send analytics
 	var val string
