@@ -6,6 +6,7 @@ import (
 )
 
 const WebhookKvKey = Prefix + "webhookData"
+const WebhookCleanupSubject = Prefix + "webhookCleanup"
 
 func (s *NatsService) AddWebhookData(roomId string, val []byte) error {
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{

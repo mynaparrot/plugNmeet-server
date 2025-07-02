@@ -8,7 +8,9 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
+	"sync"
 	"time"
 )
 
@@ -20,7 +22,10 @@ type WebhookNotifier struct {
 	isEnabled            bool
 	enabledForPerMeeting bool
 	defaultUrl           string
-	notifier             *webhook.Notifier
+	// notifiers will hold a queue for each room, local to this server instance
+	notifiers map[string]*webhook.Notifier
+	// mu will protect access to the notifiers map
+	mu sync.Mutex
 }
 
 type webhookRedisFields struct {
@@ -29,8 +34,6 @@ type webhookRedisFields struct {
 }
 
 func newWebhookNotifier(app *config.AppConfig) *WebhookNotifier {
-	notifier := webhook.GetWebhookNotifier(config.DefaultWebhookQueueSize, app.Client.Debug, config.GetLogger())
-
 	w := &WebhookNotifier{
 		app:                  app,
 		ds:                   dbservice.New(app.DB),
@@ -38,10 +41,55 @@ func newWebhookNotifier(app *config.AppConfig) *WebhookNotifier {
 		isEnabled:            app.Client.WebhookConf.Enable,
 		enabledForPerMeeting: app.Client.WebhookConf.EnableForPerMeeting,
 		defaultUrl:           app.Client.WebhookConf.Url,
-		notifier:             notifier,
+		notifiers:            make(map[string]*webhook.Notifier),
 	}
 
+	// Subscribe to the cleanup broadcast channel for clustered environments.
+	w.subscribeToCleanup()
+
 	return w
+}
+
+// subscribeToCleanup listens for cleanup messages broadcast to all servers.
+func (w *WebhookNotifier) subscribeToCleanup() {
+	_, err := w.app.NatsConn.Subscribe(natsservice.WebhookCleanupSubject, func(m *nats.Msg) {
+		roomId := string(m.Data)
+		log.Infof("received cleanup signal for room: %s", roomId)
+		w.cleanupNotifier(roomId)
+	})
+	if err != nil {
+		log.Errorf("failed to subscribe to webhook cleanup subject: %v", err)
+	}
+}
+
+// getOrCreateNotifier returns a dedicated notifier for a given room.
+// If one doesn't exist, it creates and stores it.
+func (w *WebhookNotifier) getOrCreateNotifier(roomId string) *webhook.Notifier {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if notifier, ok := w.notifiers[roomId]; ok {
+		return notifier
+	}
+
+	// Create a new notifier for this room
+	notifier := webhook.NewNotifier(config.DefaultWebhookQueueSize, w.app.Client.Debug, config.GetLogger())
+	w.notifiers[roomId] = notifier
+	log.Infof("created new webhook queue for room: %s", roomId)
+
+	return notifier
+}
+
+// cleanupNotifier stops the worker and removes the notifier for a room from the local map.
+func (w *WebhookNotifier) cleanupNotifier(roomId string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if notifier, ok := w.notifiers[roomId]; ok {
+		notifier.Kill() // This will call Kill() on the worker.
+		delete(w.notifiers, roomId)
+		log.Infof("cleaned up webhook queue for room: %s", roomId)
+	}
 }
 
 func (w *WebhookNotifier) RegisterWebhook(roomId, sid string) {
@@ -95,6 +143,13 @@ func (w *WebhookNotifier) DeleteWebhook(roomId string) error {
 		return nil
 	}
 
+	// Broadcast a cleanup message to all servers in the cluster.
+	// Only the server running the worker for this room will act on it.
+	err = w.app.NatsConn.Publish(natsservice.WebhookCleanupSubject, []byte(roomId))
+	if err != nil {
+		log.Errorf("failed to publish webhook cleanup for room %s: %v", roomId, err)
+	}
+
 	return w.natsService.DeleteWebhookData(roomId)
 }
 
@@ -102,8 +157,9 @@ func (w *WebhookNotifier) SendWebhookEvent(event *plugnmeet.CommonNotifyEvent) e
 	if !w.isEnabled || event.Room.GetRoomId() == "" {
 		return nil
 	}
+	roomId := event.Room.GetRoomId()
 
-	d, err := w.getData(event.Room.GetRoomId())
+	d, err := w.getData(roomId)
 	if err != nil {
 		return err
 	}
@@ -117,7 +173,7 @@ func (w *WebhookNotifier) SendWebhookEvent(event *plugnmeet.CommonNotifyEvent) e
 	// so here we'll reset the deleted status
 	if event.GetEvent() == "room_started" && d.PerformDeleting {
 		d.PerformDeleting = false
-		err := w.saveData(event.Room.GetRoomId(), d)
+		err := w.saveData(roomId, d)
 		if err != nil {
 			// we'll just log
 			log.Errorln(err)
@@ -125,20 +181,22 @@ func (w *WebhookNotifier) SendWebhookEvent(event *plugnmeet.CommonNotifyEvent) e
 	} else if event.GetEvent() == "room_finished" && !d.PerformDeleting {
 		// if we got room_finished then we'll set for deleting
 		d.PerformDeleting = true
-		err := w.saveData(event.Room.GetRoomId(), d)
+		err := w.saveData(roomId, d)
 		if err != nil {
 			// we'll just log
 			log.Errorln(err)
 		}
 	}
 
-	w.notifier.AddInNotifyQueue(event, w.app.Client.ApiKey, w.app.Client.Secret, d.Urls)
+	// Use the dedicated notifier for this room
+	notifier := w.getOrCreateNotifier(roomId)
+	notifier.AddInNotifyQueue(event, w.app.Client.ApiKey, w.app.Client.Secret, d.Urls)
 	return nil
 }
 
-// ForceToPutInQueue can be used to force checking meeting table to get url
-// this method will not do further validation.
-// We should not use this method always because fetching data mysql will be slower than redis
+// ForceToPutInQueue sends a webhook event synchronously without using the room's queue.
+// This method should be used for one-shot events outside the normal room lifecycle.
+// It directly queries the database for webhook URLs.
 func (w *WebhookNotifier) ForceToPutInQueue(event *plugnmeet.CommonNotifyEvent) {
 	if !w.isEnabled {
 		return
@@ -164,7 +222,9 @@ func (w *WebhookNotifier) ForceToPutInQueue(event *plugnmeet.CommonNotifyEvent) 
 		return
 	}
 
-	w.notifier.AddInNotifyQueue(event, w.app.Client.ApiKey, w.app.Client.Secret, urls)
+	notifier := webhook.NewNotifier(config.DefaultWebhookQueueSize, w.app.Client.Debug, config.GetLogger())
+	defer notifier.StopGracefully()
+	notifier.AddInNotifyQueue(event, w.app.Client.ApiKey, w.app.Client.Secret, urls)
 }
 
 func (w *WebhookNotifier) saveData(roomId string, d *webhookRedisFields) error {
