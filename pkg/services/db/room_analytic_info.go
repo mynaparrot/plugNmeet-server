@@ -8,10 +8,15 @@ import (
 
 func (s *DatabaseService) GetAnalytics(roomIds []string, offset, limit uint64, direction *string) ([]dbmodels.Analytics, int64, error) {
 	var analytics []dbmodels.Analytics
+	var total int64
 
 	d := s.db.Model(&dbmodels.Analytics{})
 	if len(roomIds) > 0 {
 		d.Where("room_id IN ?", roomIds)
+	}
+
+	if err := d.Count(&total).Error; err != nil {
+		return nil, 0, err
 	}
 
 	if limit == 0 {
@@ -24,20 +29,8 @@ func (s *DatabaseService) GetAnalytics(roomIds []string, offset, limit uint64, d
 	}
 
 	result := d.Offset(int(offset)).Limit(int(limit)).Order("id " + orderBy).Find(&analytics)
-	switch {
-	case errors.Is(result.Error, gorm.ErrRecordNotFound):
-		return nil, 0, nil
-	case result.Error != nil:
+	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, 0, result.Error
-	}
-
-	var total int64
-	if len(analytics) > 0 {
-		d = s.db.Model(&dbmodels.Analytics{})
-		if len(roomIds) > 0 {
-			d.Where("room_id IN ?", roomIds)
-		}
-		d.Count(&total)
 	}
 
 	return analytics, total, nil

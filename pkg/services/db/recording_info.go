@@ -8,10 +8,15 @@ import (
 
 func (s *DatabaseService) GetRecordings(roomIds []string, offset, limit uint64, direction *string) ([]dbmodels.Recording, int64, error) {
 	var recordings []dbmodels.Recording
+	var total int64
 
 	d := s.db.Model(&dbmodels.Recording{})
 	if len(roomIds) > 0 {
 		d.Where("room_id IN ?", roomIds)
+	}
+
+	if err := d.Count(&total).Error; err != nil {
+		return nil, 0, err
 	}
 
 	if limit == 0 {
@@ -24,20 +29,8 @@ func (s *DatabaseService) GetRecordings(roomIds []string, offset, limit uint64, 
 	}
 
 	result := d.Offset(int(offset)).Limit(int(limit)).Order("id " + orderBy).Find(&recordings)
-	switch {
-	case errors.Is(result.Error, gorm.ErrRecordNotFound):
-		return nil, 0, nil
-	case result.Error != nil:
+	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, 0, result.Error
-	}
-
-	var total int64
-	if len(recordings) > 0 {
-		d = s.db.Model(&dbmodels.Recording{})
-		if len(roomIds) > 0 {
-			d.Where("room_id IN ?", roomIds)
-		}
-		d.Count(&total)
 	}
 
 	return recordings, total, nil
@@ -62,6 +55,8 @@ func (s *DatabaseService) GetRecording(recordId string) (*dbmodels.Recording, er
 
 func (s *DatabaseService) GetRecordingsForBBB(recordIds, meetingIds []string, offset, limit uint64) ([]dbmodels.Recording, int64, error) {
 	var recordings []dbmodels.Recording
+	var total int64
+
 	d := s.db.Model(&dbmodels.Recording{})
 
 	if len(recordIds) > 0 {
@@ -70,23 +65,13 @@ func (s *DatabaseService) GetRecordingsForBBB(recordIds, meetingIds []string, of
 		d.Where("room_id IN ?", meetingIds)
 	}
 
-	result := d.Offset(int(offset)).Limit(int(limit)).Find(&recordings)
-	switch {
-	case errors.Is(result.Error, gorm.ErrRecordNotFound):
-		return nil, 0, nil
-	case result.Error != nil:
-		return nil, 0, result.Error
+	if err := d.Count(&total).Error; err != nil {
+		return nil, 0, err
 	}
 
-	var total int64
-	if len(recordings) > 0 {
-		d = s.db.Model(&dbmodels.Recording{})
-		if len(recordIds) > 0 {
-			d.Where("record_id IN ?", recordIds)
-		} else if len(meetingIds) > 0 {
-			d.Where("room_id IN ?", meetingIds)
-		}
-		d.Count(&total)
+	result := d.Offset(int(offset)).Limit(int(limit)).Find(&recordings)
+	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return nil, 0, result.Error
 	}
 
 	return recordings, total, nil

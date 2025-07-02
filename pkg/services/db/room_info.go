@@ -78,6 +78,7 @@ func (s *DatabaseService) GetActiveRoomsInfo() ([]dbmodels.RoomInfo, error) {
 
 func (s *DatabaseService) GetPastRooms(roomIds []string, offset, limit uint64, direction *string) ([]dbmodels.RoomInfo, int64, error) {
 	var roomsInfo []dbmodels.RoomInfo
+	var total int64
 	cond := &dbmodels.RoomInfo{
 		IsRunning: 0,
 	}
@@ -85,6 +86,10 @@ func (s *DatabaseService) GetPastRooms(roomIds []string, offset, limit uint64, d
 	d := s.db.Model(&dbmodels.RoomInfo{}).Where(cond)
 	if len(roomIds) > 0 {
 		d.Where("roomId IN ?", roomIds)
+	}
+
+	if err := d.Count(&total).Error; err != nil {
+		return nil, 0, err
 	}
 
 	if limit == 0 {
@@ -96,20 +101,8 @@ func (s *DatabaseService) GetPastRooms(roomIds []string, offset, limit uint64, d
 	}
 
 	result := d.Offset(int(offset)).Limit(int(limit)).Order("id " + orderBy).Find(&roomsInfo)
-	switch {
-	case errors.Is(result.Error, gorm.ErrRecordNotFound):
-		return nil, 0, nil
-	case result.Error != nil:
+	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, 0, result.Error
-	}
-
-	var total int64
-	if len(roomsInfo) > 0 {
-		d = s.db.Model(&dbmodels.RoomInfo{}).Where(cond)
-		if len(roomIds) > 0 {
-			d.Where("roomId IN ?", roomIds)
-		}
-		d.Count(&total)
 	}
 
 	return roomsInfo, total, nil
