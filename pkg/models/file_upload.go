@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -56,20 +57,23 @@ func (m *FileModel) ResumableFileUpload(c *fiber.Ctx) (*UploadedFileResponse, *f
 		return nil, fiber.NewError(fiber.StatusBadRequest, "roomId or roomSid is empty")
 	}
 
-	tempFolder := fmt.Sprintf("%s/%s/tmp", m.app.UploadFileSettings.Path, req.RoomSid)
-	chunkDir := fmt.Sprintf("%s/%s", tempFolder, req.ResumableIdentifier)
-	chunkPath := fmt.Sprintf("%s/part%d", chunkDir, req.ResumableChunkNumber)
+	tempFolder := filepath.Join(m.app.UploadFileSettings.Path, req.RoomSid, "tmp")
+	chunkDir := filepath.Join(tempFolder, req.ResumableIdentifier)
+	chunkPath := filepath.Join(chunkDir, fmt.Sprintf("part%d", req.ResumableChunkNumber))
 
 	switch c.Method() {
 	case fiber.MethodGet:
-		if stat, err := os.Stat(chunkPath); os.IsNotExist(err) {
+		stat, err := os.Stat(chunkPath)
+		if os.IsNotExist(err) {
 			return res, fiber.NewError(fiber.StatusNoContent, "OK to upload")
-		} else if stat != nil && stat.Size() == req.ResumableCurrentChunkSize {
-			return res, fiber.NewError(fiber.StatusCreated, "skipping upload as previously uploaded chunk")
-		} else {
-			_ = os.Remove(chunkPath)
-			return nil, fiber.NewError(fiber.StatusNoContent, "OK to upload")
 		}
+		if stat.Size() == req.ResumableCurrentChunkSize {
+			res.Msg = "skipping upload as previously uploaded chunk"
+			return res, fiber.NewError(fiber.StatusCreated, "skipping upload as previously uploaded chunk")
+		}
+		// Chunk is corrupted or size mismatch, remove it.
+		_ = os.Remove(chunkPath)
+		return nil, fiber.NewError(fiber.StatusNoContent, "OK to upload")
 
 	case fiber.MethodPost:
 		if req.ResumableChunkNumber == 1 {
@@ -96,19 +100,22 @@ func (m *FileModel) ResumableFileUpload(c *fiber.Ctx) (*UploadedFileResponse, *f
 		defer file.Close()
 
 		if req.ResumableChunkNumber == 1 {
-			fo, _ := reqf.Open()
-			defer fo.Close()
-			if err := m.detectMimeTypeForValidation(fo); err != nil {
+			if err := m.detectMimeTypeForValidation(file); err != nil {
 				return nil, fiber.NewError(fiber.StatusUnsupportedMediaType, err.Error())
+			}
+			// Reset reader to the beginning of the file for the next read (io.Copy)
+			if _, err := file.Seek(0, io.SeekStart); err != nil {
+				log.Errorln(err)
+				return nil, fiber.NewError(fiber.StatusInternalServerError, "failed to reset file reader")
 			}
 		}
 
-		if err := os.MkdirAll(chunkDir, os.ModePerm); err != nil {
+		if err := os.MkdirAll(chunkDir, 0755); err != nil {
 			log.Errorln(err)
 			return nil, fiber.NewError(fiber.StatusInternalServerError, "failed to create chunk directory")
 		}
 
-		out, err := os.OpenFile(chunkPath, os.O_WRONLY|os.O_CREATE, 0666)
+		out, err := os.OpenFile(chunkPath, os.O_WRONLY|os.O_CREATE, 0644)
 		if err != nil {
 			log.Errorln(err)
 			return nil, fiber.NewError(fiber.StatusServiceUnavailable, "failed to create chunk file")
@@ -128,8 +135,8 @@ func (m *FileModel) ResumableFileUpload(c *fiber.Ctx) (*UploadedFileResponse, *f
 
 // UploadedFileMerge will combine all the parts and create a final file
 func (m *FileModel) UploadedFileMerge(req *ResumableUploadedFileMergeReq) (*UploadedFileResponse, error) {
-	tempFolder := fmt.Sprintf("%s/%s/tmp", m.app.UploadFileSettings.Path, req.RoomSid)
-	chunkDir := fmt.Sprintf("%s/%s", tempFolder, req.ResumableIdentifier)
+	tempFolder := filepath.Join(m.app.UploadFileSettings.Path, req.RoomSid, "tmp")
+	chunkDir := filepath.Join(tempFolder, req.ResumableIdentifier)
 
 	if _, err := os.Stat(chunkDir); os.IsNotExist(err) {
 		return nil, errors.New("requested file's chunks not found, make sure those were uploaded")
@@ -146,7 +153,7 @@ func (m *FileModel) UploadedFileMerge(req *ResumableUploadedFileMergeReq) (*Uplo
 		return nil, err
 	}
 
-	finalPath := fmt.Sprintf("%s/%s", req.RoomSid, req.ResumableFilename)
+	finalPath := filepath.Join(req.RoomSid, req.ResumableFilename)
 	res := &UploadedFileResponse{
 		Status:        true,
 		Msg:           "file uploaded successfully",
@@ -160,35 +167,35 @@ func (m *FileModel) UploadedFileMerge(req *ResumableUploadedFileMergeReq) (*Uplo
 }
 
 func (m *FileModel) combineResumableFiles(chunksDir, fileName, roomSid string, totalParts int) (string, error) {
-	chunkSizeInBytes := 1048576
-	uploadDir := fmt.Sprintf("%s/%s", m.app.UploadFileSettings.Path, roomSid)
+	uploadDir := filepath.Join(m.app.UploadFileSettings.Path, roomSid)
 
-	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
+	if err := os.MkdirAll(uploadDir, 0755); err != nil {
 		log.Errorln(err)
 		return "", errors.New("failed to create upload directory")
 	}
 
-	combinedFile := fmt.Sprintf("%s/%s", uploadDir, fileName)
-	f, err := os.Create(combinedFile)
+	combinedFile := filepath.Join(uploadDir, fileName)
+	destFile, err := os.Create(combinedFile)
 	if err != nil {
 		log.Errorln(err)
 		return "", errors.New("failed to create combined file")
 	}
-	defer f.Close()
+	defer destFile.Close()
 
 	for i := 1; i <= totalParts; i++ {
-		relativePath := fmt.Sprintf("%s/part%d", chunksDir, i)
-		writeOffset := int64(chunkSizeInBytes * (i - 1))
-
-		dat, err := os.ReadFile(relativePath)
+		chunkPath := filepath.Join(chunksDir, fmt.Sprintf("part%d", i))
+		chunkFile, err := os.Open(chunkPath)
 		if err != nil {
-			log.Errorf("failed to read chunk %d", i)
-			return "", errors.New("failed to read chunk")
+			log.Errorf("failed to open chunk %d: %v", i, err)
+			return "", fmt.Errorf("failed to open chunk %d", i)
 		}
 
-		if _, err := f.WriteAt(dat, writeOffset); err != nil {
-			log.Errorf("failed to write chunk %d", i)
-			return "", errors.New("failed to write chunk")
+		_, err = io.Copy(destFile, chunkFile)
+		// Close inside the loop to free file descriptor early
+		chunkFile.Close()
+		if err != nil {
+			log.Errorf("failed to write chunk %d: %v", i, err)
+			return "", fmt.Errorf("failed to write chunk %d", i)
 		}
 	}
 
