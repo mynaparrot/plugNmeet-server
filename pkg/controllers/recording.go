@@ -5,17 +5,33 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"google.golang.org/protobuf/proto"
 )
 
-func HandleFetchRecordings(c *fiber.Ctx) error {
+// RecordingController holds dependencies for recording-related handlers.
+type RecordingController struct {
+	RecordingModel *models.RecordingModel
+}
+
+// NewRecordingController creates a new RecordingController.
+func NewRecordingController(m *models.RecordingModel) *RecordingController {
+	return &RecordingController{
+		RecordingModel: m,
+	}
+}
+
+// HandleFetchRecordings handles fetching recordings.
+func (rc *RecordingController) HandleFetchRecordings(c *fiber.Ctx) error {
 	req := new(plugnmeet.FetchRecordingsReq)
-	if err := parseAndValidateRequest(c.Body(), req); err != nil {
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
+	if err = req.Validate(); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := models.NewRecordingModel(nil, nil, nil)
-	result, err := m.FetchRecordings(req)
-
+	result, err := rc.RecordingModel.FetchRecordings(req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
@@ -31,14 +47,18 @@ func HandleFetchRecordings(c *fiber.Ctx) error {
 	return utils.SendProtoJsonResponse(c, r)
 }
 
-func HandleRecordingInfo(c *fiber.Ctx) error {
+// HandleRecordingInfo handles fetching information for a single recording.
+func (rc *RecordingController) HandleRecordingInfo(c *fiber.Ctx) error {
 	req := new(plugnmeet.RecordingInfoReq)
-	if err := parseAndValidateRequest(c.Body(), req); err != nil {
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
+	if err = req.Validate(); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := models.NewRecordingModel(nil, nil, nil)
-	result, err := m.RecordingInfo(req)
+	result, err := rc.RecordingModel.RecordingInfo(req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
@@ -46,14 +66,18 @@ func HandleRecordingInfo(c *fiber.Ctx) error {
 	return utils.SendProtoJsonResponse(c, result)
 }
 
-func HandleDeleteRecording(c *fiber.Ctx) error {
+// HandleDeleteRecording handles deleting a recording.
+func (rc *RecordingController) HandleDeleteRecording(c *fiber.Ctx) error {
 	req := new(plugnmeet.DeleteRecordingReq)
-	if err := parseAndValidateRequest(c.Body(), req); err != nil {
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
+	if err = req.Validate(); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := models.NewRecordingModel(nil, nil, nil)
-	err := m.DeleteRecording(req)
+	err = rc.RecordingModel.DeleteRecording(req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
@@ -61,15 +85,18 @@ func HandleDeleteRecording(c *fiber.Ctx) error {
 	return utils.SendCommonProtoJsonResponse(c, true, "success")
 }
 
-func HandleGetDownloadToken(c *fiber.Ctx) error {
+// HandleGetDownloadToken handles generating a download token for a recording.
+func (rc *RecordingController) HandleGetDownloadToken(c *fiber.Ctx) error {
 	req := new(plugnmeet.GetDownloadTokenReq)
-	if err := parseAndValidateRequest(c.Body(), req); err != nil {
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
+	if err = req.Validate(); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := models.NewRecordingModel(nil, nil, nil)
-	token, err := m.GetDownloadToken(req)
-
+	token, err := rc.RecordingModel.GetDownloadToken(req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
@@ -82,16 +109,15 @@ func HandleGetDownloadToken(c *fiber.Ctx) error {
 	return utils.SendProtoJsonResponse(c, r)
 }
 
-func HandleDownloadRecording(c *fiber.Ctx) error {
+// HandleDownloadRecording handles downloading a recording file.
+func (rc *RecordingController) HandleDownloadRecording(c *fiber.Ctx) error {
 	token := c.Params("token")
 
 	if len(token) == 0 {
 		return c.Status(fiber.StatusUnauthorized).SendString("token require or invalid url")
 	}
 
-	m := models.NewRecordingModel(nil, nil, nil)
-	file, status, err := m.VerifyRecordingToken(token)
-
+	file, status, err := rc.RecordingModel.VerifyRecordingToken(token)
 	if err != nil {
 		return c.Status(status).SendString(err.Error())
 	}

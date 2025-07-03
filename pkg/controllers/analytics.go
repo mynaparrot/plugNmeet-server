@@ -14,6 +14,18 @@ var unmarshalOpts = protojson.UnmarshalOptions{
 	DiscardUnknown: true,
 }
 
+// AnalyticsController holds the dependencies for analytics-related handlers.
+type AnalyticsController struct {
+	AnalyticsModel *models.AnalyticsModel
+}
+
+// NewAnalyticsController creates a new AnalyticsController.
+func NewAnalyticsController(am *models.AnalyticsModel) *AnalyticsController {
+	return &AnalyticsController{
+		AnalyticsModel: am,
+	}
+}
+
 func parseAndValidateRequest(data []byte, msg proto.Message) error {
 	err := unmarshalOpts.Unmarshal(data, msg)
 	if err != nil {
@@ -34,15 +46,14 @@ func validateRequest(msg proto.Message) error {
 	return nil
 }
 
-func HandleFetchAnalytics(c *fiber.Ctx) error {
+// HandleFetchAnalytics fetches analytics data.
+func (ac *AnalyticsController) HandleFetchAnalytics(c *fiber.Ctx) error {
 	req := new(plugnmeet.FetchAnalyticsReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := models.NewAnalyticsModel(nil, nil, nil)
-	result, err := m.FetchAnalytics(req)
-
+	result, err := ac.AnalyticsModel.FetchAnalytics(req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
@@ -58,14 +69,14 @@ func HandleFetchAnalytics(c *fiber.Ctx) error {
 	return utils.SendProtoJsonResponse(c, r)
 }
 
-func HandleDeleteAnalytics(c *fiber.Ctx) error {
+// HandleDeleteAnalytics deletes analytics data.
+func (ac *AnalyticsController) HandleDeleteAnalytics(c *fiber.Ctx) error {
 	req := new(plugnmeet.DeleteAnalyticsReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := models.NewAnalyticsModel(nil, nil, nil)
-	err := m.DeleteAnalytics(req)
+	err := ac.AnalyticsModel.DeleteAnalytics(req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
@@ -73,15 +84,14 @@ func HandleDeleteAnalytics(c *fiber.Ctx) error {
 	return utils.SendCommonProtoJsonResponse(c, true, "success")
 }
 
-func HandleGetAnalyticsDownloadToken(c *fiber.Ctx) error {
+// HandleGetAnalyticsDownloadToken generates a download token for analytics.
+func (ac *AnalyticsController) HandleGetAnalyticsDownloadToken(c *fiber.Ctx) error {
 	req := new(plugnmeet.GetAnalyticsDownloadTokenReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := models.NewAnalyticsModel(nil, nil, nil)
-	token, err := m.GetAnalyticsDownloadToken(req)
-
+	token, err := ac.AnalyticsModel.GetAnalyticsDownloadToken(req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
@@ -94,16 +104,14 @@ func HandleGetAnalyticsDownloadToken(c *fiber.Ctx) error {
 	return utils.SendProtoJsonResponse(c, r)
 }
 
-func HandleDownloadAnalytics(c *fiber.Ctx) error {
+// HandleDownloadAnalytics handles the download of an analytics file.
+func (ac *AnalyticsController) HandleDownloadAnalytics(c *fiber.Ctx) error {
 	token := c.Params("token")
-
 	if len(token) == 0 {
 		return c.Status(fiber.StatusUnauthorized).SendString("token require or invalid url")
 	}
 
-	m := models.NewAnalyticsModel(nil, nil, nil)
-	file, status, err := m.VerifyAnalyticsToken(token)
-
+	file, status, err := ac.AnalyticsModel.VerifyAnalyticsToken(token)
 	if err != nil {
 		return c.Status(status).SendString(err.Error())
 	}

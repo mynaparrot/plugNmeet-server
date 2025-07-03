@@ -10,18 +10,39 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"google.golang.org/protobuf/encoding/protojson"
 	"net/url"
 	"strings"
 	"time"
 )
 
-func HandleVerifyApiRequest(c *fiber.Ctx) error {
+// BBBController holds dependencies for BBB API compatibility handlers.
+type BBBController struct {
+	AppConfig          *config.AppConfig
+	RoomModel          *models.RoomModel
+	UserModel          *models.UserModel
+	BBBApiWrapperModel *models.BBBApiWrapperModel
+	RecordingModel     *models.RecordingModel
+	NatsService        *natsservice.NatsService
+}
+
+// NewBBBController creates a new BBBController.
+func NewBBBController(config *config.AppConfig, roomModel *models.RoomModel, userModel *models.UserModel, bbbApiWrapperModel *models.BBBApiWrapperModel, recordingModel *models.RecordingModel, natsService *natsservice.NatsService) *BBBController {
+	return &BBBController{
+		AppConfig:          config,
+		RoomModel:          roomModel,
+		UserModel:          userModel,
+		BBBApiWrapperModel: bbbApiWrapperModel,
+		RecordingModel:     recordingModel,
+		NatsService:        natsService,
+	}
+}
+
+// HandleVerifyApiRequest is a middleware to verify BBB API requests.
+func (bc *BBBController) HandleVerifyApiRequest(c *fiber.Ctx) error {
 	apiKey := c.Params("apiKey")
-	if apiKey == "" || apiKey != config.GetConfig().Client.ApiKey {
+	if apiKey == "" || apiKey != bc.AppConfig.Client.ApiKey {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "apiKeyError", "invalid api key"))
 	}
 
@@ -82,7 +103,7 @@ func HandleVerifyApiRequest(c *fiber.Ctx) error {
 		queries = strings.TrimSuffix(s3[0], "&")
 	}
 
-	ourSum := bbbapiwrapper.CalculateCheckSum(config.GetConfig().Client.Secret, method, queries)
+	ourSum := bbbapiwrapper.CalculateCheckSum(bc.AppConfig.Client.Secret, method, queries)
 	if subtle.ConstantTimeCompare([]byte(checksum), []byte(ourSum)) != 1 {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "checksumError", "Checksums do not match"))
 	}
@@ -90,9 +111,10 @@ func HandleVerifyApiRequest(c *fiber.Ctx) error {
 	return c.Next()
 }
 
-func HandleBBBCreate(c *fiber.Ctx) error {
+// HandleBBBCreate handles BBB create meeting requests.
+func (bc *BBBController) HandleBBBCreate(c *fiber.Ctx) error {
 	q := new(bbbapiwrapper.CreateMeetingReq)
-	var err error = nil
+	var err error
 	if c.Method() == "POST" && c.Get("Content-Type") == "application/x-www-form-urlencoded" {
 		err = c.BodyParser(q)
 	} else {
@@ -133,9 +155,7 @@ func HandleBBBCreate(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", err.Error()))
 	}
 
-	m := models.NewRoomModel(nil, nil, nil)
-	room, err := m.CreateRoom(c.UserContext(), pnmReq)
-
+	room, err := bc.RoomModel.CreateRoom(c.UserContext(), pnmReq)
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 	}
@@ -156,9 +176,10 @@ func HandleBBBCreate(c *fiber.Ctx) error {
 	})
 }
 
-func HandleBBBJoin(c *fiber.Ctx) error {
+// HandleBBBJoin handles BBB join meeting requests.
+func (bc *BBBController) HandleBBBJoin(c *fiber.Ctx) error {
 	q := new(bbbapiwrapper.JoinMeetingReq)
-	var err error = nil
+	var err error
 	if c.Method() == "POST" && c.Get("Content-Type") == "application/x-www-form-urlencoded" {
 		err = c.BodyParser(q)
 	} else {
@@ -169,11 +190,7 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 	}
 
 	roomId := bbbapiwrapper.CheckMeetingIdToMatchFormat(q.MeetingID)
-	app := config.GetConfig()
-	rs := redisservice.New(app.RDS)
-	nts := natsservice.New(app)
-
-	metadata, err := nts.GetRoomMetadataStruct(roomId)
+	metadata, err := bc.NatsService.GetRoomMetadataStruct(roomId)
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 	}
@@ -220,22 +237,20 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", err.Error()))
 	}
 
-	exist := nts.IsUserExistInBlockList(req.RoomId, req.UserInfo.UserId)
+	exist := bc.NatsService.IsUserExistInBlockList(req.RoomId, req.UserInfo.UserId)
 	if exist {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", "this user is blocked to join this session"))
 	}
 
-	ds := dbservice.New(app.DB)
-	m := models.NewUserModel(app, ds, rs)
-	token, err := m.GetPNMJoinToken(c.UserContext(), req)
+	token, err := bc.UserModel.GetPNMJoinToken(c.UserContext(), req)
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 	}
 
 	ul := fmt.Sprintf("%s://%s/?access_token=%s", c.Protocol(), c.Hostname(), token)
-	if app.Client.BBBJoinHost != nil && *app.Client.BBBJoinHost != "" {
+	if bc.AppConfig.Client.BBBJoinHost != nil && *bc.AppConfig.Client.BBBJoinHost != "" {
 		// use host name from config
-		ul = fmt.Sprintf("%s/?access_token=%s", *app.Client.BBBJoinHost, token)
+		ul = fmt.Sprintf("%s/?access_token=%s", *bc.AppConfig.Client.BBBJoinHost, token)
 	}
 	if customDesign != nil && customDesign.String() != "" {
 		op := protojson.MarshalOptions{
@@ -263,9 +278,10 @@ func HandleBBBJoin(c *fiber.Ctx) error {
 	return c.Redirect(ul)
 }
 
-func HandleBBBIsMeetingRunning(c *fiber.Ctx) error {
+// HandleBBBIsMeetingRunning handles BBB isMeetingRunning requests.
+func (bc *BBBController) HandleBBBIsMeetingRunning(c *fiber.Ctx) error {
 	q := new(bbbapiwrapper.MeetingReq)
-	var err error = nil
+	var err error
 	if c.Method() == "POST" && c.Get("Content-Type") == "application/x-www-form-urlencoded" {
 		err = c.BodyParser(q)
 	} else {
@@ -275,8 +291,7 @@ func HandleBBBIsMeetingRunning(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
 
-	m := models.NewRoomModel(nil, nil, nil)
-	res, _, _, _ := m.IsRoomActive(c.UserContext(), &plugnmeet.IsRoomActiveReq{
+	res, _, _, _ := bc.RoomModel.IsRoomActive(c.UserContext(), &plugnmeet.IsRoomActiveReq{
 		RoomId: q.MeetingID,
 	})
 
@@ -286,9 +301,10 @@ func HandleBBBIsMeetingRunning(c *fiber.Ctx) error {
 	})
 }
 
-func HandleBBBGetMeetingInfo(c *fiber.Ctx) error {
+// HandleBBBGetMeetingInfo handles BBB getMeetingInfo requests.
+func (bc *BBBController) HandleBBBGetMeetingInfo(c *fiber.Ctx) error {
 	q := new(bbbapiwrapper.MeetingReq)
-	var err error = nil
+	var err error
 	if c.Method() == "POST" && c.Get("Content-Type") == "application/x-www-form-urlencoded" {
 		err = c.BodyParser(q)
 	} else {
@@ -298,8 +314,7 @@ func HandleBBBGetMeetingInfo(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
 
-	m := models.NewRoomModel(nil, nil, nil)
-	status, msg, res := m.GetActiveRoomInfo(c.UserContext(), &plugnmeet.GetActiveRoomInfoReq{
+	status, msg, res := bc.RoomModel.GetActiveRoomInfo(c.UserContext(), &plugnmeet.GetActiveRoomInfoReq{
 		RoomId: bbbapiwrapper.CheckMeetingIdToMatchFormat(q.MeetingID),
 	})
 
@@ -320,9 +335,9 @@ func HandleBBBGetMeetingInfo(c *fiber.Ctx) error {
 	return c.SendString("<response><returncode>SUCCESS</returncode>" + dd + "</response>")
 }
 
-func HandleBBBGetMeetings(c *fiber.Ctx) error {
-	m := models.NewRoomModel(nil, nil, nil)
-	_, _, rooms := m.GetActiveRoomsInfo()
+// HandleBBBGetMeetings handles BBB getMeetings requests.
+func (bc *BBBController) HandleBBBGetMeetings(c *fiber.Ctx) error {
+	_, _, rooms := bc.RoomModel.GetActiveRoomsInfo()
 
 	if rooms == nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("SUCCESS", "noMeetings", "no meetings were found on this server"))
@@ -341,9 +356,10 @@ func HandleBBBGetMeetings(c *fiber.Ctx) error {
 	return c.XML(res)
 }
 
-func HandleBBBEndMeetings(c *fiber.Ctx) error {
+// HandleBBBEndMeetings handles BBB endMeeting requests.
+func (bc *BBBController) HandleBBBEndMeetings(c *fiber.Ctx) error {
 	q := new(bbbapiwrapper.MeetingReq)
-	var err error = nil
+	var err error
 	if c.Method() == "POST" && c.Get("Content-Type") == "application/x-www-form-urlencoded" {
 		err = c.BodyParser(q)
 	} else {
@@ -353,8 +369,7 @@ func HandleBBBEndMeetings(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
 
-	m := models.NewRoomModel(nil, nil, nil)
-	status, msg := m.EndRoom(c.UserContext(), &plugnmeet.RoomEndReq{
+	status, msg := bc.RoomModel.EndRoom(c.UserContext(), &plugnmeet.RoomEndReq{
 		RoomId: bbbapiwrapper.CheckMeetingIdToMatchFormat(q.MeetingID),
 	})
 
@@ -364,9 +379,10 @@ func HandleBBBEndMeetings(c *fiber.Ctx) error {
 	return c.XML(bbbapiwrapper.CommonResponseMsg("SUCCESS", "sentEndMeetingRequest", "A request to end the meeting was sent.  Please wait a few seconds, and then use the getMeetingInfo or isMeetingRunning API calls to verify that it was ended"))
 }
 
-func HandleBBBGetRecordings(c *fiber.Ctx) error {
+// HandleBBBGetRecordings handles BBB getRecordings requests.
+func (bc *BBBController) HandleBBBGetRecordings(c *fiber.Ctx) error {
 	q := new(bbbapiwrapper.GetRecordingsReq)
-	var err error = nil
+	var err error
 	if c.Method() == "POST" && c.Get("Content-Type") == "application/x-www-form-urlencoded" {
 		err = c.BodyParser(q)
 	} else {
@@ -377,8 +393,7 @@ func HandleBBBGetRecordings(c *fiber.Ctx) error {
 	}
 
 	host := fmt.Sprintf("%s://%s", c.Protocol(), c.Hostname())
-	m := models.NewBBBApiWrapperModel(nil, nil, nil)
-	recordings, pagination, err := m.GetRecordings(host, q)
+	recordings, pagination, err := bc.BBBApiWrapperModel.GetRecordings(host, q)
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 	}
@@ -394,9 +409,10 @@ func HandleBBBGetRecordings(c *fiber.Ctx) error {
 	return c.XML(res)
 }
 
-func HandleBBBDeleteRecordings(c *fiber.Ctx) error {
+// HandleBBBDeleteRecordings handles BBB deleteRecordings requests.
+func (bc *BBBController) HandleBBBDeleteRecordings(c *fiber.Ctx) error {
 	q := new(bbbapiwrapper.DeleteRecordingsReq)
-	var err error = nil
+	var err error
 	if c.Method() == "POST" && c.Get("Content-Type") == "application/x-www-form-urlencoded" {
 		err = c.BodyParser(q)
 	} else {
@@ -406,8 +422,7 @@ func HandleBBBDeleteRecordings(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
 
-	m := models.NewRecordingModel(nil, nil, nil)
-	err = m.DeleteRecording(&plugnmeet.DeleteRecordingReq{
+	err = bc.RecordingModel.DeleteRecording(&plugnmeet.DeleteRecordingReq{
 		RecordId: q.RecordID,
 	})
 
@@ -422,7 +437,7 @@ func HandleBBBDeleteRecordings(c *fiber.Ctx) error {
 }
 
 // HandleBBBPublishRecordings TO-DO: in the future
-func HandleBBBPublishRecordings(c *fiber.Ctx) error {
+func (bc *BBBController) HandleBBBPublishRecordings(c *fiber.Ctx) error {
 	return c.XML(bbbapiwrapper.PublishRecordingsRes{
 		ReturnCode: "SUCCESS",
 		Published:  true,
@@ -430,7 +445,7 @@ func HandleBBBPublishRecordings(c *fiber.Ctx) error {
 }
 
 // HandleBBBUpdateRecordings TO-DO: in the future
-func HandleBBBUpdateRecordings(c *fiber.Ctx) error {
+func (bc *BBBController) HandleBBBUpdateRecordings(c *fiber.Ctx) error {
 	return c.XML(bbbapiwrapper.UpdateRecordingsRes{
 		ReturnCode: "SUCCESS",
 		Updated:    true,

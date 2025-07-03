@@ -6,11 +6,27 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	"google.golang.org/protobuf/proto"
 )
 
-func HandleCreateEtherpad(c *fiber.Ctx) error {
+// EtherpadController holds dependencies for etherpad-related handlers.
+type EtherpadController struct {
+	AppConfig     *config.AppConfig
+	EtherpadModel *models.EtherpadModel
+	RoomModel     *models.RoomModel
+}
+
+// NewEtherpadController creates a new EtherpadController.
+func NewEtherpadController(config *config.AppConfig, em *models.EtherpadModel, rm *models.RoomModel) *EtherpadController {
+	return &EtherpadController{
+		AppConfig:     config,
+		EtherpadModel: em,
+		RoomModel:     rm,
+	}
+}
+
+// HandleCreateEtherpad handles the creation of an etherpad session.
+func (ec *EtherpadController) HandleCreateEtherpad(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
@@ -19,7 +35,7 @@ func HandleCreateEtherpad(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	if !config.GetConfig().SharedNotePad.Enabled {
+	if !ec.AppConfig.SharedNotePad.Enabled {
 		return utils.SendCommonProtobufResponse(c, false, "feature disabled")
 	}
 
@@ -28,23 +44,24 @@ func HandleCreateEtherpad(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "roomId required")
 	}
 
-	// now need to check if meeting is running or not
-	rm := dbservice.New(config.GetConfig().DB)
-	room, _ := rm.GetRoomInfoByRoomId(rid, 1)
-	if room == nil || room.ID == 0 {
-		return utils.SendCommonProtobufResponse(c, false, "room isn't active")
+	// check if meeting is running
+	res, _, _, _ := ec.RoomModel.IsRoomActive(c.UserContext(), &plugnmeet.IsRoomActiveReq{
+		RoomId: rid,
+	})
+	if !res.GetIsActive() {
+		return utils.SendCommonProtobufResponse(c, false, "room is not active")
 	}
 
-	m := models.NewEtherpadModel(nil, nil, nil)
-	res, err := m.CreateSession(rid, requestedUserId.(string))
+	result, err := ec.EtherpadModel.CreateSession(rid, requestedUserId.(string))
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	return utils.SendProtobufResponse(c, res)
+	return utils.SendProtobufResponse(c, result)
 }
 
-func HandleCleanPad(c *fiber.Ctx) error {
+// HandleCleanPad handles cleaning an etherpad pad.
+func (ec *EtherpadController) HandleCleanPad(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	if !isAdmin.(bool) {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
@@ -56,8 +73,7 @@ func HandleCleanPad(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	m := models.NewEtherpadModel(nil, nil, nil)
-	err = m.CleanPad(req.RoomId, req.NodeId, req.PadId)
+	err = ec.EtherpadModel.CleanPad(req.RoomId, req.NodeId, req.PadId)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -65,7 +81,8 @@ func HandleCleanPad(c *fiber.Ctx) error {
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
-func HandleChangeEtherpadStatus(c *fiber.Ctx) error {
+// HandleChangeEtherpadStatus handles changing the public status of an etherpad.
+func (ec *EtherpadController) HandleChangeEtherpadStatus(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	if !isAdmin.(bool) {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
@@ -77,8 +94,7 @@ func HandleChangeEtherpadStatus(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	m := models.NewEtherpadModel(nil, nil, nil)
-	err = m.ChangeEtherpadStatus(req)
+	err = ec.EtherpadModel.ChangeEtherpadStatus(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
