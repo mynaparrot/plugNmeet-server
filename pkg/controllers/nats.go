@@ -8,7 +8,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
-	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/mynaparrot/plugnmeet-server/version"
 	"github.com/nats-io/nats.go"
@@ -74,13 +73,10 @@ func (c *NatsController) BootUp() {
 		log.Fatal(err)
 	}
 
-	// start cache service
-	natsservice.InitNatsCacheService(c.app)
-
 	// now subscribe
-	go c.subscribeToSystemWorker(stream)
+	c.subscribeToSystemWorker(stream)
 	// subscribe to connection events
-	go c.subscribeToUsersConnEvents()
+	c.subscribeToUsersConnEvents()
 
 	// auth service
 	authService := NewNatsAuthController(c.app, c.authModel, c.issuerKeyPair, c.curveKeyPair)
@@ -98,6 +94,11 @@ func (c *NatsController) BootUp() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// Keep the application running until a signal is received.
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	<-sig
 }
 
 type NatsEvents struct {
@@ -147,10 +148,6 @@ func (c *NatsController) subscribeToUsersConnEvents() {
 		log.Fatal(err)
 		return
 	}
-
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	<-sig
 }
 
 func (c *NatsController) subscribeToSystemWorker(stream jetstream.Stream) {
@@ -161,7 +158,7 @@ func (c *NatsController) subscribeToSystemWorker(stream jetstream.Stream) {
 		log.Fatalln(err)
 	}
 
-	cc, err := cons.Consume(func(msg jetstream.Msg) {
+	_, err = cons.Consume(func(msg jetstream.Msg) {
 		defer msg.Ack()
 		go func(sub string, data []byte) {
 			req := new(plugnmeet.NatsMsgClientToServer)
@@ -182,9 +179,4 @@ func (c *NatsController) subscribeToSystemWorker(stream jetstream.Stream) {
 		log.Fatal(err)
 		return
 	}
-	defer cc.Stop()
-
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	<-sig
 }
