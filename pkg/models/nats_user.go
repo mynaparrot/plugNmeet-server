@@ -59,17 +59,21 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) {
 
 	_ = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_DISCONNECTED, roomId, userInfo, userId)
 
-	// we'll wait 5 seconds before declare this user as offline
-	// 2. remove from the online list but not delete as user may reconnect again
-	time.Sleep(5 * time.Second)
+	// Schedule to check for offline status after 5 seconds without blocking.
+	time.AfterFunc(5*time.Second, func() {
+		m.handleOfflineStatus(roomId, userId, userInfo)
+	})
+}
 
-	if status, err := m.natsService.GetRoomUserStatus(roomId, userId); err == nil {
-		if status == natsservice.UserStatusOnline {
-			// we do not need to do anything
-			return
-		}
+// handleOfflineStatus will check if the user is still disconnected and mark them as offline.
+func (m *NatsModel) handleOfflineStatus(roomId, userId string, userInfo *plugnmeet.NatsKvUserInfo) {
+	status, err := m.natsService.GetRoomUserStatus(roomId, userId)
+	if err == nil && status == natsservice.UserStatusOnline {
+		// User reconnected, do nothing.
+		return
 	}
-	err := m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusOffline)
+
+	err = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusOffline)
 	if err != nil {
 		log.Warnln(fmt.Sprintf("Error updating user status: %s for %s; roomId: %s; msg: %s", natsservice.UserStatusOffline, userId, roomId, err.Error()))
 	}
@@ -80,15 +84,18 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) {
 	// now broadcast to everyone
 	_ = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_OFFLINE, roomId, userInfo, userId)
 
-	// we'll wait another 30 seconds & delete this consumer,
-	// but we'll keep user's information in the bucket
-	// everything will be clean when the session ends.
-	time.Sleep(30 * time.Second)
-	if status, err := m.natsService.GetRoomUserStatus(roomId, userId); err == nil {
-		if status == natsservice.UserStatusOnline {
-			// we do not need to do anything
-			return
-		}
+	// Schedule consumer deletion after 30 seconds.
+	time.AfterFunc(30*time.Second, func() {
+		m.cleanupUserConsumer(roomId, userId)
+	})
+}
+
+// cleanupUserConsumer will delete the NATS consumer for the user if they haven't reconnected.
+func (m *NatsModel) cleanupUserConsumer(roomId, userId string) {
+	status, err := m.natsService.GetRoomUserStatus(roomId, userId)
+	if err == nil && status == natsservice.UserStatusOnline {
+		// User reconnected, do not delete consumer.
+		return
 	}
 
 	// do not need to delete the user as user may come to online again
