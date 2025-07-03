@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.8.5](https://github.com/mynaparrot/plugNmeet-server/compare/v1.8.4...v1.8.5) (2025-07-03)
+
+
+### Bug Fixes
+
+* cleaned up logic ([4aa5b49](https://github.com/mynaparrot/plugNmeet-server/commit/4aa5b4930286af2d5379cafc3b914bcf36cde083))
+* **cleanup:** remove unnecessary goroutine ([b5f6d0a](https://github.com/mynaparrot/plugNmeet-server/commit/b5f6d0a82a232ad3d97ef82ffe4bfe47a86407ac))
+* **improve:** handle time way more efficiently ([c379ec2](https://github.com/mynaparrot/plugNmeet-server/commit/c379ec254cb0acf025eb1d7e32e71e0aa44b3601))
+* **improve:** improve webhook notifier to handle each room's request in separate queue ([762809c](https://github.com/mynaparrot/plugNmeet-server/commit/762809c4db604251d62c5dc2bac39d6934562d80))
+* **improve:** move `os.Signal` in bootup and remove unnecessary goroutine ([4eeed0c](https://github.com/mynaparrot/plugNmeet-server/commit/4eeed0cfedd7f18307b807066a92e1831e3e7be6))
+* **improve:** optimized database query and added index ([d9c1354](https://github.com/mynaparrot/plugNmeet-server/commit/d9c135411b4af76bad8d86f4f05708e568d58014))
+* **improve:** various improvement regarding file handling ([d4453fe](https://github.com/mynaparrot/plugNmeet-server/commit/d4453fe7535fd1604591dfa5256a7800b0d9cb0a))
+
 ## [1.8.4](https://github.com/mynaparrot/plugNmeet-server/compare/v1.8.3...v1.8.4) (2025-06-27)
 
 
