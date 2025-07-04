@@ -83,7 +83,7 @@ func NewAppFactory(appConfig *config.AppConfig) (*Application, error) {
 	authController := controllers.NewAuthController(appConfig, authModel, roomModel, natsService)
 	bbbController := controllers.NewBBBController(appConfig, roomModel, userModel, bbbApiWrapperModel, recordingModel, natsService)
 	breakoutRoomController := controllers.NewBreakoutRoomController(breakoutRoomModel)
-	etherpadController := controllers.NewEtherpadController(appConfig, etherpadModel, roomModel)
+	etherpadController := controllers.NewEtherpadController(appConfig, etherpadModel, roomModel, databaseService)
 	exDisplayController := controllers.NewExDisplayController(exDisplayModel)
 	exMediaController := controllers.NewExMediaController(exMediaModel)
 	fileController := controllers.NewFileController(appConfig, fileModel)

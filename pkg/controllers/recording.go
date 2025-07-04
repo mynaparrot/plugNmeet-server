@@ -5,7 +5,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
-	"google.golang.org/protobuf/proto"
 )
 
 // RecordingController holds dependencies for recording-related handlers.
@@ -23,11 +22,7 @@ func NewRecordingController(m *models.RecordingModel) *RecordingController {
 // HandleFetchRecordings handles fetching recordings.
 func (rc *RecordingController) HandleFetchRecordings(c *fiber.Ctx) error {
 	req := new(plugnmeet.FetchRecordingsReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
-	}
-	if err = req.Validate(); err != nil {
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
@@ -50,11 +45,7 @@ func (rc *RecordingController) HandleFetchRecordings(c *fiber.Ctx) error {
 // HandleRecordingInfo handles fetching information for a single recording.
 func (rc *RecordingController) HandleRecordingInfo(c *fiber.Ctx) error {
 	req := new(plugnmeet.RecordingInfoReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
-	}
-	if err = req.Validate(); err != nil {
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
@@ -69,15 +60,11 @@ func (rc *RecordingController) HandleRecordingInfo(c *fiber.Ctx) error {
 // HandleDeleteRecording handles deleting a recording.
 func (rc *RecordingController) HandleDeleteRecording(c *fiber.Ctx) error {
 	req := new(plugnmeet.DeleteRecordingReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
-	}
-	if err = req.Validate(); err != nil {
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	err = rc.RecordingModel.DeleteRecording(req)
+	err := rc.RecordingModel.DeleteRecording(req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
@@ -88,11 +75,7 @@ func (rc *RecordingController) HandleDeleteRecording(c *fiber.Ctx) error {
 // HandleGetDownloadToken handles generating a download token for a recording.
 func (rc *RecordingController) HandleGetDownloadToken(c *fiber.Ctx) error {
 	req := new(plugnmeet.GetDownloadTokenReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
-	}
-	if err = req.Validate(); err != nil {
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 

@@ -6,6 +6,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	dbservice "github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -14,14 +15,16 @@ type EtherpadController struct {
 	AppConfig     *config.AppConfig
 	EtherpadModel *models.EtherpadModel
 	RoomModel     *models.RoomModel
+	ds            *dbservice.DatabaseService
 }
 
 // NewEtherpadController creates a new EtherpadController.
-func NewEtherpadController(config *config.AppConfig, em *models.EtherpadModel, rm *models.RoomModel) *EtherpadController {
+func NewEtherpadController(config *config.AppConfig, em *models.EtherpadModel, rm *models.RoomModel, ds *dbservice.DatabaseService) *EtherpadController {
 	return &EtherpadController{
 		AppConfig:     config,
 		EtherpadModel: em,
 		RoomModel:     rm,
+		ds:            ds,
 	}
 }
 
@@ -44,12 +47,10 @@ func (ec *EtherpadController) HandleCreateEtherpad(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "roomId required")
 	}
 
-	// check if meeting is running
-	res, _, _, _ := ec.RoomModel.IsRoomActive(c.UserContext(), &plugnmeet.IsRoomActiveReq{
-		RoomId: rid,
-	})
-	if !res.GetIsActive() {
-		return utils.SendCommonProtobufResponse(c, false, "room is not active")
+	// now need to check if meeting is running or not
+	room, _ := ec.ds.GetRoomInfoByRoomId(rid, 1)
+	if room == nil || room.ID == 0 {
+		return utils.SendCommonProtobufResponse(c, false, "room isn't active")
 	}
 
 	result, err := ec.EtherpadModel.CreateSession(rid, requestedUserId.(string))
