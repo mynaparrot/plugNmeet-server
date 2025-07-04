@@ -4,14 +4,28 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"google.golang.org/protobuf/proto"
 	"strconv"
 )
 
-func HandleActivatePolls(c *fiber.Ctx) error {
+// PollsController holds dependencies for poll-related handlers.
+type PollsController struct {
+	PollModel    *models.PollModel
+	RedisService *redisservice.RedisService
+}
+
+// NewPollsController creates a new PollsController.
+func NewPollsController(pm *models.PollModel, rs *redisservice.RedisService) *PollsController {
+	return &PollsController{
+		PollModel:    pm,
+		RedisService: rs,
+	}
+}
+
+// HandleActivatePolls handles activating or deactivating polls.
+func (pc *PollsController) HandleActivatePolls(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	isAdmin := c.Locals("isAdmin")
 
@@ -30,15 +44,15 @@ func HandleActivatePolls(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 	req.RoomId = roomId.(string)
-	m := models.NewPollModel(nil, nil, nil)
-	err = m.ManageActivation(req)
+	err = pc.PollModel.ManageActivation(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
-func HandleCreatePoll(c *fiber.Ctx) error {
+// HandleCreatePoll handles creating a new poll.
+func (pc *PollsController) HandleCreatePoll(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	isAdmin := c.Locals("isAdmin")
 	requestedUserId := c.Locals("requestedUserId")
@@ -47,50 +61,50 @@ func HandleCreatePoll(c *fiber.Ctx) error {
 
 	if !isAdmin.(bool) {
 		res.Msg = "only admin can perform this task"
-		return SendPollResponse(c, res)
+		return sendPollResponse(c, res)
 	}
 
 	req := new(plugnmeet.CreatePollReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		res.Msg = err.Error()
-		return SendPollResponse(c, res)
+		return sendPollResponse(c, res)
 	}
 
 	req.RoomId = roomId.(string)
 	req.UserId = requestedUserId.(string)
-	m := models.NewPollModel(nil, nil, nil)
-	pollId, err := m.CreatePoll(req)
+	pollId, err := pc.PollModel.CreatePoll(req)
 	if err != nil {
 		res.Msg = err.Error()
-		return SendPollResponse(c, res)
+		return sendPollResponse(c, res)
 	}
 
 	res.Status = true
 	res.Msg = "success"
 	res.PollId = &pollId
-	return SendPollResponse(c, res)
+	return sendPollResponse(c, res)
 }
 
-func HandleListPolls(c *fiber.Ctx) error {
+// HandleListPolls lists all polls for a room.
+func (pc *PollsController) HandleListPolls(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	res := new(plugnmeet.PollResponse)
 	res.Status = false
 
-	m := models.NewPollModel(nil, nil, nil)
-	polls, err := m.ListPolls(roomId.(string))
+	polls, err := pc.PollModel.ListPolls(roomId.(string))
 	if err != nil {
 		res.Msg = err.Error()
-		return SendPollResponse(c, res)
+		return sendPollResponse(c, res)
 	}
 
 	res.Status = true
 	res.Msg = "success"
 	res.Polls = polls
-	return SendPollResponse(c, res)
+	return sendPollResponse(c, res)
 }
 
-func HandleCountPollTotalResponses(c *fiber.Ctx) error {
+// HandleCountPollTotalResponses counts the total responses for a poll.
+func (pc *PollsController) HandleCountPollTotalResponses(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	pollId := c.Params("pollId")
 	res := new(plugnmeet.PollResponse)
@@ -98,31 +112,30 @@ func HandleCountPollTotalResponses(c *fiber.Ctx) error {
 
 	if pollId == "" {
 		res.Msg = "pollId required"
-		return SendPollResponse(c, res)
+		return sendPollResponse(c, res)
 	}
-	app := config.GetConfig()
-	rs := redisservice.New(app.RDS)
 
-	responses, err := rs.GetPollResponsesByField(roomId.(string), pollId, "total_resp")
+	responses, err := pc.RedisService.GetPollResponsesByField(roomId.(string), pollId, "total_resp")
 	if err != nil {
 		res.Msg = err.Error()
-		return SendPollResponse(c, res)
+		return sendPollResponse(c, res)
 	}
 
 	rps, err := strconv.ParseUint(responses, 10, 64)
 	if err != nil {
 		res.Msg = err.Error()
-		return SendPollResponse(c, res)
+		return sendPollResponse(c, res)
 	}
 
 	res.Status = true
 	res.Msg = "success"
 	res.PollId = &pollId
 	res.TotalResponses = &rps
-	return SendPollResponse(c, res)
+	return sendPollResponse(c, res)
 }
 
-func HandleUserSelectedOption(c *fiber.Ctx) error {
+// HandleUserSelectedOption checks which option a user selected.
+func (pc *PollsController) HandleUserSelectedOption(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	pollId := c.Params("pollId")
 	userId := c.Params("userId")
@@ -131,20 +144,20 @@ func HandleUserSelectedOption(c *fiber.Ctx) error {
 
 	if pollId == "" || userId == "" {
 		res.Msg = "both userId & pollId required"
-		return SendPollResponse(c, res)
+		return sendPollResponse(c, res)
 	}
 
-	m := models.NewPollModel(nil, nil, nil)
-	voted, _ := m.UserSelectedOption(roomId.(string), pollId, userId)
+	voted, _ := pc.PollModel.UserSelectedOption(roomId.(string), pollId, userId)
 
 	res.Status = true
 	res.Msg = "success"
 	res.PollId = &pollId
 	res.Voted = &voted
-	return SendPollResponse(c, res)
+	return sendPollResponse(c, res)
 }
 
-func HandleUserSubmitResponse(c *fiber.Ctx) error {
+// HandleUserSubmitResponse handles a user's poll submission.
+func (pc *PollsController) HandleUserSubmitResponse(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	res := new(plugnmeet.PollResponse)
 	res.Status = false
@@ -153,24 +166,24 @@ func HandleUserSubmitResponse(c *fiber.Ctx) error {
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		res.Msg = err.Error()
-		return SendPollResponse(c, res)
+		return sendPollResponse(c, res)
 	}
 
 	req.RoomId = roomId.(string)
-	m := models.NewPollModel(nil, nil, nil)
-	err = m.UserSubmitResponse(req)
+	err = pc.PollModel.UserSubmitResponse(req)
 	if err != nil {
 		res.Msg = err.Error()
-		return SendPollResponse(c, res)
+		return sendPollResponse(c, res)
 	}
 
 	res.Status = true
 	res.Msg = "success"
 	res.PollId = &req.PollId
-	return SendPollResponse(c, res)
+	return sendPollResponse(c, res)
 }
 
-func HandleClosePoll(c *fiber.Ctx) error {
+// HandleClosePoll handles closing a poll.
+func (pc *PollsController) HandleClosePoll(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	isAdmin := c.Locals("isAdmin")
 	requestedUserId := c.Locals("requestedUserId")
@@ -179,33 +192,33 @@ func HandleClosePoll(c *fiber.Ctx) error {
 
 	if !isAdmin.(bool) {
 		res.Msg = "only admin can perform this task"
-		return SendPollResponse(c, res)
+		return sendPollResponse(c, res)
 	}
 
-	m := models.NewPollModel(nil, nil, nil)
 	req := new(plugnmeet.ClosePollReq)
 
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		res.Msg = err.Error()
-		return SendPollResponse(c, res)
+		return sendPollResponse(c, res)
 	}
 
 	req.RoomId = roomId.(string)
 	req.UserId = requestedUserId.(string)
-	err = m.ClosePoll(req)
+	err = pc.PollModel.ClosePoll(req)
 	if err != nil {
 		res.Msg = err.Error()
-		return SendPollResponse(c, res)
+		return sendPollResponse(c, res)
 	}
 
 	res.Status = true
 	res.Msg = "success"
 	res.PollId = &req.PollId
-	return SendPollResponse(c, res)
+	return sendPollResponse(c, res)
 }
 
-func HandleGetPollResponsesDetails(c *fiber.Ctx) error {
+// HandleGetPollResponsesDetails gets detailed responses for a poll.
+func (pc *PollsController) HandleGetPollResponsesDetails(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	pollId := c.Params("pollId")
 	isAdmin := c.Locals("isAdmin")
@@ -214,67 +227,66 @@ func HandleGetPollResponsesDetails(c *fiber.Ctx) error {
 
 	if !isAdmin.(bool) {
 		res.Msg = "only admin can perform this task"
-		return SendPollResponse(c, res)
+		return sendPollResponse(c, res)
 	}
 
 	if pollId == "" {
 		res.Msg = "pollId required"
-		return SendPollResponse(c, res)
+		return sendPollResponse(c, res)
 	}
 
-	m := models.NewPollModel(nil, nil, nil)
-	responses, err := m.GetPollResponsesDetails(roomId.(string), pollId)
+	responses, err := pc.PollModel.GetPollResponsesDetails(roomId.(string), pollId)
 	if err != nil {
 		res.Msg = err.Error()
-		return SendPollResponse(c, res)
+		return sendPollResponse(c, res)
 	}
 
 	res.Status = true
 	res.Msg = "success"
 	res.PollId = &pollId
 	res.Responses = responses
-	return SendPollResponse(c, res)
+	return sendPollResponse(c, res)
 }
 
-func HandleGetResponsesResult(c *fiber.Ctx) error {
+// HandleGetResponsesResult gets the aggregated results of a poll.
+func (pc *PollsController) HandleGetResponsesResult(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	pollId := c.Params("pollId")
 	res := new(plugnmeet.PollResponse)
 	res.Status = false
 
-	m := models.NewPollModel(nil, nil, nil)
-	result, err := m.GetResponsesResult(roomId.(string), pollId)
+	result, err := pc.PollModel.GetResponsesResult(roomId.(string), pollId)
 	if err != nil {
 		res.Msg = err.Error()
-		return SendPollResponse(c, res)
+		return sendPollResponse(c, res)
 	}
 
 	res.Status = true
 	res.Msg = "success"
 	res.PollId = &pollId
 	res.PollResponsesResult = result
-	return SendPollResponse(c, res)
+	return sendPollResponse(c, res)
 }
 
-func HandleGetPollsStats(c *fiber.Ctx) error {
+// HandleGetPollsStats gets statistics for all polls in a room.
+func (pc *PollsController) HandleGetPollsStats(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	res := new(plugnmeet.PollResponse)
 	res.Status = false
 
-	m := models.NewPollModel(nil, nil, nil)
-	stats, err := m.GetPollsStats(roomId.(string))
+	stats, err := pc.PollModel.GetPollsStats(roomId.(string))
 	if err != nil {
 		res.Msg = err.Error()
-		return SendPollResponse(c, res)
+		return sendPollResponse(c, res)
 	}
 
 	res.Status = true
 	res.Msg = "success"
 	res.Stats = stats
-	return SendPollResponse(c, res)
+	return sendPollResponse(c, res)
 }
 
-func SendPollResponse(c *fiber.Ctx, res *plugnmeet.PollResponse) error {
+func sendPollResponse(c *fiber.Ctx, res *plugnmeet.PollResponse) error {
 	marshal, err := proto.Marshal(res)
 	if err != nil {
 		return err

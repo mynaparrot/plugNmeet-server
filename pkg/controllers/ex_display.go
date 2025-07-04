@@ -8,7 +8,20 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func HandleExternalDisplayLink(c *fiber.Ctx) error {
+// ExDisplayController holds dependencies for external display handlers.
+type ExDisplayController struct {
+	ExDisplayModel *models.ExDisplayModel
+}
+
+// NewExDisplayController creates a new ExDisplayController.
+func NewExDisplayController(edm *models.ExDisplayModel) *ExDisplayController {
+	return &ExDisplayController{
+		ExDisplayModel: edm,
+	}
+}
+
+// HandleExternalDisplayLink handles sharing an external display link.
+func (edc *ExDisplayController) HandleExternalDisplayLink(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
@@ -28,10 +41,9 @@ func HandleExternalDisplayLink(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	m := models.NewExDisplayModel(nil, nil, nil)
 	req.RoomId = rid
 	req.UserId = requestedUserId.(string)
-	err = m.HandleTask(req)
+	err = edc.ExDisplayModel.HandleTask(req)
 
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())

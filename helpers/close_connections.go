@@ -20,7 +20,7 @@ func HandleCloseConnections() {
 	_ = config.GetConfig().RDS.Close()
 
 	// close nats
-	natsservice.GetNatsCacheService().Shutdown()
+	natsservice.GetNatsCacheService(nil).Shutdown()
 	_ = config.GetConfig().NatsConn.Drain()
 	config.GetConfig().NatsConn.Close()
 

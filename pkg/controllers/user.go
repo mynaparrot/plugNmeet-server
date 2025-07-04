@@ -11,7 +11,26 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func HandleGenerateJoinToken(c *fiber.Ctx) error {
+// UserController holds dependencies for user-related handlers.
+type UserController struct {
+	AppConfig   *config.AppConfig
+	UserModel   *models.UserModel
+	dbservice   *dbservice.DatabaseService
+	NatsService *natsservice.NatsService
+}
+
+// NewUserController creates a new UserController.
+func NewUserController(appConfig *config.AppConfig, userModel *models.UserModel, dbservice *dbservice.DatabaseService, natsService *natsservice.NatsService) *UserController {
+	return &UserController{
+		AppConfig:   appConfig,
+		UserModel:   userModel,
+		dbservice:   dbservice,
+		NatsService: natsService,
+	}
+}
+
+// HandleGenerateJoinToken handles generating a join token for a user.
+func (uc *UserController) HandleGenerateJoinToken(c *fiber.Ctx) error {
 	req := new(plugnmeet.GenerateTokenReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
@@ -22,20 +41,17 @@ func HandleGenerateJoinToken(c *fiber.Ctx) error {
 	}
 
 	// don't generate token if user is blocked
-	nts := natsservice.New(config.GetConfig())
-	exist := nts.IsUserExistInBlockList(req.RoomId, req.UserInfo.UserId)
+	exist := uc.NatsService.IsUserExistInBlockList(req.RoomId, req.UserInfo.UserId)
 	if exist {
 		return utils.SendCommonProtoJsonResponse(c, false, "this user is blocked to join this session")
 	}
 
-	ds := dbservice.New(config.GetConfig().DB)
-	ri, _ := ds.GetRoomInfoByRoomId(req.RoomId, 1)
+	ri, _ := uc.dbservice.GetRoomInfoByRoomId(req.RoomId, 1)
 	if ri == nil || ri.ID == 0 {
 		return utils.SendCommonProtoJsonResponse(c, false, "room is not active. create room first")
 	}
 
-	m := models.NewUserModel(nil, nil, nil)
-	token, err := m.GetPNMJoinToken(c.UserContext(), req)
+	token, err := uc.UserModel.GetPNMJoinToken(c.UserContext(), req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
@@ -49,7 +65,8 @@ func HandleGenerateJoinToken(c *fiber.Ctx) error {
 	return utils.SendProtoJsonResponse(c, r)
 }
 
-func HandleUpdateUserLockSetting(c *fiber.Ctx) error {
+// HandleUpdateUserLockSetting handles updating a user's lock settings.
+func (uc *UserController) HandleUpdateUserLockSetting(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	isAdmin := c.Locals("isAdmin")
 	requestedUserId := c.Locals("requestedUserId")
@@ -69,18 +86,15 @@ func HandleUpdateUserLockSetting(c *fiber.Ctx) error {
 	}
 
 	// now need to check if meeting is running or not
-	app := config.GetConfig()
-	ds := dbservice.New(app.DB)
 	isRunning := 1
-	room, _ := ds.GetRoomInfoBySid(req.RoomSid, &isRunning)
+	room, _ := uc.dbservice.GetRoomInfoBySid(req.RoomSid, &isRunning)
 
 	if room == nil || room.ID == 0 {
 		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
 	}
 
 	req.RequestedUserId = requestedUserId.(string)
-	m := models.NewUserModel(nil, nil, nil)
-	err = m.UpdateUserLockSettings(req)
+	err = uc.UserModel.UpdateUserLockSettings(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -88,7 +102,8 @@ func HandleUpdateUserLockSetting(c *fiber.Ctx) error {
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
-func HandleMuteUnMuteTrack(c *fiber.Ctx) error {
+// HandleMuteUnMuteTrack handles muting or unmuting a user's track.
+func (uc *UserController) HandleMuteUnMuteTrack(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	isAdmin := c.Locals("isAdmin")
 	requestedUserId := c.Locals("requestedUserId")
@@ -97,11 +112,7 @@ func HandleMuteUnMuteTrack(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	app := config.GetConfig()
-	ds := dbservice.New(app.DB)
-	m := models.NewUserModel(app, ds, nil)
-
-	err := m.CommonValidation(c)
+	err := uc.UserModel.CommonValidation(c)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -118,13 +129,13 @@ func HandleMuteUnMuteTrack(c *fiber.Ctx) error {
 
 	// now need to check if meeting is running or not
 	isRunning := 1
-	room, _ := ds.GetRoomInfoBySid(req.Sid, &isRunning)
+	room, _ := uc.dbservice.GetRoomInfoBySid(req.Sid, &isRunning)
 	if room == nil || room.ID == 0 {
 		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
 	}
 
 	req.RequestedUserId = requestedUserId.(string)
-	err = m.MuteUnMuteTrack(req)
+	err = uc.UserModel.MuteUnMuteTrack(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -132,7 +143,8 @@ func HandleMuteUnMuteTrack(c *fiber.Ctx) error {
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
-func HandleRemoveParticipant(c *fiber.Ctx) error {
+// HandleRemoveParticipant handles removing a participant from a room.
+func (uc *UserController) HandleRemoveParticipant(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
 	isAdmin := c.Locals("isAdmin")
@@ -141,10 +153,7 @@ func HandleRemoveParticipant(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	app := config.GetConfig()
-	ds := dbservice.New(app.DB)
-	m := models.NewUserModel(app, ds, nil)
-	err := m.CommonValidation(c)
+	err := uc.UserModel.CommonValidation(c)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -164,12 +173,12 @@ func HandleRemoveParticipant(c *fiber.Ctx) error {
 
 	// now need to check if meeting is running or not
 	isRunning := 1
-	room, _ := ds.GetRoomInfoBySid(req.Sid, &isRunning)
+	room, _ := uc.dbservice.GetRoomInfoBySid(req.Sid, &isRunning)
 	if room == nil || room.ID == 0 {
 		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
 	}
 
-	err = m.RemoveParticipant(req)
+	err = uc.UserModel.RemoveParticipant(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -177,7 +186,8 @@ func HandleRemoveParticipant(c *fiber.Ctx) error {
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
-func HandleSwitchPresenter(c *fiber.Ctx) error {
+// HandleSwitchPresenter handles switching the presenter in a room.
+func (uc *UserController) HandleSwitchPresenter(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
@@ -192,10 +202,9 @@ func HandleSwitchPresenter(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	m := models.NewUserModel(nil, nil, nil)
 	req.RoomId = roomId.(string)
 	req.RequestedUserId = requestedUserId.(string)
-	err = m.SwitchPresenter(req)
+	err = uc.UserModel.SwitchPresenter(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}

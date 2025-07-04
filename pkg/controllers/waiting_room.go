@@ -8,7 +8,20 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func HandleApproveUsers(c *fiber.Ctx) error {
+// WaitingRoomController holds dependencies for waiting room-related handlers.
+type WaitingRoomController struct {
+	WaitingRoomModel *models.WaitingRoomModel
+}
+
+// NewWaitingRoomController creates a new WaitingRoomController.
+func NewWaitingRoomController(m *models.WaitingRoomModel) *WaitingRoomController {
+	return &WaitingRoomController{
+		WaitingRoomModel: m,
+	}
+}
+
+// HandleApproveUsers handles approving users from the waiting room.
+func (wrc *WaitingRoomController) HandleApproveUsers(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	isAdmin := c.Locals("isAdmin")
 
@@ -16,7 +29,6 @@ func HandleApproveUsers(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	m := models.NewWaitingRoomModel(nil, nil)
 	req := new(plugnmeet.ApproveWaitingUsersReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
@@ -24,7 +36,7 @@ func HandleApproveUsers(c *fiber.Ctx) error {
 	}
 
 	req.RoomId = roomId.(string)
-	err = m.ApproveWaitingUsers(req)
+	err = wrc.WaitingRoomModel.ApproveWaitingUsers(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -32,7 +44,8 @@ func HandleApproveUsers(c *fiber.Ctx) error {
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
-func HandleUpdateWaitingRoomMessage(c *fiber.Ctx) error {
+// HandleUpdateWaitingRoomMessage handles updating the waiting room message.
+func (wrc *WaitingRoomController) HandleUpdateWaitingRoomMessage(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	isAdmin := c.Locals("isAdmin")
 
@@ -40,7 +53,6 @@ func HandleUpdateWaitingRoomMessage(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	m := models.NewWaitingRoomModel(nil, nil)
 	req := new(plugnmeet.UpdateWaitingRoomMessageReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
@@ -48,7 +60,7 @@ func HandleUpdateWaitingRoomMessage(c *fiber.Ctx) error {
 	}
 
 	req.RoomId = roomId.(string)
-	err = m.UpdateWaitingRoomMessage(req)
+	err = wrc.WaitingRoomModel.UpdateWaitingRoomMessage(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}

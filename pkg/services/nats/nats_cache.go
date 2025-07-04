@@ -62,9 +62,9 @@ func InitNatsCacheService(app *config.AppConfig) {
 }
 
 // GetNatsCacheService returns the singleton instance.
-func GetNatsCacheService() *NatsCacheService {
+func GetNatsCacheService(app *config.AppConfig) *NatsCacheService {
 	if defaultNatsCacheService == nil {
-		InitNatsCacheService(nil)
+		InitNatsCacheService(app)
 	}
 	return defaultNatsCacheService
 }

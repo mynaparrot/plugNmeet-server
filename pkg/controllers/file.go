@@ -15,9 +15,23 @@ import (
 	"strings"
 )
 
+// FileController holds dependencies for file-related handlers.
+type FileController struct {
+	AppConfig *config.AppConfig
+	FileModel *models.FileModel
+}
+
+// NewFileController creates a new FileController.
+func NewFileController(config *config.AppConfig, fm *models.FileModel) *FileController {
+	return &FileController{
+		AppConfig: config,
+		FileModel: fm,
+	}
+}
+
 // HandleFileUpload method can only be use if you are using resumable.js as your frontend.
 // Library link: https://github.com/23/resumable.js
-func HandleFileUpload(c *fiber.Ctx) error {
+func (fc *FileController) HandleFileUpload(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
 
@@ -38,8 +52,7 @@ func HandleFileUpload(c *fiber.Ctx) error {
 		return commonFileErrorResponse(c, "token roomId & requested roomId didn't matched", fiber.StatusBadRequest)
 	}
 
-	m := models.NewFileModel(nil, nil, nil)
-	res, fErr := m.ResumableFileUpload(c)
+	res, fErr := fc.FileModel.ResumableFileUpload(c)
 	if fErr != nil {
 		return commonFileErrorResponse(c, fErr.Message, fErr.Code)
 	}
@@ -52,7 +65,8 @@ func HandleFileUpload(c *fiber.Ctx) error {
 	}
 }
 
-func HandleUploadedFileMerge(c *fiber.Ctx) error {
+// HandleUploadedFileMerge handles merging chunks of a resumable upload.
+func (fc *FileController) HandleUploadedFileMerge(c *fiber.Ctx) error {
 	req := new(models.ResumableUploadedFileMergeReq)
 	err := c.BodyParser(req)
 	if err != nil {
@@ -63,8 +77,7 @@ func HandleUploadedFileMerge(c *fiber.Ctx) error {
 		return commonFileErrorResponse(c, "missing required fields", fiber.StatusBadRequest)
 	}
 
-	m := models.NewFileModel(nil, nil, nil)
-	res, err := m.UploadedFileMerge(req)
+	res, err := fc.FileModel.UploadedFileMerge(req)
 	if err != nil {
 		return commonFileErrorResponse(c, err.Error(), fiber.StatusBadRequest)
 	}
@@ -72,7 +85,8 @@ func HandleUploadedFileMerge(c *fiber.Ctx) error {
 	return c.JSON(res)
 }
 
-func HandleUploadBase64EncodedData(c *fiber.Ctx) error {
+// HandleUploadBase64EncodedData handles uploading base64 encoded data.
+func (fc *FileController) HandleUploadBase64EncodedData(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 
 	req := new(plugnmeet.UploadBase64EncodedDataReq)
@@ -82,8 +96,7 @@ func HandleUploadBase64EncodedData(c *fiber.Ctx) error {
 	}
 
 	req.RoomId = roomId.(string)
-	m := models.NewFileModel(nil, nil, nil)
-	res, err := m.UploadBase64EncodedData(req)
+	res, err := fc.FileModel.UploadBase64EncodedData(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -91,12 +104,13 @@ func HandleUploadBase64EncodedData(c *fiber.Ctx) error {
 	return utils.SendProtobufResponse(c, res)
 }
 
-func HandleDownloadUploadedFile(c *fiber.Ctx) error {
+// HandleDownloadUploadedFile handles downloading an uploaded file.
+func (fc *FileController) HandleDownloadUploadedFile(c *fiber.Ctx) error {
 	sid := c.Params("sid")
 	otherParts := c.Params("*")
 	otherParts, _ = url.QueryUnescape(otherParts)
 
-	file := fmt.Sprintf("%s/%s/%s", config.GetConfig().UploadFileSettings.Path, sid, otherParts)
+	file := fmt.Sprintf("%s/%s/%s", fc.AppConfig.UploadFileSettings.Path, sid, otherParts)
 	mtype, err := mimetype.DetectFile(file)
 	if err != nil {
 		ms := strings.SplitN(err.Error(), "/", -1)
@@ -110,7 +124,8 @@ func HandleDownloadUploadedFile(c *fiber.Ctx) error {
 	return c.SendFile(file)
 }
 
-func HandleConvertWhiteboardFile(c *fiber.Ctx) error {
+// HandleConvertWhiteboardFile handles converting a file for the whiteboard.
+func (fc *FileController) HandleConvertWhiteboardFile(c *fiber.Ctx) error {
 	req := new(models.ConvertWhiteboardFileReq)
 	err := c.BodyParser(req)
 	if err != nil {
@@ -135,8 +150,7 @@ func HandleConvertWhiteboardFile(c *fiber.Ctx) error {
 		})
 	}
 
-	m := models.NewFileModel(nil, nil, nil)
-	res, err := m.ConvertAndBroadcastWhiteboardFile(req.RoomId, req.RoomSid, req.FilePath)
+	res, err := fc.FileModel.ConvertAndBroadcastWhiteboardFile(req.RoomId, req.RoomSid, req.FilePath)
 	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
@@ -147,23 +161,24 @@ func HandleConvertWhiteboardFile(c *fiber.Ctx) error {
 	return c.JSON(res)
 }
 
-func HandleGetClientFiles(c *fiber.Ctx) error {
+// HandleGetClientFiles gets the client CSS and JS files.
+func (fc *FileController) HandleGetClientFiles(c *fiber.Ctx) error {
 	var css, js []string
 
-	if config.GetConfig().Client.Debug {
+	if fc.AppConfig.Client.Debug {
 		var err error
-		css, err = utils.GetFilesFromDir(config.GetConfig().Client.Path+"/assets/css", ".css", "des")
+		css, err = utils.GetFilesFromDir(fc.AppConfig.Client.Path+"/assets/css", ".css", "des")
 		if err != nil {
 			log.Errorln(err)
 		}
 
-		js, err = utils.GetFilesFromDir(config.GetConfig().Client.Path+"/assets/js", ".js", "asc")
+		js, err = utils.GetFilesFromDir(fc.AppConfig.Client.Path+"/assets/js", ".js", "asc")
 		if err != nil {
 			log.Errorln(err)
 		}
 	} else {
-		css = config.GetConfig().ClientFiles["css"]
-		js = config.GetConfig().ClientFiles["js"]
+		css = fc.AppConfig.ClientFiles["css"]
+		js = fc.AppConfig.ClientFiles["js"]
 	}
 
 	return c.JSON(fiber.Map{

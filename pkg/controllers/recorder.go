@@ -11,7 +11,28 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func HandleRecording(c *fiber.Ctx) error {
+// RecorderController holds dependencies for recorder-related handlers.
+type RecorderController struct {
+	AppConfig      *config.AppConfig
+	RecorderModel  *models.RecorderModel
+	RecordingModel *models.RecordingModel
+	RoomModel      *models.RoomModel
+	dbservice      *dbservice.DatabaseService
+}
+
+// NewRecorderController creates a new RecorderController.
+func NewRecorderController(config *config.AppConfig, recorderModel *models.RecorderModel, recordingModel *models.RecordingModel, roomModel *models.RoomModel, dbservice *dbservice.DatabaseService) *RecorderController {
+	return &RecorderController{
+		AppConfig:      config,
+		RecorderModel:  recorderModel,
+		RecordingModel: recordingModel,
+		RoomModel:      roomModel,
+		dbservice:      dbservice,
+	}
+}
+
+// HandleRecording handles start/stop recording requests.
+func (rc *RecorderController) HandleRecording(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 
@@ -35,9 +56,8 @@ func HandleRecording(c *fiber.Ctx) error {
 	}
 
 	// now need to check if meeting is running or not
-	rm := dbservice.New(config.GetConfig().DB)
 	isRunning := 1
-	room, err := rm.GetRoomInfoBySid(req.Sid, &isRunning)
+	room, err := rc.dbservice.GetRoomInfoBySid(req.Sid, &isRunning)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -65,8 +85,7 @@ func HandleRecording(c *fiber.Ctx) error {
 	req.RoomId = room.RoomId
 	req.RoomTableId = int64(room.ID)
 
-	m := models.NewRecorderModel(nil, nil, nil)
-	err = m.SendMsgToRecorder(req)
+	err = rc.RecorderModel.SendMsgToRecorder(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -74,7 +93,8 @@ func HandleRecording(c *fiber.Ctx) error {
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
-func HandleRTMP(c *fiber.Ctx) error {
+// HandleRTMP handles start/stop RTMP requests.
+func (rc *RecorderController) HandleRTMP(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 
@@ -100,16 +120,13 @@ func HandleRTMP(c *fiber.Ctx) error {
 
 	if req.Task == plugnmeet.RecordingTasks_START_RTMP {
 		if req.RtmpUrl == nil {
-			return utils.SendCommonProtobufResponse(c, false, "rtmp url require")
-		} else if *req.RtmpUrl == "" {
-			return utils.SendCommonProtobufResponse(c, false, "rtmp url require")
+			return utils.SendCommonProtobufResponse(c, false, "rtmpUrl required")
 		}
 	}
 
 	// now need to check if meeting is running or not
-	rm := dbservice.New(config.GetConfig().DB)
 	isRunning := 1
-	room, err := rm.GetRoomInfoBySid(req.Sid, &isRunning)
+	room, err := rc.dbservice.GetRoomInfoBySid(req.Sid, &isRunning)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -131,8 +148,7 @@ func HandleRTMP(c *fiber.Ctx) error {
 	req.RoomId = room.RoomId
 	req.RoomTableId = int64(room.ID)
 
-	m := models.NewRecorderModel(nil, nil, nil)
-	err = m.SendMsgToRecorder(req)
+	err = rc.RecorderModel.SendMsgToRecorder(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -140,7 +156,8 @@ func HandleRTMP(c *fiber.Ctx) error {
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
-func HandleRecorderEvents(c *fiber.Ctx) error {
+// HandleRecorderEvents handles events coming from the recorder.
+func (rc *RecorderController) HandleRecorderEvents(c *fiber.Ctx) error {
 	req := new(plugnmeet.RecorderToPlugNmeet)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
@@ -152,17 +169,18 @@ func HandleRecorderEvents(c *fiber.Ctx) error {
 	}
 
 	if req.From == "recorder" {
-		app := config.GetConfig()
-		ds := dbservice.New(app.DB)
-		roomInfo, _ := ds.GetRoomInfoByTableId(uint64(req.RoomTableId))
+		roomInfo, err := rc.dbservice.GetRoomInfoByTableId(uint64(req.RoomTableId))
+		if err != nil {
+			log.Errorln(err)
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
 		if roomInfo == nil {
 			return c.SendStatus(fiber.StatusNotFound)
 		}
 
-		m := models.NewRecordingModel(app, ds, nil)
 		req.RoomId = roomInfo.RoomId
 		req.RoomSid = roomInfo.Sid
-		m.HandleRecorderResp(req, roomInfo)
+		rc.RecordingModel.HandleRecorderResp(req, roomInfo)
 	}
 
 	return c.SendStatus(fiber.StatusOK)

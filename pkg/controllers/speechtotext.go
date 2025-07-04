@@ -8,7 +8,20 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func HandleSpeechToTextTranslationServiceStatus(c *fiber.Ctx) error {
+// SpeechToTextController holds dependencies for speech-to-text related handlers.
+type SpeechToTextController struct {
+	SpeechToTextModel *models.SpeechToTextModel
+}
+
+// NewSpeechToTextController creates a new SpeechToTextController.
+func NewSpeechToTextController(m *models.SpeechToTextModel) *SpeechToTextController {
+	return &SpeechToTextController{
+		SpeechToTextModel: m,
+	}
+}
+
+// HandleSpeechToTextTranslationServiceStatus handles enabling/disabling speech-to-text services.
+func (stc *SpeechToTextController) HandleSpeechToTextTranslationServiceStatus(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 	if isAdmin != true {
@@ -22,8 +35,7 @@ func HandleSpeechToTextTranslationServiceStatus(c *fiber.Ctx) error {
 	}
 
 	req.RoomId = roomId.(string)
-	m := models.NewSpeechToTextModel(nil, nil, nil)
-	err = m.SpeechToTextTranslationServiceStart(req)
+	err = stc.SpeechToTextModel.SpeechToTextTranslationServiceStart(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -31,7 +43,8 @@ func HandleSpeechToTextTranslationServiceStatus(c *fiber.Ctx) error {
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
-func HandleGenerateAzureToken(c *fiber.Ctx) error {
+// HandleGenerateAzureToken handles generating an Azure token for speech services.
+func (stc *SpeechToTextController) HandleGenerateAzureToken(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
 
@@ -42,8 +55,7 @@ func HandleGenerateAzureToken(c *fiber.Ctx) error {
 	}
 	req.RoomId = roomId.(string)
 
-	m := models.NewSpeechToTextModel(nil, nil, nil)
-	err = m.GenerateAzureToken(req, requestedUserId.(string))
+	err = stc.SpeechToTextModel.GenerateAzureToken(req, requestedUserId.(string))
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -51,7 +63,8 @@ func HandleGenerateAzureToken(c *fiber.Ctx) error {
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
-func HandleSpeechServiceUserStatus(c *fiber.Ctx) error {
+// HandleSpeechServiceUserStatus handles updating a user's speech service status.
+func (stc *SpeechToTextController) HandleSpeechServiceUserStatus(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
 
@@ -67,8 +80,7 @@ func HandleSpeechServiceUserStatus(c *fiber.Ctx) error {
 	req.RoomId = roomId.(string)
 	req.UserId = requestedUserId.(string)
 
-	m := models.NewSpeechToTextModel(nil, nil, nil)
-	err = m.SpeechServiceUserStatus(req)
+	err = stc.SpeechToTextModel.SpeechServiceUserStatus(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -76,7 +88,8 @@ func HandleSpeechServiceUserStatus(c *fiber.Ctx) error {
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
-func HandleRenewAzureToken(c *fiber.Ctx) error {
+// HandleRenewAzureToken handles renewing an Azure token.
+func (stc *SpeechToTextController) HandleRenewAzureToken(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
 
@@ -87,8 +100,7 @@ func HandleRenewAzureToken(c *fiber.Ctx) error {
 	}
 	req.RoomId = roomId.(string)
 
-	m := models.NewSpeechToTextModel(nil, nil, nil)
-	err = m.RenewAzureToken(req, requestedUserId.(string))
+	err = stc.SpeechToTextModel.RenewAzureToken(req, requestedUserId.(string))
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
