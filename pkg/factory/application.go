@@ -61,7 +61,6 @@ type ApplicationControllers struct {
 	RecorderController     *controllers.RecorderController
 	RecordingController    *controllers.RecordingController
 	RoomController         *controllers.RoomController
-	SchedulerController    *controllers.SchedulerController
 	SpeechToTextController *controllers.SpeechToTextController
 	UserController         *controllers.UserController
 	WaitingRoomController  *controllers.WaitingRoomController
@@ -80,14 +79,13 @@ type Application struct {
 
 func (a *Application) Boot() {
 	var wg sync.WaitGroup
-	// We need to wait for 1 critical setup task to complete.
+	// We need to wait for authService setup task to complete.
 	wg.Add(1)
 	// Boot up the NATS controller in a goroutine.
 	go a.Controllers.NatsController.BootUp(&wg)
 	// Wait for NatsController.BootUp to finish its service registration.
 	// This blocks until `wg.Done()` is called inside BootUp.
 	wg.Wait()
-	//a.Services.NatsService.
 	// start scheduler
-	go a.Controllers.SchedulerController.StartScheduler()
+	go a.Models.SchedulerModel.StartScheduler()
 }

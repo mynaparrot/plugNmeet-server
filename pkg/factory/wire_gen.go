@@ -93,7 +93,6 @@ func NewAppFactory(appConfig *config.AppConfig) (*Application, error) {
 	recorderController := controllers.NewRecorderController(appConfig, recorderModel, recordingModel, roomModel, databaseService)
 	recordingController := controllers.NewRecordingController(recordingModel)
 	roomController := controllers.NewRoomController(roomModel)
-	schedulerController := controllers.NewSchedulerController(schedulerModel)
 	speechToTextController := controllers.NewSpeechToTextController(speechToTextModel)
 	userController := controllers.NewUserController(appConfig, userModel, databaseService, natsService)
 	waitingRoomController := controllers.NewWaitingRoomController(waitingRoomModel)
@@ -114,7 +113,6 @@ func NewAppFactory(appConfig *config.AppConfig) (*Application, error) {
 		RecorderController:     recorderController,
 		RecordingController:    recordingController,
 		RoomController:         roomController,
-		SchedulerController:    schedulerController,
 		SpeechToTextController: speechToTextController,
 		UserController:         userController,
 		WaitingRoomController:  waitingRoomController,
@@ -144,4 +142,4 @@ var serviceSet = wire.NewSet(dbservice.New, redisservice.New, natsservice.New, l
 var modelSet = wire.NewSet(models.NewAnalyticsModel, models.NewAuthModel, models.NewBBBApiWrapperModel, models.NewBreakoutRoomModel, models.NewRoomDurationModel, models.NewEtherpadModel, models.NewExDisplayModel, models.NewExMediaModel, models.NewFileModel, models.NewIngressModel, models.NewLtiV1Model, models.NewNatsModel, models.NewPollModel, models.NewRecorderModel, models.NewRecordingModel, models.NewRoomModel, models.NewSchedulerModel, models.NewSpeechToTextModel, models.NewUserModel, models.NewWaitingRoomModel, models.NewWebhookModel)
 
 // build the dependency set for controllers
-var controllerSet = wire.NewSet(controllers.NewAnalyticsController, controllers.NewAuthController, controllers.NewBBBController, controllers.NewBreakoutRoomController, controllers.NewEtherpadController, controllers.NewExDisplayController, controllers.NewExMediaController, controllers.NewFileController, controllers.NewIngressController, controllers.NewLtiV1Controller, controllers.NewPollsController, controllers.NewRecorderController, controllers.NewRecordingController, controllers.NewRoomController, controllers.NewSchedulerController, controllers.NewSpeechToTextController, controllers.NewUserController, controllers.NewWaitingRoomController, controllers.NewWebhookController, controllers.NewNatsController)
+var controllerSet = wire.NewSet(controllers.NewAnalyticsController, controllers.NewAuthController, controllers.NewBBBController, controllers.NewBreakoutRoomController, controllers.NewEtherpadController, controllers.NewExDisplayController, controllers.NewExMediaController, controllers.NewFileController, controllers.NewIngressController, controllers.NewLtiV1Controller, controllers.NewPollsController, controllers.NewRecorderController, controllers.NewRecordingController, controllers.NewRoomController, controllers.NewSpeechToTextController, controllers.NewUserController, controllers.NewWaitingRoomController, controllers.NewWebhookController, controllers.NewNatsController)

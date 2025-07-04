@@ -68,7 +68,6 @@ var controllerSet = wire.NewSet(
 	controllers.NewRecorderController,
 	controllers.NewRecordingController,
 	controllers.NewRoomController,
-	controllers.NewSchedulerController,
 	controllers.NewSpeechToTextController,
 	controllers.NewUserController,
 	controllers.NewWaitingRoomController,
