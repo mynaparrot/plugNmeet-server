@@ -51,7 +51,7 @@ jobs:
           cd client
           pnpm install && pnpm run build
       - name: Run docker-compose
-        uses: isbang/compose-action@v2.2.0
+        uses: isbang/compose-action@v2.3.0
         with:
           compose-file: "./test/docker-compose.yaml"
           down-flags: "--volumes"
