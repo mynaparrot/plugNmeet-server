@@ -16,16 +16,31 @@ import (
 	"strings"
 )
 
-// HandleAuthHeaderCheck will check auth values
-// It will accept two header values: API-KEY & HASH-SIGNATURE
-// HASH-SIGNATURE will require to calculated hmac sha256 using
-// body and Secret key
-func HandleAuthHeaderCheck(c *fiber.Ctx) error {
+// AuthController holds dependencies for auth-related handlers.
+type AuthController struct {
+	AppConfig   *config.AppConfig
+	AuthModel   *models.AuthModel
+	RoomModel   *models.RoomModel
+	NatsService *natsservice.NatsService
+}
+
+// NewAuthController creates a new AuthController.
+func NewAuthController(config *config.AppConfig, authModel *models.AuthModel, roomModel *models.RoomModel, natsService *natsservice.NatsService) *AuthController {
+	return &AuthController{
+		AppConfig:   config,
+		AuthModel:   authModel,
+		RoomModel:   roomModel,
+		NatsService: natsService,
+	}
+}
+
+// HandleAuthHeaderCheck is a middleware to check API-KEY & HASH-SIGNATURE.
+func (ac *AuthController) HandleAuthHeaderCheck(c *fiber.Ctx) error {
 	apiKey := c.Get("API-KEY", "")
 	signature := c.Get("HASH-SIGNATURE", "")
 	body := c.Body()
 
-	if apiKey != config.GetConfig().Client.ApiKey {
+	if apiKey != ac.AppConfig.Client.ApiKey {
 		c.Status(fiber.StatusUnauthorized)
 		return utils.SendCommonProtoJsonResponse(c, false, "invalid API key")
 	}
@@ -34,15 +49,10 @@ func HandleAuthHeaderCheck(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, "hash signature value required")
 	}
 
-	status := false
-	mac := hmac.New(sha256.New, []byte(config.GetConfig().Client.Secret))
+	mac := hmac.New(sha256.New, []byte(ac.AppConfig.Client.Secret))
 	mac.Write(body)
 	expectedSignature := hex.EncodeToString(mac.Sum(nil))
-	if subtle.ConstantTimeCompare([]byte(expectedSignature), []byte(signature)) == 1 {
-		status = true
-	}
-
-	if !status {
+	if subtle.ConstantTimeCompare([]byte(expectedSignature), []byte(signature)) != 1 {
 		c.Status(fiber.StatusUnauthorized)
 		return utils.SendCommonProtoJsonResponse(c, false, "can't verify provided information")
 	}
@@ -50,10 +60,10 @@ func HandleAuthHeaderCheck(c *fiber.Ctx) error {
 	return c.Next()
 }
 
-func HandleVerifyToken(c *fiber.Ctx) error {
+// HandleVerifyToken verifies a user's token before they join a room.
+func (ac *AuthController) HandleVerifyToken(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
-	app := config.GetConfig()
 
 	req := new(plugnmeet.VerifyTokenReq)
 	err := proto.Unmarshal(c.Body(), req)
@@ -62,8 +72,7 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	}
 
 	// check for duplicate join
-	nts := natsservice.New(app)
-	status, err := nts.GetRoomUserStatus(roomId.(string), requestedUserId.(string))
+	status, err := ac.NatsService.GetRoomUserStatus(roomId.(string), requestedUserId.(string))
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -71,21 +80,18 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "notifications.room-disconnected-duplicate-entry")
 	}
 
-	exist := nts.IsUserExistInBlockList(roomId.(string), requestedUserId.(string))
+	exist := ac.NatsService.IsUserExistInBlockList(roomId.(string), requestedUserId.(string))
 	if exist {
 		return utils.SendCommonProtobufResponse(c, false, "notifications.you-are-blocked")
 	}
 
-	m := models.NewRoomModel(nil, nil, nil)
-	rr, roomDbInfo, rInfo, meta := m.IsRoomActive(c.UserContext(), &plugnmeet.IsRoomActiveReq{
+	rr, roomDbInfo, rInfo, meta := ac.RoomModel.IsRoomActive(c.UserContext(), &plugnmeet.IsRoomActiveReq{
 		RoomId: roomId.(string),
 	})
 
 	if !rr.GetIsActive() {
-		// prevent joining if room status is not created or active
 		return utils.SendCommonProtobufResponse(c, false, rr.Msg)
 	}
-	// now check MaxParticipants configuration
 	if rInfo.MaxParticipants > 0 && roomDbInfo.JoinedParticipants >= int64(rInfo.MaxParticipants) {
 		return utils.SendCommonProtobufResponse(c, false, "notifications.max-num-participates-exceeded")
 	}
@@ -93,11 +99,11 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	v := version.Version
 	rId := roomId.(string)
 	uId := requestedUserId.(string)
-	natsSubjs := app.NatsInfo.Subjects
+	natsSubjs := ac.AppConfig.NatsInfo.Subjects
 	res := &plugnmeet.VerifyTokenRes{
 		Status:        true,
 		Msg:           "token is valid",
-		NatsWsUrls:    app.NatsInfo.NatsWSUrls,
+		NatsWsUrls:    ac.AppConfig.NatsInfo.NatsWSUrls,
 		ServerVersion: &v,
 		RoomId:        &rId,
 		UserId:        &uId,
@@ -116,9 +122,9 @@ func HandleVerifyToken(c *fiber.Ctx) error {
 	return utils.SendProtobufResponse(c, res)
 }
 
-func HandleVerifyHeaderToken(c *fiber.Ctx) error {
+// HandleVerifyHeaderToken is a middleware to verify the Authorization header token.
+func (ac *AuthController) HandleVerifyHeaderToken(c *fiber.Ctx) error {
 	authToken := c.Get("Authorization")
-	m := models.NewAuthModel(nil, nil)
 
 	errStatus := fiber.StatusUnauthorized
 	path := c.Path()
@@ -131,7 +137,7 @@ func HandleVerifyHeaderToken(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, "Authorization header is missing")
 	}
 
-	claims, err := m.VerifyPlugNmeetAccessToken(authToken, true)
+	claims, err := ac.AuthModel.VerifyPlugNmeetAccessToken(authToken, true)
 	if err != nil {
 		_ = c.SendStatus(errStatus)
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())

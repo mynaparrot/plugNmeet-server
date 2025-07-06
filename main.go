@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/mynaparrot/plugnmeet-server/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
+	"github.com/mynaparrot/plugnmeet-server/pkg/factory"
 	"github.com/mynaparrot/plugnmeet-server/pkg/routers"
 	"github.com/mynaparrot/plugnmeet-server/version"
 	log "github.com/sirupsen/logrus"
@@ -55,17 +55,18 @@ func startServer(ctx context.Context, c *cli.Command) error {
 		log.Fatalln(err)
 	}
 
-	// start nats services
-	nts := controllers.NewNatsController()
-	go nts.BootUp()
+	appFactory, err := factory.NewAppFactory(appCnf)
+	if err != nil {
+		log.Fatalln(err)
+	}
 
-	// start scheduler
-	go controllers.StartScheduler()
+	// boot up some services
+	appFactory.Boot()
 
 	// defer close connections
 	defer helpers.HandleCloseConnections()
 
-	rt := routers.New()
+	rt := routers.New(appFactory.AppConfig, appFactory.Controllers)
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 

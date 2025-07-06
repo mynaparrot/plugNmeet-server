@@ -7,7 +7,20 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func HandleCreateBreakoutRooms(c *fiber.Ctx) error {
+// BreakoutRoomController holds dependencies for breakout room handlers.
+type BreakoutRoomController struct {
+	BreakoutRoomModel *models.BreakoutRoomModel
+}
+
+// NewBreakoutRoomController creates a new BreakoutRoomController.
+func NewBreakoutRoomController(brm *models.BreakoutRoomModel) *BreakoutRoomController {
+	return &BreakoutRoomController{
+		BreakoutRoomModel: brm,
+	}
+}
+
+// HandleCreateBreakoutRooms handles creating breakout rooms.
+func (brc *BreakoutRoomController) HandleCreateBreakoutRooms(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
@@ -16,32 +29,32 @@ func HandleCreateBreakoutRooms(c *fiber.Ctx) error {
 
 	if isAdmin != true {
 		res.Msg = "only admin can perform this task"
-		return SendBreakoutRoomResponse(c, res)
+		return sendBreakoutRoomResponse(c, res)
 	}
 
 	req := new(plugnmeet.CreateBreakoutRoomsReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		res.Msg = err.Error()
-		return SendBreakoutRoomResponse(c, res)
+		return sendBreakoutRoomResponse(c, res)
 	}
 
 	req.RoomId = roomId.(string)
 	req.RequestedUserId = requestedUserId.(string)
 
-	m := models.NewBreakoutRoomModel(nil, nil, nil)
-	err = m.CreateBreakoutRooms(c.UserContext(), req)
+	err = brc.BreakoutRoomModel.CreateBreakoutRooms(c.UserContext(), req)
 	if err != nil {
 		res.Msg = err.Error()
-		return SendBreakoutRoomResponse(c, res)
+		return sendBreakoutRoomResponse(c, res)
 	}
 
 	res.Status = true
 	res.Msg = "success"
-	return SendBreakoutRoomResponse(c, res)
+	return sendBreakoutRoomResponse(c, res)
 }
 
-func HandleJoinBreakoutRoom(c *fiber.Ctx) error {
+// HandleJoinBreakoutRoom handles joining a breakout room.
+func (brc *BreakoutRoomController) HandleJoinBreakoutRoom(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	isAdmin := c.Locals("isAdmin")
 
@@ -52,62 +65,62 @@ func HandleJoinBreakoutRoom(c *fiber.Ctx) error {
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		res.Msg = err.Error()
-		return SendBreakoutRoomResponse(c, res)
+		return sendBreakoutRoomResponse(c, res)
 	}
 
 	req.RoomId = roomId.(string)
 	req.IsAdmin = isAdmin.(bool)
-	m := models.NewBreakoutRoomModel(nil, nil, nil)
-	token, err := m.JoinBreakoutRoom(c.UserContext(), req)
+	token, err := brc.BreakoutRoomModel.JoinBreakoutRoom(c.UserContext(), req)
 	if err != nil {
 		res.Msg = err.Error()
-		return SendBreakoutRoomResponse(c, res)
+		return sendBreakoutRoomResponse(c, res)
 	}
 
 	res.Status = true
 	res.Msg = "success"
 	res.Token = &token
-	return SendBreakoutRoomResponse(c, res)
+	return sendBreakoutRoomResponse(c, res)
 }
 
-func HandleGetBreakoutRooms(c *fiber.Ctx) error {
+// HandleGetBreakoutRooms lists all breakout rooms for a parent room.
+func (brc *BreakoutRoomController) HandleGetBreakoutRooms(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	res := new(plugnmeet.BreakoutRoomRes)
 	res.Status = false
 
-	m := models.NewBreakoutRoomModel(nil, nil, nil)
-	rooms, err := m.GetBreakoutRooms(roomId.(string))
+	rooms, err := brc.BreakoutRoomModel.GetBreakoutRooms(roomId.(string))
 	if err != nil {
 		res.Msg = err.Error()
-		return SendBreakoutRoomResponse(c, res)
+		return sendBreakoutRoomResponse(c, res)
 	}
 
 	res.Status = true
 	res.Msg = "success"
 	res.Rooms = rooms
-	return SendBreakoutRoomResponse(c, res)
+	return sendBreakoutRoomResponse(c, res)
 }
 
-func HandleGetMyBreakoutRooms(c *fiber.Ctx) error {
+// HandleGetMyBreakoutRooms gets the breakout room a user belongs to.
+func (brc *BreakoutRoomController) HandleGetMyBreakoutRooms(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
 	res := new(plugnmeet.BreakoutRoomRes)
 	res.Status = false
 
-	m := models.NewBreakoutRoomModel(nil, nil, nil)
-	room, err := m.GetMyBreakoutRooms(roomId.(string), requestedUserId.(string))
+	room, err := brc.BreakoutRoomModel.GetMyBreakoutRooms(roomId.(string), requestedUserId.(string))
 	if err != nil {
 		res.Msg = err.Error()
-		return SendBreakoutRoomResponse(c, res)
+		return sendBreakoutRoomResponse(c, res)
 	}
 
 	res.Status = true
 	res.Msg = "success"
 	res.Room = room
-	return SendBreakoutRoomResponse(c, res)
+	return sendBreakoutRoomResponse(c, res)
 }
 
-func HandleIncreaseBreakoutRoomDuration(c *fiber.Ctx) error {
+// HandleIncreaseBreakoutRoomDuration increases the duration of a breakout room.
+func (brc *BreakoutRoomController) HandleIncreaseBreakoutRoomDuration(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	res := new(plugnmeet.BreakoutRoomRes)
 	res.Status = false
@@ -116,23 +129,23 @@ func HandleIncreaseBreakoutRoomDuration(c *fiber.Ctx) error {
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		res.Msg = err.Error()
-		return SendBreakoutRoomResponse(c, res)
+		return sendBreakoutRoomResponse(c, res)
 	}
 
 	req.RoomId = roomId.(string)
-	m := models.NewBreakoutRoomModel(nil, nil, nil)
-	err = m.IncreaseBreakoutRoomDuration(req)
+	err = brc.BreakoutRoomModel.IncreaseBreakoutRoomDuration(req)
 	if err != nil {
 		res.Msg = err.Error()
-		return SendBreakoutRoomResponse(c, res)
+		return sendBreakoutRoomResponse(c, res)
 	}
 
 	res.Status = true
 	res.Msg = "success"
-	return SendBreakoutRoomResponse(c, res)
+	return sendBreakoutRoomResponse(c, res)
 }
 
-func HandleSendBreakoutRoomMsg(c *fiber.Ctx) error {
+// HandleSendBreakoutRoomMsg broadcasts a message to all breakout rooms.
+func (brc *BreakoutRoomController) HandleSendBreakoutRoomMsg(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	res := new(plugnmeet.BreakoutRoomRes)
 	res.Status = false
@@ -141,23 +154,23 @@ func HandleSendBreakoutRoomMsg(c *fiber.Ctx) error {
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		res.Msg = err.Error()
-		return SendBreakoutRoomResponse(c, res)
+		return sendBreakoutRoomResponse(c, res)
 	}
 
 	req.RoomId = roomId.(string)
-	m := models.NewBreakoutRoomModel(nil, nil, nil)
-	err = m.SendBreakoutRoomMsg(req)
+	err = brc.BreakoutRoomModel.SendBreakoutRoomMsg(req)
 	if err != nil {
 		res.Msg = err.Error()
-		return SendBreakoutRoomResponse(c, res)
+		return sendBreakoutRoomResponse(c, res)
 	}
 
 	res.Status = true
 	res.Msg = "success"
-	return SendBreakoutRoomResponse(c, res)
+	return sendBreakoutRoomResponse(c, res)
 }
 
-func HandleEndBreakoutRoom(c *fiber.Ctx) error {
+// HandleEndBreakoutRoom ends a specific breakout room.
+func (brc *BreakoutRoomController) HandleEndBreakoutRoom(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	res := new(plugnmeet.BreakoutRoomRes)
 	res.Status = false
@@ -166,23 +179,23 @@ func HandleEndBreakoutRoom(c *fiber.Ctx) error {
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		res.Msg = err.Error()
-		return SendBreakoutRoomResponse(c, res)
+		return sendBreakoutRoomResponse(c, res)
 	}
 
 	req.RoomId = roomId.(string)
-	m := models.NewBreakoutRoomModel(nil, nil, nil)
-	err = m.EndBreakoutRoom(c.UserContext(), req)
+	err = brc.BreakoutRoomModel.EndBreakoutRoom(c.UserContext(), req)
 	if err != nil {
 		res.Msg = err.Error()
-		return SendBreakoutRoomResponse(c, res)
+		return sendBreakoutRoomResponse(c, res)
 	}
 
 	res.Status = true
 	res.Msg = "success"
-	return SendBreakoutRoomResponse(c, res)
+	return sendBreakoutRoomResponse(c, res)
 }
 
-func HandleEndBreakoutRooms(c *fiber.Ctx) error {
+// HandleEndBreakoutRooms ends all breakout rooms for a parent room.
+func (brc *BreakoutRoomController) HandleEndBreakoutRooms(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	isAdmin := c.Locals("isAdmin")
 	res := new(plugnmeet.BreakoutRoomRes)
@@ -190,22 +203,21 @@ func HandleEndBreakoutRooms(c *fiber.Ctx) error {
 
 	if isAdmin != true {
 		res.Msg = "only admin can perform this task"
-		return SendBreakoutRoomResponse(c, res)
+		return sendBreakoutRoomResponse(c, res)
 	}
 
-	m := models.NewBreakoutRoomModel(nil, nil, nil)
-	err := m.EndAllBreakoutRoomsByParentRoomId(c.UserContext(), roomId.(string))
+	err := brc.BreakoutRoomModel.EndAllBreakoutRoomsByParentRoomId(c.UserContext(), roomId.(string))
 	if err != nil {
 		res.Msg = err.Error()
-		return SendBreakoutRoomResponse(c, res)
+		return sendBreakoutRoomResponse(c, res)
 	}
 
 	res.Status = true
 	res.Msg = "success"
-	return SendBreakoutRoomResponse(c, res)
+	return sendBreakoutRoomResponse(c, res)
 }
 
-func SendBreakoutRoomResponse(c *fiber.Ctx, res *plugnmeet.BreakoutRoomRes) error {
+func sendBreakoutRoomResponse(c *fiber.Ctx, res *plugnmeet.BreakoutRoomRes) error {
 	marshal, err := proto.Marshal(res)
 	if err != nil {
 		return err

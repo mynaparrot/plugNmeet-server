@@ -6,8 +6,22 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 )
 
-// HandleWebhook processes incoming webhook events from LiveKit
-func HandleWebhook(c *fiber.Ctx) error {
+// WebhookController holds dependencies for webhook-related handlers.
+type WebhookController struct {
+	AuthModel    *models.AuthModel
+	WebhookModel *models.WebhookModel
+}
+
+// NewWebhookController creates a new WebhookController.
+func NewWebhookController(authModel *models.AuthModel, webhookModel *models.WebhookModel) *WebhookController {
+	return &WebhookController{
+		AuthModel:    authModel,
+		WebhookModel: webhookModel,
+	}
+}
+
+// HandleWebhook processes incoming webhook events from LiveKit.
+func (wc *WebhookController) HandleWebhook(c *fiber.Ctx) error {
 	// Read raw request body
 	data := c.Body()
 
@@ -18,8 +32,7 @@ func HandleWebhook(c *fiber.Ctx) error {
 	}
 
 	// Validate the webhook token using LiveKit secret
-	authModel := models.NewAuthModel(nil, nil)
-	if _, err := authModel.ValidateLivekitWebhookToken(data, token); err != nil {
+	if _, err := wc.AuthModel.ValidateLivekitWebhookToken(data, token); err != nil {
 		return c.SendStatus(fiber.StatusForbidden)
 	}
 
@@ -30,8 +43,7 @@ func HandleWebhook(c *fiber.Ctx) error {
 	}
 
 	// Handle the webhook event asynchronously
-	webhookModel := models.NewWebhookModel(c.UserContext(), nil, nil, nil)
-	go webhookModel.HandleWebhookEvents(event)
+	go wc.WebhookModel.HandleWebhookEvents(event)
 
 	return c.SendStatus(fiber.StatusOK)
 }

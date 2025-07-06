@@ -8,7 +8,20 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func HandleExternalMediaPlayer(c *fiber.Ctx) error {
+// ExMediaController holds dependencies for external media player handlers.
+type ExMediaController struct {
+	ExMediaModel *models.ExMediaModel
+}
+
+// NewExMediaController creates a new ExMediaController.
+func NewExMediaController(emm *models.ExMediaModel) *ExMediaController {
+	return &ExMediaController{
+		ExMediaModel: emm,
+	}
+}
+
+// HandleExternalMediaPlayer handles external media player actions.
+func (emc *ExMediaController) HandleExternalMediaPlayer(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
@@ -19,21 +32,20 @@ func HandleExternalMediaPlayer(c *fiber.Ctx) error {
 
 	rid := roomId.(string)
 	if rid == "" {
-		return utils.SendCommonProtobufResponse(c, true, "roomId required")
+		return utils.SendCommonProtobufResponse(c, false, "roomId required")
 	}
 
 	req := new(plugnmeet.ExternalMediaPlayerReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		return utils.SendCommonProtobufResponse(c, true, err.Error())
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	m := models.NewExMediaModel(nil, nil, nil)
 	req.RoomId = rid
 	req.UserId = requestedUserId.(string)
-	err = m.HandleTask(req)
+	err = emc.ExMediaModel.HandleTask(req)
 	if err != nil {
-		return utils.SendCommonProtobufResponse(c, true, err.Error())
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
 	return utils.SendCommonProtobufResponse(c, true, "success")

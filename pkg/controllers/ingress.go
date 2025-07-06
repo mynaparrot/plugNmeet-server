@@ -7,7 +7,20 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func HandleCreateIngress(c *fiber.Ctx) error {
+// IngressController holds dependencies for ingress-related handlers.
+type IngressController struct {
+	IngressModel *models.IngressModel
+}
+
+// NewIngressController creates a new IngressController.
+func NewIngressController(im *models.IngressModel) *IngressController {
+	return &IngressController{
+		IngressModel: im,
+	}
+}
+
+// HandleCreateIngress handles creating a new ingress.
+func (ic *IngressController) HandleCreateIngress(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	isAdmin := c.Locals("isAdmin")
 	res := new(plugnmeet.CreateIngressRes)
@@ -15,22 +28,21 @@ func HandleCreateIngress(c *fiber.Ctx) error {
 
 	if !isAdmin.(bool) {
 		res.Msg = "only admin can perform this task"
-		return SendCreateIngressResponse(c, res)
+		return sendCreateIngressResponse(c, res)
 	}
 
 	req := new(plugnmeet.CreateIngressReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		res.Msg = err.Error()
-		return SendCreateIngressResponse(c, res)
+		return sendCreateIngressResponse(c, res)
 	}
 
-	m := models.NewIngressModel(nil, nil, nil, nil)
 	req.RoomId = roomId.(string)
-	f, err := m.CreateIngress(req)
+	f, err := ic.IngressModel.CreateIngress(req)
 	if err != nil {
 		res.Msg = err.Error()
-		return SendCreateIngressResponse(c, res)
+		return sendCreateIngressResponse(c, res)
 	}
 
 	res.Status = true
@@ -38,10 +50,10 @@ func HandleCreateIngress(c *fiber.Ctx) error {
 	res.Url = f.Url
 	res.StreamKey = f.StreamKey
 
-	return SendCreateIngressResponse(c, res)
+	return sendCreateIngressResponse(c, res)
 }
 
-func SendCreateIngressResponse(c *fiber.Ctx, res *plugnmeet.CreateIngressRes) error {
+func sendCreateIngressResponse(c *fiber.Ctx, res *plugnmeet.CreateIngressRes) error {
 	marshal, err := proto.Marshal(res)
 	if err != nil {
 		return err

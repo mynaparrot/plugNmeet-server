@@ -38,7 +38,7 @@ func New(app *config.AppConfig) *NatsService {
 		app: app,
 		nc:  app.NatsConn,
 		js:  app.JetStream,
-		cs:  GetNatsCacheService(),
+		cs:  GetNatsCacheService(app),
 	}
 }
 

@@ -7,8 +7,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/mynaparrot/plugnmeet-server/version"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -19,6 +17,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 )
 
@@ -31,11 +30,7 @@ type NatsController struct {
 	natsModel     *models.NatsModel
 }
 
-func NewNatsController() *NatsController {
-	app := config.GetConfig()
-	ds := dbservice.New(app.DB)
-	rs := redisservice.New(app.RDS)
-
+func NewNatsController(app *config.AppConfig, authModel *models.AuthModel, natsModel *models.NatsModel) *NatsController {
 	issuerKeyPair, err := nkeys.FromSeed([]byte(app.NatsInfo.AuthCalloutIssuerPrivate))
 	if err != nil {
 		log.Fatal(err)
@@ -45,8 +40,8 @@ func NewNatsController() *NatsController {
 		ctx:           context.Background(),
 		app:           app,
 		issuerKeyPair: issuerKeyPair,
-		authModel:     models.NewAuthModel(app, nil),
-		natsModel:     models.NewNatsModel(app, ds, rs),
+		authModel:     authModel,
+		natsModel:     natsModel,
 	}
 
 	if app.NatsInfo.AuthCalloutXkeyPrivate != nil && *app.NatsInfo.AuthCalloutXkeyPrivate != "" {
@@ -59,7 +54,7 @@ func NewNatsController() *NatsController {
 	return c
 }
 
-func (c *NatsController) BootUp() {
+func (c *NatsController) BootUp(wg *sync.WaitGroup) {
 	// system receiver as worker
 	stream, err := c.app.JetStream.CreateOrUpdateStream(c.ctx, jetstream.StreamConfig{
 		Name:      fmt.Sprintf("%s", c.app.NatsInfo.Subjects.SystemJsWorker),
@@ -94,6 +89,7 @@ func (c *NatsController) BootUp() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	wg.Done()
 
 	// Keep the application running until a signal is received.
 	sig := make(chan os.Signal, 1)

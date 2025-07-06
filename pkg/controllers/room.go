@@ -8,14 +8,26 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func HandleRoomCreate(c *fiber.Ctx) error {
+// RoomController holds dependencies for room-related handlers.
+type RoomController struct {
+	RoomModel *models.RoomModel
+}
+
+// NewRoomController creates a new RoomController.
+func NewRoomController(m *models.RoomModel) *RoomController {
+	return &RoomController{
+		RoomModel: m,
+	}
+}
+
+// HandleRoomCreate handles creating a new room.
+func (rc *RoomController) HandleRoomCreate(c *fiber.Ctx) error {
 	req := new(plugnmeet.CreateRoomReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := models.NewRoomModel(nil, nil, nil)
-	room, err := m.CreateRoom(c.UserContext(), req)
+	room, err := rc.RoomModel.CreateRoom(c.UserContext(), req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
@@ -29,25 +41,25 @@ func HandleRoomCreate(c *fiber.Ctx) error {
 	return utils.SendProtoJsonResponse(c, r)
 }
 
-func HandleIsRoomActive(c *fiber.Ctx) error {
+// HandleIsRoomActive checks if a room is active.
+func (rc *RoomController) HandleIsRoomActive(c *fiber.Ctx) error {
 	req := new(plugnmeet.IsRoomActiveReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := models.NewRoomModel(nil, nil, nil)
-	res, _, _, _ := m.IsRoomActive(c.UserContext(), req)
+	res, _, _, _ := rc.RoomModel.IsRoomActive(c.UserContext(), req)
 	return utils.SendProtoJsonResponse(c, res)
 }
 
-func HandleGetActiveRoomInfo(c *fiber.Ctx) error {
+// HandleGetActiveRoomInfo gets information about an active room.
+func (rc *RoomController) HandleGetActiveRoomInfo(c *fiber.Ctx) error {
 	req := new(plugnmeet.GetActiveRoomInfoReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := models.NewRoomModel(nil, nil, nil)
-	status, msg, res := m.GetActiveRoomInfo(c.UserContext(), req)
+	status, msg, res := rc.RoomModel.GetActiveRoomInfo(c.UserContext(), req)
 
 	r := &plugnmeet.GetActiveRoomInfoRes{
 		Status: status,
@@ -58,9 +70,9 @@ func HandleGetActiveRoomInfo(c *fiber.Ctx) error {
 	return utils.SendProtoJsonResponse(c, r)
 }
 
-func HandleGetActiveRoomsInfo(c *fiber.Ctx) error {
-	m := models.NewRoomModel(nil, nil, nil)
-	status, msg, res := m.GetActiveRoomsInfo()
+// HandleGetActiveRoomsInfo gets information about all active rooms.
+func (rc *RoomController) HandleGetActiveRoomsInfo(c *fiber.Ctx) error {
+	status, msg, res := rc.RoomModel.GetActiveRoomsInfo()
 
 	r := &plugnmeet.GetActiveRoomsInfoRes{
 		Status: status,
@@ -71,26 +83,26 @@ func HandleGetActiveRoomsInfo(c *fiber.Ctx) error {
 	return utils.SendProtoJsonResponse(c, r)
 }
 
-func HandleEndRoom(c *fiber.Ctx) error {
+// HandleEndRoom handles ending a room.
+func (rc *RoomController) HandleEndRoom(c *fiber.Ctx) error {
 	req := new(plugnmeet.RoomEndReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := models.NewRoomModel(nil, nil, nil)
-	status, msg := m.EndRoom(c.UserContext(), req)
+	status, msg := rc.RoomModel.EndRoom(c.UserContext(), req)
 
 	return utils.SendCommonProtoJsonResponse(c, status, msg)
 }
 
-func HandleFetchPastRooms(c *fiber.Ctx) error {
+// HandleFetchPastRooms handles fetching past rooms.
+func (rc *RoomController) HandleFetchPastRooms(c *fiber.Ctx) error {
 	req := new(plugnmeet.FetchPastRoomsReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	m := models.NewRoomModel(nil, nil, nil)
-	result, err := m.FetchPastRooms(req)
+	result, err := rc.RoomModel.FetchPastRooms(req)
 
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
@@ -107,7 +119,8 @@ func HandleFetchPastRooms(c *fiber.Ctx) error {
 	return utils.SendProtoJsonResponse(c, r)
 }
 
-func HandleEndRoomForAPI(c *fiber.Ctx) error {
+// HandleEndRoomForAPI handles ending a room via API call.
+func (rc *RoomController) HandleEndRoomForAPI(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 
@@ -125,12 +138,12 @@ func HandleEndRoomForAPI(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "requested roomId & token roomId mismatched")
 	}
 
-	m := models.NewRoomModel(nil, nil, nil)
-	status, msg := m.EndRoom(c.UserContext(), req)
+	status, msg := rc.RoomModel.EndRoom(c.UserContext(), req)
 	return utils.SendCommonProtobufResponse(c, status, msg)
 }
 
-func HandleChangeVisibilityForAPI(c *fiber.Ctx) error {
+// HandleChangeVisibilityForAPI handles changing room visibility via API call.
+func (rc *RoomController) HandleChangeVisibilityForAPI(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 
@@ -148,7 +161,6 @@ func HandleChangeVisibilityForAPI(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "requested roomId & token roomId mismatched")
 	}
 
-	m := models.NewRoomModel(nil, nil, nil)
-	status, msg := m.ChangeVisibility(req)
+	status, msg := rc.RoomModel.ChangeVisibility(req)
 	return utils.SendCommonProtobufResponse(c, status, msg)
 }
