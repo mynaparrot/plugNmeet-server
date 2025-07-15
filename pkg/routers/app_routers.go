@@ -183,9 +183,10 @@ func New(appConfig *config.AppConfig, ctrl *factory.ApplicationControllers) *fib
 	speech.Post("/userStatus", ctrl.SpeechToTextController.HandleSpeechServiceUserStatus)
 	speech.Post("/renewToken", ctrl.SpeechToTextController.HandleRenewAzureToken)
 
-	// for resumable.js need both methods.
+	// for resumable.js need both GET and POST  methods.
 	// https://github.com/23/resumable.js#how-do-i-set-it-up-with-my-server
 	api.Get("/fileUpload", ctrl.FileController.HandleFileUpload)
+	api.Post("/fileUpload", ctrl.FileController.HandleFileUpload)
 	// as resumable.js will upload multiple parts of the file in different request
 	// merging request should be sent from another request
 	// otherwise hard to do it concurrently
