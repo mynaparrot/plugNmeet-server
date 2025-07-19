@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.9.0](https://github.com/mynaparrot/plugNmeet-server/compare/v1.8.4...v1.9.0) (2025-07-15)
+
+
+### Features
+
+* dependencies injection using wire ([0d6ddef](https://github.com/mynaparrot/plugNmeet-server/commit/0d6ddefc6b718d7c546ab0b582c21ed46062cf02))
+* dependencies injection using wire ([a9e78ff](https://github.com/mynaparrot/plugNmeet-server/commit/a9e78ff03942386ce3d6177f8a7e8aabbd2f0a17))
+
+
+### Bug Fixes
+
+* cleaned up logic ([4aa5b49](https://github.com/mynaparrot/plugNmeet-server/commit/4aa5b4930286af2d5379cafc3b914bcf36cde083))
+* **cleanup:** remove unnecessary goroutine ([b5f6d0a](https://github.com/mynaparrot/plugNmeet-server/commit/b5f6d0a82a232ad3d97ef82ffe4bfe47a86407ac))
+* **deps:** update github.com/mynaparrot/plugnmeet-protocol digest to b2a5cc6 ([ce7e129](https://github.com/mynaparrot/plugNmeet-server/commit/ce7e12944665765bc7918d6fe1d5425bd413748a))
+* **deps:** update github.com/mynaparrot/plugnmeet-protocol digest to b2a5cc6 ([3e40713](https://github.com/mynaparrot/plugNmeet-server/commit/3e4071398f9c55b6e305a242f789f0d53126e3e4))
+* **deps:** update module github.com/ansrivas/fiberprometheus/v2 to v2.12.0 ([b5c2b26](https://github.com/mynaparrot/plugNmeet-server/commit/b5c2b26cc02fc0be77bbdf660350fccb9a0ab04e))
+* **deps:** update module github.com/ansrivas/fiberprometheus/v2 to v2.12.0 ([3bda07e](https://github.com/mynaparrot/plugNmeet-server/commit/3bda07e3d1b7abd4f863547e21aca9a2245d03c6))
+* **improve:** handle time way more efficiently ([c379ec2](https://github.com/mynaparrot/plugNmeet-server/commit/c379ec254cb0acf025eb1d7e32e71e0aa44b3601))
+* **improve:** improve webhook notifier to handle each room's request in separate queue ([762809c](https://github.com/mynaparrot/plugNmeet-server/commit/762809c4db604251d62c5dc2bac39d6934562d80))
+* **improve:** move `os.Signal` in bootup and remove unnecessary goroutine ([4eeed0c](https://github.com/mynaparrot/plugNmeet-server/commit/4eeed0cfedd7f18307b807066a92e1831e3e7be6))
+* **improve:** optimized database query and added index ([d9c1354](https://github.com/mynaparrot/plugNmeet-server/commit/d9c135411b4af76bad8d86f4f05708e568d58014))
+* **improve:** various improvement regarding file handling ([d4453fe](https://github.com/mynaparrot/plugNmeet-server/commit/d4453fe7535fd1604591dfa5256a7800b0d9cb0a))
+* mistakenly removed post method ([13a6994](https://github.com/mynaparrot/plugNmeet-server/commit/13a69947066217a10ce9f58d82aa3cfd1f926fdb))
+
 ## [1.8.4](https://github.com/mynaparrot/plugNmeet-server/compare/v1.8.3...v1.8.4) (2025-06-27)
 
 
