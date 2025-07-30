@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.1](https://github.com/mynaparrot/plugNmeet-server/compare/v1.9.0...v1.9.1) (2025-07-30)
+
+
+### Bug Fixes
+
+* nil checker to avoid `nil pointer dereference` error ([0f5fc9d](https://github.com/mynaparrot/plugNmeet-server/commit/0f5fc9d25e911ccbed9394f8387ac620a5abf885))
+
 ## [1.9.0](https://github.com/mynaparrot/plugNmeet-server/compare/v1.8.4...v1.9.0) (2025-07-15)
 
 
