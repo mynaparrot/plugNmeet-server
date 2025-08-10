@@ -3,7 +3,7 @@ module github.com/mynaparrot/plugnmeet-server
 go 1.24.2
 
 require (
-	buf.build/go/protovalidate v0.13.1
+	buf.build/go/protovalidate v0.14.0
 	github.com/ansrivas/fiberprometheus/v2 v2.12.0
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/gabriel-vasile/mimetype v1.4.9
@@ -32,7 +32,7 @@ require (
 )
 
 require (
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.6-20250625184727-c923a0c2a132.1 // indirect
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.6-20250717165733-d22d418d82d8.1 // indirect
 	buf.build/go/protoyaml v0.6.0 // indirect
 	cel.dev/expr v0.24.0 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
