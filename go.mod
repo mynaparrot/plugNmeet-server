@@ -20,7 +20,7 @@ require (
 	github.com/nats-io/jwt/v2 v2.7.4
 	github.com/nats-io/nats.go v1.43.0
 	github.com/nats-io/nkeys v0.4.11
-	github.com/redis/go-redis/v9 v9.11.0
+	github.com/redis/go-redis/v9 v9.12.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
 	github.com/urfave/cli/v3 v3.3.8
