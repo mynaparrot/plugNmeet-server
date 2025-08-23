@@ -14,7 +14,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/google/wire v0.6.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/protocol v1.39.3
+	github.com/livekit/protocol v1.40.0
 	github.com/livekit/server-sdk-go/v2 v2.9.1
 	github.com/mynaparrot/plugnmeet-protocol v1.0.16-0.20250812125547-fd70b49d5b59
 	github.com/nats-io/jwt/v2 v2.8.0
@@ -47,7 +47,7 @@ require (
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/frostbyte73/core v0.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
-	github.com/gammazero/deque v1.0.0 // indirect
+	github.com/gammazero/deque v1.1.0 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
