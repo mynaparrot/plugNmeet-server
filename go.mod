@@ -6,7 +6,7 @@ require (
 	buf.build/go/protovalidate v0.14.0
 	github.com/ansrivas/fiberprometheus/v2 v2.13.0
 	github.com/cavaliergopher/grab/v3 v3.0.1
-	github.com/gabriel-vasile/mimetype v1.4.9
+	github.com/gabriel-vasile/mimetype v1.4.10
 	github.com/go-jose/go-jose/v4 v4.1.2
 	github.com/goccy/go-json v0.10.5
 	github.com/gofiber/fiber/v2 v2.52.9
