@@ -1,6 +1,6 @@
 module github.com/mynaparrot/plugnmeet-server
 
-go 1.25
+go 1.25.1
 
 require (
 	buf.build/go/protovalidate v0.14.0
@@ -15,12 +15,12 @@ require (
 	github.com/google/wire v0.7.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.41.0
-	github.com/livekit/server-sdk-go/v2 v2.11.2
+	github.com/livekit/server-sdk-go/v2 v2.11.3
 	github.com/mynaparrot/plugnmeet-protocol v1.0.16-0.20250904141205-4581238e57fa
 	github.com/nats-io/jwt/v2 v2.8.0
 	github.com/nats-io/nats.go v1.45.0
 	github.com/nats-io/nkeys v0.4.11
-	github.com/redis/go-redis/v9 v9.13.0
+	github.com/redis/go-redis/v9 v9.14.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.11.1
 	github.com/urfave/cli/v3 v3.4.1
@@ -28,7 +28,7 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/mysql v1.6.0
-	gorm.io/gorm v1.30.5
+	gorm.io/gorm v1.31.0
 )
 
 require (
