@@ -4,6 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/signal"
+	"strings"
+	"sync"
+	"syscall"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
@@ -14,12 +20,19 @@ import (
 	"github.com/nats-io/nkeys"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
-	"os"
-	"os/signal"
-	"strings"
-	"sync"
-	"syscall"
 )
+
+const (
+	// DefaultNumWorkers Number of concurrent workers for processing NATS messages.
+	// Adjust based on expected load and available resources.
+	DefaultNumWorkers = 50
+	// DefaultJobQueueSize Size of the job queue. A larger buffer can handle larger bursts of messages.
+	DefaultJobQueueSize = 1000
+)
+
+type natsJob struct {
+	handler func()
+}
 
 type NatsController struct {
 	ctx           context.Context
@@ -28,6 +41,7 @@ type NatsController struct {
 	curveKeyPair  nkeys.KeyPair
 	authModel     *models.AuthModel
 	natsModel     *models.NatsModel
+	jobChan       chan natsJob
 }
 
 func NewNatsController(app *config.AppConfig, authModel *models.AuthModel, natsModel *models.NatsModel) *NatsController {
@@ -42,6 +56,7 @@ func NewNatsController(app *config.AppConfig, authModel *models.AuthModel, natsM
 		issuerKeyPair: issuerKeyPair,
 		authModel:     authModel,
 		natsModel:     natsModel,
+		jobChan:       make(chan natsJob, DefaultJobQueueSize),
 	}
 
 	if app.NatsInfo.AuthCalloutXkeyPrivate != nil && *app.NatsInfo.AuthCalloutXkeyPrivate != "" {
@@ -55,6 +70,11 @@ func NewNatsController(app *config.AppConfig, authModel *models.AuthModel, natsM
 }
 
 func (c *NatsController) BootUp(wg *sync.WaitGroup) {
+	// Start the worker pool
+	for i := 0; i < DefaultNumWorkers; i++ {
+		go c.worker()
+	}
+
 	// system receiver as worker
 	stream, err := c.app.JetStream.CreateOrUpdateStream(c.ctx, jetstream.StreamConfig{
 		Name:      fmt.Sprintf("%s", c.app.NatsInfo.Subjects.SystemJsWorker),
@@ -97,6 +117,12 @@ func (c *NatsController) BootUp(wg *sync.WaitGroup) {
 	<-sig
 }
 
+func (c *NatsController) worker() {
+	for job := range c.jobChan {
+		job.handler()
+	}
+}
+
 type NatsEvents struct {
 	Client map[string]interface{} `json:"client"`
 	Reason string                 `json:"reason"`
@@ -107,13 +133,18 @@ type NatsEvents struct {
 func (c *NatsController) subscribeToUsersConnEvents() {
 	_, err := c.app.NatsConn.QueueSubscribe(fmt.Sprintf("$SYS.ACCOUNT.%s.>", c.app.NatsInfo.Account), "pnm-conn-event", func(msg *nats.Msg) {
 		if strings.Contains(msg.Subject, ".CONNECT") {
-			go func(data []byte) {
+			// Copy data only when we need it to avoid unnecessary allocations.
+			// This is crucial to prevent race conditions as the message buffer is reused by the NATS client.
+			data := make([]byte, len(msg.Data))
+			copy(data, msg.Data)
+
+			c.jobChan <- natsJob{handler: func() {
 				e := new(NatsEvents)
 				if err := json.Unmarshal(data, e); err == nil {
 					if user, ok := e.Client["user"].(string); ok {
 						claims, err := c.authModel.UnsafeClaimsWithoutVerification(user)
 						if err != nil {
-							log.Errorln(err)
+							log.Errorf("failed to parse claims from connect event: %v", err)
 							return
 						}
 						if claims.GetName() != config.RecorderUserAuthName {
@@ -121,15 +152,19 @@ func (c *NatsController) subscribeToUsersConnEvents() {
 						}
 					}
 				}
-			}(msg.Data)
+			}}
 		} else if strings.Contains(msg.Subject, ".DISCONNECT") {
-			go func(data []byte) {
+			// Copy data only when we need it.
+			data := make([]byte, len(msg.Data))
+			copy(data, msg.Data)
+
+			c.jobChan <- natsJob{handler: func() {
 				e := new(NatsEvents)
 				if err := json.Unmarshal(data, e); err == nil {
 					if user, ok := e.Client["user"].(string); ok {
 						claims, err := c.authModel.UnsafeClaimsWithoutVerification(user)
 						if err != nil {
-							log.Errorln(err)
+							log.Errorf("failed to parse claims from disconnect event: %v", err)
 							return
 						}
 						if claims.GetName() != config.RecorderUserAuthName {
@@ -137,7 +172,7 @@ func (c *NatsController) subscribeToUsersConnEvents() {
 						}
 					}
 				}
-			}(msg.Data)
+			}}
 		}
 	})
 	if err != nil {
@@ -156,19 +191,22 @@ func (c *NatsController) subscribeToSystemWorker(stream jetstream.Stream) {
 
 	_, err = cons.Consume(func(msg jetstream.Msg) {
 		defer msg.Ack()
-		go func(sub string, data []byte) {
+		// Copy data to avoid race conditions as the message buffer is reused.
+		sub := msg.Subject()
+		data := make([]byte, len(msg.Data()))
+		copy(data, msg.Data())
+
+		c.jobChan <- natsJob{handler: func() {
 			req := new(plugnmeet.NatsMsgClientToServer)
 			if err := proto.Unmarshal(data, req); err == nil {
 				p := strings.Split(sub, ".")
 				if len(p) == 3 {
-					roomId := p[1]
-					userId := p[2]
-					c.natsModel.HandleFromClientToServerReq(roomId, userId, req)
+					c.natsModel.HandleFromClientToServerReq(p[1], p[2], req)
 				}
 			}
-		}(msg.Subject(), msg.Data())
+		}}
 	}, jetstream.ConsumeErrHandler(func(consumeCtx jetstream.ConsumeContext, err error) {
-		log.Errorln(err)
+		log.Errorf("jetstream consume error: %v", err)
 	}))
 
 	if err != nil {
