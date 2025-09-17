@@ -106,40 +106,31 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *dbmodels.RoomInfo, path str
 		EnabledE2Ee:  metadata.GetRoomFeatures().GetEndToEndEncryptionFeatures().GetIsEnabled(),
 		Events:       []*plugnmeet.AnalyticsEventData{},
 	}
-	var usersInfo []*plugnmeet.AnalyticsUserInfo
-	var allKeys []string
 
-	key := fmt.Sprintf(analyticsRoomKey+":room", room.RoomId)
-	// we can store all users' type key to make things faster
-	var userRedisKeys []string
-	// we'll collect all room related events
-	for _, ev := range plugnmeet.AnalyticsEvents_name {
-		if strings.Contains(ev, "ANALYTICS_EVENT_ROOM_") {
-			ekey := fmt.Sprintf(key+":%s", ev)
-			allKeys = append(allKeys, ekey)
+	// Use SCAN (via Keys) to find all analytics keys for this room
+	scanPattern := fmt.Sprintf(analyticsRoomKey, room.RoomId) + ":*"
+	allKeys, err := m.rs.AnalyticsScanKeys(scanPattern)
+	if err != nil {
+		m.logger.Errorf("failed to scan analytics keys for room %s: %v", room.RoomId, err)
+		return nil, err
+	}
+	if len(allKeys) == 0 {
+		m.logger.Infof("no analytics keys found for room %s, skipping file generation for empty analytics", room.RoomId)
+	}
 
-			ev = strings.ToLower(strings.Replace(ev, "ANALYTICS_EVENT_ROOM_", "", 1))
-			eventInfo := &plugnmeet.AnalyticsEventData{
-				Name:  ev,
-				Total: 0,
-			}
-
-			err := m.buildEventInfo(ekey, eventInfo)
-			if err != nil {
-				continue
-			}
-
-			roomInfo.Events = append(roomInfo.Events, eventInfo)
-		} else {
-			// otherwise will be user type
-			userRedisKeys = append(userRedisKeys, ev)
+	// Process room-level events
+	roomKeyPrefix := fmt.Sprintf(analyticsRoomKey+":room", room.RoomId)
+	for _, key := range allKeys {
+		if strings.HasPrefix(key, roomKeyPrefix) && !strings.Contains(key, ":user:") {
+			m.processEventKey(key, roomKeyPrefix, &roomInfo.Events)
 		}
 	}
 
+	var usersInfo []*plugnmeet.AnalyticsUserInfo
+
 	// get users first
-	k := fmt.Sprintf("%s:users", key)
+	k := fmt.Sprintf("%s:users", roomKeyPrefix)
 	users, err := m.rs.AnalyticsGetAllUsers(k)
-	allKeys = append(allKeys, fmt.Sprintf("%s:users", key))
 	if err != nil {
 		m.logger.Errorln(err)
 		return nil, err
@@ -159,22 +150,11 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *dbmodels.RoomInfo, path str
 			Events:   []*plugnmeet.AnalyticsEventData{},
 		}
 
-		for _, ev := range userRedisKeys {
-			if strings.Contains(ev, "ANALYTICS_EVENT_USER_") {
-				ekey := fmt.Sprintf(analyticsUserKey, room.RoomId, i)
-				ekey = fmt.Sprintf("%s:%s", ekey, ev)
-				allKeys = append(allKeys, ekey)
-
-				ev = strings.ToLower(strings.Replace(ev, "ANALYTICS_EVENT_USER_", "", 1))
-				eventInfo := &plugnmeet.AnalyticsEventData{
-					Name:  ev,
-					Total: 0,
-				}
-				err = m.buildEventInfo(ekey, eventInfo)
-				if err != nil {
-					continue
-				}
-				userInfo.Events = append(userInfo.Events, eventInfo)
+		// Process user-level events
+		userKeyPrefix := fmt.Sprintf(analyticsUserKey, room.RoomId, i)
+		for _, key := range allKeys {
+			if strings.HasPrefix(key, userKeyPrefix) {
+				m.processEventKey(key, userKeyPrefix, &userInfo.Events)
 			}
 		}
 
@@ -214,20 +194,46 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *dbmodels.RoomInfo, path str
 	}
 
 	// at the end delete all redis records
-	err = m.rs.AnalyticsDeleteKeys(allKeys)
-	if err != nil {
+	// also add the users key to the deletion list
+	usersKey := fmt.Sprintf(analyticsRoomKey+":room:users", room.RoomId)
+	allKeys = append(allKeys, usersKey)
+
+	if err = m.rs.AnalyticsDeleteKeys(allKeys); err != nil {
 		m.logger.Errorln(err)
 	}
 
 	return stat, err
 }
 
+func (m *AnalyticsModel) processEventKey(key, prefix string, eventList *[]*plugnmeet.AnalyticsEventData) {
+	// Extract event name from the key, e.g., "ANALYTICS_EVENT_ROOM_POLL_ADDED"
+	eventNameWithPrefix := strings.TrimPrefix(key, prefix+":")
+	eventName := ""
+
+	if strings.HasPrefix(eventNameWithPrefix, "ANALYTICS_EVENT_ROOM_") {
+		eventName = strings.ToLower(strings.Replace(eventNameWithPrefix, "ANALYTICS_EVENT_ROOM_", "", 1))
+	} else if strings.HasPrefix(eventNameWithPrefix, "ANALYTICS_EVENT_USER_") {
+		eventName = strings.ToLower(strings.Replace(eventNameWithPrefix, "ANALYTICS_EVENT_USER_", "", 1))
+	} else {
+		return // Not a valid event key format we want to process.
+	}
+
+	eventInfo := &plugnmeet.AnalyticsEventData{
+		Name:  eventName,
+		Total: 0,
+	}
+
+	if err := m.buildEventInfo(key, eventInfo); err == nil {
+		*eventList = append(*eventList, eventInfo)
+	}
+}
+
 func (m *AnalyticsModel) buildEventInfo(ekey string, eventInfo *plugnmeet.AnalyticsEventData) error {
 	// we'll check type first
 	rType, err := m.rs.AnalyticsGetKeyType(ekey)
-	if err != nil {
-		m.logger.Println(err)
-		return err
+	if err != nil || rType == "none" {
+		// Key doesn't exist or there was an error, which is fine. Just skip it.
+		return fmt.Errorf("key %s not found or error getting type: %w", ekey, err)
 	}
 	if rType == "hash" {
 		var evals []*plugnmeet.AnalyticsEventValue
