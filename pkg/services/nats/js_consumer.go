@@ -2,6 +2,7 @@ package natsservice
 
 import (
 	"fmt"
+
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nats.go/jetstream"
 )

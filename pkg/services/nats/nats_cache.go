@@ -7,7 +7,7 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -33,7 +33,7 @@ type NatsCacheService struct {
 	// Global context for all long-lived watchers in this service
 	serviceCtx    context.Context
 	serviceCancel context.CancelFunc
-	logger        *log.Entry
+	logger        *logrus.Entry
 
 	roomLock       sync.RWMutex
 	roomsInfoStore map[string]CachedRoomEntry
@@ -43,7 +43,7 @@ type NatsCacheService struct {
 	roomUsersInfoStore   map[string]map[string]CachedUserInfoEntry
 }
 
-func InitNatsCacheService(app *config.AppConfig, log *log.Logger) {
+func InitNatsCacheService(app *config.AppConfig, log *logrus.Logger) {
 	initCacheOnce.Do(func() {
 		if app == nil {
 			app = config.GetConfig()
@@ -65,7 +65,7 @@ func InitNatsCacheService(app *config.AppConfig, log *log.Logger) {
 }
 
 // GetNatsCacheService returns the singleton instance.
-func GetNatsCacheService(app *config.AppConfig, logger *log.Logger) *NatsCacheService {
+func GetNatsCacheService(app *config.AppConfig, logger *logrus.Logger) *NatsCacheService {
 	if defaultNatsCacheService == nil {
 		InitNatsCacheService(app, logger)
 	}
@@ -74,9 +74,9 @@ func GetNatsCacheService(app *config.AppConfig, logger *log.Logger) *NatsCacheSe
 
 // Shutdown gracefully stops all watchers.
 func (ncs *NatsCacheService) Shutdown() {
-	log.Info("Shutting down NATS Cache Service...")
+	ncs.logger.Info("Shutting down NATS Cache Service...")
 	ncs.serviceCancel() // Signals all watchers started with ncs.serviceCtx to stop
-	log.Info("NATS Cache Service shutdown complete.")
+	ncs.logger.Info("NATS Cache Service shutdown complete.")
 }
 
 func (ncs *NatsCacheService) convertTextToUint64(text string) uint64 {

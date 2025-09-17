@@ -3,8 +3,9 @@ package natsservice
 import (
 	"errors"
 	"fmt"
-	"github.com/nats-io/nats.go/jetstream"
 	"time"
+
+	"github.com/nats-io/nats.go/jetstream"
 )
 
 const (

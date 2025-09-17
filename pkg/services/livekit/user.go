@@ -1,7 +1,7 @@
 package livekitservice
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/livekit/protocol/livekit"
 )
@@ -33,7 +33,7 @@ func (s *LivekitService) LoadParticipantInfo(roomId string, identity string) (*l
 		return nil, err
 	}
 	if participant == nil {
-		return nil, errors.New("participant not found")
+		return nil, fmt.Errorf("participant not found")
 	}
 
 	return participant, nil
