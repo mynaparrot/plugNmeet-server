@@ -3,7 +3,6 @@ package redisservice
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -19,21 +18,6 @@ func (s *RedisService) AddRoomWithDurationInfo(roomId string, vals interface{}) 
 		return err
 	}
 	return nil
-}
-
-const janitorLockKey = "pnm:janitorLock"
-
-func (s *RedisService) IsJanitorTaskLock(task string) bool {
-	val, _ := s.rc.Get(s.ctx, janitorLockKey+":"+task).Result()
-	return val != ""
-}
-
-func (s *RedisService) LockJanitorTask(task string, duration time.Duration) error {
-	return s.rc.Set(s.ctx, janitorLockKey+":"+task, "locked", duration).Err()
-}
-
-func (s *RedisService) UnlockJanitorTask(task string) error {
-	return s.rc.Del(s.ctx, janitorLockKey+":"+task).Err()
 }
 
 func (s *RedisService) SetRoomDuration(roomId, durationField string, val uint64) error {

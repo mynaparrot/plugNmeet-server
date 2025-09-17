@@ -139,8 +139,7 @@ func (m *RoomModel) OnAfterRoomEnded(ctx context.Context, roomID, roomSID, metad
 		m.logger.WithFields(logrus.Fields{"roomId": roomID}).Errorf("Error cleaning polls: %v", err)
 	}
 
-	breakoutModel := NewBreakoutRoomModel(m.app, m.ds, m.rs, m.natsService, m, m.roomDuration, m.analyticsModel, m.userModel, m.logger.Logger)
-	if err = breakoutModel.PostTaskAfterRoomEndWebhook(ctx, roomID, metadata); err != nil {
+	if err = m.breakoutModel.PostTaskAfterRoomEndWebhook(ctx, roomID, metadata); err != nil {
 		m.logger.WithFields(logrus.Fields{"roomId": roomID}).Errorf("Error in breakout room post-end task: %v", err)
 	}
 

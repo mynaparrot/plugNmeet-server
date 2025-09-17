@@ -13,8 +13,17 @@ import (
 
 const (
 	RoomCreationLockKey = Prefix + "roomCreationLock-%s"
-	SchedulerLockKey    = Prefix + "schedulerLock-%s"
+	janitorLockKey      = Prefix + "janitorLock-%s"
 )
+
+// unlockScript is a Lua script for atomic check-and-delete.
+const unlockScript = `
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+    return redis.call("DEL", KEYS[1])
+else
+    return 0
+end
+`
 
 // LockRoomCreation attempts to acquire a distributed lock.
 // Returns:
@@ -47,15 +56,7 @@ func (s *RedisService) UnlockRoomCreation(ctx context.Context, roomID string, lo
 		return nil // Or return an error if this state is unexpected
 	}
 
-	// Lua script for atomic check-and-delete.
-	script := `
-    if redis.call("GET", KEYS[1]) == ARGV[1] then
-        return redis.call("DEL", KEYS[1])
-    else
-        return 0 
-    end
-    `
-	deleted, err := s.rc.Eval(ctx, script, []string{key}, lockValue).Int64()
+	deleted, err := s.unlockScriptExec.Eval(ctx, s.rc, []string{key}, lockValue).Int64()
 	if errors.Is(err, redis.Nil) {
 		// Key didn't exist, which is fine (lock expired or already released).
 		return nil
@@ -68,7 +69,7 @@ func (s *RedisService) UnlockRoomCreation(ctx context.Context, roomID string, lo
 		s.logger.WithFields(logrus.Fields{
 			"roomID":    roomID,
 			"lockValue": lockValue,
-		}).Warnf("UnlockRoomCreation: Failed to release lock")
+		}).Debugf("UnlockRoomCreation: Could not release lock (it may have expired or been taken by another process). This is expected during contention.")
 	} else {
 		s.logger.WithFields(logrus.Fields{
 			"roomID":    roomID,
@@ -90,30 +91,15 @@ func (s *RedisService) IsRoomCreationLock(ctx context.Context, roomID string) (i
 	return val == 1, nil
 }
 
-func (s *RedisService) LockSchedulerTask(task string, ttl time.Duration) error {
-	key := fmt.Sprintf(SchedulerLockKey, task)
-	_, err := s.rc.Set(s.ctx, key, fmt.Sprintf("%d", time.Now().Unix()), ttl).Result()
-	if err != nil {
-		return err
-	}
-
-	return nil
+func (s *RedisService) IsJanitorTaskLock(task string) bool {
+	val, _ := s.rc.Get(s.ctx, fmt.Sprintf(janitorLockKey, task)).Result()
+	return val != ""
 }
 
-func (s *RedisService) IsSchedulerTaskLock(task string) bool {
-	key := fmt.Sprintf(SchedulerLockKey, task)
-	result, err := s.rc.Get(s.ctx, key).Result()
-	if err != nil {
-		return false
-	}
-
-	if result != "" {
-		return true
-	}
-
-	return false
+func (s *RedisService) LockJanitorTask(task string, duration time.Duration) error {
+	return s.rc.Set(s.ctx, fmt.Sprintf(janitorLockKey, task), "locked", duration).Err()
 }
 
-func (s *RedisService) UnlockSchedulerTask(task string) {
-	_, _ = s.rc.Del(s.ctx, fmt.Sprintf(SchedulerLockKey, task)).Result()
+func (s *RedisService) UnlockJanitorTask(task string) error {
+	return s.rc.Del(s.ctx, fmt.Sprintf(janitorLockKey, task)).Err()
 }

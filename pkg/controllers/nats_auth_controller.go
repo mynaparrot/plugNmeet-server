@@ -25,15 +25,15 @@ type NatsAuthController struct {
 	logger        *logrus.Entry
 }
 
-func NewNatsAuthController(app *config.AppConfig, authModel *models.AuthModel, issuerKeyPair nkeys.KeyPair, curveKeyPair nkeys.KeyPair, logger *logrus.Logger) *NatsAuthController {
+func NewNatsAuthController(app *config.AppConfig, authModel *models.AuthModel, issuerKeyPair nkeys.KeyPair, curveKeyPair nkeys.KeyPair, logger *logrus.Entry) *NatsAuthController {
 	return &NatsAuthController{
 		ctx:           context.Background(),
 		app:           app,
 		authModel:     authModel,
-		natsService:   natsservice.New(app, logger),
+		natsService:   natsservice.New(app, logger.Logger),
 		issuerKeyPair: issuerKeyPair,
 		curveKeyPair:  curveKeyPair,
-		logger:        logger.WithField("controller", "nats-auth"),
+		logger:        logger.WithField("sub-controller", "nats-auth"),
 	}
 }
 

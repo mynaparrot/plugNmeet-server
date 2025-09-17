@@ -24,6 +24,7 @@ type RoomModel struct {
 	pollModel      *PollModel
 	speechToText   *SpeechToTextModel
 	analyticsModel *AnalyticsModel
+	breakoutModel  *BreakoutRoomModel
 }
 
 func NewRoomModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService, natsService *natsservice.NatsService, userModel *UserModel, recorderModel *RecorderModel, fileModel *FileModel, roomDuration *RoomDurationModel, etherpadModel *EtherpadModel, pollModel *PollModel, speechToText *SpeechToTextModel, analyticsModel *AnalyticsModel, logger *logrus.Logger) *RoomModel {
@@ -43,4 +44,9 @@ func NewRoomModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redi
 		analyticsModel: analyticsModel,
 		logger:         logger.WithField("model", "room"),
 	}
+}
+
+// SetBreakoutRoomModel is an initializer to prevent circular dependency.
+func (m *RoomModel) SetBreakoutRoomModel(bm *BreakoutRoomModel) {
+	m.breakoutModel = bm
 }

@@ -2,12 +2,13 @@ package controllers
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
-	"strings"
 )
 
 // LtiV1Controller holds dependencies for LTI v1 related handlers.

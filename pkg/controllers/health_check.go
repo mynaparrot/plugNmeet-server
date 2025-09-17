@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )

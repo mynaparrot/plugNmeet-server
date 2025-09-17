@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
@@ -13,7 +15,6 @@ import (
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/version"
 	"google.golang.org/protobuf/proto"
-	"strings"
 )
 
 // AuthController holds dependencies for auth-related handlers.
@@ -25,7 +26,7 @@ type AuthController struct {
 }
 
 // NewAuthController creates a new AuthController.
-func NewAuthController(config *config.AppConfig, authModel *models.AuthModel, roomModel *models.RoomModel, natsService *natsservice.NatsService) *AuthController {
+func NewAuthController(config *config.AppConfig, natsService *natsservice.NatsService, authModel *models.AuthModel, roomModel *models.RoomModel) *AuthController {
 	return &AuthController{
 		AppConfig:   config,
 		AuthModel:   authModel,
