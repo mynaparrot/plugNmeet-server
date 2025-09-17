@@ -15,7 +15,7 @@ func (m *JanitorModel) checkRoomWithDuration() {
 	}
 
 	// now set lock
-	_ = m.rs.LockJanitorTask("checkRoomWithDuration", time.Minute*1)
+	m.rs.LockJanitorTask("checkRoomWithDuration", time.Minute*1)
 	// clean at the end
 	defer m.rs.UnlockJanitorTask("checkRoomWithDuration")
 

@@ -20,7 +20,7 @@ func (m *JanitorModel) checkOnlineUsersStatus() {
 		return
 	}
 	// now set lock
-	_ = m.rs.LockJanitorTask("checkOnlineUsersStatus", time.Minute*1)
+	m.rs.LockJanitorTask("checkOnlineUsersStatus", time.Minute*1)
 	// clean at the end
 	defer m.rs.UnlockJanitorTask("checkOnlineUsersStatus")
 

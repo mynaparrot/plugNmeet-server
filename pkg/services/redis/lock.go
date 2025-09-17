@@ -96,10 +96,13 @@ func (s *RedisService) IsJanitorTaskLock(task string) bool {
 	return val != ""
 }
 
-func (s *RedisService) LockJanitorTask(task string, duration time.Duration) error {
-	return s.rc.Set(s.ctx, fmt.Sprintf(janitorLockKey, task), "locked", duration).Err()
+func (s *RedisService) LockJanitorTask(task string, duration time.Duration) {
+	err := s.rc.Set(s.ctx, fmt.Sprintf(janitorLockKey, task), "locked", duration).Err()
+	if err != nil {
+		s.logger.WithError(err).Errorln("LockJanitorTask failed")
+	}
 }
 
-func (s *RedisService) UnlockJanitorTask(task string) error {
-	return s.rc.Del(s.ctx, fmt.Sprintf(janitorLockKey, task)).Err()
+func (s *RedisService) UnlockJanitorTask(task string) {
+	_, _ = s.rc.Del(s.ctx, fmt.Sprintf(janitorLockKey, task)).Result()
 }

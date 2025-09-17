@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/mynaparrot/plugnmeet-server/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -56,7 +57,6 @@ func startServer(configFile string) {
 	if err != nil {
 		logger.WithError(err).Fatalln("Failed to create app factory")
 	}
-
 	// boot up some services
 	appFactory.Boot()
 
@@ -69,8 +69,11 @@ func startServer(configFile string) {
 
 	go func() {
 		sig := <-sigChan
-		logger.WithField("signal", sig).Infoln("exit requested, shutting down")
-		_ = rt.Shutdown()
+		logger.WithField("signal", sig).Infoln("Exit requested, attempting graceful shutdown...")
+
+		if err := rt.ShutdownWithTimeout(15 * time.Second); err != nil {
+			logger.WithError(err).Warn("Graceful shutdown failed, forcing exit.")
+		}
 		cancel()
 	}()
 
