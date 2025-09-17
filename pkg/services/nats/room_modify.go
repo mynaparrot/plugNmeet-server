@@ -3,10 +3,10 @@ package natsservice
 import (
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/nats-io/nats.go/jetstream"
-	log "github.com/sirupsen/logrus"
-	"time"
 )
 
 // Constants for room info bucket and keys
@@ -148,14 +148,14 @@ func (s *NatsService) UpdateRoomStatus(roomId string, status string) error {
 // OnAfterSessionEndCleanup performs cleanup after a session ends
 func (s *NatsService) OnAfterSessionEndCleanup(roomId string) {
 	if err := s.DeleteRoom(roomId); err != nil {
-		log.Errorf("failed to delete room %s with error: %v", roomId, err)
+		s.logger.WithError(err).Errorf("failed to delete room %s with error", roomId)
 	}
 
 	if err := s.DeleteAllRoomUsersWithConsumer(roomId); err != nil {
-		log.Errorf("failed to delete room %s users: %v", roomId, err)
+		s.logger.WithError(err).Errorf("failed to delete room %s users", roomId)
 	}
 
 	if err := s.DeleteRoomNatsStream(roomId); err != nil {
-		log.Errorf("failed to delete room %s stream: %v", roomId, err)
+		s.logger.WithError(err).Errorf("failed to delete room %s", roomId)
 	}
 }

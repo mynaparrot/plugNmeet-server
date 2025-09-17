@@ -2,7 +2,6 @@ package models
 
 import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	log "github.com/sirupsen/logrus"
 )
 
 func (m *PollModel) ClosePoll(r *plugnmeet.ClosePollReq) error {
@@ -13,7 +12,7 @@ func (m *PollModel) ClosePoll(r *plugnmeet.ClosePollReq) error {
 
 	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_POLL_CLOSED, r.RoomId, r.PollId, nil)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.WithError(err).Errorln("error sending POLL_CLOSED event")
 	}
 
 	// send analytics

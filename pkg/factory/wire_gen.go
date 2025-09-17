@@ -23,39 +23,40 @@ import (
 // NewAppFactory is the injector function that wire will implement.
 func NewAppFactory(appConfig *config.AppConfig) (*Application, error) {
 	client := appConfig.RDS
-	redisService := redisservice.New(client)
+	logger := appConfig.Logger
+	redisService := redisservice.New(client, logger)
 	db := appConfig.DB
-	databaseService := dbservice.New(db)
-	natsService := natsservice.New(appConfig)
-	livekitService := livekitservice.New(appConfig)
+	databaseService := dbservice.New(db, logger)
+	natsService := natsservice.New(appConfig, logger)
+	livekitService := livekitservice.New(appConfig, logger)
 	applicationServices := &ApplicationServices{
 		RedisService:    redisService,
 		DatabaseService: databaseService,
 		NatsService:     natsService,
 		LivekitService:  livekitService,
 	}
-	analyticsModel := models.NewAnalyticsModel(appConfig, databaseService, redisService)
-	authModel := models.NewAuthModel(appConfig, natsService)
-	bbbApiWrapperModel := models.NewBBBApiWrapperModel(appConfig, databaseService, redisService)
-	breakoutRoomModel := models.NewBreakoutRoomModel(appConfig, databaseService, redisService)
-	roomDurationModel := models.NewRoomDurationModel(appConfig, redisService)
-	etherpadModel := models.NewEtherpadModel(appConfig, databaseService, redisService)
-	exDisplayModel := models.NewExDisplayModel(appConfig, databaseService, redisService)
-	exMediaModel := models.NewExMediaModel(appConfig, databaseService, redisService)
-	fileModel := models.NewFileModel(appConfig, databaseService, natsService)
-	ingressModel := models.NewIngressModel(appConfig, databaseService, redisService, livekitService)
-	ltiV1Model := models.NewLtiV1Model(appConfig, databaseService, redisService)
-	natsModel := models.NewNatsModel(appConfig, databaseService, redisService)
-	pollModel := models.NewPollModel(appConfig, databaseService, redisService)
-	recorderModel := models.NewRecorderModel(appConfig, databaseService, redisService)
-	recordingModel := models.NewRecordingModel(appConfig, databaseService, redisService)
-	roomModel := models.NewRoomModel(appConfig, databaseService, redisService)
-	schedulerModel := models.NewSchedulerModel(appConfig, databaseService, redisService)
-	speechToTextModel := models.NewSpeechToTextModel(appConfig, databaseService, redisService)
-	userModel := models.NewUserModel(appConfig, databaseService, redisService)
-	waitingRoomModel := models.NewWaitingRoomModel(appConfig, redisService)
+	analyticsModel := models.NewAnalyticsModel(appConfig, databaseService, redisService, logger)
+	authModel := models.NewAuthModel(appConfig, natsService, logger)
+	bbbApiWrapperModel := models.NewBBBApiWrapperModel(appConfig, databaseService, redisService, logger)
+	breakoutRoomModel := models.NewBreakoutRoomModel(appConfig, databaseService, redisService, logger)
+	roomDurationModel := models.NewRoomDurationModel(appConfig, redisService, logger)
+	etherpadModel := models.NewEtherpadModel(appConfig, databaseService, redisService, logger)
+	exDisplayModel := models.NewExDisplayModel(appConfig, databaseService, redisService, logger)
+	exMediaModel := models.NewExMediaModel(appConfig, databaseService, redisService, logger)
+	fileModel := models.NewFileModel(appConfig, databaseService, natsService, logger)
+	ingressModel := models.NewIngressModel(appConfig, databaseService, redisService, livekitService, logger)
+	ltiV1Model := models.NewLtiV1Model(appConfig, databaseService, redisService, logger)
+	natsModel := models.NewNatsModel(appConfig, databaseService, redisService, logger)
+	pollModel := models.NewPollModel(appConfig, databaseService, redisService, logger)
+	recorderModel := models.NewRecorderModel(appConfig, databaseService, redisService, logger)
+	recordingModel := models.NewRecordingModel(appConfig, databaseService, redisService, logger)
+	roomModel := models.NewRoomModel(appConfig, databaseService, redisService, logger)
+	schedulerModel := models.NewSchedulerModel(appConfig, databaseService, redisService, logger)
+	speechToTextModel := models.NewSpeechToTextModel(appConfig, databaseService, redisService, logger)
+	userModel := models.NewUserModel(appConfig, databaseService, redisService, logger)
+	waitingRoomModel := models.NewWaitingRoomModel(appConfig, redisService, logger)
 	context := provideContext()
-	webhookModel := models.NewWebhookModel(context, appConfig, databaseService, redisService)
+	webhookModel := models.NewWebhookModel(context, appConfig, databaseService, redisService, logger)
 	applicationModels := &ApplicationModels{
 		AnalyticsModel:     analyticsModel,
 		AuthModel:          authModel,
@@ -97,7 +98,7 @@ func NewAppFactory(appConfig *config.AppConfig) (*Application, error) {
 	userController := controllers.NewUserController(appConfig, userModel, databaseService, natsService)
 	waitingRoomController := controllers.NewWaitingRoomController(waitingRoomModel)
 	webhookController := controllers.NewWebhookController(authModel, webhookModel)
-	natsController := controllers.NewNatsController(appConfig, authModel, natsModel)
+	natsController := controllers.NewNatsController(appConfig, authModel, natsModel, logger)
 	applicationControllers := &ApplicationControllers{
 		AnalyticsController:    analyticsController,
 		AuthController:         authController,

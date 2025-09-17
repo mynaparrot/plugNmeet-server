@@ -6,7 +6,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -19,29 +19,31 @@ type NatsModel struct {
 	natsService    *natsservice.NatsService
 	userModel      *UserModel
 	analyticsModel *AnalyticsModel
+	logger         *logrus.Entry
 }
 
-func NewNatsModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *NatsModel {
+func NewNatsModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, logger *logrus.Logger) *NatsModel {
 	if app == nil {
 		app = config.GetConfig()
 	}
 	if ds == nil {
-		ds = dbservice.New(app.DB)
+		ds = dbservice.New(app.DB, logger)
 	}
 	if rs == nil {
-		rs = redisservice.New(app.RDS)
+		rs = redisservice.New(app.RDS, logger)
 	}
-	natsService := natsservice.New(app)
+	natsService := natsservice.New(app, logger)
 
 	return &NatsModel{
 		app:            app,
 		ds:             ds,
 		rs:             rs,
-		analytics:      NewAnalyticsModel(app, ds, rs),
-		authModel:      NewAuthModel(app, natsService),
+		analytics:      NewAnalyticsModel(app, ds, rs, logger),
+		authModel:      NewAuthModel(app, natsService, logger),
 		natsService:    natsService,
-		userModel:      NewUserModel(app, ds, rs),
-		analyticsModel: NewAnalyticsModel(app, ds, rs),
+		userModel:      NewUserModel(app, ds, rs, logger),
+		analyticsModel: NewAnalyticsModel(app, ds, rs, logger),
+		logger:         logger.WithField("model", "nats"),
 	}
 }
 
@@ -65,7 +67,7 @@ func (m *NatsModel) HandleFromClientToServerReq(roomId, userId string, req *plug
 		ad := new(plugnmeet.AnalyticsDataMsg)
 		err := protojson.Unmarshal([]byte(req.Msg), ad)
 		if err != nil {
-			log.Errorln(err)
+			m.logger.Errorln(err)
 			return
 		}
 		m.analytics.HandleEvent(ad)

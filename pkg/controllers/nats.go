@@ -18,7 +18,7 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/nats-io/nats.go/micro"
 	"github.com/nats-io/nkeys"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -42,12 +42,13 @@ type NatsController struct {
 	authModel     *models.AuthModel
 	natsModel     *models.NatsModel
 	jobChan       chan natsJob
+	logger        *logrus.Entry
 }
 
-func NewNatsController(app *config.AppConfig, authModel *models.AuthModel, natsModel *models.NatsModel) *NatsController {
+func NewNatsController(app *config.AppConfig, authModel *models.AuthModel, natsModel *models.NatsModel, logger *logrus.Logger) *NatsController {
 	issuerKeyPair, err := nkeys.FromSeed([]byte(app.NatsInfo.AuthCalloutIssuerPrivate))
 	if err != nil {
-		log.Fatal(err)
+		logger.WithError(err).Fatal("error creating issuer key pair")
 	}
 
 	c := &NatsController{
@@ -57,12 +58,13 @@ func NewNatsController(app *config.AppConfig, authModel *models.AuthModel, natsM
 		authModel:     authModel,
 		natsModel:     natsModel,
 		jobChan:       make(chan natsJob, DefaultJobQueueSize),
+		logger:        logger.WithField("controller", "nats"),
 	}
 
 	if app.NatsInfo.AuthCalloutXkeyPrivate != nil && *app.NatsInfo.AuthCalloutXkeyPrivate != "" {
 		c.curveKeyPair, err = nkeys.FromSeed([]byte(*app.NatsInfo.AuthCalloutXkeyPrivate))
 		if err != nil {
-			log.Fatal(err)
+			c.logger.WithError(err).Fatal("error creating curve key pair")
 		}
 	}
 
@@ -85,7 +87,7 @@ func (c *NatsController) BootUp(wg *sync.WaitGroup) {
 		},
 	})
 	if err != nil {
-		log.Fatal(err)
+		c.logger.WithError(err).Fatal("error creating system worker stream")
 	}
 
 	// now subscribe
@@ -94,7 +96,7 @@ func (c *NatsController) BootUp(wg *sync.WaitGroup) {
 	c.subscribeToUsersConnEvents()
 
 	// auth service
-	authService := NewNatsAuthController(c.app, c.authModel, c.issuerKeyPair, c.curveKeyPair)
+	authService := NewNatsAuthController(c.app, c.authModel, c.issuerKeyPair, c.curveKeyPair, c.logger.Logger)
 	_, err = micro.AddService(c.app.NatsConn, micro.Config{
 		Name:        "pnm-auth",
 		Version:     version.Version,
@@ -107,7 +109,7 @@ func (c *NatsController) BootUp(wg *sync.WaitGroup) {
 	})
 
 	if err != nil {
-		log.Fatal(err)
+		c.logger.WithError(err).Fatal("error adding auth service")
 	}
 	wg.Done()
 
@@ -144,7 +146,7 @@ func (c *NatsController) subscribeToUsersConnEvents() {
 					if user, ok := e.Client["user"].(string); ok {
 						claims, err := c.authModel.UnsafeClaimsWithoutVerification(user)
 						if err != nil {
-							log.Errorf("failed to parse claims from connect event: %v", err)
+							c.logger.WithError(err).Errorln("failed to parse claims from connect event")
 							return
 						}
 						if claims.GetName() != config.RecorderUserAuthName {
@@ -164,7 +166,7 @@ func (c *NatsController) subscribeToUsersConnEvents() {
 					if user, ok := e.Client["user"].(string); ok {
 						claims, err := c.authModel.UnsafeClaimsWithoutVerification(user)
 						if err != nil {
-							log.Errorf("failed to parse claims from disconnect event: %v", err)
+							c.logger.WithError(err).Errorln("failed to parse claims from disconnect event")
 							return
 						}
 						if claims.GetName() != config.RecorderUserAuthName {
@@ -176,7 +178,7 @@ func (c *NatsController) subscribeToUsersConnEvents() {
 		}
 	})
 	if err != nil {
-		log.Fatal(err)
+		c.logger.WithError(err).Fatal("error subscribing to users connection events")
 		return
 	}
 }
@@ -186,7 +188,7 @@ func (c *NatsController) subscribeToSystemWorker(stream jetstream.Stream) {
 		Durable: fmt.Sprintf("pnm-%s", c.app.NatsInfo.Subjects.SystemJsWorker),
 	})
 	if err != nil {
-		log.Fatalln(err)
+		c.logger.WithError(err).Fatalln("error creating system worker consumer")
 	}
 
 	_, err = cons.Consume(func(msg jetstream.Msg) {
@@ -206,11 +208,11 @@ func (c *NatsController) subscribeToSystemWorker(stream jetstream.Stream) {
 			}
 		}}
 	}, jetstream.ConsumeErrHandler(func(consumeCtx jetstream.ConsumeContext, err error) {
-		log.Errorf("jetstream consume error: %v", err)
+		c.logger.WithError(err).Errorf("jetstream consume error")
 	}))
 
 	if err != nil {
-		log.Fatal(err)
+		c.logger.WithError(err).Fatal("error subscribing to system worker")
 		return
 	}
 }

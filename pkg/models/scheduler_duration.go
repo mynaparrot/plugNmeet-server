@@ -2,8 +2,9 @@ package models
 
 import (
 	"context"
-	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"time"
+
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 )
 
 func (m *SchedulerModel) checkRoomWithDuration() {

@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
-	"time"
 )
 
 const BreakoutRoomFormat = "%s-%s"
@@ -25,7 +25,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(ctx context.Context, r *plugnmee
 
 	// let's check if the parent room has a duration set or not
 	if meta.RoomFeatures.RoomDuration != nil && *meta.RoomFeatures.RoomDuration > 0 {
-		rDuration := NewRoomDurationModel(m.app, m.rs)
+		rDuration := NewRoomDurationModel(m.app, m.rs, m.logger.Logger)
 		err = rDuration.CompareDurationWithParentRoom(r.RoomId, r.Duration)
 		if err != nil {
 			return err
@@ -60,7 +60,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(ctx context.Context, r *plugnmee
 		_, err := m.rm.CreateRoom(ctx, bRoom)
 
 		if err != nil {
-			log.Errorln(err)
+			m.logger.Errorln(err)
 			e[bRoom.RoomId] = true
 			continue
 		}
@@ -70,14 +70,14 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(ctx context.Context, r *plugnmee
 
 		marshal, err := protojson.Marshal(room)
 		if err != nil {
-			log.Error(err)
+			m.logger.Error(err)
 			e[bRoom.RoomId] = true
 			continue
 		}
 
 		err = m.natsService.InsertOrUpdateBreakoutRoom(r.RoomId, bRoom.RoomId, marshal)
 		if err != nil {
-			log.Error(err)
+			m.logger.Error(err)
 			e[bRoom.RoomId] = true
 			continue
 		}
@@ -86,7 +86,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(ctx context.Context, r *plugnmee
 		for _, u := range room.Users {
 			err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_JOIN_BREAKOUT_ROOM, r.RoomId, bRoom.RoomId, &u.Id)
 			if err != nil {
-				log.Error(err)
+				m.logger.Error(err)
 				continue
 			}
 		}
@@ -105,7 +105,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(ctx context.Context, r *plugnmee
 	err = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, origMeta)
 
 	// send analytics
-	analyticsModel := NewAnalyticsModel(m.app, m.ds, m.rs)
+	analyticsModel := NewAnalyticsModel(m.app, m.ds, m.rs, m.logger.Logger)
 	analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
 		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_BREAKOUT_ROOM,
@@ -134,7 +134,7 @@ func (m *BreakoutRoomModel) PostTaskAfterRoomStartWebhook(roomId string, metadat
 
 	err = m.natsService.InsertOrUpdateBreakoutRoom(metadata.ParentRoomId, roomId, marshal)
 	if err != nil {
-		log.Error(err)
+		m.logger.Error(err)
 		return err
 	}
 

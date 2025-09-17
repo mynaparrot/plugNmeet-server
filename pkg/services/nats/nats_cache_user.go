@@ -1,18 +1,23 @@
 package natsservice
 
 import (
-	"fmt"
+	"strconv"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/nats-io/nats.go/jetstream"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
-	"strconv"
 )
 
 // AddRoomUserStatusWatcher will start watching user status in a specific room.
 // remember each room has only one RoomUsersBucket bucket
 // in this bucket userId is key and status is value
 func (ncs *NatsCacheService) AddRoomUserStatusWatcher(kv jetstream.KeyValue, bucket, roomId string) {
+	log := ncs.logger.WithFields(logrus.Fields{
+		"bucket": bucket,
+		"room":   roomId,
+	})
+
 	ncs.userLock.Lock()
 	_, ok := ncs.roomUsersStatusStore[roomId]
 	if ok {
@@ -26,16 +31,16 @@ func (ncs *NatsCacheService) AddRoomUserStatusWatcher(kv jetstream.KeyValue, buc
 	opts := []jetstream.WatchOpt{jetstream.IncludeHistory()}
 	watcher, err := kv.WatchAll(ncs.serviceCtx, opts...)
 	if err != nil {
-		log.Errorln(fmt.Sprintf("Error starting NATS KV watcher for %s: %v", bucket, err))
+		log.WithError(err).Errorln("Error starting NATS KV watcher")
 		// fallback to clean cache as we've set it above
 		ncs.cleanRoomUserStatusCache(roomId)
 		return
 	}
-	log.Infof("NATS KV watcher started for bucket: %s", bucket)
+	log.Infof("NATS KV watcher for room user status started")
 
 	go func() {
 		defer func() {
-			log.Infof("NATS KV watcher for %s stopped.", bucket)
+			log.Infof("NATS KV watcher for room user status stopped")
 			_ = watcher.Stop()
 			ncs.cleanRoomUserStatusCache(roomId)
 		}()
@@ -104,6 +109,12 @@ func (ncs *NatsCacheService) cleanRoomUserStatusCache(roomId string) {
 // AddUserInfoWatcher will start watching user info
 // each user has its own bucket, so watch should be for each userId
 func (ncs *NatsCacheService) AddUserInfoWatcher(kv jetstream.KeyValue, bucket, roomId, userId string) {
+	log := ncs.logger.WithFields(logrus.Fields{
+		"bucket": bucket,
+		"room":   roomId,
+		"user":   userId,
+	})
+
 	ncs.userLock.Lock()
 	rm, ok := ncs.roomUsersInfoStore[roomId]
 	if !ok {
@@ -124,16 +135,16 @@ func (ncs *NatsCacheService) AddUserInfoWatcher(kv jetstream.KeyValue, bucket, r
 	opts := []jetstream.WatchOpt{jetstream.IncludeHistory()}
 	watcher, err := kv.WatchAll(ncs.serviceCtx, opts...)
 	if err != nil {
-		log.Errorln(fmt.Sprintf("Error starting NATS KV watcher for %s: %v", bucket, err))
+		log.WithError(err).Errorln("Error starting NATS KV watcher")
 		// fallback to clean cache as we've set it above
 		ncs.cleanUserInfoCache(roomId, userId)
 		return
 	}
-	log.Infof("NATS KV watcher started for bucket: %s", bucket)
+	log.Infof("NATS KV watcher for user started")
 
 	go func() {
 		defer func() {
-			log.Infof("NATS KV watcher for %s stopped.", bucket)
+			log.Infof("NATS KV watcher for room user status stopped")
 			_ = watcher.Stop()
 			ncs.cleanUserInfoCache(roomId, userId)
 		}()

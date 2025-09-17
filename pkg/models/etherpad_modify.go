@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	log "github.com/sirupsen/logrus"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 )
 
 func (m *EtherpadModel) ChangeEtherpadStatus(r *plugnmeet.ChangeEtherpadStatusReq) error {
@@ -25,7 +25,7 @@ func (m *EtherpadModel) ChangeEtherpadStatus(r *plugnmeet.ChangeEtherpadStatusRe
 	meta.RoomFeatures.SharedNotePadFeatures.IsActive = r.IsActive
 	err = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, meta)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.Errorln(err)
 	}
 
 	// send analytics
@@ -67,7 +67,7 @@ func (m *EtherpadModel) addPadToRoomMetadata(roomId string, c *plugnmeet.CreateE
 
 	err = m.natsService.UpdateAndBroadcastRoomMetadata(roomId, meta)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.Errorln(err)
 	}
 
 	// send analytics
@@ -119,7 +119,7 @@ func (m *EtherpadModel) postToEtherpad(method string, vals url.Values) (*Etherpa
 	mar := new(EtherpadHttpRes)
 	err = json.Unmarshal(body, mar)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.Errorln(err)
 		return nil, err
 	}
 
@@ -172,7 +172,7 @@ func (m *EtherpadModel) getAccessToken() (string, error) {
 	// we'll store the value with expiry of 30-minute max
 	err = m.natsService.AddEtherpadToken(m.NodeId, vals.AccessToken, time.Minute*30)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.Errorln(err)
 	}
 
 	return vals.AccessToken, nil

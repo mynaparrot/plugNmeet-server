@@ -3,9 +3,9 @@ package models
 import (
 	"errors"
 	"fmt"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
-	log "github.com/sirupsen/logrus"
 )
 
 func (m *UserModel) CreateNewPresenter(r *plugnmeet.GenerateTokenReq) error {
@@ -46,7 +46,7 @@ func (m *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
 	for _, userId := range ids {
 		uInfo, metadata, err := m.natsService.GetUserWithMetadata(r.RoomId, userId)
 		if err != nil {
-			log.Errorln(err)
+			m.logger.WithError(err).Errorln("error getting user info")
 			continue
 		}
 
@@ -83,12 +83,12 @@ func (m *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
 		if update {
 			err = m.natsService.UpdateUserKeyValue(r.RoomId, userId, natsservice.UserIsPresenterKey, fmt.Sprintf("%v", uInfo.IsPresenter))
 			if err != nil {
-				log.Errorln(err)
+				m.logger.WithError(err).Errorln("error updating user metadata")
 				continue
 			}
 			err = m.natsService.UpdateAndBroadcastUserMetadata(r.RoomId, userId, metadata, nil)
 			if err != nil {
-				log.Errorln(err)
+				m.logger.WithError(err).Errorln("error updating user metadata")
 			}
 		}
 	}

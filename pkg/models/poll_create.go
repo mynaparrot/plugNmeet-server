@@ -2,12 +2,12 @@ package models
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/goccy/go-json"
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
-	"time"
 )
 
 func (m *PollModel) CreatePoll(r *plugnmeet.CreatePollReq) (string, error) {
@@ -27,7 +27,7 @@ func (m *PollModel) CreatePoll(r *plugnmeet.CreatePollReq) (string, error) {
 
 	err = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_POLL_CREATED, r.RoomId, r.PollId, r.UserId)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.WithError(err).Errorln("error sending POLL_CREATED event")
 	}
 
 	// send analytics
@@ -42,7 +42,7 @@ func (m *PollModel) CreatePoll(r *plugnmeet.CreatePollReq) (string, error) {
 	}
 	marshal, err := json.Marshal(toRecord)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.WithError(err).Errorln("marshalling failed")
 	}
 	val := string(marshal)
 	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
@@ -109,7 +109,7 @@ func (m *PollModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq) error
 	}
 	marshal, err := json.Marshal(toRecord)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.WithError(err).Errorln("marshalling failed")
 	}
 	val := string(marshal)
 	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{

@@ -2,16 +2,16 @@ package models
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	log "github.com/sirupsen/logrus"
-	"strings"
 )
 
 func (m *WebhookModel) participantJoined(event *livekit.WebhookEvent) {
 	if event.Room == nil {
-		log.Warnln(fmt.Sprintf("invalid webhook info received: %+v", event))
+		m.logger.Warnln(fmt.Sprintf("invalid webhook info received: %+v", event))
 		return
 	}
 
@@ -27,13 +27,13 @@ func (m *WebhookModel) participantJoined(event *livekit.WebhookEvent) {
 
 	_, err = m.ds.IncrementOrDecrementNumParticipants(rInfo.RoomSid, "+")
 	if err != nil {
-		log.Errorln(err)
+		m.logger.WithError(err).Errorln("error incrementing num participants")
 	}
 
 	if strings.HasPrefix(event.Participant.Identity, config.IngressUserIdPrefix) {
 		// if user was ingress user then we'll have to do it manually
 		// because that user will not use plugNmeet client interface
-		nm := NewNatsModel(m.app, m.ds, m.rs)
+		nm := NewNatsModel(m.app, m.ds, m.rs, m.logger.Logger)
 		nm.OnAfterUserJoined(event.Room.Name, event.Participant.Identity)
 	}
 
@@ -43,7 +43,7 @@ func (m *WebhookModel) participantJoined(event *livekit.WebhookEvent) {
 
 func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 	if event.Room == nil {
-		log.Warnln(fmt.Sprintf("invalid webhook info received: %+v", event))
+		m.logger.Warnln(fmt.Sprintf("invalid webhook info received: %+v", event))
 		return
 	}
 
@@ -59,13 +59,13 @@ func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 
 	_, err = m.ds.IncrementOrDecrementNumParticipants(rInfo.RoomSid, "-")
 	if err != nil {
-		log.Errorln(err)
+		m.logger.WithError(err).Errorln("error decrementing num participants")
 	}
 
 	if strings.HasPrefix(event.Participant.Identity, config.IngressUserIdPrefix) {
 		// if user was ingress user then we'll have to do it manually
 		// because that user did not use plugNmeet client interface
-		nm := NewNatsModel(m.app, m.ds, m.rs)
+		nm := NewNatsModel(m.app, m.ds, m.rs, m.logger.Logger)
 		nm.OnAfterUserDisconnected(event.Room.Name, event.Participant.Identity)
 	}
 
@@ -74,6 +74,6 @@ func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 
 	// if we missed calculating this user's speech service usage stat
 	// for sudden disconnection
-	sm := NewSpeechToTextModel(m.app, m.ds, m.rs)
+	sm := NewSpeechToTextModel(m.app, m.ds, m.rs, m.logger.Logger)
 	_ = sm.SpeechServiceUsersUsage(rInfo.RoomId, rInfo.RoomSid, event.Participant.Identity, plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED)
 }

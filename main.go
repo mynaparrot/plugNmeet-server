@@ -3,16 +3,18 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/mynaparrot/plugnmeet-server/helpers"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/factory"
-	"github.com/mynaparrot/plugnmeet-server/pkg/routers"
-	"github.com/mynaparrot/plugnmeet-server/version"
-	log "github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v3"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/mynaparrot/plugnmeet-server/helpers"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/factory"
+	"github.com/mynaparrot/plugnmeet-server/pkg/logging"
+	"github.com/mynaparrot/plugnmeet-server/pkg/routers"
+	"github.com/mynaparrot/plugnmeet-server/version"
+	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli/v3"
 )
 
 func main() {
@@ -37,7 +39,7 @@ func main() {
 	}
 	err := app.Run(context.Background(), os.Args)
 	if err != nil {
-		log.Fatalln(err)
+		logrus.Fatalln(err)
 	}
 }
 
@@ -49,15 +51,21 @@ func startServer(ctx context.Context, c *cli.Command) error {
 	// set this config for global usage
 	config.New(appCnf)
 
+	logger, err := logging.NewLogger(&appCnf.LogSettings)
+	if err != nil {
+		logrus.WithError(err).Fatal("Failed to setup logger")
+	}
+	appCnf.Logger = logger
+
 	// now prepare our server
 	err = helpers.PrepareServer(config.GetConfig())
 	if err != nil {
-		log.Fatalln(err)
+		logger.Fatalln(err)
 	}
 
 	appFactory, err := factory.NewAppFactory(appCnf)
 	if err != nil {
-		log.Fatalln(err)
+		logger.Fatalln(err)
 	}
 
 	// boot up some services
@@ -72,13 +80,13 @@ func startServer(ctx context.Context, c *cli.Command) error {
 
 	go func() {
 		sig := <-sigChan
-		log.Infoln("exit requested, shutting down", "signal", sig)
+		logger.Infoln("exit requested, shutting down", "signal", sig)
 		_ = rt.Shutdown()
 	}()
 
 	err = rt.Listen(fmt.Sprintf(":%d", appCnf.Client.Port))
 	if err != nil {
-		log.Fatalln(err)
+		logger.Fatalln(err)
 	}
 	return nil
 }

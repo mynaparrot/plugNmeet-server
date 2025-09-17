@@ -3,8 +3,8 @@ package models
 import (
 	"context"
 	"errors"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	log "github.com/sirupsen/logrus"
 )
 
 func (m *BreakoutRoomModel) EndBreakoutRoom(ctx context.Context, r *plugnmeet.EndBreakoutRoomReq) error {
@@ -38,12 +38,12 @@ func (m *BreakoutRoomModel) EndAllBreakoutRoomsByParentRoomId(ctx context.Contex
 func (m *BreakoutRoomModel) proceedToEndBkRoom(ctx context.Context, bkRoomId, parentRoomId string) {
 	ok, msg := m.rm.EndRoom(ctx, &plugnmeet.RoomEndReq{RoomId: bkRoomId})
 	if !ok {
-		log.Errorln(msg)
+		m.logger.Errorln(msg)
 	}
 
 	err := m.natsService.DeleteBreakoutRoom(parentRoomId, bkRoomId)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.Errorln(err)
 	}
 
 	m.onAfterBkRoomEnded(parentRoomId, bkRoomId)

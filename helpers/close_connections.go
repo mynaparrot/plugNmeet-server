@@ -7,22 +7,23 @@ import (
 )
 
 func HandleCloseConnections() {
-	if config.GetConfig() == nil {
+	appCnf := config.GetConfig()
+	if appCnf == nil {
 		return
 	}
 
 	// handle to close DB connection
-	if db, err := config.GetConfig().DB.DB(); err == nil {
+	if db, err := appCnf.DB.DB(); err == nil {
 		_ = db.Close()
 	}
 
 	// close redis
-	_ = config.GetConfig().RDS.Close()
+	_ = appCnf.RDS.Close()
 
 	// close nats
-	natsservice.GetNatsCacheService(nil).Shutdown()
-	_ = config.GetConfig().NatsConn.Drain()
-	config.GetConfig().NatsConn.Close()
+	natsservice.GetNatsCacheService(appCnf, appCnf.Logger).Shutdown()
+	_ = appCnf.NatsConn.Drain()
+	appCnf.NatsConn.Close()
 
 	// close logger
 	logrus.Exit(0)

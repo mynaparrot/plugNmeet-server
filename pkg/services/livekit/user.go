@@ -2,6 +2,7 @@ package livekitservice
 
 import (
 	"errors"
+
 	"github.com/livekit/protocol/livekit"
 )
 

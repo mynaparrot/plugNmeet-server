@@ -3,14 +3,16 @@ package models
 import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/sirupsen/logrus"
 )
 
 type LtiV1Model struct {
-	app *config.AppConfig
-	ds  *dbservice.DatabaseService
-	rs  *redisservice.RedisService
-	rm  *RoomModel
+	app    *config.AppConfig
+	ds     *dbservice.DatabaseService
+	rs     *redisservice.RedisService
+	rm     *RoomModel
+	logger *logrus.Entry
 }
 
 type LtiClaims struct {
@@ -48,21 +50,22 @@ type LTIV1FetchRecordingsReq struct {
 	OrderBy string `json:"order_by"`
 }
 
-func NewLtiV1Model(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *LtiV1Model {
+func NewLtiV1Model(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, logger *logrus.Logger) *LtiV1Model {
 	if app == nil {
 		app = config.GetConfig()
 	}
 	if ds == nil {
-		ds = dbservice.New(app.DB)
+		ds = dbservice.New(app.DB, logger)
 	}
 	if rs == nil {
-		rs = redisservice.New(app.RDS)
+		rs = redisservice.New(app.RDS, logger)
 	}
 
 	return &LtiV1Model{
-		app: app,
-		ds:  ds,
-		rs:  rs,
-		rm:  NewRoomModel(app, ds, rs),
+		app:    app,
+		ds:     ds,
+		rs:     rs,
+		rm:     NewRoomModel(app, ds, rs, logger),
+		logger: logger.WithField("model", "lti_v1"),
 	}
 }

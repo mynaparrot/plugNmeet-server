@@ -2,13 +2,13 @@ package models
 
 import (
 	"encoding/base64"
-	"errors"
 	"fmt"
-	"github.com/gabriel-vasile/mimetype"
-	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/gabriel-vasile/mimetype"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 )
 
 func (m *FileModel) UploadBase64EncodedData(req *plugnmeet.UploadBase64EncodedDataReq) (*plugnmeet.UploadBase64EncodedDataRes, error) {
@@ -17,7 +17,7 @@ func (m *FileModel) UploadBase64EncodedData(req *plugnmeet.UploadBase64EncodedDa
 		return nil, err
 	}
 	if roomInfo == nil {
-		return nil, errors.New("room is not active")
+		return nil, fmt.Errorf("room is not active")
 	}
 
 	data, err := base64.StdEncoding.DecodeString(req.GetData())

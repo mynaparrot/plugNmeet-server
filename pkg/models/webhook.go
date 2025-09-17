@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -9,7 +10,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 type WebhookModel struct {
@@ -21,17 +22,18 @@ type WebhookModel struct {
 	analyticsModel  *AnalyticsModel
 	webhookNotifier *helpers.WebhookNotifier
 	natsService     *natsservice.NatsService
+	logger          *logrus.Entry
 }
 
-func NewWebhookModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *WebhookModel {
+func NewWebhookModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, logger *logrus.Logger) *WebhookModel {
 	if app == nil {
 		app = config.GetConfig()
 	}
 	if ds == nil {
-		ds = dbservice.New(app.DB)
+		ds = dbservice.New(app.DB, logger)
 	}
 	if rs == nil {
-		rs = redisservice.New(app.RDS)
+		rs = redisservice.New(app.RDS, logger)
 	}
 
 	return &WebhookModel{
@@ -39,10 +41,11 @@ func NewWebhookModel(ctx context.Context, app *config.AppConfig, ds *dbservice.D
 		app:             app,
 		ds:              ds,
 		rs:              rs,
-		rm:              NewRoomModel(app, ds, rs),
-		analyticsModel:  NewAnalyticsModel(app, ds, rs),
-		webhookNotifier: helpers.GetWebhookNotifier(app),
-		natsService:     natsservice.New(app),
+		rm:              NewRoomModel(app, ds, rs, logger),
+		analyticsModel:  NewAnalyticsModel(app, ds, rs, logger),
+		webhookNotifier: helpers.GetWebhookNotifier(app, logger),
+		natsService:     natsservice.New(app, logger),
+		logger:          logger.WithField("model", "webhook"),
 	}
 }
 
@@ -70,14 +73,14 @@ func (m *WebhookModel) sendToWebhookNotifier(event *livekit.WebhookEvent) {
 		return
 	}
 	if event.Room == nil {
-		log.Errorln("empty room info for event: ", event.GetEvent())
+		m.logger.Errorln("empty room info for event: ", event.GetEvent())
 		return
 	}
 
 	msg := utils.PrepareCommonWebhookNotifyEvent(event)
 	err := m.webhookNotifier.SendWebhookEvent(msg)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.Errorln(err)
 	}
 }
 
@@ -86,7 +89,7 @@ func (m *WebhookModel) sendCustomTypeWebhook(event *livekit.WebhookEvent, eventN
 		return
 	}
 	if event.Room == nil {
-		log.Errorln("empty room info for event: ", event.GetEvent())
+		m.logger.Errorln("empty room info for event: ", event.GetEvent())
 		return
 	}
 
@@ -94,6 +97,6 @@ func (m *WebhookModel) sendCustomTypeWebhook(event *livekit.WebhookEvent, eventN
 	msg.Event = &eventName
 	err := m.webhookNotifier.SendWebhookEvent(msg)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.Errorln(err)
 	}
 }

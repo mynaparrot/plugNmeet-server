@@ -2,8 +2,8 @@ package models
 
 import (
 	"errors"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	log "github.com/sirupsen/logrus"
 )
 
 func (m *ExDisplayModel) start(req *plugnmeet.ExternalDisplayLinkReq) error {
@@ -51,7 +51,7 @@ func (m *ExDisplayModel) updateRoomMetadata(roomId string, opts *updateRoomMetad
 
 	err = m.natsService.UpdateAndBroadcastRoomMetadata(roomId, roomMeta)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.Errorln(err)
 	}
 
 	// send analytics
@@ -68,7 +68,7 @@ func (m *ExDisplayModel) updateRoomMetadata(roomId string, opts *updateRoomMetad
 		d.HsetValue = &val
 	}
 
-	analyticsModel := NewAnalyticsModel(m.app, m.ds, m.rs)
+	analyticsModel := NewAnalyticsModel(m.app, m.ds, m.rs, m.logger.Logger)
 	analyticsModel.HandleEvent(d)
 
 	return nil

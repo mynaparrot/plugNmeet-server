@@ -4,17 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/redis/go-redis/v9"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
-	"os"
-	"strconv"
-	"strings"
-	"time"
 )
 
 func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
@@ -41,19 +41,19 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 	// this may happen when we closed the room & re-created it instantly
 	exist, err := m.natsService.GetRoomInfo(roomId)
 	if err == nil && exist != nil {
-		log.Infoln("this room:", roomId, "still active or created again, so we won't process to export analytics")
+		m.logger.Infoln("this room:", roomId, "still active or created again, so we won't process to export analytics")
 		return
 	}
 
 	// lock to prevent this room re-creation until process finish
 	// otherwise will give an unexpected result
-	if lockValue, err := acquireRoomCreationLockWithRetry(context.Background(), m.rs, roomId); err == nil {
+	if lockValue, err := acquireRoomCreationLockWithRetry(context.Background(), m.rs, roomId, m.logger); err == nil {
 		defer func() {
 			unlockCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			if unlockErr := m.rs.UnlockRoomCreation(unlockCtx, roomId, lockValue); unlockErr != nil {
 				// UnlockRoomCreation in RedisService should log details
-				log.Errorf("Error trying to clean up room creation lock for room %s : %v", roomId, unlockErr)
+				m.logger.Errorf("Error trying to clean up room creation lock for room %s : %v", roomId, unlockErr)
 			}
 		}()
 	}
@@ -61,7 +61,7 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 	if _, err := os.Stat(*m.app.AnalyticsSettings.FilesStorePath); os.IsNotExist(err) {
 		err = os.MkdirAll(*m.app.AnalyticsSettings.FilesStorePath, os.ModePerm)
 		if err != nil {
-			log.Errorln(err)
+			m.logger.Errorln(err)
 			return
 		}
 	}
@@ -78,7 +78,7 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 	// export file
 	stat, err := m.exportAnalyticsToFile(room, path, metadata)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.Errorln(err)
 		return
 	}
 
@@ -90,7 +90,7 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 		// record in db
 		_, err = m.AddAnalyticsFileToDB(room.ID, room.CreationTime, room.RoomId, fileId, stat)
 		if err != nil {
-			log.Errorln(err)
+			m.logger.Errorln(err)
 		}
 		// notify
 		go m.sendToWebhookNotifier(room.RoomId, room.Sid, "analytics_proceeded", fileId)
@@ -141,7 +141,7 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *dbmodels.RoomInfo, path str
 	users, err := m.rs.AnalyticsGetAllUsers(k)
 	allKeys = append(allKeys, fmt.Sprintf("%s:users", key))
 	if err != nil {
-		log.Errorln(err)
+		m.logger.Errorln(err)
 		return nil, err
 	}
 	roomInfo.RoomTotalUsers = int64(len(users))
@@ -196,18 +196,18 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *dbmodels.RoomInfo, path str
 		}
 		marshal, err := op.Marshal(result)
 		if err != nil {
-			log.Errorln(err)
+			m.logger.Errorln(err)
 			return nil, err
 		}
 
 		err = os.WriteFile(path, marshal, 0644)
 		if err != nil {
-			log.Errorln(err)
+			m.logger.Errorln(err)
 			return nil, err
 		}
 		stat, err = os.Stat(path)
 		if err != nil {
-			log.Errorln(err)
+			m.logger.Errorln(err)
 			return nil, err
 		}
 
@@ -216,7 +216,7 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *dbmodels.RoomInfo, path str
 	// at the end delete all redis records
 	err = m.rs.AnalyticsDeleteKeys(allKeys)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.Errorln(err)
 	}
 
 	return stat, err
@@ -226,14 +226,14 @@ func (m *AnalyticsModel) buildEventInfo(ekey string, eventInfo *plugnmeet.Analyt
 	// we'll check type first
 	rType, err := m.rs.AnalyticsGetKeyType(ekey)
 	if err != nil {
-		log.Println(err)
+		m.logger.Println(err)
 		return err
 	}
 	if rType == "hash" {
 		var evals []*plugnmeet.AnalyticsEventValue
 		result, err := m.rs.GetAnalyticsAllHashTypeVals(ekey)
 		if err != nil {
-			log.Errorln(err)
+			m.logger.Errorln(err)
 			return err
 		}
 		for kk, rv := range result {
@@ -249,7 +249,7 @@ func (m *AnalyticsModel) buildEventInfo(ekey string, eventInfo *plugnmeet.Analyt
 	} else {
 		result, err := m.rs.GetAnalyticsStringTypeVal(ekey)
 		if !errors.Is(err, redis.Nil) && err != nil {
-			log.Println(err)
+			m.logger.Println(err)
 			return err
 		}
 		if result != "" {
@@ -270,7 +270,7 @@ func (m *AnalyticsModel) buildEventInfo(ekey string, eventInfo *plugnmeet.Analyt
 }
 
 func (m *AnalyticsModel) sendToWebhookNotifier(roomId, roomSid, task, fileId string) {
-	n := helpers.GetWebhookNotifier(m.app)
+	n := helpers.GetWebhookNotifier(m.app, m.logger.Logger)
 	if n != nil {
 		msg := &plugnmeet.CommonNotifyEvent{
 			Event: &task,
@@ -285,7 +285,7 @@ func (m *AnalyticsModel) sendToWebhookNotifier(roomId, roomSid, task, fileId str
 
 		err := n.SendWebhookEvent(msg)
 		if err != nil {
-			log.Errorln(err)
+			m.logger.Errorln(err)
 		}
 	}
 }

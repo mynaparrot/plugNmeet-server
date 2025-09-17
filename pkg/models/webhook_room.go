@@ -2,18 +2,18 @@ package models
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	livekitservice "github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
-	log "github.com/sirupsen/logrus"
-	"time"
 )
 
 func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 	if event.Room == nil {
-		log.Warnln(fmt.Sprintf("invalid webhook info received: %+v", event))
+		m.logger.Warnln(fmt.Sprintf("invalid webhook info received: %+v", event))
 		return
 	}
 
@@ -26,10 +26,10 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 	if rInfo == nil || meta == nil {
 		// we did not find this room to our kv
 		// we'll force to remove it
-		lk := livekitservice.New(m.app)
+		lk := livekitservice.New(m.app, m.logger.Logger)
 		_, err := lk.EndRoom(event.Room.Name)
 		if err != nil {
-			log.Errorln(err)
+			m.logger.WithError(err).Errorln("error ending room")
 		}
 		return
 	}
@@ -37,7 +37,7 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 	if rInfo.Status != natsservice.RoomStatusActive {
 		err = m.natsService.UpdateRoomStatus(rInfo.RoomId, natsservice.RoomStatusActive)
 		if err != nil {
-			log.Errorln(err)
+			m.logger.WithError(err).Errorln("error updating room status")
 			return
 		}
 	}
@@ -45,27 +45,27 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 	meta.StartedAt = uint64(time.Now().UTC().Unix())
 	if meta.RoomFeatures.GetRoomDuration() > 0 {
 		// we'll add room info in map
-		rmDuration := NewRoomDurationModel(m.app, m.rs)
+		rmDuration := NewRoomDurationModel(m.app, m.rs, m.logger.Logger)
 		err := rmDuration.AddRoomWithDurationInfo(rInfo.RoomId, &RoomDurationInfo{
 			Duration:  meta.RoomFeatures.GetRoomDuration(),
 			StartedAt: meta.StartedAt,
 		})
 		if err != nil {
-			log.Errorln(err)
+			m.logger.WithError(err).Errorln("error adding room duration info")
 		}
 	}
 
 	if meta.IsBreakoutRoom {
-		bm := NewBreakoutRoomModel(m.app, m.ds, m.rs)
+		bm := NewBreakoutRoomModel(m.app, m.ds, m.rs, m.logger.Logger)
 		err := bm.PostTaskAfterRoomStartWebhook(rInfo.RoomId, meta)
 		if err != nil {
-			log.Errorln(err)
+			m.logger.WithError(err).Errorln("error posting task after room start webhook")
 		}
 	}
 
 	err = m.natsService.UpdateAndBroadcastRoomMetadata(rInfo.RoomId, meta)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.WithError(err).Errorln("error updating room metadata")
 	}
 
 	// for room_started event we should send webhook at the end
@@ -81,7 +81,7 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 
 func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 	if event.Room == nil {
-		log.Warnln(fmt.Sprintf("invalid webhook info received: %+v", event))
+		m.logger.Warnln(fmt.Sprintf("invalid webhook info received: %+v", event))
 		return
 	}
 
@@ -106,7 +106,7 @@ func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 		// change status to ended
 		err = m.natsService.UpdateRoomStatus(rInfo.RoomId, natsservice.RoomStatusEnded)
 		if err != nil {
-			log.Errorln(err)
+			m.logger.WithError(err).Errorln("error updating room status")
 		}
 		// end the room in proper way
 		m.rm.EndRoom(m.ctx, &plugnmeet.RoomEndReq{RoomId: rInfo.RoomId})
@@ -122,6 +122,6 @@ func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 	// now clean up webhook for this room
 	err = m.webhookNotifier.DeleteWebhook(rInfo.RoomId)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.WithError(err).Errorln("error deleting webhook")
 	}
 }

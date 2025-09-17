@@ -2,13 +2,13 @@ package models
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"strings"
 )
 
 func (m *LtiV1Model) LTIV1Landing(c *fiber.Ctx, requests, signingURL string) error {
@@ -25,7 +25,7 @@ func (m *LtiV1Model) LTIV1Landing(c *fiber.Ctx, requests, signingURL string) err
 	}
 
 	if userId == "" {
-		return errors.New(config.UserIdOrEmailRequired)
+		return fmt.Errorf(config.UserIdOrEmailRequired)
 	}
 
 	name := params.Get("lis_person_name_full")

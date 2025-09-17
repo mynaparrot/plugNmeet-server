@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
-	log "github.com/sirupsen/logrus"
-	"time"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -64,9 +65,15 @@ func (s *RedisService) UnlockRoomCreation(ctx context.Context, roomID string, lo
 	}
 
 	if deleted == 0 {
-		log.Warnf("UnlockRoomCreation: Lock for roomID %s not held by this instance (lockValue: %s) or lock expired before unlock.", roomID, lockValue)
+		s.logger.WithFields(logrus.Fields{
+			"roomID":    roomID,
+			"lockValue": lockValue,
+		}).Warnf("UnlockRoomCreation: Failed to release lock")
 	} else {
-		log.Infof("UnlockRoomCreation: Successfully released lock for roomID %s (lockValue: %s)", roomID, lockValue)
+		s.logger.WithFields(logrus.Fields{
+			"roomID":    roomID,
+			"lockValue": lockValue,
+		}).Infof("UnlockRoomCreation: Successfully released lock")
 	}
 	return nil
 }

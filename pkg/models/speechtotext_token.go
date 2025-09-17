@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"io"
 	"net/http"
 	"sort"
 	"strconv"
+
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
 func (m *SpeechToTextModel) GenerateAzureToken(r *plugnmeet.GenerateAzureTokenReq, requestedUserId string) error {
@@ -18,7 +19,7 @@ func (m *SpeechToTextModel) GenerateAzureToken(r *plugnmeet.GenerateAzureTokenRe
 		return err
 	}
 	if e == "exist" {
-		return errors.New("speech-services.already-received-token")
+		return fmt.Errorf("speech-services.already-received-token")
 	}
 
 	// check if this user already using service or not
@@ -27,7 +28,7 @@ func (m *SpeechToTextModel) GenerateAzureToken(r *plugnmeet.GenerateAzureTokenRe
 		return err
 	}
 	if ss != "" {
-		return errors.New("speech-services.already-using-service")
+		return fmt.Errorf("speech-services.already-using-service")
 	}
 
 	meta, err := m.natsService.GetRoomMetadataStruct(r.RoomId)
@@ -35,12 +36,12 @@ func (m *SpeechToTextModel) GenerateAzureToken(r *plugnmeet.GenerateAzureTokenRe
 		return err
 	}
 	if meta == nil {
-		return errors.New("invalid nil room metadata information")
+		return fmt.Errorf("invalid nil room metadata information")
 	}
 	f := meta.RoomFeatures.SpeechToTextTranslationFeatures
 
 	if !m.app.AzureCognitiveServicesSpeech.Enabled || !f.IsEnabled {
-		return errors.New("speech-services.service-disabled")
+		return fmt.Errorf("speech-services.service-disabled")
 	}
 
 	k, err := m.selectAzureKey()
@@ -68,7 +69,7 @@ func (m *SpeechToTextModel) RenewAzureToken(r *plugnmeet.AzureTokenRenewReq, req
 	}
 
 	if ss == "" {
-		return errors.New("speech-services.renew-need-already-using-service")
+		return fmt.Errorf("speech-services.renew-need-already-using-service")
 	}
 
 	sub := m.app.AzureCognitiveServicesSpeech.SubscriptionKeys
@@ -80,7 +81,7 @@ func (m *SpeechToTextModel) RenewAzureToken(r *plugnmeet.AzureTokenRenewReq, req
 		}
 	}
 	if key == "" {
-		return errors.New("speech-services.renew-subscription-key-not-found")
+		return fmt.Errorf("speech-services.renew-subscription-key-not-found")
 	}
 
 	res, err := m.sendRequestToAzureForToken(key, r.ServiceRegion, r.KeyId)

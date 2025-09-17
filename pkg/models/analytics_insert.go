@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"

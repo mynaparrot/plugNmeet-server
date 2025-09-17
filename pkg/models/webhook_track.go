@@ -2,14 +2,14 @@ package models
 
 import (
 	"fmt"
+
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	log "github.com/sirupsen/logrus"
 )
 
 func (m *WebhookModel) trackPublished(event *livekit.WebhookEvent) {
 	if event.Room == nil || event.Track == nil {
-		log.Warnln(fmt.Sprintf("invalid webhook info received: %+v", event))
+		m.logger.Warnln(fmt.Sprintf("invalid webhook info received: %+v", event))
 		return
 	}
 
@@ -52,17 +52,17 @@ func (m *WebhookModel) trackPublished(event *livekit.WebhookEvent) {
 
 func (m *WebhookModel) trackUnpublished(event *livekit.WebhookEvent) {
 	if event.Room == nil || event.Track == nil {
-		log.Warnln(fmt.Sprintf("invalid webhook info received: %+v", event))
+		m.logger.Warnln(fmt.Sprintf("invalid webhook info received: %+v", event))
 		return
 	}
 
 	rInfo, err := m.natsService.GetRoomInfo(event.Room.Name)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.WithError(err).Errorln("error getting room info")
 		return
 	}
 	if rInfo == nil {
-		log.Errorln("empty roomInfo")
+		m.logger.Errorln("empty roomInfo")
 		return
 	}
 

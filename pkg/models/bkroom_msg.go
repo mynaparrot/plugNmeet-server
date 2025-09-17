@@ -2,7 +2,6 @@ package models
 
 import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	log "github.com/sirupsen/logrus"
 )
 
 type SendBreakoutRoomMsgReq struct {
@@ -23,7 +22,7 @@ func (m *BreakoutRoomModel) SendBreakoutRoomMsg(r *plugnmeet.BroadcastBreakoutRo
 	for _, rr := range rooms {
 		err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SYSTEM_CHAT_MSG, rr.Id, r.Msg, nil)
 		if err != nil {
-			log.Errorln(err)
+			m.logger.Errorln(err)
 		}
 	}
 

@@ -2,10 +2,10 @@ package models
 
 import (
 	"context"
+	"time"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
-	log "github.com/sirupsen/logrus"
-	"time"
 )
 
 // activeRoomChecker will check & do reconciliation between DB & livekit
@@ -40,7 +40,7 @@ func (m *SchedulerModel) activeRoomChecker() {
 
 		rInfo, err := m.natsService.GetRoomInfo(room.RoomId)
 		if err != nil {
-			log.Errorln(err)
+			m.logger.WithError(err).Errorln("error getting room info")
 			continue
 		}
 
@@ -52,14 +52,14 @@ func (m *SchedulerModel) activeRoomChecker() {
 				IsRunning: 0,
 			})
 			if err != nil {
-				log.Errorln(err)
+				m.logger.WithError(err).Errorln("error updating room status")
 			}
 			continue
 		}
 
 		userIds, err := m.natsService.GetOnlineUsersId(room.RoomId)
 		if err != nil {
-			log.Errorln(err)
+			m.logger.WithError(err).Errorln("error getting online users")
 			continue
 		}
 
@@ -67,7 +67,7 @@ func (m *SchedulerModel) activeRoomChecker() {
 			// no user online
 			valid := rInfo.CreatedAt + rInfo.EmptyTimeout
 			if uint64(time.Now().UTC().Unix()) > valid {
-				log.Infoln("EmptyTimeout for roomId:", room.RoomId, "passed: ", uint64(time.Now().UTC().Unix())-valid)
+				m.logger.Infoln("EmptyTimeout for roomId:", room.RoomId, "passed: ", uint64(time.Now().UTC().Unix())-valid)
 
 				// end room by proper channel
 				m.rm.EndRoom(context.Background(), &plugnmeet.RoomEndReq{RoomId: room.RoomId})

@@ -3,11 +3,12 @@ package models
 import (
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/goccy/go-json"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"google.golang.org/protobuf/encoding/protojson"
-	"strconv"
-	"strings"
 )
 
 func (m *PollModel) ListPolls(roomId string) ([]*plugnmeet.PollInfo, error) {

@@ -9,7 +9,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 type RecordingModel struct {
@@ -20,26 +20,28 @@ type RecordingModel struct {
 	analyticsModel  *AnalyticsModel
 	webhookNotifier *helpers.WebhookNotifier
 	natsService     *natsservice.NatsService
+	logger          *logrus.Entry
 }
 
-func NewRecordingModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *RecordingModel {
+func NewRecordingModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, logger *logrus.Logger) *RecordingModel {
 	if app == nil {
 		app = config.GetConfig()
 	}
 	if ds == nil {
-		ds = dbservice.New(app.DB)
+		ds = dbservice.New(app.DB, logger)
 	}
 	if rs == nil {
-		rs = redisservice.New(app.RDS)
+		rs = redisservice.New(app.RDS, logger)
 	}
 
 	return &RecordingModel{
 		app:             app,
 		ds:              ds,
 		rs:              rs,
-		analyticsModel:  NewAnalyticsModel(app, ds, rs),
-		webhookNotifier: helpers.GetWebhookNotifier(app),
-		natsService:     natsservice.New(app),
+		analyticsModel:  NewAnalyticsModel(app, ds, rs, logger),
+		webhookNotifier: helpers.GetWebhookNotifier(app, logger),
+		natsService:     natsservice.New(app, logger),
+		logger:          logger.WithField("model", "recording"),
 	}
 }
 
@@ -64,7 +66,7 @@ func (m *RecordingModel) HandleRecorderResp(r *plugnmeet.RecorderToPlugNmeet, ro
 	case plugnmeet.RecordingTasks_RECORDING_PROCEEDED:
 		creation, err := m.addRecordingInfoToDB(r, roomInfo.CreationTime)
 		if err != nil {
-			log.Errorln(err)
+			m.logger.WithError(err).Errorln("error adding recording info to db")
 		}
 		// keep record of this file
 		m.addRecordingInfoFile(r, creation, roomInfo)
@@ -97,7 +99,7 @@ func (m *RecordingModel) sendToWebhookNotifier(r *plugnmeet.RecorderToPlugNmeet)
 		} else {
 			err := n.SendWebhookEvent(msg)
 			if err != nil {
-				log.Errorln(err)
+				m.logger.WithError(err).Errorln("error sending webhook event")
 			}
 		}
 	}

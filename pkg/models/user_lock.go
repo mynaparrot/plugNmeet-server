@@ -2,8 +2,8 @@ package models
 
 import (
 	"errors"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	log "github.com/sirupsen/logrus"
 )
 
 // AssignLockSettingsToUser will assign lock to no-admin user
@@ -108,7 +108,7 @@ func (m *UserModel) updateRoomUsersLockSettings(r *plugnmeet.UpdateUserLockSetti
 		}
 		err := m.updateUserLockMetadata(r.RoomId, p.UserId, r.Service, r.Direction, p.Metadata)
 		if err != nil {
-			log.Errorln(err)
+			m.logger.WithError(err).Errorln("error updating user lock settings")
 		}
 	}
 

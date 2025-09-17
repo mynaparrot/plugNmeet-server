@@ -3,12 +3,12 @@ package models
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
-	log "github.com/sirupsen/logrus"
-	"strings"
-	"time"
 )
 
 // checkOnlineUsersStatus will compare last ping result
@@ -47,7 +47,7 @@ func (m *SchedulerModel) checkOnlineUsersStatus() {
 				lastPing += natsservice.UserOnlineMaxPingDiff.Milliseconds()
 				now := time.Now().UnixMilli()
 				if now > lastPing {
-					log.Infoln(fmt.Sprintf("userId:%s should be offline, lastPing: %d, now: %d", u, lastPing, now))
+					m.logger.Infoln(fmt.Sprintf("userId:%s should be offline, lastPing: %d, now: %d", u, lastPing, now))
 					m.changeUserStatus(roomId, u)
 				}
 			}

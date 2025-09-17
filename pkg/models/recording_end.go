@@ -2,13 +2,12 @@ package models
 
 import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	log "github.com/sirupsen/logrus"
 )
 
 func (m *RecordingModel) recordingEnded(r *plugnmeet.RecorderToPlugNmeet) {
 	_, err := m.ds.UpdateRoomRecordingStatus(uint64(r.RoomTableId), 0, nil)
 	if err != nil {
-		log.Infoln(err)
+		m.logger.WithError(err).Infoln("error updating room recording status")
 	}
 	// update room metadata
 	roomMeta, err := m.natsService.GetRoomMetadataStruct(r.RoomId)
@@ -16,7 +15,7 @@ func (m *RecordingModel) recordingEnded(r *plugnmeet.RecorderToPlugNmeet) {
 		return
 	}
 	if roomMeta == nil {
-		log.Errorln("invalid nil room metadata information")
+		m.logger.Errorln("invalid nil room metadata information")
 		return
 	}
 
@@ -29,6 +28,6 @@ func (m *RecordingModel) recordingEnded(r *plugnmeet.RecorderToPlugNmeet) {
 		err = m.natsService.NotifyErrorMsg(r.RoomId, "notifications.recording-ended-with-error", nil)
 	}
 	if err != nil {
-		log.Errorln(err)
+		m.logger.WithError(err).Errorln("error sending notification message")
 	}
 }

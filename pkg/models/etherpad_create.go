@@ -2,12 +2,12 @@ package models
 
 import (
 	"errors"
+	"net/url"
+	"sort"
+
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	log "github.com/sirupsen/logrus"
-	"net/url"
-	"sort"
 )
 
 // CreateSession will create group, pad, session
@@ -47,13 +47,13 @@ func (m *EtherpadModel) CreateSession(roomId, requestedUserId string) (*plugnmee
 	// add roomId to redis for this node
 	err = m.natsService.AddRoomInEtherpad(m.NodeId, roomId)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.Errorln(err)
 	}
 
 	// finally, update to room
 	err = m.addPadToRoomMetadata(roomId, res)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.Errorln(err)
 	}
 
 	res.Status = true
@@ -70,7 +70,7 @@ func (m *EtherpadModel) createPad(sessionId, requestedUserId string) (*EtherpadH
 
 	res, err := m.postToEtherpad("createPad", vals)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.Errorln(err)
 	}
 	return res, err
 }
@@ -81,7 +81,7 @@ func (m *EtherpadModel) createReadonlyPad(sessionId string) (*EtherpadHttpRes, e
 
 	res, err := m.postToEtherpad("getReadOnlyID", vals)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.Errorln(err)
 	}
 	return res, err
 }
@@ -132,7 +132,7 @@ func (m *EtherpadModel) checkStatus(h config.EtherpadInfo) bool {
 	vals := url.Values{}
 	_, err := m.postToEtherpad("getStats", vals)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.Errorln(err)
 		return false
 	}
 

@@ -2,6 +2,7 @@ package dbservice
 
 import (
 	"errors"
+
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"gorm.io/gorm"
 )

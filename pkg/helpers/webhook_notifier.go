@@ -1,7 +1,11 @@
 package helpers
 
 import (
+	"sync"
+	"time"
+
 	"github.com/goccy/go-json"
+	"github.com/gofiber/fiber/v2/log"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/webhook"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -9,9 +13,7 @@ import (
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
-	"sync"
-	"time"
+	"github.com/sirupsen/logrus"
 )
 
 type WebhookNotifier struct {
@@ -25,7 +27,8 @@ type WebhookNotifier struct {
 	// notifiers will hold a queue for each room, local to this server instance
 	notifiers map[string]*webhook.Notifier
 	// mu will protect access to the notifiers map
-	mu sync.Mutex
+	mu     sync.Mutex
+	logger *logrus.Entry
 }
 
 type webhookRedisFields struct {
@@ -33,15 +36,16 @@ type webhookRedisFields struct {
 	PerformDeleting bool     `json:"perform_deleting"`
 }
 
-func newWebhookNotifier(app *config.AppConfig) *WebhookNotifier {
+func newWebhookNotifier(app *config.AppConfig, logger *logrus.Logger) *WebhookNotifier {
 	w := &WebhookNotifier{
 		app:                  app,
-		ds:                   dbservice.New(app.DB),
-		natsService:          natsservice.New(app),
+		ds:                   dbservice.New(app.DB, logger),
+		natsService:          natsservice.New(app, logger),
 		isEnabled:            app.Client.WebhookConf.Enable,
 		enabledForPerMeeting: app.Client.WebhookConf.EnableForPerMeeting,
 		defaultUrl:           app.Client.WebhookConf.Url,
 		notifiers:            make(map[string]*webhook.Notifier),
+		logger:               logger.WithField("helper", "webhookNotifier"),
 	}
 
 	// Subscribe to the cleanup broadcast channel for clustered environments.
@@ -120,7 +124,7 @@ func (w *WebhookNotifier) RegisterWebhook(roomId, sid string) {
 
 	err := w.saveData(roomId, d)
 	if err != nil {
-		log.Errorln(err)
+		w.logger.WithError(err).Errorln("failed to save webhook data")
 	}
 }
 
@@ -176,7 +180,7 @@ func (w *WebhookNotifier) SendWebhookEvent(event *plugnmeet.CommonNotifyEvent) e
 		err := w.saveData(roomId, d)
 		if err != nil {
 			// we'll just log
-			log.Errorln(err)
+			w.logger.WithError(err).Errorln("failed to save webhook data")
 		}
 	} else if event.GetEvent() == "room_finished" && !d.PerformDeleting {
 		// if we got room_finished then we'll set for deleting
@@ -184,7 +188,7 @@ func (w *WebhookNotifier) SendWebhookEvent(event *plugnmeet.CommonNotifyEvent) e
 		err := w.saveData(roomId, d)
 		if err != nil {
 			// we'll just log
-			log.Errorln(err)
+			w.logger.WithError(err).Errorln("failed to save webhook data")
 		}
 	}
 
@@ -202,7 +206,7 @@ func (w *WebhookNotifier) ForceToPutInQueue(event *plugnmeet.CommonNotifyEvent) 
 		return
 	}
 	if event.Room.GetSid() == "" || event.Room.GetRoomId() == "" {
-		log.Errorln("empty room info for", event.GetEvent())
+		w.logger.Errorln("empty room info for", event.GetEvent())
 		return
 	}
 
@@ -263,11 +267,11 @@ func (w *WebhookNotifier) getData(roomId string) (*webhookRedisFields, error) {
 
 var webhookNotifier *WebhookNotifier
 
-func GetWebhookNotifier(app *config.AppConfig) *WebhookNotifier {
+func GetWebhookNotifier(app *config.AppConfig, logger *logrus.Logger) *WebhookNotifier {
 	if webhookNotifier != nil {
 		return webhookNotifier
 	}
-	webhookNotifier = newWebhookNotifier(app)
+	webhookNotifier = newWebhookNotifier(app, logger)
 
 	return webhookNotifier
 }

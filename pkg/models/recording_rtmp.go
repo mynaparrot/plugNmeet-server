@@ -2,13 +2,12 @@ package models
 
 import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	log "github.com/sirupsen/logrus"
 )
 
 func (m *RecordingModel) rtmpStarted(r *plugnmeet.RecorderToPlugNmeet) {
 	_, err := m.ds.UpdateRoomRTMPStatus(uint64(r.RoomTableId), 1, &r.RecorderId)
 	if err != nil {
-		log.Infoln(err)
+		m.logger.WithError(err).Infoln("error updating room rtmp status")
 	}
 
 	// update room metadata
@@ -17,7 +16,7 @@ func (m *RecordingModel) rtmpStarted(r *plugnmeet.RecorderToPlugNmeet) {
 		return
 	}
 	if roomMeta == nil {
-		log.Errorln("invalid nil room metadata information")
+		m.logger.Errorln("invalid nil room metadata information")
 		return
 	}
 
@@ -26,7 +25,7 @@ func (m *RecordingModel) rtmpStarted(r *plugnmeet.RecorderToPlugNmeet) {
 
 	err = m.natsService.NotifyInfoMsg(r.RoomId, "notifications.rtmp-started", false, nil)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.WithError(err).Errorln("error sending notification message")
 	}
 }
 
@@ -34,7 +33,7 @@ func (m *RecordingModel) rtmpStarted(r *plugnmeet.RecorderToPlugNmeet) {
 func (m *RecordingModel) rtmpEnded(r *plugnmeet.RecorderToPlugNmeet) {
 	_, err := m.ds.UpdateRoomRTMPStatus(uint64(r.RoomTableId), 0, nil)
 	if err != nil {
-		log.Infoln(err)
+		m.logger.WithError(err).Infoln("error updating room rtmp status")
 	}
 
 	// update room metadata
@@ -43,7 +42,7 @@ func (m *RecordingModel) rtmpEnded(r *plugnmeet.RecorderToPlugNmeet) {
 		return
 	}
 	if roomMeta == nil {
-		log.Errorln("invalid nil room metadata information")
+		m.logger.Errorln("invalid nil room metadata information")
 		return
 	}
 
@@ -56,6 +55,6 @@ func (m *RecordingModel) rtmpEnded(r *plugnmeet.RecorderToPlugNmeet) {
 		err = m.natsService.NotifyErrorMsg(r.RoomId, "notifications.rtmp-ended-with-error", nil)
 	}
 	if err != nil {
-		log.Errorln(err)
+		m.logger.WithError(err).Errorln("error sending notification message")
 	}
 }

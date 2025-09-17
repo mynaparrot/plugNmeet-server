@@ -3,14 +3,14 @@ package models
 import (
 	"errors"
 	"fmt"
-	"github.com/cavaliergopher/grab/v3"
-	"github.com/gabriel-vasile/mimetype"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	log "github.com/sirupsen/logrus"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/cavaliergopher/grab/v3"
+	"github.com/gabriel-vasile/mimetype"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
 // DownloadAndProcessPreUploadWBfile downloads and processes a pre-uploaded whiteboard file.
@@ -18,20 +18,20 @@ import (
 // This should be run in a separate goroutine due to its potentially long execution time.
 func (m *FileModel) DownloadAndProcessPreUploadWBfile(roomId, roomSid, fileUrl string) error {
 	if err := m.validateRemoteFile(fileUrl); err != nil {
-		log.Error(err)
+		m.logger.WithError(err).Error("file validation failed")
 		return errors.New("file validation failed")
 	}
 
 	downloadDir := filepath.Join(m.app.UploadFileSettings.Path, roomSid)
 	if err := os.MkdirAll(downloadDir, os.ModePerm); err != nil {
-		log.Errorln("failed to create download directory", err)
+		m.logger.WithError(err).Errorln("failed to create download directory")
 		return errors.New("failed to create download directory")
 	}
 
 	// Download the file
 	resp, err := grab.Get(downloadDir, fileUrl)
 	if err != nil {
-		log.Errorln("failed to download file", err)
+		m.logger.WithError(err).Errorln("failed to download file")
 		return errors.New("failed to download file")
 	}
 	defer os.RemoveAll(resp.Filename)
@@ -39,7 +39,7 @@ func (m *FileModel) DownloadAndProcessPreUploadWBfile(roomId, roomSid, fileUrl s
 	// Validate downloaded file type
 	mType, err := mimetype.DetectFile(resp.Filename)
 	if err != nil {
-		log.Errorln("failed to detect file type", err)
+		m.logger.WithError(err).Errorln("failed to detect file type")
 		return errors.New("failed to detect file type")
 	}
 	if err := m.ValidateMimeType(mType); err != nil {
@@ -51,7 +51,7 @@ func (m *FileModel) DownloadAndProcessPreUploadWBfile(roomId, roomSid, fileUrl s
 
 	// Convert and broadcast
 	if _, err := m.ConvertAndBroadcastWhiteboardFile(roomId, roomSid, filePath); err != nil {
-		log.Errorln("conversion/broadcast failed", err)
+		m.logger.WithError(err).Errorln("conversion/broadcast failed")
 		return errors.New("conversion/broadcast failed")
 	}
 
@@ -76,7 +76,7 @@ func (m *FileModel) validateRemoteFile(fileUrl string) error {
 
 	contentType := resp.Header.Get("Content-Type")
 	if contentType == "" {
-		return errors.New("missing Content-Type header")
+		return fmt.Errorf("missing Content-Type header")
 	}
 
 	mType := mimetype.Lookup(contentType)

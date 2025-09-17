@@ -4,21 +4,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
+	"strings"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
-	log "github.com/sirupsen/logrus"
-	"regexp"
-	"strings"
-	"time"
 )
 
 var validUserIDRegex = regexp.MustCompile("^[a-zA-Z0-9-_]+$")
 
 func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTokenReq) (string, error) {
 	// check first
-	_ = waitUntilRoomCreationCompletes(ctx, m.rs, g.GetRoomId())
+	_ = waitUntilRoomCreationCompletes(ctx, m.rs, g.GetRoomId(), m.logger)
 
 	if g.GetUserInfo().GetName() == config.RecorderUserAuthName {
 		return "", errors.New(fmt.Sprintf("name: %s is reserved for internal use only", config.RecorderUserAuthName))
@@ -51,7 +51,7 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 		if g.UserInfo.UserId != config.RecorderBot && g.UserInfo.UserId != config.RtmpBot {
 			// we'll auto generate user id no matter what sent
 			g.UserInfo.UserId = uuid.NewString()
-			log.Infoln(fmt.Sprintf("setting up auto generated user_id: %s for ex_user_id: %s; name: %s; room_id: %s", g.UserInfo.GetUserId(), g.UserInfo.GetUserMetadata().GetExUserId(), g.UserInfo.GetName(), g.GetRoomId()))
+			m.logger.Infoln(fmt.Sprintf("setting up auto generated user_id: %s for ex_user_id: %s; name: %s; room_id: %s", g.UserInfo.GetUserId(), g.UserInfo.GetUserMetadata().GetExUserId(), g.UserInfo.GetName(), g.GetRoomId()))
 		}
 	} else {
 		// check if this user is online, then we'll need to log out this user first
@@ -63,7 +63,7 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 			return "", err
 		}
 		if status == natsservice.UserStatusOnline {
-			log.Warnln(fmt.Sprintf("same user found in online status, removing that user before re-generating token for userId: %s; roomId: %s", g.UserInfo.GetUserId(), g.GetRoomId()))
+			m.logger.Warnln(fmt.Sprintf("same user found in online status, removing that user before re-generating token for userId: %s; roomId: %s", g.UserInfo.GetUserId(), g.GetRoomId()))
 
 			_ = m.RemoveParticipant(&plugnmeet.RemoveParticipantReq{
 				RoomId: g.GetRoomId(),
@@ -118,6 +118,6 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 		IsHidden: g.UserInfo.IsHidden,
 	}
 
-	am := NewAuthModel(m.app, m.natsService)
+	am := NewAuthModel(m.app, m.natsService, m.logger.Logger)
 	return am.GeneratePNMJoinToken(c)
 }

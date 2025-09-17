@@ -1,11 +1,12 @@
 package helpers
 
 import (
+	"os"
+
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/factory"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"gopkg.in/yaml.v3"
-	"os"
 )
 
 func ReadYamlConfigFile(file string) (*config.AppConfig, error) {
@@ -52,7 +53,7 @@ func PrepareServer(appCnf *config.AppConfig) error {
 	}
 
 	// initialize nats Cache Service
-	natsservice.InitNatsCacheService(config.GetConfig())
+	natsservice.InitNatsCacheService(appCnf, appCnf.Logger)
 
 	return nil
 }

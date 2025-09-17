@@ -2,7 +2,6 @@ package models
 
 import (
 	"errors"
-	log "github.com/sirupsen/logrus"
 	"net/url"
 )
 
@@ -25,7 +24,7 @@ func (m *EtherpadModel) CleanPad(roomId, nodeId, padId string) error {
 	vals.Add("padID", padId)
 	_, err := m.postToEtherpad("deletePad", vals)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.Errorln(err)
 	}
 
 	// add roomId to redis for this node

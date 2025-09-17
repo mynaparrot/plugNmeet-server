@@ -3,10 +3,11 @@ package redisservice
 import (
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/goccy/go-json"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/redis/go-redis/v9"
-	"strings"
 )
 
 func (s *RedisService) CreateRoomPoll(roomId string, val map[string]string) error {

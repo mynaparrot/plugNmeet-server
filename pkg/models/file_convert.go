@@ -4,14 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/gabriel-vasile/mimetype"
-	"github.com/google/uuid"
-	log "github.com/sirupsen/logrus"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/gabriel-vasile/mimetype"
+	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 )
 
 // ConvertWhiteboardFileReq represents the request structure for converting a whiteboard file.
@@ -68,7 +69,7 @@ func (m *FileModel) ConvertAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 		return nil, err
 	}
 
-	if err := convertPDFToImages(convertedFile, outputDir, roomId); err != nil {
+	if err := convertPDFToImages(convertedFile, outputDir, roomId, m.logger); err != nil {
 		return nil, err
 	}
 
@@ -87,7 +88,7 @@ func (m *FileModel) ConvertAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 	}
 
 	if err := m.updateRoomMetadataWithOfficeFile(roomId, res); err != nil {
-		log.Errorln("metadata update failed")
+		m.logger.Errorln("metadata update failed")
 	}
 
 	return res, nil
@@ -104,14 +105,14 @@ func checkDependencies() error {
 }
 
 // executeCommand runs a command with a timeout and handles common error cases.
-func executeCommand(ctx context.Context, name string, arg ...string) error {
+func executeCommand(ctx context.Context, logger *logrus.Entry, name string, arg ...string) error {
 	cmd := exec.CommandContext(ctx, name, arg...)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			log.Errorf("%s command timed out", name)
+			logger.Errorf("%s command timed out", name)
 			return fmt.Errorf("%s command timed out", name)
 		}
-		log.Errorf("%s command failed: %s; output: %s", name, err, string(output))
+		logger.Errorf("%s command failed: %s; output: %s", name, err, string(output))
 		return fmt.Errorf("%s command failed: %w", name, err)
 	}
 	return nil
@@ -152,9 +153,9 @@ func (m *FileModel) convertToPDFIfNeeded(filePath, fileName, roomId string, mTyp
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	err := executeCommand(ctx, "soffice", "--headless", "--invisible", "--nologo", "--nolockcheck", "--convert-to", variant, "--outdir", outputDir, filePath)
+	err := executeCommand(ctx, m.logger, "soffice", "--headless", "--invisible", "--nologo", "--nolockcheck", "--convert-to", variant, "--outdir", outputDir, filePath)
 	if err != nil {
-		log.Errorf("soffice conversion failed for roomId: %s; file: %s; msg: %s", roomId, fileName, err)
+		m.logger.Errorf("soffice conversion failed for roomId: %s; file: %s; msg: %s", roomId, fileName, err)
 		return "", fmt.Errorf("soffice: converting to PDF failed")
 	}
 
@@ -163,13 +164,13 @@ func (m *FileModel) convertToPDFIfNeeded(filePath, fileName, roomId string, mTyp
 }
 
 // convertPDFToImages uses mutool to convert a PDF file into PNG images.
-func convertPDFToImages(pdfPath, outputDir, roomId string) error {
+func convertPDFToImages(pdfPath, outputDir, roomId string, logger *logrus.Entry) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	err := executeCommand(ctx, "mutool", "convert", "-O", "resolution=300", "-o", filepath.Join(outputDir, "page_%d.png"), pdfPath)
+	err := executeCommand(ctx, logger, "mutool", "convert", "-O", "resolution=300", "-o", filepath.Join(outputDir, "page_%d.png"), pdfPath)
 	if err != nil {
-		log.Errorf("mutool conversion failed for roomId: %s; file: %s; msg: %s", roomId, pdfPath, err)
+		logger.Errorf("mutool conversion failed for roomId: %s; file: %s; msg: %s", roomId, pdfPath, err)
 		return fmt.Errorf("mutool: converting to images failed")
 	}
 	return nil

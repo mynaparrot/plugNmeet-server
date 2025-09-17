@@ -2,11 +2,12 @@ package natsservice
 
 import (
 	"context"
+	"strconv"
+	"sync"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	log "github.com/sirupsen/logrus"
-	"strconv"
-	"sync"
 )
 
 var (
@@ -32,6 +33,7 @@ type NatsCacheService struct {
 	// Global context for all long-lived watchers in this service
 	serviceCtx    context.Context
 	serviceCancel context.CancelFunc
+	logger        *log.Entry
 
 	roomLock       sync.RWMutex
 	roomsInfoStore map[string]CachedRoomEntry
@@ -41,7 +43,7 @@ type NatsCacheService struct {
 	roomUsersInfoStore   map[string]map[string]CachedUserInfoEntry
 }
 
-func InitNatsCacheService(app *config.AppConfig) {
+func InitNatsCacheService(app *config.AppConfig, log *log.Logger) {
 	initCacheOnce.Do(func() {
 		if app == nil {
 			app = config.GetConfig()
@@ -57,14 +59,15 @@ func InitNatsCacheService(app *config.AppConfig) {
 			roomsInfoStore:       make(map[string]CachedRoomEntry),
 			roomUsersStatusStore: make(map[string]map[string]CachedRoomUserStatusEntry),
 			roomUsersInfoStore:   make(map[string]map[string]CachedUserInfoEntry),
+			logger:               log.WithField("sub-service", "nats-cache"),
 		}
 	})
 }
 
 // GetNatsCacheService returns the singleton instance.
-func GetNatsCacheService(app *config.AppConfig) *NatsCacheService {
+func GetNatsCacheService(app *config.AppConfig, logger *log.Logger) *NatsCacheService {
 	if defaultNatsCacheService == nil {
-		InitNatsCacheService(app)
+		InitNatsCacheService(app, logger)
 	}
 	return defaultNatsCacheService
 }

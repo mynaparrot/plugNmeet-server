@@ -1,9 +1,9 @@
 package models
 
 import (
-	"errors"
+	"fmt"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	log "github.com/sirupsen/logrus"
 )
 
 func (m *WaitingRoomModel) ApproveWaitingUsers(r *plugnmeet.ApproveWaitingUsersReq) error {
@@ -15,7 +15,7 @@ func (m *WaitingRoomModel) ApproveWaitingUsers(r *plugnmeet.ApproveWaitingUsersR
 
 		for _, p := range participants {
 			err = m.approveUser(r.RoomId, r.UserId, p.Metadata)
-			log.Errorln(err)
+			m.logger.WithError(err).Errorln("error approving user")
 		}
 
 		return nil
@@ -26,7 +26,7 @@ func (m *WaitingRoomModel) ApproveWaitingUsers(r *plugnmeet.ApproveWaitingUsersR
 		return err
 	}
 	if p == nil {
-		return errors.New("user not found")
+		return fmt.Errorf("user not found")
 	}
 
 	return m.approveUser(r.RoomId, r.UserId, p.Metadata)
@@ -41,7 +41,7 @@ func (m *WaitingRoomModel) approveUser(roomId, userId, metadata string) error {
 
 	err = m.natsService.UpdateAndBroadcastUserMetadata(roomId, userId, mt, nil)
 	if err != nil {
-		return errors.New("can't approve user. try again")
+		return fmt.Errorf("can't approve user. try again")
 	}
 
 	return nil
@@ -53,7 +53,7 @@ func (m *WaitingRoomModel) UpdateWaitingRoomMessage(r *plugnmeet.UpdateWaitingRo
 		return err
 	}
 	if roomMeta == nil {
-		return errors.New("invalid nil room metadata information")
+		return fmt.Errorf("invalid nil room metadata information")
 	}
 
 	roomMeta.RoomFeatures.WaitingRoomFeatures.WaitingRoomMsg = r.Msg

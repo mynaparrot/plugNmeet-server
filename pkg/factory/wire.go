@@ -5,6 +5,7 @@ package factory
 
 import (
 	"context"
+
 	"github.com/google/wire"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
@@ -83,7 +84,7 @@ func NewAppFactory(appConfig *config.AppConfig) (*Application, error) {
 		modelSet,
 		controllerSet,
 		// Provide only the fields that are directly used by constructors.
-		wire.FieldsOf(new(*config.AppConfig), "DB", "RDS"),
+		wire.FieldsOf(new(*config.AppConfig), "DB", "RDS", "Logger"),
 
 		wire.Struct(new(ApplicationServices), "*"),
 		wire.Struct(new(ApplicationModels), "*"),

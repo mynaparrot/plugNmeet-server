@@ -1,7 +1,8 @@
 package models
 
 import (
-	"errors"
+	"fmt"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 )
 
@@ -49,7 +50,7 @@ func (m *RecordingModel) FetchRecording(recordId string) (*plugnmeet.RecordingIn
 		return nil, err
 	}
 	if v == nil {
-		return nil, errors.New("no info found")
+		return nil, fmt.Errorf("no info found")
 	}
 	recording := &plugnmeet.RecordingInfo{
 		RecordId:         v.RecordID,

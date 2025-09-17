@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 )
 
@@ -64,7 +65,7 @@ func (m *ExMediaModel) updateRoomMetadata(roomId string, opts *updateRoomMetadat
 		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_EXTERNAL_MEDIA_PLAYER_STATUS
 		d.HsetValue = &val
 	}
-	analyticsModel := NewAnalyticsModel(m.app, m.ds, m.rs)
+	analyticsModel := NewAnalyticsModel(m.app, m.ds, m.rs, m.logger.Logger)
 	analyticsModel.HandleEvent(d)
 
 	return err

@@ -1,8 +1,9 @@
 package models
 
 import (
-	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"os"
+
+	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 )
 
 func (m *AnalyticsModel) AddAnalyticsFileToDB(roomTableId uint64, roomCreationTime int64, roomId, fileId string, stat os.FileInfo) (int64, error) {

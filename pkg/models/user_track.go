@@ -1,7 +1,8 @@
 package models
 
 import (
-	"errors"
+	"fmt"
+
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -32,7 +33,7 @@ func (m *UserModel) MuteUnMuteTrack(r *plugnmeet.MuteUnMuteTrackReq) error {
 	}
 
 	if p == nil || p.State != livekit.ParticipantInfo_ACTIVE {
-		return errors.New(config.UserNotActive)
+		return fmt.Errorf(config.UserNotActive)
 	}
 	trackSid := r.TrackSid
 
@@ -46,7 +47,7 @@ func (m *UserModel) MuteUnMuteTrack(r *plugnmeet.MuteUnMuteTrackReq) error {
 	}
 
 	if trackSid == "" {
-		return errors.New("no track found")
+		return fmt.Errorf("no track found")
 	}
 
 	_, err = m.lk.MuteUnMuteTrack(r.RoomId, r.UserId, trackSid, r.Muted)
@@ -63,7 +64,7 @@ func (m *UserModel) muteUnmuteAllMic(r *plugnmeet.MuteUnMuteTrackReq) error {
 		return err
 	}
 	if participants == nil {
-		return errors.New("no active users found")
+		return fmt.Errorf("no active users found")
 	}
 
 	for _, p := range participants {

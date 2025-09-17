@@ -1,12 +1,12 @@
 package models
 
 import (
-	"errors"
 	"fmt"
+	"time"
+
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"time"
 )
 
 func (m *IngressModel) CreateIngress(r *plugnmeet.CreateIngressReq) (*livekit.IngressInfo, error) {
@@ -16,15 +16,15 @@ func (m *IngressModel) CreateIngress(r *plugnmeet.CreateIngressReq) (*livekit.In
 		return nil, err
 	}
 	if metadata == nil {
-		return nil, errors.New("invalid nil room metadata information")
+		return nil, fmt.Errorf("invalid nil room metadata information")
 	}
 
 	ingressFeatures := metadata.RoomFeatures.IngressFeatures
 	if !ingressFeatures.IsAllow {
-		return nil, errors.New("ingress feature isn't allow")
+		return nil, fmt.Errorf("ingress feature isn't allow")
 	}
 	if ingressFeatures.StreamKey != "" {
-		return nil, errors.New("multiple ingress creation request not allow")
+		return nil, fmt.Errorf("multiple ingress creation request not allow")
 	}
 
 	inputType := livekit.IngressInput_RTMP_INPUT
@@ -45,7 +45,7 @@ func (m *IngressModel) CreateIngress(r *plugnmeet.CreateIngressReq) (*livekit.In
 		return nil, err
 	}
 	if f == nil {
-		return nil, errors.New("invalid nil create ingress response")
+		return nil, fmt.Errorf("invalid nil create ingress response")
 	}
 
 	// add this user in our bucket
@@ -75,7 +75,7 @@ func (m *IngressModel) CreateIngress(r *plugnmeet.CreateIngressReq) (*livekit.In
 	}
 
 	// send analytics
-	analyticsModel := NewAnalyticsModel(m.app, m.ds, m.rs)
+	analyticsModel := NewAnalyticsModel(m.app, m.ds, m.rs, m.logger.Logger)
 	analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
 		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INGRESS_CREATED,

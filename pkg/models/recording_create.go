@@ -3,20 +3,20 @@ package models
 import (
 	"database/sql"
 	"fmt"
+	"os"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
-	"os"
 )
 
 // recordingStarted update when recorder will start recording
 func (m *RecordingModel) recordingStarted(r *plugnmeet.RecorderToPlugNmeet) {
 	_, err := m.ds.UpdateRoomRecordingStatus(uint64(r.RoomTableId), 1, &r.RecorderId)
 	if err != nil {
-		log.Infoln(err)
+		m.logger.WithError(err).Infoln("error updating room recording status")
 	}
 
 	// update room metadata
@@ -25,7 +25,7 @@ func (m *RecordingModel) recordingStarted(r *plugnmeet.RecorderToPlugNmeet) {
 		return
 	}
 	if roomMeta == nil {
-		log.Errorln("invalid nil room metadata information")
+		m.logger.Errorln("invalid nil room metadata information")
 		return
 	}
 
@@ -35,7 +35,7 @@ func (m *RecordingModel) recordingStarted(r *plugnmeet.RecorderToPlugNmeet) {
 	// send a notification message to room
 	err = m.natsService.NotifyInfoMsg(r.RoomId, "notifications.recording-started", false, nil)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.WithError(err).Errorln("error sending notification message")
 	}
 }
 
@@ -88,14 +88,14 @@ func (m *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet, 
 	}
 	marshal, err := op.Marshal(toRecord)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.WithError(err).Errorln("marshalling failed")
 		return
 	}
 	path := fmt.Sprintf("%s/%s.json", config.GetConfig().RecorderInfo.RecordingFilesPath, r.FilePath)
 
 	err = os.WriteFile(path, marshal, 0644)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.WithError(err).Errorln("error writing file")
 		return
 	}
 }

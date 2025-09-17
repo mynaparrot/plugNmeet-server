@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"errors"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 )
@@ -47,7 +48,7 @@ func (m *BreakoutRoomModel) JoinBreakoutRoom(ctx context.Context, r *plugnmeet.J
 			UserMetadata: meta,
 		},
 	}
-	um := NewUserModel(m.app, m.ds, m.rs)
+	um := NewUserModel(m.app, m.ds, m.rs, m.logger.Logger)
 	token, err := um.GetPNMJoinToken(ctx, req)
 	if err != nil {
 		return "", err

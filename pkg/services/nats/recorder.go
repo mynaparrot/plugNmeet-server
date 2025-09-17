@@ -2,9 +2,10 @@ package natsservice
 
 import (
 	"fmt"
-	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"strings"
 	"time"
+
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 )
 
 type RecorderInfo struct {

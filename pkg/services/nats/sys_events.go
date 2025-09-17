@@ -3,11 +3,11 @@ package natsservice
 import (
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
-	"time"
 )
 
 func (s *NatsService) BroadcastSystemEventToRoom(event plugnmeet.NatsMsgServerToClientEvents, roomId string, data interface{}, toUserId *string) error {
@@ -28,7 +28,7 @@ func (s *NatsService) BroadcastSystemEventToRoom(event plugnmeet.NatsMsgServerTo
 			return err
 		}
 	default:
-		return errors.New("invalid data type")
+		return fmt.Errorf("invalid data type")
 	}
 
 	payload := plugnmeet.NatsMsgServerToClient{
@@ -68,7 +68,7 @@ func (s *NatsService) BroadcastSystemEventToEveryoneExceptUserId(event plugnmeet
 			go func(id string) {
 				err := s.BroadcastSystemEventToRoom(event, roomId, data, &id)
 				if err != nil {
-					log.Errorln(err)
+					s.logger.WithError(err).Errorln("failed to broadcast system event")
 				}
 			}(id)
 		}

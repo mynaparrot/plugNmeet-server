@@ -1,25 +1,25 @@
 package config
 
 import (
-	"github.com/mynaparrot/plugnmeet-protocol/utils"
-	"github.com/nats-io/nats.go"
-	"github.com/nats-io/nats.go/jetstream"
-	"github.com/redis/go-redis/v9"
-	"github.com/sirupsen/logrus"
-	"gopkg.in/natefinch/lumberjack.v2"
-	"gorm.io/gorm"
-	"io"
 	"log"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mynaparrot/plugnmeet-protocol/utils"
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
+	"github.com/redis/go-redis/v9"
+	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 )
 
 type AppConfig struct {
 	RDS         *redis.Client
 	DB          *gorm.DB
+	Logger      *logrus.Logger
 	NatsConn    *nats.Conn
 	JetStream   jetstream.JetStream
 	ClientFiles map[string][]string
@@ -249,7 +249,6 @@ func New(a *AppConfig) {
 		}
 	}
 
-	setLogger()
 	a.readClientFiles()
 }
 
@@ -257,46 +256,8 @@ func GetConfig() *AppConfig {
 	return appCnf
 }
 
-func setLogger() {
-	p := appCnf.LogSettings.LogFile
-	if strings.HasPrefix(p, "./") {
-		p = filepath.Join(appCnf.RootWorkingDir, p)
-	}
-
-	logLevel := logrus.WarnLevel
-	if appCnf.LogSettings.LogLevel != nil && *appCnf.LogSettings.LogLevel != "" {
-		if lv, err := logrus.ParseLevel(strings.ToLower(*appCnf.LogSettings.LogLevel)); err == nil {
-			logLevel = lv
-		}
-	}
-
-	logWriter := &lumberjack.Logger{
-		Filename:   p,
-		MaxSize:    appCnf.LogSettings.MaxSize,
-		MaxBackups: appCnf.LogSettings.MaxBackups,
-		MaxAge:     appCnf.LogSettings.MaxAge,
-	}
-
-	logrus.SetLevel(logLevel)
-	logrus.SetReportCaller(true)
-	logrus.SetFormatter(&logrus.JSONFormatter{
-		PrettyPrint: true,
-	})
-	logrus.RegisterExitHandler(func() {
-		_ = logWriter.Close()
-	})
-
-	var w io.Writer
-	if appCnf.Client.Debug {
-		w = io.MultiWriter(os.Stdout, logWriter)
-	} else {
-		w = io.Writer(logWriter)
-	}
-	logrus.SetOutput(w)
-}
-
 func GetLogger() *logrus.Logger {
-	return logrus.StandardLogger()
+	return appCnf.Logger
 }
 
 type ErrorResponse struct {

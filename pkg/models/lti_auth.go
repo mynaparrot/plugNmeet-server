@@ -4,15 +4,16 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
+	"net/url"
+	"strings"
+	"time"
+
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/jordic/lti"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	log "github.com/sirupsen/logrus"
-	"net/url"
-	"strings"
-	"time"
+	"github.com/sirupsen/logrus"
 )
 
 func (m *LtiV1Model) VerifyAuth(requests, signingURL string) (*url.Values, error) {
@@ -43,7 +44,10 @@ func (m *LtiV1Model) VerifyAuth(requests, signingURL string) (*url.Values, error
 	params := p.Params()
 
 	if sign != providedSignature {
-		log.Errorln("Calculated: " + sign + " provided: " + providedSignature)
+		m.logger.WithFields(logrus.Fields{
+			"calculated": sign,
+			"provided":   providedSignature,
+		}).WithError(err).Errorln("signature verification failed")
 		return nil, errors.New(config.VerificationFailed)
 	}
 

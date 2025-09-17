@@ -3,10 +3,11 @@ package redisservice
 import (
 	"errors"
 	"fmt"
-	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/redis/go-redis/v9"
 	"strconv"
 	"time"
+
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/redis/go-redis/v9"
 )
 
 const SpeechServiceRedisKey = "pnm:speechService"

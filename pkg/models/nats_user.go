@@ -6,7 +6,7 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 func (m *NatsModel) OnAfterUserJoined(roomId, userId string) {
@@ -14,7 +14,7 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId string) {
 	// If there's an error or the user is already online, we don't need to proceed.
 	if err != nil || status == natsservice.UserStatusOnline {
 		if err != nil {
-			log.WithFields(log.Fields{
+			m.logger.WithFields(logrus.Fields{
 				"room_id": roomId,
 				"user_id": userId,
 			}).Errorf("failed to get room user status: %v", err)
@@ -23,7 +23,7 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId string) {
 	}
 
 	if err = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusOnline); err != nil {
-		log.WithFields(log.Fields{
+		m.logger.WithFields(logrus.Fields{
 			"room_id": roomId,
 			"user_id": userId,
 			"status":  natsservice.UserStatusOnline,
@@ -46,7 +46,7 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId string) {
 			HsetValue: &now,
 		})
 	} else if err != nil {
-		log.WithFields(log.Fields{
+		m.logger.WithFields(logrus.Fields{
 			"room_id": roomId,
 			"user_id": userId,
 		}).Warnf("could not get user info after join: %v", err)
@@ -86,7 +86,7 @@ func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, userInfo *p
 
 	// User is still disconnected, so mark as offline.
 	if err = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusOffline); err != nil {
-		log.WithFields(log.Fields{
+		m.logger.WithFields(logrus.Fields{
 			"room_id": roomId,
 			"user_id": userId,
 			"status":  natsservice.UserStatusOffline,

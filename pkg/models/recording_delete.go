@@ -3,15 +3,15 @@ package models
 import (
 	"errors"
 	"fmt"
-	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	log "github.com/sirupsen/logrus"
 	"io"
 	"io/fs"
 	"os"
 	"path"
 	"strings"
 	"time"
+
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
 func (m *RecordingModel) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
@@ -27,11 +27,11 @@ func (m *RecordingModel) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error 
 	if err != nil {
 		var pathError *fs.PathError
 		if errors.As(err, &pathError) {
-			log.Errorln(filePath + " does not exist, so deleting from DB without stopping")
+			m.logger.WithError(err).Errorln(filePath + " does not exist, so deleting from DB without stopping")
 			fileExist = false
 		} else {
 			ms := strings.SplitN(err.Error(), "/", -1)
-			return errors.New(ms[len(ms)-1])
+			return fmt.Errorf(ms[len(ms)-1])
 		}
 	}
 
@@ -44,28 +44,28 @@ func (m *RecordingModel) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error 
 			toFile := path.Join(m.app.RecorderInfo.DelRecordingBackupPath, f.Name())
 			err := os.Rename(filePath, toFile)
 			if err != nil {
-				log.Errorln(err)
+				m.logger.WithError(err).Errorln("error renaming file")
 				return err
 			}
 
 			// otherwise during cleanup will be hard to detect
 			newTime := time.Now()
 			if err := os.Chtimes(toFile, newTime, newTime); err != nil {
-				log.Errorln("Failed to update file modification time:", err)
+				m.logger.WithError(err).Errorln("Failed to update file modification time")
 			}
 
 			// now the JSON file
 			err = os.Rename(filePath+".json", toFile+".json")
 			if err != nil {
 				// just log
-				log.Errorln(err)
+				m.logger.WithError(err).Errorln("error renaming file")
 			}
 
 		} else {
 			err = os.Remove(filePath)
 			if err != nil {
 				ms := strings.SplitN(err.Error(), "/", -1)
-				return errors.New(ms[len(ms)-1])
+				return fmt.Errorf(ms[len(ms)-1])
 			}
 		}
 	}
@@ -84,7 +84,7 @@ func (m *RecordingModel) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error 
 			if err == nil && empty {
 				err = os.Remove(dir)
 				if err != nil {
-					log.Error(err)
+					m.logger.WithError(err).Error("error deleting directory")
 				}
 			}
 		}

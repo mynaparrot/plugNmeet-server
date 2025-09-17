@@ -2,12 +2,13 @@ package factory
 
 import (
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-	"strings"
-	"time"
 )
 
 func NewDatabaseConnection(appCnf *config.AppConfig) error {
@@ -28,20 +29,19 @@ func NewDatabaseConnection(appCnf *config.AppConfig) error {
 	}
 	cnf := &gorm.Config{}
 
+	loggerCnf := logger.Config{
+		SlowThreshold:             time.Second, // Slow SQL threshold
+		LogLevel:                  logger.Info,
+		IgnoreRecordNotFoundError: true,
+		ParameterizedQueries:      false,
+		Colorful:                  true,
+	}
+
 	if !appCnf.Client.Debug {
-		newLogger := logger.New(
-			config.GetLogger(),
-			logger.Config{
-				SlowThreshold:             time.Second, // Slow SQL threshold
-				LogLevel:                  logger.Warn,
-				IgnoreRecordNotFoundError: true,
-				ParameterizedQueries:      false,
-				Colorful:                  false,
-			},
-		)
-		cnf.Logger = newLogger
+		loggerCnf.LogLevel = logger.Warn
+		cnf.Logger = logger.New(config.GetLogger(), loggerCnf)
 	} else {
-		cnf.Logger = logger.Default.LogMode(logger.Info)
+		cnf.Logger = logger.New(config.GetLogger(), loggerCnf)
 	}
 
 	db, err := gorm.Open(mysql.New(mysqlCnf), cnf)
