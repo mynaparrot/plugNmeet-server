@@ -1,6 +1,8 @@
 package routers
 
 import (
+	"runtime"
+
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
@@ -12,7 +14,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/factory"
 	"github.com/mynaparrot/plugnmeet-server/version"
-	"runtime"
 )
 
 func New(appConfig *config.AppConfig, ctrl *factory.ApplicationControllers) *fiber.App {

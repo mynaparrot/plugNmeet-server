@@ -4,11 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"os/signal"
 	"strings"
 	"sync"
-	"syscall"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -114,10 +111,8 @@ func (c *NatsController) BootUp(ctx context.Context, wg *sync.WaitGroup) {
 	}
 	wg.Done()
 
-	// Keep the application running until a signal is received.
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	<-sig
+	// Keep the application running until context remain valid
+	<-ctx.Done()
 }
 
 func (c *NatsController) worker() {

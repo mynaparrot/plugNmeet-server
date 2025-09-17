@@ -52,7 +52,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	exDisplayModel := models.NewExDisplayModel(appConfig, databaseService, redisService, natsService, analyticsModel, logger)
 	exMediaModel := models.NewExMediaModel(appConfig, databaseService, redisService, natsService, analyticsModel, logger)
 	ingressModel := models.NewIngressModel(appConfig, databaseService, redisService, livekitService, natsService, analyticsModel, logger)
-	ltiV1Model := models.NewLtiV1Model(appConfig, databaseService, redisService, roomModel, userModel, logger)
+	ltiV1Model := models.NewLtiV1Model(roomModel, userModel)
 	natsModel := models.NewNatsModel(appConfig, databaseService, redisService, natsService, analyticsModel, authModel, userModel, logger)
 	janitorModel := models.NewJanitorModel(appConfig, databaseService, redisService, natsService, roomModel, roomDurationModel, logger)
 	waitingRoomModel := models.NewWaitingRoomModel(appConfig, redisService, natsService, logger)
