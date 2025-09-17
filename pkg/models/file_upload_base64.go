@@ -9,11 +9,19 @@ import (
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/sirupsen/logrus"
 )
 
 func (m *FileModel) UploadBase64EncodedData(req *plugnmeet.UploadBase64EncodedDataReq) (*plugnmeet.UploadBase64EncodedDataRes, error) {
+	log := m.logger.WithFields(logrus.Fields{
+		"roomId":   req.GetRoomId(),
+		"fileName": req.GetFileName(),
+		"method":   "UploadBase64EncodedData",
+	})
+
 	roomInfo, err := m.ds.GetRoomInfoByRoomId(req.GetRoomId(), 1)
 	if err != nil {
+		log.WithError(err).Error("failed to get room info")
 		return nil, err
 	}
 	if roomInfo == nil {
@@ -22,6 +30,7 @@ func (m *FileModel) UploadBase64EncodedData(req *plugnmeet.UploadBase64EncodedDa
 
 	data, err := base64.StdEncoding.DecodeString(req.GetData())
 	if err != nil {
+		log.WithError(err).Error("failed to decode base64 data")
 		return nil, fmt.Errorf("failed to decode base64 data: %w", err)
 	}
 
@@ -37,13 +46,17 @@ func (m *FileModel) UploadBase64EncodedData(req *plugnmeet.UploadBase64EncodedDa
 		return nil, err
 	}
 
+	safeFilename := filepath.Base(req.GetFileName())
+
 	saveDir := filepath.Join(m.app.UploadFileSettings.Path, roomInfo.Sid)
 	if err := os.MkdirAll(saveDir, 0755); err != nil {
+		log.WithError(err).Error("failed to create upload directory")
 		return nil, fmt.Errorf("failed to create upload directory: %w", err)
 	}
 
-	filePath := filepath.Join(saveDir, req.GetFileName())
+	filePath := filepath.Join(saveDir, safeFilename)
 	if err := os.WriteFile(filePath, data, 0644); err != nil {
+		log.WithError(err).Error("failed to write file to disk")
 		return nil, fmt.Errorf("failed to write file: %w", err)
 	}
 
@@ -51,8 +64,8 @@ func (m *FileModel) UploadBase64EncodedData(req *plugnmeet.UploadBase64EncodedDa
 		Status:        true,
 		Msg:           "file uploaded successfully",
 		FileMimeType:  mimeType.String(),
-		FilePath:      filepath.Join(roomInfo.Sid, req.GetFileName()),
-		FileName:      req.GetFileName(),
+		FilePath:      filepath.Join(roomInfo.Sid, safeFilename),
+		FileName:      safeFilename,
 		FileExtension: strings.TrimPrefix(mimeType.Extension(), "."),
 	}, nil
 }

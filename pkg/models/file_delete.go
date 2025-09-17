@@ -12,7 +12,7 @@ func (m *FileModel) DeleteRoomUploadedDir(roomSid string) error {
 	path := fmt.Sprintf("%s/%s", m.app.UploadFileSettings.Path, roomSid)
 	err := os.RemoveAll(path)
 	if err != nil {
-		m.logger.Errorln(err)
+		m.logger.WithField("path", path).WithError(err).Errorln("can't delete room uploaded dir")
 	}
 	return err
 }
