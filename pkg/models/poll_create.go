@@ -1,7 +1,6 @@
 package models
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/goccy/go-json"
@@ -13,14 +12,8 @@ import (
 func (m *PollModel) CreatePoll(r *plugnmeet.CreatePollReq) (string, error) {
 	r.PollId = uuid.NewString()
 
-	// first add to room
+	// create poll hash and add to room
 	err := m.createRoomPollHash(r)
-	if err != nil {
-		return "", err
-	}
-
-	// now create empty respondent hash
-	err = m.createRespondentHash(r)
 	if err != nil {
 		return "", err
 	}
@@ -76,21 +69,6 @@ func (m *PollModel) createRoomPollHash(r *plugnmeet.CreatePollReq) error {
 		r.PollId: string(marshal),
 	}
 	return m.rs.CreateRoomPoll(r.RoomId, pollVal)
-}
-
-// createRespondentHash will create initial hash
-// format for all_respondents array value = userId:option_id
-func (m *PollModel) createRespondentHash(r *plugnmeet.CreatePollReq) error {
-	v := make(map[string]interface{})
-	v["total_resp"] = 0
-	v["all_respondents"] = nil
-
-	for _, o := range r.Options {
-		c := fmt.Sprintf("%d_count", o.Id)
-		v[c] = 0
-	}
-
-	return m.rs.CreatePollResponseHash(r.RoomId, r.PollId, v)
 }
 
 func (m *PollModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq) error {

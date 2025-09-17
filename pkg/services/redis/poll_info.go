@@ -7,10 +7,18 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const pollsKey = "pnm:polls:"
+const (
+	pollsKey              = "pnm:polls:"
+	pollRespondentsSubKey = ":respondents:"
+	pollVotedUsersSubKey  = ":voted_users"
+	pollAllResSubKey      = ":all_respondents"
+	PollTotalRespField    = "total_resp"
+	PollCountSuffix       = "_count"
+)
 
-func (s *RedisService) GetPollsListByRoomId(roomId string) (map[string]string, error) {
-	result, err := s.rc.HGetAll(s.ctx, pollsKey+roomId).Result()
+func (s *RedisService) GetPollsListByRoomId(roomId string) ([]string, error) {
+	// e.g. key: pnm:polls:{roomId}
+	result, err := s.rc.HVals(s.ctx, pollsKey+roomId).Result()
 	switch {
 	case errors.Is(err, redis.Nil):
 		return nil, nil
@@ -21,22 +29,37 @@ func (s *RedisService) GetPollsListByRoomId(roomId string) (map[string]string, e
 	return result, nil
 }
 
-func (s *RedisService) GetPollResponsesByField(roomId, pollId, field string) (string, error) {
-	key := fmt.Sprintf("%s%s:respondents:%s", pollsKey, roomId, pollId)
-	result, err := s.rc.HGet(s.ctx, key, field).Result()
-
+func (s *RedisService) GetPollIdsByRoomId(roomId string) ([]string, error) {
+	// e.g. key: pnm:polls:{roomId}
+	result, err := s.rc.HKeys(s.ctx, pollsKey+roomId).Result()
 	switch {
 	case errors.Is(err, redis.Nil):
-		return "", nil
+		return nil, nil
 	case err != nil:
-		return "", err
+		return nil, err
 	}
 
 	return result, nil
 }
 
-func (s *RedisService) GetPollResponsesByPollId(roomId, pollId string) (map[string]string, error) {
-	key := fmt.Sprintf("%s%s:respondents:%s", pollsKey, roomId, pollId)
+func (s *RedisService) GetPollAllRespondents(roomId, pollId string) ([]string, error) {
+	// e.g. key: pnm:polls:{roomId}:respondents:{pollId}:all_respondents
+	key := fmt.Sprintf("%s%s%s%s%s", pollsKey, roomId, pollRespondentsSubKey, pollId, pollAllResSubKey)
+	result, err := s.rc.LRange(s.ctx, key, 0, -1).Result()
+
+	switch {
+	case errors.Is(err, redis.Nil):
+		return nil, nil
+	case err != nil:
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func (s *RedisService) GetPollCountersByPollId(roomId, pollId string) (map[string]string, error) {
+	// e.g. key: pnm:polls:{roomId}:respondents:{pollId}
+	key := fmt.Sprintf("%s%s%s%s", pollsKey, roomId, pollRespondentsSubKey, pollId)
 	result, err := s.rc.HGetAll(s.ctx, key).Result()
 
 	switch {
@@ -49,7 +72,23 @@ func (s *RedisService) GetPollResponsesByPollId(roomId, pollId string) (map[stri
 	return result, nil
 }
 
+func (s *RedisService) GetPollTotalResponses(roomId, pollId string) (string, error) {
+	// e.g. key: pnm:polls:{roomId}:respondents:{pollId}
+	key := fmt.Sprintf("%s%s%s%s", pollsKey, roomId, pollRespondentsSubKey, pollId)
+	result, err := s.rc.HGet(s.ctx, key, PollTotalRespField).Result()
+
+	switch {
+	case errors.Is(err, redis.Nil):
+		return "0", nil
+	case err != nil:
+		return "", err
+	}
+
+	return result, nil
+}
+
 func (s *RedisService) GetPollInfoByPollId(roomId, pollId string) (string, error) {
+	// e.g. key: pnm:polls:{roomId}
 	result, err := s.rc.HGet(s.ctx, pollsKey+roomId, pollId).Result()
 
 	switch {

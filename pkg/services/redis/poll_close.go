@@ -10,6 +10,7 @@ import (
 )
 
 func (s *RedisService) ClosePoll(r *plugnmeet.ClosePollReq) error {
+	// e.g. key: pnm:polls:{roomId}
 	key := pollsKey + r.RoomId
 
 	err := s.rc.Watch(s.ctx, func(tx *redis.Tx) error {
@@ -36,10 +37,7 @@ func (s *RedisService) ClosePoll(r *plugnmeet.ClosePollReq) error {
 			return err
 		}
 
-		pollVal := map[string]string{
-			r.PollId: string(marshal),
-		}
-		tx.HSet(s.ctx, key, pollVal)
+		tx.HSet(s.ctx, key, r.PollId, string(marshal))
 
 		return nil
 	}, key)
@@ -51,10 +49,18 @@ func (s *RedisService) CleanUpPolls(roomId string, pollIds []string) error {
 	pp := s.rc.Pipeline()
 
 	for _, id := range pollIds {
-		key := fmt.Sprintf("%s%s:respondents:%s", pollsKey, roomId, id)
-		pp.Del(s.ctx, key)
+		// e.g. pnm:polls:{roomId}:respondents:{pollId}
+		respondentsKey := fmt.Sprintf("%s%s%s%s", pollsKey, roomId, pollRespondentsSubKey, id)
+		// e.g. pnm:polls:{roomId}:respondents:{pollId}:voted_users
+		votedUsersKey := fmt.Sprintf("%s%s", respondentsKey, pollVotedUsersSubKey)
+		// e.g. pnm:polls:{roomId}:respondents:{pollId}:all_respondents
+		allRespondentsKey := fmt.Sprintf("%s%s", respondentsKey, pollAllResSubKey)
+		pp.Del(s.ctx, respondentsKey)
+		pp.Del(s.ctx, votedUsersKey)
+		pp.Del(s.ctx, allRespondentsKey)
 	}
 
+	// e.g. pnm:polls:{roomId}
 	roomKey := pollsKey + roomId
 	pp.Del(s.ctx, roomKey)
 

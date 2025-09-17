@@ -116,7 +116,7 @@ func (pc *PollsController) HandleCountPollTotalResponses(c *fiber.Ctx) error {
 		return sendPollResponse(c, res)
 	}
 
-	responses, err := pc.RedisService.GetPollResponsesByField(roomId.(string), pollId, "total_resp")
+	responses, err := pc.RedisService.GetPollTotalResponses(roomId.(string), pollId)
 	if err != nil {
 		res.Msg = err.Error()
 		return sendPollResponse(c, res)

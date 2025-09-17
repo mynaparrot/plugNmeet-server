@@ -27,14 +27,14 @@ func (m *PollModel) ClosePoll(r *plugnmeet.ClosePollReq) error {
 }
 
 func (m *PollModel) CleanUpPolls(roomId string) error {
-	polls, err := m.ListPolls(roomId)
+	// Directly fetch poll IDs instead of the full poll objects.
+	pIds, err := m.rs.GetPollIdsByRoomId(roomId)
 	if err != nil {
 		return err
 	}
 
-	var pIds []string
-	for _, p := range polls {
-		pIds = append(pIds, p.Id)
+	if len(pIds) == 0 {
+		return nil // No polls to clean up.
 	}
 
 	return m.rs.CleanUpPolls(roomId, pIds)
