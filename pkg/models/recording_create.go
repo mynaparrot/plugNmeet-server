@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -91,7 +90,7 @@ func (m *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet, 
 		m.logger.WithError(err).Errorln("marshalling failed")
 		return
 	}
-	path := fmt.Sprintf("%s/%s.json", config.GetConfig().RecorderInfo.RecordingFilesPath, r.FilePath)
+	path := fmt.Sprintf("%s/%s.json", m.app.RecorderInfo.RecordingFilesPath, r.FilePath)
 
 	err = os.WriteFile(path, marshal, 0644)
 	if err != nil {

@@ -63,6 +63,7 @@ var controllerSet = wire.NewSet(
 	controllers.NewAuthController,
 	controllers.NewBBBController,
 	controllers.NewBreakoutRoomController,
+	controllers.NewHealthCheckController,
 	controllers.NewEtherpadController,
 	controllers.NewExDisplayController,
 	controllers.NewExMediaController,
@@ -86,7 +87,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 		serviceSet,
 		modelSet,
 		controllerSet,
-		// Provide only the fields that are directly used by constructors.
+		// Provide the whole AppConfig, and also specific fields needed by constructors.
 		wire.FieldsOf(new(*config.AppConfig), "DB", "RDS", "Logger"),
 
 		wire.Struct(new(ApplicationServices), "*"),

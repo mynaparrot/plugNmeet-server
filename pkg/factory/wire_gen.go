@@ -52,7 +52,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	exDisplayModel := models.NewExDisplayModel(appConfig, databaseService, redisService, natsService, analyticsModel, logger)
 	exMediaModel := models.NewExMediaModel(appConfig, databaseService, redisService, natsService, analyticsModel, logger)
 	ingressModel := models.NewIngressModel(appConfig, databaseService, redisService, livekitService, natsService, analyticsModel, logger)
-	ltiV1Model := models.NewLtiV1Model(roomModel, userModel)
+	ltiV1Model := models.NewLtiV1Model(appConfig, roomModel, userModel)
 	natsModel := models.NewNatsModel(appConfig, databaseService, redisService, natsService, analyticsModel, authModel, userModel, logger)
 	janitorModel := models.NewJanitorModel(appConfig, databaseService, redisService, natsService, roomModel, roomDurationModel, logger)
 	waitingRoomModel := models.NewWaitingRoomModel(appConfig, redisService, natsService, logger)
@@ -99,6 +99,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	waitingRoomController := controllers.NewWaitingRoomController(waitingRoomModel)
 	webhookController := controllers.NewWebhookController(authModel, webhookModel)
 	natsController := controllers.NewNatsController(appConfig, natsService, authModel, natsModel, logger)
+	healthCheckController := controllers.NewHealthCheckController(appConfig)
 	applicationControllers := &ApplicationControllers{
 		AnalyticsController:    analyticsController,
 		AuthController:         authController,
@@ -119,6 +120,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 		WaitingRoomController:  waitingRoomController,
 		WebhookController:      webhookController,
 		NatsController:         natsController,
+		HealthCheckController:  healthCheckController,
 	}
 	application := &Application{
 		Services:    applicationServices,
@@ -146,4 +148,4 @@ func provideRoomModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *
 var modelSet = wire.NewSet(models.NewAnalyticsModel, models.NewAuthModel, models.NewBBBApiWrapperModel, models.NewBreakoutRoomModel, models.NewRoomDurationModel, models.NewEtherpadModel, models.NewExDisplayModel, models.NewExMediaModel, models.NewFileModel, models.NewIngressModel, models.NewLtiV1Model, models.NewNatsModel, models.NewPollModel, models.NewRecorderModel, models.NewRecordingModel, provideRoomModel, models.NewJanitorModel, models.NewSpeechToTextModel, models.NewUserModel, models.NewWaitingRoomModel, models.NewWebhookModel)
 
 // build the dependency set for controllers
-var controllerSet = wire.NewSet(controllers.NewAnalyticsController, controllers.NewAuthController, controllers.NewBBBController, controllers.NewBreakoutRoomController, controllers.NewEtherpadController, controllers.NewExDisplayController, controllers.NewExMediaController, controllers.NewFileController, controllers.NewIngressController, controllers.NewLtiV1Controller, controllers.NewPollsController, controllers.NewRecorderController, controllers.NewRecordingController, controllers.NewRoomController, controllers.NewSpeechToTextController, controllers.NewUserController, controllers.NewWaitingRoomController, controllers.NewWebhookController, controllers.NewNatsController)
+var controllerSet = wire.NewSet(controllers.NewAnalyticsController, controllers.NewAuthController, controllers.NewBBBController, controllers.NewBreakoutRoomController, controllers.NewHealthCheckController, controllers.NewEtherpadController, controllers.NewExDisplayController, controllers.NewExMediaController, controllers.NewFileController, controllers.NewIngressController, controllers.NewLtiV1Controller, controllers.NewPollsController, controllers.NewRecorderController, controllers.NewRecordingController, controllers.NewRoomController, controllers.NewSpeechToTextController, controllers.NewUserController, controllers.NewWaitingRoomController, controllers.NewWebhookController, controllers.NewNatsController)

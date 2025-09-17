@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
 func (m *AnalyticsModel) DeleteAnalytics(r *plugnmeet.DeleteAnalyticsReq) error {
@@ -16,7 +15,7 @@ func (m *AnalyticsModel) DeleteAnalytics(r *plugnmeet.DeleteAnalyticsReq) error 
 		return err
 	}
 
-	path := fmt.Sprintf("%s/%s", *config.GetConfig().AnalyticsSettings.FilesStorePath, analytic.FileName)
+	path := fmt.Sprintf("%s/%s", *m.app.AnalyticsSettings.FilesStorePath, analytic.FileName)
 
 	// delete the main file
 	err = os.Remove(path)

@@ -4,11 +4,10 @@ import (
 	"errors"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
 func (m *SpeechToTextModel) SpeechToTextTranslationServiceStart(r *plugnmeet.SpeechToTextTranslationReq) error {
-	if !config.GetConfig().AzureCognitiveServicesSpeech.Enabled {
+	if !m.app.AzureCognitiveServicesSpeech.Enabled {
 		return errors.New("speech service disabled")
 	}
 

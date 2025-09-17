@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
 func (m *RecordingModel) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error {
@@ -20,7 +19,7 @@ func (m *RecordingModel) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error 
 		return err
 	}
 
-	filePath := fmt.Sprintf("%s/%s", config.GetConfig().RecorderInfo.RecordingFilesPath, recording.FilePath)
+	filePath := fmt.Sprintf("%s/%s", m.app.RecorderInfo.RecordingFilesPath, recording.FilePath)
 	fileExist := true
 
 	f, err := os.Stat(filePath)
@@ -79,7 +78,7 @@ func (m *RecordingModel) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error 
 	// if empty then better to delete that directory
 	if fileExist {
 		dir := strings.Replace(filePath, f.Name(), "", 1)
-		if dir != config.GetConfig().RecorderInfo.RecordingFilesPath {
+		if dir != m.app.RecorderInfo.RecordingFilesPath {
 			empty, err := m.isDirEmpty(dir)
 			if err == nil && empty {
 				err = os.Remove(dir)

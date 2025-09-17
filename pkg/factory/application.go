@@ -67,6 +67,7 @@ type ApplicationControllers struct {
 	WaitingRoomController  *controllers.WaitingRoomController
 	WebhookController      *controllers.WebhookController
 	NatsController         *controllers.NatsController
+	HealthCheckController  *controllers.HealthCheckController
 }
 
 // Application is the root struct holding all dependencies.

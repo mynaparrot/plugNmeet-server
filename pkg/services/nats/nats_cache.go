@@ -45,9 +45,6 @@ type NatsCacheService struct {
 
 func InitNatsCacheService(app *config.AppConfig, log *logrus.Logger) {
 	initCacheOnce.Do(func() {
-		if app == nil {
-			app = config.GetConfig()
-		}
 		if app.JetStream == nil {
 			log.Fatal("NATS JetStream not provided to InitNatsCacheService")
 		}

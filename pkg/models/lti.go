@@ -1,10 +1,12 @@
 package models
 
 import (
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/sirupsen/logrus"
 )
 
 type LtiV1Model struct {
+	app    *config.AppConfig
 	rm     *RoomModel
 	um     *UserModel
 	logger *logrus.Entry
@@ -45,8 +47,9 @@ type LTIV1FetchRecordingsReq struct {
 	OrderBy string `json:"order_by"`
 }
 
-func NewLtiV1Model(rm *RoomModel, um *UserModel) *LtiV1Model {
+func NewLtiV1Model(app *config.AppConfig, rm *RoomModel, um *UserModel) *LtiV1Model {
 	return &LtiV1Model{
+		app:    app,
 		rm:     rm,
 		um:     um,
 		logger: rm.logger.Logger.WithField("model", "lti_v1"),

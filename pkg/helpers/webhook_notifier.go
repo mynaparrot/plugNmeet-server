@@ -77,7 +77,7 @@ func (w *WebhookNotifier) getOrCreateNotifier(roomId string) *webhook.Notifier {
 	}
 
 	// Create a new notifier for this room
-	notifier := webhook.NewNotifier(config.DefaultWebhookQueueSize, w.app.Client.Debug, config.GetLogger())
+	notifier := webhook.NewNotifier(config.DefaultWebhookQueueSize, w.app.Client.Debug, w.logger.Logger)
 	w.notifiers[roomId] = notifier
 	log.Infof("created new webhook queue for room: %s", roomId)
 
@@ -226,7 +226,7 @@ func (w *WebhookNotifier) ForceToPutInQueue(event *plugnmeet.CommonNotifyEvent) 
 		return
 	}
 
-	notifier := webhook.NewNotifier(config.DefaultWebhookQueueSize, w.app.Client.Debug, config.GetLogger())
+	notifier := webhook.NewNotifier(config.DefaultWebhookQueueSize, w.app.Client.Debug, w.logger.Logger)
 	defer notifier.StopGracefully()
 	notifier.AddInNotifyQueue(event, w.app.Client.ApiKey, w.app.Client.Secret, urls)
 }

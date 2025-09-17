@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
 const (
@@ -14,8 +13,8 @@ const (
 )
 
 func (m *AnalyticsModel) HandleEvent(d *plugnmeet.AnalyticsDataMsg) {
-	if config.GetConfig().AnalyticsSettings == nil ||
-		!config.GetConfig().AnalyticsSettings.Enabled {
+	if m.app.AnalyticsSettings == nil ||
+		!m.app.AnalyticsSettings.Enabled {
 		return
 	}
 	// we'll use unix milliseconds to make sure fields are unique

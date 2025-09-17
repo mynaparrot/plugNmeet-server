@@ -1,7 +1,7 @@
 package config
 
 import (
-	"log"
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -15,6 +15,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
+
+var dbTablePrefix string
 
 type AppConfig struct {
 	RDS         *redis.Client
@@ -196,18 +198,7 @@ type NatsInfoRecorder struct {
 	RecorderInfoKv  string `yaml:"recorder_info_kv"`
 }
 
-var appCnf *AppConfig
-
-func New(a *AppConfig) {
-	if appCnf != nil {
-		// not allow multiple config
-		return
-	}
-
-	appCnf = new(AppConfig) // otherwise will give error
-	// now set the config
-	appCnf = a
-
+func New(appCnf *AppConfig) (*AppConfig, error) {
 	// default validation of token is 10 minutes
 	if appCnf.Client.TokenValidity == nil || *appCnf.Client.TokenValidity < 0 {
 		validity := time.Minute * 10
@@ -225,11 +216,14 @@ func New(a *AppConfig) {
 
 		p := *appCnf.AnalyticsSettings.FilesStorePath
 		if strings.HasPrefix(p, "./") {
-			p = filepath.Join(a.RootWorkingDir, p)
+			p = filepath.Join(appCnf.RootWorkingDir, p)
 		}
 
 		if _, err := os.Stat(p); os.IsNotExist(err) {
-			_ = os.MkdirAll(p, os.ModePerm)
+			err = os.MkdirAll(p, os.ModePerm)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create analytics directory %s: %w", p, err)
+			}
 		}
 	}
 
@@ -245,51 +239,20 @@ func New(a *AppConfig) {
 
 		err := os.MkdirAll(appCnf.RecorderInfo.DelRecordingBackupPath, 0755)
 		if err != nil {
-			log.Fatal(err)
+			return nil, fmt.Errorf("failed to create recording backup directory %s: %w", appCnf.RecorderInfo.DelRecordingBackupPath, err)
 		}
 	}
 
-	a.readClientFiles()
+	if appCnf.DatabaseInfo.Prefix != "" {
+		dbTablePrefix = appCnf.DatabaseInfo.Prefix
+	}
+
+	return appCnf, nil
 }
 
-func GetConfig() *AppConfig {
-	return appCnf
-}
-
-func GetLogger() *logrus.Logger {
-	return appCnf.Logger
-}
-
-type ErrorResponse struct {
-	FailedField string
-	Tag         string
-}
-
-func (a *AppConfig) FormatDBTable(table string) string {
-	if a.DatabaseInfo.Prefix != "" {
-		return a.DatabaseInfo.Prefix + table
+func FormatDBTable(table string) string {
+	if dbTablePrefix != "" {
+		return dbTablePrefix + table
 	}
 	return table
-}
-
-func (a *AppConfig) readClientFiles() {
-	// if enable debug mode, then we won't cache files
-	// otherwise changes of files won't be loaded
-	if a.Client.Debug {
-		return
-	}
-	appCnf.ClientFiles = make(map[string][]string)
-
-	css, err := utils.GetFilesFromDir(a.Client.Path+"/assets/css", ".css", "des")
-	if err != nil {
-		logrus.Errorln(err)
-	}
-
-	js, err := utils.GetFilesFromDir(a.Client.Path+"/assets/js", ".js", "asc")
-	if err != nil {
-		logrus.Errorln(err)
-	}
-
-	appCnf.ClientFiles["css"] = css
-	appCnf.ClientFiles["js"] = js
 }

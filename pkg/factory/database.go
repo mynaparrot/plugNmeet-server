@@ -40,9 +40,9 @@ func NewDatabaseConnection(ctx context.Context, appCnf *config.AppConfig) error 
 
 	if !appCnf.Client.Debug {
 		loggerCnf.LogLevel = logger.Warn
-		cnf.Logger = logger.New(config.GetLogger(), loggerCnf)
+		cnf.Logger = logger.New(appCnf.Logger, loggerCnf)
 	} else {
-		cnf.Logger = logger.New(config.GetLogger(), loggerCnf)
+		cnf.Logger = logger.New(appCnf.Logger, loggerCnf)
 	}
 
 	db, err := gorm.Open(mysql.New(mysqlCnf), cnf)

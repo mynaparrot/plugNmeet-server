@@ -11,7 +11,6 @@ import (
 	rr "github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/template/html/v2"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/factory"
 	"github.com/mynaparrot/plugnmeet-server/version"
 )
@@ -61,8 +60,8 @@ func New(appConfig *config.AppConfig, ctrl *factory.ApplicationControllers) *fib
 	app.Use(cors.New(cors.Config{
 		AllowMethods: "POST,GET,OPTIONS",
 	}))
-	app.Static("/assets", config.GetConfig().Client.Path+"/assets")
-	app.Static("/favicon.ico", config.GetConfig().Client.Path+"/assets/imgs/favicon.ico")
+	app.Static("/assets", appConfig.Client.Path+"/assets")
+	app.Static("/favicon.ico", appConfig.Client.Path+"/assets/imgs/favicon.ico")
 
 	// --- Route Registration ---
 	r := &router{
@@ -96,7 +95,7 @@ func (r *router) registerBaseRoutes() {
 	r.app.Get("/download/uploadedFile/:sid/*", r.ctrl.FileController.HandleDownloadUploadedFile)
 	r.app.Get("/download/recording/:token", r.ctrl.RecordingController.HandleDownloadRecording)
 	r.app.Get("/download/analytics/:token", r.ctrl.AnalyticsController.HandleDownloadAnalytics)
-	r.app.Get("/healthCheck", controllers.HandleHealthCheck)
+	r.app.Get("/healthCheck", r.ctrl.HealthCheckController.HandleHealthCheck)
 }
 
 func (r *router) registerLtiRoutes() {

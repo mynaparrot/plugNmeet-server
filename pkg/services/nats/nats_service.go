@@ -32,9 +32,6 @@ type NatsService struct {
 }
 
 func New(app *config.AppConfig, logger *logrus.Logger) *NatsService {
-	if app == nil {
-		app = config.GetConfig()
-	}
 	log := logger.WithField("service", "nats")
 
 	return &NatsService{

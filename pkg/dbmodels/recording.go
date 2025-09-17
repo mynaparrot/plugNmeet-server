@@ -2,8 +2,9 @@ package dbmodels
 
 import (
 	"database/sql"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"time"
+
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
 type Recording struct {
@@ -22,5 +23,5 @@ type Recording struct {
 }
 
 func (m *Recording) TableName() string {
-	return config.GetConfig().FormatDBTable("recordings")
+	return config.FormatDBTable("recordings")
 }

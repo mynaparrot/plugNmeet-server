@@ -6,8 +6,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func HandleCloseConnections() {
-	appCnf := config.GetConfig()
+func HandleCloseConnections(appCnf *config.AppConfig) {
 	if appCnf == nil {
 		return
 	}
