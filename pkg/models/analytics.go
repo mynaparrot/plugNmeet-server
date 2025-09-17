@@ -1,9 +1,6 @@
 package models
 
 import (
-	"sync"
-
-	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
@@ -12,8 +9,6 @@ import (
 )
 
 type AnalyticsModel struct {
-	sync.RWMutex
-	data        *plugnmeet.AnalyticsDataMsg
 	app         *config.AppConfig
 	ds          *dbservice.DatabaseService
 	rs          *redisservice.RedisService
