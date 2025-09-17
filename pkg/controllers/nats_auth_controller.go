@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
@@ -16,7 +15,6 @@ import (
 )
 
 type NatsAuthController struct {
-	ctx           context.Context
 	app           *config.AppConfig
 	authModel     *models.AuthModel
 	natsService   *natsservice.NatsService
@@ -25,12 +23,11 @@ type NatsAuthController struct {
 	logger        *logrus.Entry
 }
 
-func NewNatsAuthController(app *config.AppConfig, authModel *models.AuthModel, issuerKeyPair nkeys.KeyPair, curveKeyPair nkeys.KeyPair, logger *logrus.Entry) *NatsAuthController {
+func NewNatsAuthController(app *config.AppConfig, natsService *natsservice.NatsService, authModel *models.AuthModel, issuerKeyPair nkeys.KeyPair, curveKeyPair nkeys.KeyPair, logger *logrus.Entry) *NatsAuthController {
 	return &NatsAuthController{
-		ctx:           context.Background(),
 		app:           app,
 		authModel:     authModel,
-		natsService:   natsservice.New(app, logger.Logger),
+		natsService:   natsService,
 		issuerKeyPair: issuerKeyPair,
 		curveKeyPair:  curveKeyPair,
 		logger:        logger.WithField("sub-controller", "nats-auth"),

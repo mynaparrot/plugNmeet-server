@@ -13,6 +13,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/version"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -36,6 +37,7 @@ type natsJob struct {
 
 type NatsController struct {
 	app           *config.AppConfig
+	natsService   *natsservice.NatsService
 	issuerKeyPair nkeys.KeyPair
 	curveKeyPair  nkeys.KeyPair
 	authModel     *models.AuthModel
@@ -44,7 +46,7 @@ type NatsController struct {
 	logger        *logrus.Entry
 }
 
-func NewNatsController(app *config.AppConfig, authModel *models.AuthModel, natsModel *models.NatsModel, logger *logrus.Logger) *NatsController {
+func NewNatsController(app *config.AppConfig, natsService *natsservice.NatsService, authModel *models.AuthModel, natsModel *models.NatsModel, logger *logrus.Logger) *NatsController {
 	issuerKeyPair, err := nkeys.FromSeed([]byte(app.NatsInfo.AuthCalloutIssuerPrivate))
 	if err != nil {
 		logger.WithError(err).Fatal("error creating issuer key pair")
@@ -52,6 +54,7 @@ func NewNatsController(app *config.AppConfig, authModel *models.AuthModel, natsM
 
 	c := &NatsController{
 		app:           app,
+		natsService:   natsService,
 		issuerKeyPair: issuerKeyPair,
 		authModel:     authModel,
 		natsModel:     natsModel,
@@ -94,7 +97,7 @@ func (c *NatsController) BootUp(ctx context.Context, wg *sync.WaitGroup) {
 	c.subscribeToUsersConnEvents()
 
 	// auth service
-	authService := NewNatsAuthController(c.app, c.authModel, c.issuerKeyPair, c.curveKeyPair, c.logger)
+	authService := NewNatsAuthController(c.app, c.natsService, c.authModel, c.issuerKeyPair, c.curveKeyPair, c.logger)
 	_, err = micro.AddService(c.app.NatsConn, micro.Config{
 		Name:        "pnm-auth",
 		Version:     version.Version,

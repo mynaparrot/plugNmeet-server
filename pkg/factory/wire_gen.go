@@ -98,7 +98,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	userController := controllers.NewUserController(appConfig, databaseService, natsService, userModel)
 	waitingRoomController := controllers.NewWaitingRoomController(waitingRoomModel)
 	webhookController := controllers.NewWebhookController(authModel, webhookModel)
-	natsController := controllers.NewNatsController(appConfig, authModel, natsModel, logger)
+	natsController := controllers.NewNatsController(appConfig, natsService, authModel, natsModel, logger)
 	applicationControllers := &ApplicationControllers{
 		AnalyticsController:    analyticsController,
 		AuthController:         authController,
