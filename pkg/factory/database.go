@@ -1,6 +1,7 @@
 package factory
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -11,7 +12,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-func NewDatabaseConnection(appCnf *config.AppConfig) error {
+func NewDatabaseConnection(ctx context.Context, appCnf *config.AppConfig) error {
 	info := appCnf.DatabaseInfo
 	charset := "utf8mb4"
 	loc := "UTC"
@@ -50,6 +51,10 @@ func NewDatabaseConnection(appCnf *config.AppConfig) error {
 	}
 
 	d, err := db.DB()
+	if err != nil {
+		return err
+	}
+	err = d.PingContext(ctx)
 	if err != nil {
 		return err
 	}

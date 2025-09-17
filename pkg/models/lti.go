@@ -12,6 +12,7 @@ type LtiV1Model struct {
 	ds     *dbservice.DatabaseService
 	rs     *redisservice.RedisService
 	rm     *RoomModel
+	um     *UserModel
 	logger *logrus.Entry
 }
 
@@ -50,22 +51,13 @@ type LTIV1FetchRecordingsReq struct {
 	OrderBy string `json:"order_by"`
 }
 
-func NewLtiV1Model(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, logger *logrus.Logger) *LtiV1Model {
-	if app == nil {
-		app = config.GetConfig()
-	}
-	if ds == nil {
-		ds = dbservice.New(app.DB, logger)
-	}
-	if rs == nil {
-		rs = redisservice.New(app.RDS, logger)
-	}
-
+func NewLtiV1Model(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, rm *RoomModel, um *UserModel, logger *logrus.Logger) *LtiV1Model {
 	return &LtiV1Model{
 		app:    app,
 		ds:     ds,
 		rs:     rs,
-		rm:     NewRoomModel(app, ds, rs, logger),
+		rm:     rm,
+		um:     um,
 		logger: logger.WithField("model", "lti_v1"),
 	}
 }

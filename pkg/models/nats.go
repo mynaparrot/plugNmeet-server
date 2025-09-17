@@ -14,7 +14,6 @@ type NatsModel struct {
 	app            *config.AppConfig
 	ds             *dbservice.DatabaseService
 	rs             *redisservice.RedisService
-	analytics      *AnalyticsModel
 	authModel      *AuthModel
 	natsService    *natsservice.NatsService
 	userModel      *UserModel
@@ -22,27 +21,15 @@ type NatsModel struct {
 	logger         *logrus.Entry
 }
 
-func NewNatsModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, logger *logrus.Logger) *NatsModel {
-	if app == nil {
-		app = config.GetConfig()
-	}
-	if ds == nil {
-		ds = dbservice.New(app.DB, logger)
-	}
-	if rs == nil {
-		rs = redisservice.New(app.RDS, logger)
-	}
-	natsService := natsservice.New(app, logger)
-
+func NewNatsModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, analyticsModel *AnalyticsModel, authModel *AuthModel, userModel *UserModel, logger *logrus.Logger) *NatsModel {
 	return &NatsModel{
 		app:            app,
 		ds:             ds,
 		rs:             rs,
-		analytics:      NewAnalyticsModel(app, ds, rs, logger),
-		authModel:      NewAuthModel(app, natsService, logger),
 		natsService:    natsService,
-		userModel:      NewUserModel(app, ds, rs, logger),
-		analyticsModel: NewAnalyticsModel(app, ds, rs, logger),
+		authModel:      authModel,
+		userModel:      userModel,
+		analyticsModel: analyticsModel,
 		logger:         logger.WithField("model", "nats"),
 	}
 }
@@ -70,6 +57,6 @@ func (m *NatsModel) HandleFromClientToServerReq(roomId, userId string, req *plug
 			m.logger.Errorln(err)
 			return
 		}
-		m.analytics.HandleEvent(ad)
+		m.analyticsModel.HandleEvent(ad)
 	}
 }

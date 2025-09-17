@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -26,7 +25,7 @@ func (m *AnalyticsModel) handleFirstTimeUserJoined(key string) {
 	}
 	marshal, err := op.Marshal(uInfo)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.WithError(err).Errorln("marshalling failed")
 	}
 
 	u := map[string]string{
@@ -36,7 +35,7 @@ func (m *AnalyticsModel) handleFirstTimeUserJoined(key string) {
 
 	err = m.rs.AddAnalyticsUser(k, u)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.WithError(err).Errorln("AddAnalyticsUser failed")
 	}
 }
 
@@ -56,7 +55,7 @@ func (m *AnalyticsModel) insertEventData(key string) {
 		k := fmt.Sprintf("%s:%s", key, m.data.EventName.String())
 		err := m.rs.AddAnalyticsHSETType(k, val)
 		if err != nil {
-			log.Errorln(err)
+			m.logger.WithError(err).Errorln("AddAnalyticsHSETType failed")
 		}
 
 	} else if m.data.EventValueInteger != nil {
@@ -65,7 +64,7 @@ func (m *AnalyticsModel) insertEventData(key string) {
 		k := fmt.Sprintf("%s:%s", key, m.data.EventName.String())
 		err := m.rs.IncrementAnalyticsVal(k, m.data.GetEventValueInteger())
 		if err != nil {
-			log.Errorln(err)
+			m.logger.WithError(err).Errorln("IncrementAnalyticsVal failed")
 		}
 	} else if m.data.EventValueString != nil {
 		// we are assuming that we want to set the supplied value
@@ -73,7 +72,7 @@ func (m *AnalyticsModel) insertEventData(key string) {
 		k := fmt.Sprintf("%s:%s", key, m.data.EventName.String())
 		err := m.rs.AddAnalyticsStringType(k, m.data.GetEventValueString())
 		if err != nil {
-			log.Errorln(err)
+			m.logger.WithError(err).Errorln("AddAnalyticsStringType failed")
 		}
 	}
 }

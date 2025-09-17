@@ -119,46 +119,39 @@ func (m *RoomModel) OnAfterRoomEnded(ctx context.Context, roomID, roomSID, metad
 
 	m.natsService.DeleteRoomUsersBlockList(roomID)
 
-	recorderModel := NewRecorderModel(m.app, m.ds, m.rs, m.logger.Logger)
-	if err = recorderModel.SendMsgToRecorder(&plugnmeet.RecordingReq{Task: plugnmeet.RecordingTasks_STOP, Sid: roomSID, RoomId: roomID}); err != nil {
+	if err = m.recorderModel.SendMsgToRecorder(&plugnmeet.RecordingReq{Task: plugnmeet.RecordingTasks_STOP, Sid: roomSID, RoomId: roomID}); err != nil {
 		m.logger.WithFields(logrus.Fields{"roomId": roomID, "roomSid": roomSID}).Errorf("Error sending stop to recorder: %v", err)
 	}
 
 	if !m.app.UploadFileSettings.KeepForever {
-		fileM := NewFileModel(m.app, m.ds, m.natsService, m.logger.Logger)
-		if err = fileM.DeleteRoomUploadedDir(roomSID); err != nil {
+		if err = m.fileModel.DeleteRoomUploadedDir(roomSID); err != nil {
 			m.logger.WithFields(logrus.Fields{"roomId": roomID, "roomSid": roomSID}).Errorf("Error deleting uploads: %v", err)
 		}
 	}
 
-	rmDuration := NewRoomDurationModel(m.app, m.rs, m.logger.Logger)
-	if err = rmDuration.DeleteRoomWithDuration(roomID); err != nil {
+	if err = m.roomDuration.DeleteRoomWithDuration(roomID); err != nil {
 		m.logger.WithFields(logrus.Fields{"roomId": roomID}).Errorf("Error deleting room duration: %v", err)
 	}
 
-	em := NewEtherpadModel(m.app, m.ds, m.rs, m.logger.Logger)
-	_ = em.CleanAfterRoomEnd(roomID, metadata)
+	_ = m.etherpadModel.CleanAfterRoomEnd(roomID, metadata)
 
-	pm := NewPollModel(m.app, m.ds, m.rs, m.logger.Logger)
-	if err = pm.CleanUpPolls(roomID); err != nil {
+	if err = m.pollModel.CleanUpPolls(roomID); err != nil {
 		m.logger.WithFields(logrus.Fields{"roomId": roomID}).Errorf("Error cleaning polls: %v", err)
 	}
 
-	bm := NewBreakoutRoomModel(m.app, m.ds, m.rs, m.logger.Logger)
-	if err = bm.PostTaskAfterRoomEndWebhook(ctx, roomID, metadata); err != nil {
+	breakoutModel := NewBreakoutRoomModel(m.app, m.ds, m.rs, m.natsService, m, m.roomDuration, m.analyticsModel, m.userModel, m.logger.Logger)
+	if err = breakoutModel.PostTaskAfterRoomEndWebhook(ctx, roomID, metadata); err != nil {
 		m.logger.WithFields(logrus.Fields{"roomId": roomID}).Errorf("Error in breakout room post-end task: %v", err)
 	}
 
-	sm := NewSpeechToTextModel(m.app, m.ds, m.rs, m.logger.Logger)
-	if err = sm.OnAfterRoomEnded(roomID, roomSID); err != nil {
+	if err = m.speechToText.OnAfterRoomEnded(roomID, roomSID); err != nil {
 		m.logger.WithFields(logrus.Fields{"roomId": roomID, "roomSid": roomSID}).Errorf("Error in speech service cleanup: %v", err)
 	}
 
 	m.natsService.OnAfterSessionEndCleanup(roomID)
 	m.logger.WithFields(logrus.Fields{"roomId": roomID, "operation": "OnAfterRoomEnded"}).Info("Room has been cleaned properly.")
 
-	analyticsModel := NewAnalyticsModel(m.app, m.ds, m.rs, m.logger.Logger)
-	analyticsModel.PrepareToExportAnalytics(roomID, roomSID, metadata)
+	m.analyticsModel.PrepareToExportAnalytics(roomID, roomSID, metadata)
 }
 
 // Helper function to check if all users are disconnected

@@ -16,18 +16,11 @@ type RoomDurationModel struct {
 	logger      *logrus.Entry
 }
 
-func NewRoomDurationModel(app *config.AppConfig, rs *redisservice.RedisService, logger *logrus.Logger) *RoomDurationModel {
-	if app == nil {
-		app = config.GetConfig()
-	}
-	if rs == nil {
-		rs = redisservice.New(app.RDS, logger)
-	}
-
+func NewRoomDurationModel(app *config.AppConfig, rs *redisservice.RedisService, natsService *natsservice.NatsService, logger *logrus.Logger) *RoomDurationModel {
 	return &RoomDurationModel{
 		app:         app,
 		rs:          rs,
-		natsService: natsservice.New(app, logger),
+		natsService: natsService,
 		logger:      logger.WithField("model", "room_duration"),
 	}
 }

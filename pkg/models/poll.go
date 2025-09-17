@@ -20,23 +20,13 @@ type PollModel struct {
 	logger         *logrus.Entry
 }
 
-func NewPollModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, logger *logrus.Logger) *PollModel {
-	if app == nil {
-		app = config.GetConfig()
-	}
-	if ds == nil {
-		ds = dbservice.New(app.DB, logger)
-	}
-	if rs == nil {
-		rs = redisservice.New(app.RDS, logger)
-	}
-
+func NewPollModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, analyticsModel *AnalyticsModel, logger *logrus.Logger) *PollModel {
 	return &PollModel{
 		app:            app,
 		ds:             ds,
 		rs:             rs,
-		analyticsModel: NewAnalyticsModel(app, ds, rs, logger),
-		natsService:    natsservice.New(app, logger),
+		natsService:    natsService,
+		analyticsModel: analyticsModel,
 		logger:         logger.WithField("model", "poll"),
 	}
 }

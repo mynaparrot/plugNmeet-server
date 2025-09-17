@@ -75,8 +75,7 @@ func (m *IngressModel) CreateIngress(r *plugnmeet.CreateIngressReq) (*livekit.In
 	}
 
 	// send analytics
-	analyticsModel := NewAnalyticsModel(m.app, m.ds, m.rs, m.logger.Logger)
-	analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
+	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
 		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INGRESS_CREATED,
 		RoomId:    r.RoomId,

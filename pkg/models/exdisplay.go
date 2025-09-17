@@ -13,31 +13,23 @@ import (
 )
 
 type ExDisplayModel struct {
-	app         *config.AppConfig
-	ds          *dbservice.DatabaseService
-	rs          *redisservice.RedisService
-	lk          *livekitservice.LivekitService
-	natsService *natsservice.NatsService
-	logger      *logrus.Entry
+	app            *config.AppConfig
+	ds             *dbservice.DatabaseService
+	rs             *redisservice.RedisService
+	lk             *livekitservice.LivekitService
+	natsService    *natsservice.NatsService
+	analyticsModel *AnalyticsModel
+	logger         *logrus.Entry
 }
 
-func NewExDisplayModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, logger *logrus.Logger) *ExDisplayModel {
-	if app == nil {
-		app = config.GetConfig()
-	}
-	if ds == nil {
-		ds = dbservice.New(app.DB, logger)
-	}
-	if rs == nil {
-		rs = redisservice.New(app.RDS, logger)
-	}
-
+func NewExDisplayModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, analyticsModel *AnalyticsModel, logger *logrus.Logger) *ExDisplayModel {
 	return &ExDisplayModel{
-		app:         app,
-		ds:          ds,
-		rs:          rs,
-		natsService: natsservice.New(app, logger),
-		logger:      logger.WithField("model", "external-display"),
+		app:            app,
+		ds:             ds,
+		rs:             rs,
+		natsService:    natsService,
+		analyticsModel: analyticsModel,
+		logger:         logger.WithField("model", "external-display"),
 	}
 }
 

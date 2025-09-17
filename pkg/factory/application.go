@@ -2,6 +2,8 @@ package factory
 
 import (
 	"context"
+	"sync"
+
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
@@ -9,7 +11,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
-	"sync"
 )
 
 // ApplicationServices holds all the shared services.
@@ -38,7 +39,7 @@ type ApplicationModels struct {
 	RecorderModel      *models.RecorderModel
 	RecordingModel     *models.RecordingModel
 	RoomModel          *models.RoomModel
-	SchedulerModel     *models.SchedulerModel
+	JanitorModel       *models.JanitorModel
 	SpeechToTextModel  *models.SpeechToTextModel
 	UserModel          *models.UserModel
 	WaitingRoomModel   *models.WaitingRoomModel
@@ -82,10 +83,10 @@ func (a *Application) Boot() {
 	// We need to wait for authService setup task to complete.
 	wg.Add(1)
 	// Boot up the NATS controller in a goroutine.
-	go a.Controllers.NatsController.BootUp(&wg)
+	go a.Controllers.NatsController.BootUp(a.Ctx, &wg)
 	// Wait for NatsController.BootUp to finish its service registration.
 	// This blocks until `wg.Done()` is called inside BootUp.
 	wg.Wait()
 	// start scheduler
-	go a.Models.SchedulerModel.StartScheduler()
+	go a.Models.JanitorModel.StartJanitor(a.Ctx)
 }

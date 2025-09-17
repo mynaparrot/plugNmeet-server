@@ -14,18 +14,11 @@ type WaitingRoomModel struct {
 	logger      *logrus.Entry
 }
 
-func NewWaitingRoomModel(app *config.AppConfig, rs *redisservice.RedisService, logger *logrus.Logger) *WaitingRoomModel {
-	if app == nil {
-		app = config.GetConfig()
-	}
-	if rs == nil {
-		rs = redisservice.New(app.RDS, logger)
-	}
-
+func NewWaitingRoomModel(app *config.AppConfig, rs *redisservice.RedisService, natsService *natsservice.NatsService, logger *logrus.Logger) *WaitingRoomModel {
 	return &WaitingRoomModel{
 		app:         app,
 		rs:          rs,
-		natsService: natsservice.New(app, logger),
+		natsService: natsService,
 		logger:      logger.WithField("model", "waiting-room"),
 	}
 }

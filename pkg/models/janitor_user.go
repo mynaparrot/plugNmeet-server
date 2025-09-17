@@ -13,16 +13,16 @@ import (
 
 // checkOnlineUsersStatus will compare last ping result
 // and take the decision to update user's status
-func (m *SchedulerModel) checkOnlineUsersStatus() {
-	locked := m.rs.IsSchedulerTaskLock("checkOnlineUsersStatus")
+func (m *JanitorModel) checkOnlineUsersStatus() {
+	locked := m.rs.IsJanitorTaskLock("checkOnlineUsersStatus")
 	if locked {
 		// if lock then we will not perform here
 		return
 	}
 	// now set lock
-	_ = m.rs.LockSchedulerTask("checkOnlineUsersStatus", time.Minute*1)
+	_ = m.rs.LockJanitorTask("checkOnlineUsersStatus", time.Minute*1)
 	// clean at the end
-	defer m.rs.UnlockSchedulerTask("checkOnlineUsersStatus")
+	defer m.rs.UnlockJanitorTask("checkOnlineUsersStatus")
 
 	kl := m.app.JetStream.KeyValueStoreNames(context.Background())
 	for s := range kl.Name() {
@@ -55,7 +55,7 @@ func (m *SchedulerModel) checkOnlineUsersStatus() {
 	}
 }
 
-func (m *SchedulerModel) changeUserStatus(roomId, userId string) {
+func (m *JanitorModel) changeUserStatus(roomId, userId string) {
 	// this user should be offline
 	_ = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusOffline)
 

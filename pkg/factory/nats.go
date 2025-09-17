@@ -1,11 +1,12 @@
 package factory
 
 import (
+	"strings"
+
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
-	"strings"
 )
 
 func NewNatsConnection(appCnf *config.AppConfig) error {

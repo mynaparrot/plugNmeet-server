@@ -35,7 +35,6 @@ type natsJob struct {
 }
 
 type NatsController struct {
-	ctx           context.Context
 	app           *config.AppConfig
 	issuerKeyPair nkeys.KeyPair
 	curveKeyPair  nkeys.KeyPair
@@ -52,7 +51,6 @@ func NewNatsController(app *config.AppConfig, authModel *models.AuthModel, natsM
 	}
 
 	c := &NatsController{
-		ctx:           context.Background(),
 		app:           app,
 		issuerKeyPair: issuerKeyPair,
 		authModel:     authModel,
@@ -71,14 +69,14 @@ func NewNatsController(app *config.AppConfig, authModel *models.AuthModel, natsM
 	return c
 }
 
-func (c *NatsController) BootUp(wg *sync.WaitGroup) {
+func (c *NatsController) BootUp(ctx context.Context, wg *sync.WaitGroup) {
 	// Start the worker pool
 	for i := 0; i < DefaultNumWorkers; i++ {
 		go c.worker()
 	}
 
 	// system receiver as worker
-	stream, err := c.app.JetStream.CreateOrUpdateStream(c.ctx, jetstream.StreamConfig{
+	stream, err := c.app.JetStream.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
 		Name:      fmt.Sprintf("%s", c.app.NatsInfo.Subjects.SystemJsWorker),
 		Replicas:  c.app.NatsInfo.NumReplicas,
 		Retention: jetstream.WorkQueuePolicy, // to become a worker
@@ -91,7 +89,7 @@ func (c *NatsController) BootUp(wg *sync.WaitGroup) {
 	}
 
 	// now subscribe
-	c.subscribeToSystemWorker(stream)
+	c.subscribeToSystemWorker(ctx, stream)
 	// subscribe to connection events
 	c.subscribeToUsersConnEvents()
 
@@ -183,8 +181,8 @@ func (c *NatsController) subscribeToUsersConnEvents() {
 	}
 }
 
-func (c *NatsController) subscribeToSystemWorker(stream jetstream.Stream) {
-	cons, err := stream.CreateOrUpdateConsumer(c.ctx, jetstream.ConsumerConfig{
+func (c *NatsController) subscribeToSystemWorker(ctx context.Context, stream jetstream.Stream) {
+	cons, err := stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
 		Durable: fmt.Sprintf("pnm-%s", c.app.NatsInfo.Subjects.SystemJsWorker),
 	})
 	if err != nil {
@@ -208,7 +206,9 @@ func (c *NatsController) subscribeToSystemWorker(stream jetstream.Stream) {
 			}
 		}}
 	}, jetstream.ConsumeErrHandler(func(consumeCtx jetstream.ConsumeContext, err error) {
-		c.logger.WithError(err).Errorf("jetstream consume error")
+		if ctx.Err() == nil {
+			c.logger.WithError(err).Errorf("jetstream consume error")
+		}
 	}))
 
 	if err != nil {

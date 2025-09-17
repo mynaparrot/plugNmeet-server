@@ -45,8 +45,7 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 	meta.StartedAt = uint64(time.Now().UTC().Unix())
 	if meta.RoomFeatures.GetRoomDuration() > 0 {
 		// we'll add room info in map
-		rmDuration := NewRoomDurationModel(m.app, m.rs, m.logger.Logger)
-		err := rmDuration.AddRoomWithDurationInfo(rInfo.RoomId, &RoomDurationInfo{
+		err := m.rmDuration.AddRoomWithDurationInfo(rInfo.RoomId, &RoomDurationInfo{
 			Duration:  meta.RoomFeatures.GetRoomDuration(),
 			StartedAt: meta.StartedAt,
 		})
@@ -56,8 +55,7 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 	}
 
 	if meta.IsBreakoutRoom {
-		bm := NewBreakoutRoomModel(m.app, m.ds, m.rs, m.logger.Logger)
-		err := bm.PostTaskAfterRoomStartWebhook(rInfo.RoomId, meta)
+		err := m.bm.PostTaskAfterRoomStartWebhook(rInfo.RoomId, meta)
 		if err != nil {
 			m.logger.WithError(err).Errorln("error posting task after room start webhook")
 		}

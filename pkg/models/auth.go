@@ -13,15 +13,8 @@ type AuthModel struct {
 }
 
 func NewAuthModel(app *config.AppConfig, natsService *natsservice.NatsService, logger *logrus.Logger) *AuthModel {
-	if app == nil {
-		app = config.GetConfig()
-	}
-	if natsService == nil {
-		natsService = natsservice.New(app, logger)
-	}
-
 	return &AuthModel{
-		app:         config.GetConfig(),
+		app:         app,
 		natsService: natsService,
 		logger:      logger.WithField("model", "auth"),
 	}

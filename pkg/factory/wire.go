@@ -16,10 +16,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 )
 
-func provideContext() context.Context {
-	return context.Background()
-}
-
 // build the dependency set for services
 var serviceSet = wire.NewSet(
 	dbservice.New,
@@ -46,7 +42,7 @@ var modelSet = wire.NewSet(
 	models.NewRecorderModel,
 	models.NewRecordingModel,
 	models.NewRoomModel,
-	models.NewSchedulerModel,
+	models.NewJanitorModel,
 	models.NewSpeechToTextModel,
 	models.NewUserModel,
 	models.NewWaitingRoomModel,
@@ -77,9 +73,8 @@ var controllerSet = wire.NewSet(
 )
 
 // NewAppFactory is the injector function that wire will implement.
-func NewAppFactory(appConfig *config.AppConfig) (*Application, error) {
+func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Application, error) {
 	wire.Build(
-		provideContext,
 		serviceSet,
 		modelSet,
 		controllerSet,

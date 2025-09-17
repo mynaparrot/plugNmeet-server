@@ -20,31 +20,29 @@ type WebhookModel struct {
 	rs              *redisservice.RedisService
 	rm              *RoomModel
 	analyticsModel  *AnalyticsModel
+	rmDuration      *RoomDurationModel
+	bm              *BreakoutRoomModel
+	nm              *NatsModel
+	sm              *SpeechToTextModel
 	webhookNotifier *helpers.WebhookNotifier
 	natsService     *natsservice.NatsService
 	logger          *logrus.Entry
 }
 
-func NewWebhookModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, logger *logrus.Logger) *WebhookModel {
-	if app == nil {
-		app = config.GetConfig()
-	}
-	if ds == nil {
-		ds = dbservice.New(app.DB, logger)
-	}
-	if rs == nil {
-		rs = redisservice.New(app.RDS, logger)
-	}
-
+func NewWebhookModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, rm *RoomModel, analyticsModel *AnalyticsModel, rmDuration *RoomDurationModel, bm *BreakoutRoomModel, nm *NatsModel, sm *SpeechToTextModel, logger *logrus.Logger) *WebhookModel {
 	return &WebhookModel{
 		ctx:             ctx,
 		app:             app,
 		ds:              ds,
 		rs:              rs,
-		rm:              NewRoomModel(app, ds, rs, logger),
-		analyticsModel:  NewAnalyticsModel(app, ds, rs, logger),
+		rm:              rm,
+		analyticsModel:  analyticsModel,
+		rmDuration:      rmDuration,
+		bm:              bm,
+		nm:              nm,
+		sm:              sm,
 		webhookNotifier: helpers.GetWebhookNotifier(app, logger),
-		natsService:     natsservice.New(app, logger),
+		natsService:     natsService,
 		logger:          logger.WithField("model", "webhook"),
 	}
 }

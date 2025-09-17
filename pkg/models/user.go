@@ -13,32 +13,24 @@ import (
 )
 
 type UserModel struct {
-	app         *config.AppConfig
-	ds          *dbservice.DatabaseService
-	rs          *redisservice.RedisService
-	lk          *livekitservice.LivekitService
-	natsService *natsservice.NatsService
-	logger      *logrus.Entry
+	app            *config.AppConfig
+	ds             *dbservice.DatabaseService
+	rs             *redisservice.RedisService
+	lk             *livekitservice.LivekitService
+	natsService    *natsservice.NatsService
+	analyticsModel *AnalyticsModel
+	logger         *logrus.Entry
 }
 
-func NewUserModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, logger *logrus.Logger) *UserModel {
-	if app == nil {
-		app = config.GetConfig()
-	}
-	if ds == nil {
-		ds = dbservice.New(app.DB, logger)
-	}
-	if rs == nil {
-		rs = redisservice.New(app.RDS, logger)
-	}
-
+func NewUserModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService, natsService *natsservice.NatsService, analyticsModel *AnalyticsModel, logger *logrus.Logger) *UserModel {
 	return &UserModel{
-		app:         app,
-		ds:          ds,
-		rs:          rs,
-		lk:          livekitservice.New(app, logger),
-		natsService: natsservice.New(app, logger),
-		logger:      logger.WithField("model", "user"),
+		app:            app,
+		ds:             ds,
+		rs:             rs,
+		lk:             lk,
+		natsService:    natsService,
+		analyticsModel: analyticsModel,
+		logger:         logger.WithField("model", "user"),
 	}
 }
 

@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"context"
 	"os"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -33,15 +34,15 @@ func ReadYamlConfigFile(file string) (*config.AppConfig, error) {
 	return appCnf, err
 }
 
-func PrepareServer(appCnf *config.AppConfig) error {
+func PrepareServer(ctx context.Context, appCnf *config.AppConfig) error {
 	// orm
-	err := factory.NewDatabaseConnection(appCnf)
+	err := factory.NewDatabaseConnection(ctx, appCnf)
 	if err != nil {
 		return err
 	}
 
 	// set redis connection
-	err = factory.NewRedisConnection(appCnf)
+	err = factory.NewRedisConnection(ctx, appCnf)
 	if err != nil {
 		return err
 	}

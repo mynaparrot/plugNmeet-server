@@ -66,8 +66,7 @@ func (m *UserModel) RaisedHand(roomId, userId, msg string) {
 	}
 
 	if metadata.RaisedHand {
-		analyticsModel := NewAnalyticsModel(m.app, m.ds, m.rs, m.logger.Logger)
-		analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
+		m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 			EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
 			EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_RAISE_HAND,
 			RoomId:    roomId,

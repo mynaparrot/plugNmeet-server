@@ -15,16 +15,6 @@ type FileModel struct {
 }
 
 func NewFileModel(app *config.AppConfig, ds *dbservice.DatabaseService, natsService *natsservice.NatsService, logger *logrus.Logger) *FileModel {
-	if app == nil {
-		app = config.GetConfig()
-	}
-	if ds == nil {
-		ds = dbservice.New(app.DB, logger)
-	}
-	if natsService == nil {
-		natsService = natsservice.New(app, logger)
-	}
-
 	return &FileModel{
 		app:         app,
 		ds:          ds,

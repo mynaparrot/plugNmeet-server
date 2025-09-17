@@ -33,8 +33,7 @@ func (m *WebhookModel) participantJoined(event *livekit.WebhookEvent) {
 	if strings.HasPrefix(event.Participant.Identity, config.IngressUserIdPrefix) {
 		// if user was ingress user then we'll have to do it manually
 		// because that user will not use plugNmeet client interface
-		nm := NewNatsModel(m.app, m.ds, m.rs, m.logger.Logger)
-		nm.OnAfterUserJoined(event.Room.Name, event.Participant.Identity)
+		m.nm.OnAfterUserJoined(event.Room.Name, event.Participant.Identity)
 	}
 
 	// webhook notification
@@ -65,8 +64,7 @@ func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 	if strings.HasPrefix(event.Participant.Identity, config.IngressUserIdPrefix) {
 		// if user was ingress user then we'll have to do it manually
 		// because that user did not use plugNmeet client interface
-		nm := NewNatsModel(m.app, m.ds, m.rs, m.logger.Logger)
-		nm.OnAfterUserDisconnected(event.Room.Name, event.Participant.Identity)
+		m.nm.OnAfterUserDisconnected(event.Room.Name, event.Participant.Identity)
 	}
 
 	// webhook notification
@@ -74,6 +72,5 @@ func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 
 	// if we missed calculating this user's speech service usage stat
 	// for sudden disconnection
-	sm := NewSpeechToTextModel(m.app, m.ds, m.rs, m.logger.Logger)
-	_ = sm.SpeechServiceUsersUsage(rInfo.RoomId, rInfo.RoomSid, event.Participant.Identity, plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED)
+	_ = m.sm.SpeechServiceUsersUsage(rInfo.RoomId, rInfo.RoomSid, event.Participant.Identity, plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED)
 }

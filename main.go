@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -14,39 +15,27 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/routers"
 	"github.com/mynaparrot/plugnmeet-server/version"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v3"
 )
 
 func main() {
-	cli.VersionPrinter = func(c *cli.Command) {
-		fmt.Printf("%s\n", c.Version)
+	configFile := flag.String("config", "config.yaml", "Configuration file")
+	showVersion := flag.Bool("version", false, "Show version info")
+	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("version: %s\n", version.Version)
+		return
 	}
 
-	app := &cli.Command{
-		Name:        "plugnmeet-server",
-		Usage:       "Scalable, Open source web conference system",
-		Description: "without option will start server",
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:        "config",
-				Usage:       "Configuration file",
-				DefaultText: "config.yaml",
-				Value:       "config.yaml",
-			},
-		},
-		Action:  startServer,
-		Version: version.Version,
-	}
-	err := app.Run(context.Background(), os.Args)
-	if err != nil {
-		logrus.Fatalln(err)
-	}
+	startServer(*configFile)
 }
 
-func startServer(ctx context.Context, c *cli.Command) error {
-	appCnf, err := helpers.ReadYamlConfigFile(c.String("config"))
+func startServer(configFile string) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	appCnf, err := helpers.ReadYamlConfigFile(configFile)
 	if err != nil {
-		panic(err)
+		logrus.WithError(err).Fatal("Failed to read config file")
 	}
 	// set this config for global usage
 	config.New(appCnf)
@@ -58,14 +47,14 @@ func startServer(ctx context.Context, c *cli.Command) error {
 	appCnf.Logger = logger
 
 	// now prepare our server
-	err = helpers.PrepareServer(config.GetConfig())
+	err = helpers.PrepareServer(ctx, appCnf)
 	if err != nil {
-		logger.Fatalln(err)
+		logger.WithError(err).Fatalln("Failed to prepare server")
 	}
 
-	appFactory, err := factory.NewAppFactory(appCnf)
+	appFactory, err := factory.NewAppFactory(ctx, appCnf)
 	if err != nil {
-		logger.Fatalln(err)
+		logger.WithError(err).Fatalln("Failed to create app factory")
 	}
 
 	// boot up some services
@@ -80,13 +69,13 @@ func startServer(ctx context.Context, c *cli.Command) error {
 
 	go func() {
 		sig := <-sigChan
-		logger.Infoln("exit requested, shutting down", "signal", sig)
+		logger.WithField("signal", sig).Infoln("exit requested, shutting down")
 		_ = rt.Shutdown()
+		cancel()
 	}()
 
 	err = rt.Listen(fmt.Sprintf(":%d", appCnf.Client.Port))
 	if err != nil {
-		logger.Fatalln(err)
+		logger.WithError(err).Fatalln("Failed to start server")
 	}
-	return nil
 }

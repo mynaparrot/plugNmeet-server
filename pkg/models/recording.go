@@ -23,24 +23,14 @@ type RecordingModel struct {
 	logger          *logrus.Entry
 }
 
-func NewRecordingModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, logger *logrus.Logger) *RecordingModel {
-	if app == nil {
-		app = config.GetConfig()
-	}
-	if ds == nil {
-		ds = dbservice.New(app.DB, logger)
-	}
-	if rs == nil {
-		rs = redisservice.New(app.RDS, logger)
-	}
-
+func NewRecordingModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, analyticsModel *AnalyticsModel, logger *logrus.Logger) *RecordingModel {
 	return &RecordingModel{
 		app:             app,
 		ds:              ds,
 		rs:              rs,
-		analyticsModel:  NewAnalyticsModel(app, ds, rs, logger),
+		analyticsModel:  analyticsModel,
 		webhookNotifier: helpers.GetWebhookNotifier(app, logger),
-		natsService:     natsservice.New(app, logger),
+		natsService:     natsService,
 		logger:          logger.WithField("model", "recording"),
 	}
 }

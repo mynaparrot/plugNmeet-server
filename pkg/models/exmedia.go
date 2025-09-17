@@ -13,12 +13,13 @@ import (
 )
 
 type ExMediaModel struct {
-	app         *config.AppConfig
-	ds          *dbservice.DatabaseService
-	rs          *redisservice.RedisService
-	lk          *livekitservice.LivekitService
-	natsService *natsservice.NatsService
-	logger      *logrus.Entry
+	app            *config.AppConfig
+	ds             *dbservice.DatabaseService
+	rs             *redisservice.RedisService
+	lk             *livekitservice.LivekitService
+	natsService    *natsservice.NatsService
+	analyticsModel *AnalyticsModel
+	logger         *logrus.Entry
 }
 
 type updateRoomMetadataOpts struct {
@@ -27,23 +28,14 @@ type updateRoomMetadataOpts struct {
 	url      *string
 }
 
-func NewExMediaModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, logger *logrus.Logger) *ExMediaModel {
-	if app == nil {
-		app = config.GetConfig()
-	}
-	if ds == nil {
-		ds = dbservice.New(app.DB, logger)
-	}
-	if rs == nil {
-		rs = redisservice.New(app.RDS, logger)
-	}
-
+func NewExMediaModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, analyticsModel *AnalyticsModel, logger *logrus.Logger) *ExMediaModel {
 	return &ExMediaModel{
-		app:         app,
-		ds:          ds,
-		rs:          rs,
-		natsService: natsservice.New(app, logger),
-		logger:      logger.WithField("model", "external-media"),
+		app:            app,
+		ds:             ds,
+		rs:             rs,
+		natsService:    natsService,
+		analyticsModel: analyticsModel,
+		logger:         logger.WithField("model", "external-media"),
 	}
 }
 

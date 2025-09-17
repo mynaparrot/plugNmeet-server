@@ -48,8 +48,7 @@ func (m *BreakoutRoomModel) JoinBreakoutRoom(ctx context.Context, r *plugnmeet.J
 			UserMetadata: meta,
 		},
 	}
-	um := NewUserModel(m.app, m.ds, m.rs, m.logger.Logger)
-	token, err := um.GetPNMJoinToken(ctx, req)
+	token, err := m.um.GetPNMJoinToken(ctx, req)
 	if err != nil {
 		return "", err
 	}

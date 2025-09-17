@@ -21,22 +21,12 @@ type AnalyticsModel struct {
 	logger      *logrus.Entry
 }
 
-func NewAnalyticsModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, logger *logrus.Logger) *AnalyticsModel {
-	if app == nil {
-		app = config.GetConfig()
-	}
-	if ds == nil {
-		ds = dbservice.New(app.DB, logger)
-	}
-	if rs == nil {
-		rs = redisservice.New(app.RDS, logger)
-	}
-
+func NewAnalyticsModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, logger *logrus.Logger) *AnalyticsModel {
 	return &AnalyticsModel{
-		app:         config.GetConfig(),
+		app:         app,
 		ds:          ds,
 		rs:          rs,
-		natsService: natsservice.New(app, logger),
+		natsService: natsService,
 		logger:      logger.WithField("model", "analytics"),
 	}
 }

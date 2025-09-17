@@ -23,8 +23,7 @@ func (m *RecorderModel) addTokenAndRecorder(ctx context.Context, req *plugnmeet.
 			IsAdmin:  true,
 		},
 	}
-	um := NewUserModel(m.app, m.ds, m.rs, m.logger.Logger)
-	token, err := um.GetPNMJoinToken(ctx, gt)
+	token, err := m.um.GetPNMJoinToken(ctx, gt)
 	if err != nil {
 		m.logger.WithError(err).Errorln("error getting pnm token")
 		return err

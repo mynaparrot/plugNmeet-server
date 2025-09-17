@@ -25,8 +25,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(ctx context.Context, r *plugnmee
 
 	// let's check if the parent room has a duration set or not
 	if meta.RoomFeatures.RoomDuration != nil && *meta.RoomFeatures.RoomDuration > 0 {
-		rDuration := NewRoomDurationModel(m.app, m.rs, m.logger.Logger)
-		err = rDuration.CompareDurationWithParentRoom(r.RoomId, r.Duration)
+		err = m.rDuration.CompareDurationWithParentRoom(r.RoomId, r.Duration)
 		if err != nil {
 			return err
 		}
@@ -105,8 +104,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(ctx context.Context, r *plugnmee
 	err = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, origMeta)
 
 	// send analytics
-	analyticsModel := NewAnalyticsModel(m.app, m.ds, m.rs, m.logger.Logger)
-	analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
+	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
 		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_BREAKOUT_ROOM,
 		RoomId:    r.RoomId,

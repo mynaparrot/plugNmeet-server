@@ -9,31 +9,27 @@ import (
 )
 
 type BreakoutRoomModel struct {
-	app         *config.AppConfig
-	ds          *dbservice.DatabaseService
-	rs          *redisservice.RedisService
-	rm          *RoomModel
-	natsService *natsservice.NatsService
-	logger      *logrus.Entry
+	app            *config.AppConfig
+	ds             *dbservice.DatabaseService
+	rs             *redisservice.RedisService
+	rm             *RoomModel
+	rDuration      *RoomDurationModel
+	analyticsModel *AnalyticsModel
+	um             *UserModel
+	natsService    *natsservice.NatsService
+	logger         *logrus.Entry
 }
 
-func NewBreakoutRoomModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, logger *logrus.Logger) *BreakoutRoomModel {
-	if app == nil {
-		app = config.GetConfig()
-	}
-	if ds == nil {
-		ds = dbservice.New(app.DB, logger)
-	}
-	if rs == nil {
-		rs = redisservice.New(app.RDS, logger)
-	}
-
+func NewBreakoutRoomModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, rm *RoomModel, rDuration *RoomDurationModel, analyticsModel *AnalyticsModel, um *UserModel, logger *logrus.Logger) *BreakoutRoomModel {
 	return &BreakoutRoomModel{
-		app:         app,
-		ds:          ds,
-		rs:          rs,
-		rm:          NewRoomModel(app, ds, rs, logger),
-		natsService: natsservice.New(app, logger),
-		logger:      logger.WithField("model", "breakout_room"),
+		app:            app,
+		ds:             ds,
+		rs:             rs,
+		rm:             rm,
+		um:             um,
+		rDuration:      rDuration,
+		natsService:    natsService,
+		analyticsModel: analyticsModel,
+		logger:         logger.WithField("model", "breakout_room"),
 	}
 }

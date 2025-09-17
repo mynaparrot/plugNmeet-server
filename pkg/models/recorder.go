@@ -21,25 +21,17 @@ type RecorderModel struct {
 	ds          *dbservice.DatabaseService
 	rs          *redisservice.RedisService
 	natsService *natsservice.NatsService
+	um          *UserModel
 	logger      *logrus.Entry
 }
 
-func NewRecorderModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, logger *logrus.Logger) *RecorderModel {
-	if app == nil {
-		app = config.GetConfig()
-	}
-	if ds == nil {
-		ds = dbservice.New(app.DB, logger)
-	}
-	if rs == nil {
-		rs = redisservice.New(app.RDS, logger)
-	}
-
+func NewRecorderModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, um *UserModel, logger *logrus.Logger) *RecorderModel {
 	return &RecorderModel{
 		app:         app,
 		ds:          ds,
 		rs:          rs,
-		natsService: natsservice.New(app, logger),
+		natsService: natsService,
+		um:          um,
 		logger:      logger.WithField("model", "recorder"),
 	}
 }

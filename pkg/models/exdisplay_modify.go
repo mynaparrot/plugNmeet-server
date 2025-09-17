@@ -68,8 +68,7 @@ func (m *ExDisplayModel) updateRoomMetadata(roomId string, opts *updateRoomMetad
 		d.HsetValue = &val
 	}
 
-	analyticsModel := NewAnalyticsModel(m.app, m.ds, m.rs, m.logger.Logger)
-	analyticsModel.HandleEvent(d)
+	m.analyticsModel.HandleEvent(d)
 
 	return nil
 }

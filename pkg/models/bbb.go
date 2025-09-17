@@ -11,24 +11,16 @@ type BBBApiWrapperModel struct {
 	app    *config.AppConfig
 	ds     *dbservice.DatabaseService
 	rs     *redisservice.RedisService
+	rrm    *RecordingModel
 	logger *logrus.Entry
 }
 
-func NewBBBApiWrapperModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, logger *logrus.Logger) *BBBApiWrapperModel {
-	if app == nil {
-		app = config.GetConfig()
-	}
-	if ds == nil {
-		ds = dbservice.New(app.DB, logger)
-	}
-	if rs == nil {
-		rs = redisservice.New(app.RDS, logger)
-	}
-
+func NewBBBApiWrapperModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, rrm *RecordingModel, logger *logrus.Logger) *BBBApiWrapperModel {
 	return &BBBApiWrapperModel{
 		app:    app,
 		ds:     ds,
 		rs:     rs,
+		rrm:    rrm,
 		logger: logger.WithField("model", "bbb"),
 	}
 }
