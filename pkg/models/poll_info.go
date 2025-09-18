@@ -81,10 +81,10 @@ func (m *PollModel) GetPollResponsesDetails(roomId, pollId string) (map[string]s
 	jsonRespondents, _ := json.Marshal(allRespondents)
 	result["all_respondents"] = string(jsonRespondents)
 
-	if len(result) == 0 {
-		return nil, nil
+	// Ensure total_resp is always present for backward compatibility.
+	if _, ok := result[redisservice.PollTotalRespField]; !ok {
+		result[redisservice.PollTotalRespField] = "0"
 	}
-
 	return result, nil
 }
 
