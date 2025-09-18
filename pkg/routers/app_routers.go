@@ -1,6 +1,7 @@
 package routers
 
 import (
+	"io"
 	"runtime"
 
 	"github.com/ansrivas/fiberprometheus/v2"
@@ -46,9 +47,12 @@ func New(appConfig *config.AppConfig, ctrl *factory.ApplicationControllers) *fib
 	// --- App Initialization & Middleware ---
 	app := fiber.New(cnf)
 
-	if appConfig.Client.Debug {
-		app.Use(logger.New())
-	}
+	app.Use(logger.New(logger.Config{
+		Done: func(c *fiber.Ctx, logString []byte) {
+			appConfig.Logger.Debugln(string(logString))
+		},
+		Output: io.Discard,
+	}))
 
 	if appConfig.Client.PrometheusConf.Enable {
 		prometheus := fiberprometheus.New("plugNmeet")

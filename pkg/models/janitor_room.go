@@ -6,10 +6,12 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
+	"github.com/sirupsen/logrus"
 )
 
 // activeRoomChecker will check & do reconciliation between DB & livekit
 func (m *JanitorModel) activeRoomChecker() {
+	log := m.logger.WithField("task", "activeRoomChecker")
 	locked := m.rs.IsJanitorTaskLock("activeRoomChecker")
 	if locked {
 		// if lock then we will not perform here
@@ -40,7 +42,7 @@ func (m *JanitorModel) activeRoomChecker() {
 
 		rInfo, err := m.natsService.GetRoomInfo(room.RoomId)
 		if err != nil {
-			m.logger.WithError(err).Errorln("error getting room info")
+			log.WithError(err).Errorln("error getting room info")
 			continue
 		}
 
@@ -52,14 +54,14 @@ func (m *JanitorModel) activeRoomChecker() {
 				IsRunning: 0,
 			})
 			if err != nil {
-				m.logger.WithError(err).Errorln("error updating room status")
+				log.WithError(err).Errorln("error updating room status")
 			}
 			continue
 		}
 
 		userIds, err := m.natsService.GetOnlineUsersId(room.RoomId)
 		if err != nil {
-			m.logger.WithError(err).Errorln("error getting online users")
+			log.WithError(err).Errorln("error getting online users")
 			continue
 		}
 
@@ -67,7 +69,12 @@ func (m *JanitorModel) activeRoomChecker() {
 			// no user online
 			valid := rInfo.CreatedAt + rInfo.EmptyTimeout
 			if uint64(time.Now().UTC().Unix()) > valid {
-				m.logger.Infoln("EmptyTimeout for roomId:", room.RoomId, "passed: ", uint64(time.Now().UTC().Unix())-valid)
+				log.WithFields(logrus.Fields{
+					"emptyTimeout": rInfo.EmptyTimeout,
+					"createdAt":    rInfo.CreatedAt,
+					"validUntil":   valid,
+					"secondsOver":  uint64(time.Now().UTC().Unix()) - valid,
+				}).Info("closing empty room as it reached empty timeout")
 
 				// end room by proper channel
 				m.rm.EndRoom(context.Background(), &plugnmeet.RoomEndReq{RoomId: room.RoomId})

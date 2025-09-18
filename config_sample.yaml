@@ -52,7 +52,7 @@ log_settings:
   # Maximum age of log files before rotation, in days.
   maxage: 2
   # Log levels: info, warn, error, fatal, debug, or panic.
-  log_level: "info"
+  log_level: "debug"
 
 livekit_info:
   host: "http://host.docker.internal:7880"

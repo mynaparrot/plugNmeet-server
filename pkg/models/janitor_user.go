@@ -2,18 +2,20 @@ package models
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
+	"github.com/sirupsen/logrus"
 )
 
 // checkOnlineUsersStatus will compare last ping result
 // and take the decision to update user's status
 func (m *JanitorModel) checkOnlineUsersStatus() {
+	log := m.logger.WithField("task", "checkOnlineUsersStatus")
+
 	locked := m.rs.IsJanitorTaskLock("checkOnlineUsersStatus")
 	if locked {
 		// if lock then we will not perform here
@@ -32,6 +34,10 @@ func (m *JanitorModel) checkOnlineUsersStatus() {
 		roomId := strings.ReplaceAll(s, natsservice.RoomUsersBucketPrefix, "")
 		if users, err := m.natsService.GetOnlineUsersId(roomId); err == nil && users != nil && len(users) > 0 {
 			for _, u := range users {
+				userLog := log.WithFields(logrus.Fields{
+					"roomId": roomId,
+					"userId": u,
+				})
 				if strings.HasPrefix(u, config.IngressUserIdPrefix) {
 					// we won't get ping from ingress user
 					// so, we can't check from here.
@@ -44,10 +50,17 @@ func (m *JanitorModel) checkOnlineUsersStatus() {
 				}
 
 				// we'll compare
-				lastPing += natsservice.UserOnlineMaxPingDiff.Milliseconds()
+				maxDiff := natsservice.UserOnlineMaxPingDiff.Milliseconds()
+				deadline := lastPing + maxDiff
 				now := time.Now().UnixMilli()
-				if now > lastPing {
-					m.logger.Infoln(fmt.Sprintf("userId:%s should be offline, lastPing: %d, now: %d", u, lastPing, now))
+				if now > deadline {
+					userLog.WithFields(logrus.Fields{
+						"lastPing":     time.UnixMilli(lastPing).Format(time.RFC3339),
+						"now":          time.UnixMilli(now).Format(time.RFC3339),
+						"diff_ms":      now - lastPing,
+						"threshold_ms": maxDiff,
+						"over_by_ms":   now - deadline,
+					}).Warn("user missed ping deadline, marking as offline")
 					m.changeUserStatus(roomId, u)
 				}
 			}
