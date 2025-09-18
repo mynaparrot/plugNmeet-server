@@ -46,33 +46,29 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 	// let's wait a few seconds so that all other processes will finish
 	time.Sleep(config.WaitBeforeAnalyticsStartProcessing)
 
+	// lock to prevent this room re-creation until process finish
+	// otherwise will give an unexpected result
+	lockValue, err := acquireRoomCreationLockWithRetry(context.Background(), m.rs, roomId, log)
+	if err != nil {
+		// Error is already logged by the helper.
+		// We can't proceed without the lock.
+		return
+	}
+	defer func() {
+		unlockCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if unlockErr := m.rs.UnlockRoomCreation(unlockCtx, roomId, lockValue); unlockErr != nil {
+			// UnlockRoomCreation in RedisService should log details
+			log.WithError(unlockErr).Error("error trying to clean up room creation lock")
+		}
+	}()
+
 	// we'll check if the room is still active or not.
 	// this may happen when we closed the room & re-created it instantly
 	exist, err := m.natsService.GetRoomInfo(roomId)
 	if err == nil && exist != nil && exist.RoomSid != sid {
 		log.Info("room was likely re-created, skipping analytics export for the previous session")
-		return
-	}
-
-	// lock to prevent this room re-creation until process finish
-	// otherwise will give an unexpected result
-	if lockValue, err := acquireRoomCreationLockWithRetry(context.Background(), m.rs, roomId, log); err == nil {
-		defer func() {
-			unlockCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			if unlockErr := m.rs.UnlockRoomCreation(unlockCtx, roomId, lockValue); unlockErr != nil {
-				// UnlockRoomCreation in RedisService should log details
-				log.WithError(unlockErr).Error("error trying to clean up room creation lock")
-			}
-		}()
-	}
-
-	if _, err := os.Stat(*m.app.AnalyticsSettings.FilesStorePath); os.IsNotExist(err) {
-		err = os.MkdirAll(*m.app.AnalyticsSettings.FilesStorePath, os.ModePerm)
-		if err != nil {
-			log.WithError(err).Error("failed to create analytics store directory")
-			return
-		}
+		return // The lock will be released by the deferred function.
 	}
 
 	isRunning := 0
