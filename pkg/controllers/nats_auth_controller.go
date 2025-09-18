@@ -1,9 +1,9 @@
 package controllers
 
 import (
-	"context"
 	"errors"
 	"fmt"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
@@ -11,26 +11,26 @@ import (
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nats.go/micro"
 	"github.com/nats-io/nkeys"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 type NatsAuthController struct {
-	ctx           context.Context
 	app           *config.AppConfig
 	authModel     *models.AuthModel
 	natsService   *natsservice.NatsService
 	issuerKeyPair nkeys.KeyPair
 	curveKeyPair  nkeys.KeyPair
+	logger        *logrus.Entry
 }
 
-func NewNatsAuthController(app *config.AppConfig, authModel *models.AuthModel, issuerKeyPair nkeys.KeyPair, curveKeyPair nkeys.KeyPair) *NatsAuthController {
+func NewNatsAuthController(app *config.AppConfig, natsService *natsservice.NatsService, authModel *models.AuthModel, issuerKeyPair nkeys.KeyPair, curveKeyPair nkeys.KeyPair, logger *logrus.Entry) *NatsAuthController {
 	return &NatsAuthController{
-		ctx:           context.Background(),
 		app:           app,
 		authModel:     authModel,
-		natsService:   natsservice.New(app),
+		natsService:   natsService,
 		issuerKeyPair: issuerKeyPair,
 		curveKeyPair:  curveKeyPair,
+		logger:        logger.WithField("sub-controller", "nats-auth"),
 	}
 }
 
@@ -41,14 +41,14 @@ func (s *NatsAuthController) Handle(r micro.Request) {
 	xKey := r.Headers().Get("Nats-Server-Xkey")
 	if len(xKey) > 0 {
 		if s.curveKeyPair == nil {
-			log.Errorln("received encrypted data from nats server but curveKeyPair is nil")
+			s.logger.Errorln("received encrypted data from nats server but curveKeyPair is nil")
 			_ = r.Error("500", "xKey not supported", nil)
 			return
 		}
 
 		data, err = s.curveKeyPair.Open(r.Data(), xKey)
 		if err != nil {
-			log.Errorln("error decrypting message from nats server", err)
+			s.logger.WithError(err).Errorln("error decrypting message from nats server")
 			_ = r.Error("500", err.Error(), nil)
 			return
 		}
@@ -58,7 +58,7 @@ func (s *NatsAuthController) Handle(r micro.Request) {
 
 	rc, err := jwt.DecodeAuthorizationRequestClaims(string(data))
 	if err != nil {
-		log.Errorln(err)
+		s.logger.WithError(err).Errorln("error decoding authorization request")
 		_ = r.Error("500", err.Error(), nil)
 		return
 	}
@@ -202,7 +202,7 @@ func (s *NatsAuthController) respond(req micro.Request, userNKey, serverId, user
 
 	token, err := rc.Encode(s.issuerKeyPair)
 	if err != nil {
-		log.Errorln("error encoding response jwt:", err)
+		s.logger.WithError(err).Errorln("error encoding response jwt")
 		_ = req.Respond(nil)
 		return
 	}
@@ -213,7 +213,7 @@ func (s *NatsAuthController) respond(req micro.Request, userNKey, serverId, user
 	if len(xKey) > 0 {
 		data, err = s.curveKeyPair.Seal(data, xKey)
 		if err != nil {
-			log.Errorln("error encrypting response JWT:", err)
+			s.logger.WithError(err).Errorln("error encrypting response JWT")
 			_ = req.Respond(nil)
 			return
 		}

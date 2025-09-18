@@ -2,83 +2,99 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
-	"github.com/mynaparrot/plugnmeet-server/helpers"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/factory"
-	"github.com/mynaparrot/plugnmeet-server/pkg/routers"
-	"github.com/mynaparrot/plugnmeet-server/version"
-	log "github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v3"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
+
+	"github.com/mynaparrot/plugnmeet-server/helpers"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/factory"
+	"github.com/mynaparrot/plugnmeet-server/pkg/logging"
+	"github.com/mynaparrot/plugnmeet-server/pkg/routers"
+	"github.com/mynaparrot/plugnmeet-server/version"
+	"github.com/sirupsen/logrus"
 )
 
 func main() {
-	cli.VersionPrinter = func(c *cli.Command) {
-		fmt.Printf("%s\n", c.Version)
+	configFile := flag.String("config", "config.yaml", "Configuration file")
+	showVersion := flag.Bool("version", false, "Show version info")
+	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("version: %s\n", version.Version)
+		return
 	}
 
-	app := &cli.Command{
-		Name:        "plugnmeet-server",
-		Usage:       "Scalable, Open source web conference system",
-		Description: "without option will start server",
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:        "config",
-				Usage:       "Configuration file",
-				DefaultText: "config.yaml",
-				Value:       "config.yaml",
-			},
-		},
-		Action:  startServer,
-		Version: version.Version,
-	}
-	err := app.Run(context.Background(), os.Args)
-	if err != nil {
-		log.Fatalln(err)
-	}
+	startServer(*configFile)
 }
 
-func startServer(ctx context.Context, c *cli.Command) error {
-	appCnf, err := helpers.ReadYamlConfigFile(c.String("config"))
-	if err != nil {
-		panic(err)
-	}
-	// set this config for global usage
-	config.New(appCnf)
+func startServer(configFile string) {
+	// 1. Create a context that can be canceled to signal all services to shut down.
+	ctx, cancel := context.WithCancel(context.Background())
 
-	// now prepare our server
-	err = helpers.PrepareServer(config.GetConfig())
+	// 2. Read the main configuration from the YAML file.
+	appCnf, err := helpers.ReadYamlConfigFile(configFile)
 	if err != nil {
-		log.Fatalln(err)
+		logrus.WithError(err).Fatal("Failed to read config file")
 	}
 
-	appFactory, err := factory.NewAppFactory(appCnf)
+	// 3. Initialize the configuration, setting default values and creating necessary directories.
+	appCnf, err = config.New(appCnf)
 	if err != nil {
-		log.Fatalln(err)
+		logrus.WithError(err).Fatal("Failed to initialize config")
 	}
 
-	// boot up some services
+	// 4. Set up the structured logger (logrus) based on the configuration.
+	logger, err := logging.NewLogger(&appCnf.LogSettings)
+	if err != nil {
+		logrus.WithError(err).Fatal("Failed to setup logger")
+	}
+	appCnf.Logger = logger
+
+	// 5. Prepare server dependencies like database, Redis, and NATS connections.
+	err = helpers.PrepareServer(ctx, appCnf)
+	if err != nil {
+		logger.WithError(err).Fatalln("Failed to prepare server")
+	}
+
+	// 6. Use the dependency injection container (wire) to build the main application object,
+	//    which includes all services, models, and controllers.
+	appFactory, err := factory.NewAppFactory(ctx, appCnf)
+	if err != nil {
+		logger.WithError(err).Fatalln("Failed to create app factory")
+	}
+	// 7. Boot up background services (e.g., NATS listeners, janitor for cleanup tasks).
 	appFactory.Boot()
 
-	// defer close connections
-	defer helpers.HandleCloseConnections()
+	// 8. Defer the closing of connections (DB, Redis, NATS) to ensure they are closed gracefully on exit.
+	defer helpers.HandleCloseConnections(appCnf)
 
+	// 9. Create a new Fiber router and register all the application routes.
 	rt := routers.New(appFactory.AppConfig, appFactory.Controllers)
+
+	// 10. Set up a channel to listen for OS signals (like Ctrl+C) for graceful shutdown.
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
+	// 11. Start a goroutine to handle the shutdown process when a signal is received.
 	go func() {
 		sig := <-sigChan
-		log.Infoln("exit requested, shutting down", "signal", sig)
-		_ = rt.Shutdown()
+		logger.WithField("signal", sig).Infoln("Exit requested, attempting graceful shutdown...")
+
+		// Attempt to gracefully shut down the Fiber server, waiting for active connections to finish.
+		if err := rt.ShutdownWithTimeout(15 * time.Second); err != nil {
+			logger.WithError(err).Warn("Graceful shutdown failed, forcing exit.")
+		}
+		// Cancel the context to signal all other parts of the application (like background services) to stop.
+		cancel()
 	}()
 
+	// 12. Start the Fiber web server and listen for incoming HTTP requests. This is a blocking call.
 	err = rt.Listen(fmt.Sprintf(":%d", appCnf.Client.Port))
 	if err != nil {
-		log.Fatalln(err)
+		logger.WithError(err).Fatalln("Failed to start server")
 	}
-	return nil
 }

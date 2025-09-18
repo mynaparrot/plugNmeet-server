@@ -15,16 +15,16 @@ import (
 type UserController struct {
 	AppConfig   *config.AppConfig
 	UserModel   *models.UserModel
-	dbservice   *dbservice.DatabaseService
+	ds          *dbservice.DatabaseService
 	NatsService *natsservice.NatsService
 }
 
 // NewUserController creates a new UserController.
-func NewUserController(appConfig *config.AppConfig, userModel *models.UserModel, dbservice *dbservice.DatabaseService, natsService *natsservice.NatsService) *UserController {
+func NewUserController(appConfig *config.AppConfig, ds *dbservice.DatabaseService, natsService *natsservice.NatsService, userModel *models.UserModel) *UserController {
 	return &UserController{
 		AppConfig:   appConfig,
 		UserModel:   userModel,
-		dbservice:   dbservice,
+		ds:          ds,
 		NatsService: natsService,
 	}
 }
@@ -46,7 +46,7 @@ func (uc *UserController) HandleGenerateJoinToken(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, "this user is blocked to join this session")
 	}
 
-	ri, _ := uc.dbservice.GetRoomInfoByRoomId(req.RoomId, 1)
+	ri, _ := uc.ds.GetRoomInfoByRoomId(req.RoomId, 1)
 	if ri == nil || ri.ID == 0 {
 		return utils.SendCommonProtoJsonResponse(c, false, "room is not active. create room first")
 	}
@@ -87,7 +87,7 @@ func (uc *UserController) HandleUpdateUserLockSetting(c *fiber.Ctx) error {
 
 	// now need to check if meeting is running or not
 	isRunning := 1
-	room, _ := uc.dbservice.GetRoomInfoBySid(req.RoomSid, &isRunning)
+	room, _ := uc.ds.GetRoomInfoBySid(req.RoomSid, &isRunning)
 
 	if room == nil || room.ID == 0 {
 		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
@@ -129,7 +129,7 @@ func (uc *UserController) HandleMuteUnMuteTrack(c *fiber.Ctx) error {
 
 	// now need to check if meeting is running or not
 	isRunning := 1
-	room, _ := uc.dbservice.GetRoomInfoBySid(req.Sid, &isRunning)
+	room, _ := uc.ds.GetRoomInfoBySid(req.Sid, &isRunning)
 	if room == nil || room.ID == 0 {
 		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
 	}
@@ -173,7 +173,7 @@ func (uc *UserController) HandleRemoveParticipant(c *fiber.Ctx) error {
 
 	// now need to check if meeting is running or not
 	isRunning := 1
-	room, _ := uc.dbservice.GetRoomInfoBySid(req.Sid, &isRunning)
+	room, _ := uc.ds.GetRoomInfoBySid(req.Sid, &isRunning)
 	if room == nil || room.ID == 0 {
 		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
 	}

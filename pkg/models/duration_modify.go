@@ -2,7 +2,6 @@ package models
 
 import (
 	"errors"
-	log "github.com/sirupsen/logrus"
 	"reflect"
 	"time"
 )
@@ -15,7 +14,7 @@ type RoomDurationInfo struct {
 func (m *RoomDurationModel) AddRoomWithDurationInfo(roomId string, r *RoomDurationInfo) error {
 	err := m.rs.AddRoomWithDurationInfo(roomId, r)
 	if err != nil {
-		log.Error(err)
+		m.logger.Error(err)
 		return err
 	}
 	return nil

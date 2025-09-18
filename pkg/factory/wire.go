@@ -5,6 +5,7 @@ package factory
 
 import (
 	"context"
+
 	"github.com/google/wire"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
@@ -13,11 +14,8 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/sirupsen/logrus"
 )
-
-func provideContext() context.Context {
-	return context.Background()
-}
 
 // build the dependency set for services
 var serviceSet = wire.NewSet(
@@ -26,6 +24,13 @@ var serviceSet = wire.NewSet(
 	natsservice.New,
 	livekitservice.New,
 )
+
+func provideRoomModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService, natsService *natsservice.NatsService, userModel *models.UserModel, recorderModel *models.RecorderModel, fileModel *models.FileModel, roomDuration *models.RoomDurationModel, etherpadModel *models.EtherpadModel, pollModel *models.PollModel, speechToText *models.SpeechToTextModel, analyticsModel *models.AnalyticsModel, logger *logrus.Logger) *models.RoomModel {
+	rm := models.NewRoomModel(app, ds, rs, lk, natsService, userModel, recorderModel, fileModel, roomDuration, etherpadModel, pollModel, speechToText, analyticsModel, logger)
+	bm := models.NewBreakoutRoomModel(rm, natsService)
+	rm.SetBreakoutRoomModel(bm)
+	return rm
+}
 
 // build the dependency set for models
 var modelSet = wire.NewSet(
@@ -44,8 +49,8 @@ var modelSet = wire.NewSet(
 	models.NewPollModel,
 	models.NewRecorderModel,
 	models.NewRecordingModel,
-	models.NewRoomModel,
-	models.NewSchedulerModel,
+	provideRoomModel,
+	models.NewJanitorModel,
 	models.NewSpeechToTextModel,
 	models.NewUserModel,
 	models.NewWaitingRoomModel,
@@ -58,6 +63,7 @@ var controllerSet = wire.NewSet(
 	controllers.NewAuthController,
 	controllers.NewBBBController,
 	controllers.NewBreakoutRoomController,
+	controllers.NewHealthCheckController,
 	controllers.NewEtherpadController,
 	controllers.NewExDisplayController,
 	controllers.NewExMediaController,
@@ -76,14 +82,13 @@ var controllerSet = wire.NewSet(
 )
 
 // NewAppFactory is the injector function that wire will implement.
-func NewAppFactory(appConfig *config.AppConfig) (*Application, error) {
+func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Application, error) {
 	wire.Build(
-		provideContext,
 		serviceSet,
 		modelSet,
 		controllerSet,
-		// Provide only the fields that are directly used by constructors.
-		wire.FieldsOf(new(*config.AppConfig), "DB", "RDS"),
+		// Provide the whole AppConfig, and also specific fields needed by constructors.
+		wire.FieldsOf(new(*config.AppConfig), "DB", "RDS", "Logger"),
 
 		wire.Struct(new(ApplicationServices), "*"),
 		wire.Struct(new(ApplicationModels), "*"),

@@ -2,7 +2,9 @@ package redisservice
 
 import (
 	"context"
+
 	"github.com/redis/go-redis/v9"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -10,13 +12,17 @@ const (
 )
 
 type RedisService struct {
-	rc  *redis.Client
-	ctx context.Context
+	rc               *redis.Client
+	ctx              context.Context
+	unlockScriptExec *redis.Script
+	logger           *logrus.Entry
 }
 
-func New(rc *redis.Client) *RedisService {
+func New(rc *redis.Client, logger *logrus.Logger) *RedisService {
 	return &RedisService{
-		rc:  rc,
-		ctx: context.Background(),
+		rc:               rc,
+		ctx:              context.Background(),
+		unlockScriptExec: redis.NewScript(unlockScript),
+		logger:           logger.WithField("service", "redis"),
 	}
 }

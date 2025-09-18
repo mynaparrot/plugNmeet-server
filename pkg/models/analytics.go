@@ -1,38 +1,32 @@
 package models
 
 import (
-	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
-	"sync"
+	"github.com/sirupsen/logrus"
+)
+
+const (
+	analyticsRoomKey = redisservice.Prefix + "analytics:%s"
+	analyticsUserKey = analyticsRoomKey + ":user:%s"
 )
 
 type AnalyticsModel struct {
-	sync.RWMutex
-	data        *plugnmeet.AnalyticsDataMsg
 	app         *config.AppConfig
 	ds          *dbservice.DatabaseService
 	rs          *redisservice.RedisService
 	natsService *natsservice.NatsService
+	logger      *logrus.Entry
 }
 
-func NewAnalyticsModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *AnalyticsModel {
-	if app == nil {
-		app = config.GetConfig()
-	}
-	if ds == nil {
-		ds = dbservice.New(app.DB)
-	}
-	if rs == nil {
-		rs = redisservice.New(app.RDS)
-	}
-
+func NewAnalyticsModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, logger *logrus.Logger) *AnalyticsModel {
 	return &AnalyticsModel{
-		app:         config.GetConfig(),
+		app:         app,
 		ds:          ds,
 		rs:          rs,
-		natsService: natsservice.New(app),
+		natsService: natsService,
+		logger:      logger.WithField("model", "analytics"),
 	}
 }

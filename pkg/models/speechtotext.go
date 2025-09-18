@@ -1,15 +1,16 @@
 package models
 
 import (
+	"strconv"
+	"time"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
-	log "github.com/sirupsen/logrus"
-	"strconv"
-	"time"
+	"github.com/sirupsen/logrus"
 )
 
 type SpeechToTextModel struct {
@@ -19,26 +20,18 @@ type SpeechToTextModel struct {
 	analyticsModel  *AnalyticsModel
 	webhookNotifier *helpers.WebhookNotifier
 	natsService     *natsservice.NatsService
+	logger          *logrus.Entry
 }
 
-func NewSpeechToTextModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *SpeechToTextModel {
-	if app == nil {
-		app = config.GetConfig()
-	}
-	if ds == nil {
-		ds = dbservice.New(app.DB)
-	}
-	if rs == nil {
-		rs = redisservice.New(app.RDS)
-	}
-
+func NewSpeechToTextModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, analyticsModel *AnalyticsModel, logger *logrus.Logger) *SpeechToTextModel {
 	return &SpeechToTextModel{
 		app:             app,
 		ds:              ds,
 		rs:              rs,
-		analyticsModel:  NewAnalyticsModel(app, ds, rs),
-		webhookNotifier: helpers.GetWebhookNotifier(app),
-		natsService:     natsservice.New(app),
+		analyticsModel:  analyticsModel,
+		webhookNotifier: helpers.GetWebhookNotifier(app, logger),
+		natsService:     natsService,
+		logger:          logger.WithField("model", "speech_to_text"),
 	}
 }
 
@@ -61,7 +54,7 @@ func (m *SpeechToTextModel) sendToWebhookNotifier(rId, rSid string, userId *stri
 	}
 	err := n.SendWebhookEvent(msg)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.Errorln(err)
 	}
 }
 

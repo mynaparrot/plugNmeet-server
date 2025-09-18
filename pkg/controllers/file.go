@@ -2,30 +2,33 @@ package controllers
 
 import (
 	"fmt"
+	"net/url"
+	"strconv"
+	"strings"
+
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
-	"net/url"
-	"strconv"
-	"strings"
 )
 
 // FileController holds dependencies for file-related handlers.
 type FileController struct {
 	AppConfig *config.AppConfig
 	FileModel *models.FileModel
+	logger    *logrus.Entry
 }
 
 // NewFileController creates a new FileController.
-func NewFileController(config *config.AppConfig, fm *models.FileModel) *FileController {
+func NewFileController(config *config.AppConfig, fm *models.FileModel, logger *logrus.Logger) *FileController {
 	return &FileController{
 		AppConfig: config,
 		FileModel: fm,
+		logger:    logger.WithField("controller", "file"),
 	}
 }
 
@@ -169,12 +172,12 @@ func (fc *FileController) HandleGetClientFiles(c *fiber.Ctx) error {
 		var err error
 		css, err = utils.GetFilesFromDir(fc.AppConfig.Client.Path+"/assets/css", ".css", "des")
 		if err != nil {
-			log.Errorln(err)
+			fc.logger.WithError(err).Errorln("error getting css files")
 		}
 
 		js, err = utils.GetFilesFromDir(fc.AppConfig.Client.Path+"/assets/js", ".js", "asc")
 		if err != nil {
-			log.Errorln(err)
+			fc.logger.WithError(err).Errorln("error getting js files")
 		}
 	} else {
 		css = fc.AppConfig.ClientFiles["css"]

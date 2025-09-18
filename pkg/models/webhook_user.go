@@ -1,22 +1,34 @@
 package models
 
 import (
-	"fmt"
+	"strings"
+
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	log "github.com/sirupsen/logrus"
-	"strings"
+	"github.com/sirupsen/logrus"
 )
 
 func (m *WebhookModel) participantJoined(event *livekit.WebhookEvent) {
-	if event.Room == nil {
-		log.Warnln(fmt.Sprintf("invalid webhook info received: %+v", event))
+	if event.Room == nil || event.Participant == nil {
+		m.logger.Warnln("received participant_joined webhook with nil room or participant info")
 		return
 	}
 
+	log := m.logger.WithFields(logrus.Fields{
+		"roomId":        event.Room.Name,
+		"participantId": event.Participant.Identity,
+		"event":         event.GetEvent(),
+	})
+	log.Infoln("handling participant_joined webhook")
+
 	rInfo, err := m.natsService.GetRoomInfo(event.Room.Name)
-	if err != nil || rInfo == nil {
+	if err != nil {
+		log.WithError(err).Errorln("failed to get room info from NATS")
+		return
+	}
+	if rInfo == nil {
+		log.Warnln("room not found in NATS, skipping participant_joined tasks")
 		return
 	}
 
@@ -27,28 +39,41 @@ func (m *WebhookModel) participantJoined(event *livekit.WebhookEvent) {
 
 	_, err = m.ds.IncrementOrDecrementNumParticipants(rInfo.RoomSid, "+")
 	if err != nil {
-		log.Errorln(err)
+		log.WithError(err).Errorln("error incrementing num participants")
 	}
 
 	if strings.HasPrefix(event.Participant.Identity, config.IngressUserIdPrefix) {
 		// if user was ingress user then we'll have to do it manually
 		// because that user will not use plugNmeet client interface
-		nm := NewNatsModel(m.app, m.ds, m.rs)
-		nm.OnAfterUserJoined(event.Room.Name, event.Participant.Identity)
+		log.Info("ingress participant joined, triggering OnAfterUserJoined manually")
+		m.nm.OnAfterUserJoined(event.Room.Name, event.Participant.Identity)
 	}
 
 	// webhook notification
 	m.sendToWebhookNotifier(event)
+	log.Info("successfully processed participant_joined webhook")
 }
 
 func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
-	if event.Room == nil {
-		log.Warnln(fmt.Sprintf("invalid webhook info received: %+v", event))
+	if event.Room == nil || event.Participant == nil {
+		m.logger.Warnln("received participant_left webhook with nil room or participant info")
 		return
 	}
 
+	log := m.logger.WithFields(logrus.Fields{
+		"roomId":        event.Room.Name,
+		"participantId": event.Participant.Identity,
+		"event":         event.GetEvent(),
+	})
+	log.Infoln("handling participant_left webhook")
+
 	rInfo, err := m.natsService.GetRoomInfo(event.Room.Name)
-	if err != nil || rInfo == nil {
+	if err != nil {
+		log.WithError(err).Errorln("failed to get room info from NATS")
+		return
+	}
+	if rInfo == nil {
+		log.Warnln("room not found in NATS, skipping participant_left tasks")
 		return
 	}
 
@@ -59,14 +84,14 @@ func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 
 	_, err = m.ds.IncrementOrDecrementNumParticipants(rInfo.RoomSid, "-")
 	if err != nil {
-		log.Errorln(err)
+		log.WithError(err).Errorln("error decrementing num participants")
 	}
 
 	if strings.HasPrefix(event.Participant.Identity, config.IngressUserIdPrefix) {
 		// if user was ingress user then we'll have to do it manually
 		// because that user did not use plugNmeet client interface
-		nm := NewNatsModel(m.app, m.ds, m.rs)
-		nm.OnAfterUserDisconnected(event.Room.Name, event.Participant.Identity)
+		log.Info("ingress participant left, triggering OnAfterUserDisconnected manually")
+		m.nm.OnAfterUserDisconnected(event.Room.Name, event.Participant.Identity)
 	}
 
 	// webhook notification
@@ -74,6 +99,6 @@ func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 
 	// if we missed calculating this user's speech service usage stat
 	// for sudden disconnection
-	sm := NewSpeechToTextModel(m.app, m.ds, m.rs)
-	_ = sm.SpeechServiceUsersUsage(rInfo.RoomId, rInfo.RoomSid, event.Participant.Identity, plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED)
+	_ = m.sm.SpeechServiceUsersUsage(rInfo.RoomId, rInfo.RoomSid, event.Participant.Identity, plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED)
+	log.Info("successfully processed participant_left webhook")
 }

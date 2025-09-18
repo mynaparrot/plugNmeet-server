@@ -4,6 +4,7 @@ go 1.25.1
 
 require (
 	buf.build/go/protovalidate v1.0.0
+	github.com/DeRuina/timberjack v1.3.6
 	github.com/ansrivas/fiberprometheus/v2 v2.14.0
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/gabriel-vasile/mimetype v1.4.10
@@ -23,9 +24,7 @@ require (
 	github.com/redis/go-redis/v9 v9.14.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.11.1
-	github.com/urfave/cli/v3 v3.4.1
 	google.golang.org/protobuf v1.36.9
-	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/mysql v1.6.0
 	gorm.io/gorm v1.31.0

@@ -1,39 +1,35 @@
 package models
 
 import (
-	"errors"
+	"fmt"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/sirupsen/logrus"
 )
 
 type ExDisplayModel struct {
-	app         *config.AppConfig
-	ds          *dbservice.DatabaseService
-	rs          *redisservice.RedisService
-	lk          *livekitservice.LivekitService
-	natsService *natsservice.NatsService
+	app            *config.AppConfig
+	ds             *dbservice.DatabaseService
+	rs             *redisservice.RedisService
+	lk             *livekitservice.LivekitService
+	natsService    *natsservice.NatsService
+	analyticsModel *AnalyticsModel
+	logger         *logrus.Entry
 }
 
-func NewExDisplayModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *ExDisplayModel {
-	if app == nil {
-		app = config.GetConfig()
-	}
-	if ds == nil {
-		ds = dbservice.New(app.DB)
-	}
-	if rs == nil {
-		rs = redisservice.New(app.RDS)
-	}
-
+func NewExDisplayModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, analyticsModel *AnalyticsModel, logger *logrus.Logger) *ExDisplayModel {
 	return &ExDisplayModel{
-		app:         app,
-		ds:          ds,
-		rs:          rs,
-		natsService: natsservice.New(app),
+		app:            app,
+		ds:             ds,
+		rs:             rs,
+		natsService:    natsService,
+		analyticsModel: analyticsModel,
+		logger:         logger.WithField("model", "external-display"),
 	}
 }
 
@@ -45,5 +41,5 @@ func (m *ExDisplayModel) HandleTask(req *plugnmeet.ExternalDisplayLinkReq) error
 		return m.end(req)
 	}
 
-	return errors.New("not valid request")
+	return fmt.Errorf("not valid request")
 }

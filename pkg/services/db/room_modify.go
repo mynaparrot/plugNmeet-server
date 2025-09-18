@@ -1,9 +1,10 @@
 package dbservice
 
 import (
+	"time"
+
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"gorm.io/gorm"
-	"time"
 )
 
 // InsertOrUpdateRoomInfo will insert if sid do not duplicate

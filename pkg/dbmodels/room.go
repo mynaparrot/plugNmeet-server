@@ -1,8 +1,9 @@
 package dbmodels
 
 import (
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"time"
+
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
 type RoomInfo struct {
@@ -26,5 +27,5 @@ type RoomInfo struct {
 }
 
 func (m *RoomInfo) TableName() string {
-	return config.GetConfig().FormatDBTable("room_info")
+	return config.FormatDBTable("room_info")
 }

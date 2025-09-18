@@ -2,11 +2,12 @@ package natsservice
 
 import (
 	"context"
-	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	log "github.com/sirupsen/logrus"
 	"strconv"
 	"sync"
+
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -32,6 +33,7 @@ type NatsCacheService struct {
 	// Global context for all long-lived watchers in this service
 	serviceCtx    context.Context
 	serviceCancel context.CancelFunc
+	logger        *logrus.Entry
 
 	roomLock       sync.RWMutex
 	roomsInfoStore map[string]CachedRoomEntry
@@ -41,11 +43,8 @@ type NatsCacheService struct {
 	roomUsersInfoStore   map[string]map[string]CachedUserInfoEntry
 }
 
-func InitNatsCacheService(app *config.AppConfig) {
+func InitNatsCacheService(app *config.AppConfig, log *logrus.Logger) {
 	initCacheOnce.Do(func() {
-		if app == nil {
-			app = config.GetConfig()
-		}
 		if app.JetStream == nil {
 			log.Fatal("NATS JetStream not provided to InitNatsCacheService")
 		}
@@ -57,23 +56,24 @@ func InitNatsCacheService(app *config.AppConfig) {
 			roomsInfoStore:       make(map[string]CachedRoomEntry),
 			roomUsersStatusStore: make(map[string]map[string]CachedRoomUserStatusEntry),
 			roomUsersInfoStore:   make(map[string]map[string]CachedUserInfoEntry),
+			logger:               log.WithField("sub-service", "nats-cache"),
 		}
 	})
 }
 
 // GetNatsCacheService returns the singleton instance.
-func GetNatsCacheService(app *config.AppConfig) *NatsCacheService {
+func GetNatsCacheService(app *config.AppConfig, logger *logrus.Logger) *NatsCacheService {
 	if defaultNatsCacheService == nil {
-		InitNatsCacheService(app)
+		InitNatsCacheService(app, logger)
 	}
 	return defaultNatsCacheService
 }
 
 // Shutdown gracefully stops all watchers.
 func (ncs *NatsCacheService) Shutdown() {
-	log.Info("Shutting down NATS Cache Service...")
+	ncs.logger.Info("Shutting down NATS Cache Service...")
 	ncs.serviceCancel() // Signals all watchers started with ncs.serviceCtx to stop
-	log.Info("NATS Cache Service shutdown complete.")
+	ncs.logger.Info("NATS Cache Service shutdown complete.")
 }
 
 func (ncs *NatsCacheService) convertTextToUint64(text string) uint64 {

@@ -1,33 +1,36 @@
 package models
 
 import (
-	"fmt"
+	"time"
+
 	"github.com/goccy/go-json"
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
-	"time"
 )
 
 func (m *PollModel) CreatePoll(r *plugnmeet.CreatePollReq) (string, error) {
-	r.PollId = uuid.NewString()
+	log := m.logger.WithFields(logrus.Fields{
+		"roomId": r.RoomId,
+		"userId": r.UserId,
+		"method": "CreatePoll",
+	})
+	log.Infoln("request to create poll")
 
-	// first add to room
+	r.PollId = uuid.NewString()
+	log = log.WithField("pollId", r.PollId)
+
+	// create poll hash and add to room
 	err := m.createRoomPollHash(r)
 	if err != nil {
-		return "", err
-	}
-
-	// now create empty respondent hash
-	err = m.createRespondentHash(r)
-	if err != nil {
+		log.WithError(err).Errorln("failed to create room poll hash")
 		return "", err
 	}
 
 	err = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_POLL_CREATED, r.RoomId, r.PollId, r.UserId)
 	if err != nil {
-		log.Errorln(err)
+		log.WithError(err).Errorln("error sending POLL_CREATED event")
 	}
 
 	// send analytics
@@ -42,7 +45,7 @@ func (m *PollModel) CreatePoll(r *plugnmeet.CreatePollReq) (string, error) {
 	}
 	marshal, err := json.Marshal(toRecord)
 	if err != nil {
-		log.Errorln(err)
+		log.WithError(err).Errorln("failed to marshal analytics data")
 	}
 	val := string(marshal)
 	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
@@ -52,6 +55,7 @@ func (m *PollModel) CreatePoll(r *plugnmeet.CreatePollReq) (string, error) {
 		HsetValue: &val,
 	})
 
+	log.Info("successfully created poll")
 	return r.PollId, nil
 }
 
@@ -78,24 +82,18 @@ func (m *PollModel) createRoomPollHash(r *plugnmeet.CreatePollReq) error {
 	return m.rs.CreateRoomPoll(r.RoomId, pollVal)
 }
 
-// createRespondentHash will create initial hash
-// format for all_respondents array value = userId:option_id
-func (m *PollModel) createRespondentHash(r *plugnmeet.CreatePollReq) error {
-	v := make(map[string]interface{})
-	v["total_resp"] = 0
-	v["all_respondents"] = nil
-
-	for _, o := range r.Options {
-		c := fmt.Sprintf("%d_count", o.Id)
-		v[c] = 0
-	}
-
-	return m.rs.CreatePollResponseHash(r.RoomId, r.PollId, v)
-}
-
 func (m *PollModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq) error {
+	log := m.logger.WithFields(logrus.Fields{
+		"roomId": r.RoomId,
+		"userId": r.UserId,
+		"pollId": r.PollId,
+		"method": "UserSubmitResponse",
+	})
+	log.Infoln("request to submit poll response")
+
 	err := m.rs.AddPollResponse(r)
 	if err != nil {
+		log.WithError(err).Errorln("failed to add poll response to redis")
 		return err
 	}
 
@@ -109,7 +107,7 @@ func (m *PollModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq) error
 	}
 	marshal, err := json.Marshal(toRecord)
 	if err != nil {
-		log.Errorln(err)
+		log.WithError(err).Errorln("failed to marshal analytics data")
 	}
 	val := string(marshal)
 	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
@@ -120,5 +118,6 @@ func (m *PollModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq) error
 		HsetValue: &val,
 	})
 
+	log.Info("successfully submitted poll response")
 	return nil
 }

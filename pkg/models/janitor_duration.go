@@ -2,21 +2,22 @@ package models
 
 import (
 	"context"
-	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"time"
+
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 )
 
-func (m *SchedulerModel) checkRoomWithDuration() {
-	locked := m.rs.IsSchedulerTaskLock("checkRoomWithDuration")
+func (m *JanitorModel) checkRoomWithDuration() {
+	locked := m.rs.IsJanitorTaskLock("checkRoomWithDuration")
 	if locked {
 		// if lock then we will not perform here
 		return
 	}
 
 	// now set lock
-	_ = m.rs.LockSchedulerTask("checkRoomWithDuration", time.Minute*1)
+	m.rs.LockJanitorTask("checkRoomWithDuration", time.Minute*1)
 	// clean at the end
-	defer m.rs.UnlockSchedulerTask("checkRoomWithDuration")
+	defer m.rs.UnlockJanitorTask("checkRoomWithDuration")
 
 	rooms := m.rmDuration.GetRoomsWithDurationMap()
 	for i, r := range rooms {

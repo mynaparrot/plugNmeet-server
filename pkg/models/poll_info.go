@@ -3,11 +3,13 @@ package models
 import (
 	"errors"
 	"fmt"
-	"github.com/goccy/go-json"
-	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"google.golang.org/protobuf/encoding/protojson"
 	"strconv"
 	"strings"
+
+	"github.com/goccy/go-json"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func (m *PollModel) ListPolls(roomId string) ([]*plugnmeet.PollInfo, error) {
@@ -37,43 +39,49 @@ func (m *PollModel) ListPolls(roomId string) ([]*plugnmeet.PollInfo, error) {
 }
 
 func (m *PollModel) UserSelectedOption(roomId, pollId, userId string) (uint64, error) {
-	allRespondents, err := m.rs.GetPollResponsesByField(roomId, pollId, "all_respondents")
+	allRespondents, err := m.rs.GetPollAllRespondents(roomId, pollId)
 	if err != nil {
 		return 0, err
 	}
 
-	if allRespondents == "" {
-		return 0, err
-	}
-
-	var respondents []string
-	err = json.Unmarshal([]byte(allRespondents), &respondents)
-	if err != nil {
-		return 0, err
-	}
-
-	for i := 0; i < len(respondents); i++ {
+	for i := 0; i < len(allRespondents); i++ {
 		// format userId:option_id:name
-		p := strings.Split(respondents[i], ":")
+		p := strings.Split(allRespondents[i], ":")
 		if p[0] == userId {
 			voted, err := strconv.ParseUint(p[1], 10, 64)
 			if err != nil {
 				return 0, err
 			}
-			return voted, err
+			return voted, nil
 		}
 	}
 
+	// user did not vote
 	return 0, nil
 }
 
 func (m *PollModel) GetPollResponsesDetails(roomId, pollId string) (map[string]string, error) {
-	result, err := m.rs.GetPollResponsesByPollId(roomId, pollId)
+	// Get the counters first
+	result, err := m.rs.GetPollCountersByPollId(roomId, pollId)
 	if err != nil {
 		return nil, err
 	}
+	if result == nil {
+		result = make(map[string]string)
+	}
 
-	if result == nil || len(result) < 0 {
+	// Now get the detailed list of respondents
+	allRespondents, err := m.rs.GetPollAllRespondents(roomId, pollId)
+	if err != nil {
+		// Log the error but continue, as we might still have the counters
+		m.logger.WithError(err).Warn("could not fetch all_respondents list")
+	}
+
+	// Marshal the list into a JSON string to match the original output format
+	jsonRespondents, _ := json.Marshal(allRespondents)
+	result["all_respondents"] = string(jsonRespondents)
+
+	if len(result) == 0 {
 		return nil, nil
 	}
 
@@ -98,7 +106,7 @@ func (m *PollModel) GetResponsesResult(roomId, pollId string) (*plugnmeet.PollRe
 	res := new(plugnmeet.PollResponsesResult)
 	res.Question = info.Question
 
-	result, err := m.rs.GetPollResponsesByPollId(roomId, pollId)
+	result, err := m.rs.GetPollCountersByPollId(roomId, pollId)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +116,7 @@ func (m *PollModel) GetResponsesResult(roomId, pollId string) (*plugnmeet.PollRe
 
 	var options []*plugnmeet.PollResponsesResultOptions
 	for _, opt := range info.Options {
-		f := fmt.Sprintf("%d_count", opt.Id)
+		f := fmt.Sprintf("%d%s", opt.Id, redisservice.PollCountSuffix)
 		i, _ := strconv.Atoi(result[f])
 		rr := &plugnmeet.PollResponsesResultOptions{
 			Id:        uint64(opt.Id),
@@ -119,7 +127,7 @@ func (m *PollModel) GetResponsesResult(roomId, pollId string) (*plugnmeet.PollRe
 	}
 
 	res.Options = options
-	i, _ := strconv.Atoi(result["total_resp"])
+	i, _ := strconv.Atoi(result[redisservice.PollTotalRespField])
 	res.TotalResponses = uint64(i)
 
 	return res, nil

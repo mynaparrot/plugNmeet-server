@@ -14,5 +14,5 @@ type Analytics struct {
 }
 
 func (m *Analytics) TableName() string {
-	return config.GetConfig().FormatDBTable("room_analytics")
+	return config.FormatDBTable("room_analytics")
 }

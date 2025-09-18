@@ -3,22 +3,25 @@ package models
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
-	log "github.com/sirupsen/logrus"
-	"time"
+	"github.com/sirupsen/logrus"
 )
 
 // EndRoom now accepts context and userIDForLog
 func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool, string) {
 	roomID := r.GetRoomId()
-	if errWait := waitUntilRoomCreationCompletes(ctx, m.rs, roomID); errWait != nil {
-		log.WithFields(log.Fields{"roomId": roomID}).Errorf("Cannot end room: %v", errWait)
+	log := m.logger.WithField("roomId", roomID)
+
+	if errWait := waitUntilRoomCreationCompletes(ctx, m.rs, roomID, m.logger); errWait != nil {
+		log.WithError(errWait).Error("Cannot end room as it's locked")
 		return false, fmt.Sprintf("Failed to end room: %s", errWait.Error())
 	}
-	log.WithFields(log.Fields{"roomId": roomID}).Info("Proceeding to end room.")
+	log.Info("Proceeding to end room")
 
 	roomDbInfo, err := m.ds.GetRoomInfoByRoomId(roomID, 1)
 	if err != nil {
@@ -30,10 +33,10 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 
 	info, err := m.natsService.GetRoomInfo(roomID)
 	if err != nil {
-		log.WithFields(log.Fields{"roomId": roomID}).Warnf("NATS GetRoomInfo failed during EndRoom: %v. Proceeding with DB cleanup.", err)
+		log.WithError(err).Warn("NATS GetRoomInfo failed during EndRoom. Proceeding with DB cleanup.")
 	}
 	if info == nil && roomDbInfo.IsRunning == 1 {
-		log.WithFields(log.Fields{"roomId": roomID}).Warn("Room active in DB but not in NATS during EndRoom. Marking as ended and cleaning up.")
+		log.Warn("Room active in DB but not in NATS during EndRoom. Marking as ended and cleaning up.")
 		go m.OnAfterRoomEnded(ctx, roomDbInfo.RoomId, roomDbInfo.Sid, "") // Metadata might be empty
 		return true, "room ended (NATS info was missing, cleanup initiated)"
 	}
@@ -43,17 +46,17 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 
 	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SESSION_ENDED, roomID, "notifications.room-disconnected-room-ended", nil)
 	if err != nil {
-		log.Errorln(err)
+		log.WithError(err).Error("error sending session ended notification message")
 	}
 
 	if info.Status != natsservice.RoomStatusEnded {
 		err = m.natsService.UpdateRoomStatus(roomID, natsservice.RoomStatusEnded)
 		if err != nil {
-			log.Errorln(err)
+			log.WithError(err).Error("error updating room status")
 		}
 		_, err = m.lk.EndRoom(roomID)
 		if err != nil {
-			log.Errorln(err)
+			log.WithError(err).Error("error ending room in livekit")
 		}
 	}
 	go m.OnAfterRoomEnded(ctx, info.RoomId, info.RoomSid, info.Metadata)
@@ -61,32 +64,37 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 }
 
 func (m *RoomModel) OnAfterRoomEnded(ctx context.Context, roomID, roomSID, metadata string) {
-	log.WithFields(log.Fields{"roomId": roomID, "roomSid": roomSID, "operation": "OnAfterRoomEnded"}).Info("Starting cleanup.")
+	log := m.logger.WithFields(logrus.Fields{
+		"roomId":    roomID,
+		"roomSid":   roomSID,
+		"operation": "OnAfterRoomEnded",
+	})
+	log.Info("Starting cleanup")
 
 	cleanupLockTTL := config.WaitBeforeTriggerOnAfterRoomEnded + (time.Second * 10)
 	lockAcquired, lockVal, errLock := m.rs.LockRoomCreation(ctx, roomID, cleanupLockTTL)
 
 	if errLock != nil {
-		log.WithFields(log.Fields{"roomId": roomID, "operation": "OnAfterRoomEnded"}).Errorf("Redis error acquiring cleanup lock: %v. Cleanup might be incomplete.", errLock)
+		log.WithError(errLock).Error("Redis error acquiring cleanup lock. Cleanup might be incomplete.")
 	} else if !lockAcquired {
-		log.WithFields(log.Fields{"roomId": roomID, "operation": "OnAfterRoomEnded"}).Warn("Could not acquire cleanup lock. Cleanup might be incomplete.")
+		log.Warn("Could not acquire cleanup lock. Cleanup might be incomplete.")
 	}
 	if lockAcquired {
-		log.WithFields(log.Fields{"roomId": roomID, "lockVal": lockVal, "operation": "OnAfterRoomEnded"}).Info("Cleanup lock acquired.")
+		log.WithField("lockVal", lockVal).Info("Cleanup lock acquired")
 		defer func() {
 			unlockCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			if err := m.rs.UnlockRoomCreation(unlockCtx, roomID, lockVal); err != nil {
-				log.WithFields(log.Fields{"roomId": roomID, "lockVal": lockVal, "operation": "OnAfterRoomEnded"}).Errorf("Error releasing cleanup lock: %v", err)
+				log.WithField("lockVal", lockVal).WithError(err).Error("Error releasing cleanup lock")
 			} else {
-				log.WithFields(log.Fields{"roomId": roomID, "lockVal": lockVal, "operation": "OnAfterRoomEnded"}).Info("Cleanup lock released.")
+				log.WithField("lockVal", lockVal).Info("Cleanup lock released")
 			}
 		}()
 	}
 
 	_, err := m.ds.UpdateRoomStatus(&dbmodels.RoomInfo{RoomId: roomID, IsRunning: 0})
 	if err != nil {
-		log.WithFields(log.Fields{"roomId": roomID, "operation": "OnAfterRoomEnded"}).Errorf("DB error updating status: %v", err)
+		log.WithError(err).Error("DB error updating status")
 	}
 
 	done := make(chan struct{})
@@ -96,12 +104,12 @@ func (m *RoomModel) OnAfterRoomEnded(ctx context.Context, roomID, roomSID, metad
 		for {
 			select {
 			case <-waitCtx.Done():
-				log.WithFields(log.Fields{"roomId": roomID, "operation": "OnAfterRoomEnded.userDisconnectWait"}).Warnf("Wait cancelled/timed out: %v", waitCtx.Err())
+				log.WithField("subOperation", "userDisconnectWait").WithError(waitCtx.Err()).Warn("Wait cancelled/timed out")
 				close(done)
 				return
 			default:
 				if m.areAllUsersDisconnected(roomID) {
-					log.WithFields(log.Fields{"roomId": roomID, "operation": "OnAfterRoomEnded.userDisconnectWait"}).Info("All users disconnected.")
+					log.WithField("subOperation", "userDisconnectWait").Info("All users disconnected")
 					close(done)
 					return
 				}
@@ -111,53 +119,45 @@ func (m *RoomModel) OnAfterRoomEnded(ctx context.Context, roomID, roomSID, metad
 	}()
 	select {
 	case <-done:
-		log.WithFields(log.Fields{"roomId": roomID, "operation": "OnAfterRoomEnded"}).Info("Proceeding with cleanup after user disconnect.")
+		log.Info("Proceeding with cleanup after user disconnect")
 	case <-waitCtx.Done():
-		log.WithFields(log.Fields{"roomId": roomID, "operation": "OnAfterRoomEnded"}).Warn("Timeout waiting for all users to disconnect (fallback).")
+		log.Warn("Timeout waiting for all users to disconnect (fallback)")
 	}
 
 	m.natsService.DeleteRoomUsersBlockList(roomID)
 
-	recorderModel := NewRecorderModel(m.app, m.ds, m.rs)
-	if err = recorderModel.SendMsgToRecorder(&plugnmeet.RecordingReq{Task: plugnmeet.RecordingTasks_STOP, Sid: roomSID, RoomId: roomID}); err != nil {
-		log.WithFields(log.Fields{"roomId": roomID, "roomSid": roomSID}).Errorf("Error sending stop to recorder: %v", err)
+	if err = m.recorderModel.SendMsgToRecorder(&plugnmeet.RecordingReq{Task: plugnmeet.RecordingTasks_STOP, Sid: roomSID, RoomId: roomID}); err != nil {
+		log.WithError(err).Error("Error sending stop to recorder")
 	}
 
 	if !m.app.UploadFileSettings.KeepForever {
-		fileM := NewFileModel(m.app, m.ds, m.natsService)
-		if err = fileM.DeleteRoomUploadedDir(roomSID); err != nil {
-			log.WithFields(log.Fields{"roomId": roomID, "roomSid": roomSID}).Errorf("Error deleting uploads: %v", err)
+		if err = m.fileModel.DeleteRoomUploadedDir(roomSID); err != nil {
+			log.WithError(err).Error("Error deleting uploads")
 		}
 	}
 
-	rmDuration := NewRoomDurationModel(m.app, m.rs)
-	if err = rmDuration.DeleteRoomWithDuration(roomID); err != nil {
-		log.WithFields(log.Fields{"roomId": roomID}).Errorf("Error deleting room duration: %v", err)
+	if err = m.roomDuration.DeleteRoomWithDuration(roomID); err != nil {
+		log.WithError(err).Error("Error deleting room duration")
 	}
 
-	em := NewEtherpadModel(m.app, m.ds, m.rs)
-	_ = em.CleanAfterRoomEnd(roomID, metadata)
+	_ = m.etherpadModel.CleanAfterRoomEnd(roomID, metadata)
 
-	pm := NewPollModel(m.app, m.ds, m.rs)
-	if err = pm.CleanUpPolls(roomID); err != nil {
-		log.WithFields(log.Fields{"roomId": roomID}).Errorf("Error cleaning polls: %v", err)
+	if err = m.pollModel.CleanUpPolls(roomID); err != nil {
+		log.WithError(err).Error("Error cleaning polls")
 	}
 
-	bm := NewBreakoutRoomModel(m.app, m.ds, m.rs)
-	if err = bm.PostTaskAfterRoomEndWebhook(ctx, roomID, metadata); err != nil {
-		log.WithFields(log.Fields{"roomId": roomID}).Errorf("Error in breakout room post-end task: %v", err)
+	if err = m.breakoutModel.PostTaskAfterRoomEndWebhook(ctx, roomID, metadata); err != nil {
+		log.WithError(err).Error("Error in breakout room post-end task")
 	}
 
-	sm := NewSpeechToTextModel(m.app, m.ds, m.rs)
-	if err = sm.OnAfterRoomEnded(roomID, roomSID); err != nil {
-		log.WithFields(log.Fields{"roomId": roomID, "roomSid": roomSID}).Errorf("Error in speech service cleanup: %v", err)
+	if err = m.speechToText.OnAfterRoomEnded(roomID, roomSID); err != nil {
+		log.WithError(err).Error("Error in speech service cleanup")
 	}
 
 	m.natsService.OnAfterSessionEndCleanup(roomID)
-	log.WithFields(log.Fields{"roomId": roomID, "operation": "OnAfterRoomEnded"}).Info("Room has been cleaned properly.")
+	log.Info("Room has been cleaned properly")
 
-	analyticsModel := NewAnalyticsModel(m.app, m.ds, m.rs)
-	analyticsModel.PrepareToExportAnalytics(roomID, roomSID, metadata)
+	m.analyticsModel.PrepareToExportAnalytics(roomID, roomSID, metadata)
 }
 
 // Helper function to check if all users are disconnected

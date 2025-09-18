@@ -6,7 +6,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -14,34 +14,23 @@ type NatsModel struct {
 	app            *config.AppConfig
 	ds             *dbservice.DatabaseService
 	rs             *redisservice.RedisService
-	analytics      *AnalyticsModel
 	authModel      *AuthModel
 	natsService    *natsservice.NatsService
 	userModel      *UserModel
 	analyticsModel *AnalyticsModel
+	logger         *logrus.Entry
 }
 
-func NewNatsModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *NatsModel {
-	if app == nil {
-		app = config.GetConfig()
-	}
-	if ds == nil {
-		ds = dbservice.New(app.DB)
-	}
-	if rs == nil {
-		rs = redisservice.New(app.RDS)
-	}
-	natsService := natsservice.New(app)
-
+func NewNatsModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, analyticsModel *AnalyticsModel, authModel *AuthModel, userModel *UserModel, logger *logrus.Logger) *NatsModel {
 	return &NatsModel{
 		app:            app,
 		ds:             ds,
 		rs:             rs,
-		analytics:      NewAnalyticsModel(app, ds, rs),
-		authModel:      NewAuthModel(app, natsService),
 		natsService:    natsService,
-		userModel:      NewUserModel(app, ds, rs),
-		analyticsModel: NewAnalyticsModel(app, ds, rs),
+		authModel:      authModel,
+		userModel:      userModel,
+		analyticsModel: analyticsModel,
+		logger:         logger.WithField("model", "nats"),
 	}
 }
 
@@ -65,9 +54,9 @@ func (m *NatsModel) HandleFromClientToServerReq(roomId, userId string, req *plug
 		ad := new(plugnmeet.AnalyticsDataMsg)
 		err := protojson.Unmarshal([]byte(req.Msg), ad)
 		if err != nil {
-			log.Errorln(err)
+			m.logger.Errorln(err)
 			return
 		}
-		m.analytics.HandleEvent(ad)
+		m.analyticsModel.HandleEvent(ad)
 	}
 }

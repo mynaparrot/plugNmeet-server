@@ -2,11 +2,13 @@ package natsservice
 
 import (
 	"context"
+
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -21,24 +23,24 @@ var protoJsonOpts = protojson.MarshalOptions{
 }
 
 type NatsService struct {
-	ctx context.Context
-	app *config.AppConfig
-	nc  *nats.Conn
-	js  jetstream.JetStream
-	cs  *NatsCacheService
+	ctx    context.Context
+	app    *config.AppConfig
+	nc     *nats.Conn
+	js     jetstream.JetStream
+	cs     *NatsCacheService
+	logger *logrus.Entry
 }
 
-func New(app *config.AppConfig) *NatsService {
-	if app == nil {
-		app = config.GetConfig()
-	}
+func New(app *config.AppConfig, logger *logrus.Logger) *NatsService {
+	log := logger.WithField("service", "nats")
 
 	return &NatsService{
-		ctx: context.Background(),
-		app: app,
-		nc:  app.NatsConn,
-		js:  app.JetStream,
-		cs:  GetNatsCacheService(app),
+		ctx:    context.Background(),
+		app:    app,
+		nc:     app.NatsConn,
+		js:     app.JetStream,
+		cs:     GetNatsCacheService(app, log.Logger),
+		logger: log,
 	}
 }
 

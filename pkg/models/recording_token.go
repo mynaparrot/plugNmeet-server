@@ -3,15 +3,15 @@ package models
 import (
 	"errors"
 	"fmt"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"os"
-	"strings"
-	"time"
 )
 
 // GetDownloadToken will use the same JWT token generator as plugNmeet is using
@@ -38,15 +38,15 @@ func (m *RecordingModel) VerifyRecordingToken(token string) (string, int, error)
 	}
 
 	out := jwt.Claims{}
-	if err = tok.Claims([]byte(config.GetConfig().Client.Secret), &out); err != nil {
+	if err = tok.Claims([]byte(m.app.Client.Secret), &out); err != nil {
 		return "", fiber.StatusUnauthorized, err
 	}
 
-	if err = out.Validate(jwt.Expected{Issuer: config.GetConfig().Client.ApiKey, Time: time.Now().UTC()}); err != nil {
+	if err = out.Validate(jwt.Expected{Issuer: m.app.Client.ApiKey, Time: time.Now().UTC()}); err != nil {
 		return "", fiber.StatusUnauthorized, err
 	}
 
-	file := fmt.Sprintf("%s/%s", config.GetConfig().RecorderInfo.RecordingFilesPath, out.Subject)
+	file := fmt.Sprintf("%s/%s", m.app.RecorderInfo.RecordingFilesPath, out.Subject)
 	_, err = os.Lstat(file)
 
 	if err != nil {

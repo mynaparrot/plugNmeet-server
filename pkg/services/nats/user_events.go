@@ -1,9 +1,9 @@
 package natsservice
 
 import (
-	"errors"
+	"fmt"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	log "github.com/sirupsen/logrus"
 )
 
 func (s *NatsService) BroadcastUserMetadata(roomId string, userId string, metadata, toUser *string) error {
@@ -14,7 +14,7 @@ func (s *NatsService) BroadcastUserMetadata(roomId string, userId string, metada
 		}
 
 		if result == nil {
-			return errors.New("user not found")
+			return fmt.Errorf("user not found")
 		}
 		metadata = &result.Metadata
 	}
@@ -30,7 +30,7 @@ func (s *NatsService) BroadcastUserMetadata(roomId string, userId string, metada
 // UpdateAndBroadcastUserMetadata will update metadata & broadcast to everyone
 func (s *NatsService) UpdateAndBroadcastUserMetadata(roomId, userId string, meta interface{}, toUserId *string) error {
 	if meta == nil {
-		return errors.New("metadata cannot be nil")
+		return fmt.Errorf("metadata cannot be nil")
 	}
 
 	mt, err := s.UpdateUserMetadata(roomId, userId, meta)
@@ -53,6 +53,6 @@ func (s *NatsService) BroadcastUserInfoToRoom(event plugnmeet.NatsMsgServerToCli
 
 	err := s.BroadcastSystemEventToRoom(event, roomId, userInfo, nil)
 	if err != nil {
-		log.Warnln(err)
+		s.logger.WithError(err).Warnln("failed to broadcast user info")
 	}
 }

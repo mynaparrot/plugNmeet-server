@@ -2,11 +2,11 @@ package models
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/mynaparrot/plugnmeet-protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
-	log "github.com/sirupsen/logrus"
-	"time"
 )
 
 func (m *NatsModel) RenewPNMToken(roomId, userId, token string) {
@@ -16,13 +16,13 @@ func (m *NatsModel) RenewPNMToken(roomId, userId, token string) {
 	// as renew request is coming from nats, so it should be secure
 	token, err := m.authModel.RenewPNMToken(token, false)
 	if err != nil {
-		log.Errorln(fmt.Errorf("error renewing pnm token for %s; roomId: %s; msg: %s", userId, roomId, err.Error()))
+		m.logger.Errorln(fmt.Errorf("error renewing pnm token for %s; roomId: %s; msg: %s", userId, roomId, err.Error()))
 		return
 	}
 
 	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_RESP_RENEW_PNM_TOKEN, roomId, token, &userId)
 	if err != nil {
-		log.Errorln(fmt.Errorf("error sending RESP_RENEW_PNM_TOKEN event for %s; roomId: %s; msg: %s", userId, roomId, err.Error()))
+		m.logger.Errorln(fmt.Errorf("error sending RESP_RENEW_PNM_TOKEN event for %s; roomId: %s; msg: %s", userId, roomId, err.Error()))
 	}
 }
 
@@ -47,6 +47,6 @@ func (m *NatsModel) HandleClientPing(roomId, userId string) {
 
 	err := m.natsService.UpdateUserKeyValue(roomId, userId, natsservice.UserLastPingAt, fmt.Sprintf("%d", time.Now().UnixMilli()))
 	if err != nil {
-		log.Errorln(fmt.Sprintf("error updating user last ping for %s; roomId: %s; msg: %s", userId, roomId, err.Error()))
+		m.logger.Errorln(fmt.Sprintf("error updating user last ping for %s; roomId: %s; msg: %s", userId, roomId, err.Error()))
 	}
 }

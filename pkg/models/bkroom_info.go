@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"google.golang.org/protobuf/encoding/protojson"

@@ -4,21 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"os/signal"
 	"strings"
 	"sync"
-	"syscall"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/version"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/nats-io/nats.go/micro"
 	"github.com/nats-io/nkeys"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -35,48 +33,50 @@ type natsJob struct {
 }
 
 type NatsController struct {
-	ctx           context.Context
 	app           *config.AppConfig
+	natsService   *natsservice.NatsService
 	issuerKeyPair nkeys.KeyPair
 	curveKeyPair  nkeys.KeyPair
 	authModel     *models.AuthModel
 	natsModel     *models.NatsModel
 	jobChan       chan natsJob
+	logger        *logrus.Entry
 }
 
-func NewNatsController(app *config.AppConfig, authModel *models.AuthModel, natsModel *models.NatsModel) *NatsController {
+func NewNatsController(app *config.AppConfig, natsService *natsservice.NatsService, authModel *models.AuthModel, natsModel *models.NatsModel, logger *logrus.Logger) *NatsController {
 	issuerKeyPair, err := nkeys.FromSeed([]byte(app.NatsInfo.AuthCalloutIssuerPrivate))
 	if err != nil {
-		log.Fatal(err)
+		logger.WithError(err).Fatal("error creating issuer key pair")
 	}
 
 	c := &NatsController{
-		ctx:           context.Background(),
 		app:           app,
+		natsService:   natsService,
 		issuerKeyPair: issuerKeyPair,
 		authModel:     authModel,
 		natsModel:     natsModel,
 		jobChan:       make(chan natsJob, DefaultJobQueueSize),
+		logger:        logger.WithField("controller", "nats"),
 	}
 
 	if app.NatsInfo.AuthCalloutXkeyPrivate != nil && *app.NatsInfo.AuthCalloutXkeyPrivate != "" {
 		c.curveKeyPair, err = nkeys.FromSeed([]byte(*app.NatsInfo.AuthCalloutXkeyPrivate))
 		if err != nil {
-			log.Fatal(err)
+			c.logger.WithError(err).Fatal("error creating curve key pair")
 		}
 	}
 
 	return c
 }
 
-func (c *NatsController) BootUp(wg *sync.WaitGroup) {
+func (c *NatsController) BootUp(ctx context.Context, wg *sync.WaitGroup) {
 	// Start the worker pool
 	for i := 0; i < DefaultNumWorkers; i++ {
 		go c.worker()
 	}
 
 	// system receiver as worker
-	stream, err := c.app.JetStream.CreateOrUpdateStream(c.ctx, jetstream.StreamConfig{
+	stream, err := c.app.JetStream.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
 		Name:      fmt.Sprintf("%s", c.app.NatsInfo.Subjects.SystemJsWorker),
 		Replicas:  c.app.NatsInfo.NumReplicas,
 		Retention: jetstream.WorkQueuePolicy, // to become a worker
@@ -85,16 +85,16 @@ func (c *NatsController) BootUp(wg *sync.WaitGroup) {
 		},
 	})
 	if err != nil {
-		log.Fatal(err)
+		c.logger.WithError(err).Fatal("error creating system worker stream")
 	}
 
 	// now subscribe
-	c.subscribeToSystemWorker(stream)
+	c.subscribeToSystemWorker(ctx, stream)
 	// subscribe to connection events
 	c.subscribeToUsersConnEvents()
 
 	// auth service
-	authService := NewNatsAuthController(c.app, c.authModel, c.issuerKeyPair, c.curveKeyPair)
+	authService := NewNatsAuthController(c.app, c.natsService, c.authModel, c.issuerKeyPair, c.curveKeyPair, c.logger)
 	_, err = micro.AddService(c.app.NatsConn, micro.Config{
 		Name:        "pnm-auth",
 		Version:     version.Version,
@@ -107,14 +107,12 @@ func (c *NatsController) BootUp(wg *sync.WaitGroup) {
 	})
 
 	if err != nil {
-		log.Fatal(err)
+		c.logger.WithError(err).Fatal("error adding auth service")
 	}
 	wg.Done()
 
-	// Keep the application running until a signal is received.
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	<-sig
+	// Keep the application running until context remain valid
+	<-ctx.Done()
 }
 
 func (c *NatsController) worker() {
@@ -144,7 +142,7 @@ func (c *NatsController) subscribeToUsersConnEvents() {
 					if user, ok := e.Client["user"].(string); ok {
 						claims, err := c.authModel.UnsafeClaimsWithoutVerification(user)
 						if err != nil {
-							log.Errorf("failed to parse claims from connect event: %v", err)
+							c.logger.WithError(err).Errorln("failed to parse claims from connect event")
 							return
 						}
 						if claims.GetName() != config.RecorderUserAuthName {
@@ -164,7 +162,7 @@ func (c *NatsController) subscribeToUsersConnEvents() {
 					if user, ok := e.Client["user"].(string); ok {
 						claims, err := c.authModel.UnsafeClaimsWithoutVerification(user)
 						if err != nil {
-							log.Errorf("failed to parse claims from disconnect event: %v", err)
+							c.logger.WithError(err).Errorln("failed to parse claims from disconnect event")
 							return
 						}
 						if claims.GetName() != config.RecorderUserAuthName {
@@ -176,17 +174,17 @@ func (c *NatsController) subscribeToUsersConnEvents() {
 		}
 	})
 	if err != nil {
-		log.Fatal(err)
+		c.logger.WithError(err).Fatal("error subscribing to users connection events")
 		return
 	}
 }
 
-func (c *NatsController) subscribeToSystemWorker(stream jetstream.Stream) {
-	cons, err := stream.CreateOrUpdateConsumer(c.ctx, jetstream.ConsumerConfig{
+func (c *NatsController) subscribeToSystemWorker(ctx context.Context, stream jetstream.Stream) {
+	cons, err := stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
 		Durable: fmt.Sprintf("pnm-%s", c.app.NatsInfo.Subjects.SystemJsWorker),
 	})
 	if err != nil {
-		log.Fatalln(err)
+		c.logger.WithError(err).Fatalln("error creating system worker consumer")
 	}
 
 	_, err = cons.Consume(func(msg jetstream.Msg) {
@@ -206,11 +204,13 @@ func (c *NatsController) subscribeToSystemWorker(stream jetstream.Stream) {
 			}
 		}}
 	}, jetstream.ConsumeErrHandler(func(consumeCtx jetstream.ConsumeContext, err error) {
-		log.Errorf("jetstream consume error: %v", err)
+		if ctx.Err() == nil {
+			c.logger.WithError(err).Errorf("jetstream consume error")
+		}
 	}))
 
 	if err != nil {
-		log.Fatal(err)
+		c.logger.WithError(err).Fatal("error subscribing to system worker")
 		return
 	}
 }

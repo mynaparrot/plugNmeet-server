@@ -1,36 +1,26 @@
 package models
 
 import (
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/sirupsen/logrus"
 )
 
 type BreakoutRoomModel struct {
-	app         *config.AppConfig
-	ds          *dbservice.DatabaseService
-	rs          *redisservice.RedisService
-	rm          *RoomModel
-	natsService *natsservice.NatsService
+	natsService    *natsservice.NatsService
+	rm             *RoomModel
+	rDuration      *RoomDurationModel
+	analyticsModel *AnalyticsModel
+	um             *UserModel
+	logger         *logrus.Entry
 }
 
-func NewBreakoutRoomModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *BreakoutRoomModel {
-	if app == nil {
-		app = config.GetConfig()
-	}
-	if ds == nil {
-		ds = dbservice.New(app.DB)
-	}
-	if rs == nil {
-		rs = redisservice.New(app.RDS)
-	}
-
+func NewBreakoutRoomModel(rm *RoomModel, natsService *natsservice.NatsService) *BreakoutRoomModel {
 	return &BreakoutRoomModel{
-		app:         app,
-		ds:          ds,
-		rs:          rs,
-		rm:          NewRoomModel(app, ds, rs),
-		natsService: natsservice.New(app),
+		rm:             rm,
+		natsService:    natsService,
+		rDuration:      rm.roomDuration,
+		analyticsModel: rm.analyticsModel,
+		um:             rm.userModel,
+		logger:         rm.logger.Logger.WithField("model", "breakout_room"),
 	}
 }

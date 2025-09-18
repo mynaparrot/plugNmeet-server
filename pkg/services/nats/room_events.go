@@ -2,6 +2,7 @@ package natsservice
 
 import (
 	"errors"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 )
 

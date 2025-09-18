@@ -2,11 +2,13 @@ package models
 
 import (
 	"errors"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/sirupsen/logrus"
 )
 
 type PollModel struct {
@@ -15,25 +17,17 @@ type PollModel struct {
 	rs             *redisservice.RedisService
 	analyticsModel *AnalyticsModel
 	natsService    *natsservice.NatsService
+	logger         *logrus.Entry
 }
 
-func NewPollModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *PollModel {
-	if app == nil {
-		app = config.GetConfig()
-	}
-	if ds == nil {
-		ds = dbservice.New(app.DB)
-	}
-	if rs == nil {
-		rs = redisservice.New(app.RDS)
-	}
-
+func NewPollModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, analyticsModel *AnalyticsModel, logger *logrus.Logger) *PollModel {
 	return &PollModel{
 		app:            app,
 		ds:             ds,
 		rs:             rs,
-		analyticsModel: NewAnalyticsModel(app, ds, rs),
-		natsService:    natsservice.New(app),
+		natsService:    natsService,
+		analyticsModel: analyticsModel,
+		logger:         logger.WithField("model", "poll"),
 	}
 }
 

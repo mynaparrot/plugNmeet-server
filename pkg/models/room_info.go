@@ -2,15 +2,16 @@ package models
 
 import (
 	"context"
+	"time"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
-	"time"
 )
 
 func (m *RoomModel) IsRoomActive(ctx context.Context, r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoomActiveRes, *dbmodels.RoomInfo, *plugnmeet.NatsKvRoomInfo, *plugnmeet.RoomMetadata) {
 	// check first
-	_ = waitUntilRoomCreationCompletes(ctx, m.rs, r.GetRoomId())
+	_ = waitUntilRoomCreationCompletes(ctx, m.rs, r.GetRoomId(), m.logger)
 
 	res := &plugnmeet.IsRoomActiveRes{
 		Status: true,
@@ -54,7 +55,7 @@ func (m *RoomModel) IsRoomActive(ctx context.Context, r *plugnmeet.IsRoomActiveR
 
 func (m *RoomModel) GetActiveRoomInfo(ctx context.Context, r *plugnmeet.GetActiveRoomInfoReq) (bool, string, *plugnmeet.ActiveRoomWithParticipant) {
 	// check first
-	_ = waitUntilRoomCreationCompletes(ctx, m.rs, r.GetRoomId())
+	_ = waitUntilRoomCreationCompletes(ctx, m.rs, r.GetRoomId(), m.logger)
 
 	roomDbInfo, _ := m.ds.GetRoomInfoByRoomId(r.RoomId, 1)
 	if roomDbInfo == nil || roomDbInfo.ID == 0 {

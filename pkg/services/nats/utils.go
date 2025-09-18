@@ -2,8 +2,9 @@ package natsservice
 
 import (
 	"errors"
-	"github.com/nats-io/nats.go/jetstream"
 	"strconv"
+
+	"github.com/nats-io/nats.go/jetstream"
 )
 
 // getKV retrieves the KeyValue store for the given bucket name.

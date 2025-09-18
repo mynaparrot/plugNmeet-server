@@ -1,11 +1,12 @@
 package models
 
 import (
-	"errors"
-	"github.com/gabriel-vasile/mimetype"
+	"fmt"
 	"mime/multipart"
 	"sort"
 	"strings"
+
+	"github.com/gabriel-vasile/mimetype"
 )
 
 func (m *FileModel) detectMimeTypeForValidation(file multipart.File) error {
@@ -25,7 +26,7 @@ func (m *FileModel) ValidateMimeType(mtype *mimetype.MIME) error {
 
 	ext := strings.TrimPrefix(mtype.Extension(), ".")
 	if ext == "" {
-		return errors.New("invalid file")
+		return fmt.Errorf("invalid file")
 	}
 
 	for _, t := range allowedTypes {
@@ -34,5 +35,5 @@ func (m *FileModel) ValidateMimeType(mtype *mimetype.MIME) error {
 		}
 	}
 
-	return errors.New(mtype.Extension() + " file type not allowed")
+	return fmt.Errorf(mtype.Extension() + " file type not allowed")
 }

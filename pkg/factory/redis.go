@@ -3,11 +3,12 @@ package factory
 import (
 	"context"
 	"crypto/tls"
+
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/redis/go-redis/v9"
 )
 
-func NewRedisConnection(appCnf *config.AppConfig) error {
+func NewRedisConnection(ctx context.Context, appCnf *config.AppConfig) error {
 	rf := appCnf.RedisInfo
 	var rdb *redis.Client
 	var tlsConfig *tls.Config
@@ -38,7 +39,7 @@ func NewRedisConnection(appCnf *config.AppConfig) error {
 		})
 	}
 
-	_, err := rdb.Ping(context.Background()).Result()
+	_, err := rdb.Ping(ctx).Result()
 	if err != nil {
 		return err
 	}

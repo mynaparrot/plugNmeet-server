@@ -3,10 +3,18 @@ package redisservice
 import (
 	"errors"
 	"fmt"
-	"github.com/goccy/go-json"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/redis/go-redis/v9"
-	"strings"
+)
+
+const (
+	pollsKey              = "pnm:polls:"
+	pollRespondentsSubKey = ":respondents:"
+	pollVotedUsersSubKey  = ":voted_users"
+	pollAllResSubKey      = ":all_respondents"
+	PollTotalRespField    = "total_resp"
+	PollCountSuffix       = "_count"
 )
 
 func (s *RedisService) CreateRoomPoll(roomId string, val map[string]string) error {
@@ -17,65 +25,45 @@ func (s *RedisService) CreateRoomPoll(roomId string, val map[string]string) erro
 	return nil
 }
 
-func (s *RedisService) CreatePollResponseHash(roomId, pollId string, val map[string]interface{}) error {
-	key := fmt.Sprintf("%s%s:respondents:%s", pollsKey, roomId, pollId)
-	_, err := s.rc.HSet(s.ctx, key, val).Result()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type userResponseCommonFields struct {
-	TotalRes       int    `redis:"total_resp"`
-	AllRespondents string `redis:"all_respondents"`
-}
-
 func (s *RedisService) AddPollResponse(r *plugnmeet.SubmitPollResponseReq) error {
-	key := fmt.Sprintf("%s%s:respondents:%s", pollsKey, r.RoomId, r.PollId)
+	// respondentsKey is the base key for a specific poll's responses.
+	// It's a HASH that stores counters like total_resp, 1_count, etc.
+	// e.g. pnm:polls:room_id:respondents:poll_id
+	respondentsKey := fmt.Sprintf("%s%s%s%s", pollsKey, r.RoomId, pollRespondentsSubKey, r.PollId)
 
-	err := s.rc.Watch(s.ctx, func(tx *redis.Tx) error {
-		d := new(userResponseCommonFields)
-		err := tx.HMGet(s.ctx, key, "all_respondents").Scan(d)
-		if err != nil {
+	// votedUsersKey is a SET that stores the user IDs of everyone who has voted.
+	// Used for O(1) check to see if a user has already voted.
+	// e.g. pnm:polls:room_id:respondents:poll_id:voted_users
+	votedUsersKey := fmt.Sprintf("%s%s", respondentsKey, pollVotedUsersSubKey)
+
+	// allRespondentsKey is a LIST that stores the detailed vote information for each user.
+	// e.g. pnm:polls:room_id:respondents:poll_id:all_respondents
+	allRespondentsKey := fmt.Sprintf("%s%s", respondentsKey, pollAllResSubKey)
+
+	return s.rc.Watch(s.ctx, func(tx *redis.Tx) error {
+		// Check if the user has already voted using a Set for O(1) lookup.
+		voted, err := tx.SIsMember(s.ctx, votedUsersKey, r.UserId).Result()
+		if err != nil && !errors.Is(err, redis.Nil) {
 			return err
 		}
-
-		var respondents []string
-		if d.AllRespondents != "" {
-			err = json.Unmarshal([]byte(d.AllRespondents), &respondents)
-			if err != nil {
-				return err
-			}
-		}
-
-		if len(respondents) > 0 {
-			for i := 0; i < len(respondents); i++ {
-				// format userId:option_id:name
-				p := strings.Split(respondents[i], ":")
-				if p[0] == r.UserId {
-					return errors.New("user already voted")
-				}
-			}
+		if voted {
+			return fmt.Errorf("user already voted")
 		}
 
 		// format userId:option_id:name
-		respondents = append(respondents, fmt.Sprintf("%s:%d:%s", r.UserId, r.SelectedOption, r.Name))
-		marshal, err := json.Marshal(respondents)
-		if err != nil {
-			return err
-		}
+		voteData := fmt.Sprintf("%s:%d:%s", r.UserId, r.SelectedOption, r.Name)
 
-		pp := tx.Pipeline()
-		pp.HSet(s.ctx, key, map[string]string{
-			"all_respondents": string(marshal),
-		})
-		pp.HIncrBy(s.ctx, key, "total_resp", 1)
-		pp.HIncrBy(s.ctx, key, fmt.Sprintf("%d_count", r.SelectedOption), 1)
-		_, err = pp.Exec(s.ctx)
+		// Queue commands directly on the transaction object.
+		// Add user to the set of voters.
+		tx.SAdd(s.ctx, votedUsersKey, r.UserId)
+		// Add the vote details to a list.
+		tx.RPush(s.ctx, allRespondentsKey, voteData)
+		// Increment the total response counter.
+		tx.HIncrBy(s.ctx, respondentsKey, PollTotalRespField, 1)
+		// Increment the specific option counter.
+		tx.HIncrBy(s.ctx, respondentsKey, fmt.Sprintf("%d%s", r.SelectedOption, PollCountSuffix), 1)
+		// The commands will be executed when the function returns.
 
-		return err
-	}, key)
-
-	return err
+		return nil
+	}, votedUsersKey)
 }

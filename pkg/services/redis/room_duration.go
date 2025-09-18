@@ -3,11 +3,12 @@ package redisservice
 import (
 	"errors"
 	"fmt"
+
 	"github.com/redis/go-redis/v9"
 )
 
 const (
-	RoomWithDurationInfoKey = "pnm:roomWithDurationInfo"
+	RoomWithDurationInfoKey = Prefix + "roomWithDurationInfo"
 )
 
 func (s *RedisService) AddRoomWithDurationInfo(roomId string, vals interface{}) error {

@@ -4,6 +4,10 @@ import (
 	"crypto/subtle"
 	"encoding/xml"
 	"fmt"
+	"net/url"
+	"strings"
+	"time"
+
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/bbbapiwrapper"
@@ -12,9 +16,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"google.golang.org/protobuf/encoding/protojson"
-	"net/url"
-	"strings"
-	"time"
 )
 
 // BBBController holds dependencies for BBB API compatibility handlers.

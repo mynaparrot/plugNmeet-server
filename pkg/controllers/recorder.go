@@ -7,7 +7,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -17,17 +17,19 @@ type RecorderController struct {
 	RecorderModel  *models.RecorderModel
 	RecordingModel *models.RecordingModel
 	RoomModel      *models.RoomModel
-	dbservice      *dbservice.DatabaseService
+	ds             *dbservice.DatabaseService
+	logger         *logrus.Entry
 }
 
 // NewRecorderController creates a new RecorderController.
-func NewRecorderController(config *config.AppConfig, recorderModel *models.RecorderModel, recordingModel *models.RecordingModel, roomModel *models.RoomModel, dbservice *dbservice.DatabaseService) *RecorderController {
+func NewRecorderController(config *config.AppConfig, ds *dbservice.DatabaseService, recorderModel *models.RecorderModel, recordingModel *models.RecordingModel, roomModel *models.RoomModel, logger *logrus.Logger) *RecorderController {
 	return &RecorderController{
 		AppConfig:      config,
 		RecorderModel:  recorderModel,
 		RecordingModel: recordingModel,
 		RoomModel:      roomModel,
-		dbservice:      dbservice,
+		ds:             ds,
+		logger:         logger.WithField("controller", "recorder"),
 	}
 }
 
@@ -57,7 +59,7 @@ func (rc *RecorderController) HandleRecording(c *fiber.Ctx) error {
 
 	// now need to check if meeting is running or not
 	isRunning := 1
-	room, err := rc.dbservice.GetRoomInfoBySid(req.Sid, &isRunning)
+	room, err := rc.ds.GetRoomInfoBySid(req.Sid, &isRunning)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -126,7 +128,7 @@ func (rc *RecorderController) HandleRTMP(c *fiber.Ctx) error {
 
 	// now need to check if meeting is running or not
 	isRunning := 1
-	room, err := rc.dbservice.GetRoomInfoBySid(req.Sid, &isRunning)
+	room, err := rc.ds.GetRoomInfoBySid(req.Sid, &isRunning)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -161,7 +163,7 @@ func (rc *RecorderController) HandleRecorderEvents(c *fiber.Ctx) error {
 	req := new(plugnmeet.RecorderToPlugNmeet)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		log.Errorln(err)
+		rc.logger.WithError(err).Errorln("unmarshalling failed")
 		return c.JSON(fiber.Map{
 			"status": false,
 			"msg":    err.Error(),
@@ -169,9 +171,9 @@ func (rc *RecorderController) HandleRecorderEvents(c *fiber.Ctx) error {
 	}
 
 	if req.From == "recorder" {
-		roomInfo, err := rc.dbservice.GetRoomInfoByTableId(uint64(req.RoomTableId))
+		roomInfo, err := rc.ds.GetRoomInfoByTableId(uint64(req.RoomTableId))
 		if err != nil {
-			log.Errorln(err)
+			rc.logger.WithError(err).Errorln("error getting room info")
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 		if roomInfo == nil {

@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 )
 

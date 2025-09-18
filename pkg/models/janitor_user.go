@@ -3,26 +3,26 @@ package models
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
-	log "github.com/sirupsen/logrus"
-	"strings"
-	"time"
 )
 
 // checkOnlineUsersStatus will compare last ping result
 // and take the decision to update user's status
-func (m *SchedulerModel) checkOnlineUsersStatus() {
-	locked := m.rs.IsSchedulerTaskLock("checkOnlineUsersStatus")
+func (m *JanitorModel) checkOnlineUsersStatus() {
+	locked := m.rs.IsJanitorTaskLock("checkOnlineUsersStatus")
 	if locked {
 		// if lock then we will not perform here
 		return
 	}
 	// now set lock
-	_ = m.rs.LockSchedulerTask("checkOnlineUsersStatus", time.Minute*1)
+	m.rs.LockJanitorTask("checkOnlineUsersStatus", time.Minute*1)
 	// clean at the end
-	defer m.rs.UnlockSchedulerTask("checkOnlineUsersStatus")
+	defer m.rs.UnlockJanitorTask("checkOnlineUsersStatus")
 
 	kl := m.app.JetStream.KeyValueStoreNames(context.Background())
 	for s := range kl.Name() {
@@ -47,7 +47,7 @@ func (m *SchedulerModel) checkOnlineUsersStatus() {
 				lastPing += natsservice.UserOnlineMaxPingDiff.Milliseconds()
 				now := time.Now().UnixMilli()
 				if now > lastPing {
-					log.Infoln(fmt.Sprintf("userId:%s should be offline, lastPing: %d, now: %d", u, lastPing, now))
+					m.logger.Infoln(fmt.Sprintf("userId:%s should be offline, lastPing: %d, now: %d", u, lastPing, now))
 					m.changeUserStatus(roomId, u)
 				}
 			}
@@ -55,7 +55,7 @@ func (m *SchedulerModel) checkOnlineUsersStatus() {
 	}
 }
 
-func (m *SchedulerModel) changeUserStatus(roomId, userId string) {
+func (m *JanitorModel) changeUserStatus(roomId, userId string) {
 	// this user should be offline
 	_ = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusOffline)
 

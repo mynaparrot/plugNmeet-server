@@ -1,9 +1,9 @@
 package models
 
 import (
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
-	log "github.com/sirupsen/logrus"
 	"strings"
+
+	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 )
 
 func (m *RoomDurationModel) GetRoomDurationInfo(roomId string) (*RoomDurationInfo, error) {
@@ -25,7 +25,7 @@ func (m *RoomDurationModel) GetRoomsWithDurationMap() map[string]RoomDurationInf
 		var val RoomDurationInfo
 		err = m.rs.GetRoomWithDurationInfoByKey(key, &val)
 		if err != nil {
-			log.Errorln(err)
+			m.logger.Errorln(err)
 			continue
 		}
 

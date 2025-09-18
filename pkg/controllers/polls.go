@@ -1,13 +1,14 @@
 package controllers
 
 import (
+	"strconv"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"google.golang.org/protobuf/proto"
-	"strconv"
 )
 
 // PollsController holds dependencies for poll-related handlers.
@@ -115,7 +116,7 @@ func (pc *PollsController) HandleCountPollTotalResponses(c *fiber.Ctx) error {
 		return sendPollResponse(c, res)
 	}
 
-	responses, err := pc.RedisService.GetPollResponsesByField(roomId.(string), pollId, "total_resp")
+	responses, err := pc.RedisService.GetPollTotalResponses(roomId.(string), pollId)
 	if err != nil {
 		res.Msg = err.Error()
 		return sendPollResponse(c, res)

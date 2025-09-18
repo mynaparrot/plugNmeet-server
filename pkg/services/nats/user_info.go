@@ -3,9 +3,10 @@ package natsservice
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/nats-io/nats.go/jetstream"
-	"strconv"
 )
 
 // GetRoomUserStatus retrieves the status of a user in a specific room.

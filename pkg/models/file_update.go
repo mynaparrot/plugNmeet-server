@@ -2,7 +2,6 @@ package models
 
 import (
 	"errors"
-	log "github.com/sirupsen/logrus"
 )
 
 func (m *FileModel) updateRoomMetadataWithOfficeFile(roomId string, f *ConvertWhiteboardFileRes) error {
@@ -22,7 +21,7 @@ func (m *FileModel) updateRoomMetadataWithOfficeFile(roomId string, f *ConvertWh
 
 	err = m.natsService.UpdateAndBroadcastRoomMetadata(roomId, roomMeta)
 	if err != nil {
-		log.Errorln(err)
+		m.logger.WithError(err).Errorln("metadata update failed")
 	}
 
 	return err

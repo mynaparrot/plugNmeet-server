@@ -6,6 +6,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -30,35 +31,22 @@ type EtherpadDataTypes struct {
 }
 
 type EtherpadModel struct {
-	NodeId       string
-	Host         string
-	ClientId     string
-	ClientSecret string
-
 	app            *config.AppConfig
 	ds             *dbservice.DatabaseService
 	rs             *redisservice.RedisService
 	lk             *livekitservice.LivekitService
 	analyticsModel *AnalyticsModel
 	natsService    *natsservice.NatsService
+	logger         *logrus.Entry
 }
 
-func NewEtherpadModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService) *EtherpadModel {
-	if app == nil {
-		app = config.GetConfig()
-	}
-	if ds == nil {
-		ds = dbservice.New(app.DB)
-	}
-	if rs == nil {
-		rs = redisservice.New(app.RDS)
-	}
-
+func NewEtherpadModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, analyticsModel *AnalyticsModel, logger *logrus.Logger) *EtherpadModel {
 	return &EtherpadModel{
 		app:            app,
 		ds:             ds,
 		rs:             rs,
-		analyticsModel: NewAnalyticsModel(app, ds, rs),
-		natsService:    natsservice.New(app),
+		analyticsModel: analyticsModel,
+		natsService:    natsService,
+		logger:         logger.WithField("model", "etherpad"),
 	}
 }

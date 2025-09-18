@@ -2,10 +2,10 @@ package models
 
 import (
 	"fmt"
-	"github.com/mynaparrot/plugnmeet-protocol/bbbapiwrapper"
-	log "github.com/sirupsen/logrus"
 	"strings"
 	"time"
+
+	"github.com/mynaparrot/plugnmeet-protocol/bbbapiwrapper"
 )
 
 func (m *BBBApiWrapperModel) GetRecordings(host string, r *bbbapiwrapper.GetRecordingsReq) ([]*bbbapiwrapper.RecordingInfo, *bbbapiwrapper.Pagination, error) {
@@ -49,7 +49,7 @@ func (m *BBBApiWrapperModel) GetRecordings(host string, r *bbbapiwrapper.GetReco
 		// for path, let's create a download link directly
 		url, err := m.createPlayBackURL(host, v.FilePath)
 		if err != nil {
-			log.Errorln(err)
+			m.logger.Errorln(err)
 			continue
 		}
 		recording.Playback.PlayBackFormat = []bbbapiwrapper.PlayBackFormat{
@@ -90,8 +90,7 @@ func (m *BBBApiWrapperModel) GetRecordings(host string, r *bbbapiwrapper.GetReco
 }
 
 func (m *BBBApiWrapperModel) createPlayBackURL(host, path string) (string, error) {
-	auth := NewRecordingModel(m.app, m.ds, m.rs)
-	token, err := auth.CreateTokenForDownload(path)
+	token, err := m.rrm.CreateTokenForDownload(path)
 	if err != nil {
 		return "", err
 	}
