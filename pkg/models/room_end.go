@@ -43,6 +43,9 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 	if info == nil {
 		return false, "room not active (not found in NATS)"
 	}
+	// before cleanup, we'll hold room records temporary in redis
+	// because room_finished event from LK may arrive delay and we can use it
+	m.rs.HoldTemporaryRoomData(info)
 
 	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SESSION_ENDED, roomID, "notifications.room-disconnected-room-ended", nil)
 	if err != nil {
