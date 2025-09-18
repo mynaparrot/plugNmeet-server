@@ -165,6 +165,7 @@ func (fc *FileController) HandleConvertWhiteboardFile(c *fiber.Ctx) error {
 }
 
 // HandleGetClientFiles gets the client CSS and JS files.
+// this also depends on config's readClientFiles method
 func (fc *FileController) HandleGetClientFiles(c *fiber.Ctx) error {
 	var css, js []string
 
@@ -184,11 +185,11 @@ func (fc *FileController) HandleGetClientFiles(c *fiber.Ctx) error {
 		js = fc.AppConfig.ClientFiles["js"]
 	}
 
-	return c.JSON(fiber.Map{
-		"status": true,
-		"msg":    "success",
-		"css":    css,
-		"js":     js,
+	return utils.SendProtoJsonResponse(c, &plugnmeet.GetClientFilesRes{
+		Status: true,
+		Msg:    "success",
+		Css:    css,
+		Js:     js,
 	})
 }
 

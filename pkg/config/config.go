@@ -247,7 +247,42 @@ func New(appCnf *AppConfig) (*AppConfig, error) {
 		dbTablePrefix = appCnf.DatabaseInfo.Prefix
 	}
 
+	// read client files and cache it
+	err := readClientFiles(appCnf)
+	if err != nil {
+		return nil, err
+	}
+
 	return appCnf, nil
+}
+
+// readClientFiles will read client files and cache it at startup
+func readClientFiles(a *AppConfig) error {
+	a.ClientFiles = make(map[string][]string)
+
+	// if enable debug mode, then we won't cache files
+	// otherwise changes of files won't be loaded
+	if a.Client.Debug {
+		return nil
+	}
+
+	cssPath := filepath.Join(a.Client.Path, "assets", "css")
+	css, err := utils.GetFilesFromDir(cssPath, ".css", "des")
+	if err != nil {
+		logrus.WithError(err).Errorf("failed to read css files from %s", cssPath)
+		return err
+	}
+
+	jsPath := filepath.Join(a.Client.Path, "assets", "js")
+	js, err := utils.GetFilesFromDir(jsPath, ".js", "asc")
+	if err != nil {
+		logrus.WithError(err).Errorf("failed to read js files from %s", jsPath)
+		return err
+	}
+
+	a.ClientFiles["css"] = css
+	a.ClientFiles["js"] = js
+	return nil
 }
 
 func FormatDBTable(table string) string {
