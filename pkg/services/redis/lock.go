@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -66,15 +65,7 @@ func (s *RedisService) UnlockRoomCreation(ctx context.Context, roomID string, lo
 	}
 
 	if deleted == 0 {
-		s.logger.WithFields(logrus.Fields{
-			"roomID":    roomID,
-			"lockValue": lockValue,
-		}).Debugf("UnlockRoomCreation: Could not release lock (it may have expired or been taken by another process). This is expected during contention.")
-	} else {
-		s.logger.WithFields(logrus.Fields{
-			"roomID":    roomID,
-			"lockValue": lockValue,
-		}).Infof("UnlockRoomCreation: Successfully released lock")
+		return fmt.Errorf("could not release lock on key %s roomID: %s (it may have expired or been taken by another process)", key, roomID)
 	}
 	return nil
 }

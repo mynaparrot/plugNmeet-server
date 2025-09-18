@@ -51,6 +51,7 @@ func New(appConfig *config.AppConfig, ctrl *factory.ApplicationControllers) *fib
 		Done: func(c *fiber.Ctx, logString []byte) {
 			appConfig.Logger.Debugln(string(logString))
 		},
+		Format: "${status} | ${latency} | ${ip} | ${method} | ${path} | ${error}",
 		Output: io.Discard,
 	}))
 

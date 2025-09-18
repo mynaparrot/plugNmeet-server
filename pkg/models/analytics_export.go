@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/redis/go-redis/v9"
@@ -18,11 +17,13 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
+// PrepareToExportAnalytics will export analytics data and create file
+// this method is the final call after proper delay
 func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId":    roomId,
 		"roomSid":   sid,
-		"operation": "PrepareToExportAnalytics",
+		"operation": "ExportAnalytics",
 	})
 	if m.app.AnalyticsSettings == nil || !m.app.AnalyticsSettings.Enabled {
 		log.Debug("analytics is disabled, skipping export")
@@ -43,9 +44,6 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 		return
 	}
 
-	// let's wait a few seconds so that all other processes will finish
-	time.Sleep(config.WaitBeforeAnalyticsStartProcessing)
-
 	// lock to prevent this room re-creation until process finish
 	// otherwise will give an unexpected result
 	lockValue, err := acquireRoomCreationLockWithRetry(context.Background(), m.rs, roomId, log)
@@ -60,6 +58,8 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 		if unlockErr := m.rs.UnlockRoomCreation(unlockCtx, roomId, lockValue); unlockErr != nil {
 			// UnlockRoomCreation in RedisService should log details
 			log.WithError(unlockErr).Error("error trying to clean up room creation lock")
+		} else {
+			log.Info("room creation lock released")
 		}
 	}()
 

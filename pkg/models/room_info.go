@@ -10,8 +10,9 @@ import (
 )
 
 func (m *RoomModel) IsRoomActive(ctx context.Context, r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoomActiveRes, *dbmodels.RoomInfo, *plugnmeet.NatsKvRoomInfo, *plugnmeet.RoomMetadata) {
+	log := m.logger.WithField("roomId", r.GetRoomId())
 	// check first
-	_ = waitUntilRoomCreationCompletes(ctx, m.rs, r.GetRoomId(), m.logger)
+	_ = waitUntilRoomCreationCompletes(ctx, m.rs, r.GetRoomId(), log)
 
 	res := &plugnmeet.IsRoomActiveRes{
 		Status: true,
@@ -54,8 +55,9 @@ func (m *RoomModel) IsRoomActive(ctx context.Context, r *plugnmeet.IsRoomActiveR
 }
 
 func (m *RoomModel) GetActiveRoomInfo(ctx context.Context, r *plugnmeet.GetActiveRoomInfoReq) (bool, string, *plugnmeet.ActiveRoomWithParticipant) {
+	log := m.logger.WithField("roomId", r.GetRoomId())
 	// check first
-	_ = waitUntilRoomCreationCompletes(ctx, m.rs, r.GetRoomId(), m.logger)
+	_ = waitUntilRoomCreationCompletes(ctx, m.rs, r.GetRoomId(), log)
 
 	roomDbInfo, _ := m.ds.GetRoomInfoByRoomId(r.RoomId, 1)
 	if roomDbInfo == nil || roomDbInfo.ID == 0 {

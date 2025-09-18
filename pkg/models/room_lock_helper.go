@@ -27,14 +27,13 @@ const (
 	backoffJitter          = 0.2
 )
 
-func acquireRoomCreationLockWithRetry(ctx context.Context, rs *redisservice.RedisService, roomID string, logger *logrus.Entry) (string, error) {
+func acquireRoomCreationLockWithRetry(ctx context.Context, rs *redisservice.RedisService, roomID string, log *logrus.Entry) (string, error) {
 	maxWaitTime := defaultRoomCreationMaxWaitTime
 	lockTTL := defaultRoomCreationLockTTL
 	currentInterval := backoffInitialInterval
 
 	loopStartTime := time.Now()
-	log := logger.WithField("roomID", roomID)
-	log.Info("attempting to acquire creation lock")
+	log.Info("attempting to acquire room creation lock")
 
 	for {
 		select {
@@ -85,11 +84,10 @@ func acquireRoomCreationLockWithRetry(ctx context.Context, rs *redisservice.Redi
 }
 
 // waitUntilRoomCreationCompletes waits until the room creation lock for the given roomID is released.
-func waitUntilRoomCreationCompletes(ctx context.Context, rs *redisservice.RedisService, roomID string, logger *logrus.Entry) error {
+func waitUntilRoomCreationCompletes(ctx context.Context, rs *redisservice.RedisService, roomID string, log *logrus.Entry) error {
 	maxWaitTime := defaultWaitForRoomCreationMaxWaitTime
 	currentInterval := backoffInitialInterval
 	loopStartTime := time.Now()
-	log := logger.WithField("roomID", roomID)
 
 	for {
 		select {

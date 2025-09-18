@@ -33,6 +33,8 @@ func (m *RoomModel) CreateRoom(ctx context.Context, r *plugnmeet.CreateRoomReq) 
 		if unlockErr := m.rs.UnlockRoomCreation(unlockCtx, r.GetRoomId(), lockValue); unlockErr != nil {
 			// UnlockRoomCreation in RedisService should log details
 			log.WithError(unlockErr).Error("error trying to clean up room creation lock")
+		} else {
+			log.Info("room creation lock released")
 		}
 	}()
 

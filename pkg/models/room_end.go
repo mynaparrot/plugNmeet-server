@@ -78,53 +78,27 @@ func (m *RoomModel) OnAfterRoomEnded(ctx context.Context, roomID, roomSID, metad
 	lockAcquired, lockVal, errLock := m.rs.LockRoomCreation(ctx, roomID, cleanupLockTTL)
 
 	if errLock != nil {
-		log.WithError(errLock).Error("Redis error acquiring cleanup lock. Cleanup might be incomplete.")
+		log.WithError(errLock).Error("redis error acquiring room creation. Cleanup might be incomplete.")
+		return // Can't proceed without a clear lock status.
 	} else if !lockAcquired {
-		log.Warn("Could not acquire cleanup lock. Cleanup might be incomplete.")
+		log.Warn("could not acquire room creation lock. Cleanup might be incomplete.")
+		return // Another process is likely handling this room.
 	}
-	if lockAcquired {
-		log.WithField("lockVal", lockVal).Info("Cleanup lock acquired")
-		defer func() {
-			unlockCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			if err := m.rs.UnlockRoomCreation(unlockCtx, roomID, lockVal); err != nil {
-				log.WithField("lockVal", lockVal).WithError(err).Error("Error releasing cleanup lock")
-			} else {
-				log.WithField("lockVal", lockVal).Info("Cleanup lock released")
-			}
-		}()
-	}
+	log.WithField("lockVal", lockVal).Info("room creation lock acquired")
+
+	defer func() {
+		unlockCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := m.rs.UnlockRoomCreation(unlockCtx, roomID, lockVal); err != nil {
+			log.WithField("lockVal", lockVal).WithError(err).Error("Error releasing cleanup lock")
+		} else {
+			log.WithField("lockVal", lockVal).Info("room creation lock released")
+		}
+	}()
 
 	_, err := m.ds.UpdateRoomStatus(&dbmodels.RoomInfo{RoomId: roomID, IsRunning: 0})
 	if err != nil {
 		log.WithError(err).Error("DB error updating status")
-	}
-
-	done := make(chan struct{})
-	waitCtx, cancelWait := context.WithTimeout(ctx, 3*time.Second)
-	defer cancelWait()
-	go func() {
-		for {
-			select {
-			case <-waitCtx.Done():
-				log.WithField("subOperation", "userDisconnectWait").WithError(waitCtx.Err()).Warn("Wait cancelled/timed out")
-				close(done)
-				return
-			default:
-				if m.areAllUsersDisconnected(roomID) {
-					log.WithField("subOperation", "userDisconnectWait").Info("All users disconnected")
-					close(done)
-					return
-				}
-				time.Sleep(1 * time.Second)
-			}
-		}
-	}()
-	select {
-	case <-done:
-		log.Info("Proceeding with cleanup after user disconnect")
-	case <-waitCtx.Done():
-		log.Warn("Timeout waiting for all users to disconnect (fallback)")
 	}
 
 	m.natsService.DeleteRoomUsersBlockList(roomID)
@@ -160,14 +134,8 @@ func (m *RoomModel) OnAfterRoomEnded(ctx context.Context, roomID, roomSID, metad
 	m.natsService.OnAfterSessionEndCleanup(roomID)
 	log.Info("Room has been cleaned properly")
 
-	m.analyticsModel.PrepareToExportAnalytics(roomID, roomSID, metadata)
-}
-
-// Helper function to check if all users are disconnected
-func (m *RoomModel) areAllUsersDisconnected(roomId string) bool {
-	users, err := m.natsService.GetOnlineUsersId(roomId)
-	if err != nil || users == nil || len(users) == 0 {
-		return true
-	}
-	return false
+	time.AfterFunc(config.WaitBeforeAnalyticsStartProcessing, func() {
+		// let's wait a few seconds so that all other processes will finish
+		m.analyticsModel.PrepareToExportAnalytics(roomID, roomSID, metadata)
+	})
 }
