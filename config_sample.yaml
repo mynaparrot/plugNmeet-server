@@ -92,6 +92,16 @@ database_info:
   conn_max_lifetime: 4m
   # Maximum number of open connections. Default is 10.
   max_open_conns: 10
+  # Optional Read Replicas
+#  replicas:
+#    - host: "replica-db-host-1"
+#      port: 3306
+#      username: "user"
+#      password: "password"
+#    - host: "replica-db-host-2"
+#      port: 3306
+#      username: "user"
+#      password: "password"
 
 nats_info:
   nats_urls:

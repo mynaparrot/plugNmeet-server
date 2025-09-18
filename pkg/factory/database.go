@@ -10,6 +10,7 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+	"gorm.io/plugin/dbresolver"
 )
 
 func NewDatabaseConnection(ctx context.Context, appCnf *config.AppConfig) error {
@@ -48,6 +49,40 @@ func NewDatabaseConnection(ctx context.Context, appCnf *config.AppConfig) error 
 	db, err := gorm.Open(mysql.New(mysqlCnf), cnf)
 	if err != nil {
 		return err
+	}
+
+	// If read replicas are configured, set up the dbresolver.
+	if len(info.Replicas) > 0 {
+		appCnf.Logger.Infof("found %d read replicas, configuring dbresolver", len(info.Replicas))
+		var replicaDialectors []gorm.Dialector
+
+		for _, r := range info.Replicas {
+			// Use primary's settings as default for replicas if not specified.
+			if r.Username == "" {
+				r.Username = info.Username
+			}
+			if r.Password == "" {
+				r.Password = info.Password
+			}
+			if r.Port == 0 {
+				r.Port = info.Port
+			}
+
+			replicaDsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s&parseTime=True&loc=%s", r.Username, r.Password, r.Host, r.Port, info.DBName, charset, loc)
+			replicaDialectors = append(replicaDialectors, mysql.Open(replicaDsn))
+		}
+		resolverCnf := dbresolver.Config{
+			Replicas: replicaDialectors,
+			Policy:   dbresolver.RandomPolicy{}, // Use random policy to distribute read load.
+		}
+		if appCnf.Client.Debug {
+			resolverCnf.TraceResolverMode = true
+		}
+
+		err = db.Use(dbresolver.Register(resolverCnf))
+		if err != nil {
+			return err
+		}
 	}
 
 	d, err := db.DB()
