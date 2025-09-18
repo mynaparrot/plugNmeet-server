@@ -3,6 +3,7 @@ package models
 import (
 	"net/url"
 
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/sirupsen/logrus"
 )
 
@@ -16,18 +17,14 @@ func (m *EtherpadModel) CleanPad(roomId, nodeId, padId string) error {
 	})
 	log.Infoln("request to clean etherpad pad")
 
-	var hostFound bool
+	var selectedHost *config.EtherpadInfo
 	for _, h := range m.app.SharedNotePad.EtherpadHosts {
 		if h.Id == nodeId {
-			m.NodeId = nodeId
-			m.Host = h.Host
-			m.ClientId = h.ClientId
-			m.ClientSecret = h.ClientSecret
-			hostFound = true
+			selectedHost = &h
 			break
 		}
 	}
-	if !hostFound {
+	if selectedHost == nil {
 		// this is normal if etherpad wasn't created
 		log.Info("no host found for the given node id")
 		return nil
@@ -36,7 +33,7 @@ func (m *EtherpadModel) CleanPad(roomId, nodeId, padId string) error {
 	// step 1: delete pad
 	vals := url.Values{}
 	vals.Add("padID", padId)
-	_, err := m.postToEtherpad("deletePad", vals, log)
+	_, err := m.postToEtherpad(selectedHost, "deletePad", vals, log)
 	if err != nil {
 		// postToEtherpad will log the error details, so we just log a warning here.
 		log.WithError(err).Warn("failed to delete pad from etherpad, continuing cleanup")

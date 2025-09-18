@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/sirupsen/logrus"
 )
@@ -60,7 +62,7 @@ func (m *EtherpadModel) ChangeEtherpadStatus(r *plugnmeet.ChangeEtherpadStatusRe
 	return err
 }
 
-func (m *EtherpadModel) addPadToRoomMetadata(roomId string, c *plugnmeet.CreateEtherpadSessionRes, log *logrus.Entry) error {
+func (m *EtherpadModel) addPadToRoomMetadata(roomId string, selectedHost *config.EtherpadInfo, c *plugnmeet.CreateEtherpadSessionRes, log *logrus.Entry) error {
 	log = log.WithField("method", "addPadToRoomMetadata")
 	log.Info("adding pad info to room metadata")
 
@@ -78,8 +80,8 @@ func (m *EtherpadModel) addPadToRoomMetadata(roomId string, c *plugnmeet.CreateE
 	f := &plugnmeet.SharedNotePadFeatures{
 		AllowedSharedNotePad: meta.RoomFeatures.SharedNotePadFeatures.AllowedSharedNotePad,
 		IsActive:             true,
-		NodeId:               m.NodeId,
-		Host:                 m.Host,
+		NodeId:               selectedHost.Id,
+		Host:                 selectedHost.Host,
 		NotePadId:            *c.PadId,
 		ReadOnlyPadId:        *c.ReadonlyPadId,
 	}
@@ -105,15 +107,15 @@ func (m *EtherpadModel) addPadToRoomMetadata(roomId string, c *plugnmeet.CreateE
 	return err
 }
 
-func (m *EtherpadModel) postToEtherpad(method string, vals url.Values, log *logrus.Entry) (*EtherpadHttpRes, error) {
+func (m *EtherpadModel) postToEtherpad(host *config.EtherpadInfo, method string, vals url.Values, log *logrus.Entry) (*EtherpadHttpRes, error) {
 	log = log.WithField("etherpadMethod", method)
 
-	if m.NodeId == "" {
+	if host.Id == "" {
 		err := errors.New("no notepad nodeId found")
 		log.WithError(err).Error()
 		return nil, err
 	}
-	token, err := m.getAccessToken(log)
+	token, err := m.getAccessToken(host, log)
 	if err != nil {
 		// getAccessToken will log the error
 		return nil, err
@@ -121,7 +123,7 @@ func (m *EtherpadModel) postToEtherpad(method string, vals url.Values, log *logr
 
 	client := &http.Client{}
 	en := vals.Encode()
-	endPoint := fmt.Sprintf("%s/api/%s/%s?%s", m.Host, APIVersion, method, en)
+	endPoint := fmt.Sprintf("%s/api/%s/%s?%s", host.Host, APIVersion, method, en)
 	log.WithField("endpoint", endPoint).Debug("sending request to etherpad")
 
 	req, err := http.NewRequest("GET", endPoint, nil)
@@ -160,8 +162,8 @@ func (m *EtherpadModel) postToEtherpad(method string, vals url.Values, log *logr
 	return mar, nil
 }
 
-func (m *EtherpadModel) getAccessToken(log *logrus.Entry) (string, error) {
-	token, _ := m.natsService.GetEtherpadToken(m.NodeId)
+func (m *EtherpadModel) getAccessToken(host *config.EtherpadInfo, log *logrus.Entry) (string, error) {
+	token, _ := m.natsService.GetEtherpadToken(host.Id)
 	if token != "" {
 		log.Debug("using cached etherpad access token")
 		return token, nil
@@ -170,12 +172,12 @@ func (m *EtherpadModel) getAccessToken(log *logrus.Entry) (string, error) {
 
 	data := url.Values{}
 	data.Set("grant_type", "client_credentials")
-	data.Set("client_id", m.ClientId)
-	data.Set("client_secret", m.ClientSecret)
+	data.Set("client_id", host.ClientId)
+	data.Set("client_secret", host.ClientSecret)
 	encodedData := data.Encode()
 
 	client := &http.Client{}
-	urlPath := fmt.Sprintf("%s/oidc/token", m.Host)
+	urlPath := fmt.Sprintf("%s/oidc/token", host.Host)
 
 	req, err := http.NewRequest("POST", urlPath, strings.NewReader(encodedData))
 	if err != nil {
@@ -218,7 +220,7 @@ func (m *EtherpadModel) getAccessToken(log *logrus.Entry) (string, error) {
 	}
 
 	// we'll store the value with expiry of 30-minute max
-	err = m.natsService.AddEtherpadToken(m.NodeId, vals.AccessToken, time.Minute*30)
+	err = m.natsService.AddEtherpadToken(host.Id, vals.AccessToken, time.Minute*30)
 	if err != nil {
 		log.WithError(err).Warn("failed to cache etherpad access token")
 	}

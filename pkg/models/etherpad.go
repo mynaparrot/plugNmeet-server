@@ -31,11 +31,6 @@ type EtherpadDataTypes struct {
 }
 
 type EtherpadModel struct {
-	NodeId       string
-	Host         string
-	ClientId     string
-	ClientSecret string
-
 	app            *config.AppConfig
 	ds             *dbservice.DatabaseService
 	rs             *redisservice.RedisService
