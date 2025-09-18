@@ -69,7 +69,7 @@ func (m *EtherpadModel) CleanAfterRoomEnd(roomId, metadata string) error {
 	}
 
 	np := roomMeta.RoomFeatures.SharedNotePadFeatures
-	if !np.AllowedSharedNotePad {
+	if !np.AllowedSharedNotePad || np.NodeId == "" || np.NotePadId == "" {
 		return nil
 	}
 
