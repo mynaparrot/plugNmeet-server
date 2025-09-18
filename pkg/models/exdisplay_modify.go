@@ -4,11 +4,22 @@ import (
 	"errors"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/sirupsen/logrus"
 )
 
 func (m *ExDisplayModel) start(req *plugnmeet.ExternalDisplayLinkReq) error {
+	log := m.logger.WithFields(logrus.Fields{
+		"roomId": req.RoomId,
+		"userId": req.UserId,
+		"url":    req.GetUrl(),
+		"method": "startExternalDisplay",
+	})
+	log.Infoln("request to start external display link")
+
 	if req.Url != nil && *req.Url == "" {
-		return errors.New("valid url required")
+		err := errors.New("valid url required")
+		log.WithError(err).Warnln()
+		return err
 	}
 	active := new(bool)
 	*active = true
@@ -18,25 +29,36 @@ func (m *ExDisplayModel) start(req *plugnmeet.ExternalDisplayLinkReq) error {
 		url:      req.Url,
 		sharedBy: &req.UserId,
 	}
-	return m.updateRoomMetadata(req.RoomId, opts)
+	return m.updateRoomMetadata(req.RoomId, opts, log)
 }
 
 func (m *ExDisplayModel) end(req *plugnmeet.ExternalDisplayLinkReq) error {
+	log := m.logger.WithFields(logrus.Fields{
+		"roomId": req.RoomId,
+		"userId": req.UserId,
+		"method": "endExternalDisplay",
+	})
+	log.Infoln("request to end external display link")
+
 	active := new(bool)
 
 	opts := &updateRoomMetadataOpts{
 		isActive: active,
 	}
-	return m.updateRoomMetadata(req.RoomId, opts)
+	return m.updateRoomMetadata(req.RoomId, opts, log)
 }
 
-func (m *ExDisplayModel) updateRoomMetadata(roomId string, opts *updateRoomMetadataOpts) error {
+func (m *ExDisplayModel) updateRoomMetadata(roomId string, opts *updateRoomMetadataOpts, log *logrus.Entry) error {
+	log.Info("updating room metadata for external display")
 	roomMeta, err := m.natsService.GetRoomMetadataStruct(roomId)
 	if err != nil {
+		log.WithError(err).Error("failed to get room metadata")
 		return err
 	}
 	if roomMeta == nil {
-		return errors.New("invalid nil room metadata information")
+		err = errors.New("invalid nil room metadata information")
+		log.WithError(err).Error()
+		return err
 	}
 
 	if opts.isActive != nil {
@@ -51,7 +73,7 @@ func (m *ExDisplayModel) updateRoomMetadata(roomId string, opts *updateRoomMetad
 
 	err = m.natsService.UpdateAndBroadcastRoomMetadata(roomId, roomMeta)
 	if err != nil {
-		m.logger.Errorln(err)
+		log.WithError(err).Error("failed to update and broadcast room metadata")
 	}
 
 	// send analytics
@@ -70,5 +92,9 @@ func (m *ExDisplayModel) updateRoomMetadata(roomId string, opts *updateRoomMetad
 
 	m.analyticsModel.HandleEvent(d)
 
-	return nil
+	if err == nil {
+		log.Info("successfully updated room metadata")
+	}
+
+	return err
 }

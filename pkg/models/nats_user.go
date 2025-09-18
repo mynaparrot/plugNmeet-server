@@ -10,30 +10,34 @@ import (
 )
 
 func (m *NatsModel) OnAfterUserJoined(roomId, userId string) {
+	log := m.logger.WithFields(logrus.Fields{
+		"roomId": roomId,
+		"userId": userId,
+		"method": "OnAfterUserJoined",
+	})
+
 	status, err := m.natsService.GetRoomUserStatus(roomId, userId)
 	// If there's an error or the user is already online, we don't need to proceed.
-	if err != nil || status == natsservice.UserStatusOnline {
-		if err != nil {
-			m.logger.WithFields(logrus.Fields{
-				"room_id": roomId,
-				"user_id": userId,
-			}).Errorf("failed to get room user status: %v", err)
-		}
+	if err != nil {
+		log.WithError(err).Error("failed to get room user status")
+		return
+	}
+	if status == natsservice.UserStatusOnline {
+		// This is a frequent case due to pings, so we don't log it to avoid noise.
 		return
 	}
 
+	log.Info("handling user joined event")
 	if err = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusOnline); err != nil {
-		m.logger.WithFields(logrus.Fields{
-			"room_id": roomId,
-			"user_id": userId,
-			"status":  natsservice.UserStatusOnline,
-		}).Warnf("failed to update user status: %v", err)
+		log.WithError(err).WithField("status", natsservice.UserStatusOnline).Warn("failed to update user status")
 	}
 
 	userInfo, err := m.natsService.GetUserInfo(roomId, userId)
 	if err == nil && userInfo != nil {
 		// broadcast this user to everyone
-		_ = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_JOINED, roomId, userInfo, userId)
+		if err = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_JOINED, roomId, userInfo, userId); err != nil {
+			log.WithError(err).Error("failed to broadcast USER_JOINED event")
+		}
 
 		now := fmt.Sprintf("%d", time.Now().UnixMilli())
 		m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
@@ -45,11 +49,9 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId string) {
 			ExtraData: &userInfo.Metadata,
 			HsetValue: &now,
 		})
+		log.Info("successfully processed user joined event")
 	} else if err != nil {
-		m.logger.WithFields(logrus.Fields{
-			"room_id": roomId,
-			"user_id": userId,
-		}).Warnf("could not get user info after join: %v", err)
+		log.WithError(err).Warn("could not get user info after join")
 	}
 }
 
@@ -57,40 +59,53 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId string) {
 // we'll wait for 5 seconds before declare user as offline
 // but will broadcast as disconnected
 func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) {
+	log := m.logger.WithFields(logrus.Fields{
+		"roomId": roomId,
+		"userId": userId,
+		"method": "OnAfterUserDisconnected",
+	})
+	log.Info("handling user disconnected event")
+
 	// Immediately set status to disconnected and notify clients.
-	_ = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusDisconnected)
+	if err := m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusDisconnected); err != nil {
+		log.WithError(err).WithField("status", natsservice.UserStatusDisconnected).Warn("failed to update user status")
+	}
 
 	// Try to get user info for a richer disconnect message.
 	userInfo, err := m.natsService.GetUserInfo(roomId, userId)
 	if err != nil || userInfo == nil {
 		// If we can't get user info, send a basic event and update analytics.
-		_ = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_DISCONNECTED, roomId, &plugnmeet.NatsKvUserInfo{UserId: userId}, userId)
+		if err = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_DISCONNECTED, roomId, &plugnmeet.NatsKvUserInfo{UserId: userId}, userId); err != nil {
+			log.WithError(err).Error("failed to broadcast basic USER_DISCONNECTED event")
+		}
 	} else {
-		_ = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_DISCONNECTED, roomId, userInfo, userId)
+		if err = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_DISCONNECTED, roomId, userInfo, userId); err != nil {
+			log.WithError(err).Error("failed to broadcast USER_DISCONNECTED event")
+		}
 	}
 
 	// Start a non-blocking background task to handle the full offline/cleanup lifecycle.
-	go m.handleDelayedOfflineTasks(roomId, userId, userInfo)
+	go m.handleDelayedOfflineTasks(roomId, userId, userInfo, log)
 }
 
 // handleDelayedOfflineTasks manages the grace period for user reconnection and subsequent cleanup.
-func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, userInfo *plugnmeet.NatsKvUserInfo) {
+func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, userInfo *plugnmeet.NatsKvUserInfo, log *logrus.Entry) {
+	log = log.WithField("subMethod", "handleDelayedOfflineTasks")
+	log.Info("starting delayed offline tasks")
+
 	// Stage 1: Wait for the reconnection grace period.
 	time.Sleep(5 * time.Second)
 
 	status, err := m.natsService.GetRoomUserStatus(roomId, userId)
 	if err == nil && status == natsservice.UserStatusOnline {
 		// User reconnected, do nothing.
+		log.Info("user reconnected within grace period, aborting offline tasks")
 		return
 	}
 
 	// User is still disconnected, so mark as offline.
 	if err = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusOffline); err != nil {
-		m.logger.WithFields(logrus.Fields{
-			"room_id": roomId,
-			"user_id": userId,
-			"status":  natsservice.UserStatusOffline,
-		}).Warnf("failed to update user status: %v", err)
+		log.WithError(err).WithField("status", natsservice.UserStatusOffline).Warn("failed to update user status")
 	}
 
 	// Send analytics for the user leaving.
@@ -98,10 +113,14 @@ func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, userInfo *p
 
 	// Broadcast the final offline status.
 	if userInfo != nil {
-		_ = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_OFFLINE, roomId, userInfo, userId)
+		if err = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_OFFLINE, roomId, userInfo, userId); err != nil {
+			log.WithError(err).Error("failed to broadcast USER_OFFLINE event")
+		}
 	} else {
 		// Fallback if userInfo was not available initially.
-		_ = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_OFFLINE, roomId, &plugnmeet.NatsKvUserInfo{UserId: userId}, userId)
+		if err = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_OFFLINE, roomId, &plugnmeet.NatsKvUserInfo{UserId: userId}, userId); err != nil {
+			log.WithError(err).Error("failed to broadcast basic USER_OFFLINE event")
+		}
 	}
 
 	// Stage 2: Wait a bit longer before cleaning up resources.
@@ -110,10 +129,12 @@ func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, userInfo *p
 	status, err = m.natsService.GetRoomUserStatus(roomId, userId)
 	if err == nil && status == natsservice.UserStatusOnline {
 		// User reconnected, do not delete consumer.
+		log.Info("user reconnected before final cleanup, consumer will not be deleted")
 		return
 	}
 
 	// Final cleanup: Delete the user's NATS consumer.
+	log.Info("deleting user's NATS consumer")
 	m.natsService.DeleteConsumer(roomId, userId)
 }
 

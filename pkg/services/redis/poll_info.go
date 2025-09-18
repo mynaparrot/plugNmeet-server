@@ -7,15 +7,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const (
-	pollsKey              = "pnm:polls:"
-	pollRespondentsSubKey = ":respondents:"
-	pollVotedUsersSubKey  = ":voted_users"
-	pollAllResSubKey      = ":all_respondents"
-	PollTotalRespField    = "total_resp"
-	PollCountSuffix       = "_count"
-)
-
 func (s *RedisService) GetPollsListByRoomId(roomId string) ([]string, error) {
 	// e.g. key: pnm:polls:{roomId}
 	result, err := s.rc.HVals(s.ctx, pollsKey+roomId).Result()

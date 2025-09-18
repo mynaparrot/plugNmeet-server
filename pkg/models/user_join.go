@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -22,26 +21,35 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 		"room_id": g.GetRoomId(),
 		"user_id": g.GetUserInfo().GetUserId(),
 		"name":    g.GetUserInfo().GetName(),
+		"method":  "GetPNMJoinToken",
 	})
+	log.Infoln("request to generate pnm join token")
 
 	// check first
 	_ = waitUntilRoomCreationCompletes(ctx, m.rs, g.GetRoomId(), log)
 
 	if g.GetUserInfo().GetName() == config.RecorderUserAuthName {
-		return "", errors.New(fmt.Sprintf("name: %s is reserved for internal use only", config.RecorderUserAuthName))
+		err := fmt.Errorf("name: %s is reserved for internal use only", config.RecorderUserAuthName)
+		log.WithError(err).Warnln()
+		return "", err
 	}
 
 	rInfo, meta, err := m.natsService.GetRoomInfoWithMetadata(g.GetRoomId())
 	if err != nil {
+		log.WithError(err).Errorln("failed to get room info with metadata")
 		return "", err
 	}
 
 	if rInfo == nil || meta == nil {
-		return "", errors.New("did not find correct room info")
+		err = fmt.Errorf("did not find correct room info")
+		log.WithError(err).Errorln()
+		return "", err
 	}
 
 	if rInfo.Status == natsservice.RoomStatusEnded {
-		return "", errors.New("room found in delete status, need to recreate it")
+		err = fmt.Errorf("room found in delete status, need to recreate it")
+		log.WithError(err).Warnln()
+		return "", err
 	}
 
 	if g.UserInfo.UserMetadata == nil {
@@ -70,10 +78,11 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 		// and only send log-out signal to the user
 		status, err := m.natsService.GetRoomUserStatus(g.GetRoomId(), g.GetUserInfo().GetUserId())
 		if err != nil {
+			log.WithError(err).Errorln("failed to get room user status")
 			return "", err
 		}
 		if status == natsservice.UserStatusOnline {
-			m.logger.Warnln("same user found in online status, removing that user before re-generating token")
+			log.Warnln("same user found in online status, removing that user before re-generating token")
 
 			_ = m.RemoveParticipant(&plugnmeet.RemoveParticipantReq{
 				RoomId: g.GetRoomId(),
@@ -82,13 +91,15 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 			})
 
 			// Wait for the user to be fully offline before proceeding.
-			m.waitForUserToBeOffline(ctx, g.GetRoomId(), g.GetUserInfo().GetUserId())
+			m.waitForUserToBeOffline(ctx, g.GetRoomId(), g.GetUserInfo().GetUserId(), log)
 		}
 	}
 
 	// we'll validate user id
 	if !validUserIDRegex.MatchString(g.UserInfo.UserId) {
-		return "", fmt.Errorf("user_id should only contain ASCII letters (a-z A-Z), digits (0-9) or -_")
+		err = fmt.Errorf("user_id should only contain ASCII letters (a-z A-Z), digits (0-9) or -_")
+		log.WithError(err).Errorln()
+		return "", err
 	}
 
 	if g.UserInfo.IsAdmin {
@@ -98,6 +109,7 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 		g.UserInfo.UserMetadata.LockSettings = new(plugnmeet.LockSettings)
 
 		if err := m.CreateNewPresenter(g); err != nil {
+			log.WithError(err).Errorln("failed to create new presenter")
 			return "", err
 		}
 	} else {
@@ -117,6 +129,7 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 	// add user to our bucket
 	err = m.natsService.AddUser(g.RoomId, g.UserInfo.UserId, g.UserInfo.Name, g.UserInfo.IsAdmin, g.UserInfo.UserMetadata.IsPresenter, g.UserInfo.UserMetadata)
 	if err != nil {
+		log.WithError(err).Errorln("failed to add user to nats")
 		return "", err
 	}
 
@@ -128,13 +141,14 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 		IsHidden: g.UserInfo.IsHidden,
 	}
 
+	log.Infoln("successfully generated pnm join token")
 	am := NewAuthModel(m.app, m.natsService, m.logger.Logger)
 	return am.GeneratePNMJoinToken(c)
 }
 
 // waitForUserToBeOffline polls until the user's status is no longer "online".
 // It includes a timeout to prevent indefinite waiting.
-func (m *UserModel) waitForUserToBeOffline(ctx context.Context, roomID, userID string) {
+func (m *UserModel) waitForUserToBeOffline(ctx context.Context, roomID, userID string, log *logrus.Entry) {
 	// We'll wait for a maximum of 5 seconds for the user to be offline.
 	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -145,17 +159,17 @@ func (m *UserModel) waitForUserToBeOffline(ctx context.Context, roomID, userID s
 	for {
 		select {
 		case <-timeoutCtx.Done():
-			m.logger.Warnf("timed out waiting for user %s in room %s to go offline", userID, roomID)
+			log.Warn("timed out waiting for user to go offline")
 			return
 		case <-ticker.C:
 			status, err := m.natsService.GetRoomUserStatus(roomID, userID)
 			if err != nil {
 				// An error (e.g., key not found) implies the user is gone.
-				m.logger.Infof("user %s in room %s is offline (key not found)", userID, roomID)
+				log.Info("user is offline (key not found)")
 				return
 			}
 			if status != natsservice.UserStatusOnline {
-				m.logger.Infof("user %s in room %s is now offline (status: %s)", userID, roomID, status)
+				log.WithField("status", status).Info("user is now offline")
 				return
 			}
 			// User is still online, loop will continue.

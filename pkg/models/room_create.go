@@ -15,8 +15,13 @@ import (
 )
 
 func (m *RoomModel) CreateRoom(ctx context.Context, r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoomInfo, error) {
+	log := m.logger.WithFields(logrus.Fields{
+		"roomId": r.GetRoomId(),
+		"method": "CreateRoom",
+	})
+	log.Infoln("create room request")
 	// we'll lock the same room creation until the room is created
-	lockValue, err := acquireRoomCreationLockWithRetry(ctx, m.rs, r.GetRoomId(), m.logger)
+	lockValue, err := acquireRoomCreationLockWithRetry(ctx, m.rs, r.GetRoomId(), log)
 	if err != nil {
 		return nil, err // Error already logged by helper
 	}
@@ -27,13 +32,14 @@ func (m *RoomModel) CreateRoom(ctx context.Context, r *plugnmeet.CreateRoomReq) 
 		defer cancel()
 		if unlockErr := m.rs.UnlockRoomCreation(unlockCtx, r.GetRoomId(), lockValue); unlockErr != nil {
 			// UnlockRoomCreation in RedisService should log details
-			m.logger.WithError(unlockErr).Errorf("Error trying to clean up room creation lock for room %s", r.GetRoomId())
+			log.WithError(unlockErr).Error("error trying to clean up room creation lock")
 		}
 	}()
 
 	// check if room already exists in db or not
 	roomDbInfo, err := m.ds.GetRoomInfoByRoomId(r.RoomId, 1)
 	if err != nil {
+		log.WithError(err).Error("could not get room info from db")
 		return nil, err
 	}
 
@@ -41,9 +47,11 @@ func (m *RoomModel) CreateRoom(ctx context.Context, r *plugnmeet.CreateRoomReq) 
 	if roomDbInfo != nil && roomDbInfo.Sid != "" {
 		ari, err := m.handleExistingRoom(r, roomDbInfo)
 		if err != nil {
+			log.WithError(err).Error("failed to handle existing room")
 			return nil, err
 		}
 		if ari != nil {
+			log.Info("handled existing room")
 			return ari, nil
 		}
 		// otherwise we'll keep going
@@ -58,20 +66,26 @@ func (m *RoomModel) CreateRoom(ctx context.Context, r *plugnmeet.CreateRoomReq) 
 	// save info to db
 	_, err = m.ds.InsertOrUpdateRoomInfo(roomDbInfo)
 	if err != nil {
+		log.WithError(err).Error("failed to insert or update room in db")
 		return nil, err
 	}
+	log.Info("room info saved to db")
 
 	// now create room bucket
 	err = m.natsService.AddRoom(roomDbInfo.ID, r.RoomId, sid, r.EmptyTimeout, r.MaxParticipants, r.Metadata)
 	if err != nil {
+		log.WithError(err).Error("failed to add room to nats")
 		return nil, err
 	}
+	log.Info("room added to nats")
 
 	// create streams
 	err = m.natsService.CreateRoomNatsStreams(r.RoomId)
 	if err != nil {
+		log.WithError(err).Error("failed to create nats streams")
 		return nil, err
 	}
+	log.Info("nats streams created")
 
 	rInfo, err := m.natsService.GetRoomInfo(r.RoomId)
 	if err != nil || rInfo == nil {
@@ -96,6 +110,10 @@ func (m *RoomModel) CreateRoom(ctx context.Context, r *plugnmeet.CreateRoomReq) 
 	// create and send room_created webhook
 	go m.sendRoomCreatedWebhook(ari, r.EmptyTimeout, r.MaxParticipants)
 
+	log.WithFields(logrus.Fields{
+		"roomSid":     rInfo.RoomSid,
+		"webhook_url": roomDbInfo.WebhookUrl,
+	}).Info("successfully created new room")
 	return ari, nil
 }
 
@@ -207,26 +225,31 @@ func (m *RoomModel) prepareWhiteboardPreloadFile(meta *plugnmeet.RoomMetadata, r
 		return
 	}
 
-	m.logger.WithFields(logrus.Fields{
-		"roomSid": roomSid,
-		"roomId":  roomId,
-	}).Infof("roomId: %s has preloadFile: %s for whiteboard so, preparing it", roomId, *wbf.PreloadFile)
-
-	fm := NewFileModel(m.app, m.ds, m.natsService, m.logger.Logger)
-	err := fm.DownloadAndProcessPreUploadWBfile(roomId, roomSid, *wbf.PreloadFile)
-	if err != nil {
-		m.logger.Errorln(err)
-		_ = m.natsService.NotifyErrorMsg(roomId, "notifications.preloaded-whiteboard-file-processing-error", nil)
-		meta.RoomFeatures.WhiteboardFeatures.PreloadFile = nil
-		_ = m.natsService.UpdateAndBroadcastRoomMetadata(roomId, meta)
-		return
-	}
-
-	m.logger.WithFields(logrus.Fields{
+	log := m.logger.WithFields(logrus.Fields{
 		"roomSid": roomSid,
 		"roomId":  roomId,
 		"file":    *wbf.PreloadFile,
-	}).Infoln("preloadFile had been processed successfully")
+		"method":  "prepareWhiteboardPreloadFile",
+	})
+
+	log.Info("preparing preloaded whiteboard file")
+
+	err := m.fileModel.DownloadAndProcessPreUploadWBfile(roomId, roomSid, *wbf.PreloadFile, log)
+	if err != nil {
+		log.WithError(err).Error("failed to download and process preloaded whiteboard file")
+
+		if notifyErr := m.natsService.NotifyErrorMsg(roomId, "notifications.preloaded-whiteboard-file-processing-error", nil); notifyErr != nil {
+			log.WithError(notifyErr).Error("failed to send notification for whiteboard processing error")
+		}
+
+		meta.RoomFeatures.WhiteboardFeatures.PreloadFile = nil
+		if updateErr := m.natsService.UpdateAndBroadcastRoomMetadata(roomId, meta); updateErr != nil {
+			log.WithError(updateErr).Error("failed to update room metadata after whiteboard processing error")
+		}
+		return
+	}
+
+	log.Info("preloaded whiteboard file processed successfully")
 }
 
 // sendRoomCreatedWebhook to send webhook

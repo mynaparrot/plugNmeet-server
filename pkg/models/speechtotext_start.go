@@ -1,14 +1,14 @@
 package models
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 )
 
 func (m *SpeechToTextModel) SpeechToTextTranslationServiceStart(r *plugnmeet.SpeechToTextTranslationReq) error {
 	if !m.app.AzureCognitiveServicesSpeech.Enabled {
-		return errors.New("speech service disabled")
+		return fmt.Errorf("speech service disabled")
 	}
 
 	meta, err := m.natsService.GetRoomMetadataStruct(r.RoomId)
@@ -16,7 +16,7 @@ func (m *SpeechToTextModel) SpeechToTextTranslationServiceStart(r *plugnmeet.Spe
 		return err
 	}
 	if meta == nil {
-		return errors.New("invalid nil room metadata information")
+		return fmt.Errorf("invalid nil room metadata information")
 	}
 
 	f := meta.RoomFeatures.SpeechToTextTranslationFeatures

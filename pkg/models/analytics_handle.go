@@ -7,11 +7,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 )
 
-const (
-	analyticsRoomKey = "pnm:analytics:%s"
-	analyticsUserKey = analyticsRoomKey + ":user:%s"
-)
-
 func (m *AnalyticsModel) HandleEvent(d *plugnmeet.AnalyticsDataMsg) {
 	if m.app.AnalyticsSettings == nil ||
 		!m.app.AnalyticsSettings.Enabled {

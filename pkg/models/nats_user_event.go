@@ -1,32 +1,41 @@
 package models
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/sirupsen/logrus"
 )
 
 func (m *NatsModel) HandleInitialData(roomId, userId string) {
+	log := m.logger.WithFields(logrus.Fields{
+		"roomId": roomId,
+		"userId": userId,
+		"method": "HandleInitialData",
+	})
+
 	// send room info
 	rInfo, err := m.natsService.GetRoomInfo(roomId)
 	if err != nil {
-		m.logger.Errorln(fmt.Sprintf("error getting room info for userId: %s, roomId: %s, msg: %s", userId, roomId, err.Error()))
+		log.WithError(err).Errorln("error getting room info")
 		_ = m.natsService.NotifyErrorMsg(roomId, err.Error(), &userId)
 		return
 	}
 	if rInfo == nil {
+		log.Errorln("room information not found")
 		_ = m.natsService.NotifyErrorMsg(roomId, "room information not found", &userId)
+		return
 	}
 
 	// send this user's info
 	userInfo, err := m.natsService.GetUserInfo(roomId, userId)
 	if err != nil {
-		m.logger.Errorln(fmt.Sprintf("error getting user info for userId: %s, roomId: %s, msg: %s", userId, roomId, err.Error()))
+		log.WithError(err).Errorln("error getting user info")
 		_ = m.natsService.NotifyErrorMsg(roomId, err.Error(), &userId)
 		return
 	}
 	if userInfo == nil {
+		log.Errorln("user info not found")
 		_ = m.natsService.NotifyErrorMsg(roomId, "no user found", &userId)
 		return
 	}
@@ -34,7 +43,7 @@ func (m *NatsModel) HandleInitialData(roomId, userId string) {
 	// send media server connection info
 	token, err := m.GenerateLivekitToken(roomId, userInfo)
 	if err != nil {
-		m.logger.Errorln(err)
+		log.WithError(err).Errorln("failed to generate livekit token")
 		_ = m.natsService.NotifyErrorMsg(roomId, err.Error(), &userId)
 		return
 	}
@@ -52,15 +61,27 @@ func (m *NatsModel) HandleInitialData(roomId, userId string) {
 	// send important info first
 	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_RES_INITIAL_DATA, roomId, initial, &userId)
 	if err != nil {
-		m.logger.Warnln(fmt.Sprintf("error sending RES_INITIAL_DATA event userId: %s, roomId: %s, msg: %s", userId, roomId, err.Error()))
+		log.WithError(err).Warnln("error sending RES_INITIAL_DATA event")
 	}
 }
 
 func (m *NatsModel) HandleSendUsersList(roomId, userId string) {
-	if users, err := m.natsService.GetOnlineUsersListAsJson(roomId); err == nil && users != nil {
-		err := m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_RES_JOINED_USERS_LIST, roomId, users, &userId)
+	log := m.logger.WithFields(logrus.Fields{
+		"roomId": roomId,
+		"userId": userId,
+		"method": "HandleSendUsersList",
+	})
+
+	users, err := m.natsService.GetOnlineUsersListAsJson(roomId)
+	if err != nil {
+		log.WithError(err).Errorln("failed to get online users list as json")
+		return
+	}
+
+	if users != nil {
+		err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_RES_JOINED_USERS_LIST, roomId, users, &userId)
 		if err != nil {
-			m.logger.Warnln(fmt.Sprintf("error sending RES_JOINED_USERS_LIST event userId: %s, roomId: %s, msg: %s", userId, roomId, err.Error()))
+			log.WithError(err).Warnln("error sending RES_JOINED_USERS_LIST event")
 		}
 	}
 }

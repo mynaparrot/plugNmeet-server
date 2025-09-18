@@ -1,7 +1,7 @@
 package models
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -47,5 +47,5 @@ func (m *ExMediaModel) HandleTask(req *plugnmeet.ExternalMediaPlayerReq) error {
 		return m.endPlayBack(req)
 	}
 
-	return errors.New("not valid request")
+	return fmt.Errorf("not valid request")
 }

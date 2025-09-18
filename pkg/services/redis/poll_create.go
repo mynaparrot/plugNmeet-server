@@ -8,6 +8,15 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+const (
+	pollsKey              = "pnm:polls:"
+	pollRespondentsSubKey = ":respondents:"
+	pollVotedUsersSubKey  = ":voted_users"
+	pollAllResSubKey      = ":all_respondents"
+	PollTotalRespField    = "total_resp"
+	PollCountSuffix       = "_count"
+)
+
 func (s *RedisService) CreateRoomPoll(roomId string, val map[string]string) error {
 	_, err := s.rc.HSet(s.ctx, pollsKey+roomId, val).Result()
 	if err != nil {

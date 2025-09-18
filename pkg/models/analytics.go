@@ -8,6 +8,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	analyticsRoomKey = redisservice.Prefix + "analytics:%s"
+	analyticsUserKey = analyticsRoomKey + ":user:%s"
+)
+
 type AnalyticsModel struct {
 	app         *config.AppConfig
 	ds          *dbservice.DatabaseService

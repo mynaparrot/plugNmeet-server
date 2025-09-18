@@ -17,12 +17,9 @@ import (
 // DownloadAndProcessPreUploadWBfile downloads and processes a pre-uploaded whiteboard file.
 // It validates the file, saves it, and triggers conversion and broadcasting.
 // This should be run in a separate goroutine due to its potentially long execution time.
-func (m *FileModel) DownloadAndProcessPreUploadWBfile(roomId, roomSid, fileUrl string) error {
-	log := m.logger.WithFields(logrus.Fields{
-		"roomId":  roomId,
-		"roomSid": roomSid,
-		"fileUrl": fileUrl,
-		"method":  "DownloadAndProcessPreUploadWBfile",
+func (m *FileModel) DownloadAndProcessPreUploadWBfile(roomId, roomSid, fileUrl string, log *logrus.Entry) error {
+	log.WithFields(logrus.Fields{
+		"sub-method": "DownloadAndProcessPreUploadWBfile",
 	})
 	if err := m.validateRemoteFile(fileUrl); err != nil {
 		log.WithError(err).Errorln("file validation failed")

@@ -6,21 +6,31 @@ import (
 	"github.com/goccy/go-json"
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func (m *PollModel) CreatePoll(r *plugnmeet.CreatePollReq) (string, error) {
+	log := m.logger.WithFields(logrus.Fields{
+		"roomId": r.RoomId,
+		"userId": r.UserId,
+		"method": "CreatePoll",
+	})
+	log.Infoln("request to create poll")
+
 	r.PollId = uuid.NewString()
+	log = log.WithField("pollId", r.PollId)
 
 	// create poll hash and add to room
 	err := m.createRoomPollHash(r)
 	if err != nil {
+		log.WithError(err).Errorln("failed to create room poll hash")
 		return "", err
 	}
 
 	err = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_POLL_CREATED, r.RoomId, r.PollId, r.UserId)
 	if err != nil {
-		m.logger.WithError(err).Errorln("error sending POLL_CREATED event")
+		log.WithError(err).Errorln("error sending POLL_CREATED event")
 	}
 
 	// send analytics
@@ -35,7 +45,7 @@ func (m *PollModel) CreatePoll(r *plugnmeet.CreatePollReq) (string, error) {
 	}
 	marshal, err := json.Marshal(toRecord)
 	if err != nil {
-		m.logger.WithError(err).Errorln("marshalling failed")
+		log.WithError(err).Errorln("failed to marshal analytics data")
 	}
 	val := string(marshal)
 	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
@@ -45,6 +55,7 @@ func (m *PollModel) CreatePoll(r *plugnmeet.CreatePollReq) (string, error) {
 		HsetValue: &val,
 	})
 
+	log.Info("successfully created poll")
 	return r.PollId, nil
 }
 
@@ -72,8 +83,17 @@ func (m *PollModel) createRoomPollHash(r *plugnmeet.CreatePollReq) error {
 }
 
 func (m *PollModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq) error {
+	log := m.logger.WithFields(logrus.Fields{
+		"roomId": r.RoomId,
+		"userId": r.UserId,
+		"pollId": r.PollId,
+		"method": "UserSubmitResponse",
+	})
+	log.Infoln("request to submit poll response")
+
 	err := m.rs.AddPollResponse(r)
 	if err != nil {
+		log.WithError(err).Errorln("failed to add poll response to redis")
 		return err
 	}
 
@@ -87,7 +107,7 @@ func (m *PollModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq) error
 	}
 	marshal, err := json.Marshal(toRecord)
 	if err != nil {
-		m.logger.WithError(err).Errorln("marshalling failed")
+		log.WithError(err).Errorln("failed to marshal analytics data")
 	}
 	val := string(marshal)
 	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
@@ -98,5 +118,6 @@ func (m *PollModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq) error
 		HsetValue: &val,
 	})
 
+	log.Info("successfully submitted poll response")
 	return nil
 }

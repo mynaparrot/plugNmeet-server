@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	RoomWithDurationInfoKey = "pnm:roomWithDurationInfo"
+	RoomWithDurationInfoKey = Prefix + "roomWithDurationInfo"
 )
 
 func (s *RedisService) AddRoomWithDurationInfo(roomId string, vals interface{}) error {

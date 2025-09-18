@@ -7,12 +7,21 @@ import (
 	"sort"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/sirupsen/logrus"
 )
 
-func (m *RecorderModel) addTokenAndRecorder(ctx context.Context, req *plugnmeet.RecordingReq, rq *plugnmeet.PlugNmeetToRecorder, userId string) error {
-	recorderId := m.selectRecorder()
+func (m *RecorderModel) addTokenAndRecorder(ctx context.Context, req *plugnmeet.RecordingReq, rq *plugnmeet.PlugNmeetToRecorder, userId string, log *logrus.Entry) error {
+	log = log.WithFields(logrus.Fields{
+		"userId": userId,
+		"method": "addTokenAndRecorder",
+	})
+	log.Info("adding token and selecting recorder")
+
+	recorderId := m.selectRecorder(log)
 	if recorderId == "" {
-		return fmt.Errorf("notifications.no-recorder-available")
+		err := fmt.Errorf("notifications.no-recorder-available")
+		log.WithError(err).Error("no recorder available")
+		return err
 	}
 
 	gt := &plugnmeet.GenerateTokenReq{
@@ -25,7 +34,7 @@ func (m *RecorderModel) addTokenAndRecorder(ctx context.Context, req *plugnmeet.
 	}
 	token, err := m.um.GetPNMJoinToken(ctx, gt)
 	if err != nil {
-		m.logger.WithError(err).Errorln("error getting pnm token")
+		log.WithError(err).Errorln("error getting pnm token")
 		return err
 	}
 
@@ -35,25 +44,42 @@ func (m *RecorderModel) addTokenAndRecorder(ctx context.Context, req *plugnmeet.
 	// if we have custom design, then we'll set custom design with token
 	// don't need to change anything in the recorder.
 	if req.CustomDesign != nil && *req.CustomDesign != "" {
+		log.Info("appending custom design to access token")
 		rq.AccessToken += "&custom_design=" + url.QueryEscape(*req.CustomDesign)
 	}
 
+	log.WithField("recorderId", recorderId).Info("successfully added token and selected recorder")
 	return nil
 }
 
-func (m *RecorderModel) selectRecorder() string {
+func (m *RecorderModel) selectRecorder(log *logrus.Entry) string {
+	log = log.WithField("method", "selectRecorder")
+	log.Info("selecting a recorder")
+
 	recorders := m.natsService.GetAllActiveRecorders()
 
 	if len(recorders) < 1 {
+		log.Warn("no active recorders found")
 		return ""
 	}
 	// let's sort it based on active processes & max limit.
 	sort.Slice(recorders, func(i int, j int) bool {
-		iA := (recorders[i].CurrentProgress) / recorders[i].MaxLimit
-		jA := (recorders[j].CurrentProgress) / recorders[j].MaxLimit
+		var iA, jA float64
+		if recorders[i].MaxLimit > 0 {
+			iA = float64(recorders[i].CurrentProgress) / float64(recorders[i].MaxLimit)
+		}
+		if recorders[j].MaxLimit > 0 {
+			jA = float64(recorders[j].CurrentProgress) / float64(recorders[j].MaxLimit)
+		}
 		return iA < jA
 	})
 
 	// we'll return the first one
-	return recorders[0].RecorderId
+	selected := recorders[0]
+	log.WithFields(logrus.Fields{
+		"selectedRecorderId": selected.RecorderId,
+		"currentProgress":    selected.CurrentProgress,
+		"maxLimit":           selected.MaxLimit,
+	}).Info("selected recorder")
+	return selected.RecorderId
 }

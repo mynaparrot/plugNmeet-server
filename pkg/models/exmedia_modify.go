@@ -4,11 +4,22 @@ import (
 	"errors"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/sirupsen/logrus"
 )
 
 func (m *ExMediaModel) startPlayBack(req *plugnmeet.ExternalMediaPlayerReq) error {
+	log := m.logger.WithFields(logrus.Fields{
+		"roomId": req.RoomId,
+		"userId": req.UserId,
+		"url":    req.GetUrl(),
+		"method": "startPlayBack",
+	})
+	log.Infoln("request to start external media playback")
+
 	if req.Url != nil && *req.Url == "" {
-		return errors.New("valid url required")
+		err := errors.New("valid url required")
+		log.WithError(err).Warnln()
+		return err
 	}
 	active := new(bool)
 	*active = true
@@ -18,26 +29,37 @@ func (m *ExMediaModel) startPlayBack(req *plugnmeet.ExternalMediaPlayerReq) erro
 		url:      req.Url,
 		sharedBy: &req.UserId,
 	}
-	return m.updateRoomMetadata(req.RoomId, opts)
+	return m.updateRoomMetadata(req.RoomId, opts, log)
 }
 
 func (m *ExMediaModel) endPlayBack(req *plugnmeet.ExternalMediaPlayerReq) error {
+	log := m.logger.WithFields(logrus.Fields{
+		"roomId": req.RoomId,
+		"userId": req.UserId,
+		"method": "endPlayBack",
+	})
+	log.Infoln("request to end external media playback")
+
 	active := new(bool)
 
 	opts := &updateRoomMetadataOpts{
 		isActive: active,
 	}
-	return m.updateRoomMetadata(req.RoomId, opts)
+	return m.updateRoomMetadata(req.RoomId, opts, log)
 }
 
-func (m *ExMediaModel) updateRoomMetadata(roomId string, opts *updateRoomMetadataOpts) error {
+func (m *ExMediaModel) updateRoomMetadata(roomId string, opts *updateRoomMetadataOpts, log *logrus.Entry) error {
+	log.Info("updating room metadata for external media player")
 	roomMeta, err := m.natsService.GetRoomMetadataStruct(roomId)
 	if err != nil {
+		log.WithError(err).Error("failed to get room metadata")
 		return err
 	}
 
 	if roomMeta == nil {
-		return errors.New("invalid nil room metadata information")
+		err = errors.New("invalid nil room metadata information")
+		log.WithError(err).Error()
+		return err
 	}
 
 	if opts.isActive != nil {
@@ -51,6 +73,9 @@ func (m *ExMediaModel) updateRoomMetadata(roomId string, opts *updateRoomMetadat
 	}
 
 	err = m.natsService.UpdateAndBroadcastRoomMetadata(roomId, roomMeta)
+	if err != nil {
+		log.WithError(err).Error("failed to update and broadcast room metadata")
+	}
 
 	// send analytics
 	val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()
@@ -66,6 +91,10 @@ func (m *ExMediaModel) updateRoomMetadata(roomId string, opts *updateRoomMetadat
 		d.HsetValue = &val
 	}
 	m.analyticsModel.HandleEvent(d)
+
+	if err == nil {
+		log.Info("successfully updated room metadata")
+	}
 
 	return err
 }

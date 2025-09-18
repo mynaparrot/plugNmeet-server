@@ -10,7 +10,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const SpeechServiceRedisKey = "pnm:speechService"
+const SpeechServiceRedisKey = Prefix + "speechService"
 
 func (s *RedisService) SpeechToTextGetConnectionsByKeyId(keyId string) (string, error) {
 	keyStatus := fmt.Sprintf("%s:%s:connections", SpeechServiceRedisKey, keyId)
