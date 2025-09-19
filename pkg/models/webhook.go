@@ -31,7 +31,7 @@ type WebhookModel struct {
 	logger          *logrus.Entry
 }
 
-func NewWebhookModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, lk *livekitservice.LivekitService, rm *RoomModel, analyticsModel *AnalyticsModel, rmDuration *RoomDurationModel, bm *BreakoutRoomModel, nm *NatsModel, sm *SpeechToTextModel, logger *logrus.Logger) *WebhookModel {
+func NewWebhookModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, lk *livekitservice.LivekitService, rm *RoomModel, analyticsModel *AnalyticsModel, rmDuration *RoomDurationModel, bm *BreakoutRoomModel, nm *NatsModel, sm *SpeechToTextModel, webhookNotifier *helpers.WebhookNotifier, logger *logrus.Logger) *WebhookModel {
 	return &WebhookModel{
 		ctx:             ctx,
 		app:             app,
@@ -44,7 +44,7 @@ func NewWebhookModel(ctx context.Context, app *config.AppConfig, ds *dbservice.D
 		bm:              bm,
 		nm:              nm,
 		sm:              sm,
-		webhookNotifier: helpers.GetWebhookNotifier(app, logger),
+		webhookNotifier: webhookNotifier,
 		natsService:     natsService,
 		logger:          logger.WithField("model", "webhook"),
 	}

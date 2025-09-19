@@ -31,11 +31,11 @@ type NatsService struct {
 	logger *logrus.Entry
 }
 
-func New(app *config.AppConfig, logger *logrus.Logger) *NatsService {
+func New(ctx context.Context, app *config.AppConfig, logger *logrus.Logger) *NatsService {
 	log := logger.WithField("service", "nats")
 
 	return &NatsService{
-		ctx:    context.Background(),
+		ctx:    ctx,
 		app:    app,
 		nc:     app.NatsConn,
 		js:     app.JetStream,

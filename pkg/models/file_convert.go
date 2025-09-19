@@ -69,7 +69,7 @@ func (m *FileModel) ConvertAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 		return nil, err
 	}
 
-	if err := convertPDFToImages(convertedFile, outputDir, roomId, m.logger); err != nil {
+	if err := convertPDFToImages(m.ctx, convertedFile, outputDir, roomId, m.logger); err != nil {
 		return nil, err
 	}
 
@@ -150,7 +150,7 @@ func (m *FileModel) convertToPDFIfNeeded(filePath, fileName, roomId string, mTyp
 		return "", fmt.Errorf("unsupported file type for conversion: %s", mType.String())
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(m.ctx, 2*time.Minute)
 	defer cancel()
 
 	err := executeCommand(ctx, m.logger, "soffice", "--headless", "--invisible", "--nologo", "--nolockcheck", "--convert-to", variant, "--outdir", outputDir, filePath)
@@ -164,8 +164,8 @@ func (m *FileModel) convertToPDFIfNeeded(filePath, fileName, roomId string, mTyp
 }
 
 // convertPDFToImages uses mutool to convert a PDF file into PNG images.
-func convertPDFToImages(pdfPath, outputDir, roomId string, logger *logrus.Entry) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+func convertPDFToImages(ctx context.Context, pdfPath, outputDir, roomId string, logger *logrus.Entry) error {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
 	err := executeCommand(ctx, logger, "mutool", "convert", "-O", "resolution=300", "-o", filepath.Join(outputDir, "page_%d.png"), pdfPath)

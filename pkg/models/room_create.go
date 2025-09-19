@@ -9,7 +9,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
-	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 )
@@ -274,9 +273,8 @@ func (m *RoomModel) prepareWhiteboardPreloadFile(meta *plugnmeet.RoomMetadata, r
 
 // sendRoomCreatedWebhook to send webhook
 func (m *RoomModel) sendRoomCreatedWebhook(info *plugnmeet.ActiveRoomInfo, emptyTimeout, maxParticipants *uint32) {
-	n := helpers.GetWebhookNotifier(m.app, m.logger.Logger)
-	if n != nil {
-		n.RegisterWebhook(info.RoomId, info.Sid)
+	if m.webhookNotifier != nil {
+		m.webhookNotifier.RegisterWebhook(info.RoomId, info.Sid)
 		e := "room_created"
 		cr := uint64(info.CreationTime)
 		msg := &plugnmeet.CommonNotifyEvent{
@@ -291,7 +289,7 @@ func (m *RoomModel) sendRoomCreatedWebhook(info *plugnmeet.ActiveRoomInfo, empty
 			},
 		}
 
-		err := n.SendWebhookEvent(msg)
+		err := m.webhookNotifier.SendWebhookEvent(msg)
 		if err != nil {
 			m.logger.WithError(err).Errorln("error sending room created webhook")
 		}

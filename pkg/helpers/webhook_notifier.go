@@ -36,11 +36,11 @@ type webhookRedisFields struct {
 	PerformDeleting bool     `json:"perform_deleting"`
 }
 
-func newWebhookNotifier(app *config.AppConfig, logger *logrus.Logger) *WebhookNotifier {
+func newWebhookNotifier(app *config.AppConfig, ds *dbservice.DatabaseService, natsService *natsservice.NatsService, logger *logrus.Logger) *WebhookNotifier {
 	w := &WebhookNotifier{
 		app:                  app,
-		ds:                   dbservice.New(app.DB, logger),
-		natsService:          natsservice.New(app, logger),
+		ds:                   ds,
+		natsService:          natsService,
 		isEnabled:            app.Client.WebhookConf.Enable,
 		enabledForPerMeeting: app.Client.WebhookConf.EnableForPerMeeting,
 		defaultUrl:           app.Client.WebhookConf.Url,
@@ -267,11 +267,11 @@ func (w *WebhookNotifier) getData(roomId string) (*webhookRedisFields, error) {
 
 var webhookNotifier *WebhookNotifier
 
-func GetWebhookNotifier(app *config.AppConfig, logger *logrus.Logger) *WebhookNotifier {
+func GetWebhookNotifier(app *config.AppConfig, ds *dbservice.DatabaseService, natsService *natsservice.NatsService, logger *logrus.Logger) *WebhookNotifier {
 	if webhookNotifier != nil {
 		return webhookNotifier
 	}
-	webhookNotifier = newWebhookNotifier(app, logger)
+	webhookNotifier = newWebhookNotifier(app, ds, natsService, logger)
 
 	return webhookNotifier
 }

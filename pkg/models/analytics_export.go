@@ -11,7 +11,6 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
-	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -293,8 +292,7 @@ func (m *AnalyticsModel) buildEventInfo(ekey string, eventInfo *plugnmeet.Analyt
 }
 
 func (m *AnalyticsModel) sendToWebhookNotifier(roomId, roomSid, task, fileId string) {
-	n := helpers.GetWebhookNotifier(m.app, m.logger.Logger)
-	if n != nil {
+	if m.webhookNotifier != nil {
 		msg := &plugnmeet.CommonNotifyEvent{
 			Event: &task,
 			Room: &plugnmeet.NotifyEventRoom{
@@ -306,7 +304,7 @@ func (m *AnalyticsModel) sendToWebhookNotifier(roomId, roomSid, task, fileId str
 			},
 		}
 
-		err := n.SendWebhookEvent(msg)
+		err := m.webhookNotifier.SendWebhookEvent(msg)
 		if err != nil {
 			m.logger.Errorln(err)
 		}

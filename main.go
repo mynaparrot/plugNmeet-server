@@ -61,7 +61,7 @@ func startServer(configFile string) {
 	}
 
 	// 6. Use the dependency injection container (wire) to build the main application object,
-	//    which includes all services, models, and controllers.
+	//    which includes all the controllers.
 	appFactory, err := factory.NewAppFactory(ctx, appCnf)
 	if err != nil {
 		logger.WithError(err).Fatalln("Failed to create app factory")
@@ -70,7 +70,7 @@ func startServer(configFile string) {
 	appFactory.Boot()
 
 	// 8. Defer the closing of connections (DB, Redis, NATS) to ensure they are closed gracefully on exit.
-	defer helpers.HandleCloseConnections(appCnf)
+	defer helpers.HandleCloseConnections(appFactory.AppConfig)
 
 	// 9. Create a new Fiber router and register all the application routes.
 	rt := routers.New(appFactory.AppConfig, appFactory.Controllers)
@@ -93,7 +93,7 @@ func startServer(configFile string) {
 	}()
 
 	// 12. Start the Fiber web server and listen for incoming HTTP requests. This is a blocking call.
-	err = rt.Listen(fmt.Sprintf(":%d", appCnf.Client.Port))
+	err = rt.Listen(fmt.Sprintf(":%d", appFactory.AppConfig.Client.Port))
 	if err != nil {
 		logger.WithError(err).Fatalln("Failed to start server")
 	}

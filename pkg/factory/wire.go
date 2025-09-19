@@ -9,12 +9,12 @@ import (
 	"github.com/google/wire"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
-	"github.com/sirupsen/logrus"
 )
 
 // build the dependency set for services
@@ -25,11 +25,17 @@ var serviceSet = wire.NewSet(
 	livekitservice.New,
 )
 
-func provideRoomModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService, natsService *natsservice.NatsService, userModel *models.UserModel, recorderModel *models.RecorderModel, fileModel *models.FileModel, roomDuration *models.RoomDurationModel, etherpadModel *models.EtherpadModel, pollModel *models.PollModel, speechToText *models.SpeechToTextModel, analyticsModel *models.AnalyticsModel, logger *logrus.Logger) *models.RoomModel {
-	rm := models.NewRoomModel(ctx, app, ds, rs, lk, natsService, userModel, recorderModel, fileModel, roomDuration, etherpadModel, pollModel, speechToText, analyticsModel, logger)
+// build the dependency set for helpers
+var helperSet = wire.NewSet(
+	helpers.GetWebhookNotifier,
+)
+
+func provideBreakoutRoomModel(rm *models.RoomModel, natsService *natsservice.NatsService) *models.BreakoutRoomModel {
+	// we need to create BreakoutRoomModel first
 	bm := models.NewBreakoutRoomModel(rm, natsService)
+	// then set it to RoomModel to solve circular dependency
 	rm.SetBreakoutRoomModel(bm)
-	return rm
+	return bm
 }
 
 // build the dependency set for models
@@ -37,7 +43,6 @@ var modelSet = wire.NewSet(
 	models.NewAnalyticsModel,
 	models.NewAuthModel,
 	models.NewBBBApiWrapperModel,
-	models.NewBreakoutRoomModel,
 	models.NewRoomDurationModel,
 	models.NewEtherpadModel,
 	models.NewExDisplayModel,
@@ -49,7 +54,8 @@ var modelSet = wire.NewSet(
 	models.NewPollModel,
 	models.NewRecorderModel,
 	models.NewRecordingModel,
-	provideRoomModel,
+	models.NewRoomModel,
+	provideBreakoutRoomModel,
 	models.NewJanitorModel,
 	models.NewSpeechToTextModel,
 	models.NewUserModel,
@@ -85,13 +91,12 @@ var controllerSet = wire.NewSet(
 func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Application, error) {
 	wire.Build(
 		serviceSet,
+		helperSet,
 		modelSet,
 		controllerSet,
 		// Provide the whole AppConfig, and also specific fields needed by constructors.
 		wire.FieldsOf(new(*config.AppConfig), "DB", "RDS", "Logger"),
 
-		wire.Struct(new(ApplicationServices), "*"),
-		wire.Struct(new(ApplicationModels), "*"),
 		wire.Struct(new(ApplicationControllers), "*"),
 		wire.Struct(new(Application), "*"),
 	)

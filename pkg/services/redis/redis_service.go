@@ -12,16 +12,16 @@ const (
 )
 
 type RedisService struct {
-	rc               *redis.Client
 	ctx              context.Context
+	rc               *redis.Client
 	unlockScriptExec *redis.Script
 	logger           *logrus.Entry
 }
 
-func New(rc *redis.Client, logger *logrus.Logger) *RedisService {
+func New(ctx context.Context, rc *redis.Client, logger *logrus.Logger) *RedisService {
 	return &RedisService{
+		ctx:              ctx,
 		rc:               rc,
-		ctx:              context.Background(),
 		unlockScriptExec: redis.NewScript(unlockScript),
 		logger:           logger.WithField("service", "redis"),
 	}

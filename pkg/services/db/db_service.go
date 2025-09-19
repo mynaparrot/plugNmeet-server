@@ -1,6 +1,8 @@
 package dbservice
 
 import (
+	"context"
+
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
@@ -10,9 +12,9 @@ type DatabaseService struct {
 	logger *logrus.Entry
 }
 
-func New(db *gorm.DB, logger *logrus.Logger) *DatabaseService {
+func New(ctx context.Context, db *gorm.DB, logger *logrus.Logger) *DatabaseService {
 	return &DatabaseService{
-		db:     db,
+		db:     db.WithContext(ctx),
 		logger: logger.WithField("service", "database"),
 	}
 }
