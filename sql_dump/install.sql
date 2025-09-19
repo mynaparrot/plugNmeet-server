@@ -22,8 +22,7 @@ CREATE TABLE IF NOT EXISTS `pnm_room_info` (
   `modified` datetime NOT NULL DEFAULT '0000-00-00 00:00:00' ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `sid` (`sid`),
-  KEY `roomId` (`roomId`),
-  KEY `is_running_roomId` (`is_running`, `roomId`)
+  KEY `room_id_is_running` (`roomId`, `is_running`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `pnm_recordings` (
