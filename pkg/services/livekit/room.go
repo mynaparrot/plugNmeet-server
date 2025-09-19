@@ -1,6 +1,9 @@
 package livekitservice
 
 import (
+	"context"
+	"time"
+
 	"github.com/livekit/protocol/livekit"
 )
 
@@ -9,8 +12,10 @@ func (s *LivekitService) EndRoom(roomId string) (string, error) {
 	data := livekit.DeleteRoomRequest{
 		Room: roomId,
 	}
+	ctx, cancel := context.WithTimeout(s.ctx, time.Second*15)
+	defer cancel()
 
-	res, err := s.lkc.DeleteRoom(s.ctx, &data)
+	res, err := s.lkc.DeleteRoom(ctx, &data)
 	if err != nil {
 		return "", err
 	}

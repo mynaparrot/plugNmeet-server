@@ -15,14 +15,19 @@ import (
 // EndRoom now accepts context and userIDForLog
 func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool, string) {
 	roomID := r.GetRoomId()
-	log := m.logger.WithField("roomId", roomID)
+	log := m.logger.WithFields(logrus.Fields{
+		"room_id": roomID,
+		"method":  "EndRoom",
+	})
 
+	// Step 1: Wait until any ongoing room creation process is complete to avoid race conditions.
 	if errWait := waitUntilRoomCreationCompletes(ctx, m.rs, roomID, m.logger); errWait != nil {
 		log.WithError(errWait).Error("Cannot end room as it's locked")
 		return false, fmt.Sprintf("Failed to end room: %s", errWait.Error())
 	}
 	log.Info("Proceeding to end room")
 
+	// Step 2: Fetch room information from the database.
 	roomDbInfo, err := m.ds.GetRoomInfoByRoomId(roomID, 1)
 	if err != nil {
 		return false, err.Error()
@@ -31,49 +36,45 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 		return false, "room not found in DB or not active"
 	}
 
+	// Step 3: Fetch the live room state from the NATS key-value store.
 	info, err := m.natsService.GetRoomInfo(roomID)
 	if err != nil {
 		log.WithError(err).Warn("NATS GetRoomInfo failed during EndRoom. Proceeding with DB cleanup.")
 	}
-	if info == nil && roomDbInfo.IsRunning == 1 {
-		log.Warn("Room active in DB but not in NATS during EndRoom. Marking as ended and cleaning up.")
-		go m.OnAfterRoomEnded(ctx, roomDbInfo.RoomId, roomDbInfo.Sid, "") // Metadata might be empty
+	// Step 4: Handle cases where the room exists in the DB but not in NATS.
+	if info == nil {
+		if roomDbInfo.IsRunning == 1 {
+			log.Warn("Room active in DB but not in NATS during EndRoom. Marking as ended and cleaning up.")
+			go m.OnAfterRoomEnded(ctx, roomDbInfo.RoomId, roomDbInfo.Sid, "", "") // Metadata might be empty
+		}
 		return true, "room ended (NATS info was missing, cleanup initiated)"
 	}
-	if info == nil {
-		return false, "room not active (not found in NATS)"
-	}
-	// before cleanup, we'll hold room records temporary in redis
-	// because room_finished event from LK may arrive delay and we can use it
+
+	// Step 5: Temporarily cache the live room data in Redis.
+	// This serves as a fallback in case the 'room_finished' webhook from LiveKit is delayed.
 	m.rs.HoldTemporaryRoomData(info)
 
+	// Step 6: Broadcast a 'SESSION_ENDED' event to all clients in the room to notify them.
 	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SESSION_ENDED, roomID, "notifications.room-disconnected-room-ended", nil)
 	if err != nil {
 		log.WithError(err).Error("error sending session ended notification message")
 	}
 
-	if info.Status != natsservice.RoomStatusEnded {
-		err = m.natsService.UpdateRoomStatus(roomID, natsservice.RoomStatusEnded)
-		if err != nil {
-			log.WithError(err).Error("error updating room status")
-		}
-		_, err = m.lk.EndRoom(roomID)
-		if err != nil {
-			log.WithError(err).Error("error ending room in livekit")
-		}
-	}
-	go m.OnAfterRoomEnded(ctx, info.RoomId, info.RoomSid, info.Metadata)
+	// Step 7: Trigger the main asynchronous cleanup process in a separate goroutine.
+	go m.OnAfterRoomEnded(ctx, info.RoomId, info.RoomSid, info.Metadata, info.Status)
 	return true, "success"
 }
 
-func (m *RoomModel) OnAfterRoomEnded(ctx context.Context, roomID, roomSID, metadata string) {
+func (m *RoomModel) OnAfterRoomEnded(ctx context.Context, roomID, roomSID, metadata, roomStatus string) {
 	log := m.logger.WithFields(logrus.Fields{
-		"roomId":    roomID,
-		"roomSid":   roomSID,
-		"operation": "OnAfterRoomEnded",
+		"room_id":     roomID,
+		"room_sid":    roomSID,
+		"room_status": roomStatus,
+		"operation":   "OnAfterRoomEnded",
 	})
-	log.Info("Starting cleanup")
+	log.Info("Starting room cleanup")
 
+	// Step 1: Acquire a distributed lock to prevent race conditions with room creation.
 	cleanupLockTTL := config.WaitBeforeTriggerOnAfterRoomEnded + (time.Second * 10)
 	lockAcquired, lockVal, errLock := m.rs.LockRoomCreation(ctx, roomID, cleanupLockTTL)
 
@@ -86,6 +87,7 @@ func (m *RoomModel) OnAfterRoomEnded(ctx context.Context, roomID, roomSID, metad
 	}
 	log.WithField("lockVal", lockVal).Info("room creation lock acquired")
 
+	// Step 2: Defer the lock release to ensure it's always unlocked, even if a panic occurs.
 	defer func() {
 		unlockCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -96,46 +98,72 @@ func (m *RoomModel) OnAfterRoomEnded(ctx context.Context, roomID, roomSID, metad
 		}
 	}()
 
+	// Step 3: If the room wasn't ended via the API, ensure its status is updated in NATS
+	// and that the session is terminated in LiveKit.
+	if roomStatus != natsservice.RoomStatusEnded {
+		err := m.natsService.UpdateRoomStatus(roomID, natsservice.RoomStatusEnded)
+		if err != nil {
+			log.WithError(err).Error("error updating room status")
+		}
+		_, err = m.lk.EndRoom(roomID)
+		if err != nil {
+			log.WithError(err).Error("error ending room in livekit")
+		}
+	}
+
+	// Step 4: Mark the room as not running in the database.
 	_, err := m.ds.UpdateRoomStatus(&dbmodels.RoomInfo{RoomId: roomID, IsRunning: 0})
 	if err != nil {
 		log.WithError(err).Error("DB error updating status")
 	}
 
+	// Step 5: Clear any user blocklists associated with the room from NATS.
 	m.natsService.DeleteRoomUsersBlockList(roomID)
 
+	// Step 6: Send a stop signal to any active recorders for this room.
 	if err = m.recorderModel.SendMsgToRecorder(&plugnmeet.RecordingReq{Task: plugnmeet.RecordingTasks_STOP, Sid: roomSID, RoomId: roomID}); err != nil {
 		log.WithError(err).Error("Error sending stop to recorder")
 	}
 
+	// Step 7: If not configured to keep files, delete all uploaded files for this session.
 	if !m.app.UploadFileSettings.KeepForever {
 		if err = m.fileModel.DeleteRoomUploadedDir(roomSID); err != nil {
 			log.WithError(err).Error("Error deleting uploads")
 		}
 	}
 
+	// Step 8: Remove the room from the duration checker if it was being monitored.
 	if err = m.roomDuration.DeleteRoomWithDuration(roomID); err != nil {
 		log.WithError(err).Error("Error deleting room duration")
 	}
 
+	// Step 9: Clean up any associated Etherpad (shared notepad) pads.
 	_ = m.etherpadModel.CleanAfterRoomEnd(roomID, metadata)
 
+	// Step 10: Clean up any polls created during the session.
 	if err = m.pollModel.CleanUpPolls(roomID); err != nil {
 		log.WithError(err).Error("Error cleaning polls")
 	}
 
+	// Step 11: Perform post-end tasks for breakout rooms, if any.
 	if err = m.breakoutModel.PostTaskAfterRoomEndWebhook(ctx, roomID, metadata); err != nil {
 		log.WithError(err).Error("Error in breakout room post-end task")
 	}
 
+	// Step 12: Finalize and clean up any speech-to-text service usage stats.
 	if err = m.speechToText.OnAfterRoomEnded(roomID, roomSID); err != nil {
 		log.WithError(err).Error("Error in speech service cleanup")
 	}
 
+	// Step 13: Perform the final NATS cleanup, deleting room-specific streams and KV stores.
 	m.natsService.OnAfterSessionEndCleanup(roomID)
 	log.Info("Room has been cleaned properly")
 
+	// Step 14: Schedule the analytics export to run after a delay.
+	// This is done asynchronously to allow the current cleanup lock to be released.
 	time.AfterFunc(config.WaitBeforeAnalyticsStartProcessing, func() {
 		// let's wait a few seconds so that all other processes will finish
+		// PrepareToExportAnalytics has it's own room creation locking logic
 		m.analyticsModel.PrepareToExportAnalytics(roomID, roomSID, metadata)
 	})
 }

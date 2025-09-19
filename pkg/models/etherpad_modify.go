@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -126,7 +127,10 @@ func (m *EtherpadModel) postToEtherpad(host *config.EtherpadInfo, method string,
 	endPoint := fmt.Sprintf("%s/api/%s/%s?%s", host.Host, APIVersion, method, en)
 	log.WithField("endpoint", endPoint).Debug("sending request to etherpad")
 
-	req, err := http.NewRequest("GET", endPoint, nil)
+	ctx, cancel := context.WithTimeout(m.ctx, 20*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", endPoint, nil)
 	if err != nil {
 		log.WithError(err).Error("failed to create http request")
 		return nil, err

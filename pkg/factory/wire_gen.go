@@ -29,7 +29,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	db := appConfig.DB
 	databaseService := dbservice.New(db, logger)
 	natsService := natsservice.New(appConfig, logger)
-	livekitService := livekitservice.New(appConfig, logger)
+	livekitService := livekitservice.New(ctx, appConfig, logger)
 	applicationServices := &ApplicationServices{
 		RedisService:    redisService,
 		DatabaseService: databaseService,
@@ -44,7 +44,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	recorderModel := models.NewRecorderModel(appConfig, databaseService, redisService, natsService, userModel, logger)
 	fileModel := models.NewFileModel(appConfig, databaseService, natsService, logger)
 	roomDurationModel := models.NewRoomDurationModel(appConfig, redisService, natsService, logger)
-	etherpadModel := models.NewEtherpadModel(appConfig, databaseService, redisService, natsService, analyticsModel, logger)
+	etherpadModel := models.NewEtherpadModel(ctx, appConfig, databaseService, redisService, natsService, analyticsModel, logger)
 	pollModel := models.NewPollModel(appConfig, databaseService, redisService, natsService, analyticsModel, logger)
 	speechToTextModel := models.NewSpeechToTextModel(appConfig, databaseService, redisService, natsService, analyticsModel, logger)
 	roomModel := provideRoomModel(appConfig, databaseService, redisService, livekitService, natsService, userModel, recorderModel, fileModel, roomDurationModel, etherpadModel, pollModel, speechToTextModel, analyticsModel, logger)
@@ -56,7 +56,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	natsModel := models.NewNatsModel(appConfig, databaseService, redisService, natsService, analyticsModel, authModel, userModel, logger)
 	janitorModel := models.NewJanitorModel(appConfig, databaseService, redisService, natsService, roomModel, roomDurationModel, logger)
 	waitingRoomModel := models.NewWaitingRoomModel(appConfig, redisService, natsService, logger)
-	webhookModel := models.NewWebhookModel(ctx, appConfig, databaseService, redisService, natsService, roomModel, analyticsModel, roomDurationModel, breakoutRoomModel, natsModel, speechToTextModel, logger)
+	webhookModel := models.NewWebhookModel(ctx, appConfig, databaseService, redisService, natsService, livekitService, roomModel, analyticsModel, roomDurationModel, breakoutRoomModel, natsModel, speechToTextModel, logger)
 	applicationModels := &ApplicationModels{
 		AnalyticsModel:     analyticsModel,
 		AuthModel:          authModel,

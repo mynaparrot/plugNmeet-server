@@ -6,7 +6,6 @@ import (
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	livekitservice "github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 )
@@ -34,8 +33,7 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 		// This can happen if a room is created directly in LiveKit without going through plugNmeet's API.
 		// We'll forcefully end it to maintain consistency.
 		log.Warnln("room not found in plugNmeet's NATS store, forcing room termination")
-		lk := livekitservice.New(m.app, m.logger.Logger)
-		_, err := lk.EndRoom(event.Room.Name)
+		_, err := m.lk.EndRoom(event.Room.Name)
 		if err != nil {
 			log.WithError(err).Errorln("failed to forcefully end room in livekit")
 		}

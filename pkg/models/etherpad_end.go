@@ -26,7 +26,7 @@ func (m *EtherpadModel) CleanPad(roomId, nodeId, padId string) error {
 	}
 	if selectedHost == nil {
 		// this is normal if etherpad wasn't created
-		log.Info("no host found for the given node id")
+		log.Warnln("no host found for the given node id")
 		return nil
 	}
 

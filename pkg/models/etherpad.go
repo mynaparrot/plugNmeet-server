@@ -1,6 +1,8 @@
 package models
 
 import (
+	"context"
+
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
@@ -31,6 +33,7 @@ type EtherpadDataTypes struct {
 }
 
 type EtherpadModel struct {
+	ctx            context.Context
 	app            *config.AppConfig
 	ds             *dbservice.DatabaseService
 	rs             *redisservice.RedisService
@@ -40,8 +43,9 @@ type EtherpadModel struct {
 	logger         *logrus.Entry
 }
 
-func NewEtherpadModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, analyticsModel *AnalyticsModel, logger *logrus.Logger) *EtherpadModel {
+func NewEtherpadModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, analyticsModel *AnalyticsModel, logger *logrus.Logger) *EtherpadModel {
 	return &EtherpadModel{
+		ctx:            ctx,
 		app:            app,
 		ds:             ds,
 		rs:             rs,

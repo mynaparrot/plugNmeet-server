@@ -80,7 +80,7 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) {
 		}
 	} else {
 		if err = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_DISCONNECTED, roomId, userInfo, userId); err != nil {
-			log.WithError(err).Error("failed to broadcast USER_DISCONNECTED event")
+			log.WithError(err).Warn("failed to broadcast USER_DISCONNECTED event")
 		}
 	}
 
@@ -114,7 +114,7 @@ func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, userInfo *p
 	// Broadcast the final offline status.
 	if userInfo != nil {
 		if err = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_OFFLINE, roomId, userInfo, userId); err != nil {
-			log.WithError(err).Error("failed to broadcast USER_OFFLINE event")
+			log.WithError(err).Warn("failed to broadcast USER_OFFLINE event")
 		}
 	} else {
 		// Fallback if userInfo was not available initially.

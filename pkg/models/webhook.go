@@ -8,6 +8,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
+	livekitservice "github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
@@ -18,6 +19,7 @@ type WebhookModel struct {
 	app             *config.AppConfig
 	ds              *dbservice.DatabaseService
 	rs              *redisservice.RedisService
+	lk              *livekitservice.LivekitService
 	rm              *RoomModel
 	analyticsModel  *AnalyticsModel
 	rmDuration      *RoomDurationModel
@@ -29,12 +31,13 @@ type WebhookModel struct {
 	logger          *logrus.Entry
 }
 
-func NewWebhookModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, rm *RoomModel, analyticsModel *AnalyticsModel, rmDuration *RoomDurationModel, bm *BreakoutRoomModel, nm *NatsModel, sm *SpeechToTextModel, logger *logrus.Logger) *WebhookModel {
+func NewWebhookModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, lk *livekitservice.LivekitService, rm *RoomModel, analyticsModel *AnalyticsModel, rmDuration *RoomDurationModel, bm *BreakoutRoomModel, nm *NatsModel, sm *SpeechToTextModel, logger *logrus.Logger) *WebhookModel {
 	return &WebhookModel{
 		ctx:             ctx,
 		app:             app,
 		ds:              ds,
 		rs:              rs,
+		lk:              lk,
 		rm:              rm,
 		analyticsModel:  analyticsModel,
 		rmDuration:      rmDuration,

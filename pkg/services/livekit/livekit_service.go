@@ -15,12 +15,11 @@ type LivekitService struct {
 	logger *logrus.Entry
 }
 
-func New(app *config.AppConfig, logger *logrus.Logger) *LivekitService {
-	cnf := app.LivekitInfo
-	lkc := lksdk.NewRoomServiceClient(cnf.Host, cnf.ApiKey, cnf.Secret)
+func New(ctx context.Context, app *config.AppConfig, logger *logrus.Logger) *LivekitService {
+	lkc := lksdk.NewRoomServiceClient(app.LivekitInfo.Host, app.LivekitInfo.ApiKey, app.LivekitInfo.Secret)
 
 	return &LivekitService{
-		ctx:    context.Background(),
+		ctx:    ctx,
 		app:    app,
 		lkc:    lkc,
 		logger: logger.WithField("service", "livekit"),

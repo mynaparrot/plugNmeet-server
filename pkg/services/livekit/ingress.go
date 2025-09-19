@@ -1,6 +1,9 @@
 package livekitservice
 
 import (
+	"context"
+	"time"
+
 	"github.com/livekit/protocol/livekit"
 	lksdk "github.com/livekit/server-sdk-go/v2"
 )
@@ -9,5 +12,8 @@ func (s *LivekitService) CreateIngress(req *livekit.CreateIngressRequest) (*live
 	cnf := s.app.LivekitInfo
 	ic := lksdk.NewIngressClient(cnf.Host, cnf.ApiKey, cnf.Secret)
 
-	return ic.CreateIngress(s.ctx, req)
+	ctx, cancel := context.WithTimeout(s.ctx, time.Second*15)
+	defer cancel()
+
+	return ic.CreateIngress(ctx, req)
 }

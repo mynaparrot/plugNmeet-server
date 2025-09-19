@@ -57,6 +57,7 @@ func (s *RedisService) GetTemporaryRoomData(roomId string) *plugnmeet.NatsKvRoom
 		log.WithError(err).Errorln("unmarshalling failed")
 		return nil
 	}
+	// otherwise there will be looping
 	info.Status = natsservice.RoomStatusEnded
 	return &info
 }
