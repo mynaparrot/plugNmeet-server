@@ -17,6 +17,7 @@ var (
 
 type CachedRoomEntry struct {
 	RoomInfo *plugnmeet.NatsKvRoomInfo
+	stop     chan struct{}
 }
 
 type CachedRoomUserStatusEntry struct {

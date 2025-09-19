@@ -47,16 +47,18 @@ func (m *RoomModel) CreateRoom(ctx context.Context, r *plugnmeet.CreateRoomReq) 
 
 	// handle existing room logic
 	if roomDbInfo != nil && roomDbInfo.Sid != "" {
-		ari, err := m.handleExistingRoom(r, roomDbInfo)
+		log.Info("found existing active room in db, attempting to handle it")
+		ari, err := m.handleExistingRoom(r, roomDbInfo, log)
 		if err != nil {
 			log.WithError(err).Error("failed to handle existing room")
 			return nil, err
 		}
 		if ari != nil {
-			log.Info("handled existing room")
+			log.Info("successfully handled existing room, returning info")
 			return ari, nil
 		}
-		// otherwise we'll keep going
+		// otherwise, we'll keep going
+		log.Info("existing room record was stale or mismatched, proceeding to create a new session")
 	}
 
 	// initialize room defaults
@@ -120,33 +122,49 @@ func (m *RoomModel) CreateRoom(ctx context.Context, r *plugnmeet.CreateRoomReq) 
 }
 
 // handleExistingRoom to handle logic if room already exists
-func (m *RoomModel) handleExistingRoom(r *plugnmeet.CreateRoomReq, roomDbInfo *dbmodels.RoomInfo) (*plugnmeet.ActiveRoomInfo, error) {
+func (m *RoomModel) handleExistingRoom(r *plugnmeet.CreateRoomReq, roomDbInfo *dbmodels.RoomInfo, log *logrus.Entry) (*plugnmeet.ActiveRoomInfo, error) {
+	log = log.WithField("subMethod", "handleExistingRoom")
+	log.Info("checking NATS for live room info")
+
 	rInfo, err := m.natsService.GetRoomInfo(r.RoomId)
 	if err != nil {
+		log.WithError(err).Error("failed to get room info from NATS")
 		return nil, err
 	}
-	if rInfo != nil && rInfo.DbTableId == roomDbInfo.ID {
-		// so, we found the same room
-		// in this case we'll just create streams for safety
-		err := m.natsService.CreateRoomNatsStreams(r.RoomId)
-		if err != nil {
-			return nil, err
-		}
-		err = m.natsService.UpdateRoomStatus(r.RoomId, natsservice.RoomStatusActive)
-		if err != nil {
-			return nil, err
-		}
-		return &plugnmeet.ActiveRoomInfo{
-			RoomId:       rInfo.RoomId,
-			Sid:          rInfo.RoomSid,
-			RoomTitle:    roomDbInfo.RoomTitle,
-			IsRunning:    1,
-			CreationTime: roomDbInfo.CreationTime,
-			WebhookUrl:   roomDbInfo.WebhookUrl,
-			Metadata:     rInfo.Metadata,
-		}, nil
+
+	if rInfo == nil {
+		log.Info("no active room found in NATS, proceeding to create a new session")
+		return nil, nil
 	}
-	return nil, nil
+
+	if rInfo.DbTableId != roomDbInfo.ID {
+		log.WithFields(logrus.Fields{
+			"nats_db_id": rInfo.DbTableId,
+			"db_id":      roomDbInfo.ID,
+		}).Warn("NATS room info does not match DB record, proceeding to create a new session")
+		return nil, nil
+	}
+
+	// The room is active and matches the DB record.
+	log.Info("found matching active room in NATS, ensuring streams are active and returning info")
+	if err := m.natsService.CreateRoomNatsStreams(r.RoomId); err != nil {
+		log.WithError(err).Error("failed to ensure NATS streams are active")
+		return nil, err
+	}
+	if err := m.natsService.UpdateRoomStatus(r.RoomId, natsservice.RoomStatusActive); err != nil {
+		log.WithError(err).Error("failed to update room status to active")
+		return nil, err
+	}
+
+	return &plugnmeet.ActiveRoomInfo{
+		RoomId:       rInfo.RoomId,
+		Sid:          rInfo.RoomSid,
+		RoomTitle:    roomDbInfo.RoomTitle,
+		IsRunning:    1,
+		CreationTime: roomDbInfo.CreationTime,
+		WebhookUrl:   roomDbInfo.WebhookUrl,
+		Metadata:     rInfo.Metadata,
+	}, nil
 }
 
 // setRoomDefaults to Sets default values and metadata

@@ -29,8 +29,12 @@ func (s *NatsService) GetRoomInfo(roomId string) (*plugnmeet.NatsKvRoomInfo, err
 	info.CreatedAt, _ = s.getUint64Value(kv, RoomCreatedKey)
 	info.Metadata, _ = s.getStringValue(kv, RoomMetadataKey)
 
-	// So, for some reason, if the room info is not found in cache, then may be room wasn't created in this server. So, we will start watching
-	s.cs.AddRoomWatcher(kv, bucket, roomId)
+	// So, for some reason, if the room info is not found in cache,
+	// then may be room wasn't created in this server.
+	// So, we will start watching if status not ended
+	if info.Status != RoomStatusEnded {
+		s.cs.AddRoomWatcher(kv, bucket, roomId)
+	}
 
 	return info, nil
 }

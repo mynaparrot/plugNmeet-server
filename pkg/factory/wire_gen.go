@@ -42,7 +42,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	bbbApiWrapperModel := models.NewBBBApiWrapperModel(appConfig, databaseService, redisService, recordingModel, logger)
 	userModel := models.NewUserModel(appConfig, databaseService, redisService, livekitService, natsService, analyticsModel, logger)
 	recorderModel := models.NewRecorderModel(appConfig, databaseService, redisService, natsService, userModel, logger)
-	fileModel := models.NewFileModel(appConfig, databaseService, natsService, logger)
+	fileModel := models.NewFileModel(ctx, appConfig, databaseService, natsService, logger)
 	roomDurationModel := models.NewRoomDurationModel(appConfig, redisService, natsService, logger)
 	etherpadModel := models.NewEtherpadModel(ctx, appConfig, databaseService, redisService, natsService, analyticsModel, logger)
 	pollModel := models.NewPollModel(appConfig, databaseService, redisService, natsService, analyticsModel, logger)

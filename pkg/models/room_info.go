@@ -68,15 +68,15 @@ func (m *RoomModel) GetActiveRoomInfo(ctx context.Context, r *plugnmeet.GetActiv
 	if err != nil {
 		return false, err.Error(), nil
 	}
-	if rrr == nil {
-		// we did not find this room in kv, so
-		// we should change the status of the room to end
+	if rrr == nil || (rrr.Status != natsservice.RoomStatusCreated && rrr.Status != natsservice.RoomStatusActive) {
+		// The room is not in NATS or its status is not active, so we'll mark it as ended in the DB.
+		log.WithField("nats_status", rrr.GetStatus()).Warn("room found in DB but not active in NATS, marking as ended")
 		roomDbInfo.IsRunning = 0
 		_, err := m.ds.UpdateRoomStatus(roomDbInfo)
 		if err != nil {
 			return false, err.Error(), nil
 		}
-		return false, "no room found", nil
+		return false, "room is not active", nil
 	}
 
 	res := new(plugnmeet.ActiveRoomWithParticipant)

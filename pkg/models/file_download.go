@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -32,13 +33,23 @@ func (m *FileModel) DownloadAndProcessPreUploadWBfile(roomId, roomSid, fileUrl s
 		return fmt.Errorf("failed to create download directory: %w", err)
 	}
 
-	// Download the file
-	resp, err := grab.Get(downloadDir, fileUrl)
+	// Create a new grab client
+	client := grab.NewClient()
+	req, err := grab.NewRequest(downloadDir, fileUrl)
 	if err != nil {
-		log.WithError(err).Errorln("failed to download file")
-		return fmt.Errorf("failed to download file: %w", err)
+		log.WithError(err).Errorln("failed to create download request")
+		return fmt.Errorf("failed to create download request: %w", err)
 	}
-	defer os.Remove(resp.Filename) // Use os.Remove for a single file.
+
+	// Create a context with a 3-minute timeout for the download.
+	ctx, cancel := context.WithTimeout(m.ctx, 3*time.Minute)
+	defer cancel()
+
+	// Run the download
+	resp := client.Do(req.WithContext(ctx))
+	<-resp.Done // Wait for the download to complete or be canceled.
+
+	defer os.Remove(resp.Filename)
 
 	// Validate downloaded file type
 	mType, err := mimetype.DetectFile(resp.Filename)

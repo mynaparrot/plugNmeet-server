@@ -22,8 +22,11 @@ func (ncs *NatsCacheService) AddRoomWatcher(kv jetstream.KeyValue, bucket, roomI
 		ncs.roomLock.Unlock()
 		return
 	}
+	// Create a stop channel for this watcher.
+	stopChan := make(chan struct{})
 	ncs.roomsInfoStore[roomId] = CachedRoomEntry{
 		RoomInfo: new(plugnmeet.NatsKvRoomInfo),
+		stop:     stopChan,
 	}
 	ncs.roomLock.Unlock()
 
@@ -48,6 +51,9 @@ func (ncs *NatsCacheService) AddRoomWatcher(kv jetstream.KeyValue, bucket, roomI
 			select {
 			case <-ncs.serviceCtx.Done():
 				return
+			case <-stopChan:
+				log.Info("Explicit stop signal received")
+				return
 			case entry, ok := <-watcher.Updates():
 				if !ok {
 					// Channel closed may be bucket deleted
@@ -64,7 +70,12 @@ func (ncs *NatsCacheService) AddRoomWatcher(kv jetstream.KeyValue, bucket, roomI
 func (ncs *NatsCacheService) updateRoomCache(entry jetstream.KeyValueEntry, roomId string) {
 	ncs.roomLock.Lock()
 	defer ncs.roomLock.Unlock()
-	cacheEntry := ncs.roomsInfoStore[roomId]
+
+	cacheEntry, ok := ncs.roomsInfoStore[roomId]
+	if !ok {
+		// Entry was cleaned up by another process.
+		return
+	}
 
 	val := string(entry.Value())
 	switch entry.Key() {
@@ -76,6 +87,11 @@ func (ncs *NatsCacheService) updateRoomCache(entry jetstream.KeyValueEntry, room
 		cacheEntry.RoomInfo.RoomSid = val
 	case RoomStatusKey:
 		cacheEntry.RoomInfo.Status = val
+		if val == RoomStatusEnded {
+			// The room has ended. We can clean up now since we already have the lock.
+			ncs.cleanRoomCacheUnsafe(roomId)
+			return
+		}
 	case RoomEmptyTimeoutKey:
 		cacheEntry.RoomInfo.EmptyTimeout = ncs.convertTextToUint64(val)
 	case RoomMaxParticipants:
@@ -93,6 +109,10 @@ func (ncs *NatsCacheService) GetCachedRoomInfo(roomID string) *plugnmeet.NatsKvR
 	ncs.roomLock.RLock()
 	defer ncs.roomLock.RUnlock()
 	if cachedEntry, found := ncs.roomsInfoStore[roomID]; found && cachedEntry.RoomInfo != nil {
+		if cachedEntry.RoomInfo.Status == RoomStatusEnded {
+			// don't deliver cache value if room has ended status
+			return nil
+		}
 		infoCopy := proto.Clone(cachedEntry.RoomInfo).(*plugnmeet.NatsKvRoomInfo)
 		return infoCopy
 	}
@@ -102,5 +122,16 @@ func (ncs *NatsCacheService) GetCachedRoomInfo(roomID string) *plugnmeet.NatsKvR
 func (ncs *NatsCacheService) cleanRoomCache(roomID string) {
 	ncs.roomLock.Lock()
 	defer ncs.roomLock.Unlock()
+	ncs.cleanRoomCacheUnsafe(roomID)
+}
+
+// cleanRoomCacheUnsafe performs the cleanup without acquiring a lock.
+// The caller MUST hold the lock before calling this.
+func (ncs *NatsCacheService) cleanRoomCacheUnsafe(roomID string) {
+	// Check if the entry exists before trying to stop its watcher.
+	if entry, ok := ncs.roomsInfoStore[roomID]; ok {
+		// Signal the watcher goroutine to stop.
+		close(entry.stop)
+	}
 	delete(ncs.roomsInfoStore, roomID)
 }

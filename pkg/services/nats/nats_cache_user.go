@@ -144,7 +144,7 @@ func (ncs *NatsCacheService) AddUserInfoWatcher(kv jetstream.KeyValue, bucket, r
 
 	go func() {
 		defer func() {
-			log.Infof("NATS KV watcher for room user status stopped")
+			log.Infof("NATS KV watcher for user info stopped")
 			_ = watcher.Stop()
 			ncs.cleanUserInfoCache(roomId, userId)
 		}()
