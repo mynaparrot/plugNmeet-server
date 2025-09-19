@@ -36,7 +36,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 		NatsService:     natsService,
 		LivekitService:  livekitService,
 	}
-	analyticsModel := models.NewAnalyticsModel(appConfig, databaseService, redisService, natsService, logger)
+	analyticsModel := models.NewAnalyticsModel(ctx, appConfig, databaseService, redisService, natsService, logger)
 	authModel := models.NewAuthModel(appConfig, natsService, logger)
 	recordingModel := models.NewRecordingModel(appConfig, databaseService, redisService, natsService, analyticsModel, logger)
 	bbbApiWrapperModel := models.NewBBBApiWrapperModel(appConfig, databaseService, redisService, recordingModel, logger)
@@ -47,7 +47,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	etherpadModel := models.NewEtherpadModel(ctx, appConfig, databaseService, redisService, natsService, analyticsModel, logger)
 	pollModel := models.NewPollModel(appConfig, databaseService, redisService, natsService, analyticsModel, logger)
 	speechToTextModel := models.NewSpeechToTextModel(appConfig, databaseService, redisService, natsService, analyticsModel, logger)
-	roomModel := provideRoomModel(appConfig, databaseService, redisService, livekitService, natsService, userModel, recorderModel, fileModel, roomDurationModel, etherpadModel, pollModel, speechToTextModel, analyticsModel, logger)
+	roomModel := provideRoomModel(ctx, appConfig, databaseService, redisService, livekitService, natsService, userModel, recorderModel, fileModel, roomDurationModel, etherpadModel, pollModel, speechToTextModel, analyticsModel, logger)
 	breakoutRoomModel := models.NewBreakoutRoomModel(roomModel, natsService)
 	exDisplayModel := models.NewExDisplayModel(appConfig, databaseService, redisService, natsService, analyticsModel, logger)
 	exMediaModel := models.NewExMediaModel(appConfig, databaseService, redisService, natsService, analyticsModel, logger)
@@ -137,8 +137,8 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 // build the dependency set for services
 var serviceSet = wire.NewSet(dbservice.New, redisservice.New, natsservice.New, livekitservice.New)
 
-func provideRoomModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService, natsService *natsservice.NatsService, userModel *models.UserModel, recorderModel *models.RecorderModel, fileModel *models.FileModel, roomDuration *models.RoomDurationModel, etherpadModel *models.EtherpadModel, pollModel *models.PollModel, speechToText *models.SpeechToTextModel, analyticsModel *models.AnalyticsModel, logger *logrus.Logger) *models.RoomModel {
-	rm := models.NewRoomModel(app, ds, rs, lk, natsService, userModel, recorderModel, fileModel, roomDuration, etherpadModel, pollModel, speechToText, analyticsModel, logger)
+func provideRoomModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService, natsService *natsservice.NatsService, userModel *models.UserModel, recorderModel *models.RecorderModel, fileModel *models.FileModel, roomDuration *models.RoomDurationModel, etherpadModel *models.EtherpadModel, pollModel *models.PollModel, speechToText *models.SpeechToTextModel, analyticsModel *models.AnalyticsModel, logger *logrus.Logger) *models.RoomModel {
+	rm := models.NewRoomModel(ctx, app, ds, rs, lk, natsService, userModel, recorderModel, fileModel, roomDuration, etherpadModel, pollModel, speechToText, analyticsModel, logger)
 	bm := models.NewBreakoutRoomModel(rm, natsService)
 	rm.SetBreakoutRoomModel(bm)
 	return rm

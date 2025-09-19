@@ -25,8 +25,8 @@ var serviceSet = wire.NewSet(
 	livekitservice.New,
 )
 
-func provideRoomModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService, natsService *natsservice.NatsService, userModel *models.UserModel, recorderModel *models.RecorderModel, fileModel *models.FileModel, roomDuration *models.RoomDurationModel, etherpadModel *models.EtherpadModel, pollModel *models.PollModel, speechToText *models.SpeechToTextModel, analyticsModel *models.AnalyticsModel, logger *logrus.Logger) *models.RoomModel {
-	rm := models.NewRoomModel(app, ds, rs, lk, natsService, userModel, recorderModel, fileModel, roomDuration, etherpadModel, pollModel, speechToText, analyticsModel, logger)
+func provideRoomModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService, natsService *natsservice.NatsService, userModel *models.UserModel, recorderModel *models.RecorderModel, fileModel *models.FileModel, roomDuration *models.RoomDurationModel, etherpadModel *models.EtherpadModel, pollModel *models.PollModel, speechToText *models.SpeechToTextModel, analyticsModel *models.AnalyticsModel, logger *logrus.Logger) *models.RoomModel {
+	rm := models.NewRoomModel(ctx, app, ds, rs, lk, natsService, userModel, recorderModel, fileModel, roomDuration, etherpadModel, pollModel, speechToText, analyticsModel, logger)
 	bm := models.NewBreakoutRoomModel(rm, natsService)
 	rm.SetBreakoutRoomModel(bm)
 	return rm

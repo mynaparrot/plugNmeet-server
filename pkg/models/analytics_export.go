@@ -46,14 +46,14 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 
 	// lock to prevent this room re-creation until process finish
 	// otherwise will give an unexpected result
-	lockValue, err := acquireRoomCreationLockWithRetry(context.Background(), m.rs, roomId, log)
+	lockValue, err := acquireRoomCreationLockWithRetry(m.ctx, m.rs, roomId, log)
 	if err != nil {
 		// Error is already logged by the helper.
 		// We can't proceed without the lock.
 		return
 	}
 	defer func() {
-		unlockCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		unlockCtx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
 		defer cancel()
 		if unlockErr := m.rs.UnlockRoomCreation(unlockCtx, roomId, lockValue); unlockErr != nil {
 			// UnlockRoomCreation in RedisService should log details

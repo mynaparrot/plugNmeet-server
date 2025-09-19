@@ -45,7 +45,7 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 	if info == nil {
 		if roomDbInfo.IsRunning == 1 {
 			log.Warn("Room active in DB but not in NATS during EndRoom. Marking as ended and cleaning up.")
-			go m.OnAfterRoomEnded(ctx, roomDbInfo.RoomId, roomDbInfo.Sid, "", "") // Metadata might be empty
+			go m.OnAfterRoomEnded(roomDbInfo.RoomId, roomDbInfo.Sid, "", "") // Metadata might be empty
 		}
 		return true, "room ended (NATS info was missing, cleanup initiated)"
 	}
@@ -61,11 +61,11 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 	}
 
 	// Step 7: Trigger the main asynchronous cleanup process in a separate goroutine.
-	go m.OnAfterRoomEnded(ctx, info.RoomId, info.RoomSid, info.Metadata, info.Status)
+	go m.OnAfterRoomEnded(info.RoomId, info.RoomSid, info.Metadata, info.Status)
 	return true, "success"
 }
 
-func (m *RoomModel) OnAfterRoomEnded(ctx context.Context, roomID, roomSID, metadata, roomStatus string) {
+func (m *RoomModel) OnAfterRoomEnded(roomID, roomSID, metadata, roomStatus string) {
 	log := m.logger.WithFields(logrus.Fields{
 		"room_id":     roomID,
 		"room_sid":    roomSID,
@@ -76,7 +76,7 @@ func (m *RoomModel) OnAfterRoomEnded(ctx context.Context, roomID, roomSID, metad
 
 	// Step 1: Acquire a distributed lock to prevent race conditions with room creation.
 	cleanupLockTTL := config.WaitBeforeTriggerOnAfterRoomEnded + (time.Second * 10)
-	lockAcquired, lockVal, errLock := m.rs.LockRoomCreation(ctx, roomID, cleanupLockTTL)
+	lockAcquired, lockVal, errLock := m.rs.LockRoomCreation(m.ctx, roomID, cleanupLockTTL)
 
 	if errLock != nil {
 		log.WithError(errLock).Error("redis error acquiring room creation. Cleanup might be incomplete.")
@@ -89,7 +89,7 @@ func (m *RoomModel) OnAfterRoomEnded(ctx context.Context, roomID, roomSID, metad
 
 	// Step 2: Defer the lock release to ensure it's always unlocked, even if a panic occurs.
 	defer func() {
-		unlockCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		unlockCtx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
 		defer cancel()
 		if err := m.rs.UnlockRoomCreation(unlockCtx, roomID, lockVal); err != nil {
 			log.WithField("lockVal", lockVal).WithError(err).Error("Error releasing cleanup lock")
@@ -146,7 +146,7 @@ func (m *RoomModel) OnAfterRoomEnded(ctx context.Context, roomID, roomSID, metad
 	}
 
 	// Step 11: Perform post-end tasks for breakout rooms, if any.
-	if err = m.breakoutModel.PostTaskAfterRoomEndWebhook(ctx, roomID, metadata); err != nil {
+	if err = m.breakoutModel.PostTaskAfterRoomEndWebhook(m.ctx, roomID, metadata); err != nil {
 		log.WithError(err).Error("Error in breakout room post-end task")
 	}
 

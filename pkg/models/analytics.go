@@ -1,6 +1,8 @@
 package models
 
 import (
+	"context"
+
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
@@ -14,6 +16,7 @@ const (
 )
 
 type AnalyticsModel struct {
+	ctx         context.Context
 	app         *config.AppConfig
 	ds          *dbservice.DatabaseService
 	rs          *redisservice.RedisService
@@ -21,8 +24,9 @@ type AnalyticsModel struct {
 	logger      *logrus.Entry
 }
 
-func NewAnalyticsModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, logger *logrus.Logger) *AnalyticsModel {
+func NewAnalyticsModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, logger *logrus.Logger) *AnalyticsModel {
 	return &AnalyticsModel{
+		ctx:         ctx,
 		app:         app,
 		ds:          ds,
 		rs:          rs,

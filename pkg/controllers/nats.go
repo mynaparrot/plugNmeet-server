@@ -205,7 +205,7 @@ func (c *NatsController) subscribeToSystemWorker(ctx context.Context, stream jet
 		}}
 	}, jetstream.ConsumeErrHandler(func(consumeCtx jetstream.ConsumeContext, err error) {
 		if ctx.Err() == nil {
-			c.logger.WithError(err).Errorf("jetstream consume error")
+			c.logger.WithError(err).Warn("jetstream consume error")
 		}
 	}))
 

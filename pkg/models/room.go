@@ -1,6 +1,8 @@
 package models
 
 import (
+	"context"
+
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
@@ -10,6 +12,7 @@ import (
 )
 
 type RoomModel struct {
+	ctx            context.Context
 	app            *config.AppConfig
 	ds             *dbservice.DatabaseService
 	rs             *redisservice.RedisService
@@ -27,8 +30,9 @@ type RoomModel struct {
 	breakoutModel  *BreakoutRoomModel
 }
 
-func NewRoomModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService, natsService *natsservice.NatsService, userModel *UserModel, recorderModel *RecorderModel, fileModel *FileModel, roomDuration *RoomDurationModel, etherpadModel *EtherpadModel, pollModel *PollModel, speechToText *SpeechToTextModel, analyticsModel *AnalyticsModel, logger *logrus.Logger) *RoomModel {
+func NewRoomModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService, natsService *natsservice.NatsService, userModel *UserModel, recorderModel *RecorderModel, fileModel *FileModel, roomDuration *RoomDurationModel, etherpadModel *EtherpadModel, pollModel *PollModel, speechToText *SpeechToTextModel, analyticsModel *AnalyticsModel, logger *logrus.Logger) *RoomModel {
 	return &RoomModel{
+		ctx:            ctx,
 		app:            app,
 		ds:             ds,
 		rs:             rs,
