@@ -16,8 +16,9 @@ import (
 
 func (m *RoomModel) CreateRoom(ctx context.Context, r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoomInfo, error) {
 	log := m.logger.WithFields(logrus.Fields{
-		"roomId": r.GetRoomId(),
-		"method": "CreateRoom",
+		"room_id":       r.GetRoomId(),
+		"breakout_room": r.GetMetadata().GetIsBreakoutRoom(),
+		"method":        "CreateRoom",
 	})
 	log.Infoln("create room request")
 	// we'll lock the same room creation until the room is created
@@ -73,6 +74,10 @@ func (m *RoomModel) CreateRoom(ctx context.Context, r *plugnmeet.CreateRoomReq) 
 		log.WithError(err).Error("failed to insert or update room in db")
 		return nil, err
 	}
+	log = log.WithFields(logrus.Fields{
+		"room_sid":    sid,
+		"webhook_url": roomDbInfo.WebhookUrl,
+	})
 	log.Info("room info saved to db")
 
 	// now create room bucket
@@ -98,7 +103,7 @@ func (m *RoomModel) CreateRoom(ctx context.Context, r *plugnmeet.CreateRoomReq) 
 
 	// preload whiteboard file if needed
 	if !r.Metadata.IsBreakoutRoom {
-		go m.prepareWhiteboardPreloadFile(r.Metadata, r.RoomId, sid)
+		go m.prepareWhiteboardPreloadFile(r.Metadata, r.RoomId, sid, log)
 	}
 
 	ari := &plugnmeet.ActiveRoomInfo{
@@ -114,10 +119,7 @@ func (m *RoomModel) CreateRoom(ctx context.Context, r *plugnmeet.CreateRoomReq) 
 	// create and send room_created webhook
 	go m.sendRoomCreatedWebhook(ari, r.EmptyTimeout, r.MaxParticipants)
 
-	log.WithFields(logrus.Fields{
-		"roomSid":     rInfo.RoomSid,
-		"webhook_url": roomDbInfo.WebhookUrl,
-	}).Info("successfully created new room")
+	log.Info("successfully created new room")
 	return ari, nil
 }
 
@@ -239,22 +241,20 @@ func (m *RoomModel) prepareRoomDbInfo(r *plugnmeet.CreateRoomReq, existing *dbmo
 }
 
 // prepareWhiteboardPreloadFile preload whiteboard file
-func (m *RoomModel) prepareWhiteboardPreloadFile(meta *plugnmeet.RoomMetadata, roomId, roomSid string) {
+func (m *RoomModel) prepareWhiteboardPreloadFile(meta *plugnmeet.RoomMetadata, roomId, roomSid string, log *logrus.Entry) {
 	wbf := meta.RoomFeatures.WhiteboardFeatures
 	if wbf == nil || !wbf.AllowedWhiteboard || wbf.PreloadFile == nil || *wbf.PreloadFile == "" {
 		return
 	}
-
-	log := m.logger.WithFields(logrus.Fields{
-		"roomSid": roomSid,
-		"roomId":  roomId,
-		"file":    *wbf.PreloadFile,
-		"method":  "prepareWhiteboardPreloadFile",
+	preloadFile := *wbf.PreloadFile
+	log = log.WithFields(logrus.Fields{
+		"preload_file_url": preloadFile,
+		"subMethod":        "prepareWhiteboardPreloadFile",
 	})
 
 	log.Info("preparing preloaded whiteboard file")
 
-	err := m.fileModel.DownloadAndProcessPreUploadWBfile(roomId, roomSid, *wbf.PreloadFile, log)
+	err := m.fileModel.DownloadAndProcessPreUploadWBfile(roomId, roomSid, preloadFile, log)
 	if err != nil {
 		log.WithError(err).Error("failed to download and process preloaded whiteboard file")
 
