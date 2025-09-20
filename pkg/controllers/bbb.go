@@ -156,7 +156,7 @@ func (bc *BBBController) HandleBBBCreate(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", err.Error()))
 	}
 
-	room, err := bc.RoomModel.CreateRoom(c.UserContext(), pnmReq)
+	room, err := bc.RoomModel.CreateRoom(pnmReq)
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 	}

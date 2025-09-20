@@ -42,7 +42,7 @@ func (brc *BreakoutRoomController) HandleCreateBreakoutRooms(c *fiber.Ctx) error
 	req.RoomId = roomId.(string)
 	req.RequestedUserId = requestedUserId.(string)
 
-	err = brc.BreakoutRoomModel.CreateBreakoutRooms(c.UserContext(), req)
+	err = brc.BreakoutRoomModel.CreateBreakoutRooms(req)
 	if err != nil {
 		res.Msg = err.Error()
 		return sendBreakoutRoomResponse(c, res)

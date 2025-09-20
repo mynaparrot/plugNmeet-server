@@ -27,7 +27,7 @@ func (rc *RoomController) HandleRoomCreate(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	room, err := rc.RoomModel.CreateRoom(c.UserContext(), req)
+	room, err := rc.RoomModel.CreateRoom(req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}

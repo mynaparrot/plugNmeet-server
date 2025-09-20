@@ -35,46 +35,67 @@ type ConvertWhiteboardFileRes struct {
 
 // ConvertAndBroadcastWhiteboardFile will convert & broadcast files for whiteboard.
 func (m *FileModel) ConvertAndBroadcastWhiteboardFile(roomId, roomSid, filePath string) (*ConvertWhiteboardFileRes, error) {
+	log := m.logger.WithFields(logrus.Fields{
+		"roomId":   roomId,
+		"roomSid":  roomSid,
+		"filePath": filePath,
+		"method":   "ConvertAndBroadcastWhiteboardFile",
+	})
+	log.Infoln("request to convert and broadcast whiteboard file")
+
 	if roomId == "" || filePath == "" {
-		return nil, errors.New("roomId or filePath is empty")
+		err := errors.New("roomId or filePath is empty")
+		log.WithError(err).Error()
+		return nil, err
 	}
 
 	if err := checkDependencies(); err != nil {
+		log.WithError(err).Error("dependency check failed")
 		return nil, err
 	}
 
 	fullPath := filepath.Join(m.app.UploadFileSettings.Path, filePath)
 	info, err := os.Stat(fullPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to stat file: %w", err)
+		err = fmt.Errorf("failed to stat file: %w", err)
+		log.WithError(err).Error()
+		return nil, err
 	}
 
 	mType, err := mimetype.DetectFile(fullPath)
 	if err != nil {
-		return nil, fmt.Errorf("mime detection failed: %w", err)
+		err = fmt.Errorf("mime detection failed: %w", err)
+		log.WithError(err).Error()
+		return nil, err
 	}
 
 	if err := m.ValidateMimeType(mType); err != nil {
+		log.WithError(err).Error("mime type validation failed")
 		return nil, err
 	}
 
 	fileId := uuid.NewString()
 	outputDir := filepath.Join(m.app.UploadFileSettings.Path, roomSid, fileId)
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create output dir: %w", err)
+		err = fmt.Errorf("failed to create output dir: %w", err)
+		log.WithError(err).Error()
+		return nil, err
 	}
 
 	convertedFile, err := m.convertToPDFIfNeeded(fullPath, info.Name(), roomId, mType, outputDir)
 	if err != nil {
+		log.WithError(err).Error("failed to convert file to PDF")
 		return nil, err
 	}
 
 	if err := convertPDFToImages(m.ctx, convertedFile, outputDir, roomId, m.logger); err != nil {
+		log.WithError(err).Error("failed to convert PDF to images")
 		return nil, err
 	}
 
 	totalPages, err := countPages(outputDir)
 	if err != nil {
+		log.WithError(err).Error("failed to count pages")
 		return nil, err
 	}
 
@@ -88,9 +109,11 @@ func (m *FileModel) ConvertAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 	}
 
 	if err := m.updateRoomMetadataWithOfficeFile(roomId, res); err != nil {
-		m.logger.Errorln("metadata update failed")
+		log.WithError(err).Error("metadata update failed")
+		// Don't return the error, as the file conversion was successful.
 	}
 
+	log.WithField("totalPages", totalPages).Info("successfully converted and broadcasted whiteboard file")
 	return res, nil
 }
 

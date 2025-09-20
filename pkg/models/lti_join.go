@@ -13,7 +13,7 @@ func (m *LtiV1Model) LTIV1JoinRoom(ctx context.Context, c *plugnmeet.LtiClaims) 
 	})
 
 	if !res.GetIsActive() {
-		_, err := m.createRoomSession(ctx, c)
+		_, err := m.createRoomSession(c)
 		if err != nil {
 			return "", err
 		}
@@ -27,9 +27,9 @@ func (m *LtiV1Model) LTIV1JoinRoom(ctx context.Context, c *plugnmeet.LtiClaims) 
 	return token, nil
 }
 
-func (m *LtiV1Model) createRoomSession(ctx context.Context, c *plugnmeet.LtiClaims) (*plugnmeet.ActiveRoomInfo, error) {
+func (m *LtiV1Model) createRoomSession(c *plugnmeet.LtiClaims) (*plugnmeet.ActiveRoomInfo, error) {
 	req := utils.PrepareLTIV1RoomCreateReq(c)
-	return m.rm.CreateRoom(ctx, req)
+	return m.rm.CreateRoom(req)
 }
 
 func (m *LtiV1Model) joinRoom(ctx context.Context, c *plugnmeet.LtiClaims) (string, error) {

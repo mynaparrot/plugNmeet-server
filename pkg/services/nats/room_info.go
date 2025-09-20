@@ -61,7 +61,7 @@ func (s *NatsService) GetRoomMetadataStruct(roomId string) (*plugnmeet.RoomMetad
 		return nil, err
 	}
 
-	if len(info.Metadata) == 0 {
+	if info == nil || len(info.Metadata) == 0 {
 		return nil, nil
 	}
 

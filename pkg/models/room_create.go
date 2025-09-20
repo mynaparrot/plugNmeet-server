@@ -13,7 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (m *RoomModel) CreateRoom(ctx context.Context, r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoomInfo, error) {
+func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoomInfo, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"room_id":       r.GetRoomId(),
 		"breakout_room": r.GetMetadata().GetIsBreakoutRoom(),
@@ -21,14 +21,14 @@ func (m *RoomModel) CreateRoom(ctx context.Context, r *plugnmeet.CreateRoomReq) 
 	})
 	log.Infoln("create room request")
 	// we'll lock the same room creation until the room is created
-	lockValue, err := acquireRoomCreationLockWithRetry(ctx, m.rs, r.GetRoomId(), log)
+	lockValue, err := acquireRoomCreationLockWithRetry(m.ctx, m.rs, r.GetRoomId(), log)
 	if err != nil {
 		return nil, err // Error already logged by helper
 	}
 
 	// Defer unlock using the obtained lockValue for safety.
 	defer func() {
-		unlockCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		unlockCtx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
 		defer cancel()
 		if unlockErr := m.rs.UnlockRoomCreation(unlockCtx, r.GetRoomId(), lockValue); unlockErr != nil {
 			// UnlockRoomCreation in RedisService should log details
