@@ -1,11 +1,11 @@
 package helpers
 
 import (
+	"context"
 	"sync"
 	"time"
 
 	"github.com/goccy/go-json"
-	"github.com/gofiber/fiber/v2/log"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/webhook"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -17,6 +17,7 @@ import (
 )
 
 type WebhookNotifier struct {
+	ctx                  context.Context
 	ds                   *dbservice.DatabaseService
 	rs                   *redisservice.RedisService
 	app                  *config.AppConfig
@@ -36,8 +37,9 @@ type webhookRedisFields struct {
 	PerformDeleting bool     `json:"perform_deleting"`
 }
 
-func newWebhookNotifier(app *config.AppConfig, ds *dbservice.DatabaseService, natsService *natsservice.NatsService, logger *logrus.Logger) *WebhookNotifier {
+func newWebhookNotifier(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, natsService *natsservice.NatsService, logger *logrus.Logger) *WebhookNotifier {
 	w := &WebhookNotifier{
+		ctx:                  ctx,
 		app:                  app,
 		ds:                   ds,
 		natsService:          natsService,
@@ -57,12 +59,17 @@ func newWebhookNotifier(app *config.AppConfig, ds *dbservice.DatabaseService, na
 // subscribeToCleanup listens for cleanup messages broadcast to all servers.
 func (w *WebhookNotifier) subscribeToCleanup() {
 	_, err := w.app.NatsConn.Subscribe(natsservice.WebhookCleanupSubject, func(m *nats.Msg) {
-		roomId := string(m.Data)
-		log.Infof("received cleanup signal for room: %s", roomId)
+		roomId := string(m.Data) // Make a copy of the data
+		w.logger.WithFields(logrus.Fields{
+			"room_id": roomId,
+			"method":  "subscribeToCleanup",
+		}).Info("received webhook cleanup signal")
 		w.cleanupNotifier(roomId)
 	})
 	if err != nil {
-		log.Errorf("failed to subscribe to webhook cleanup subject: %v", err)
+		w.logger.WithFields(logrus.Fields{
+			"method": "subscribeToCleanup",
+		}).WithError(err).Error("failed to subscribe to webhook cleanup subject")
 	}
 }
 
@@ -77,9 +84,12 @@ func (w *WebhookNotifier) getOrCreateNotifier(roomId string) *webhook.Notifier {
 	}
 
 	// Create a new notifier for this room
-	notifier := webhook.NewNotifier(config.DefaultWebhookQueueSize, w.app.Client.Debug, w.logger.Logger)
+	notifier := webhook.NewNotifier(w.ctx, config.DefaultWebhookQueueSize, w.logger.Logger)
 	w.notifiers[roomId] = notifier
-	log.Infof("created new webhook queue for room: %s", roomId)
+	w.logger.WithFields(logrus.Fields{
+		"room_id": roomId,
+		"method":  "getOrCreateNotifier",
+	}).Info("created new webhook queue for room")
 
 	return notifier
 }
@@ -92,30 +102,49 @@ func (w *WebhookNotifier) cleanupNotifier(roomId string) {
 	if notifier, ok := w.notifiers[roomId]; ok {
 		notifier.Kill() // This will call Kill() on the worker.
 		delete(w.notifiers, roomId)
-		log.Infof("cleaned up webhook queue for room: %s", roomId)
+		w.logger.WithFields(logrus.Fields{
+			"room_id": roomId,
+			"method":  "cleanupNotifier",
+		}).Info("cleaned up webhook queue for room")
 	}
 }
 
 func (w *WebhookNotifier) RegisterWebhook(roomId, sid string) {
-	if !w.isEnabled || roomId == "" {
+	log := w.logger.WithFields(logrus.Fields{
+		"room_id": roomId,
+		"sid":     sid,
+		"method":  "RegisterWebhook",
+	})
+	log.Info("request to register webhook")
+
+	if !w.isEnabled {
+		log.Debug("webhook is disabled, skipping registration")
+		return
+	}
+	if roomId == "" {
+		log.Warn("room_id is empty, skipping registration")
 		return
 	}
 
 	var urls []string
 	if w.defaultUrl != "" {
 		urls = append(urls, w.defaultUrl)
+		log.WithField("default_url", w.defaultUrl).Debug("added default webhook url")
 	}
 
 	if w.enabledForPerMeeting {
 		roomInfo, _ := w.ds.GetRoomInfoBySid(sid, nil)
 		if roomInfo != nil && roomInfo.WebhookUrl != "" {
 			urls = append(urls, roomInfo.WebhookUrl)
+			log.WithField("per_meeting_url", roomInfo.WebhookUrl).Debug("added per-meeting webhook url")
 		}
 	}
 
 	if len(urls) < 1 {
+		log.Info("no webhook urls found to register")
 		return
 	}
+	log.WithField("urls", urls).Info("found webhook urls to register")
 
 	d := &webhookRedisFields{
 		Urls:            urls,
@@ -124,8 +153,10 @@ func (w *WebhookNotifier) RegisterWebhook(roomId, sid string) {
 
 	err := w.saveData(roomId, d)
 	if err != nil {
-		w.logger.WithError(err).Errorln("failed to save webhook data")
+		log.WithError(err).Errorln("failed to save webhook data")
+		return
 	}
+	log.Info("successfully registered webhook")
 }
 
 func (w *WebhookNotifier) DeleteWebhook(roomId string) error {
@@ -151,7 +182,10 @@ func (w *WebhookNotifier) DeleteWebhook(roomId string) error {
 	// Only the server running the worker for this room will act on it.
 	err = w.app.NatsConn.Publish(natsservice.WebhookCleanupSubject, []byte(roomId))
 	if err != nil {
-		log.Errorf("failed to publish webhook cleanup for room %s: %v", roomId, err)
+		w.logger.WithFields(logrus.Fields{
+			"room_id": roomId,
+			"method":  "DeleteWebhook",
+		}).WithError(err).Error("failed to publish webhook cleanup")
 	}
 
 	return w.natsService.DeleteWebhookData(roomId)
@@ -226,7 +260,7 @@ func (w *WebhookNotifier) ForceToPutInQueue(event *plugnmeet.CommonNotifyEvent) 
 		return
 	}
 
-	notifier := webhook.NewNotifier(config.DefaultWebhookQueueSize, w.app.Client.Debug, w.logger.Logger)
+	notifier := webhook.NewNotifier(w.ctx, config.DefaultWebhookQueueSize, w.logger.Logger)
 	defer notifier.StopGracefully()
 	notifier.AddInNotifyQueue(event, w.app.Client.ApiKey, w.app.Client.Secret, urls)
 }
@@ -267,11 +301,11 @@ func (w *WebhookNotifier) getData(roomId string) (*webhookRedisFields, error) {
 
 var webhookNotifier *WebhookNotifier
 
-func GetWebhookNotifier(app *config.AppConfig, ds *dbservice.DatabaseService, natsService *natsservice.NatsService, logger *logrus.Logger) *WebhookNotifier {
+func GetWebhookNotifier(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, natsService *natsservice.NatsService, logger *logrus.Logger) *WebhookNotifier {
 	if webhookNotifier != nil {
 		return webhookNotifier
 	}
-	webhookNotifier = newWebhookNotifier(app, ds, natsService, logger)
+	webhookNotifier = newWebhookNotifier(ctx, app, ds, natsService, logger)
 
 	return webhookNotifier
 }

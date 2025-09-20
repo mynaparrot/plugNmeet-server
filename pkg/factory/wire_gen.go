@@ -30,7 +30,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	redisService := redisservice.New(ctx, client, logger)
 	natsService := natsservice.New(ctx, appConfig, logger)
 	livekitService := livekitservice.New(ctx, appConfig, logger)
-	webhookNotifier := helpers.GetWebhookNotifier(appConfig, databaseService, natsService, logger)
+	webhookNotifier := helpers.GetWebhookNotifier(ctx, appConfig, databaseService, natsService, logger)
 	analyticsModel := models.NewAnalyticsModel(ctx, appConfig, databaseService, redisService, natsService, webhookNotifier, logger)
 	userModel := models.NewUserModel(appConfig, databaseService, redisService, livekitService, natsService, analyticsModel, logger)
 	recorderModel := models.NewRecorderModel(appConfig, databaseService, redisService, natsService, userModel, logger)
