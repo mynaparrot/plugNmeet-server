@@ -1,5 +1,37 @@
 # Changelog
 
+## [1.9.3](https://github.com/mynaparrot/plugNmeet-server/compare/v1.9.2...v1.9.3) (2025-09-20)
+
+
+### Bug Fixes
+
+* **analytics:** Make event handling stateless and remove lock ([699c496](https://github.com/mynaparrot/plugNmeet-server/commit/699c4963ab375597926beb6609b55eca83576e3e))
+* **analytics:** Optimize export process with Redis SCAN ([942d976](https://github.com/mynaparrot/plugNmeet-server/commit/942d976e3a2aa881292ffd846500917edd625f92))
+* **analytics:** Prevent race condition in analytics export ([0107211](https://github.com/mynaparrot/plugNmeet-server/commit/010721160ed17ed2d1b5c213311b7398307eacab))
+* **bug:** accidentally deleted important method to handle `HandleGetClientFiles` ([d251223](https://github.com/mynaparrot/plugNmeet-server/commit/d251223cd323325d5e46fc98e64627cd03cb2560))
+* **cleanup:** added more logs ([1b4da4b](https://github.com/mynaparrot/plugNmeet-server/commit/1b4da4b786fabead9660018621afc67543ac6432))
+* **db:** added option to configure database read replicas ([f5197ee](https://github.com/mynaparrot/plugNmeet-server/commit/f5197ee6699d55c70b05e1e7ebb7b287218f7641))
+* **db:** single key `room_id_is_running` enough ([c8dbae7](https://github.com/mynaparrot/plugNmeet-server/commit/c8dbae7336c949fd91fe871d7098fa7d89c6cf6d))
+* **DI:** dependency inject improvement ([5573565](https://github.com/mynaparrot/plugNmeet-server/commit/55735653f78664ab2374edb45467c32a5f6fdcf3))
+* **etherpad:** Make etherpad stateless to prevent race conditions ([7eb1d54](https://github.com/mynaparrot/plugNmeet-server/commit/7eb1d541438f21ba3748893abe1753ecaf22c370))
+* **etherpad:** prevent to clean up if nodeId empty ([b7b50cb](https://github.com/mynaparrot/plugNmeet-server/commit/b7b50cbdc148b9ba5dfb350aaf8d97efd71f9fe5))
+* **improve:** grouped routers + more logs ([2bb7100](https://github.com/mynaparrot/plugNmeet-server/commit/2bb7100f0fe29dcec6d04d48b7aa77e4901a12b2))
+* **improve:** implemented better logging and other improvements ([13fd15b](https://github.com/mynaparrot/plugNmeet-server/commit/13fd15b61220ad81ee16ee6af0456ad87abae560))
+* **improve:** Optimize Redis implementation for performance ([8cde76b](https://github.com/mynaparrot/plugNmeet-server/commit/8cde76b3716cf53271cd7e4808e9edab5a28f9bb))
+* **logging:** added more logs ([012f04d](https://github.com/mynaparrot/plugNmeet-server/commit/012f04de0c4fe292181904501a1a5cce3de567a6))
+* **logging:** implemented better logging ([b36b0d6](https://github.com/mynaparrot/plugNmeet-server/commit/b36b0d63553b610457c8807757e922177126496b))
+* **nats:** Implement worker pool for message processing ([a38e8c9](https://github.com/mynaparrot/plugNmeet-server/commit/a38e8c95fc874f4890d460f8e6089d72100ad217))
+* **poll:** backward incompatibility ([cdbf51c](https://github.com/mynaparrot/plugNmeet-server/commit/cdbf51ccc20008d61d0e6b53730842e8994674b9))
+* rearranged room ended sequence + context aware ([02911a1](https://github.com/mynaparrot/plugNmeet-server/commit/02911a1be2137d61b310cd8cadff4a2e3ab67852))
+* **refactor:** removed config global variable ([ed02e72](https://github.com/mynaparrot/plugNmeet-server/commit/ed02e72c14fde6c46d5a707f421635e74a20db89))
+* **room:** fixed critical race condition while quick room end/create situation ([20011dd](https://github.com/mynaparrot/plugNmeet-server/commit/20011dd7caa66c6a85e3d93c8d7fb2e0793b2b2d))
+* **room:** Hold temporary room data on exit for webhook race condition ([6a207bd](https://github.com/mynaparrot/plugNmeet-server/commit/6a207bd50b56cbdb2096210e7b49ddb1467b0011))
+* use application context as parent + cleanup ([929ee66](https://github.com/mynaparrot/plugNmeet-server/commit/929ee6661af140db04ab257b5dcdfe51f19966b1))
+* use application context when locking ([bc1293e](https://github.com/mynaparrot/plugNmeet-server/commit/bc1293e5687241dc52949f54716198d76dae8e15))
+* use application level context ([af55c4b](https://github.com/mynaparrot/plugNmeet-server/commit/af55c4b299e48460906a33cf8cb05a2821484edd))
+* use better way to check user's online status ([2b4963d](https://github.com/mynaparrot/plugNmeet-server/commit/2b4963df692230129fc34ffc6bc0c072bca87dd9))
+* version display ([41cb9f2](https://github.com/mynaparrot/plugNmeet-server/commit/41cb9f24fdc0aeb6cbdaa0c07f647f284a9e860a))
+
 ## [1.9.2](https://github.com/mynaparrot/plugNmeet-server/compare/v1.9.1...v1.9.2) (2025-09-13)
 
 
