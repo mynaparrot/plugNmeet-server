@@ -89,9 +89,16 @@ func (c *NatsController) BootUp(ctx context.Context, wg *sync.WaitGroup) {
 	}
 
 	// now subscribe
-	c.subscribeToSystemWorker(ctx, stream)
+	sysWorkerCon, err := c.subscribeToSystemWorker(ctx, stream)
+	if err != nil {
+		c.logger.WithError(err).Fatal("error subscribing to system worker")
+	}
+
 	// subscribe to connection events
-	c.subscribeToUsersConnEvents()
+	con, err := c.subscribeToUsersConnEvents()
+	if err != nil {
+		c.logger.WithError(err).Fatal("error subscribing to users connection events")
+	}
 
 	// auth service
 	authService := NewNatsAuthController(c.app, c.natsService, c.authModel, c.issuerKeyPair, c.curveKeyPair, c.logger)
@@ -113,6 +120,9 @@ func (c *NatsController) BootUp(ctx context.Context, wg *sync.WaitGroup) {
 
 	// Keep the application running until context remain valid
 	<-ctx.Done()
+
+	sysWorkerCon.Stop()
+	_ = con.Unsubscribe()
 }
 
 func (c *NatsController) worker() {
@@ -121,65 +131,62 @@ func (c *NatsController) worker() {
 	}
 }
 
-type NatsEvents struct {
-	Client map[string]interface{} `json:"client"`
-	Reason string                 `json:"reason"`
-}
-
 // SubscribeToUsersConnEvents will be used to subscribe with users' connection events
 // based on user connection we can determine user's connection status
-func (c *NatsController) subscribeToUsersConnEvents() {
-	_, err := c.app.NatsConn.QueueSubscribe(fmt.Sprintf("$SYS.ACCOUNT.%s.>", c.app.NatsInfo.Account), "pnm-conn-event", func(msg *nats.Msg) {
-		if strings.Contains(msg.Subject, ".CONNECT") {
-			// Copy data only when we need it to avoid unnecessary allocations.
-			// This is crucial to prevent race conditions as the message buffer is reused by the NATS client.
-			data := make([]byte, len(msg.Data))
-			copy(data, msg.Data)
+func (c *NatsController) subscribeToUsersConnEvents() (*nats.Subscription, error) {
+	return c.app.NatsConn.QueueSubscribe(fmt.Sprintf("$SYS.ACCOUNT.%s.>", c.app.NatsInfo.Account), "pnm-conn-event", func(msg *nats.Msg) {
+		isConnect := strings.Contains(msg.Subject, ".CONNECT")
+		isDisconnect := strings.Contains(msg.Subject, ".DISCONNECT")
 
-			c.jobChan <- natsJob{handler: func() {
-				e := new(NatsEvents)
-				if err := json.Unmarshal(data, e); err == nil {
-					if user, ok := e.Client["user"].(string); ok {
-						claims, err := c.authModel.UnsafeClaimsWithoutVerification(user)
-						if err != nil {
-							c.logger.WithError(err).Errorln("failed to parse claims from connect event")
-							return
-						}
-						if claims.GetName() != config.RecorderUserAuthName {
-							c.natsModel.OnAfterUserJoined(claims.GetRoomId(), claims.GetUserId())
-						}
-					}
-				}
-			}}
-		} else if strings.Contains(msg.Subject, ".DISCONNECT") {
-			// Copy data only when we need it.
-			data := make([]byte, len(msg.Data))
-			copy(data, msg.Data)
-
-			c.jobChan <- natsJob{handler: func() {
-				e := new(NatsEvents)
-				if err := json.Unmarshal(data, e); err == nil {
-					if user, ok := e.Client["user"].(string); ok {
-						claims, err := c.authModel.UnsafeClaimsWithoutVerification(user)
-						if err != nil {
-							c.logger.WithError(err).Errorln("failed to parse claims from disconnect event")
-							return
-						}
-						if claims.GetName() != config.RecorderUserAuthName {
-							c.natsModel.OnAfterUserDisconnected(claims.GetRoomId(), claims.GetUserId())
-						}
-					}
-				}
-			}}
+		if !isConnect && !isDisconnect {
+			return
 		}
+
+		// Copy data to avoid race conditions as the message buffer is reused by the NATS client.
+		data := make([]byte, len(msg.Data))
+		copy(data, msg.Data)
+
+		c.jobChan <- natsJob{handler: func() {
+			c.handleUserConnectionEvent(data, isConnect)
+		}}
 	})
-	if err != nil {
-		c.logger.WithError(err).Fatal("error subscribing to users connection events")
+}
+
+func (c *NatsController) handleUserConnectionEvent(data []byte, isConnect bool) {
+	e := &struct {
+		Type   string                 `json:"type"`
+		Client map[string]interface{} `json:"client"`
+		Reason string                 `json:"reason"`
+	}{}
+	if err := json.Unmarshal(data, e); err != nil {
+		c.logger.WithError(err).Warn("failed to unmarshal NATS connection event")
 		return
+	}
+	log := c.logger.WithFields(logrus.Fields{
+		"client":    e.Client,
+		"reason":    e.Reason,
+		"type":      e.Type,
+		"isConnect": isConnect,
+	})
+	log.Debug("received NATS connection event")
+
+	if userToken, ok := e.Client["user"].(string); ok {
+		claims, err := c.authModel.UnsafeClaimsWithoutVerification(userToken)
+		if err != nil {
+			log.WithError(err).Errorln("failed to parse claims from connection event")
+			return
+		}
+		if claims.GetName() != config.RecorderUserAuthName {
+			if isConnect {
+				c.natsModel.OnAfterUserJoined(claims.GetRoomId(), claims.GetUserId())
+			} else {
+				c.natsModel.OnAfterUserDisconnected(claims.GetRoomId(), claims.GetUserId())
+			}
+		}
 	}
 }
 
-func (c *NatsController) subscribeToSystemWorker(ctx context.Context, stream jetstream.Stream) {
+func (c *NatsController) subscribeToSystemWorker(ctx context.Context, stream jetstream.Stream) (jetstream.ConsumeContext, error) {
 	cons, err := stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
 		Durable: fmt.Sprintf("pnm-%s", c.app.NatsInfo.Subjects.SystemJsWorker),
 	})
@@ -187,7 +194,7 @@ func (c *NatsController) subscribeToSystemWorker(ctx context.Context, stream jet
 		c.logger.WithError(err).Fatalln("error creating system worker consumer")
 	}
 
-	_, err = cons.Consume(func(msg jetstream.Msg) {
+	consumeContext, err := cons.Consume(func(msg jetstream.Msg) {
 		defer msg.Ack()
 		// Copy data to avoid race conditions as the message buffer is reused.
 		sub := msg.Subject()
@@ -209,8 +216,5 @@ func (c *NatsController) subscribeToSystemWorker(ctx context.Context, stream jet
 		}
 	}))
 
-	if err != nil {
-		c.logger.WithError(err).Fatal("error subscribing to system worker")
-		return
-	}
+	return consumeContext, err
 }
