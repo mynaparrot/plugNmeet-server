@@ -9,10 +9,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mynaparrot/plugnmeet-protocol/logging"
 	"github.com/mynaparrot/plugnmeet-server/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/factory"
-	"github.com/mynaparrot/plugnmeet-server/pkg/logging"
 	"github.com/mynaparrot/plugnmeet-server/pkg/routers"
 	"github.com/mynaparrot/plugnmeet-server/version"
 	"github.com/sirupsen/logrus"

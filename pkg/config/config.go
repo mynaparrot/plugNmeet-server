@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mynaparrot/plugnmeet-protocol/logging"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -29,7 +30,7 @@ type AppConfig struct {
 	RootWorkingDir               string
 	Client                       ClientInfo                   `yaml:"client"`
 	RoomDefaultSettings          *utils.RoomDefaultSettings   `yaml:"room_default_settings"`
-	LogSettings                  LogSettings                  `yaml:"log_settings"`
+	LogSettings                  logging.LogSettings          `yaml:"log_settings"`
 	LivekitInfo                  LivekitInfo                  `yaml:"livekit_info"`
 	RedisInfo                    RedisInfo                    `yaml:"redis_info"`
 	DatabaseInfo                 DatabaseInfo                 `yaml:"database_info"`
@@ -64,14 +65,6 @@ type WebhookConf struct {
 type PrometheusConf struct {
 	Enable      bool   `yaml:"enable"`
 	MetricsPath string `yaml:"metrics_path"`
-}
-
-type LogSettings struct {
-	LogFile    string  `yaml:"log_file"`
-	MaxSize    int     `yaml:"max_size"`
-	MaxBackups int     `yaml:"max_backups"`
-	MaxAge     int     `yaml:"max_age"`
-	LogLevel   *string `yaml:"log_level"`
 }
 
 type LivekitInfo struct {

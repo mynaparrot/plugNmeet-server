@@ -4,7 +4,6 @@ go 1.25.1
 
 require (
 	buf.build/go/protovalidate v1.0.0
-	github.com/DeRuina/timberjack v1.3.7
 	github.com/ansrivas/fiberprometheus/v2 v2.14.0
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/gabriel-vasile/mimetype v1.4.10
@@ -17,7 +16,7 @@ require (
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.41.0
 	github.com/livekit/server-sdk-go/v2 v2.11.3
-	github.com/mynaparrot/plugnmeet-protocol v1.0.16-0.20250920112838-01926b8d7348
+	github.com/mynaparrot/plugnmeet-protocol v1.0.16-0.20250920165118-763ad9e68bce
 	github.com/nats-io/jwt/v2 v2.8.0
 	github.com/nats-io/nats.go v1.45.0
 	github.com/nats-io/nkeys v0.4.11
@@ -36,6 +35,7 @@ require (
 	buf.build/go/protoyaml v0.6.0 // indirect
 	cel.dev/expr v0.24.0 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
+	github.com/DeRuina/timberjack v1.3.7 // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
