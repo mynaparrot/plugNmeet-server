@@ -22,7 +22,6 @@ import (
 
 const (
 	// DefaultNumWorkers Number of concurrent workers for processing NATS messages.
-	// Adjust based on expected load and available resources.
 	DefaultNumWorkers = 50
 	// DefaultJobQueueSize Size of the job queue. A larger buffer can handle larger bursts of messages.
 	DefaultJobQueueSize = 1000
@@ -169,6 +168,13 @@ func (c *NatsController) handleUserConnectionEvent(data []byte, isConnect bool) 
 		"isConnect": isConnect,
 	})
 	log.Debug("received NATS connection event")
+
+	if clientType, ok := e.Client["client_type"]; ok && clientType != "websocket" {
+		// this feature only for websocket connections from frontend only
+		// for other client different ways, so preventing unnecessary errors
+		log.WithField("client_type", clientType).Warn("ignoring non-websocket connection event")
+		return
+	}
 
 	if userToken, ok := e.Client["user"].(string); ok {
 		claims, err := c.authModel.UnsafeClaimsWithoutVerification(userToken)
