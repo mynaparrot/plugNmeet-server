@@ -68,6 +68,7 @@ func (s *NatsAuthController) Handle(r micro.Request) {
 
 	claims, err := s.handleClaims(rc)
 	if err != nil {
+		s.logger.WithError(err).Errorln("error handling claims")
 		s.respond(r, userNkey, serverId, "", err)
 		return
 	}
@@ -137,7 +138,7 @@ func (s *NatsAuthController) setPermissionForClient(data *plugnmeet.PlugNmeetTok
 		return err
 	}
 	if userInfo == nil {
-		return errors.New(fmt.Sprintf("User info not found for userId: %s, roomId: %s", userId, roomId))
+		return fmt.Errorf("user info not found for userId: %s, roomId: %s", userId, roomId)
 	}
 
 	allowPub := jwt.StringList{

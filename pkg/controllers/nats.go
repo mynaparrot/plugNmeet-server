@@ -25,6 +25,19 @@ const (
 	DefaultNumWorkers = 50
 	// DefaultJobQueueSize Size of the job queue. A larger buffer can handle larger bursts of messages.
 	DefaultJobQueueSize = 1000
+	// nats auth service endpoint subject
+	natsAuthServiceEndpointSubject = "$SYS.REQ.USER.AUTH"
+	// nats connection event subject format
+	natsConnectionEventSubjectFormat = "$SYS.ACCOUNT.%s.>"
+
+	prefix = "pnm-"
+	// nats auth service name
+	natsAuthServiceName = prefix + "auth"
+	// nats auth service queue group
+	natsAuthServiceQueueGroup = prefix + "auth-queue"
+	// nats connection event queue
+	natsConnectionEventQueueGroup = prefix + "conn-event-queue"
+	websocketClientType           = "websocket"
 )
 
 type natsJob struct {
@@ -102,12 +115,12 @@ func (c *NatsController) BootUp(ctx context.Context, wg *sync.WaitGroup) {
 	// auth service
 	authService := NewNatsAuthController(c.app, c.natsService, c.authModel, c.issuerKeyPair, c.curveKeyPair, c.logger)
 	_, err = micro.AddService(c.app.NatsConn, micro.Config{
-		Name:        "pnm-auth",
+		Name:        natsAuthServiceName,
 		Version:     version.Version,
 		Description: "Handle authorization of pnm nats client",
-		QueueGroup:  "pnm-auth",
+		QueueGroup:  natsAuthServiceQueueGroup,
 		Endpoint: &micro.EndpointConfig{
-			Subject: "$SYS.REQ.USER.AUTH",
+			Subject: natsAuthServiceEndpointSubject,
 			Handler: micro.HandlerFunc(authService.Handle),
 		},
 	})
@@ -133,7 +146,7 @@ func (c *NatsController) worker() {
 // SubscribeToUsersConnEvents will be used to subscribe with users' connection events
 // based on user connection we can determine user's connection status
 func (c *NatsController) subscribeToUsersConnEvents() (*nats.Subscription, error) {
-	return c.app.NatsConn.QueueSubscribe(fmt.Sprintf("$SYS.ACCOUNT.%s.>", c.app.NatsInfo.Account), "pnm-conn-event", func(msg *nats.Msg) {
+	return c.app.NatsConn.QueueSubscribe(fmt.Sprintf(natsConnectionEventSubjectFormat, c.app.NatsInfo.Account), natsConnectionEventQueueGroup, func(msg *nats.Msg) {
 		isConnect := strings.Contains(msg.Subject, ".CONNECT")
 		isDisconnect := strings.Contains(msg.Subject, ".DISCONNECT")
 
@@ -162,14 +175,14 @@ func (c *NatsController) handleUserConnectionEvent(data []byte, isConnect bool) 
 		return
 	}
 	log := c.logger.WithFields(logrus.Fields{
+		"type":      e.Type,
 		"client":    e.Client,
 		"reason":    e.Reason,
-		"type":      e.Type,
 		"isConnect": isConnect,
 	})
 	log.Debug("received NATS connection event")
 
-	if clientType, ok := e.Client["client_type"]; ok && clientType != "websocket" {
+	if clientType, ok := e.Client["client_type"]; ok && clientType != websocketClientType {
 		// this feature only for websocket connections from frontend only
 		// for other client different ways, so preventing unnecessary errors
 		log.WithField("client_type", clientType).Warn("ignoring non-websocket connection event")
@@ -194,7 +207,7 @@ func (c *NatsController) handleUserConnectionEvent(data []byte, isConnect bool) 
 
 func (c *NatsController) subscribeToSystemWorker(ctx context.Context, stream jetstream.Stream) (jetstream.ConsumeContext, error) {
 	cons, err := stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
-		Durable: fmt.Sprintf("pnm-%s", c.app.NatsInfo.Subjects.SystemJsWorker),
+		Durable: fmt.Sprintf("%s%s", prefix, c.app.NatsInfo.Subjects.SystemJsWorker),
 	})
 	if err != nil {
 		c.logger.WithError(err).Fatalln("error creating system worker consumer")
