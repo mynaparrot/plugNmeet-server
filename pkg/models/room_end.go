@@ -162,7 +162,6 @@ func (m *RoomModel) OnAfterRoomEnded(roomID, roomSID, metadata, roomStatus strin
 	// Step 14: Schedule the analytics export to run after a delay.
 	// This is done asynchronously to allow the current cleanup lock to be released.
 	time.AfterFunc(config.WaitBeforeAnalyticsStartProcessing, func() {
-		// let's wait a few seconds so that all other processes will finish
 		// PrepareToExportAnalytics has it's own room creation locking logic
 		m.analyticsModel.PrepareToExportAnalytics(roomID, roomSID, metadata)
 	})

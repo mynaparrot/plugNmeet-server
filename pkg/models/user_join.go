@@ -18,10 +18,11 @@ var validUserIDRegex = regexp.MustCompile("^[a-zA-Z0-9-_]+$")
 
 func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTokenReq) (string, error) {
 	log := m.logger.WithFields(logrus.Fields{
-		"room_id": g.GetRoomId(),
-		"user_id": g.GetUserInfo().GetUserId(),
-		"name":    g.GetUserInfo().GetName(),
-		"method":  "GetPNMJoinToken",
+		"room_id":  g.GetRoomId(),
+		"user_id":  g.GetUserInfo().GetUserId(),
+		"name":     g.GetUserInfo().GetName(),
+		"is_admin": g.GetUserInfo().GetIsAdmin(),
+		"method":   "GetPNMJoinToken",
 	})
 	log.Infoln("request to generate join token")
 
@@ -74,7 +75,7 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 			log.WithFields(logrus.Fields{
 				"ex_user_id":  g.UserInfo.GetUserMetadata().GetExUserId(),
 				"new_user_id": g.UserInfo.GetUserId(),
-			}).Infof("auto generated user_id: %s", g.UserInfo.GetUserId())
+			}).Infof("room has auto generated userId feature enabled, assigning new random user_id: %s", g.UserInfo.GetUserId())
 		}
 	} else {
 		// If auto-generation is off, check if a user with the same ID is already online.
