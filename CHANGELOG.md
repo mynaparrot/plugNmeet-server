@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.9.4](https://github.com/mynaparrot/plugNmeet-server/compare/v1.9.3...v1.9.4) (2025-09-23)
+
+
+### Bug Fixes
+
+* add more logs in webhook + user application context ([dd95c73](https://github.com/mynaparrot/plugNmeet-server/commit/dd95c734041676168099f2fe171a2715d63584e1))
+* better to use `ON DELETE RESTRICT` to make `FOREIGN KEY` to work as it suppose to do. ([16e6d7e](https://github.com/mynaparrot/plugNmeet-server/commit/16e6d7e723baa0c5153e40df3c6a7ee641d35057))
+* close nats properly + cleanup ([a1ce9cd](https://github.com/mynaparrot/plugNmeet-server/commit/a1ce9cd3116e248b7f64581a6b0c3009241e7c07))
+* missed to clean up ([ce7fd0c](https://github.com/mynaparrot/plugNmeet-server/commit/ce7fd0c142c99ed90cf3bdffca4450377fab5c7e))
+* missed to clean up ([5d3834f](https://github.com/mynaparrot/plugNmeet-server/commit/5d3834f59fe1dd1dfa9cfd547bd4473b33d51254))
+* moved logging to proto for sharing ([c6d5825](https://github.com/mynaparrot/plugNmeet-server/commit/c6d58253e2c62ae9cd50cf384bf4e6cd279e0df8))
+* prevent non-websocket users connections ([ef0612b](https://github.com/mynaparrot/plugNmeet-server/commit/ef0612b12885c0c3622e901aeabefa620a127c9e))
+
 ## [1.9.3](https://github.com/mynaparrot/plugNmeet-server/compare/v1.9.2...v1.9.3) (2025-09-20)
 
 
