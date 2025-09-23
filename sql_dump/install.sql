@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS `pnm_room_info` (
   `modified` datetime NOT NULL DEFAULT '0000-00-00 00:00:00' ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `sid` (`sid`),
-  KEY `room_id_is_running` (`roomId`, `is_running`)
+  KEY `idx_room_id` (`roomId`, `is_running`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `pnm_recordings` (
@@ -40,9 +40,9 @@ CREATE TABLE IF NOT EXISTS `pnm_recordings` (
   `modified` datetime NOT NULL DEFAULT '0000-00-00 00:00:00' ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `record_id` (`record_id`),
-  KEY `room_id` (`room_id`),
+  KEY `idx_room_id` (`room_id`),
   FOREIGN KEY (room_sid) REFERENCES `pnm_room_info` (sid)
-     ON DELETE SET NULL
+     ON DELETE RESTRICT
      ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -56,9 +56,9 @@ CREATE TABLE IF NOT EXISTS `pnm_room_analytics` (
   `room_creation_time` int(11) NOT NULL,
   `creation_time` int(11) NOT NULL,
   PRIMARY KEY (`id`),
-  KEY `room_id` (`room_id`),
-  KEY `file_id` (`file_id`),
+  KEY `idx_room_id` (`room_id`),
+  KEY `idx_file_id` (`file_id`),
   FOREIGN KEY (room_table_id) REFERENCES `pnm_room_info` (id)
-     ON DELETE SET NULL
+     ON DELETE RESTRICT
      ON UPDATE CASCADE
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
