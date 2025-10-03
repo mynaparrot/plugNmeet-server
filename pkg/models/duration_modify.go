@@ -80,17 +80,30 @@ func (m *RoomDurationModel) IncreaseRoomDuration(roomId string, duration uint64)
 
 	// check if this is a breakout room
 	if meta.IsBreakoutRoom && info != nil {
-		log.Info("room is a breakout room, comparing duration with parent")
-		// need to check how long time left for this room
-		now := uint64(time.Now().Unix())
-		valid := info.StartedAt + (info.Duration * 60)
-		d := ((valid - now) / 60) + duration
-
-		// we'll need to make sure that breakout room duration isn't bigger than main room duration
-		err = m.CompareDurationWithParentRoom(meta.ParentRoomId, d)
-		if err != nil {
-			log.WithError(err).Error("duration comparison with parent room failed")
+		// only if the room has a duration, we will check with the parent
+		if info.StartedAt == 0 {
+			err = errors.New("can't increase duration as breakout room is not running")
+			log.WithError(err).Warn()
 			return 0, err
+		}
+		if info.Duration == 0 {
+			err = errors.New("can't increase duration as breakout room has unlimited duration")
+			log.WithError(err).Warn()
+			return 0, err
+		} else {
+			log.Info(
+				"breakout room has duration, will compare with parent room")
+			// need to check how long time left for this room
+			now := uint64(time.Now().Unix())
+			valid := info.StartedAt + (info.Duration * 60)
+			d := ((valid - now) / 60) + duration
+
+			// we'll need to make sure that breakout room duration isn't bigger than main room duration
+			err = m.CompareDurationWithParentRoom(meta.ParentRoomId, d)
+			if err != nil {
+				log.WithError(err).Error("duration comparison with parent room failed")
+				return 0, err
+			}
 		}
 	}
 
@@ -130,6 +143,12 @@ func (m *RoomDurationModel) CompareDurationWithParentRoom(mainRoomId string, dur
 	}
 	if info == nil {
 		// this is indicating that the no info found
+		log.Info("parent room has no duration limit, comparison skipped")
+		return nil
+	}
+
+	if info.Duration == 0 {
+		// parent room has no duration limit
 		log.Info("parent room has no duration limit, comparison skipped")
 		return nil
 	}
