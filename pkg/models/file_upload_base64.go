@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gabriel-vasile/mimetype"
+	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/sirupsen/logrus"
 )
@@ -60,6 +61,19 @@ func (m *FileModel) UploadBase64EncodedData(req *plugnmeet.UploadBase64EncodedDa
 		return nil, fmt.Errorf("failed to write file: %w", err)
 	}
 
+	meta := &plugnmeet.RoomUploadedFileMetadata{
+		FileId:   uuid.NewString(),
+		FileName: safeFilename,
+		FilePath: filePath,
+		FileType: req.FileType,
+		MimeType: mimeType.String(),
+	}
+	err = m.natsService.AddRoomFile(req.RoomId, meta)
+	if err != nil {
+		log.WithError(err).Error("failed to store file metadata in NATS")
+	}
+
+	//TODO: replace with UploadedFileMergeReq and set file ID
 	return &plugnmeet.UploadBase64EncodedDataRes{
 		Status:        true,
 		Msg:           "file uploaded successfully",

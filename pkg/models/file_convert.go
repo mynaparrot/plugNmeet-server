@@ -12,6 +12,7 @@ import (
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/google/uuid"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/sirupsen/logrus"
 )
 
@@ -108,13 +109,26 @@ func (m *FileModel) ConvertAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 		TotalPages: totalPages,
 	}
 
-	if err := m.updateRoomMetadataWithOfficeFile(roomId, res); err != nil {
-		log.WithError(err).Error("metadata update failed")
+	if err := m.addFileToNatsStore(roomId, res); err != nil {
+		log.WithError(err).Error("failed to store converted file metadata in NATS")
 		// Don't return the error, as the file conversion was successful.
 	}
 
 	log.WithField("totalPages", totalPages).Info("successfully converted and broadcasted whiteboard file")
 	return res, nil
+}
+
+// addFileToNatsStore stores the metadata of a converted file into the dedicated NATS KV bucket.
+func (m *FileModel) addFileToNatsStore(roomId string, fileInfo *ConvertWhiteboardFileRes) error {
+	pages := int32(fileInfo.TotalPages)
+	meta := plugnmeet.RoomUploadedFileMetadata{
+		FileId:     fileInfo.FileId,
+		FileName:   fileInfo.FileName,
+		FilePath:   fileInfo.FilePath,
+		FileType:   plugnmeet.RoomUploadedFileType_WHITEBOARD_CONVERTED_FILE,
+		TotalPages: &pages,
+	}
+	return m.natsService.AddRoomFile(roomId, &meta)
 }
 
 // checkDependencies verifies that required external tools are installed.

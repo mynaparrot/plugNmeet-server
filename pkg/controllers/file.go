@@ -13,6 +13,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -70,8 +71,15 @@ func (fc *FileController) HandleFileUpload(c *fiber.Ctx) error {
 
 // HandleUploadedFileMerge handles merging chunks of a resumable upload.
 func (fc *FileController) HandleUploadedFileMerge(c *fiber.Ctx) error {
-	req := new(models.ResumableUploadedFileMergeReq)
-	err := c.BodyParser(req)
+	req := new(plugnmeet.UploadedFileMergeReq)
+	ctnType := c.Get("Content-Type")
+	var err error
+	if ctnType == "application/protobuf" {
+		err = proto.Unmarshal(c.Body(), req)
+	} else {
+		err = protojson.Unmarshal(c.Body(), req)
+	}
+
 	if err != nil {
 		return commonFileErrorResponse(c, err.Error(), fiber.StatusBadRequest)
 	}
@@ -85,7 +93,17 @@ func (fc *FileController) HandleUploadedFileMerge(c *fiber.Ctx) error {
 		return commonFileErrorResponse(c, err.Error(), fiber.StatusBadRequest)
 	}
 
-	return c.JSON(res)
+	if ctnType == "application/protobuf" {
+		return utils.SendProtobufResponse(c, res)
+	}
+
+	// for backward compatibility
+	marshal, err := protojson.Marshal(res)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+	c.Set("Content-Type", "application/json")
+	return c.Send(marshal)
 }
 
 // HandleUploadBase64EncodedData handles uploading base64 encoded data.
@@ -162,6 +180,21 @@ func (fc *FileController) HandleConvertWhiteboardFile(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(res)
+}
+
+func (fc *FileController) HandleGetRoomFilesByType(c *fiber.Ctx) error {
+	req := new(plugnmeet.GetRoomUploadedFilesReq)
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	res, err := fc.FileModel.GetRoomFilesByType(req.RoomId, req.FileType)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	return utils.SendProtobufResponse(c, res)
 }
 
 // HandleGetClientFiles gets the client CSS and JS files.

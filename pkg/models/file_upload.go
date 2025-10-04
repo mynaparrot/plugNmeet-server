@@ -9,6 +9,8 @@ import (
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/sirupsen/logrus"
 )
 
@@ -24,28 +26,11 @@ type ResumableUploadReq struct {
 	ResumableCurrentChunkSize int64  `query:"resumableCurrentChunkSize"`
 }
 
-type ResumableUploadedFileMergeReq struct {
-	RoomSid              string `json:"roomSid" query:"roomSid"`
-	RoomId               string `json:"roomId" query:"roomId"`
-	ResumableIdentifier  string `json:"resumableIdentifier" query:"resumableIdentifier"`
-	ResumableFilename    string `json:"resumableFilename" query:"resumableFilename"`
-	ResumableTotalChunks int    `json:"resumableTotalChunks" query:"resumableTotalChunks"`
-}
-
-type UploadedFileResponse struct {
-	Status        bool   `json:"status"`
-	Msg           string `json:"msg"`
-	FilePath      string `json:"filePath"`
-	FileName      string `json:"fileName"`
-	FileExtension string `json:"fileExtension"`
-	FileMimeType  string `json:"fileMimeType"`
-}
-
 // ResumableFileUpload method can only be use if you are using resumable.js as your frontend.
 // Library link: https://github.com/23/resumable.js
-func (m *FileModel) ResumableFileUpload(c *fiber.Ctx) (*UploadedFileResponse, *fiber.Error) {
+func (m *FileModel) ResumableFileUpload(c *fiber.Ctx) (*plugnmeet.UploadedFileRes, *fiber.Error) {
 	req := new(ResumableUploadReq)
-	res := &UploadedFileResponse{
+	res := &plugnmeet.UploadedFileRes{
 		Status: true,
 	}
 
@@ -144,7 +129,7 @@ func (m *FileModel) ResumableFileUpload(c *fiber.Ctx) (*UploadedFileResponse, *f
 }
 
 // UploadedFileMerge will combine all the parts and create a final file
-func (m *FileModel) UploadedFileMerge(req *ResumableUploadedFileMergeReq) (*UploadedFileResponse, error) {
+func (m *FileModel) UploadedFileMerge(req *plugnmeet.UploadedFileMergeReq) (*plugnmeet.UploadedFileRes, error) {
 	safeFilename := filepath.Base(req.ResumableFilename)
 	tempFolder := filepath.Join(m.app.UploadFileSettings.Path, req.RoomSid, "tmp")
 	chunkDir := filepath.Join(tempFolder, req.ResumableIdentifier)
@@ -165,9 +150,32 @@ func (m *FileModel) UploadedFileMerge(req *ResumableUploadedFileMergeReq) (*Uplo
 	}
 
 	finalPath := filepath.Join(req.RoomSid, safeFilename)
-	res := &UploadedFileResponse{
+	fileId := uuid.NewString()
+	if req.FileType != plugnmeet.RoomUploadedFileType_WHITEBOARD_CONVERTED_FILE {
+		// we can save other files because this type file will process again
+		// we'll save after complete conversion of that file
+		meta := &plugnmeet.RoomUploadedFileMetadata{
+			FileId:   fileId,
+			FileName: safeFilename,
+			FilePath: finalPath,
+			FileType: req.FileType,
+			MimeType: mtype.String(),
+		}
+		err = m.natsService.AddRoomFile(req.RoomId, meta)
+		if err != nil {
+			m.logger.WithFields(logrus.Fields{
+				"roomId":   req.RoomId,
+				"roomSid":  req.RoomSid,
+				"filePath": finalPath,
+			}).WithError(err).Error("failed to store file metadata in NATS")
+		}
+	}
+
+	res := &plugnmeet.UploadedFileRes{
 		Status:        true,
 		Msg:           "file uploaded successfully",
+		FileId:        fileId,
+		FileType:      req.FileType,
 		FileMimeType:  mtype.String(),
 		FilePath:      finalPath,
 		FileName:      safeFilename,
@@ -177,12 +185,13 @@ func (m *FileModel) UploadedFileMerge(req *ResumableUploadedFileMergeReq) (*Uplo
 	return res, nil
 }
 
-func (m *FileModel) combineResumableFiles(req *ResumableUploadedFileMergeReq, chunksDir, safeFilename string) (string, error) {
+func (m *FileModel) combineResumableFiles(req *plugnmeet.UploadedFileMergeReq, chunksDir, safeFilename string) (string, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId":              req.RoomId,
 		"roomSid":             req.RoomSid,
 		"resumableIdentifier": req.ResumableIdentifier,
 		"resumableFilename":   req.ResumableFilename,
+		"fileType":            req.FileType,
 		"method":              "combineResumableFiles",
 	})
 
@@ -201,7 +210,8 @@ func (m *FileModel) combineResumableFiles(req *ResumableUploadedFileMergeReq, ch
 	}
 	defer destFile.Close()
 
-	for i := 1; i <= req.ResumableTotalChunks; i++ {
+	var i int32 = 1
+	for i = 1; i <= req.ResumableTotalChunks; i++ {
 		chunkPath := filepath.Join(chunksDir, fmt.Sprintf("part%d", i))
 		chunkFile, err := os.Open(chunkPath)
 		if err != nil {

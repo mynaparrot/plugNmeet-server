@@ -225,4 +225,5 @@ func (r *router) registerAPIRoutes() {
 	// uploadBase64EncodedData will accept raw base64 data of files
 	// mostly for whiteboard images
 	api.Post("/uploadBase64EncodedData", r.ctrl.FileController.HandleUploadBase64EncodedData)
+	api.All("/getRoomFilesByType", r.ctrl.FileController.HandleGetRoomFilesByType)
 }

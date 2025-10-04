@@ -158,4 +158,8 @@ func (s *NatsService) OnAfterSessionEndCleanup(roomId string) {
 	if err := s.DeleteRoomNatsStream(roomId); err != nil {
 		s.logger.WithError(err).Errorf("failed to delete room %s", roomId)
 	}
+
+	if err := s.DeleteAllRoomFiles(roomId); err != nil {
+		s.logger.WithError(err).Errorf("failed to delete room %s files bucket", roomId)
+	}
 }
