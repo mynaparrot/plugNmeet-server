@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/gabriel-vasile/mimetype"
-	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/sirupsen/logrus"
 )
@@ -61,8 +60,10 @@ func (m *FileModel) UploadBase64EncodedData(req *plugnmeet.UploadBase64EncodedDa
 		return nil, fmt.Errorf("failed to write file: %w", err)
 	}
 
+	// at present format ${file.id}.png
+	fileId := strings.TrimSuffix(req.FileName, ".png")
 	meta := &plugnmeet.RoomUploadedFileMetadata{
-		FileId:   uuid.NewString(),
+		FileId:   fileId,
 		FileName: safeFilename,
 		FilePath: filePath,
 		FileType: req.FileType,
