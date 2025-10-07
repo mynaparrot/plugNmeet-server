@@ -75,7 +75,7 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) {
 	userInfo, err := m.natsService.GetUserInfo(roomId, userId)
 	if err != nil || userInfo == nil {
 		// If we can't get user info, send a basic event and update analytics.
-		if err = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_DISCONNECTED, roomId, &plugnmeet.NatsKvUserInfo{UserId: userId}, userId); err != nil {
+		if err = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_DISCONNECTED, roomId, &plugnmeet.NatsKvUserInfo{UserId: userId, RoomId: roomId}, userId); err != nil {
 			log.WithError(err).Error("failed to broadcast basic USER_DISCONNECTED event")
 		}
 	} else {

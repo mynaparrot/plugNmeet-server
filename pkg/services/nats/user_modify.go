@@ -49,7 +49,7 @@ func (s *NatsService) AddUser(roomId, userId, name string, isAdmin, isPresenter 
 		Bucket:   bucket,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create room bucket: %w", err)
+		return fmt.Errorf("failed to create room user bucket: %w", err)
 	}
 
 	// Add user status to the room bucket
@@ -106,7 +106,7 @@ func (s *NatsService) UpdateUserStatus(roomId, userId string, status string) err
 	roomKV, err := s.js.KeyValue(s.ctx, fmt.Sprintf(RoomUsersBucket, roomId))
 	if err != nil {
 		if errors.Is(err, jetstream.ErrBucketNotFound) {
-			return fmt.Errorf("no user found with userId: %s", userId)
+			return fmt.Errorf("no room users bucket found with roomId: %s", userId)
 		}
 		return err
 	}

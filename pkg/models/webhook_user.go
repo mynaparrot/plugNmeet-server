@@ -2,10 +2,12 @@ package models
 
 import (
 	"strings"
+	"time"
 
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 )
 
@@ -92,6 +94,15 @@ func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 		// because that user did not use plugNmeet client interface
 		log.Info("ingress participant left, triggering OnAfterUserDisconnected manually")
 		m.nm.OnAfterUserDisconnected(event.Room.Name, event.Participant.Identity)
+	} else {
+		time.AfterFunc(time.Second*1, func() {
+			if status, err := m.natsService.GetRoomUserStatus(event.Room.Name, event.Participant.Identity); err == nil && status == natsservice.UserStatusOnline {
+				// user should be offline because it's disconnected from media server
+				// but may be for some reason it wasn't triggered by Nats correctly
+				log.Warnln("user status remain online, triggering OnAfterUserDisconnected manually")
+				m.nm.OnAfterUserDisconnected(event.Room.Name, event.Participant.Identity)
+			}
+		})
 	}
 
 	// webhook notification
