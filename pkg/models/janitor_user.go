@@ -75,5 +75,7 @@ func (m *JanitorModel) changeUserStatus(roomId, userId string) {
 	if info, err := m.natsService.GetUserInfo(roomId, userId); err == nil && info != nil {
 		// notify to the room
 		m.natsService.BroadcastUserInfoToRoom(plugnmeet.NatsMsgServerToClientEvents_USER_OFFLINE, roomId, userId, info)
+		// also try to silently remove this user from livekit as well
+		_, _ = m.lk.RemoveParticipant(roomId, userId)
 	}
 }

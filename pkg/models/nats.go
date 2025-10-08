@@ -4,6 +4,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
+	livekitservice "github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
@@ -14,6 +15,7 @@ type NatsModel struct {
 	app            *config.AppConfig
 	ds             *dbservice.DatabaseService
 	rs             *redisservice.RedisService
+	lk             *livekitservice.LivekitService
 	authModel      *AuthModel
 	natsService    *natsservice.NatsService
 	userModel      *UserModel
@@ -21,11 +23,12 @@ type NatsModel struct {
 	logger         *logrus.Entry
 }
 
-func NewNatsModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, analyticsModel *AnalyticsModel, authModel *AuthModel, userModel *UserModel, logger *logrus.Logger) *NatsModel {
+func NewNatsModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, lk *livekitservice.LivekitService, analyticsModel *AnalyticsModel, authModel *AuthModel, userModel *UserModel, logger *logrus.Logger) *NatsModel {
 	return &NatsModel{
 		app:            app,
 		ds:             ds,
 		rs:             rs,
+		lk:             lk,
 		natsService:    natsService,
 		authModel:      authModel,
 		userModel:      userModel,

@@ -132,10 +132,12 @@ func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, userInfo *p
 		log.Info("user reconnected before final cleanup, consumer will not be deleted")
 		return
 	}
+	// also try to silently remove this user from livekit as well
+	_, _ = m.lk.RemoveParticipant(roomId, userId)
 
 	// Final cleanup: Delete the user's NATS consumer.
-	log.Info("deleting user's NATS consumer")
 	m.natsService.DeleteConsumer(roomId, userId)
+	log.Info("user offline tasks completed")
 }
 
 func (m *NatsModel) updateUserLeftAnalytics(roomId, userId string) {
