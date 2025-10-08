@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.9.4](https://github.com/mynaparrot/plugNmeet-server/compare/v1.9.3...v1.9.4) (2025-10-08)
+
+
+### Bug Fixes
+
+* add more logs in webhook + user application context ([dd95c73](https://github.com/mynaparrot/plugNmeet-server/commit/dd95c734041676168099f2fe171a2715d63584e1))
+* better to use `ON DELETE RESTRICT` to make `FOREIGN KEY` to work as it suppose to do. ([16e6d7e](https://github.com/mynaparrot/plugNmeet-server/commit/16e6d7e723baa0c5153e40df3c6a7ee641d35057))
+* **bug:** breakout room invalid duration compare ([02c4f36](https://github.com/mynaparrot/plugNmeet-server/commit/02c4f36f3694bd186e5484083933b571b699a7a3))
+* close nats properly + cleanup ([a1ce9cd](https://github.com/mynaparrot/plugNmeet-server/commit/a1ce9cd3116e248b7f64581a6b0c3009241e7c07))
+* consider to clean from media server as well ([beceb63](https://github.com/mynaparrot/plugNmeet-server/commit/beceb6315df09eb55ae1f42c26daf1809d14dde2))
+* extract id from name ([185ff41](https://github.com/mynaparrot/plugNmeet-server/commit/185ff419a739457fdafcb2e6c12e66ee269312f5))
+* **feat:** store uploaded file metadata ([0f654b6](https://github.com/mynaparrot/plugNmeet-server/commit/0f654b688800d08f4461407e9e15159fae05ec3e))
+* missed to clean up ([ce7fd0c](https://github.com/mynaparrot/plugNmeet-server/commit/ce7fd0c142c99ed90cf3bdffca4450377fab5c7e))
+* missed to clean up ([5d3834f](https://github.com/mynaparrot/plugNmeet-server/commit/5d3834f59fe1dd1dfa9cfd547bd4473b33d51254))
+* moved logging to proto for sharing ([c6d5825](https://github.com/mynaparrot/plugNmeet-server/commit/c6d58253e2c62ae9cd50cf384bf4e6cd279e0df8))
+* prevent non-websocket users connections ([ef0612b](https://github.com/mynaparrot/plugNmeet-server/commit/ef0612b12885c0c3622e901aeabefa620a127c9e))
+* trigger from webhook if user status online but disconnected from media server ([9663d92](https://github.com/mynaparrot/plugNmeet-server/commit/9663d927b00f5a5497c127f7592645de1c06b9b6))
+
 ## [1.9.3](https://github.com/mynaparrot/plugNmeet-server/compare/v1.9.2...v1.9.3) (2025-09-20)
 
 
