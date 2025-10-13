@@ -7,6 +7,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+	"github.com/sirupsen/logrus"
 )
 
 func NewNatsConnection(appCnf *config.AppConfig) error {
@@ -34,7 +35,10 @@ func NewNatsConnection(appCnf *config.AppConfig) error {
 		return err
 	}
 
-	appCnf.Logger.WithField("version", nc.ConnectedServerVersion()).Info("successfully connected to NATS server")
+	appCnf.Logger.WithFields(logrus.Fields{
+		"version": nc.ConnectedServerVersion(),
+		"address": nc.ConnectedAddr(),
+	}).Info("successfully connected to NATS server")
 	appCnf.JetStream = js
 
 	return nil
