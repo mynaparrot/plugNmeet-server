@@ -17,6 +17,8 @@ func NewDatabaseConnection(ctx context.Context, appCnf *config.AppConfig) error 
 	info := appCnf.DatabaseInfo
 	charset := "utf8mb4"
 	loc := "UTC"
+	connMaxLifetime := time.Minute * 4
+	maxOpenConns := 10
 
 	if info.Charset != nil && *info.Charset != "" {
 		charset = *info.Charset
@@ -24,6 +26,13 @@ func NewDatabaseConnection(ctx context.Context, appCnf *config.AppConfig) error 
 	if info.Loc != nil && *info.Loc != "" {
 		loc = strings.ReplaceAll(*info.Loc, "/", "%2F")
 	}
+	if info.ConnMaxLifetime != nil && *info.ConnMaxLifetime > 0 {
+		connMaxLifetime = *info.ConnMaxLifetime
+	}
+	if info.MaxOpenConns != nil && *info.MaxOpenConns > 0 {
+		maxOpenConns = *info.MaxOpenConns
+	}
+
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s&parseTime=True&loc=%s", info.Username, info.Password, info.Host, info.Port, info.DBName, charset, loc)
 
 	mysqlCnf := mysql.Config{
@@ -79,7 +88,10 @@ func NewDatabaseConnection(ctx context.Context, appCnf *config.AppConfig) error 
 			resolverCnf.TraceResolverMode = true
 		}
 
-		err = db.Use(dbresolver.Register(resolverCnf))
+		err = db.Use(dbresolver.Register(resolverCnf).
+			SetConnMaxLifetime(connMaxLifetime).
+			SetMaxOpenConns(maxOpenConns).
+			SetMaxIdleConns(maxOpenConns))
 		if err != nil {
 			return err
 		}
@@ -89,24 +101,20 @@ func NewDatabaseConnection(ctx context.Context, appCnf *config.AppConfig) error 
 	if err != nil {
 		return err
 	}
-	err = d.PingContext(ctx)
-	if err != nil {
-		return err
-	}
-
-	connMaxLifetime := time.Minute * 4
-	if info.ConnMaxLifetime != nil && *info.ConnMaxLifetime > 0 {
-		connMaxLifetime = *info.ConnMaxLifetime
-	}
-	maxOpenConns := 10
-	if info.MaxOpenConns != nil && *info.MaxOpenConns > 0 {
-		maxOpenConns = *info.MaxOpenConns
-	}
 
 	// https://github.com/go-sql-driver/mysql?tab=readme-ov-file#important-settings
 	d.SetConnMaxLifetime(connMaxLifetime)
 	d.SetMaxOpenConns(maxOpenConns)
 	d.SetMaxIdleConns(maxOpenConns)
+
+	err = d.PingContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	dbVersion := ""
+	db.Raw("SELECT VERSION()").Scan(&dbVersion)
+	appCnf.Logger.WithField("version", dbVersion).Info("successfully connected to database")
 
 	appCnf.DB = db
 	return nil

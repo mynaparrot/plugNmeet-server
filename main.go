@@ -92,6 +92,11 @@ func startServer(configFile string) {
 		cancel()
 	}()
 
+	appCnf.Logger.WithFields(logrus.Fields{
+		"version": version.Version,
+		"port":    appFactory.AppConfig.Client.Port,
+	}).Info("starting plugNmeet server")
+
 	// 12. Start the Fiber web server and listen for incoming HTTP requests. This is a blocking call.
 	err = rt.Listen(fmt.Sprintf(":%d", appFactory.AppConfig.Client.Port))
 	if err != nil {

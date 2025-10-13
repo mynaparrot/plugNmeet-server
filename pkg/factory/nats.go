@@ -33,6 +33,8 @@ func NewNatsConnection(appCnf *config.AppConfig) error {
 	if err != nil {
 		return err
 	}
+
+	appCnf.Logger.WithField("version", nc.ConnectedServerVersion()).Info("successfully connected to NATS server")
 	appCnf.JetStream = js
 
 	return nil
