@@ -9,15 +9,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type MuteUnMuteTrackReq struct {
-	Sid             string `json:"sid" validate:"required"`
-	RoomId          string `json:"room_id" validate:"required"`
-	UserId          string `json:"user_id" validate:"required"`
-	TrackSid        string `json:"track_sid"`
-	Muted           bool   `json:"muted"`
-	RequestedUserId string `json:"-"`
-}
-
 // MuteUnMuteTrack can be used to mute or unmute track
 // if track_sid wasn't send then it will find the microphone track & mute it
 // for unmute you'll require enabling "enable_remote_unmute: true" in livekit
