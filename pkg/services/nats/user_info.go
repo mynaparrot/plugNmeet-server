@@ -217,6 +217,23 @@ func (s *NatsService) GetUserLastPing(roomId, userId string) int64 {
 	return 0
 }
 
+// IsUserPresenter checks if a user is a presenter in a specific room.
+// Returns false if the user or room is not found.
+func (s *NatsService) IsUserPresenter(roomId, userId string) bool {
+	// check cache first
+	userInfo := s.cs.GetUserInfo(roomId, userId)
+	if userInfo != nil {
+		return userInfo.GetIsPresenter()
+	}
+
+	// fallback to nats
+	val, err := s.GetUserKeyValue(roomId, userId, UserIsPresenterKey)
+	if err != nil || val == nil {
+		return false
+	}
+	return string(val.Value()) == "true"
+}
+
 // IsUserExistInBlockList checks if a user is in the block list for a specific room.
 // Returns false if the user or room is not found.
 func (s *NatsService) IsUserExistInBlockList(roomId, userId string) bool {

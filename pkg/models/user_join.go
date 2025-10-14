@@ -12,6 +12,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/proto"
 )
 
 var validUserIDRegex = regexp.MustCompile("^[a-zA-Z0-9-_]+$")
@@ -110,13 +111,22 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 	if g.UserInfo.IsAdmin {
 		g.UserInfo.UserMetadata.IsAdmin = true
 		g.UserInfo.UserMetadata.WaitForApproval = false
-		// no lock for admin
-		g.UserInfo.UserMetadata.LockSettings = new(plugnmeet.LockSettings)
 
+		// check current room users to make presenter
 		if err := m.CreateNewPresenter(g); err != nil {
 			log.WithError(err).Errorln("failed to create new presenter")
 			return "", err
 		}
+
+		// by default, no lock for admin user
+		g.UserInfo.UserMetadata.LockSettings = new(plugnmeet.LockSettings)
+		// except for whiteboard, which should follow as room settings for non-presenter
+		// otherwise UI become confusion during allowing other admin to draw on whiteboard
+		// admin can always take over the whiteboard
+		if !g.UserInfo.UserMetadata.GetIsPresenter() {
+			g.UserInfo.UserMetadata.LockSettings.LockWhiteboard = meta.DefaultLockSettings.LockWhiteboard
+		}
+
 	} else {
 		m.AssignLockSettingsToUser(meta, g)
 
@@ -127,8 +137,7 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 	}
 
 	if g.UserInfo.UserMetadata.RecordWebcam == nil {
-		recordWebcam := true
-		g.UserInfo.UserMetadata.RecordWebcam = &recordWebcam
+		g.UserInfo.UserMetadata.RecordWebcam = proto.Bool(true)
 	}
 
 	// Step 9: Add the user's information to the NATS key-value store for the room.
