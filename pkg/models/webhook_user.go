@@ -94,31 +94,7 @@ func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 		// because that user did not use plugNmeet client interface
 		log.Info("ingress participant left, triggering OnAfterUserDisconnected manually")
 		m.nm.OnAfterUserDisconnected(event.Room.Name, event.Participant.Identity)
-	} else {
-		nowUnix := uint64(time.Now().UnixMilli())
-		time.AfterFunc(time.Second*8, func() {
-			if status, err := m.natsService.GetRoomUserStatus(event.Room.Name, event.Participant.Identity); err == nil && status == natsservice.UserStatusOnline {
-				userInfo, err := m.natsService.GetUserInfo(event.Room.Name, event.Participant.Identity)
-				if err != nil {
-					log.WithError(err).Errorln("failed to get user info from NATS")
-					return
-				}
-				if userInfo == nil {
-					return
-				}
-				if userInfo.ReconnectedAt > nowUnix {
-					log.WithField("reconnectedAfter", userInfo.ReconnectedAt-nowUnix).Info("user reconnected, skipping manual disconnect")
-					return
-				}
-
-				// user should be offline because it's disconnected from media server
-				// but may be for some reason it wasn't triggered by Nats correctly
-				log.Warnln("user status remain online, triggering OnAfterUserDisconnected manually")
-				m.nm.OnAfterUserDisconnected(event.Room.Name, event.Participant.Identity)
-			}
-		})
 	}
-
 	// webhook notification
 	m.sendToWebhookNotifier(event)
 
@@ -126,4 +102,40 @@ func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 	// for sudden disconnection
 	_ = m.sm.SpeechServiceUsersUsage(rInfo.RoomId, rInfo.RoomSid, event.Participant.Identity, plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED)
 	log.Info("successfully processed participant_left webhook")
+
+	m.ensureUserIsOffline(event, log)
+}
+
+// ensureUserIsOffline acts as a safety net. It verifies that a user who disconnected
+// from the media server is also correctly marked as offline in the signaling system,
+// fixing any discrepancies that might arise from race conditions.
+func (m *WebhookModel) ensureUserIsOffline(event *livekit.WebhookEvent, log *logrus.Entry) {
+	if strings.HasPrefix(event.Participant.Identity, config.IngressUserIdPrefix) {
+		// as we already proceeded
+		return
+	}
+
+	// for all other user's we'll do this
+	nowUnix := uint64(time.Now().UnixMilli())
+	time.Sleep(time.Second * 8)
+
+	if status, err := m.natsService.GetRoomUserStatus(event.Room.Name, event.Participant.Identity); err == nil && status == natsservice.UserStatusOnline {
+		userInfo, err := m.natsService.GetUserInfo(event.Room.Name, event.Participant.Identity)
+		if err != nil {
+			log.WithError(err).Errorln("failed to get user info from NATS")
+			return
+		}
+		if userInfo == nil {
+			return
+		}
+		if userInfo.ReconnectedAt > nowUnix {
+			log.WithField("reconnectedAfter", userInfo.ReconnectedAt-nowUnix).Info("user reconnected, skipping manual disconnect")
+			return
+		}
+
+		// user should be offline because it's disconnected from media server
+		// but may be for some reason it wasn't triggered by Nats correctly
+		log.Warnln("user status remain online, triggering OnAfterUserDisconnected manually")
+		m.nm.OnAfterUserDisconnected(event.Room.Name, event.Participant.Identity)
+	}
 }
