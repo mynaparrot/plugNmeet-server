@@ -253,19 +253,26 @@ func (m *RoomModel) prepareWhiteboardPreloadFile(meta *plugnmeet.RoomMetadata, r
 
 	log.Info("preparing preloaded whiteboard file")
 
-	err := m.fileModel.DownloadAndProcessPreUploadWBfile(roomId, roomSid, preloadFile, log)
+	res, err := m.fileModel.DownloadAndProcessPreUploadWBfile(roomId, roomSid, preloadFile, log)
 	if err != nil {
 		log.WithError(err).Error("failed to download and process preloaded whiteboard file")
 
 		if notifyErr := m.natsService.NotifyErrorMsg(roomId, "notifications.preloaded-whiteboard-file-processing-error", nil); notifyErr != nil {
 			log.WithError(notifyErr).Error("failed to send notification for whiteboard processing error")
 		}
-
-		meta.RoomFeatures.WhiteboardFeatures.PreloadFile = nil
-		if updateErr := m.natsService.UpdateAndBroadcastRoomMetadata(roomId, meta); updateErr != nil {
-			log.WithError(updateErr).Error("failed to update room metadata after whiteboard processing error")
-		}
 		return
+	}
+
+	meta.RoomFeatures.WhiteboardFeatures.PreloadFile = nil
+	// TODO: change current metadata update way and think to broadcast differently
+	// TODO: may be use ADD_WHITEBOARD_OFFICE_FILE which will be clean approach
+	meta.RoomFeatures.WhiteboardFeatures.WhiteboardFileId = res.FileId
+	meta.RoomFeatures.WhiteboardFeatures.FileName = res.FileName
+	meta.RoomFeatures.WhiteboardFeatures.FilePath = res.FilePath
+	meta.RoomFeatures.WhiteboardFeatures.TotalPages = uint32(res.TotalPages)
+
+	if updateErr := m.natsService.UpdateAndBroadcastRoomMetadata(roomId, meta); updateErr != nil {
+		log.WithError(updateErr).Error("failed to update room metadata after whiteboard processing error")
 	}
 
 	log.Info("preloaded whiteboard file processed successfully")

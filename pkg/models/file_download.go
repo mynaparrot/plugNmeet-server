@@ -18,19 +18,19 @@ import (
 // DownloadAndProcessPreUploadWBfile downloads and processes a pre-uploaded whiteboard file.
 // It validates the file, saves it, and triggers conversion and broadcasting.
 // This should be run in a separate goroutine due to its potentially long execution time.
-func (m *FileModel) DownloadAndProcessPreUploadWBfile(roomId, roomSid, fileUrl string, log *logrus.Entry) error {
+func (m *FileModel) DownloadAndProcessPreUploadWBfile(roomId, roomSid, fileUrl string, log *logrus.Entry) (*ConvertWhiteboardFileRes, error) {
 	log.WithFields(logrus.Fields{
 		"sub-method": "DownloadAndProcessPreUploadWBfile",
 	})
 	if err := m.validateRemoteFile(fileUrl); err != nil {
 		log.WithError(err).Errorln("file validation failed")
-		return err
+		return nil, err
 	}
 
 	downloadDir := filepath.Join(m.app.UploadFileSettings.Path, roomSid)
 	if err := os.MkdirAll(downloadDir, os.ModePerm); err != nil {
 		log.WithError(err).Errorln("failed to create download directory")
-		return fmt.Errorf("failed to create download directory: %w", err)
+		return nil, fmt.Errorf("failed to create download directory: %w", err)
 	}
 
 	// Create a new grab client
@@ -38,7 +38,7 @@ func (m *FileModel) DownloadAndProcessPreUploadWBfile(roomId, roomSid, fileUrl s
 	req, err := grab.NewRequest(downloadDir, fileUrl)
 	if err != nil {
 		log.WithError(err).Errorln("failed to create download request")
-		return fmt.Errorf("failed to create download request: %w", err)
+		return nil, fmt.Errorf("failed to create download request: %w", err)
 	}
 
 	// Create a context with a 3-minute timeout for the download.
@@ -55,23 +55,24 @@ func (m *FileModel) DownloadAndProcessPreUploadWBfile(roomId, roomSid, fileUrl s
 	mType, err := mimetype.DetectFile(resp.Filename)
 	if err != nil {
 		log.WithError(err).Errorln("failed to detect file type")
-		return fmt.Errorf("failed to detect file type: %w", err)
+		return nil, fmt.Errorf("failed to detect file type: %w", err)
 	}
 	if err := m.ValidateMimeType(mType); err != nil {
 		log.WithError(err).Errorln("downloaded file mime type is not allowed")
-		return err
+		return nil, err
 	}
 
 	// Construct relative file path
 	filePath := filepath.Join(roomSid, filepath.Base(resp.Filename))
 
 	// Convert and broadcast. This is a synchronous, long-running task.
-	if _, err := m.ConvertAndBroadcastWhiteboardFile(roomId, roomSid, filePath); err != nil {
+	res, err := m.ConvertAndBroadcastWhiteboardFile(roomId, roomSid, filePath)
+	if err != nil {
 		log.WithError(err).Errorln("conversion/broadcast failed")
-		return fmt.Errorf("conversion/broadcast failed: %w", err)
+		return nil, fmt.Errorf("conversion/broadcast failed: %w", err)
 	}
 
-	return nil
+	return res, nil
 }
 
 // validateRemoteFile checks the file's headers for size and MIME type.
