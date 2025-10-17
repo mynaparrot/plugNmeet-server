@@ -7,10 +7,11 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
+	"github.com/sirupsen/logrus"
 )
 
 func (m *RoomModel) IsRoomActive(ctx context.Context, r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoomActiveRes, *dbmodels.RoomInfo, *plugnmeet.NatsKvRoomInfo, *plugnmeet.RoomMetadata) {
-	log := m.logger.WithField("roomId", r.GetRoomId())
+	log := m.logger.WithFields(logrus.Fields{"roomId": r.RoomId, "method": "IsRoomActive"})
 	// check first
 	_ = waitUntilRoomCreationCompletes(ctx, m.rs, r.GetRoomId(), log)
 
@@ -55,7 +56,7 @@ func (m *RoomModel) IsRoomActive(ctx context.Context, r *plugnmeet.IsRoomActiveR
 }
 
 func (m *RoomModel) GetActiveRoomInfo(ctx context.Context, r *plugnmeet.GetActiveRoomInfoReq) (bool, string, *plugnmeet.ActiveRoomWithParticipant) {
-	log := m.logger.WithField("roomId", r.GetRoomId())
+	log := m.logger.WithFields(logrus.Fields{"roomId": r.RoomId, "method": "GetActiveRoomInfo"})
 	// check first
 	_ = waitUntilRoomCreationCompletes(ctx, m.rs, r.GetRoomId(), log)
 
@@ -117,8 +118,8 @@ func (m *RoomModel) GetActiveRoomsInfo() (bool, string, []*plugnmeet.ActiveRoomW
 	if roomsInfo == nil || len(roomsInfo) == 0 {
 		return false, "no active room found", nil
 	}
+	res := make([]*plugnmeet.ActiveRoomWithParticipant, 0, len(roomsInfo))
 
-	var res []*plugnmeet.ActiveRoomWithParticipant
 	for _, r := range roomsInfo {
 		i := &plugnmeet.ActiveRoomWithParticipant{
 			RoomInfo: &plugnmeet.ActiveRoomInfo{
@@ -163,6 +164,10 @@ func (m *RoomModel) FetchPastRooms(r *plugnmeet.FetchPastRoomsReq) (*plugnmeet.F
 	if r.Limit <= 0 {
 		r.Limit = 20
 	}
+	// If the limit exceeds the maximum, cap it at the maximum.
+	if r.Limit > 100 {
+		r.Limit = 100
+	}
 	if r.OrderBy == "" {
 		r.OrderBy = "DESC"
 	}
@@ -170,7 +175,7 @@ func (m *RoomModel) FetchPastRooms(r *plugnmeet.FetchPastRoomsReq) (*plugnmeet.F
 	if err != nil {
 		return nil, err
 	}
-	var list []*plugnmeet.PastRoomInfo
+	list := make([]*plugnmeet.PastRoomInfo, 0, len(rooms))
 
 	for _, rr := range rooms {
 		room := &plugnmeet.PastRoomInfo{

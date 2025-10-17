@@ -10,6 +10,10 @@ func (m *RecordingModel) FetchRecordings(r *plugnmeet.FetchRecordingsReq) (*plug
 	if r.Limit <= 0 {
 		r.Limit = 20
 	}
+	// If the limit exceeds the maximum, cap it at the maximum.
+	if r.Limit > 100 {
+		r.Limit = 100
+	}
 	if r.OrderBy == "" {
 		r.OrderBy = "DESC"
 	}
@@ -18,7 +22,8 @@ func (m *RecordingModel) FetchRecordings(r *plugnmeet.FetchRecordingsReq) (*plug
 	if err != nil {
 		return nil, err
 	}
-	var recordings []*plugnmeet.RecordingInfo
+	recordings := make([]*plugnmeet.RecordingInfo, 0, len(data))
+
 	for _, v := range data {
 		recording := &plugnmeet.RecordingInfo{
 			RecordId:         v.RecordID,
