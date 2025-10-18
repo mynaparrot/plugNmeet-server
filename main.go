@@ -84,6 +84,9 @@ func startServer(configFile string) {
 		sig := <-sigChan
 		logger.WithField("signal", sig).Infoln("Exit requested, attempting graceful shutdown...")
 
+		// shut down the application
+		appFactory.Shutdown()
+
 		// Attempt to gracefully shut down the Fiber server, waiting for active connections to finish.
 		if err := rt.ShutdownWithTimeout(15 * time.Second); err != nil {
 			logger.WithError(err).Warn("Graceful shutdown failed, forcing exit.")

@@ -8,17 +8,6 @@ import (
 )
 
 func (m *JanitorModel) checkRoomWithDuration() {
-	locked := m.rs.IsJanitorTaskLock("checkRoomWithDuration")
-	if locked {
-		// if lock then we will not perform here
-		return
-	}
-
-	// now set lock
-	m.rs.LockJanitorTask("checkRoomWithDuration", time.Minute*1)
-	// clean at the end
-	defer m.rs.UnlockJanitorTask("checkRoomWithDuration")
-
 	rooms := m.rmDuration.GetRoomsWithDurationMap()
 	for i, r := range rooms {
 		now := uint64(time.Now().Unix())

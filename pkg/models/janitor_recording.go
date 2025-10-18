@@ -15,17 +15,6 @@ func (m *JanitorModel) checkDelRecordingBackupPath() {
 	}
 	log := m.logger.WithField("task", "checkDelRecordingBackupPath")
 
-	locked := m.rs.IsJanitorTaskLock("checkDelRecordingBackupPath")
-	if locked {
-		// if lock then we will not perform here
-		return
-	}
-
-	// now set lock
-	m.rs.LockJanitorTask("checkDelRecordingBackupPath", time.Minute*1)
-	// clean at the end
-	defer m.rs.UnlockJanitorTask("checkDelRecordingBackupPath")
-
 	checkTime := time.Now().Add(-m.app.RecorderInfo.DelRecordingBackupDuration)
 	entries, err := os.ReadDir(m.app.RecorderInfo.DelRecordingBackupPath)
 	if err != nil {

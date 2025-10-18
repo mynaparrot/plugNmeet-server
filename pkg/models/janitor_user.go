@@ -16,16 +16,6 @@ import (
 func (m *JanitorModel) checkOnlineUsersStatus() {
 	log := m.logger.WithField("task", "checkOnlineUsersStatus")
 
-	locked := m.rs.IsJanitorTaskLock("checkOnlineUsersStatus")
-	if locked {
-		// if lock then we will not perform here
-		return
-	}
-	// now set lock
-	m.rs.LockJanitorTask("checkOnlineUsersStatus", time.Minute*1)
-	// clean at the end
-	defer m.rs.UnlockJanitorTask("checkOnlineUsersStatus")
-
 	kl := m.app.JetStream.KeyValueStoreNames(context.Background())
 	for s := range kl.Name() {
 		if !strings.HasPrefix(s, natsservice.RoomUsersBucketPrefix) {

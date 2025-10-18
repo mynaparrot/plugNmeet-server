@@ -40,7 +40,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	pollModel := models.NewPollModel(appConfig, databaseService, redisService, natsService, analyticsModel, logger)
 	speechToTextModel := models.NewSpeechToTextModel(appConfig, databaseService, redisService, natsService, analyticsModel, webhookNotifier, logger)
 	roomModel := models.NewRoomModel(ctx, appConfig, databaseService, redisService, livekitService, natsService, webhookNotifier, userModel, recorderModel, fileModel, roomDurationModel, etherpadModel, pollModel, speechToTextModel, analyticsModel, logger)
-	janitorModel := models.NewJanitorModel(appConfig, databaseService, redisService, natsService, livekitService, roomModel, roomDurationModel, logger)
+	janitorModel := models.NewJanitorModel(ctx, appConfig, databaseService, redisService, natsService, livekitService, roomModel, roomDurationModel, logger)
 	analyticsController := controllers.NewAnalyticsController(analyticsModel)
 	authModel := models.NewAuthModel(appConfig, natsService, logger)
 	authController := controllers.NewAuthController(appConfig, natsService, authModel, roomModel)

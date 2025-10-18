@@ -12,16 +12,6 @@ import (
 // activeRoomChecker will check & do reconciliation between DB & livekit
 func (m *JanitorModel) activeRoomChecker() {
 	log := m.logger.WithField("task", "activeRoomChecker")
-	locked := m.rs.IsJanitorTaskLock("activeRoomChecker")
-	if locked {
-		// if lock then we will not perform here
-		return
-	}
-
-	// now set lock
-	m.rs.LockJanitorTask("activeRoomChecker", time.Minute*10)
-	// clean at the end
-	defer m.rs.UnlockJanitorTask("activeRoomChecker")
 
 	activeRooms, err := m.ds.GetActiveRoomsInfo()
 	if err != nil {

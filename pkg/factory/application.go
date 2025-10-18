@@ -51,5 +51,9 @@ func (a *Application) Boot() {
 	// This blocks until `wg.Done()` is called inside BootUp.
 	wg.Wait()
 	// start scheduler
-	go a.JanitorModel.StartJanitor(a.Ctx)
+	go a.JanitorModel.StartJanitor()
+}
+
+func (a *Application) Shutdown() {
+	a.JanitorModel.Shutdown()
 }

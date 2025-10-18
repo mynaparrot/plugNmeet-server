@@ -8,11 +8,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+	"github.com/sirupsen/logrus"
 )
 
 const (
 	RoomCreationLockKey = Prefix + "roomCreationLock-%s"
-	janitorLockKey      = Prefix + "janitorLock-%s"
+	janitorLockKey      = Prefix + "janitorLeaderLockKey"
 )
 
 // unlockScript is a Lua script for atomic check-and-delete.
@@ -23,6 +24,14 @@ else
     return 0
 end
 `
+
+// renewScript is a Lua script for atomic check-and-set TTL.
+const renewScript = `
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+    return redis.call("EXPIRE", KEYS[1], ARGV[2])
+else
+    return 0
+end`
 
 // LockRoomCreation attempts to acquire a distributed lock.
 // Returns:
@@ -82,18 +91,49 @@ func (s *RedisService) IsRoomCreationLock(ctx context.Context, roomID string) (i
 	return val == 1, nil
 }
 
-func (s *RedisService) IsJanitorTaskLock(task string) bool {
-	val, _ := s.rc.Get(s.ctx, fmt.Sprintf(janitorLockKey, task)).Result()
-	return val != ""
+// AcquireJanitorLeaderLock attempts to acquire a distributed lock for a janitor leader election.
+func (s *RedisService) AcquireJanitorLeaderLock(ctx context.Context, ttl time.Duration) (acquired bool, lockValue string, err error) {
+	val := uuid.New().String()
+
+	ok, err := s.rc.SetNX(ctx, janitorLockKey, val, ttl).Result()
+	if err != nil {
+		return false, "", fmt.Errorf("redis SetNX error for key %s: %w", janitorLockKey, err)
+	}
+
+	if !ok {
+		return false, "", nil
+	}
+
+	return true, val, nil
 }
 
-func (s *RedisService) LockJanitorTask(task string, duration time.Duration) {
-	err := s.rc.Set(s.ctx, fmt.Sprintf(janitorLockKey, task), "locked", duration).Err()
+// ReleaseJanitorLeadershipLock safely releases a janitor task lock.
+func (s *RedisService) ReleaseJanitorLeadershipLock(ctx context.Context, lockValue string, log *logrus.Entry) {
+	if lockValue == "" {
+		return
+	}
+	_, err := s.unlockScriptExec.Eval(ctx, s.rc, []string{janitorLockKey}, lockValue).Result()
 	if err != nil {
-		s.logger.WithError(err).Errorln("LockJanitorTask failed")
+		log.WithError(err).Errorf("failed to unlock janitor leadership with lockValue %s", lockValue)
 	}
 }
 
-func (s *RedisService) UnlockJanitorTask(task string) {
-	_, _ = s.rc.Del(s.ctx, fmt.Sprintf(janitorLockKey, task)).Result()
+// RenewJanitorLeadershipLock extends the TTL of a lock if it's still held by the same owner.
+// Returns true if the lock was successfully renewed.
+func (s *RedisService) RenewJanitorLeadershipLock(ctx context.Context, lockValue string, ttl time.Duration) (bool, error) {
+	ttlSeconds := int(ttl.Seconds())
+	if ttlSeconds < 1 {
+		return false, errors.New("TTL must be at least 1 second")
+	}
+
+	renewed, err := s.rc.Eval(ctx, renewScript, []string{janitorLockKey}, lockValue, ttlSeconds).Int64()
+	if errors.Is(err, redis.Nil) {
+		// Key doesn't exist, so we couldn't renew it.
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("redis Eval error for renew script on key %s: %w", janitorLockKey, err)
+	}
+
+	return renewed == 1, nil
 }
