@@ -13,7 +13,7 @@ import (
 
 const (
 	RoomCreationLockKey = Prefix + "roomCreationLock-%s"
-	janitorLockKey      = Prefix + "janitorLeaderLockKey"
+	janitorLockKey      = Prefix + "janitorLeaderLock"
 )
 
 // unlockScript is a Lua script for atomic check-and-delete.
@@ -126,7 +126,7 @@ func (s *RedisService) RenewJanitorLeadershipLock(ctx context.Context, lockValue
 		return false, errors.New("TTL must be at least 1 second")
 	}
 
-	renewed, err := s.rc.Eval(ctx, renewScript, []string{janitorLockKey}, lockValue, ttlSeconds).Int64()
+	renewed, err := s.renewScriptExec.Eval(ctx, s.rc, []string{janitorLockKey}, lockValue, ttlSeconds).Int64()
 	if errors.Is(err, redis.Nil) {
 		// Key doesn't exist, so we couldn't renew it.
 		return false, nil
