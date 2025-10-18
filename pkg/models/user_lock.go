@@ -80,6 +80,10 @@ func (m *UserModel) handleUpdateAllUsersLockSettings(r *plugnmeet.UpdateUserLock
 	}
 
 	for _, id := range userIds {
+		if id == r.RequestedUserId {
+			// nothing for requested user
+			continue
+		}
 		err = m.updateAndBroadcastUserLock(r.RoomId, id, r.Service, r.Direction)
 		if err != nil {
 			log.WithError(err).WithField("user_id", id).Errorln("failed to update user lock settings during all-user change")
@@ -99,8 +103,8 @@ func (m *UserModel) updateAndBroadcastUserLock(roomId, userId, service, directio
 	if mt == nil {
 		return errors.New("user's metadata not found")
 	}
-	if mt.IsAdmin {
-		// no lock for admin
+	if mt.IsAdmin && service != "whiteboard" {
+		// no lock for admin other than whiteboard
 		return nil
 	}
 
