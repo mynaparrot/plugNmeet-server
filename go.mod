@@ -16,11 +16,11 @@ require (
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.42.0
 	github.com/livekit/server-sdk-go/v2 v2.11.3
-	github.com/mynaparrot/plugnmeet-protocol v1.0.16-0.20251011122244-de19e61f4d27
+	github.com/mynaparrot/plugnmeet-protocol v1.0.16-0.20251021085443-dc5cbe4c72c8
 	github.com/nats-io/jwt/v2 v2.8.0
-	github.com/nats-io/nats.go v1.46.1
+	github.com/nats-io/nats.go v1.47.0
 	github.com/nats-io/nkeys v0.4.11
-	github.com/redis/go-redis/v9 v9.14.0
+	github.com/redis/go-redis/v9 v9.14.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/protobuf v1.36.10
@@ -35,7 +35,7 @@ require (
 	buf.build/go/protoyaml v0.6.0 // indirect
 	cel.dev/expr v0.24.0 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/DeRuina/timberjack v1.3.7 // indirect
+	github.com/DeRuina/timberjack v1.3.8 // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect

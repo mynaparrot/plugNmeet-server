@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"time"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
@@ -14,8 +15,8 @@ func (m *AuthModel) GeneratePNMJoinToken(c *plugnmeet.PlugNmeetTokenClaims) (str
 	return auth.GeneratePlugNmeetJWTAccessToken(m.app.Client.ApiKey, m.app.Client.Secret, c.UserId, *m.app.Client.TokenValidity, c)
 }
 
-func (m *AuthModel) VerifyPlugNmeetAccessToken(token string, withTime bool) (*plugnmeet.PlugNmeetTokenClaims, error) {
-	return auth.VerifyPlugNmeetAccessToken(m.app.Client.ApiKey, m.app.Client.Secret, token, withTime)
+func (m *AuthModel) VerifyPlugNmeetAccessToken(token string, gracefulPeriod time.Duration) (*plugnmeet.PlugNmeetTokenClaims, error) {
+	return auth.VerifyPlugNmeetAccessToken(m.app.Client.ApiKey, m.app.Client.Secret, token, gracefulPeriod)
 }
 
 func (m *AuthModel) UnsafeClaimsWithoutVerification(token string) (*plugnmeet.PlugNmeetTokenClaims, error) {
@@ -34,8 +35,8 @@ func (m *AuthModel) UnsafeClaimsWithoutVerification(token string) (*plugnmeet.Pl
 }
 
 // RenewPNMToken we'll renew token
-func (m *AuthModel) RenewPNMToken(token string, withTime bool) (string, error) {
-	claims, err := m.VerifyPlugNmeetAccessToken(token, withTime)
+func (m *AuthModel) RenewPNMToken(token string, gracefulPeriod time.Duration) (string, error) {
+	claims, err := m.VerifyPlugNmeetAccessToken(token, gracefulPeriod)
 	if err != nil {
 		return "", err
 	}

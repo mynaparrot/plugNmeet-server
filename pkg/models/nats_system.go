@@ -10,11 +10,12 @@ import (
 )
 
 func (m *NatsModel) RenewPNMToken(roomId, userId, token string) {
-	// to renew token, we can avoid it to check expiry
+	// to renew token, we can add graceful period for expiry time
 	// because in may case because of network related issues,
 	// the client was not able to renew token
 	// as renew request is coming from nats, so it should be secure
-	token, err := m.authModel.RenewPNMToken(token, false)
+	gracefulPeriod := time.Hour * 3
+	token, err := m.authModel.RenewPNMToken(token, gracefulPeriod)
 	if err != nil {
 		m.logger.Errorln(fmt.Errorf("error renewing pnm token for %s; roomId: %s; msg: %s", userId, roomId, err.Error()))
 		return

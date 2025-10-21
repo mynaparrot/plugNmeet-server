@@ -87,7 +87,7 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 	claims.Name = req.ConnectOptions.Token
 
 	// check the info first
-	data, err := s.authModel.VerifyPlugNmeetAccessToken(req.ConnectOptions.Token, true)
+	data, err := s.authModel.VerifyPlugNmeetAccessToken(req.ConnectOptions.Token, 0)
 	if err != nil {
 		return nil, err
 	}
