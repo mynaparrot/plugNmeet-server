@@ -23,8 +23,8 @@ And many more!
 ## Core Components
 
 1.  **plugNmeet-server**: The primary backend server written in **Go**, handling all API and business logic.
-2.  **plugNmeet-client**: The main frontend interface built with **React** and **Redux**.
-3.  **plugNmeet-recorder**: A dedicated Go application for managing MP4 recordings and RTMP broadcasting.
+2.  **[plugNmeet-client](https://github.com/mynaparrot/plugNmeet-client)**: The main frontend interface built with **React** and **Redux**.
+3.  **[plugNmeet-recorder](https://github.com/mynaparrot/plugNmeet-recorder)**: A dedicated Go application for managing MP4 recordings and RTMP broadcasting.
 
 #### Demo
 
