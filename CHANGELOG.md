@@ -1,5 +1,38 @@
 # Changelog
 
+## [1.9.4](https://github.com/mynaparrot/plugNmeet-server/compare/v1.9.3...v1.9.4) (2025-10-28)
+
+
+### Bug Fixes
+
+* add address as well ([5c689bc](https://github.com/mynaparrot/plugNmeet-server/commit/5c689bc55a3539ff206c2e53891df8c52ccb3b63))
+* add more logs in webhook + user application context ([dd95c73](https://github.com/mynaparrot/plugNmeet-server/commit/dd95c734041676168099f2fe171a2715d63584e1))
+* added repo links ([7aa919e](https://github.com/mynaparrot/plugNmeet-server/commit/7aa919ecf3383112c9bc0b8e3a304e77ea82268e))
+* added support for `pnm-RecorderTranscoderJobs` ([bac6b01](https://github.com/mynaparrot/plugNmeet-server/commit/bac6b01b312be242970527f5cd05970a7e7806dc))
+* better to use `ON DELETE RESTRICT` to make `FOREIGN KEY` to work as it suppose to do. ([16e6d7e](https://github.com/mynaparrot/plugNmeet-server/commit/16e6d7e723baa0c5153e40df3c6a7ee641d35057))
+* **bug:** breakout room invalid duration compare ([02c4f36](https://github.com/mynaparrot/plugNmeet-server/commit/02c4f36f3694bd186e5484083933b571b699a7a3))
+* **bug:** collaborator wasn't cleanup properly when right update ([6382eee](https://github.com/mynaparrot/plugNmeet-server/commit/6382eeeee3ba554e758659678f85c7a527c4a6d0))
+* check reconnect status before proceeding ([7101933](https://github.com/mynaparrot/plugNmeet-server/commit/710193368719e2a885462962afdf1831328e02b4))
+* close nats properly + cleanup ([a1ce9cd](https://github.com/mynaparrot/plugNmeet-server/commit/a1ce9cd3116e248b7f64581a6b0c3009241e7c07))
+* consider to clean from media server as well ([beceb63](https://github.com/mynaparrot/plugNmeet-server/commit/beceb6315df09eb55ae1f42c26daf1809d14dde2))
+* **deps:** update github.com/mynaparrot/plugnmeet-protocol digest to de19e61 ([a7a2652](https://github.com/mynaparrot/plugNmeet-server/commit/a7a2652d82c5d75df2df7d0c96e6d9484a41943f))
+* **deps:** update github.com/mynaparrot/plugnmeet-protocol digest to de19e61 ([f48f8d1](https://github.com/mynaparrot/plugNmeet-server/commit/f48f8d15c5f072f6c1c38fd4b62814f32e20e40f))
+* extract id from name ([185ff41](https://github.com/mynaparrot/plugNmeet-server/commit/185ff419a739457fdafcb2e6c12e66ee269312f5))
+* **feat:** store uploaded file metadata ([0f654b6](https://github.com/mynaparrot/plugNmeet-server/commit/0f654b688800d08f4461407e9e15159fae05ec3e))
+* improved presenter and room lock settings ([7079ba8](https://github.com/mynaparrot/plugNmeet-server/commit/7079ba8c978b0e26a74807d0afc14a0f32acd9d0))
+* limit maximum of 100 data ([5094d9b](https://github.com/mynaparrot/plugNmeet-server/commit/5094d9b500f5dad0e356366663fc04202c565384))
+* log version number of all server components ([77f8098](https://github.com/mynaparrot/plugNmeet-server/commit/77f809827455664d3b09f8ad91b6d646274fcbff))
+* missed to clean up ([ce7fd0c](https://github.com/mynaparrot/plugNmeet-server/commit/ce7fd0c142c99ed90cf3bdffca4450377fab5c7e))
+* missed to clean up ([5d3834f](https://github.com/mynaparrot/plugNmeet-server/commit/5d3834f59fe1dd1dfa9cfd547bd4473b33d51254))
+* moved logging to proto for sharing ([c6d5825](https://github.com/mynaparrot/plugNmeet-server/commit/c6d58253e2c62ae9cd50cf384bf4e6cd279e0df8))
+* no need to open in another goroutine ([b1365aa](https://github.com/mynaparrot/plugNmeet-server/commit/b1365aa31cf39fd7a694ed99970a5ee8c5e177cd))
+* preloadFile whiteboard file wasn't added properly ([472be4d](https://github.com/mynaparrot/plugNmeet-server/commit/472be4da12415e3900eeb41be308d77b6866db9d))
+* prevent non-websocket users connections ([ef0612b](https://github.com/mynaparrot/plugNmeet-server/commit/ef0612b12885c0c3622e901aeabefa620a127c9e))
+* removed buggy code ([db8d72b](https://github.com/mynaparrot/plugNmeet-server/commit/db8d72ba1ca2611ebd1ce7497e6cc1a887e5eb9b))
+* trigger from webhook if user status online but disconnected from media server ([9663d92](https://github.com/mynaparrot/plugNmeet-server/commit/9663d927b00f5a5497c127f7592645de1c06b9b6))
+* use better way to handle janitor's task in distributed mode. ([0abdc14](https://github.com/mynaparrot/plugNmeet-server/commit/0abdc14e66d598ee27d67d93a7c3ad50b3842595))
+* use graceful period for verification ([32282c4](https://github.com/mynaparrot/plugNmeet-server/commit/32282c4a7a6a257d6cb624c92ca86165d8e90a67))
+
 ## [1.9.3](https://github.com/mynaparrot/plugNmeet-server/compare/v1.9.2...v1.9.3) (2025-09-20)
 
 
