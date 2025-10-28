@@ -127,6 +127,7 @@ nats_info:
   recorder:
     recorder_channel: "recorderChannel"
     recorder_info_kv: "pnm-recorderInfo"
+    transcoding_jobs_subject: "pnm-RecorderTranscoderJobs"
 
 upload_file_settings:
   # If multiple plugNmeet servers are used, ensure all can access this directory.

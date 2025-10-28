@@ -114,6 +114,12 @@ func (s *NatsAuthController) setPermissionForRecorder(data *plugnmeet.PlugNmeetT
 		fmt.Sprintf("$JS.API.STREAM.CREATE.KV_%s-%s", s.app.NatsInfo.Recorder.RecorderInfoKv, data.GetUserId()),
 		fmt.Sprintf("$KV.%s-%s.>", s.app.NatsInfo.Recorder.RecorderInfoKv, data.GetUserId()),
 		fmt.Sprintf("$JS.API.DIRECT.GET.KV_%s-%s.>", s.app.NatsInfo.Recorder.RecorderInfoKv, data.GetUserId()),
+		// Allow publishing the job to the stream
+		s.app.NatsInfo.Recorder.TranscodingJobs,
+		// Allow fetching the next message from the consumer & send ack
+		fmt.Sprintf("$JS.API.CONSUMER.MSG.NEXT.%s.%s", s.app.NatsInfo.Recorder.TranscodingJobs, transcoderConsumerDurable),
+		fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.%s", s.app.NatsInfo.Recorder.TranscodingJobs, transcoderConsumerDurable),
+		fmt.Sprintf("$JS.ACK.%s.%s.>", s.app.NatsInfo.Recorder.TranscodingJobs, transcoderConsumerDurable),
 	}
 
 	claims.Permissions = jwt.Permissions{

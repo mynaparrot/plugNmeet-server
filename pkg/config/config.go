@@ -198,6 +198,7 @@ type NatsSubjects struct {
 type NatsInfoRecorder struct {
 	RecorderChannel string `yaml:"recorder_channel"`
 	RecorderInfoKv  string `yaml:"recorder_info_kv"`
+	TranscodingJobs string `yaml:"transcoding_jobs_subject"`
 }
 
 func New(appCnf *AppConfig) (*AppConfig, error) {
@@ -247,6 +248,9 @@ func New(appCnf *AppConfig) (*AppConfig, error) {
 
 	if appCnf.DatabaseInfo.Prefix != "" {
 		dbTablePrefix = appCnf.DatabaseInfo.Prefix
+	}
+	if appCnf.NatsInfo.Recorder.TranscodingJobs == "" {
+		appCnf.NatsInfo.Recorder.TranscodingJobs = "pnm-RecorderTranscoderJobs"
 	}
 
 	// read client files and cache it

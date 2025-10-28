@@ -38,6 +38,7 @@ const (
 	// nats connection event queue
 	natsConnectionEventQueueGroup = prefix + "conn-event-queue"
 	websocketClientType           = "websocket"
+	transcoderConsumerDurable     = "transcoderWorker"
 )
 
 type natsJob struct {
@@ -104,6 +105,25 @@ func (c *NatsController) BootUp(ctx context.Context, wg *sync.WaitGroup) {
 	sysWorkerCon, err := c.subscribeToSystemWorker(ctx, stream)
 	if err != nil {
 		c.logger.WithError(err).Fatal("error subscribing to system worker")
+	}
+
+	// create recorder transcoder worker
+	transcoderStream, err := c.app.JetStream.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
+		Name:      c.app.NatsInfo.Recorder.TranscodingJobs,
+		Replicas:  c.app.NatsInfo.NumReplicas,
+		Retention: jetstream.WorkQueuePolicy,
+		Subjects:  []string{c.app.NatsInfo.Recorder.TranscodingJobs},
+	})
+	if err != nil {
+		c.logger.WithError(err).Fatal("error creating recorder transcoder stream")
+	}
+
+	_, err = transcoderStream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
+		Durable:   transcoderConsumerDurable,
+		AckPolicy: jetstream.AckExplicitPolicy,
+	})
+	if err != nil {
+		c.logger.WithError(err).Fatal("error creating recorder transcoder consumer")
 	}
 
 	// subscribe to connection events
