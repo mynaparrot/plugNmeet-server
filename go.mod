@@ -14,8 +14,8 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/google/wire v0.7.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/protocol v1.42.0
-	github.com/livekit/server-sdk-go/v2 v2.11.3
+	github.com/livekit/protocol v1.42.3-0.20251023002554-070839e4cae7
+	github.com/livekit/server-sdk-go/v2 v2.12.5
 	github.com/mynaparrot/plugnmeet-protocol v1.0.16-0.20251028233830-1dd8dc1d6324
 	github.com/nats-io/jwt/v2 v2.8.0
 	github.com/nats-io/nats.go v1.47.0
@@ -43,7 +43,7 @@ require (
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.2.0 // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dennwc/iters v1.2.2 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/frostbyte73/core v0.1.1 // indirect
@@ -83,14 +83,14 @@ require (
 	github.com/pion/randutil v0.1.0 // indirect
 	github.com/pion/rtcp v1.2.15 // indirect
 	github.com/pion/rtp v1.8.23 // indirect
-	github.com/pion/sctp v1.8.39 // indirect
+	github.com/pion/sctp v1.8.40 // indirect
 	github.com/pion/sdp/v3 v3.0.16 // indirect
 	github.com/pion/srtp/v3 v3.0.8 // indirect
 	github.com/pion/stun/v3 v3.0.0 // indirect
 	github.com/pion/transport/v3 v3.0.8 // indirect
 	github.com/pion/turn/v4 v4.1.1 // indirect
-	github.com/pion/webrtc/v4 v4.1.5 // indirect
-	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/pion/webrtc/v4 v4.1.6 // indirect
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.66.1 // indirect
@@ -116,7 +116,7 @@ require (
 	golang.org/x/sync v0.17.0 // indirect
 	golang.org/x/sys v0.37.0 // indirect
 	golang.org/x/text v0.30.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20251007200510-49b9836ed3ff // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20251007200510-49b9836ed3ff // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20251014184007-4626949a642f // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20251014184007-4626949a642f // indirect
 	google.golang.org/grpc v1.76.0 // indirect
 )
