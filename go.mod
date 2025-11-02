@@ -16,7 +16,7 @@ require (
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/protocol v1.42.0
 	github.com/livekit/server-sdk-go/v2 v2.11.3
-	github.com/mynaparrot/plugnmeet-protocol v1.0.16-0.20251028233830-1dd8dc1d6324
+	github.com/mynaparrot/plugnmeet-protocol v1.0.16-0.20251102174458-b05bfab82689
 	github.com/nats-io/jwt/v2 v2.8.0
 	github.com/nats-io/nats.go v1.47.0
 	github.com/nats-io/nkeys v0.4.11
@@ -26,7 +26,7 @@ require (
 	google.golang.org/protobuf v1.36.10
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/mysql v1.6.0
-	gorm.io/gorm v1.31.0
+	gorm.io/gorm v1.31.1
 	gorm.io/plugin/dbresolver v1.6.2
 )
 
