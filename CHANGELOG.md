@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.9.5](https://github.com/mynaparrot/plugNmeet-server/compare/v1.9.4...v1.9.5) (2025-11-03)
+
+
+### Bug Fixes
+
+* added option to request/response media server info ([72d1082](https://github.com/mynaparrot/plugNmeet-server/commit/72d10826397b9cf36c7fd4ac169a160b3c464153))
+* **deps:** update module github.com/gabriel-vasile/mimetype to v1.4.11 ([aecb7f7](https://github.com/mynaparrot/plugNmeet-server/commit/aecb7f731ec4d71b4e9a3c83039920ff3d2b465f))
+* **deps:** update module github.com/gabriel-vasile/mimetype to v1.4.11 ([e41faa3](https://github.com/mynaparrot/plugNmeet-server/commit/e41faa376273c02dfadbb477b5c04672173717af))
+
 ## [1.9.4](https://github.com/mynaparrot/plugNmeet-server/compare/v1.9.3...v1.9.4) (2025-10-28)
 
 
