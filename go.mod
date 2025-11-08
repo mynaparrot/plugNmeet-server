@@ -14,7 +14,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/google/wire v0.7.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/protocol v1.42.0
+	github.com/livekit/protocol v1.43.0
 	github.com/livekit/server-sdk-go/v2 v2.11.3
 	github.com/mynaparrot/plugnmeet-protocol v1.0.16-0.20251102174458-b05bfab82689
 	github.com/nats-io/jwt/v2 v2.8.0
@@ -67,7 +67,7 @@ require (
 	github.com/lithammer/shortuuid/v4 v4.2.0 // indirect
 	github.com/livekit/mageutil v0.0.0-20250511045019-0f1ff63f7731 // indirect
 	github.com/livekit/mediatransportutil v0.0.0-20250825135402-7bc31f107ade // indirect
-	github.com/livekit/psrpc v0.7.0 // indirect
+	github.com/livekit/psrpc v0.7.1-0.20251021235041-bdebea7dacf4 // indirect
 	github.com/magefile/mage v1.15.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
