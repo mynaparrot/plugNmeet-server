@@ -3,6 +3,7 @@ package azure
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/Microsoft/cognitive-services-speech-sdk-go/audio"
 	"github.com/Microsoft/cognitive-services-speech-sdk-go/speech"
@@ -13,9 +14,9 @@ import (
 
 // transcribeClient holds the actual Azure SDK configuration and objects.
 type transcribeClient struct {
-	config *speech.SpeechConfig
-	model  string
-	log    *logrus.Entry
+	creds config.CredentialsConfig
+	model string
+	log   *logrus.Entry
 }
 
 // newTranscribeClient creates a new client.
@@ -24,57 +25,73 @@ func newTranscribeClient(creds config.CredentialsConfig, model string, log *logr
 		return nil, fmt.Errorf("azure provider requires api_key (subscription key) and region")
 	}
 
-	cnf, err := speech.NewSpeechConfigFromSubscription(creds.APIKey, creds.Region)
-	if err != nil {
-		return nil, err
-	}
-
 	return &transcribeClient{
-		config: cnf,
-		model:  model,
-		log:    log,
+		creds: creds,
+		model: model,
+		log:   log,
 	}, nil
 }
 
-func (c *transcribeClient) CreateTranscription(ctx context.Context, roomId, userId, spokenLang string) (insights.TranscriptionStream, error) {
+func (c *transcribeClient) getSdkConfig() (*audio.PushAudioInputStream, *audio.AudioConfig, error) {
+	audioFormat, err := audio.GetWaveFormatPCM(16000, 16, 1)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not create audio format: %v", err)
+	}
+
+	inputStream, err := audio.CreatePushAudioInputStreamFromFormat(audioFormat)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not create audio config from custom inputStream: %v", err)
+	}
+
+	audioConfig, err := audio.NewAudioConfigFromStreamInput(inputStream)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return inputStream, audioConfig, nil
+}
+
+func (c *transcribeClient) CreateTranscription(mainCtx context.Context, roomId, userId, spokenLang string) (insights.TranscriptionStream, error) {
 	log := c.log.WithFields(logrus.Fields{
-		"method": "TranscribeStream",
+		"method": "CreateTranscription",
 		"roomId": roomId,
 		"userId": userId,
 	})
 	log.Infoln("starting transcription")
 
-	audioFormat, err := audio.GetWaveFormatPCM(16000, 16, 1)
-	if err != nil {
-		return nil, fmt.Errorf("could not create audio format: %v", err)
-	}
-
-	inputStream, err := audio.CreatePushAudioInputStreamFromFormat(audioFormat)
-	if err != nil {
-		return nil, fmt.Errorf("could not create audio config from custom inputStream: %v", err)
-	}
-
-	audioConfig, err := audio.NewAudioConfigFromStreamInput(inputStream)
+	inputStream, audioConfig, err := c.getSdkConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	recognizer, err := speech.NewSpeechRecognizerFromConfig(c.config, audioConfig)
+	cnf, err := speech.NewSpeechConfigFromSubscription(c.creds.APIKey, c.creds.Region)
 	if err != nil {
 		return nil, err
 	}
 
-	err = c.config.SetSpeechRecognitionLanguage(spokenLang)
+	err = cnf.SetSpeechRecognitionLanguage(spokenLang)
 	if err != nil {
 		return nil, err
 	}
+
+	recognizer, err := speech.NewSpeechRecognizerFromConfig(cnf, audioConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	resultsChan := make(chan *insights.TranscriptionResult)
+	var closeOnce sync.Once
+	safeClose := func() {
+		closeOnce.Do(func() {
+			close(resultsChan)
+		})
+	}
 
 	recognizer.SessionStarted(func(e speech.SessionEventArgs) {
 		log.Infoln("azure transcription started")
 	})
 	recognizer.SessionStopped(func(e speech.SessionEventArgs) {
-		close(resultsChan)
+		safeClose()
 		log.Infoln("azure transcription stopped")
 	})
 
@@ -92,19 +109,11 @@ func (c *transcribeClient) CreateTranscription(ctx context.Context, roomId, user
 			IsPartial: false,
 		}
 		resultsChan <- finalSourceResult
-
-		/*for lang, text := range e.Result.Translations {
-			translationResult := &insights.TranscriptionResult{
-				Text:      fmt.Sprintf("%s: %s", lang, text),
-				IsPartial: false,
-			}
-			resultsChan <- translationResult
-		}*/
 	})
 
 	recognizer.Canceled(func(e speech.SpeechRecognitionCanceledEventArgs) {
 		log.Infof("Azure transcription canceled: %v\n", e.ErrorDetails)
-		close(resultsChan)
+		safeClose()
 	})
 
 	go func() {
@@ -113,10 +122,11 @@ func (c *transcribeClient) CreateTranscription(ctx context.Context, roomId, user
 		err := <-recognizer.StartContinuousRecognitionAsync()
 		if err != nil {
 			log.WithError(err).Errorln("Error starting Azure recognition")
-			close(resultsChan)
+			safeClose()
 		}
 	}()
 
+	ctx, cancel := context.WithCancel(mainCtx)
 	go func() {
 		<-ctx.Done()
 		recognizer.StopContinuousRecognitionAsync()
@@ -124,7 +134,116 @@ func (c *transcribeClient) CreateTranscription(ctx context.Context, roomId, user
 
 	stream := &azureTranscribeStream{
 		pushStream: inputStream,
-		recognizer: recognizer,
+		cancel:     cancel,
+		results:    resultsChan,
+	}
+
+	return stream, nil
+}
+
+func (c *transcribeClient) CreateTranscriptionWithTranslation(mainCtx context.Context, roomId, userId, spokenLang string, transLangs []string) (insights.TranscriptionStream, error) {
+	log := c.log.WithFields(logrus.Fields{
+		"method": "CreateTranscriptionWithTranslation",
+		"roomId": roomId,
+		"userId": userId,
+	})
+	log.Infoln("starting transcription with translation")
+
+	inputStream, audioConfig, err := c.getSdkConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	cnf, err := speech.NewSpeechTranslationConfigFromSubscription(c.creds.APIKey, c.creds.Region)
+	if err != nil {
+		return nil, err
+	}
+
+	err = cnf.SetSpeechRecognitionLanguage(spokenLang)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, lang := range transLangs {
+		err := cnf.AddTargetLanguage(lang)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	recognizer, err := speech.NewTranslationRecognizerFromConfig(cnf, audioConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	resultsChan := make(chan *insights.TranscriptionResult)
+	var closeOnce sync.Once
+	safeClose := func() {
+		closeOnce.Do(func() {
+			close(resultsChan)
+		})
+	}
+
+	recognizer.SessionStarted(func(e speech.SessionEventArgs) {
+		log.Infoln("azure transcription with translation started")
+	})
+	recognizer.SessionStopped(func(e speech.SessionEventArgs) {
+		safeClose()
+		log.Infoln("azure transcription with translation stopped")
+	})
+
+	recognizer.Recognizing(func(e speech.TranslationRecognitionEventArgs) {
+		result := &insights.TranscriptionResult{
+			Lang:         spokenLang,
+			Text:         e.Result.Text,
+			IsPartial:    true,
+			Translations: map[string]string{},
+		}
+
+		for lang, text := range e.Result.GetTranslations() {
+			result.Translations[lang] = text
+		}
+		resultsChan <- result
+	})
+
+	recognizer.Recognized(func(e speech.TranslationRecognitionEventArgs) {
+		result := &insights.TranscriptionResult{
+			Lang:         spokenLang,
+			Text:         e.Result.Text,
+			IsPartial:    false,
+			Translations: map[string]string{},
+		}
+
+		for lang, text := range e.Result.GetTranslations() {
+			result.Translations[lang] = text
+		}
+		resultsChan <- result
+	})
+
+	recognizer.Canceled(func(e speech.TranslationRecognitionCanceledEventArgs) {
+		log.Infof("Azure transcription with translation canceled: %v\n", e.ErrorDetails)
+		safeClose()
+	})
+
+	go func() {
+		// StartContinuousRecognitionAsync returns a channel that provides the result of the async operation.
+		// We must wait for and check the error from this channel.
+		err := <-recognizer.StartContinuousRecognitionAsync()
+		if err != nil {
+			log.WithError(err).Errorln("Error starting Azure recognition")
+			safeClose()
+		}
+	}()
+
+	ctx, cancel := context.WithCancel(mainCtx)
+	go func() {
+		<-ctx.Done()
+		recognizer.StopContinuousRecognitionAsync()
+	}()
+
+	stream := &azureTranscribeStream{
+		pushStream: inputStream,
+		cancel:     cancel,
 		results:    resultsChan,
 	}
 

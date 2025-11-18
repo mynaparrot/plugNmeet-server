@@ -20,14 +20,12 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights/media"
 )
 
-// activeParticipant holds the resources for a participant currently being processed.
 type activeParticipant struct {
 	transcoder *media.Transcoder
 	cancel     context.CancelFunc
 	identity   string
 }
 
-// roomAgent now manages tasks for a SINGLE service within a single room.
 type roomAgent struct {
 	ctx          context.Context
 	cancel       context.CancelFunc

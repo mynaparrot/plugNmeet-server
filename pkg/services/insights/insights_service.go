@@ -21,7 +21,6 @@ const (
 	TaskEnd             = "end"
 )
 
-// InsightsTaskPayload is the new unified message format.
 type InsightsTaskPayload struct {
 	Task        string `json:"task"` // "start" or "end"
 	ServiceName string `json:"service_name"`
@@ -30,7 +29,6 @@ type InsightsTaskPayload struct {
 	Options     []byte `json:"options"`
 }
 
-// InsightsService is a long-lived manager that dispatches requests.
 type InsightsService struct {
 	ctx          context.Context
 	conf         *config.AppConfig

@@ -1,8 +1,9 @@
 package azure
 
 import (
+	"context"
+
 	"github.com/Microsoft/cognitive-services-speech-sdk-go/audio"
-	"github.com/Microsoft/cognitive-services-speech-sdk-go/speech"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 )
 
@@ -10,7 +11,7 @@ import (
 // It acts as an adapter, wrapping the Azure-specific PushAudioInputStream and recognizer.
 type azureTranscribeStream struct {
 	pushStream *audio.PushAudioInputStream
-	recognizer *speech.SpeechRecognizer // Use TranslationRecognizer to handle both
+	cancel     context.CancelFunc
 	results    chan *insights.TranscriptionResult
 }
 
@@ -26,10 +27,7 @@ func (s *azureTranscribeStream) Write(p []byte) (n int, err error) {
 // Close implements the io.Closer interface. It stops the recognizer and closes the stream.
 func (s *azureTranscribeStream) Close() error {
 	// Stop the recognizer first. This will trigger SessionStopped events.
-	err := <-s.recognizer.StopContinuousRecognitionAsync()
-	if err != nil {
-		return err
-	}
+	s.cancel()
 	// Now close the underlying audio stream.
 	s.pushStream.Close()
 	return nil

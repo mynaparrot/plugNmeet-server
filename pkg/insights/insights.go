@@ -9,8 +9,16 @@ import (
 
 // TranscriptionResult is the standardized struct for a single piece of transcribed text.
 type TranscriptionResult struct {
-	Text      string `json:"text"`
-	IsPartial bool   `json:"is_partial"`
+	Lang         string            `json:"lang"`
+	Text         string            `json:"text"`
+	IsPartial    bool              `json:"is_partial"`
+	Translations map[string]string `json:"translations"` // A map of target language -> translated text
+}
+
+// TranscriptionOptions defines the structure for options passed to the transcription service.
+type TranscriptionOptions struct {
+	SpokenLang string   `json:"spokenLang"`
+	TransLangs []string `json:"transLangs"`
 }
 
 // TranscriptionStream defines a universal, bidirectional interface for a live transcription.
@@ -37,8 +45,8 @@ type Provider interface {
 	// CreateTranscription initializes a real-time transcription stream.
 	CreateTranscription(ctx context.Context, roomID, userID string, options []byte) (TranscriptionStream, error)
 
-	// Translate translates a block of text.
-	Translate(ctx context.Context, text string, targetLangs []string) (map[string]string, error)
+	// CreateTranscriptionWithTranslation translates a block of text.
+	CreateTranscriptionWithTranslation(ctx context.Context, roomID, userID string, options []byte) (TranscriptionStream, error)
 
 	// GetSupportedLanguages mostly for Transcription & Translation
 	GetSupportedLanguages(serviceName string) []config.LanguageInfo

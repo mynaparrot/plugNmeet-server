@@ -22,7 +22,7 @@ func (m *WebhookModel) trackPublished(event *livekit.WebhookEvent) {
 	log.Infoln("handling track_published webhook")
 
 	in := insights.NewInsightsService(m.ctx, m.app, log.Logger, m.rs)
-	err := in.ActivateTask("transcription", event.Room.Name, event.Participant.Identity, nil)
+	err := in.ActivateTask("transcription_translation", event.Room.Name, event.Participant.Identity, nil)
 	if err != nil {
 		log.Error(err)
 	}
