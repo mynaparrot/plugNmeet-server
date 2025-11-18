@@ -13,13 +13,13 @@ import (
 // It holds clients for the different services Azure offers. For Phase 1, it will only
 // hold the client for transcription services.
 type AzureProvider struct {
-	conf config.ServiceConfig
+	conf *config.ServiceConfig
 	log  *logrus.Entry
 }
 
 // NewProvider creates a new, fully configured Azure provider.
 // It initializes the necessary internal clients based on the provided service configuration.
-func NewProvider(conf config.ServiceConfig, log *logrus.Entry) *AzureProvider {
+func NewProvider(conf *config.ServiceConfig, log *logrus.Entry) *AzureProvider {
 	return &AzureProvider{
 		conf: conf,
 		log:  log,
@@ -28,7 +28,7 @@ func NewProvider(conf config.ServiceConfig, log *logrus.Entry) *AzureProvider {
 
 // CreateTranscription delegates the transcription task to the specialized transcribe client.
 // This is a simple pass-through, keeping this file clean and easy to read.
-func (p *AzureProvider) CreateTranscription(ctx context.Context, roomId, userId, spokenLang string) (insights.TranscriptionStream, error) {
+func (p *AzureProvider) CreateTranscription(ctx context.Context, roomId, userId, spokenLang string, options []byte) (insights.TranscriptionStream, error) {
 	// For now, we only initialize the transcription client.
 	// The transcribeClient's constructor will extract the credentials it needs from the universal config.
 	transcribeClient, err := newTranscribeClient(p.conf.Credentials, p.conf.Model, p.log)
@@ -36,7 +36,7 @@ func (p *AzureProvider) CreateTranscription(ctx context.Context, roomId, userId,
 		return nil, err
 	}
 
-	return transcribeClient.TranscribeStream(ctx, roomId, userId, spokenLang)
+	return transcribeClient.TranscribeStream(ctx, roomId, userId, spokenLang, options)
 }
 
 // Translate is intended for a separate translation provider.

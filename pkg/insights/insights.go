@@ -36,7 +36,7 @@ type Provider interface {
 	// if supported, integrated translation.
 	// It takes a channel of raw audio data and a list of target languages.
 	// It returns a channel of transcription results.
-	CreateTranscription(ctx context.Context, roomId, userId, spokenLang string) (TranscriptionStream, error)
+	CreateTranscription(ctx context.Context, roomId, userId, spokenLang string, options []byte) (TranscriptionStream, error)
 
 	// Translate translates a block of text.
 	// This is intended for use by the orchestrator when a separate translation provider is configured.
@@ -47,5 +47,5 @@ type Provider interface {
 type Task interface {
 	// Run starts the task's processing pipeline.
 	// It takes the audio stream and other context, and returns an error if initialization fails.
-	Run(ctx context.Context, audioStream <-chan []byte, roomID, identity string) error
+	Run(ctx context.Context, audioStream <-chan []byte, roomID, identity string, options []byte) error
 }

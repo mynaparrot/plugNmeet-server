@@ -12,7 +12,7 @@ import (
 
 // NewProvider is a factory function that creates and returns the configured AI provider.
 // It takes a specific service configuration and initializes the correct implementation.
-func NewProvider(providerName string, conf config.ServiceConfig, logger *logrus.Entry) insights.Provider {
+func NewProvider(providerName string, conf *config.ServiceConfig, logger *logrus.Entry) insights.Provider {
 	log := logger.WithFields(logrus.Fields{
 		"provider": providerName,
 	})
@@ -31,7 +31,7 @@ func NewProvider(providerName string, conf config.ServiceConfig, logger *logrus.
 
 // NewTask is a factory that returns the correct Task implementation
 // based on the service name (e.g., "transcription").
-func NewTask(serviceName string, conf config.ServiceConfig, logger *logrus.Entry) (insights.Task, error) {
+func NewTask(serviceName string, conf *config.ServiceConfig, logger *logrus.Entry) (insights.Task, error) {
 	switch serviceName {
 	case "transcription":
 		return NewTranscriptionTask(conf, logger)

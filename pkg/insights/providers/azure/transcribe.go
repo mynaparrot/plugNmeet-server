@@ -37,7 +37,7 @@ func newTranscribeClient(creds config.CredentialsConfig, model string, log *logr
 }
 
 // TranscribeStream now uses the channelStream adapter.
-func (c *transcribeClient) TranscribeStream(ctx context.Context, roomId, userId, spokenLang string) (insights.TranscriptionStream, error) {
+func (c *transcribeClient) TranscribeStream(ctx context.Context, roomId, userId, spokenLang string, options []byte) (insights.TranscriptionStream, error) {
 	log := c.log.WithFields(logrus.Fields{
 		"method": "TranscribeStream",
 		"roomId": roomId,

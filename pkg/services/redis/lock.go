@@ -33,6 +33,57 @@ else
     return 0
 end`
 
+// Lock represents a single distributed lock instance, created by the RedisService.
+type Lock struct {
+	s     *RedisService // A reference back to the main service
+	key   string
+	value string
+	ttl   time.Duration
+}
+
+// NewLock is a new method on your RedisService that acts as a factory.
+func (s *RedisService) NewLock(key string, ttl time.Duration) *Lock {
+	return &Lock{
+		s:     s,
+		key:   key,
+		value: uuid.New().String(), // Each lock instance gets a unique value.
+		ttl:   ttl,
+	}
+}
+
+// TryLock attempts to acquire the lock. Returns true if successful.
+func (l *Lock) TryLock(ctx context.Context) (bool, error) {
+	ok, err := l.s.rc.SetNX(ctx, l.key, l.value, l.ttl).Result()
+	if err != nil {
+		return false, fmt.Errorf("redis SetNX error for key %s: %w", l.key, err)
+	}
+	return ok, nil
+}
+
+// Unlock releases the lock.
+func (l *Lock) Unlock(ctx context.Context) error {
+	_, err := l.s.unlockScriptExec.Eval(ctx, l.s.rc, []string{l.key}, l.value).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return fmt.Errorf("redis Eval error for unlock script on key %s: %w", l.key, err)
+	}
+	return nil
+}
+
+// Refresh extends the TTL of the lock.
+func (l *Lock) Refresh(ctx context.Context) error {
+	ttlSeconds := int(l.ttl.Seconds())
+	renewed, err := l.s.renewScriptExec.Eval(ctx, l.s.rc, []string{l.key}, l.value, ttlSeconds).Int64()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return fmt.Errorf("redis Eval error for renew script on key %s: %w", l.key, err)
+	}
+
+	if renewed == 0 {
+		return errors.New("lock expired or was taken by another process")
+	}
+
+	return nil
+}
+
 // LockRoomCreation attempts to acquire a distributed lock.
 // Returns:
 // - acquired (bool): true if the lock was acquired.

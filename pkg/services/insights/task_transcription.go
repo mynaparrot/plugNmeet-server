@@ -9,11 +9,11 @@ import (
 
 // TranscriptionTask handles the entire pipeline for a transcription service.
 type TranscriptionTask struct {
-	conf   config.ServiceConfig
+	conf   *config.ServiceConfig
 	logger *logrus.Entry
 }
 
-func NewTranscriptionTask(conf config.ServiceConfig, logger *logrus.Entry) (*TranscriptionTask, error) {
+func NewTranscriptionTask(conf *config.ServiceConfig, logger *logrus.Entry) (*TranscriptionTask, error) {
 	return &TranscriptionTask{
 		conf:   conf,
 		logger: logger,
@@ -21,11 +21,11 @@ func NewTranscriptionTask(conf config.ServiceConfig, logger *logrus.Entry) (*Tra
 }
 
 // Run implements the insights.Task interface.
-func (t *TranscriptionTask) Run(ctx context.Context, audioStream <-chan []byte, roomID, identity string) error {
+func (t *TranscriptionTask) Run(ctx context.Context, audioStream <-chan []byte, roomID, identity string, options []byte) error {
 	// Note: We use the factory from the parent 'insights' package.
 	provider := NewProvider(t.conf.Provider, t.conf, t.logger)
 
-	stream, err := provider.CreateTranscription(ctx, roomID, identity, "en")
+	stream, err := provider.CreateTranscription(ctx, roomID, identity, "en", options)
 	if err != nil {
 		return err
 	}

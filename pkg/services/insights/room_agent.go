@@ -36,12 +36,12 @@ type roomAgent struct {
 	room         *lksdk.Room
 	lock         sync.RWMutex
 	participants map[string]*activeParticipant
-	pendingTasks map[string]bool // key is userId
-	task         insights.Task   // The single task this agent is responsible for.
+	pendingTasks map[string][]byte // key is userId
+	task         insights.Task     // The single task this agent is responsible for.
 	serviceName  string
 }
 
-func newRoomAgent(ctx context.Context, conf *config.AppConfig, logger *logrus.Entry, roomName, serviceName string, serviceConfig config.ServiceConfig) (*roomAgent, error) {
+func newRoomAgent(ctx context.Context, conf *config.AppConfig, logger *logrus.Entry, roomName, serviceName string, serviceConfig *config.ServiceConfig) (*roomAgent, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	log := logger.WithFields(logrus.Fields{"room": roomName, "service": serviceName})
 
@@ -58,7 +58,7 @@ func newRoomAgent(ctx context.Context, conf *config.AppConfig, logger *logrus.En
 		conf:         conf,
 		logger:       log,
 		participants: make(map[string]*activeParticipant),
-		pendingTasks: make(map[string]bool),
+		pendingTasks: make(map[string][]byte),
 		serviceName:  serviceName,
 		task:         task,
 	}
@@ -94,14 +94,14 @@ func newRoomAgent(ctx context.Context, conf *config.AppConfig, logger *logrus.En
 }
 
 // ActivateTaskForUser queues a task for a user for this agent's specific service.
-func (a *roomAgent) ActivateTaskForUser(userId string) error {
+func (a *roomAgent) ActivateTaskForUser(userId string, options []byte) error {
 	a.lock.Lock()
 	if _, ok := a.pendingTasks[userId]; ok {
 		a.lock.Unlock()
 		a.logger.Infof("task is already pending for participant %s", userId)
 		return nil
 	}
-	a.pendingTasks[userId] = true
+	a.pendingTasks[userId] = options
 	a.lock.Unlock()
 
 	a.logger.Infof("queued task for participant %s", userId)
@@ -155,7 +155,8 @@ func (a *roomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	if _, ok := a.pendingTasks[rp.Identity()]; !ok {
+	options, ok := a.pendingTasks[rp.Identity()]
+	if !ok {
 		return
 	}
 
@@ -175,7 +176,7 @@ func (a *roomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 
 	// Launch the agent's single, pre-created task.
 	go func() {
-		err := a.task.Run(ctx, transcoder.AudioStream(), a.room.Name(), rp.Identity())
+		err := a.task.Run(ctx, transcoder.AudioStream(), a.room.Name(), rp.Identity(), options)
 		if err != nil && !errors.Is(err, context.Canceled) {
 			a.logger.WithError(err).Errorf("insights task %s failed", a.serviceName)
 		}

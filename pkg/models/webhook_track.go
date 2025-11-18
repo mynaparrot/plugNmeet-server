@@ -3,7 +3,6 @@ package models
 import (
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 	"github.com/sirupsen/logrus"
 )
 
@@ -20,12 +19,6 @@ func (m *WebhookModel) trackPublished(event *livekit.WebhookEvent) {
 		"event":         event.GetEvent(),
 	})
 	log.Infoln("handling track_published webhook")
-
-	in := insights.NewInsightsService(m.ctx, m.app, log.Logger)
-	err := in.ActivateTask("transcription", event.Room.Name, event.Participant.Identity)
-	if err != nil {
-		log.Error(err)
-	}
 
 	rInfo, err := m.natsService.GetRoomInfo(event.Room.Name)
 	if err != nil {
