@@ -29,7 +29,7 @@ func NewProvider(creds config.CredentialsConfig, model string, log *logrus.Entry
 // CreateTranscription now uses the stored credentials and parses the options.
 func (p *AzureProvider) CreateTranscription(ctx context.Context, roomID, userID string, options []byte) (insights.TranscriptionStream, error) {
 	opts := &insights.TranscriptionOptions{
-		SpokenLang: "en-US", // Default language
+		SpokenLang: "en-US",
 	}
 	if len(options) > 0 {
 		if err := json.Unmarshal(options, opts); err != nil {
@@ -48,8 +48,8 @@ func (p *AzureProvider) CreateTranscription(ctx context.Context, roomID, userID 
 
 func (p *AzureProvider) CreateTranscriptionWithTranslation(ctx context.Context, roomID, userID string, options []byte) (insights.TranscriptionStream, error) {
 	opts := &insights.TranscriptionOptions{
-		SpokenLang: "en-US", // Default language
-		TransLangs: []string{"es-ES"},
+		SpokenLang: "en-US",
+		TransLangs: []string{"es-ES", "bn-IN"},
 	}
 	if len(options) > 0 {
 		if err := json.Unmarshal(options, opts); err != nil {
