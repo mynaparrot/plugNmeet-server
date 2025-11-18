@@ -103,9 +103,6 @@ func (t *Transcoder) AudioStream() <-chan []byte {
 	return t.writer.audioChan
 }
 
-// The explicit Close method is no longer needed on the Transcoder itself,
-// as its lifecycle is now tied to the context passed during creation.
-
 // --- Publisher for outgoing audio ---
 
 // AudioPublisher handles publishing a local PCM audio track to a LiveKit room.

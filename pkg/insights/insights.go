@@ -33,19 +33,14 @@ type TranscriptionStream interface {
 // It defines a contract for any provider we want to support.
 type Provider interface {
 	// CreateTranscription handles real-time, streaming speech-to-text and,
-	// if supported, integrated translation.
-	// It takes a channel of raw audio data and a list of target languages.
-	// It returns a channel of transcription results.
 	CreateTranscription(ctx context.Context, roomId, userId, spokenLang string, options []byte) (TranscriptionStream, error)
 
 	// Translate translates a block of text.
-	// This is intended for use by the orchestrator when a separate translation provider is configured.
 	Translate(ctx context.Context, text string, targetLangs []string) (map[string]string, error)
 }
 
 // Task defines the interface for any runnable, self-contained AI task.
 type Task interface {
 	// Run starts the task's processing pipeline.
-	// It takes the audio stream and other context, and returns an error if initialization fails.
 	Run(ctx context.Context, audioStream <-chan []byte, roomID, identity string, options []byte) error
 }
