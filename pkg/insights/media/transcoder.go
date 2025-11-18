@@ -75,11 +75,17 @@ type Transcoder struct {
 	pcmTrack *lkmedia.PCMRemoteTrack
 }
 
-// NewTranscoder now accepts a context for lifecycle management.
-func NewTranscoder(ctx context.Context, track *webrtc.TrackRemote) (*Transcoder, error) {
+func NewTranscoder(ctx context.Context, track *webrtc.TrackRemote, decryptor lkmedia.Decryptor) (*Transcoder, error) {
 	writer := newPCMWriter()
 
-	pcmTrack, err := lkmedia.NewPCMRemoteTrack(track, writer, lkmedia.WithTargetSampleRate(targetSampleRate))
+	opts := []lkmedia.PCMRemoteTrackOption{
+		lkmedia.WithTargetSampleRate(targetSampleRate),
+	}
+	if decryptor != nil {
+		opts = append(opts, lkmedia.WithDecryptor(decryptor))
+	}
+
+	pcmTrack, err := lkmedia.NewPCMRemoteTrack(track, writer, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +111,6 @@ func (t *Transcoder) AudioStream() <-chan []byte {
 
 // --- Publisher for outgoing audio ---
 
-// AudioPublisher handles publishing a local PCM audio track to a LiveKit room.
 type AudioPublisher struct {
 	track *lkmedia.PCMLocalTrack
 }
@@ -134,7 +139,7 @@ func NewAudioPublisher(room *lksdk.Room, trackName string, sampleRate int, numCh
 // This is how the service will send synthesized audio back to the room.
 func (p *AudioPublisher) WriteSample(sample media.PCM16Sample) error {
 	if p.track == nil {
-		return errors.New("publisher is closed or not initialized")
+		return errors.New("publisher is not initialized")
 	}
 	return p.track.WriteSample(sample)
 }

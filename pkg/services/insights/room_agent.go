@@ -13,7 +13,9 @@ import (
 	"github.com/pion/webrtc/v4"
 	"github.com/sirupsen/logrus"
 
+	"github.com/livekit/protocol/livekit"
 	lksdk "github.com/livekit/server-sdk-go/v2"
+	lkmedia "github.com/livekit/server-sdk-go/v2/pkg/media"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
@@ -37,10 +39,11 @@ type roomAgent struct {
 	pendingTasks map[string][]byte // Simplified: key is userId, value is the options []byte
 	task         insights.Task     // The single task this agent is responsible for.
 	serviceName  string
+	e2eeKey      *string
 }
 
 // newRoomAgent creates a single-purpose agent.
-func newRoomAgent(ctx context.Context, conf *config.AppConfig, logger *logrus.Entry, roomName, serviceName string, serviceConfig config.ServiceConfig, creds config.CredentialsConfig) (*roomAgent, error) {
+func newRoomAgent(ctx context.Context, conf *config.AppConfig, logger *logrus.Entry, roomName, serviceName string, serviceConfig *config.ServiceConfig, creds *config.CredentialsConfig, e2eeKey *string) (*roomAgent, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	log := logger.WithFields(logrus.Fields{"room": roomName, "service": serviceName})
 
@@ -60,6 +63,7 @@ func newRoomAgent(ctx context.Context, conf *config.AppConfig, logger *logrus.En
 		pendingTasks: make(map[string][]byte),
 		serviceName:  serviceName,
 		task:         task,
+		e2eeKey:      e2eeKey,
 	}
 
 	c := &plugnmeet.PlugNmeetTokenClaims{
@@ -159,8 +163,27 @@ func (a *roomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 		return
 	}
 
+	var decryptor lkmedia.Decryptor
+	if publication.TrackInfo().GetEncryption() != livekit.Encryption_NONE {
+		if a.e2eeKey == nil || *a.e2eeKey == "" {
+			a.logger.Errorln("received an encrypted track but no key was provided, so not continuing")
+			return
+		} else {
+			key, err := lksdk.DeriveKeyFromString(*a.e2eeKey)
+			if err != nil {
+				a.logger.WithError(err).Error("failed to derive key")
+				return
+			}
+			decryptor, err = lkmedia.NewGCMDecryptor(key, a.room.SifTrailer())
+			if err != nil {
+				a.logger.WithError(err).Error("failed to create decryptor")
+				return
+			}
+		}
+	}
+
 	ctx, cancel := context.WithCancel(a.ctx)
-	transcoder, err := media.NewTranscoder(ctx, track)
+	transcoder, err := media.NewTranscoder(ctx, track, decryptor)
 	if err != nil {
 		a.logger.WithError(err).Error("failed to create transcoder")
 		cancel()

@@ -21,12 +21,6 @@ func (m *WebhookModel) trackPublished(event *livekit.WebhookEvent) {
 	})
 	log.Infoln("handling track_published webhook")
 
-	in := insights.NewInsightsService(m.ctx, m.app, log.Logger, m.rs)
-	err := in.ActivateTask("transcription_translation", event.Room.Name, event.Participant.Identity, nil)
-	if err != nil {
-		log.Error(err)
-	}
-
 	rInfo, err := m.natsService.GetRoomInfo(event.Room.Name)
 	if err != nil {
 		log.WithError(err).Errorln("failed to get room info from NATS")
@@ -35,6 +29,13 @@ func (m *WebhookModel) trackPublished(event *livekit.WebhookEvent) {
 	if rInfo == nil {
 		log.Warnln("room not found in NATS, skipping track_published tasks")
 		return
+	}
+
+	meta, _ := m.natsService.UnmarshalRoomMetadata(rInfo.Metadata)
+	in := insights.NewInsightsService(m.ctx, m.app, log.Logger, m.rs)
+	err = in.ActivateTask("transcription_translation", event.Room.Name, event.Participant.Identity, nil, meta.RoomFeatures.EndToEndEncryptionFeatures.EncryptionKey)
+	if err != nil {
+		log.Error(err)
 	}
 
 	event.Room.Sid = rInfo.RoomSid

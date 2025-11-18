@@ -22,11 +22,12 @@ const (
 )
 
 type InsightsTaskPayload struct {
-	Task        string `json:"task"` // "start" or "end"
-	ServiceName string `json:"service_name"`
-	RoomName    string `json:"room_name"`
-	UserID      string `json:"user_id"`
-	Options     []byte `json:"options"`
+	Task        string  `json:"task"` // "start" or "end"
+	ServiceName string  `json:"service_name"`
+	RoomName    string  `json:"room_name"`
+	UserID      string  `json:"user_id"`
+	Options     []byte  `json:"options"`
+	RoomE2EEKey *string `json:"room_e2ee_key"`
 }
 
 type InsightsService struct {
@@ -140,7 +141,7 @@ func (s *InsightsService) getProviderAccountForService(serviceName string) (*con
 }
 
 // ActivateTask now only publishes a 'start' message.
-func (s *InsightsService) ActivateTask(serviceName, roomName, userId string, options []byte) error {
+func (s *InsightsService) ActivateTask(serviceName, roomName, userId string, options []byte, roomE2EEKey *string) error {
 	s.logger.Infof("Publishing start task request for service '%s' in room '%s'", serviceName, roomName)
 	payload := &InsightsTaskPayload{
 		Task:        TaskStart,
@@ -148,6 +149,7 @@ func (s *InsightsService) ActivateTask(serviceName, roomName, userId string, opt
 		RoomName:    roomName,
 		UserID:      userId,
 		Options:     options,
+		RoomE2EEKey: roomE2EEKey,
 	}
 	p, err := json.Marshal(payload)
 	if err != nil {
@@ -189,7 +191,7 @@ func (s *InsightsService) manageLocalAgent(payload *InsightsTaskPayload, lock *r
 			return err
 		}
 
-		agent, err = newRoomAgent(s.ctx, s.conf, s.logger, payload.RoomName, payload.ServiceName, *serviceConfig, targetAccount.Credentials)
+		agent, err = newRoomAgent(s.ctx, s.conf, s.logger, payload.RoomName, payload.ServiceName, serviceConfig, &targetAccount.Credentials, payload.RoomE2EEKey)
 		if err != nil {
 			s.lock.Unlock()
 			lock.Unlock(s.ctx)
@@ -283,7 +285,7 @@ func (s *InsightsService) GetSupportedLanguagesForServices() map[string][]config
 		providerKey := fmt.Sprintf("%s_%s", serviceConfig.Provider, serviceConfig.ID)
 		provider, ok := providerInstances[providerKey]
 		if !ok {
-			provider, err = NewProvider(serviceConfig.Provider, targetAccount.Credentials, serviceConfig.Model, s.logger)
+			provider, err = NewProvider(serviceConfig.Provider, &targetAccount.Credentials, serviceConfig.Model, s.logger)
 			if err != nil {
 				s.logger.WithError(err).Warnf("could not create provider for service %s", serviceName)
 				continue

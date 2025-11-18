@@ -14,13 +14,13 @@ import (
 
 // transcribeClient holds the actual Azure SDK configuration and objects.
 type transcribeClient struct {
-	creds config.CredentialsConfig
+	creds *config.CredentialsConfig
 	model string
 	log   *logrus.Entry
 }
 
 // newTranscribeClient creates a new client.
-func newTranscribeClient(creds config.CredentialsConfig, model string, log *logrus.Entry) (*transcribeClient, error) {
+func newTranscribeClient(creds *config.CredentialsConfig, model string, log *logrus.Entry) (*transcribeClient, error) {
 	if creds.APIKey == "" || creds.Region == "" {
 		return nil, fmt.Errorf("azure provider requires api_key (subscription key) and region")
 	}

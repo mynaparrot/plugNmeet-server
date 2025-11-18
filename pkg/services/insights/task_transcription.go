@@ -9,12 +9,12 @@ import (
 )
 
 type TranscriptionTask struct {
-	conf   config.ServiceConfig
-	creds  config.CredentialsConfig // Store credentials
+	conf   *config.ServiceConfig
+	creds  *config.CredentialsConfig // Store credentials
 	logger *logrus.Entry
 }
 
-func NewTranscriptionTask(conf config.ServiceConfig, creds config.CredentialsConfig, logger *logrus.Entry) (insights.Task, error) {
+func NewTranscriptionTask(conf *config.ServiceConfig, creds *config.CredentialsConfig, logger *logrus.Entry) (insights.Task, error) {
 	return &TranscriptionTask{
 		conf:   conf,
 		creds:  creds,

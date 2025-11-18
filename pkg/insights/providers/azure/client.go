@@ -12,13 +12,13 @@ import (
 
 // AzureProvider is the main struct that implements the insights.Provider interface.
 type AzureProvider struct {
-	creds  config.CredentialsConfig // Store the specific credentials for this provider instance
-	model  string                   // Store the model from the service config
+	creds  *config.CredentialsConfig // Store the specific credentials for this provider instance
+	model  string                    // Store the model from the service config
 	logger *logrus.Entry
 }
 
 // NewProvider now accepts the specific credentials for this provider instance.
-func NewProvider(creds config.CredentialsConfig, model string, log *logrus.Entry) (*AzureProvider, error) {
+func NewProvider(creds *config.CredentialsConfig, model string, log *logrus.Entry) (*AzureProvider, error) {
 	return &AzureProvider{
 		creds:  creds,
 		model:  model,
