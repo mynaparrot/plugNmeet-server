@@ -201,3 +201,20 @@ analytics_settings:
   # Otherwise, file retrieval may fail. This path can be an NFS or other network-accessible location.
   files_store_path: ./analytics
   token_validity: 30m
+
+insights:
+  services:
+    # --- Real-time Transcription Service ---
+    transcription:
+      provider: "azure"
+      model: "default" # Use Azure's default speech model, or a custom model ID.
+
+      # If false, this provider is expected to handle translation internally.
+      # If true, the system will pipe results to the dedicated 'translation' service.
+      use_separate_translation_provider: false
+
+      credentials:
+        # Universal names are used. The provider's implementation knows how to interpret them.
+        # For Azure Speech, 'api_key' maps to the Subscription Key.
+        api_key: "subscription_key"
+        region: "westus2"

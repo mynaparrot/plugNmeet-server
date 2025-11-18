@@ -40,6 +40,7 @@ type AppConfig struct {
 	AzureCognitiveServicesSpeech AzureCognitiveServicesSpeech `yaml:"azure_cognitive_services_speech"`
 	AnalyticsSettings            *AnalyticsSettings           `yaml:"analytics_settings"`
 	NatsInfo                     NatsInfo                     `yaml:"nats_info"`
+	Insights                     InsightsConfig               `yaml:"insights"`
 }
 
 type ClientInfo struct {
