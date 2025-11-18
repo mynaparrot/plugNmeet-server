@@ -180,21 +180,6 @@ shared_notepad:
       client_id: "plugNmeet"
       client_secret: "lmpGEH0MxrBg7ymsbSh9TU1d6VHRMk"
 
-azure_cognitive_services_speech:
-  enabled: false
-  # Maximum number of translation languages that can be selected. Default is 2.
-  # Pricing may vary with more languages. Refer to Azure pricing documentation.
-  max_num_tran_langs: 2
-  subscription_keys:
-    -
-      # Refer to the note at the top of this file regarding valid IDs.
-      id: "key_1"
-      # Documentation: https://learn.microsoft.com/en-us/azure/cognitive-services/speech-service/get-started-text-to-speech
-      subscription_key: "your_key_here"
-      service_region: westus2
-      # Azure limits concurrent connections per key. Contact Azure to confirm your limit. Default is 20.
-      max_connection: 20
-
 analytics_settings:
   enabled: true
   # If multiple plugNmeet servers are used, ensure all can access this directory.
@@ -203,18 +188,31 @@ analytics_settings:
   token_validity: 30m
 
 insights:
+  # 1. Define all available provider accounts ONCE.
+  # The key ("azure") is the provider TYPE.
+  providers:
+    azure:
+      # A list of uniquely identified accounts for this provider.
+      - id: "eastus_standard" # A unique name you choose for this account
+        credentials:
+          api_key: "YOUR_AZURE_KEY_1"
+          region: "eastus"
+          # endpoint: "" # Optional: for custom models
+
+      - id: "westeu_premium"
+        credentials:
+          api_key: "YOUR_AZURE_KEY_2"
+          region: "westeurope"
+
+  # 2. Define the services that USE the providers.
+  # The key ("transcription", "transcription_translation") is the service name.
   services:
-    # --- Real-time Transcription Service ---
     transcription:
+      provider: "azure"         # The provider TYPE to use
+      id: "eastus_standard" # The specific account ID to use from the list above
+      model: "default"          # A model ID specific to this service
+
+    transcription_translation:
       provider: "azure"
-      model: "default" # Use Azure's default speech model, or a custom model ID.
-
-      # If false, this provider is expected to handle translation internally.
-      # If true, the system will pipe results to the dedicated 'translation' service.
-      use_separate_translation_provider: false
-
-      credentials:
-        # Universal names are used. The provider's implementation knows how to interpret them.
-        # For Azure Speech, 'api_key' maps to the Subscription Key.
-        api_key: "subscription_key"
-        region: "westus2"
+      id: "westeu_premium"
+      model: "default"

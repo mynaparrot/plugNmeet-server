@@ -2,49 +2,67 @@ package azure
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/sirupsen/logrus"
 )
 
+// TranscriptionOptions defines the structure for options passed to the transcription service.
+type TranscriptionOptions struct {
+	Language string `json:"language"`
+}
+
 // AzureProvider is the main struct that implements the insights.Provider interface.
-// It holds clients for the different services Azure offers. For Phase 1, it will only
-// hold the client for transcription services.
 type AzureProvider struct {
-	conf *config.ServiceConfig
-	log  *logrus.Entry
+	creds  config.CredentialsConfig // Store the specific credentials for this provider instance
+	model  string                   // Store the model from the service config
+	logger *logrus.Entry
 }
 
-// NewProvider creates a new, fully configured Azure provider.
-// It initializes the necessary internal clients based on the provided service configuration.
-func NewProvider(conf *config.ServiceConfig, log *logrus.Entry) *AzureProvider {
+// NewProvider now accepts the specific credentials for this provider instance.
+func NewProvider(creds config.CredentialsConfig, model string, log *logrus.Entry) (*AzureProvider, error) {
 	return &AzureProvider{
-		conf: conf,
-		log:  log,
-	}
+		creds:  creds,
+		model:  model,
+		logger: log,
+	}, nil
 }
 
-// CreateTranscription delegates the transcription task to the specialized transcribe client.
-// This is a simple pass-through, keeping this file clean and easy to read.
-func (p *AzureProvider) CreateTranscription(ctx context.Context, roomId, userId, spokenLang string, options []byte) (insights.TranscriptionStream, error) {
-	// For now, we only initialize the transcription client.
-	// The transcribeClient's constructor will extract the credentials it needs from the universal config.
-	transcribeClient, err := newTranscribeClient(p.conf.Credentials, p.conf.Model, p.log)
+// CreateTranscription now uses the stored credentials and parses the options.
+func (p *AzureProvider) CreateTranscription(ctx context.Context, roomID, userID string, options []byte) (insights.TranscriptionStream, error) {
+	opts := &TranscriptionOptions{
+		Language: "en-US", // Default language
+	}
+	if len(options) > 0 {
+		if err := json.Unmarshal(options, opts); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal transcription options: %w", err)
+		}
+	}
+
+	// Use the stored credentials and model to create the client.
+	transcribeClient, err := newTranscribeClient(p.creds, p.model, p.logger)
 	if err != nil {
 		return nil, err
 	}
 
-	return transcribeClient.TranscribeStream(ctx, roomId, userId, spokenLang, options)
+	return transcribeClient.CreateTranscription(ctx, roomID, userID, opts.Language)
 }
 
-// Translate is intended for a separate translation provider.
-// Since our Phase 1 plan is to use Azure's integrated translation, this method
-// will not be used if the config is set correctly (`use_separate_translation_provider: false`).
-// We implement it to satisfy the interface, but return an error.
+// Translate remains the same.
 func (p *AzureProvider) Translate(ctx context.Context, text string, targetLangs []string) (map[string]string, error) {
-	// This provider relies on integrated translation within the transcription stream.
-	// It should not be called directly for translation if configured correctly.
 	return nil, errors.New("azure provider is configured for integrated translation; direct translation is not supported")
+}
+
+// GetSupportedLanguages implements the insights.Provider interface.
+// It looks up the service name in the hard-coded map from languages.go.
+func (p *AzureProvider) GetSupportedLanguages(serviceName string) []config.LanguageInfo {
+	if langs, ok := supportedLanguages[serviceName]; ok {
+		return langs
+	}
+	// Return an empty slice if the service is not found for this provider.
+	return []config.LanguageInfo{}
 }

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
@@ -65,9 +66,6 @@ func (s *InsightsService) subscribeToTaskRequests() {
 		}
 
 		s.logger.Infof("received task '%s' for service '%s' in room '%s'", payload.Task, payload.ServiceName, payload.RoomName)
-
-		// Every server receives the message. The logic inside handleIncomingTask
-		// will determine if this specific server should act.
 		s.handleIncomingTask(&payload)
 	})
 	if err != nil {
@@ -78,16 +76,11 @@ func (s *InsightsService) subscribeToTaskRequests() {
 // handleIncomingTask is the core logic that runs on every server.
 func (s *InsightsService) handleIncomingTask(payload *InsightsTaskPayload) {
 	if payload.Task == TaskEnd {
-		// --- End Task Logic ---
-		// No leader election needed. Just try to end the task locally.
-		// Only the server that is the leader will have a matching agent.
 		s.endLocalAgentTask(payload.ServiceName, payload.RoomName, payload.UserID)
 		return
 	}
 
 	if payload.Task == TaskStart {
-		// --- Start Task Logic ---
-		// Leader election is required to start a new agent.
 		lockKey := getAgentKey(payload.RoomName, payload.ServiceName)
 		lock := s.redisService.NewLock(lockKey, 30*time.Second)
 
@@ -98,13 +91,11 @@ func (s *InsightsService) handleIncomingTask(payload *InsightsTaskPayload) {
 		}
 
 		if isLeader {
-			// I won the election, so I am responsible for starting the agent.
 			s.logger.Infof("Acquired leadership for task '%s'", lockKey)
 			if err := s.manageLocalAgent(payload, lock); err != nil {
 				s.logger.WithError(err).Error("failed to manage local agent")
 			}
 		}
-		// If not the leader, do nothing.
 	}
 }
 
@@ -116,7 +107,6 @@ func (s *InsightsService) endLocalAgentTask(serviceName, roomName, userId string
 	s.lock.RUnlock()
 
 	if ok {
-		// This server is the leader for this task, so end it.
 		agent.EndTasksForUser(userId)
 	}
 }
@@ -124,6 +114,31 @@ func (s *InsightsService) endLocalAgentTask(serviceName, roomName, userId string
 // getAgentKey creates a unique identifier for an agent.
 func getAgentKey(roomName, serviceName string) string {
 	return fmt.Sprintf("insights:%s_%s", roomName, serviceName)
+}
+
+// getProviderAccountForService is a helper to find the correct provider account configuration for a given service.
+func (s *InsightsService) getProviderAccountForService(serviceName string) (*config.ProviderAccount, *config.ServiceConfig, error) {
+	// 1. Get the service configuration
+	serviceConfig, configOk := s.conf.Insights.Services[serviceName]
+	if !configOk {
+		return nil, nil, fmt.Errorf("service '%s' is not defined in config", serviceName)
+	}
+
+	// 2. Get the list of accounts for the provider type
+	providerAccounts, providerOk := s.conf.Insights.Providers[serviceConfig.Provider]
+	if !providerOk {
+		return nil, nil, fmt.Errorf("provider '%s' (referenced by service '%s') is not defined in config", serviceConfig.Provider, serviceName)
+	}
+
+	// 3. Find the specific account within the list by its ID.
+	for _, acc := range providerAccounts {
+		if acc.ID == serviceConfig.ID {
+			found := acc
+			return &found, &serviceConfig, nil
+		}
+	}
+
+	return nil, nil, fmt.Errorf("account with id '%s' not found for provider '%s'", serviceConfig.ID, serviceConfig.Provider)
 }
 
 // ActivateTask now only publishes a 'start' message.
@@ -159,7 +174,7 @@ func (s *InsightsService) EndTask(serviceName, roomName, userId string) error {
 	return s.conf.NatsConn.Publish(InsightsNatsChannel, p)
 }
 
-// manageLocalAgent creates or finds the local agent and activates the task.
+// manageLocalAgent now uses the helper method.
 func (s *InsightsService) manageLocalAgent(payload *InsightsTaskPayload, lock *redisservice.Lock) error {
 	key := getAgentKey(payload.RoomName, payload.ServiceName)
 
@@ -168,28 +183,26 @@ func (s *InsightsService) manageLocalAgent(payload *InsightsTaskPayload, lock *r
 	if !ok {
 		s.logger.Infof("no agent found for service '%s' in room %s, creating a new one", payload.ServiceName, payload.RoomName)
 
-		serviceConfig, configOk := s.conf.Insights.Services[payload.ServiceName]
-		if !configOk {
-			s.lock.Unlock()
-			lock.Unlock(s.ctx) // Release leadership if we can't configure.
-			return fmt.Errorf("service '%s' is not defined in config", payload.ServiceName)
-		}
-
-		var err error
-		agent, err = newRoomAgent(s.ctx, s.conf, s.logger, payload.RoomName, payload.ServiceName, &serviceConfig)
+		// Use the new helper method to get both configs
+		targetAccount, serviceConfig, err := s.getProviderAccountForService(payload.ServiceName)
 		if err != nil {
 			s.lock.Unlock()
-			lock.Unlock(s.ctx) // Release leadership if agent fails to start.
+			lock.Unlock(s.ctx)
+			return err
+		}
+
+		agent, err = newRoomAgent(s.ctx, s.conf, s.logger, payload.RoomName, payload.ServiceName, *serviceConfig, targetAccount.Credentials)
+		if err != nil {
+			s.lock.Unlock()
+			lock.Unlock(s.ctx)
 			return fmt.Errorf("failed to create insights agent: %w", err)
 		}
 		s.roomAgents[key] = agent
 
-		// Start the "Janitor" process to keep the lock alive.
 		go s.superviseAgent(agent, lock)
 	}
 	s.lock.Unlock()
 
-	// Now, delegate the task activation to the local agent.
 	return agent.ActivateTaskForUser(payload.UserID, payload.Options)
 }
 
@@ -253,4 +266,35 @@ func (s *InsightsService) RemoveAgentForRoom(roomName string) {
 	if len(keysToDelete) > 0 {
 		s.logger.Infof("removed %d insights agents for room %s", len(keysToDelete), roomName)
 	}
+}
+
+// GetSupportedLanguagesForServices returns a map where the key is the service name
+// and the value is the list of supported languages for the provider configured for that service.
+func (s *InsightsService) GetSupportedLanguagesForServices() map[string][]config.LanguageInfo {
+	response := make(map[string][]config.LanguageInfo)
+	providerInstances := make(map[string]insights.Provider)
+
+	for serviceName := range s.conf.Insights.Services {
+		// Use the new helper method
+		targetAccount, serviceConfig, err := s.getProviderAccountForService(serviceName)
+		if err != nil {
+			s.logger.WithError(err).Warnf("could not get provider account for service %s", serviceName)
+			continue
+		}
+
+		providerKey := fmt.Sprintf("%s_%s", serviceConfig.Provider, serviceConfig.ID)
+		provider, ok := providerInstances[providerKey]
+		if !ok {
+			provider, err = NewProvider(serviceConfig.Provider, targetAccount.Credentials, serviceConfig.Model, s.logger)
+			if err != nil {
+				s.logger.WithError(err).Warnf("could not create provider for service %s", serviceName)
+				continue
+			}
+			providerInstances[providerKey] = provider
+		}
+
+		response[serviceName] = provider.GetSupportedLanguages(serviceName)
+	}
+
+	return response
 }

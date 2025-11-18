@@ -1,27 +1,36 @@
 package config
 
-// This file defines the configuration structures for the Insights service.
-// These structs are used by both the main service and the provider implementations
-// to avoid circular dependencies.
-
-// InsightsConfig is the top-level configuration for the entire service.
-type InsightsConfig struct {
-	// Services is a map where the key is the name of the service (e.g., "transcription").
-	Services map[string]ServiceConfig `yaml:"services"`
+// LanguageInfo defines the structure for a single supported language.
+type LanguageInfo struct {
+	Code   string `json:"code"`
+	Name   string `json:"name"`
+	Locale string `json:"locale"`
 }
 
-// ServiceConfig defines a single AI service, its provider, model, and credentials.
-type ServiceConfig struct {
-	Provider    string            `yaml:"provider"`
-	Model       string            `yaml:"model"`
+// InsightsConfig is the main config block for the insights feature.
+type InsightsConfig struct {
+	// The key is the provider type ("azure", "google"), the value is a list of accounts.
+	Providers map[string][]ProviderAccount `yaml:"providers"`
+	Services  map[string]ServiceConfig     `yaml:"services"`
+}
+
+// ProviderAccount defines a single, uniquely identified set of credentials for a provider.
+type ProviderAccount struct {
+	ID          string            `yaml:"id"`
 	Credentials CredentialsConfig `yaml:"credentials"`
 }
 
-// CredentialsConfig is the UNIVERSAL credentials block.
+// ServiceConfig now references a provider type and a specific account ID.
+type ServiceConfig struct {
+	Provider string `yaml:"provider"`
+	ID       string `yaml:"id"`
+	Model    string `yaml:"model"`
+}
+
+// CredentialsConfig now includes an optional Endpoint.
 type CredentialsConfig struct {
 	APIKey             string `yaml:"api_key"`
-	APIEndpoint        string `yaml:"api_endpoint"`
 	Region             string `yaml:"region"`
-	ProjectID          string `yaml:"project_id"`
-	ServiceAccountJSON string `yaml:"service_account_json"`
+	ServiceAccountFile string `yaml:"service_account_file"`
+	Endpoint           string `yaml:"endpoint"`
 }

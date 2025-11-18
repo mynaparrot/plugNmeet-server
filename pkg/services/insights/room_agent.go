@@ -36,17 +36,18 @@ type roomAgent struct {
 	room         *lksdk.Room
 	lock         sync.RWMutex
 	participants map[string]*activeParticipant
-	pendingTasks map[string][]byte // key is userId
+	pendingTasks map[string][]byte // Simplified: key is userId, value is the options []byte
 	task         insights.Task     // The single task this agent is responsible for.
 	serviceName  string
 }
 
-func newRoomAgent(ctx context.Context, conf *config.AppConfig, logger *logrus.Entry, roomName, serviceName string, serviceConfig *config.ServiceConfig) (*roomAgent, error) {
+// newRoomAgent creates a single-purpose agent.
+func newRoomAgent(ctx context.Context, conf *config.AppConfig, logger *logrus.Entry, roomName, serviceName string, serviceConfig config.ServiceConfig, creds config.CredentialsConfig) (*roomAgent, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	log := logger.WithFields(logrus.Fields{"room": roomName, "service": serviceName})
 
 	// Create a single task for this agent's one and only service.
-	task, err := NewTask(serviceName, serviceConfig, log)
+	task, err := NewTask(serviceName, serviceConfig, creds, log)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("could not create task for service '%s': %w", serviceName, err)
