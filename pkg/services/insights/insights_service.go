@@ -41,15 +41,13 @@ type InsightsService struct {
 }
 
 func New(ctx context.Context, conf *config.AppConfig, logger *logrus.Logger, redisService *redisservice.RedisService) *InsightsService {
-	s := &InsightsService{
+	return &InsightsService{
 		ctx:          ctx,
 		conf:         conf,
 		logger:       logger.WithField("service", "insights"),
 		roomAgents:   make(map[string]*roomAgent),
 		redisService: redisService,
 	}
-
-	return s
 }
 
 // SubscribeToTaskRequests is the central handler for all incoming tasks.
@@ -115,35 +113,10 @@ func getAgentKey(roomName, serviceName string) string {
 	return fmt.Sprintf("insights:%s_%s", roomName, serviceName)
 }
 
-// getProviderAccountForService is a helper to find the correct provider account configuration for a given service.
-func (s *InsightsService) getProviderAccountForService(serviceName string) (*config.ProviderAccount, *config.ServiceConfig, error) {
-	// 1. Get the service configuration
-	serviceConfig, configOk := s.conf.Insights.Services[serviceName]
-	if !configOk {
-		return nil, nil, fmt.Errorf("service '%s' is not defined in config", serviceName)
-	}
-
-	// 2. Get the list of accounts for the provider type
-	providerAccounts, providerOk := s.conf.Insights.Providers[serviceConfig.Provider]
-	if !providerOk {
-		return nil, nil, fmt.Errorf("provider '%s' (referenced by service '%s') is not defined in config", serviceConfig.Provider, serviceName)
-	}
-
-	// 3. Find the specific account within the list by its ID.
-	for _, acc := range providerAccounts {
-		if acc.ID == serviceConfig.ID {
-			found := acc
-			return &found, &serviceConfig, nil
-		}
-	}
-
-	return nil, nil, fmt.Errorf("account with id '%s' not found for provider '%s'", serviceConfig.ID, serviceConfig.Provider)
-}
-
 // ActivateTextTask performs a direct, stateless text-based task using the configured provider.
 func (s *InsightsService) ActivateTextTask(ctx context.Context, serviceName string, options []byte) (interface{}, error) {
 	// 1. Get the configuration for the requested service.
-	targetAccount, serviceConfig, err := s.getProviderAccountForService(serviceName)
+	targetAccount, serviceConfig, err := s.conf.Insights.GetProviderAccountForService(serviceName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get provider account for service '%s': %w", serviceName, err)
 	}
@@ -202,7 +175,7 @@ func (s *InsightsService) manageLocalAgent(payload *InsightsTaskPayload, lock *r
 		s.logger.Infof("no agent found for service '%s' in room %s, creating a new one", payload.ServiceName, payload.RoomName)
 
 		// Use the new helper method to get both configs
-		targetAccount, serviceConfig, err := s.getProviderAccountForService(payload.ServiceName)
+		targetAccount, serviceConfig, err := s.conf.Insights.GetProviderAccountForService(payload.ServiceName)
 		if err != nil {
 			s.lock.Unlock()
 			_ = lock.Unlock(s.ctx)
@@ -289,7 +262,7 @@ func (s *InsightsService) RemoveAgentForRoom(roomName string) {
 // GetSupportedLanguagesForService returns the list of supported languages for a single, specific service.
 func (s *InsightsService) GetSupportedLanguagesForService(serviceName string) ([]insights.LanguageInfo, error) {
 	// 1. Get the configuration for the requested service.
-	targetAccount, serviceConfig, err := s.getProviderAccountForService(serviceName)
+	targetAccount, serviceConfig, err := s.conf.Insights.GetProviderAccountForService(serviceName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get provider account for service '%s': %w", serviceName, err)
 	}

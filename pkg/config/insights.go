@@ -1,5 +1,7 @@
 package config
 
+import "fmt"
+
 // InsightsConfig is the main config block for the insights feature.
 type InsightsConfig struct {
 	// The key is the provider type ("azure", "google"), the value is a list of accounts.
@@ -26,4 +28,29 @@ type ServiceConfig struct {
 type CredentialsConfig struct {
 	APIKey string `yaml:"api_key"`
 	Region string `yaml:"region"`
+}
+
+// GetProviderAccountForService is a helper to find the correct provider account configuration for a given service.
+func (c *InsightsConfig) GetProviderAccountForService(serviceName string) (*ProviderAccount, *ServiceConfig, error) {
+	// 1. Get the service configuration
+	serviceConfig, configOk := c.Services[serviceName]
+	if !configOk {
+		return nil, nil, fmt.Errorf("service '%s' is not defined in config", serviceName)
+	}
+
+	// 2. Get the list of accounts for the provider type
+	providerAccounts, providerOk := c.Providers[serviceConfig.Provider]
+	if !providerOk {
+		return nil, nil, fmt.Errorf("provider '%s' (referenced by service '%s') is not defined in config", serviceConfig.Provider, serviceName)
+	}
+
+	// 3. Find the specific account within the list by its ID.
+	for _, acc := range providerAccounts {
+		if acc.ID == serviceConfig.ID {
+			found := acc
+			return &found, &serviceConfig, nil
+		}
+	}
+
+	return nil, nil, fmt.Errorf("account with id '%s' not found for provider '%s'", serviceConfig.ID, serviceConfig.Provider)
 }
