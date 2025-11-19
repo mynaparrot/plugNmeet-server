@@ -7,6 +7,12 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
+// TranscriptionOptions defines the structure for options passed to the transcription service.
+type TranscriptionOptions struct {
+	SpokenLang string   `json:"spokenLang"`
+	TransLangs []string `json:"transLangs"`
+}
+
 // TranscriptionResult is the standardized struct for a single piece of transcribed text.
 type TranscriptionResult struct {
 	Lang         string            `json:"lang"`
@@ -15,10 +21,18 @@ type TranscriptionResult struct {
 	Translations map[string]string `json:"translations"` // A map of target language -> translated text
 }
 
-// TranscriptionOptions defines the structure for options passed to the transcription service.
-type TranscriptionOptions struct {
-	SpokenLang string   `json:"spokenLang"`
-	TransLangs []string `json:"transLangs"`
+// TranslationTaskOptions defines the structure for options passed to the translation service.
+type TranslationTaskOptions struct {
+	Text        string   `json:"text"`
+	SourceLang  string   `json:"source_lang"`
+	TargetLangs []string `json:"target_langs"`
+}
+
+// TextTranslationResult is the standardized struct for a single text translation result.
+type TextTranslationResult struct {
+	Text         string            `json:"text"`
+	SourceLang   string            `json:"source_lang"`
+	Translations map[string]string `json:"translations"` // map of target language -> translated text
 }
 
 // TranscriptionStream defines a universal, bidirectional interface for a live transcription.
@@ -40,18 +54,24 @@ type TranscriptionStream interface {
 }
 
 // Provider is the master interface for all AI services.
-// It defines the contract for any provider we want to support.
 type Provider interface {
-	// CreateTranscription initializes a real-time transcription stream.
-	// if the provider supports translation as well, then we can use the same method
+	// CreateTranscription initializes a real-time transcription stream for speech-to-text.
 	CreateTranscription(ctx context.Context, roomID, userID string, options []byte) (TranscriptionStream, error)
 
-	// GetSupportedLanguages mostly for Transcription & Translation
+	// TranslateText performs stateless translation of a given text string to one or more languages.
+	// It returns a channel that will yield a single result and then close.
+	TranslateText(ctx context.Context, text, sourceLang string, targetLangs []string) (<-chan *TextTranslationResult, error)
+
+	// GetSupportedLanguages is primarily for Transcription & Translation services.
 	GetSupportedLanguages(serviceName string) []config.LanguageInfo
 }
 
 // Task defines the interface for any runnable, self-contained AI task.
 type Task interface {
-	// Run starts the task's processing pipeline.
-	Run(ctx context.Context, audioStream <-chan []byte, roomName, identity string, options []byte) error
+	// RunAudioStream starts the task's processing pipeline for a continuous audio stream.
+	RunAudioStream(ctx context.Context, audioStream <-chan []byte, roomName, identity string, options []byte) error
+
+	// RunStateless executes a single, stateless task (e.g., text translation).
+	// It returns a channel that will yield a single result and then close.
+	RunStateless(ctx context.Context, options []byte) (interface{}, error)
 }

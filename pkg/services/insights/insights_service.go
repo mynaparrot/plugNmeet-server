@@ -1,6 +1,7 @@
 package insights
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -8,11 +9,9 @@ import (
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 )
 
 const (
@@ -140,9 +139,27 @@ func (s *InsightsService) getProviderAccountForService(serviceName string) (*con
 	return nil, nil, fmt.Errorf("account with id '%s' not found for provider '%s'", serviceConfig.ID, serviceConfig.Provider)
 }
 
-// ActivateTask now only publishes a 'start' message.
-func (s *InsightsService) ActivateTask(serviceName, roomName, userId string, options []byte, roomE2EEKey *string) error {
-	s.logger.Infof("Publishing start task request for service '%s' in room '%s'", serviceName, roomName)
+// ActivateTextTask performs a direct, stateless text-based task using the configured provider.
+func (s *InsightsService) ActivateTextTask(ctx context.Context, serviceName string, options []byte) (interface{}, error) {
+	// 1. Get the configuration for the requested service.
+	targetAccount, serviceConfig, err := s.getProviderAccountForService(serviceName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get provider account for service '%s': %w", serviceName, err)
+	}
+
+	// 2. Create the appropriate task using the factory.
+	task, err := NewTask(serviceName, serviceConfig, &targetAccount.Credentials, s.logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create task for service '%s': %w", serviceName, err)
+	}
+
+	// 3. Run the stateless task and return the results channel.
+	return task.RunStateless(ctx, options)
+}
+
+// ActivateAgentTask publishes a 'start' message to activate a room agent for a long-running task.
+func (s *InsightsService) ActivateAgentTask(serviceName, roomName, userId string, options []byte, roomE2EEKey *string) error {
+	s.logger.Infof("Publishing start agent task request for service '%s' in room '%s'", serviceName, roomName)
 	payload := &InsightsTaskPayload{
 		Task:        TaskStart,
 		ServiceName: serviceName,
@@ -268,33 +285,22 @@ func (s *InsightsService) RemoveAgentForRoom(roomName string) {
 	}
 }
 
-// GetSupportedLanguagesForServices returns a map where the key is the service name
-// and the value is the list of supported languages for the provider configured for that service.
-func (s *InsightsService) GetSupportedLanguagesForServices() map[string][]config.LanguageInfo {
-	response := make(map[string][]config.LanguageInfo)
-	providerInstances := make(map[string]insights.Provider)
-
-	for serviceName := range s.conf.Insights.Services {
-		// Use the new helper method
-		targetAccount, serviceConfig, err := s.getProviderAccountForService(serviceName)
-		if err != nil {
-			s.logger.WithError(err).Warnf("could not get provider account for service %s", serviceName)
-			continue
-		}
-
-		providerKey := fmt.Sprintf("%s_%s", serviceConfig.Provider, serviceConfig.ID)
-		provider, ok := providerInstances[providerKey]
-		if !ok {
-			provider, err = NewProvider(serviceConfig.Provider, &targetAccount.Credentials, serviceConfig.Model, s.logger)
-			if err != nil {
-				s.logger.WithError(err).Warnf("could not create provider for service %s", serviceName)
-				continue
-			}
-			providerInstances[providerKey] = provider
-		}
-
-		response[serviceName] = provider.GetSupportedLanguages(serviceName)
+// GetSupportedLanguagesForService returns the list of supported languages for a single, specific service.
+func (s *InsightsService) GetSupportedLanguagesForService(serviceName string) ([]config.LanguageInfo, error) {
+	// 1. Get the configuration for the requested service.
+	targetAccount, serviceConfig, err := s.getProviderAccountForService(serviceName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get provider account for service '%s': %w", serviceName, err)
 	}
 
-	return response
+	// 2. Create a new provider instance on-the-fly.
+	provider, err := NewProvider(serviceConfig.Provider, &targetAccount.Credentials, serviceConfig.Model, s.logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create provider for service '%s': %w", serviceName, err)
+	}
+
+	// 3. Call the provider's GetSupportedLanguages method and return the results.
+	// Here, we assume the 'serviceName' from the config (e.g., "transcription", "translation")
+	// is the canonical name the provider understands.
+	return provider.GetSupportedLanguages(serviceName), nil
 }

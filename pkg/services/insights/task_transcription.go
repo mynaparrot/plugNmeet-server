@@ -2,6 +2,7 @@ package insights
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -23,8 +24,8 @@ func NewTranscriptionTask(conf *config.ServiceConfig, creds *config.CredentialsC
 	}, nil
 }
 
-// Run implements the insights.Task interface.
-func (t *TranscriptionTask) Run(ctx context.Context, audioStream <-chan []byte, roomID, identity string, options []byte) error {
+// RunAudioStream implements the insights.Task interface.
+func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-chan []byte, roomID, identity string, options []byte) error {
 	// Use the factory to create a provider instance, passing the credentials and model.
 	provider, err := NewProvider(t.conf.Provider, t.creds, t.conf.Model, t.logger)
 	if err != nil {
@@ -73,4 +74,9 @@ func (t *TranscriptionTask) Run(ctx context.Context, audioStream <-chan []byte, 
 	}()
 
 	return nil
+}
+
+// RunStateless is not implemented for TranslationTask as it's a stateless service.
+func (t *TranscriptionTask) RunStateless(ctx context.Context, options []byte) (interface{}, error) {
+	return nil, errors.New("run is not supported for a stateless translation task")
 }
