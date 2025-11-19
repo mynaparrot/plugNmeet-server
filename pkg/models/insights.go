@@ -48,17 +48,17 @@ func NewInsightsModel(ctx context.Context, conf *config.AppConfig, redisService 
 }
 
 // ActivateTextTask performs a direct, stateless text-based task using the configured provider.
-func (s *InsightsModel) ActivateTextTask(ctx context.Context, serviceName string, options []byte) (interface{}, error) {
+func (s *InsightsModel) ActivateTextTask(ctx context.Context, serviceName string, options []byte) error {
 	// 1. Get the configuration for the requested service.
 	targetAccount, serviceConfig, err := s.conf.Insights.GetProviderAccountForService(serviceName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get provider account for service '%s': %w", serviceName, err)
+		return fmt.Errorf("failed to get provider account for service '%s': %w", serviceName, err)
 	}
 
 	// 2. Create the appropriate task using the factory.
 	task, err := insightsservice.NewTask(serviceName, serviceConfig, targetAccount, s.logger)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create task for service '%s': %w", serviceName, err)
+		return fmt.Errorf("failed to create task for service '%s': %w", serviceName, err)
 	}
 
 	// 3. Run the stateless task and return the results channel.

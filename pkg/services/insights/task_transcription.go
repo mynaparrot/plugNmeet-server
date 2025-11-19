@@ -77,6 +77,6 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 }
 
 // RunStateless is not implemented for TranslationTask as it's a stateless service.
-func (t *TranscriptionTask) RunStateless(ctx context.Context, options []byte) (interface{}, error) {
-	return nil, errors.New("run is not supported for a stateless translation task")
+func (t *TranscriptionTask) RunStateless(ctx context.Context, options []byte) error {
+	return errors.New("run is not supported for a stateless translation task")
 }
