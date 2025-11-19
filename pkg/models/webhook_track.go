@@ -33,7 +33,7 @@ func (m *WebhookModel) trackPublished(event *livekit.WebhookEvent) {
 
 	meta, _ := m.natsService.UnmarshalRoomMetadata(rInfo.Metadata)
 	in := insights.NewInsightsService(m.ctx, m.app, log.Logger, m.rs)
-	err = in.ActivateTask("transcription_translation", event.Room.Name, event.Participant.Identity, nil, meta.RoomFeatures.EndToEndEncryptionFeatures.EncryptionKey)
+	err = in.ActivateTask("transcription", event.Room.Name, event.Participant.Identity, nil, meta.RoomFeatures.EndToEndEncryptionFeatures.EncryptionKey)
 	if err != nil {
 		log.Error(err)
 	}

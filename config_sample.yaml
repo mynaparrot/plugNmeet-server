@@ -212,7 +212,7 @@ insights:
       id: "eastus_standard" # The specific account ID to use from the list above
       model: "default"          # A model ID specific to this service
 
-    transcription_translation:
+    translation:
       provider: "azure"
       id: "westeu_premium"
       model: "default"

@@ -2,6 +2,7 @@ package insights
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
@@ -66,7 +67,7 @@ func (t *TranscriptionTask) Run(ctx context.Context, audioStream <-chan []byte, 
 					return
 				}
 				// TODO: Publish to NATS
-				t.logger.Infof("Result for %s: (Partial: %v) %s", identity, result.IsPartial, result.Text)
+				fmt.Println(fmt.Sprintf("%+v", result))
 			}
 		}
 	}()

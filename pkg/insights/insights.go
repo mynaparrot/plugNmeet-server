@@ -26,10 +26,10 @@ type TranscriptionOptions struct {
 // The user of this interface can Write() audio to the stream and will receive
 // results by reading from the Results() channel.
 type TranscriptionStream interface {
-	// Write accepts a chunk of audio data to be sent to the provider.
+	// Writer accepts a chunk of audio data to be sent to the provider.
 	io.Writer
 
-	// Close signals that the audio stream is finished and no more data will be sent.
+	// Closer signals that the audio stream is finished and no more data will be sent.
 	io.Closer
 
 	// SetProperty allows setting provider-specific properties on the fly.
@@ -43,10 +43,8 @@ type TranscriptionStream interface {
 // It defines the contract for any provider we want to support.
 type Provider interface {
 	// CreateTranscription initializes a real-time transcription stream.
+	// if the provider supports translation as well, then we can use the same method
 	CreateTranscription(ctx context.Context, roomID, userID string, options []byte) (TranscriptionStream, error)
-
-	// CreateTranscriptionWithTranslation translates a block of text.
-	CreateTranscriptionWithTranslation(ctx context.Context, roomID, userID string, options []byte) (TranscriptionStream, error)
 
 	// GetSupportedLanguages mostly for Transcription & Translation
 	GetSupportedLanguages(serviceName string) []config.LanguageInfo

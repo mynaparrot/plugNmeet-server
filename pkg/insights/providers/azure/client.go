@@ -43,27 +43,7 @@ func (p *AzureProvider) CreateTranscription(ctx context.Context, roomID, userID 
 		return nil, err
 	}
 
-	return transcribeClient.CreateTranscription(ctx, roomID, userID, opts.SpokenLang)
-}
-
-func (p *AzureProvider) CreateTranscriptionWithTranslation(ctx context.Context, roomID, userID string, options []byte) (insights.TranscriptionStream, error) {
-	opts := &insights.TranscriptionOptions{
-		SpokenLang: "en-US",
-		TransLangs: []string{"es-ES", "bn-IN"},
-	}
-	if len(options) > 0 {
-		if err := json.Unmarshal(options, opts); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal transcription options: %w", err)
-		}
-	}
-
-	// Use the stored credentials and model to create the client.
-	transcribeClient, err := newTranscribeClient(p.creds, p.model, p.logger)
-	if err != nil {
-		return nil, err
-	}
-
-	return transcribeClient.CreateTranscriptionWithTranslation(ctx, roomID, userID, opts.SpokenLang, opts.TransLangs)
+	return transcribeClient.CreateTranscription(ctx, roomID, userID, opts.SpokenLang, opts.TransLangs)
 }
 
 // GetSupportedLanguages implements the insights.Provider interface.

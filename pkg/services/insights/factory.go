@@ -27,8 +27,6 @@ func NewTask(serviceName string, conf *config.ServiceConfig, creds *config.Crede
 	switch serviceName {
 	case "transcription":
 		return NewTranscriptionTask(conf, creds, logger)
-	case "transcription_translation":
-		return NewTranscriptionWithTranslationTask(conf, creds, logger)
 	default:
 		return nil, fmt.Errorf("unknown insights service task: %s", serviceName)
 	}
