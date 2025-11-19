@@ -28,22 +28,22 @@ type activeParticipant struct {
 	identity   string
 }
 
-type roomAgent struct {
-	ctx          context.Context
+type RoomAgent struct {
+	Ctx          context.Context
 	cancel       context.CancelFunc
 	conf         *config.AppConfig
 	logger       *logrus.Entry
-	room         *lksdk.Room
+	Room         *lksdk.Room
 	lock         sync.RWMutex
 	participants map[string]*activeParticipant
 	pendingTasks map[string][]byte // Simplified: key is userId, value is the options []byte
 	task         insights.Task     // The single task this agent is responsible for.
-	serviceName  string
+	ServiceName  string
 	e2eeKey      *string
 }
 
-// newRoomAgent creates a single-purpose agent.
-func newRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, logger *logrus.Entry, roomName, serviceName string, e2eeKey *string) (*roomAgent, error) {
+// NewRoomAgent creates a single-purpose agent.
+func NewRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, logger *logrus.Entry, roomName, serviceName string, e2eeKey *string) (*RoomAgent, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	log := logger.WithFields(logrus.Fields{"room": roomName, "service": serviceName})
 
@@ -54,14 +54,14 @@ func newRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *co
 		return nil, fmt.Errorf("could not create task for service '%s': %w", serviceName, err)
 	}
 
-	agent := &roomAgent{
-		ctx:          ctx,
+	agent := &RoomAgent{
+		Ctx:          ctx,
 		cancel:       cancel,
 		conf:         conf,
 		logger:       log,
 		participants: make(map[string]*activeParticipant),
 		pendingTasks: make(map[string][]byte),
-		serviceName:  serviceName,
+		ServiceName:  serviceName,
 		task:         task,
 		e2eeKey:      e2eeKey,
 	}
@@ -92,12 +92,12 @@ func newRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *co
 		return nil, err
 	}
 
-	agent.room = room
+	agent.Room = room
 	return agent, nil
 }
 
 // ActivateTaskForUser queues a task for a user for this agent's specific service.
-func (a *roomAgent) ActivateTaskForUser(userId string, options []byte) error {
+func (a *RoomAgent) ActivateTaskForUser(userId string, options []byte) error {
 	a.lock.Lock()
 	if _, ok := a.pendingTasks[userId]; ok {
 		a.lock.Unlock()
@@ -110,7 +110,7 @@ func (a *roomAgent) ActivateTaskForUser(userId string, options []byte) error {
 	a.logger.Infof("queued task for participant %s", userId)
 
 	// Check if track already exists.
-	for _, p := range a.room.GetRemoteParticipants() {
+	for _, p := range a.Room.GetRemoteParticipants() {
 		if p.Identity() == userId {
 			for _, pub := range p.TrackPublications() {
 				if pub.Kind() == lksdk.TrackKindAudio {
@@ -123,7 +123,7 @@ func (a *roomAgent) ActivateTaskForUser(userId string, options []byte) error {
 }
 
 // EndTasksForUser stops the task for a specific user.
-func (a *roomAgent) EndTasksForUser(userId string) {
+func (a *RoomAgent) EndTasksForUser(userId string) {
 	a.lock.Lock()
 	delete(a.pendingTasks, userId)
 	participant, ok := a.participants[userId]
@@ -137,7 +137,7 @@ func (a *roomAgent) EndTasksForUser(userId string) {
 }
 
 // onTrackPublished checks if a task is pending for this user.
-func (a *roomAgent) onTrackPublished(publication *lksdk.RemoteTrackPublication, rp *lksdk.RemoteParticipant) {
+func (a *RoomAgent) onTrackPublished(publication *lksdk.RemoteTrackPublication, rp *lksdk.RemoteParticipant) {
 	if publication.Kind() != lksdk.TrackKindAudio {
 		return
 	}
@@ -151,7 +151,7 @@ func (a *roomAgent) onTrackPublished(publication *lksdk.RemoteTrackPublication, 
 }
 
 // onTrackSubscribed creates the media pipeline and runs the agent's single task.
-func (a *roomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lksdk.RemoteTrackPublication, rp *lksdk.RemoteParticipant) {
+func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lksdk.RemoteTrackPublication, rp *lksdk.RemoteParticipant) {
 	if track.Codec().MimeType != webrtc.MimeTypeOpus {
 		return
 	}
@@ -174,7 +174,7 @@ func (a *roomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 				a.logger.WithError(err).Error("failed to derive key")
 				return
 			}
-			decryptor, err = lkmedia.NewGCMDecryptor(key, a.room.SifTrailer())
+			decryptor, err = lkmedia.NewGCMDecryptor(key, a.Room.SifTrailer())
 			if err != nil {
 				a.logger.WithError(err).Error("failed to create decryptor")
 				return
@@ -182,7 +182,7 @@ func (a *roomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 		}
 	}
 
-	ctx, cancel := context.WithCancel(a.ctx)
+	ctx, cancel := context.WithCancel(a.Ctx)
 	transcoder, err := media.NewTranscoder(ctx, track, decryptor)
 	if err != nil {
 		a.logger.WithError(err).Error("failed to create transcoder")
@@ -198,9 +198,9 @@ func (a *roomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 
 	// Launch the agent's single, pre-created task.
 	go func() {
-		err := a.task.RunAudioStream(ctx, transcoder.AudioStream(), a.room.Name(), rp.Identity(), options)
+		err := a.task.RunAudioStream(ctx, transcoder.AudioStream(), a.Room.Name(), rp.Identity(), options)
 		if err != nil && !errors.Is(err, context.Canceled) {
-			a.logger.WithError(err).Errorf("insights task %s failed", a.serviceName)
+			a.logger.WithError(err).Errorf("insights task %s failed", a.ServiceName)
 		}
 	}()
 
@@ -209,21 +209,21 @@ func (a *roomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 }
 
 // onTrackUnsubscribed cleans up resources for a user.
-func (a *roomAgent) onTrackUnsubscribed(track *webrtc.TrackRemote, publication *lksdk.RemoteTrackPublication, rp *lksdk.RemoteParticipant) {
+func (a *RoomAgent) onTrackUnsubscribed(track *webrtc.TrackRemote, publication *lksdk.RemoteTrackPublication, rp *lksdk.RemoteParticipant) {
 	a.EndTasksForUser(rp.Identity())
 }
 
 // Shutdown gracefully closes the agent.
-func (a *roomAgent) Shutdown() {
+func (a *RoomAgent) Shutdown() {
 	a.logger.Infoln("shutting down room agent")
 	a.cancel()
-	if a.room != nil {
-		a.room.Disconnect()
+	if a.Room != nil {
+		a.Room.Disconnect()
 	}
 }
 
 // onDisconnected is a final cleanup step.
-func (a *roomAgent) onDisconnected() {
+func (a *RoomAgent) onDisconnected() {
 	a.logger.Infoln("agent disconnected from room")
 	a.cancel()
 }

@@ -12,7 +12,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
@@ -24,7 +23,6 @@ var serviceSet = wire.NewSet(
 	redisservice.New,
 	natsservice.New,
 	livekitservice.New,
-	insightsservice.New,
 )
 
 // build the dependency set for helpers
@@ -44,6 +42,7 @@ func provideBreakoutRoomModel(rm *models.RoomModel, natsService *natsservice.Nat
 var modelSet = wire.NewSet(
 	models.NewAnalyticsModel,
 	models.NewAuthModel,
+	models.NewInsightsModel,
 	models.NewBBBApiWrapperModel,
 	models.NewRoomDurationModel,
 	models.NewEtherpadModel,
@@ -87,6 +86,7 @@ var controllerSet = wire.NewSet(
 	controllers.NewWaitingRoomController,
 	controllers.NewWebhookController,
 	controllers.NewNatsController,
+	controllers.NewInsightsController,
 )
 
 // NewAppFactory is the injector function that wire will implement.

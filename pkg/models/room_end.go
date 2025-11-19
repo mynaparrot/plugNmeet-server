@@ -155,7 +155,12 @@ func (m *RoomModel) OnAfterRoomEnded(roomID, roomSID, metadata, roomStatus strin
 		log.WithError(err).Error("Error in speech service cleanup")
 	}
 
-	// Step 13: Perform the final NATS cleanup, deleting room-specific streams and KV stores.
+	// Step 13: End all the agent tasks for this room.
+	if err = m.insightsModel.EndAllRoomTasks(roomID); err != nil {
+		log.WithError(err).Error("Error in agent task cleanup")
+	}
+
+	// Step 14: Perform the final NATS cleanup, deleting room-specific streams and KV stores.
 	m.natsService.OnAfterSessionEndCleanup(roomID)
 	log.Info("Room has been cleaned properly")
 
