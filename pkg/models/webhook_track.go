@@ -3,7 +3,6 @@ package models
 import (
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 	"github.com/sirupsen/logrus"
 )
 
@@ -31,12 +30,12 @@ func (m *WebhookModel) trackPublished(event *livekit.WebhookEvent) {
 		return
 	}
 
-	meta, _ := m.natsService.UnmarshalRoomMetadata(rInfo.Metadata)
-	in := insights.NewInsightsService(m.ctx, m.app, log.Logger, m.rs)
+	/*meta, _ := m.natsService.UnmarshalRoomMetadata(rInfo.Metadata)
+	in := insightsservice.New(m.ctx, m.app, log.Logger, m.rs)
 	err = in.ActivateAgentTask("transcription", event.Room.Name, event.Participant.Identity, nil, meta.RoomFeatures.EndToEndEncryptionFeatures.EncryptionKey)
 	if err != nil {
 		log.Error(err)
-	}
+	}*/
 
 	event.Room.Sid = rInfo.RoomSid
 	event.Room.Metadata = rInfo.Metadata

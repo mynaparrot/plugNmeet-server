@@ -3,8 +3,6 @@ package insights
 import (
 	"context"
 	"io"
-
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
 // TranscriptionOptions defines the structure for options passed to the transcription service.
@@ -35,6 +33,13 @@ type TextTranslationResult struct {
 	Translations map[string]string `json:"translations"` // map of target language -> translated text
 }
 
+// LanguageInfo defines the structure for a single supported language.
+type LanguageInfo struct {
+	Code   string `json:"code"`
+	Name   string `json:"name"`
+	Locale string `json:"locale"`
+}
+
 // TranscriptionStream defines a universal, bidirectional interface for a live transcription.
 // It is the contract that all providers must fulfill to offer real-time STT.
 // The user of this interface can Write() audio to the stream and will receive
@@ -63,7 +68,7 @@ type Provider interface {
 	TranslateText(ctx context.Context, text, sourceLang string, targetLangs []string) (<-chan *TextTranslationResult, error)
 
 	// GetSupportedLanguages is primarily for Transcription & Translation services.
-	GetSupportedLanguages(serviceName string) []config.LanguageInfo
+	GetSupportedLanguages(serviceName string) []LanguageInfo
 }
 
 // Task defines the interface for any runnable, self-contained AI task.

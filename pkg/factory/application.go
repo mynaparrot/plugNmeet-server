@@ -7,6 +7,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 )
 
 // ApplicationControllers holds all the controllers.
@@ -35,10 +36,11 @@ type ApplicationControllers struct {
 
 // Application is the root struct holding all dependencies.
 type Application struct {
-	JanitorModel *models.JanitorModel
 	Controllers  *ApplicationControllers
 	AppConfig    *config.AppConfig
 	Ctx          context.Context
+	janitorModel *models.JanitorModel
+	insights     *insightsservice.InsightsService
 }
 
 func (a *Application) Boot() {
@@ -50,10 +52,12 @@ func (a *Application) Boot() {
 	// Wait for NatsController.BootUp to finish its service registration.
 	// This blocks until `wg.Done()` is called inside BootUp.
 	wg.Wait()
-	// start scheduler
-	go a.JanitorModel.StartJanitor()
+
+	go a.insights.SubscribeToTaskRequests()
+	go a.janitorModel.StartJanitor()
 }
 
 func (a *Application) Shutdown() {
-	a.JanitorModel.Shutdown()
+	a.insights.Shutdown()
+	a.janitorModel.Shutdown()
 }

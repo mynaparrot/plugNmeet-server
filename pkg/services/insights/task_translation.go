@@ -1,4 +1,4 @@
-package insights
+package insightsservice
 
 import (
 	"context"
@@ -13,16 +13,16 @@ import (
 
 // TranslationTask implements the insights.Task interface for stateless text translation.
 type TranslationTask struct {
-	conf   *config.ServiceConfig
-	creds  *config.CredentialsConfig
-	logger *logrus.Entry
+	service *config.ServiceConfig
+	account *config.ProviderAccount
+	logger  *logrus.Entry
 }
 
-func NewTranslationTask(conf *config.ServiceConfig, creds *config.CredentialsConfig, logger *logrus.Entry) (insights.Task, error) {
+func NewTranslationTask(serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, logger *logrus.Entry) (insights.Task, error) {
 	return &TranslationTask{
-		conf:   conf,
-		creds:  creds,
-		logger: logger,
+		service: serviceConfig,
+		account: providerAccount,
+		logger:  logger,
 	}, nil
 }
 
@@ -38,7 +38,7 @@ func (t *TranslationTask) RunStateless(ctx context.Context, options []byte) (int
 	}
 
 	// Use the factory to create a provider instance.
-	provider, err := NewProvider(t.conf.Provider, t.creds, t.conf.Model, t.logger)
+	provider, err := NewProvider(t.service.Provider, t.account, t.service, t.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -49,5 +49,5 @@ func (t *TranslationTask) RunStateless(ctx context.Context, options []byte) (int
 
 // RunAudioStream is not implemented for TranslationTask as it's a stateless service.
 func (t *TranslationTask) RunAudioStream(ctx context.Context, audioStream <-chan []byte, roomName, identity string, options []byte) error {
-	return errors.New("run is not supported for a stateless translation task")
+	return errors.New("RunAudioStream is not supported for a translation task")
 }

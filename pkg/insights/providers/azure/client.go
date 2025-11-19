@@ -17,17 +17,17 @@ import (
 
 // AzureProvider is the main struct that implements the insights.Provider interface.
 type AzureProvider struct {
-	creds  *config.CredentialsConfig // Store the specific credentials for this provider instance
-	model  string                    // Store the model from the service config
-	logger *logrus.Entry
+	account *config.ProviderAccount
+	service *config.ServiceConfig
+	logger  *logrus.Entry
 }
 
-// NewProvider now accepts the specific credentials for this provider instance.
-func NewProvider(creds *config.CredentialsConfig, model string, log *logrus.Entry) (*AzureProvider, error) {
+// NewProvider now accepts the full configuration structs.
+func NewProvider(providerAccount *config.ProviderAccount, serviceConfig *config.ServiceConfig, log *logrus.Entry) (*AzureProvider, error) {
 	return &AzureProvider{
-		creds:  creds,
-		model:  model,
-		logger: log,
+		account: providerAccount,
+		service: serviceConfig,
+		logger:  log,
 	}, nil
 }
 
@@ -42,8 +42,11 @@ func (p *AzureProvider) CreateTranscription(ctx context.Context, roomID, userID 
 		}
 	}
 
+	// Read model from service config options
+	model, _ := p.service.Options["model"].(string)
+
 	// Use the stored credentials and model to create the client.
-	transcribeClient, err := newTranscribeClient(p.creds, p.model, p.logger)
+	transcribeClient, err := newTranscribeClient(&p.account.Credentials, model, p.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -53,10 +56,10 @@ func (p *AzureProvider) CreateTranscription(ctx context.Context, roomID, userID 
 
 // TranslateText implements the insights.Provider interface for stateless text translation.
 func (p *AzureProvider) TranslateText(ctx context.Context, text, sourceLang string, targetLangs []string) (<-chan *insights.TextTranslationResult, error) {
-	if p.creds.APIKey == "" {
+	if p.account.Credentials.APIKey == "" {
 		return nil, fmt.Errorf("azure API key is not configured")
 	}
-	if p.creds.Region == "" {
+	if p.account.Credentials.Region == "" {
 		return nil, fmt.Errorf("azure region is not configured")
 	}
 	if len(targetLangs) == 0 {
@@ -84,8 +87,8 @@ func (p *AzureProvider) TranslateText(ctx context.Context, text, sourceLang stri
 			return
 		}
 
-		req.Header.Set("Ocp-Apim-Subscription-Key", p.creds.APIKey)
-		req.Header.Set("Ocp-Apim-Subscription-Region", p.creds.Region)
+		req.Header.Set("Ocp-Apim-Subscription-Key", p.account.Credentials.APIKey)
+		req.Header.Set("Ocp-Apim-Subscription-Region", p.account.Credentials.Region)
 		req.Header.Set("Content-Type", "application/json")
 
 		client := &http.Client{Timeout: 10 * time.Second}
@@ -142,10 +145,10 @@ func (p *AzureProvider) TranslateText(ctx context.Context, text, sourceLang stri
 
 // GetSupportedLanguages implements the insights.Provider interface.
 // It looks up the service name in the hard-coded map from languages.go.
-func (p *AzureProvider) GetSupportedLanguages(serviceName string) []config.LanguageInfo {
+func (p *AzureProvider) GetSupportedLanguages(serviceName string) []insights.LanguageInfo {
 	if langs, ok := supportedLanguages[serviceName]; ok {
 		return langs
 	}
 	// Return an empty slice if the service is not found for this provider.
-	return []config.LanguageInfo{}
+	return []insights.LanguageInfo{}
 }

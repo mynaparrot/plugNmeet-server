@@ -14,6 +14,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
+	"github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
@@ -29,9 +30,11 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	client := appConfig.RDS
 	redisService := redisservice.New(ctx, client, logger)
 	natsService := natsservice.New(ctx, appConfig, logger)
-	livekitService := livekitservice.New(ctx, appConfig, logger)
 	webhookNotifier := helpers.GetWebhookNotifier(ctx, appConfig, databaseService, natsService, logger)
 	analyticsModel := models.NewAnalyticsModel(ctx, appConfig, databaseService, redisService, natsService, webhookNotifier, logger)
+	analyticsController := controllers.NewAnalyticsController(analyticsModel)
+	authModel := models.NewAuthModel(appConfig, natsService, logger)
+	livekitService := livekitservice.New(ctx, appConfig, logger)
 	userModel := models.NewUserModel(appConfig, databaseService, redisService, livekitService, natsService, analyticsModel, logger)
 	recorderModel := models.NewRecorderModel(appConfig, databaseService, redisService, natsService, userModel, logger)
 	fileModel := models.NewFileModel(ctx, appConfig, databaseService, natsService, logger)
@@ -40,9 +43,6 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	pollModel := models.NewPollModel(appConfig, databaseService, redisService, natsService, analyticsModel, logger)
 	speechToTextModel := models.NewSpeechToTextModel(appConfig, databaseService, redisService, natsService, analyticsModel, webhookNotifier, logger)
 	roomModel := models.NewRoomModel(ctx, appConfig, databaseService, redisService, livekitService, natsService, webhookNotifier, userModel, recorderModel, fileModel, roomDurationModel, etherpadModel, pollModel, speechToTextModel, analyticsModel, logger)
-	janitorModel := models.NewJanitorModel(ctx, appConfig, databaseService, redisService, natsService, livekitService, roomModel, roomDurationModel, logger)
-	analyticsController := controllers.NewAnalyticsController(analyticsModel)
-	authModel := models.NewAuthModel(appConfig, natsService, logger)
 	authController := controllers.NewAuthController(appConfig, natsService, authModel, roomModel)
 	recordingModel := models.NewRecordingModel(appConfig, databaseService, redisService, natsService, analyticsModel, webhookNotifier, logger)
 	bbbApiWrapperModel := models.NewBBBApiWrapperModel(appConfig, databaseService, redisService, recordingModel, logger)
@@ -94,11 +94,14 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 		NatsController:         natsController,
 		HealthCheckController:  healthCheckController,
 	}
+	janitorModel := models.NewJanitorModel(ctx, appConfig, databaseService, redisService, natsService, livekitService, roomModel, roomDurationModel, logger)
+	insightsService := insightsservice.New(ctx, appConfig, logger, redisService)
 	application := &Application{
-		JanitorModel: janitorModel,
 		Controllers:  applicationControllers,
 		AppConfig:    appConfig,
 		Ctx:          ctx,
+		janitorModel: janitorModel,
+		insights:     insightsService,
 	}
 	return application, nil
 }
@@ -106,7 +109,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 // wire.go:
 
 // build the dependency set for services
-var serviceSet = wire.NewSet(dbservice.New, redisservice.New, natsservice.New, livekitservice.New)
+var serviceSet = wire.NewSet(dbservice.New, redisservice.New, natsservice.New, livekitservice.New, insightsservice.New)
 
 // build the dependency set for helpers
 var helperSet = wire.NewSet(helpers.GetWebhookNotifier)

@@ -197,22 +197,25 @@ insights:
         credentials:
           api_key: "YOUR_AZURE_KEY_1"
           region: "eastus"
-          # endpoint: "" # Optional: for custom models
+      #  options: {} # Generic options for this provider account, e.g., custom endpoints
 
       - id: "westeu_premium"
         credentials:
           api_key: "YOUR_AZURE_KEY_2"
           region: "westeurope"
+      #  options: {}
 
   # 2. Define the services that USE the providers.
-  # The key ("transcription", "transcription_translation") is the service name.
+  # The key ("transcription", "translation") is the service name.
   services:
     transcription:
       provider: "azure"         # The provider TYPE to use
       id: "eastus_standard" # The specific account ID to use from the list above
-      model: "default"          # A model ID specific to this service
+      options:
+        model: "default"          # A model ID specific to this service
 
     translation:
       provider: "azure"
       id: "westeu_premium"
-      model: "default"
+      options:
+        model: "default"

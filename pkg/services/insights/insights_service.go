@@ -1,4 +1,4 @@
-package insights
+package insightsservice
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
@@ -36,9 +37,10 @@ type InsightsService struct {
 	lock         sync.RWMutex
 	roomAgents   map[string]*roomAgent // Maps a unique key (roomName_serviceName) to a dedicated agent
 	redisService *redisservice.RedisService
+	sub          *nats.Subscription
 }
 
-func NewInsightsService(ctx context.Context, conf *config.AppConfig, logger *logrus.Logger, redisService *redisservice.RedisService) *InsightsService {
+func New(ctx context.Context, conf *config.AppConfig, logger *logrus.Logger, redisService *redisservice.RedisService) *InsightsService {
 	s := &InsightsService{
 		ctx:          ctx,
 		conf:         conf,
@@ -47,15 +49,12 @@ func NewInsightsService(ctx context.Context, conf *config.AppConfig, logger *log
 		redisService: redisService,
 	}
 
-	// Create the single subscription for this server instance.
-	go s.subscribeToTaskRequests()
-
 	return s
 }
 
-// subscribeToTaskRequests is the central handler for all incoming tasks.
-func (s *InsightsService) subscribeToTaskRequests() {
-	_, err := s.conf.NatsConn.Subscribe(InsightsNatsChannel, func(msg *nats.Msg) {
+// SubscribeToTaskRequests is the central handler for all incoming tasks.
+func (s *InsightsService) SubscribeToTaskRequests() {
+	sub, err := s.conf.NatsConn.Subscribe(InsightsNatsChannel, func(msg *nats.Msg) {
 		var payload InsightsTaskPayload
 		err := json.Unmarshal(msg.Data, &payload)
 		if err != nil {
@@ -67,8 +66,10 @@ func (s *InsightsService) subscribeToTaskRequests() {
 		s.handleIncomingTask(&payload)
 	})
 	if err != nil {
-		s.logger.WithError(err).Error("failed to subscribe to NATS for insights tasks")
+		s.logger.WithError(err).Fatalln("failed to subscribe to NATS for insights tasks")
 	}
+	s.logger.Infof("successfully connected with %s channel", sub.Subject)
+	s.sub = sub
 }
 
 // handleIncomingTask is the core logic that runs on every server.
@@ -148,7 +149,7 @@ func (s *InsightsService) ActivateTextTask(ctx context.Context, serviceName stri
 	}
 
 	// 2. Create the appropriate task using the factory.
-	task, err := NewTask(serviceName, serviceConfig, &targetAccount.Credentials, s.logger)
+	task, err := NewTask(serviceName, serviceConfig, targetAccount, s.logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create task for service '%s': %w", serviceName, err)
 	}
@@ -204,14 +205,14 @@ func (s *InsightsService) manageLocalAgent(payload *InsightsTaskPayload, lock *r
 		targetAccount, serviceConfig, err := s.getProviderAccountForService(payload.ServiceName)
 		if err != nil {
 			s.lock.Unlock()
-			lock.Unlock(s.ctx)
+			_ = lock.Unlock(s.ctx)
 			return err
 		}
 
-		agent, err = newRoomAgent(s.ctx, s.conf, s.logger, payload.RoomName, payload.ServiceName, serviceConfig, &targetAccount.Credentials, payload.RoomE2EEKey)
+		agent, err = newRoomAgent(s.ctx, s.conf, serviceConfig, targetAccount, s.logger, payload.RoomName, payload.ServiceName, payload.RoomE2EEKey)
 		if err != nil {
 			s.lock.Unlock()
-			lock.Unlock(s.ctx)
+			_ = lock.Unlock(s.ctx)
 			return fmt.Errorf("failed to create insights agent: %w", err)
 		}
 		s.roomAgents[key] = agent
@@ -241,7 +242,7 @@ func (s *InsightsService) superviseAgent(agent *roomAgent, lock *redisservice.Lo
 			}
 		case <-agent.ctx.Done():
 			s.logger.Infof("Agent for '%s' has shut down, releasing leadership.", agent.serviceName)
-			lock.Unlock(s.ctx)
+			_ = lock.Unlock(s.ctx)
 			s.shutdownAndRemoveAgent(key)
 			return
 		}
@@ -286,7 +287,7 @@ func (s *InsightsService) RemoveAgentForRoom(roomName string) {
 }
 
 // GetSupportedLanguagesForService returns the list of supported languages for a single, specific service.
-func (s *InsightsService) GetSupportedLanguagesForService(serviceName string) ([]config.LanguageInfo, error) {
+func (s *InsightsService) GetSupportedLanguagesForService(serviceName string) ([]insights.LanguageInfo, error) {
 	// 1. Get the configuration for the requested service.
 	targetAccount, serviceConfig, err := s.getProviderAccountForService(serviceName)
 	if err != nil {
@@ -294,7 +295,7 @@ func (s *InsightsService) GetSupportedLanguagesForService(serviceName string) ([
 	}
 
 	// 2. Create a new provider instance on-the-fly.
-	provider, err := NewProvider(serviceConfig.Provider, &targetAccount.Credentials, serviceConfig.Model, s.logger)
+	provider, err := NewProvider(serviceConfig.Provider, targetAccount, serviceConfig, s.logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create provider for service '%s': %w", serviceName, err)
 	}
@@ -303,4 +304,27 @@ func (s *InsightsService) GetSupportedLanguagesForService(serviceName string) ([
 	// Here, we assume the 'serviceName' from the config (e.g., "transcription", "translation")
 	// is the canonical name the provider understands.
 	return provider.GetSupportedLanguages(serviceName), nil
+}
+
+func (s *InsightsService) Shutdown() {
+	if s.sub != nil {
+		if err := s.sub.Unsubscribe(); err != nil {
+			s.logger.WithError(err).Errorln("failed to unsubscribe from NATS")
+		}
+	}
+
+	s.lock.RLock()
+	// Find all agents that belong to this room without holding a write lock for the whole loop.
+	toShutdown := make([]string, 0)
+	for key := range s.roomAgents {
+		toShutdown = append(toShutdown, key)
+	}
+	s.lock.RUnlock()
+
+	// Now, call the safe shutdown method for each.
+	for _, key := range toShutdown {
+		s.shutdownAndRemoveAgent(key)
+	}
+
+	s.logger.Infoln("Insights Service shutdown complete.")
 }

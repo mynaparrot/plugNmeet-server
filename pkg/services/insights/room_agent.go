@@ -1,4 +1,4 @@
-package insights
+package insightsservice
 
 import (
 	"context"
@@ -43,12 +43,12 @@ type roomAgent struct {
 }
 
 // newRoomAgent creates a single-purpose agent.
-func newRoomAgent(ctx context.Context, conf *config.AppConfig, logger *logrus.Entry, roomName, serviceName string, serviceConfig *config.ServiceConfig, creds *config.CredentialsConfig, e2eeKey *string) (*roomAgent, error) {
+func newRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, logger *logrus.Entry, roomName, serviceName string, e2eeKey *string) (*roomAgent, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	log := logger.WithFields(logrus.Fields{"room": roomName, "service": serviceName})
 
 	// Create a single task for this agent's one and only service.
-	task, err := NewTask(serviceName, serviceConfig, creds, log)
+	task, err := NewTask(serviceName, serviceConfig, providerAccount, log)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("could not create task for service '%s': %w", serviceName, err)
@@ -198,7 +198,7 @@ func (a *roomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 
 	// Launch the agent's single, pre-created task.
 	go func() {
-		err := a.task.Run(ctx, transcoder.AudioStream(), a.room.Name(), rp.Identity(), options)
+		err := a.task.RunAudioStream(ctx, transcoder.AudioStream(), a.room.Name(), rp.Identity(), options)
 		if err != nil && !errors.Is(err, context.Canceled) {
 			a.logger.WithError(err).Errorf("insights task %s failed", a.serviceName)
 		}

@@ -1,4 +1,4 @@
-package insights
+package insightsservice
 
 import (
 	"context"
@@ -11,23 +11,23 @@ import (
 )
 
 type TranscriptionTask struct {
-	conf   *config.ServiceConfig
-	creds  *config.CredentialsConfig // Store credentials
-	logger *logrus.Entry
+	service *config.ServiceConfig
+	account *config.ProviderAccount
+	logger  *logrus.Entry
 }
 
-func NewTranscriptionTask(conf *config.ServiceConfig, creds *config.CredentialsConfig, logger *logrus.Entry) (insights.Task, error) {
+func NewTranscriptionTask(serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, logger *logrus.Entry) (insights.Task, error) {
 	return &TranscriptionTask{
-		conf:   conf,
-		creds:  creds,
-		logger: logger,
+		service: serviceConfig,
+		account: providerAccount,
+		logger:  logger,
 	}, nil
 }
 
 // RunAudioStream implements the insights.Task interface.
 func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-chan []byte, roomID, identity string, options []byte) error {
-	// Use the factory to create a provider instance, passing the credentials and model.
-	provider, err := NewProvider(t.conf.Provider, t.creds, t.conf.Model, t.logger)
+	// Use the factory to create a provider instance.
+	provider, err := NewProvider(t.service.Provider, t.account, t.service, t.logger)
 	if err != nil {
 		return err
 	}

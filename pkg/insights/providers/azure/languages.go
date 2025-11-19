@@ -1,10 +1,12 @@
 package azure
 
-import "github.com/mynaparrot/plugnmeet-server/pkg/config"
+import (
+	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
+)
 
 // supportedLanguages holds the static list of languages for Azure services.
 // The key is the service name (e.g., "transcription", "translation").
-var supportedLanguages = map[string][]config.LanguageInfo{
+var supportedLanguages = map[string][]insights.LanguageInfo{
 	"transcription": {
 		{Code: "af-ZA", Name: "Afrikaans", Locale: "af"},
 		{Code: "am-ET", Name: "Amharic", Locale: "am"},

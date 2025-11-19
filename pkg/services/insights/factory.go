@@ -1,4 +1,4 @@
-package insights
+package insightsservice
 
 import (
 	"fmt"
@@ -10,25 +10,25 @@ import (
 )
 
 // NewProvider is a factory function that creates and returns the configured AI provider.
-func NewProvider(providerType string, creds *config.CredentialsConfig, model string, logger *logrus.Entry) (insights.Provider, error) {
+func NewProvider(providerType string, providerAccount *config.ProviderAccount, serviceConfig *config.ServiceConfig, logger *logrus.Entry) (insights.Provider, error) {
 	log := logger.WithFields(logrus.Fields{
 		"provider": providerType,
 	})
 	switch providerType {
 	case "azure":
-		return azure.NewProvider(creds, model, log)
+		return azure.NewProvider(providerAccount, serviceConfig, log)
 	default:
 		return nil, fmt.Errorf("unknown AI provider type: %s", providerType)
 	}
 }
 
 // NewTask is a factory that returns the correct Task implementation.
-func NewTask(serviceName string, conf *config.ServiceConfig, creds *config.CredentialsConfig, logger *logrus.Entry) (insights.Task, error) {
+func NewTask(serviceName string, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, logger *logrus.Entry) (insights.Task, error) {
 	switch serviceName {
 	case "transcription":
-		return NewTranscriptionTask(conf, creds, logger)
+		return NewTranscriptionTask(serviceConfig, providerAccount, logger)
 	case "translation":
-		return NewTranslationTask(conf, creds, logger)
+		return NewTranslationTask(serviceConfig, providerAccount, logger)
 	default:
 		return nil, fmt.Errorf("unknown insights service task: %s", serviceName)
 	}
