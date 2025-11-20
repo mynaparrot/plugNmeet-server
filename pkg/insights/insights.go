@@ -3,7 +3,28 @@ package insights
 import (
 	"context"
 	"io"
+
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 )
+
+// EventType defines the type of transcription lifecycle event.
+type EventType string
+
+const (
+	EventTypeSessionStarted EventType = "session_started"
+	EventTypeSessionStopped EventType = "session_stopped"
+	EventTypeError          EventType = "error"
+
+	EventTypePartialResult EventType = "partial_result"
+	EventTypeFinalResult   EventType = "final_result"
+)
+
+// TranscriptionEvent is the universal message sent over the results channel.
+type TranscriptionEvent struct {
+	Type   EventType                              `json:"type"`
+	Error  string                                 `json:"error,omitempty"`
+	Result *plugnmeet.InsightsTranscriptionResult `json:"result,omitempty"`
+}
 
 // ServiceType defines the canonical name for an insights service.
 type ServiceType string
@@ -19,33 +40,11 @@ type TranscriptionOptions struct {
 	TransLangs []string `json:"transLangs"`
 }
 
-// TranscriptionResult is the standardized struct for a single piece of transcribed text.
-type TranscriptionResult struct {
-	Lang         string            `json:"lang"`
-	Text         string            `json:"text"`
-	IsPartial    bool              `json:"is_partial"`
-	Translations map[string]string `json:"translations"` // A map of target language -> translated text
-}
-
 // TranslationTaskOptions defines the structure for options passed to the translation service.
 type TranslationTaskOptions struct {
 	Text        string   `json:"text"`
 	SourceLang  string   `json:"source_lang"`
 	TargetLangs []string `json:"target_langs"`
-}
-
-// TextTranslationResult is the standardized struct for a single text translation result.
-type TextTranslationResult struct {
-	Text         string            `json:"text"`
-	SourceLang   string            `json:"source_lang"`
-	Translations map[string]string `json:"translations"` // map of target language -> translated text
-}
-
-// LanguageInfo defines the structure for a single supported language.
-type LanguageInfo struct {
-	Code   string `json:"code"`
-	Name   string `json:"name"`
-	Locale string `json:"locale"`
 }
 
 // TranscriptionStream defines a universal, bidirectional interface for a live transcription.
@@ -62,8 +61,8 @@ type TranscriptionStream interface {
 	// SetProperty allows setting provider-specific properties on the fly.
 	SetProperty(key string, value string) error
 
-	// Results returns a read-only channel where the transcription results will be sent.
-	Results() <-chan *TranscriptionResult
+	// Results now returns a channel of generic transcription events.
+	Results() <-chan *TranscriptionEvent
 }
 
 // Provider is the master interface for all AI services.
@@ -73,10 +72,10 @@ type Provider interface {
 
 	// TranslateText performs stateless translation of a given text string to one or more languages.
 	// It returns a channel that will yield a single result and then close.
-	TranslateText(ctx context.Context, text, sourceLang string, targetLangs []string) (*TextTranslationResult, error)
+	TranslateText(ctx context.Context, text, sourceLang string, targetLangs []string) (*plugnmeet.InsightsTextTranslationResult, error)
 
 	// GetSupportedLanguages is primarily for Transcription & Translation services.
-	GetSupportedLanguages(serviceName string) []LanguageInfo
+	GetSupportedLanguages(serviceName string) []plugnmeet.InsightsSupportedLangInfo
 }
 
 // Task defines the interface for any runnable, self-contained AI task.

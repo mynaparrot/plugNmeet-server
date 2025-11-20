@@ -12,7 +12,7 @@ import (
 type azureTranscribeStream struct {
 	pushStream *audio.PushAudioInputStream
 	cancel     context.CancelFunc
-	results    chan *insights.TranscriptionResult
+	results    chan *insights.TranscriptionEvent
 }
 
 // Write implements the io.Writer interface by calling the underlying push stream's Write method.
@@ -39,6 +39,6 @@ func (s *azureTranscribeStream) SetProperty(key string, value string) error {
 }
 
 // Results implements the TranscriptionStream interface.
-func (s *azureTranscribeStream) Results() <-chan *insights.TranscriptionResult {
+func (s *azureTranscribeStream) Results() <-chan *insights.TranscriptionEvent {
 	return s.results
 }

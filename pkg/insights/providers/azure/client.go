@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/sirupsen/logrus"
@@ -55,7 +56,7 @@ func (p *AzureProvider) CreateTranscription(ctx context.Context, roomID, userID 
 }
 
 // TranslateText implements the insights.Provider interface for stateless text translation.
-func (p *AzureProvider) TranslateText(ctx context.Context, text, sourceLang string, targetLangs []string) (*insights.TextTranslationResult, error) {
+func (p *AzureProvider) TranslateText(ctx context.Context, text, sourceLang string, targetLangs []string) (*plugnmeet.InsightsTextTranslationResult, error) {
 	if p.account.Credentials.APIKey == "" {
 		return nil, fmt.Errorf("azure API key is not configured")
 	}
@@ -116,8 +117,8 @@ func (p *AzureProvider) TranslateText(ctx context.Context, text, sourceLang stri
 		translations[trans.To] = trans.Text
 	}
 
-	result := &insights.TextTranslationResult{
-		Text:         text,
+	result := &plugnmeet.InsightsTextTranslationResult{
+		OriginalText: text,
 		SourceLang:   sourceLang,
 		Translations: translations,
 	}
@@ -127,10 +128,10 @@ func (p *AzureProvider) TranslateText(ctx context.Context, text, sourceLang stri
 
 // GetSupportedLanguages implements the insights.Provider interface.
 // It looks up the service name in the hard-coded map from languages.go.
-func (p *AzureProvider) GetSupportedLanguages(serviceName string) []insights.LanguageInfo {
+func (p *AzureProvider) GetSupportedLanguages(serviceName string) []plugnmeet.InsightsSupportedLangInfo {
 	if langs, ok := supportedLanguages[serviceName]; ok {
 		return langs
 	}
 	// Return an empty slice if the service is not found for this provider.
-	return []insights.LanguageInfo{}
+	return []plugnmeet.InsightsSupportedLangInfo{}
 }

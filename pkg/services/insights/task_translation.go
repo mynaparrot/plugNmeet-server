@@ -56,7 +56,7 @@ func (t *TranslationTask) RunStateless(ctx context.Context, options []byte) (int
 	// Success! We have the result directly.
 	// The goroutine is no longer needed.
 	fmt.Println("\n--- Translation Successful ---")
-	fmt.Printf("Original Text: '%s' (from %s)\n", result.Text, result.SourceLang)
+	fmt.Printf("Original Text: '%s' (from %s)\n", result.OriginalText, result.SourceLang)
 	fmt.Println("Translations:")
 	for lang, translatedText := range result.Translations {
 		fmt.Printf("  - %s: '%s'\n", lang, translatedText)

@@ -7,6 +7,7 @@ import (
 
 	"github.com/Microsoft/cognitive-services-speech-sdk-go/audio"
 	"github.com/Microsoft/cognitive-services-speech-sdk-go/speech"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/sirupsen/logrus"
@@ -77,7 +78,7 @@ func (c *transcribeClient) CreateTranscription(mainCtx context.Context, roomId, 
 		return nil, err
 	}
 
-	resultsChan := make(chan *insights.TranscriptionResult)
+	resultsChan := make(chan *insights.TranscriptionEvent)
 	var closeOnce sync.Once
 	safeClose := func() {
 		closeOnce.Do(func() {
@@ -87,54 +88,60 @@ func (c *transcribeClient) CreateTranscription(mainCtx context.Context, roomId, 
 
 	recognizer.SessionStarted(func(e speech.SessionEventArgs) {
 		log.Infoln("azure transcription started")
+		resultsChan <- &insights.TranscriptionEvent{Type: insights.EventTypeSessionStarted}
 	})
 	recognizer.SessionStopped(func(e speech.SessionEventArgs) {
-		safeClose()
 		log.Infoln("azure transcription stopped")
+		resultsChan <- &insights.TranscriptionEvent{Type: insights.EventTypeSessionStopped}
+		safeClose()
 	})
 
 	recognizer.Recognizing(func(e speech.TranslationRecognitionEventArgs) {
-		result := &insights.TranscriptionResult{
+		result := &plugnmeet.InsightsTranscriptionResult{
 			Lang:         spokenLang,
 			Text:         e.Result.Text,
 			IsPartial:    true,
-			Translations: map[string]string{},
+			Translations: make(map[string]string),
 		}
-
 		for lang, text := range e.Result.GetTranslations() {
 			result.Translations[lang] = text
 		}
-		resultsChan <- result
+		resultsChan <- &insights.TranscriptionEvent{
+			Type:   insights.EventTypePartialResult,
+			Result: result,
+		}
 	})
 
 	recognizer.Recognized(func(e speech.TranslationRecognitionEventArgs) {
-		result := &insights.TranscriptionResult{
+		result := &plugnmeet.InsightsTranscriptionResult{
 			Lang:         spokenLang,
 			Text:         e.Result.Text,
 			IsPartial:    false,
-			Translations: map[string]string{},
+			Translations: make(map[string]string),
 		}
-
 		for lang, text := range e.Result.GetTranslations() {
 			result.Translations[lang] = text
 		}
-		resultsChan <- result
+		resultsChan <- &insights.TranscriptionEvent{
+			Type:   insights.EventTypeFinalResult,
+			Result: result,
+		}
 	})
 
 	recognizer.Canceled(func(e speech.TranslationRecognitionCanceledEventArgs) {
 		log.Infof("Azure transcription with translation canceled: %v\n", e.ErrorDetails)
+		resultsChan <- &insights.TranscriptionEvent{
+			Type:  insights.EventTypeError,
+			Error: e.ErrorDetails,
+		}
 		safeClose()
 	})
 
-	go func() {
-		// StartContinuousRecognitionAsync returns a channel that provides the result of the async operation.
-		// We must wait for and check the error from this channel.
-		err := <-recognizer.StartContinuousRecognitionAsync()
-		if err != nil {
-			log.WithError(err).Errorln("Error starting Azure recognition")
-			safeClose()
-		}
-	}()
+	err = <-recognizer.StartContinuousRecognitionAsync()
+	if err != nil {
+		log.WithError(err).Errorln("Error starting Azure recognition")
+		safeClose()
+	}
 
 	ctx, cancel := context.WithCancel(mainCtx)
 	go func() {

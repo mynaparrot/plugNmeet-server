@@ -8,12 +8,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/pion/webrtc/v4"
 	"github.com/sirupsen/logrus"
 
-	"github.com/livekit/protocol/livekit"
+	lkLogger "github.com/livekit/protocol/logger"
 	lksdk "github.com/livekit/server-sdk-go/v2"
 	lkmedia "github.com/livekit/server-sdk-go/v2/pkg/media"
 
@@ -46,7 +47,12 @@ type RoomAgent struct {
 // NewRoomAgent creates a single-purpose agent.
 func NewRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, logger *logrus.Entry, roomName, serviceName string, e2eeKey *string) (*RoomAgent, error) {
 	ctx, cancel := context.WithCancel(ctx)
-	log := logger.WithFields(logrus.Fields{"room": roomName, "service": serviceName})
+	log := logger.WithFields(logrus.Fields{
+		"room":       roomName,
+		"service":    serviceName,
+		"providerId": providerAccount.ID,
+		"serviceId":  serviceConfig.ID,
+	})
 
 	// Create a single task for this agent's one and only service.
 	task, err := NewTask(serviceName, serviceConfig, providerAccount, log)
@@ -87,6 +93,7 @@ func NewRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *co
 		},
 		OnDisconnected: agent.onDisconnected,
 	})
+	room.SetLogger(lkLogger.GetLogger())
 
 	err = room.JoinWithToken(agent.conf.LivekitInfo.Host, token, lksdk.WithAutoSubscribe(false))
 	if err != nil {
@@ -277,7 +284,7 @@ func (a *RoomAgent) onTrackUnsubscribed(track *webrtc.TrackRemote, publication *
 
 // Shutdown gracefully closes the agent.
 func (a *RoomAgent) Shutdown() {
-	a.logger.Infoln("shutting down room agent")
+	a.logger.Infoln("received shutdown signal, disconnecting room agent")
 	a.cancel()
 	if a.Room != nil {
 		a.Room.Disconnect()

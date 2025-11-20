@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
 )
@@ -37,17 +38,19 @@ type InsightsModel struct {
 	conf         *config.AppConfig
 	logger       *logrus.Entry
 	lock         sync.RWMutex
-	roomAgents   map[string]*insightsservice.RoomAgent // Maps a unique key (roomName_serviceName) to a dedicated agent
+	roomAgents   map[string]*insightsservice.RoomAgent // Maps a unique key (roomName@serviceName) to a dedicated agent
 	redisService *redisservice.RedisService
+	natsService  *natsservice.NatsService
 }
 
-func NewInsightsModel(ctx context.Context, conf *config.AppConfig, redisService *redisservice.RedisService, logger *logrus.Logger) *InsightsModel {
+func NewInsightsModel(ctx context.Context, conf *config.AppConfig, redisService *redisservice.RedisService, natsService *natsservice.NatsService, logger *logrus.Logger) *InsightsModel {
 	return &InsightsModel{
 		ctx:          ctx,
 		conf:         conf,
-		logger:       logger.WithField("model", "insights"),
-		roomAgents:   make(map[string]*insightsservice.RoomAgent),
 		redisService: redisService,
+		natsService:  natsService,
+		roomAgents:   make(map[string]*insightsservice.RoomAgent),
+		logger:       logger.WithField("model", "insights"),
 	}
 }
 
@@ -93,7 +96,7 @@ func (s *InsightsModel) ActivateAgentTaskForUser(serviceName, roomName, userId s
 
 // EndAgentTaskForUser now only publishes an 'end' message.
 func (s *InsightsModel) EndAgentTaskForUser(serviceName, roomName, userId string) error {
-	s.logger.Infof("Publishing end task request for service '%s' in room '%s'", serviceName, roomName)
+	s.logger.Infof("Publishing end task request for service '%s' in room '%s' for user '%s'", serviceName, roomName, userId)
 	payload := &InsightsTaskPayload{
 		Task:        TaskEnd,
 		ServiceName: serviceName,
@@ -110,7 +113,9 @@ func (s *InsightsModel) EndAgentTaskForUser(serviceName, roomName, userId string
 func (s *InsightsModel) EndRoomAgentTaskByServiceName(serviceName, roomName string) error {
 	s.logger.Infof("Publishing end task request for service '%s' in room '%s'", serviceName, roomName)
 	payload := &InsightsTaskPayload{
-		Task: TaskEndRoomAgentByServiceName,
+		Task:        TaskEndRoomAgentByServiceName,
+		ServiceName: serviceName,
+		RoomName:    roomName,
 	}
 	p, err := json.Marshal(payload)
 	if err != nil {
@@ -151,7 +156,7 @@ func (s *InsightsModel) ActivateTextTask(ctx context.Context, serviceName string
 }
 
 // GetSupportedLanguagesForService returns the list of supported languages for a single, specific service.
-func (s *InsightsModel) GetSupportedLanguagesForService(serviceName string) ([]insights.LanguageInfo, error) {
+func (s *InsightsModel) GetSupportedLanguagesForService(serviceName string) ([]plugnmeet.InsightsSupportedLangInfo, error) {
 	// 1. Get the configuration for the requested service.
 	targetAccount, serviceConfig, err := s.conf.Insights.GetProviderAccountForService(serviceName)
 	if err != nil {

@@ -58,17 +58,25 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 
 	// Goroutine to process results
 	go func() {
-		resultsChan := stream.Results()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case result, ok := <-resultsChan:
-				if !ok {
-					return
-				}
-				// TODO: Publish to NATS
-				fmt.Println(fmt.Sprintf("%+v", result))
+		defer func() {
+			fmt.Println("closed session")
+		}()
+
+		// The loop will automatically break when the channel is closed.
+		for event := range stream.Results() {
+			switch event.Type {
+			case insights.EventTypePartialResult, insights.EventTypeFinalResult:
+				fmt.Printf("Result Received: %+v\n", event.Result)
+
+			case insights.EventTypeSessionStarted:
+				fmt.Println("Event: Session Started")
+
+			case insights.EventTypeSessionStopped:
+				// This event is now guaranteed to be received before the channel closes.
+				fmt.Println("Event: Session Stopped")
+
+			case insights.EventTypeError:
+				t.logger.Errorln("insights provider error: ", event.Error)
 			}
 		}
 	}()

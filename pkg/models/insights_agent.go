@@ -6,13 +6,27 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 )
 
-// getAgentKey creates a unique identifier for an agent.
+// getAgentKey creates a unique identifier for an agent using the new robust format.
+// NEW FORMAT: {roomId}@{serviceName}
 func getAgentKey(roomName, serviceName string) string {
-	return fmt.Sprintf("insights:%s_%s", roomName, serviceName)
+	return fmt.Sprintf("%s@%s", roomName, serviceName)
+}
+
+// parseAgentKey safely extracts the roomId and serviceName from the new key format.
+func parseAgentKey(key string) (roomId, serviceName string, err error) {
+	parts := strings.SplitN(key, "@", 2)
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid agent key format: expected 'roomId@serviceName', got '%s'", key)
+	}
+	if parts[0] == "" || parts[1] == "" {
+		return "", "", fmt.Errorf("invalid agent key format: empty roomId or serviceName in key '%s'", key)
+	}
+	return parts[0], parts[1], nil
 }
 
 // HandleIncomingAgentTask is the core logic that runs on every server.
@@ -114,6 +128,7 @@ func (s *InsightsModel) manageLocalAgent(payload *InsightsTaskPayload, lock *red
 	s.roomAgents[key] = agent
 
 	go s.superviseAgent(agent, lock)
+	s.updateRoomMetadata(payload.RoomName, payload.ServiceName, true)
 	return nil
 }
 
@@ -166,10 +181,18 @@ func (s *InsightsModel) shutdownAndRemoveAgent(key string) {
 	if ok {
 		agent.Shutdown()
 		s.logger.Infof("removed and shut down agent for key %s", key)
+
+		roomId, serviceName, err := parseAgentKey(key)
+		if err != nil {
+			s.logger.WithError(err).Error("could not parse agent key during shutdown")
+			return
+		}
+		s.updateRoomMetadata(roomId, serviceName, false)
 	}
 }
 
 func (s *InsightsModel) removeAgentForRoom(serviceName, roomName string) {
+	s.logger.Infof("removing agent for service '%s' in room '%s'", serviceName, roomName)
 	key := getAgentKey(roomName, serviceName)
 	s.shutdownAndRemoveAgent(key)
 }
@@ -180,7 +203,7 @@ func (s *InsightsModel) removeAgentsForRoom(roomName string) {
 	// Find all agents that belong to this room without holding a write lock for the whole loop.
 	keysToDelete := make([]string, 0)
 	for key := range s.roomAgents {
-		if strings.HasPrefix(key, fmt.Sprintf("insights:%s_", roomName)) {
+		if strings.HasPrefix(key, roomName+"@") {
 			keysToDelete = append(keysToDelete, key)
 		}
 	}
@@ -193,5 +216,36 @@ func (s *InsightsModel) removeAgentsForRoom(roomName string) {
 
 	if len(keysToDelete) > 0 {
 		s.logger.Infof("removed %d insights agents for room %s", len(keysToDelete), roomName)
+	}
+}
+
+func (s *InsightsModel) updateRoomMetadata(roomId, serviceName string, enabled bool) {
+	metadataStruct, err := s.natsService.GetRoomMetadataStruct(roomId)
+	if err != nil {
+		s.logger.WithError(err).Error("failed to get room metadata")
+		return
+	}
+	needToUpdate := false
+
+	switch insights.ServiceType(serviceName) {
+	case insights.ServiceTypeTranscription:
+		if metadataStruct.RoomFeatures.InsightsFeatures != nil {
+			metadataStruct.RoomFeatures.InsightsFeatures.TranscriptionFeatures.IsEnabled = enabled
+			needToUpdate = true
+		}
+	case insights.ServiceTypeTranslation:
+		if metadataStruct.RoomFeatures.InsightsFeatures != nil {
+			metadataStruct.RoomFeatures.InsightsFeatures.ChatTranslationFeatures.IsEnabled = enabled
+			needToUpdate = true
+		}
+	default:
+		s.logger.Errorf("unknown insights service task: %s", serviceName)
+	}
+
+	if needToUpdate {
+		err := s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadataStruct)
+		if err != nil {
+			s.logger.WithError(err).Error("failed to update room metadata")
+		}
 	}
 }

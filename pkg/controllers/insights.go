@@ -63,8 +63,13 @@ func (i *InsightsController) HandleTranscriptionConfigure(c *fiber.Ctx) error {
 	if i.app.Insights == nil {
 		return utils.SendCommonProtobufResponse(c, false, "insights feature wasn't configured")
 	}
+	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
+
+	if !isAdmin.(bool) {
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
+	}
 
 	/*metadataStruct, err := i.natsService.GetRoomMetadataStruct(roomId.(string))
 	if err != nil {
@@ -84,5 +89,21 @@ func (i *InsightsController) HandleTranscriptionConfigure(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	return nil
+	return utils.SendCommonProtobufResponse(c, false, "success")
+}
+
+func (i *InsightsController) HandleEndTranscription(c *fiber.Ctx) error {
+	isAdmin := c.Locals("isAdmin")
+	roomId := c.Locals("roomId")
+
+	if !isAdmin.(bool) {
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
+	}
+
+	err := i.insightsModel.EndRoomAgentTaskByServiceName("transcription", roomId.(string))
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	return utils.SendCommonProtobufResponse(c, false, "success")
 }
