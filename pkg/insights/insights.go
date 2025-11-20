@@ -2,6 +2,7 @@ package insights
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -33,6 +34,19 @@ const (
 	ServiceTypeTranscription ServiceType = "transcription"
 	ServiceTypeTranslation   ServiceType = "translation"
 )
+
+// ToServiceType translates the Protobuf enum to our internal Go type.
+// This keeps the core logic decoupled from the Protobuf definitions.
+func ToServiceType(t plugnmeet.InsightsServiceType) (ServiceType, error) {
+	switch t {
+	case plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_TRANSCRIPTION:
+		return ServiceTypeTranscription, nil
+	case plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_TRANSLATION:
+		return ServiceTypeTranslation, nil
+	default:
+		return "", fmt.Errorf("unknown or unsupported insights service type: %s", t.String())
+	}
+}
 
 // TranscriptionOptions defines the structure for options passed to the transcription service.
 type TranscriptionOptions struct {
@@ -75,7 +89,7 @@ type Provider interface {
 	TranslateText(ctx context.Context, text, sourceLang string, targetLangs []string) (*plugnmeet.InsightsTextTranslationResult, error)
 
 	// GetSupportedLanguages is primarily for Transcription & Translation services.
-	GetSupportedLanguages(serviceName string) []plugnmeet.InsightsSupportedLangInfo
+	GetSupportedLanguages(serviceName string) []*plugnmeet.InsightsSupportedLangInfo
 }
 
 // Task defines the interface for any runnable, self-contained AI task.

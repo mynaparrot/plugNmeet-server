@@ -215,10 +215,12 @@ func (r *router) registerAPIRoutes() {
 	speech.Post("/renewToken", r.ctrl.SpeechToTextController.HandleRenewAzureToken)
 
 	insights := api.Group("/insights")
+	insights.Post("/supportedLangs", r.ctrl.InsightsController.HandleGetSupportedLangs)
+
 	transcription := insights.Group("/transcription")
 	transcription.Post("/configure", r.ctrl.InsightsController.HandleTranscriptionConfigure)
 	transcription.Post("/end", r.ctrl.InsightsController.HandleEndTranscription)
-	//transcription.Post("/state")
+	transcription.Post("/state", r.ctrl.InsightsController.HandleTranscriptionState)
 
 	// for resumable.js need both GET and POST  methods.
 	// https://github.com/23/resumable.js#how-do-i-set-it-up-with-my-server

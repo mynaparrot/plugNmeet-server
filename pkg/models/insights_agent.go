@@ -1,14 +1,15 @@
 package models
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"strings"
 	"time"
 
-	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/nats-io/nats.go"
 )
 
 // getAgentKey creates a unique identifier for an agent using the new robust format.
@@ -17,25 +18,35 @@ func getAgentKey(roomName, serviceName string) string {
 	return fmt.Sprintf("%s@%s", roomName, serviceName)
 }
 
-// parseAgentKey safely extracts the roomId and serviceName from the new key format.
-func parseAgentKey(key string) (roomId, serviceName string, err error) {
-	parts := strings.SplitN(key, "@", 2)
-	if len(parts) != 2 {
-		return "", "", fmt.Errorf("invalid agent key format: expected 'roomId@serviceName', got '%s'", key)
-	}
-	if parts[0] == "" || parts[1] == "" {
-		return "", "", fmt.Errorf("invalid agent key format: empty roomId or serviceName in key '%s'", key)
-	}
-	return parts[0], parts[1], nil
-}
-
 // HandleIncomingAgentTask is the core logic that runs on every server.
-func (s *InsightsModel) HandleIncomingAgentTask(payload *InsightsTaskPayload) {
+func (s *InsightsModel) HandleIncomingAgentTask(msg *nats.Msg) {
+	payload := new(InsightsTaskPayload)
+	err := json.Unmarshal(msg.Data, &payload)
+	if err != nil {
+		s.logger.WithError(err).Error("failed to unmarshal insights task payload")
+		return
+	}
+
+	// Create a helper function to send the reply
+	reply := func(status bool, message string) {
+		if msg.Reply == "" {
+			// Not a request, just a fire-and-forget message
+			return
+		}
+		res := &AgentTaskResponse{Status: status, Msg: message}
+		resBytes, _ := json.Marshal(res)
+		err := s.conf.NatsConn.Publish(msg.Reply, resBytes)
+		if err != nil {
+			s.logger.WithError(err).Error("failed to publish reply")
+		}
+	}
+
 	if payload.Task == TaskEnd {
 		s.endLocalAgentTask(payload.ServiceName, payload.RoomName, payload.UserID)
 		return
 	} else if payload.Task == TaskEndRoomAgentByServiceName {
 		s.removeAgentForRoom(payload.ServiceName, payload.RoomName)
+		reply(true, "agent removed successfully")
 		return
 	} else if payload.Task == TaskEndRoomAllAgents {
 		s.removeAgentsForRoom(payload.RoomName)
@@ -54,6 +65,7 @@ func (s *InsightsModel) HandleIncomingAgentTask(payload *InsightsTaskPayload) {
 			// We are the leader. This is an UPDATE request.
 			s.logger.Infof("updating configuration for running agent: %s", key)
 			agent.UpdateAllowedUsers(payload.TargetUsers)
+			reply(true, "agent configured successfully")
 			return // The update is done.
 		}
 
@@ -66,6 +78,7 @@ func (s *InsightsModel) HandleIncomingAgentTask(payload *InsightsTaskPayload) {
 		isLeader, err := lock.TryLock(s.ctx)
 		if err != nil {
 			s.logger.WithError(err).Error("failed leader election attempt")
+			reply(false, "failed leader election attempt")
 			return
 		}
 
@@ -74,6 +87,7 @@ func (s *InsightsModel) HandleIncomingAgentTask(payload *InsightsTaskPayload) {
 			// Create the agent...
 			if err := s.manageLocalAgent(payload, lock); err != nil {
 				s.logger.WithError(err).Error("failed to manage local agent")
+				reply(false, "failed to manage local agent")
 				return
 			}
 
@@ -81,6 +95,7 @@ func (s *InsightsModel) HandleIncomingAgentTask(payload *InsightsTaskPayload) {
 			newAgent, _ := s.roomAgents[key]
 			s.lock.RUnlock()
 			newAgent.UpdateAllowedUsers(payload.TargetUsers)
+			reply(true, "agent configured successfully")
 		}
 
 	} else if payload.Task == TaskStart {
@@ -128,7 +143,6 @@ func (s *InsightsModel) manageLocalAgent(payload *InsightsTaskPayload, lock *red
 	s.roomAgents[key] = agent
 
 	go s.superviseAgent(agent, lock)
-	s.updateRoomMetadata(payload.RoomName, payload.ServiceName, true)
 	return nil
 }
 
@@ -181,13 +195,6 @@ func (s *InsightsModel) shutdownAndRemoveAgent(key string) {
 	if ok {
 		agent.Shutdown()
 		s.logger.Infof("removed and shut down agent for key %s", key)
-
-		roomId, serviceName, err := parseAgentKey(key)
-		if err != nil {
-			s.logger.WithError(err).Error("could not parse agent key during shutdown")
-			return
-		}
-		s.updateRoomMetadata(roomId, serviceName, false)
 	}
 }
 
@@ -216,36 +223,5 @@ func (s *InsightsModel) removeAgentsForRoom(roomName string) {
 
 	if len(keysToDelete) > 0 {
 		s.logger.Infof("removed %d insights agents for room %s", len(keysToDelete), roomName)
-	}
-}
-
-func (s *InsightsModel) updateRoomMetadata(roomId, serviceName string, enabled bool) {
-	metadataStruct, err := s.natsService.GetRoomMetadataStruct(roomId)
-	if err != nil {
-		s.logger.WithError(err).Error("failed to get room metadata")
-		return
-	}
-	needToUpdate := false
-
-	switch insights.ServiceType(serviceName) {
-	case insights.ServiceTypeTranscription:
-		if metadataStruct.RoomFeatures.InsightsFeatures != nil {
-			metadataStruct.RoomFeatures.InsightsFeatures.TranscriptionFeatures.IsEnabled = enabled
-			needToUpdate = true
-		}
-	case insights.ServiceTypeTranslation:
-		if metadataStruct.RoomFeatures.InsightsFeatures != nil {
-			metadataStruct.RoomFeatures.InsightsFeatures.ChatTranslationFeatures.IsEnabled = enabled
-			needToUpdate = true
-		}
-	default:
-		s.logger.Errorf("unknown insights service task: %s", serviceName)
-	}
-
-	if needToUpdate {
-		err := s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadataStruct)
-		if err != nil {
-			s.logger.WithError(err).Error("failed to update room metadata")
-		}
 	}
 }

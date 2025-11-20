@@ -2,15 +2,17 @@ package controllers
 
 import (
 	"encoding/json"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/proto"
 )
 
 type InsightsController struct {
@@ -33,15 +35,9 @@ func NewInsightsController(app *config.AppConfig, natsService *natsservice.NatsS
 // SubscribeToAgentTaskRequests is the central handler for all incoming agent tasks.
 func (i *InsightsController) SubscribeToAgentTaskRequests() {
 	sub, err := i.app.NatsConn.Subscribe(models.InsightsNatsChannel, func(msg *nats.Msg) {
-		var payload models.InsightsTaskPayload
-		err := json.Unmarshal(msg.Data, &payload)
-		if err != nil {
-			i.logger.WithError(err).Error("failed to unmarshal insights task payload")
-			return
-		}
-
-		i.logger.Infof("received task '%s' for service '%s' in room '%s'", payload.Task, payload.ServiceName, payload.RoomName)
-		i.insightsModel.HandleIncomingAgentTask(&payload)
+		// Pass the raw message directly to the model's handler.
+		// The model is now responsible for unmarshalling and replying.
+		i.insightsModel.HandleIncomingAgentTask(msg)
 	})
 	if err != nil {
 		i.logger.WithError(err).Fatalln("failed to subscribe to NATS for insights tasks")
@@ -65,31 +61,79 @@ func (i *InsightsController) HandleTranscriptionConfigure(c *fiber.Ctx) error {
 	}
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
-	requestedUserId := c.Locals("requestedUserId")
 
 	if !isAdmin.(bool) {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	/*metadataStruct, err := i.natsService.GetRoomMetadataStruct(roomId.(string))
+	req := new(plugnmeet.InsightsTranscriptionConfigReq)
+	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
-	if !metadataStruct.RoomFeatures.InsightsFeatures.IsAllow || !metadataStruct.RoomFeatures.InsightsFeatures.TranscriptionFeatures.IsAllow {
-		return utils.SendCommonProtobufResponse(c, false, "insights feature wasn't enabled")
-	}*/
-	err := i.insightsModel.ConfigureAgentTask("transcription", roomId.(string), []string{requestedUserId.(string)})
-	if err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
-	}
-	time.Sleep(time.Second * 5)
 
-	err = i.insightsModel.ActivateAgentTaskForUser("transcription", roomId.(string), requestedUserId.(string), nil, nil)
+	metadata, err := i.natsService.GetRoomMetadataStruct(roomId.(string))
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+	if !metadata.RoomFeatures.InsightsFeatures.IsAllow || !metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.IsAllow {
+		return utils.SendCommonProtobufResponse(c, false, "insights feature wasn't enabled")
+	}
+
+	err = i.insightsModel.TranscriptionConfigure(req, roomId.(string))
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
 	return utils.SendCommonProtobufResponse(c, false, "success")
+}
+
+func (i *InsightsController) HandleTranscriptionState(c *fiber.Ctx) error {
+	roomId := c.Locals("roomId")
+	requestedUserId := c.Locals("requestedUserId")
+
+	req := new(plugnmeet.InsightsTranscriptionStateReq)
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	if req.State == plugnmeet.InsightsTranscriptionState_INSIGHTS_TRANSCRIPTION_STATE_START {
+		metadata, err := i.natsService.GetRoomMetadataStruct(roomId.(string))
+		if err != nil {
+			return utils.SendCommonProtobufResponse(c, false, err.Error())
+		}
+		options := insights.TranscriptionOptions{
+			SpokenLang: req.SpokenLang,
+		}
+		if metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.IsEnabledTranslation {
+			options.TransLangs = metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.AllowedTransLangs
+		}
+		optionsBytes, err := json.Marshal(options)
+		if err != nil {
+			return utils.SendCommonProtobufResponse(c, false, err.Error())
+		}
+
+		var roomE2EEKey *string = nil
+		if metadata.RoomFeatures.EndToEndEncryptionFeatures.IsEnabled {
+			roomE2EEKey = metadata.RoomFeatures.EndToEndEncryptionFeatures.EncryptionKey
+		}
+
+		err = i.insightsModel.ActivateAgentTaskForUser("transcription", roomId.(string), requestedUserId.(string), optionsBytes, roomE2EEKey)
+		if err != nil {
+			return utils.SendCommonProtobufResponse(c, false, err.Error())
+		}
+		return utils.SendCommonProtobufResponse(c, true, "success")
+
+	} else if req.State == plugnmeet.InsightsTranscriptionState_INSIGHTS_TRANSCRIPTION_STATE_STOP {
+		err := i.insightsModel.EndAgentTaskForUser("transcription", roomId.(string), requestedUserId.(string))
+		if err != nil {
+			return utils.SendCommonProtobufResponse(c, false, err.Error())
+		}
+		return utils.SendCommonProtobufResponse(c, true, "success")
+	}
+
+	return utils.SendCommonProtobufResponse(c, false, "unknown state")
 }
 
 func (i *InsightsController) HandleEndTranscription(c *fiber.Ctx) error {
@@ -100,10 +144,36 @@ func (i *InsightsController) HandleEndTranscription(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	err := i.insightsModel.EndRoomAgentTaskByServiceName("transcription", roomId.(string))
+	err := i.insightsModel.EndTranscription(roomId.(string))
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
 	return utils.SendCommonProtobufResponse(c, false, "success")
+}
+
+func (i *InsightsController) HandleGetSupportedLangs(c *fiber.Ctx) error {
+	req := new(plugnmeet.InsightsGetSupportedLanguagesReq)
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	serviceType, err := insights.ToServiceType(req.ServiceType)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	langs, err := i.insightsModel.GetSupportedLanguagesForService(string(serviceType))
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	res := &plugnmeet.InsightsGetSupportedLanguagesRes{
+		Status:    true,
+		Msg:       "success",
+		Languages: langs,
+	}
+
+	return utils.SendProtobufResponse(c, res)
 }

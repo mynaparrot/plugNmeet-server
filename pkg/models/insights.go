@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -22,6 +23,11 @@ const (
 	TaskEndRoomAgentByServiceName = "endRoomAgentByServiceName"
 	TaskEndRoomAllAgents          = "endRoomAllAgents"
 )
+
+type AgentTaskResponse struct {
+	Status bool   `json:"status"`
+	Msg    string `json:"msg"`
+}
 
 type InsightsTaskPayload struct {
 	Task        string          `json:"task"`
@@ -54,9 +60,9 @@ func NewInsightsModel(ctx context.Context, conf *config.AppConfig, redisService 
 	}
 }
 
-// ConfigureAgentTask publishes a 'configure' message to boot or update an agent.
-func (s *InsightsModel) ConfigureAgentTask(serviceName, roomName string, allowedUsers []string) error {
-	s.logger.Infof("Publishing configure agent task for service '%s' in room '%s'", serviceName, roomName)
+// ConfigureAgentAndWait sends a configuration task and waits for confirmation.
+func (s *InsightsModel) ConfigureAgentAndWait(serviceName, roomName string, allowedUsers []string, timeout time.Duration) error {
+	s.logger.Infof("Sending request to configure agent for service '%s' in room '%s'", serviceName, roomName)
 
 	usersMap := make(map[string]bool)
 	for _, user := range allowedUsers {
@@ -73,7 +79,23 @@ func (s *InsightsModel) ConfigureAgentTask(serviceName, roomName string, allowed
 	if err != nil {
 		return err
 	}
-	return s.conf.NatsConn.Publish(InsightsNatsChannel, p)
+
+	// Use nats request/reply
+	msg, err := s.conf.NatsConn.Request(InsightsNatsChannel, p, timeout)
+	if err != nil {
+		return fmt.Errorf("NATS request failed: %w", err)
+	}
+
+	var res AgentTaskResponse
+	if err := json.Unmarshal(msg.Data, &res); err != nil {
+		return fmt.Errorf("failed to parse response from agent: %w", err)
+	}
+
+	if !res.Status {
+		return fmt.Errorf("agent failed to process task: %s", res.Msg)
+	}
+
+	return nil // Success!
 }
 
 // ActivateAgentTaskForUser publishes a 'start' message to activate a room agent for a long-running task for a specific user.
@@ -110,7 +132,7 @@ func (s *InsightsModel) EndAgentTaskForUser(serviceName, roomName, userId string
 	return s.conf.NatsConn.Publish(InsightsNatsChannel, p)
 }
 
-func (s *InsightsModel) EndRoomAgentTaskByServiceName(serviceName, roomName string) error {
+func (s *InsightsModel) EndRoomAgentTaskByServiceNameAndWait(serviceName, roomName string, timeout time.Duration) error {
 	s.logger.Infof("Publishing end task request for service '%s' in room '%s'", serviceName, roomName)
 	payload := &InsightsTaskPayload{
 		Task:        TaskEndRoomAgentByServiceName,
@@ -121,7 +143,22 @@ func (s *InsightsModel) EndRoomAgentTaskByServiceName(serviceName, roomName stri
 	if err != nil {
 		return err
 	}
-	return s.conf.NatsConn.Publish(InsightsNatsChannel, p)
+
+	msg, err := s.conf.NatsConn.Request(InsightsNatsChannel, p, timeout)
+	if err != nil {
+		return fmt.Errorf("NATS request failed: %w", err)
+	}
+
+	var res AgentTaskResponse
+	if err := json.Unmarshal(msg.Data, &res); err != nil {
+		return fmt.Errorf("failed to parse response from agent: %w", err)
+	}
+
+	if !res.Status {
+		return fmt.Errorf("agent failed to process task: %s", res.Msg)
+	}
+
+	return nil // Success!
 }
 
 // EndRoomAllAgentTasks will close everything for this room
@@ -156,7 +193,7 @@ func (s *InsightsModel) ActivateTextTask(ctx context.Context, serviceName string
 }
 
 // GetSupportedLanguagesForService returns the list of supported languages for a single, specific service.
-func (s *InsightsModel) GetSupportedLanguagesForService(serviceName string) ([]plugnmeet.InsightsSupportedLangInfo, error) {
+func (s *InsightsModel) GetSupportedLanguagesForService(serviceName string) ([]*plugnmeet.InsightsSupportedLangInfo, error) {
 	// 1. Get the configuration for the requested service.
 	targetAccount, serviceConfig, err := s.conf.Insights.GetProviderAccountForService(serviceName)
 	if err != nil {
