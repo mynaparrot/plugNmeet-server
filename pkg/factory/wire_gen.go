@@ -72,7 +72,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	webhookController := controllers.NewWebhookController(authModel, webhookModel)
 	natsController := controllers.NewNatsController(appConfig, natsService, authModel, natsModel, logger)
 	healthCheckController := controllers.NewHealthCheckController(appConfig)
-	insightsController := controllers.NewInsightsController(appConfig, insightsModel, logger)
+	insightsController := controllers.NewInsightsController(appConfig, natsService, insightsModel, logger)
 	applicationControllers := &ApplicationControllers{
 		AnalyticsController:    analyticsController,
 		AuthController:         authController,

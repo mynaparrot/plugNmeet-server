@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -13,10 +14,12 @@ import (
 )
 
 const (
-	InsightsNatsChannel = "plug-n-meet-insights"
-	TaskStart           = "start"
-	TaskEnd             = "end"
-	EndRoomTasks        = "endRoomTasks"
+	InsightsNatsChannel           = "plug-n-meet-insights"
+	TaskBootAgent                 = "boot" // New task to pre-warm the agent
+	TaskStart                     = "start"
+	TaskEnd                       = "end"
+	TaskEndRoomAgentByServiceName = "endRoomAgentByServiceName"
+	TaskEndRoomAllAgents          = "endRoomAllAgents"
 )
 
 type InsightsTaskPayload struct {
@@ -45,6 +48,80 @@ func NewInsightsModel(ctx context.Context, conf *config.AppConfig, redisService 
 		roomAgents:   make(map[string]*insightsservice.RoomAgent),
 		redisService: redisService,
 	}
+}
+
+// BootAgentTask publishes a 'boot' message to pre-warm a room agent.
+func (s *InsightsModel) BootAgentTask(serviceName, roomName string) error {
+	s.logger.Infof("Publishing boot agent task request for service '%s' in room '%s'", serviceName, roomName)
+	payload := &InsightsTaskPayload{
+		Task:        TaskBootAgent,
+		ServiceName: serviceName,
+		RoomName:    roomName,
+	}
+	p, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	return s.conf.NatsConn.Publish(InsightsNatsChannel, p)
+}
+
+// ActivateAgentTaskForUser publishes a 'start' message to activate a room agent for a long-running task.
+func (s *InsightsModel) ActivateAgentTaskForUser(serviceName, roomName, userId string, options []byte, roomE2EEKey *string) error {
+	s.logger.Infof("Publishing start agent task request for service '%s' in room '%s'", serviceName, roomName)
+	payload := &InsightsTaskPayload{
+		Task:        TaskStart,
+		ServiceName: serviceName,
+		RoomName:    roomName,
+		UserID:      userId,
+		Options:     options,
+		RoomE2EEKey: roomE2EEKey,
+	}
+	p, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	return s.conf.NatsConn.Publish(InsightsNatsChannel, p)
+}
+
+// EndAgentTaskForUser now only publishes an 'end' message.
+func (s *InsightsModel) EndAgentTaskForUser(serviceName, roomName, userId string) error {
+	s.logger.Infof("Publishing end task request for service '%s' in room '%s'", serviceName, roomName)
+	payload := &InsightsTaskPayload{
+		Task:        TaskEnd,
+		ServiceName: serviceName,
+		RoomName:    roomName,
+		UserID:      userId,
+	}
+	p, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	return s.conf.NatsConn.Publish(InsightsNatsChannel, p)
+}
+
+func (s *InsightsModel) EndRoomAgentTaskByServiceName(serviceName, roomName string) error {
+	s.logger.Infof("Publishing end task request for service '%s' in room '%s'", serviceName, roomName)
+	payload := &InsightsTaskPayload{
+		Task: TaskEndRoomAgentByServiceName,
+	}
+	p, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	return s.conf.NatsConn.Publish(InsightsNatsChannel, p)
+}
+
+// EndRoomAllAgentTasks will close everything for this room
+func (s *InsightsModel) EndRoomAllAgentTasks(roomName string) error {
+	s.logger.Infof("Publishing end all room tasks request for room '%s'", roomName)
+	payload := &InsightsTaskPayload{
+		Task: TaskEndRoomAllAgents,
+	}
+	p, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	return s.conf.NatsConn.Publish(InsightsNatsChannel, p)
 }
 
 // ActivateTextTask performs a direct, stateless text-based task using the configured provider.

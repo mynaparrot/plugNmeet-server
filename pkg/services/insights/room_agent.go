@@ -93,6 +93,8 @@ func NewRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *co
 	}
 
 	agent.Room = room
+	log.Infof("successfully connected with room %s", roomName)
+
 	return agent, nil
 }
 
@@ -141,6 +143,12 @@ func (a *RoomAgent) onTrackPublished(publication *lksdk.RemoteTrackPublication, 
 	if publication.Kind() != lksdk.TrackKindAudio {
 		return
 	}
+	a.logger.WithFields(logrus.Fields{
+		"userId": rp.Identity(),
+		"kind":   publication.Kind(),
+		"name":   publication.Name(),
+	}).Infoln("onTrackPublished fired")
+
 	a.lock.RLock()
 	_, ok := a.pendingTasks[rp.Identity()]
 	a.lock.RUnlock()
@@ -155,6 +163,13 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 	if track.Codec().MimeType != webrtc.MimeTypeOpus {
 		return
 	}
+	a.logger.WithFields(logrus.Fields{
+		"userId":     rp.Identity(),
+		"kind":       publication.Kind(),
+		"name":       publication.Name(),
+		"encryption": publication.TrackInfo().Encryption,
+	}).Infoln("onTrackSubscribed fired")
+
 	a.lock.Lock()
 	defer a.lock.Unlock()
 

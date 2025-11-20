@@ -24,10 +24,10 @@ func NewProvider(providerType string, providerAccount *config.ProviderAccount, s
 
 // NewTask is a factory that returns the correct Task implementation.
 func NewTask(serviceName string, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, logger *logrus.Entry) (insights.Task, error) {
-	switch serviceName {
-	case "transcription":
+	switch insights.ServiceType(serviceName) {
+	case insights.ServiceTypeTranscription:
 		return NewTranscriptionTask(serviceConfig, providerAccount, logger)
-	case "translation":
+	case insights.ServiceTypeTranslation:
 		return NewTranslationTask(serviceConfig, providerAccount, logger)
 	default:
 		return nil, fmt.Errorf("unknown insights service task: %s", serviceName)

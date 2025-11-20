@@ -5,6 +5,14 @@ import (
 	"io"
 )
 
+// ServiceType defines the canonical name for an insights service.
+type ServiceType string
+
+const (
+	ServiceTypeTranscription ServiceType = "transcription"
+	ServiceTypeTranslation   ServiceType = "translation"
+)
+
 // TranscriptionOptions defines the structure for options passed to the transcription service.
 type TranscriptionOptions struct {
 	SpokenLang string   `json:"spokenLang"`

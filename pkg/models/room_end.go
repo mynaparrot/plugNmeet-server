@@ -156,7 +156,7 @@ func (m *RoomModel) OnAfterRoomEnded(roomID, roomSID, metadata, roomStatus strin
 	}
 
 	// Step 13: End all the agent tasks for this room.
-	if err = m.insightsModel.EndAllRoomTasks(roomID); err != nil {
+	if err = m.insightsModel.EndRoomAllAgentTasks(roomID); err != nil {
 		log.WithError(err).Error("Error in agent task cleanup")
 	}
 
