@@ -22,24 +22,25 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights/media"
 )
 
-type activeParticipant struct {
+type activePipeline struct {
 	transcoder *media.Transcoder
 	cancel     context.CancelFunc
 	identity   string
 }
 
 type RoomAgent struct {
-	Ctx          context.Context
-	cancel       context.CancelFunc
-	conf         *config.AppConfig
-	logger       *logrus.Entry
-	Room         *lksdk.Room
-	lock         sync.RWMutex
-	participants map[string]*activeParticipant
-	pendingTasks map[string][]byte // Simplified: key is userId, value is the options []byte
-	task         insights.Task     // The single task this agent is responsible for.
-	ServiceName  string
-	e2eeKey      *string
+	Ctx             context.Context
+	cancel          context.CancelFunc
+	conf            *config.AppConfig
+	logger          *logrus.Entry
+	Room            *lksdk.Room
+	lock            sync.RWMutex
+	activePipelines map[string]*activePipeline
+	allowedUsers    map[string]bool   // Admin-defined permissions
+	activeUserTasks map[string][]byte // User-driven state
+	task            insights.Task     // The single task this agent is responsible for.
+	ServiceName     string
+	e2eeKey         *string
 }
 
 // NewRoomAgent creates a single-purpose agent.
@@ -55,15 +56,16 @@ func NewRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *co
 	}
 
 	agent := &RoomAgent{
-		Ctx:          ctx,
-		cancel:       cancel,
-		conf:         conf,
-		logger:       log,
-		participants: make(map[string]*activeParticipant),
-		pendingTasks: make(map[string][]byte),
-		ServiceName:  serviceName,
-		task:         task,
-		e2eeKey:      e2eeKey,
+		Ctx:             ctx,
+		cancel:          cancel,
+		conf:            conf,
+		logger:          log,
+		activePipelines: make(map[string]*activePipeline),
+		allowedUsers:    make(map[string]bool),
+		activeUserTasks: make(map[string][]byte),
+		ServiceName:     serviceName,
+		task:            task,
+		e2eeKey:         e2eeKey,
 	}
 
 	c := &plugnmeet.PlugNmeetTokenClaims{
@@ -98,20 +100,46 @@ func NewRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *co
 	return agent, nil
 }
 
-// ActivateTaskForUser queues a task for a user for this agent's specific service.
+// UpdateAllowedUsers is the new reconciliation logic.
+func (a *RoomAgent) UpdateAllowedUsers(allowed map[string]bool) {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	a.allowedUsers = allowed
+
+	// Reconciliation: check if any currently active users need to be removed.
+	for userId := range a.activeUserTasks {
+		if _, isAllowed := a.allowedUsers[userId]; !isAllowed {
+			// This user is no longer allowed, stop their task.
+			// We call the internal method to avoid a deadlock.
+			a.endTasksForUser(userId)
+		}
+	}
+}
+
+// ActivateTaskForUser now checks for permission first.
 func (a *RoomAgent) ActivateTaskForUser(userId string, options []byte) error {
 	a.lock.Lock()
-	if _, ok := a.pendingTasks[userId]; ok {
+
+	if _, isAllowed := a.allowedUsers[userId]; !isAllowed {
+		// If the allowed list is not empty and the user is not in it.
+		if len(a.allowedUsers) > 0 {
+			a.lock.Unlock()
+			return fmt.Errorf("user %s is not allowed to perform this task", userId)
+		}
+	}
+
+	if _, ok := a.activeUserTasks[userId]; ok {
+		a.logger.Infof("task is already active for participant %s", userId)
 		a.lock.Unlock()
-		a.logger.Infof("task is already pending for participant %s", userId)
 		return nil
 	}
-	a.pendingTasks[userId] = options
+	a.activeUserTasks[userId] = options
 	a.lock.Unlock()
 
-	a.logger.Infof("queued task for participant %s", userId)
+	a.logger.Infof("activated task for participant %s", userId)
 
-	// Check if track already exists.
+	// Attempt to subscribe immediately if the track is already available.
 	for _, p := range a.Room.GetRemoteParticipants() {
 		if p.Identity() == userId {
 			for _, pub := range p.TrackPublications() {
@@ -127,18 +155,24 @@ func (a *RoomAgent) ActivateTaskForUser(userId string, options []byte) error {
 // EndTasksForUser stops the task for a specific user.
 func (a *RoomAgent) EndTasksForUser(userId string) {
 	a.lock.Lock()
-	delete(a.pendingTasks, userId)
-	participant, ok := a.participants[userId]
-	delete(a.participants, userId)
+	a.endTasksForUser(userId)
 	a.lock.Unlock()
+}
+
+// endTasksForUser is the internal, non-locking version.
+// it's assumed that the caller has hold mutex lock.
+func (a *RoomAgent) endTasksForUser(userId string) {
+	delete(a.activeUserTasks, userId)
+	pipeline, ok := a.activePipelines[userId]
+	delete(a.activePipelines, userId)
 
 	if ok {
-		participant.cancel()
+		pipeline.cancel()
 		a.logger.WithField("userId", userId).Infoln("stopped insights task for participant")
 	}
 }
 
-// onTrackPublished checks if a task is pending for this user.
+// onTrackPublished now checks the activeUserTasks map.
 func (a *RoomAgent) onTrackPublished(publication *lksdk.RemoteTrackPublication, rp *lksdk.RemoteParticipant) {
 	if publication.Kind() != lksdk.TrackKindAudio {
 		return
@@ -150,7 +184,7 @@ func (a *RoomAgent) onTrackPublished(publication *lksdk.RemoteTrackPublication, 
 	}).Infoln("onTrackPublished fired")
 
 	a.lock.RLock()
-	_, ok := a.pendingTasks[rp.Identity()]
+	_, ok := a.activeUserTasks[rp.Identity()]
 	a.lock.RUnlock()
 
 	if ok {
@@ -158,7 +192,7 @@ func (a *RoomAgent) onTrackPublished(publication *lksdk.RemoteTrackPublication, 
 	}
 }
 
-// onTrackSubscribed creates the media pipeline and runs the agent's single task.
+// onTrackSubscribed now uses the activeUserTasks map and does NOT delete from it.
 func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lksdk.RemoteTrackPublication, rp *lksdk.RemoteParticipant) {
 	if track.Codec().MimeType != webrtc.MimeTypeOpus {
 		return
@@ -173,7 +207,7 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	options, ok := a.pendingTasks[rp.Identity()]
+	options, ok := a.activeUserTasks[rp.Identity()]
 	if !ok {
 		return
 	}
@@ -205,7 +239,7 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 		return
 	}
 
-	a.participants[rp.Identity()] = &activeParticipant{
+	a.activePipelines[rp.Identity()] = &activePipeline{
 		transcoder: transcoder,
 		cancel:     cancel,
 		identity:   rp.Identity(),
@@ -220,12 +254,25 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 	}()
 
 	a.logger.Infof("activated task for participant %s", rp.Identity())
-	delete(a.pendingTasks, rp.Identity())
 }
 
-// onTrackUnsubscribed cleans up resources for a user.
+// onTrackUnsubscribed cleans up the processing pipeline for a user's track,
+// but preserves their "active" status in case they reconnect.
 func (a *RoomAgent) onTrackUnsubscribed(track *webrtc.TrackRemote, publication *lksdk.RemoteTrackPublication, rp *lksdk.RemoteParticipant) {
-	a.EndTasksForUser(rp.Identity())
+	a.lock.Lock()
+	pipeline, ok := a.activePipelines[rp.Identity()]
+	// Remove from the map of active pipelines.
+	delete(a.activePipelines, rp.Identity())
+	a.lock.Unlock()
+
+	if !ok {
+		// No active pipeline, nothing to do.
+		return
+	}
+
+	// Stop the transcoder and associated goroutines.
+	pipeline.cancel()
+	a.logger.WithField("userId", rp.Identity()).Infoln("stopped insights task pipeline due to track unsubscription")
 }
 
 // Shutdown gracefully closes the agent.

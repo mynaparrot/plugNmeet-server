@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -27,12 +28,27 @@ func (s *InsightsModel) HandleIncomingAgentTask(payload *InsightsTaskPayload) {
 		return
 	}
 
-	// For both boot and start, we need to find or create the agent.
-	// The leader election only happens on boot.
-	if payload.Task == TaskBootAgent {
-		lockKey := getAgentKey(payload.RoomName, payload.ServiceName)
-		lock := s.redisService.NewLock(lockKey, 30*time.Second)
+	if payload.Task == TaskConfigureAgent {
+		key := getAgentKey(payload.RoomName, payload.ServiceName)
 
+		// 1. Check if we are the leader and the agent is already running locally.
+		s.lock.RLock()
+		agent, ok := s.roomAgents[key]
+		s.lock.RUnlock()
+
+		if ok {
+			// We are the leader. This is an UPDATE request.
+			s.logger.Infof("updating configuration for running agent: %s", key)
+			agent.UpdateAllowedUsers(payload.TargetUsers)
+			return // The update is done.
+		}
+
+		// 2. If no local agent, this is a BOOT request.
+		// ADD JITTER: Wait for a random period to avoid a thundering herd on Redis.
+		time.Sleep(time.Duration(rand.Intn(250)) * time.Millisecond)
+
+		// Now, try to become the leader.
+		lock := s.redisService.NewLock(key, 30*time.Second)
 		isLeader, err := lock.TryLock(s.ctx)
 		if err != nil {
 			s.logger.WithError(err).Error("failed leader election attempt")
@@ -40,24 +56,26 @@ func (s *InsightsModel) HandleIncomingAgentTask(payload *InsightsTaskPayload) {
 		}
 
 		if isLeader {
-			s.logger.Infof("Acquired leadership for agent '%s'", lockKey)
-			// We only create the agent here. The user task is not activated.
+			s.logger.Infof("Acquired leadership for agent '%s'", key)
+			// Create the agent...
 			if err := s.manageLocalAgent(payload, lock); err != nil {
 				s.logger.WithError(err).Error("failed to manage local agent")
+				return
 			}
+
+			s.lock.RLock()
+			newAgent, _ := s.roomAgents[key]
+			s.lock.RUnlock()
+			newAgent.UpdateAllowedUsers(payload.TargetUsers)
 		}
+
 	} else if payload.Task == TaskStart {
-		// No leader election needed. The agent should already be running.
-		// We just find it and activate the user's task.
 		key := getAgentKey(payload.RoomName, payload.ServiceName)
 		s.lock.RLock()
 		agent, ok := s.roomAgents[key]
 		s.lock.RUnlock()
 
 		if !ok {
-			s.logger.Warnf("received a start task for a non-running agent: %s", key)
-			// Optional: We could try to boot it here as a fallback.
-			// For now, we'll just log a warning.
 			return
 		}
 		err := agent.ActivateTaskForUser(payload.UserID, payload.Options)

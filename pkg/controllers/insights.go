@@ -73,7 +73,7 @@ func (i *InsightsController) HandleTranscriptionConfigure(c *fiber.Ctx) error {
 	if !metadataStruct.RoomFeatures.InsightsFeatures.IsAllow || !metadataStruct.RoomFeatures.InsightsFeatures.TranscriptionFeatures.IsAllow {
 		return utils.SendCommonProtobufResponse(c, false, "insights feature wasn't enabled")
 	}*/
-	err := i.insightsModel.BootAgentTask("transcription", roomId.(string))
+	err := i.insightsModel.ConfigureAgentTask("transcription", roomId.(string), []string{requestedUserId.(string)})
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}

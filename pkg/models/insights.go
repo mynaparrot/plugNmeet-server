@@ -15,7 +15,7 @@ import (
 
 const (
 	InsightsNatsChannel           = "plug-n-meet-insights"
-	TaskBootAgent                 = "boot" // New task to pre-warm the agent
+	TaskConfigureAgent            = "configureAgent"
 	TaskStart                     = "start"
 	TaskEnd                       = "end"
 	TaskEndRoomAgentByServiceName = "endRoomAgentByServiceName"
@@ -23,12 +23,13 @@ const (
 )
 
 type InsightsTaskPayload struct {
-	Task        string  `json:"task"` // "start" or "end"
-	ServiceName string  `json:"service_name"`
-	RoomName    string  `json:"room_name"`
-	UserID      string  `json:"user_id"`
-	Options     []byte  `json:"options"`
-	RoomE2EEKey *string `json:"room_e2ee_key"`
+	Task        string          `json:"task"`
+	ServiceName string          `json:"service_name"`
+	RoomName    string          `json:"room_name"`
+	UserID      string          `json:"user_id"`
+	Options     []byte          `json:"options"`
+	RoomE2EEKey *string         `json:"room_e2ee_key"`
+	TargetUsers map[string]bool `json:"target_users,omitempty"` // NEW
 }
 
 type InsightsModel struct {
@@ -50,13 +51,20 @@ func NewInsightsModel(ctx context.Context, conf *config.AppConfig, redisService 
 	}
 }
 
-// BootAgentTask publishes a 'boot' message to pre-warm a room agent.
-func (s *InsightsModel) BootAgentTask(serviceName, roomName string) error {
-	s.logger.Infof("Publishing boot agent task request for service '%s' in room '%s'", serviceName, roomName)
+// ConfigureAgentTask publishes a 'configure' message to boot or update an agent.
+func (s *InsightsModel) ConfigureAgentTask(serviceName, roomName string, allowedUsers []string) error {
+	s.logger.Infof("Publishing configure agent task for service '%s' in room '%s'", serviceName, roomName)
+
+	usersMap := make(map[string]bool)
+	for _, user := range allowedUsers {
+		usersMap[user] = true
+	}
+
 	payload := &InsightsTaskPayload{
-		Task:        TaskBootAgent,
+		Task:        TaskConfigureAgent,
 		ServiceName: serviceName,
 		RoomName:    roomName,
+		TargetUsers: usersMap,
 	}
 	p, err := json.Marshal(payload)
 	if err != nil {
@@ -65,9 +73,9 @@ func (s *InsightsModel) BootAgentTask(serviceName, roomName string) error {
 	return s.conf.NatsConn.Publish(InsightsNatsChannel, p)
 }
 
-// ActivateAgentTaskForUser publishes a 'start' message to activate a room agent for a long-running task.
+// ActivateAgentTaskForUser publishes a 'start' message to activate a room agent for a long-running task for a specific user.
 func (s *InsightsModel) ActivateAgentTaskForUser(serviceName, roomName, userId string, options []byte, roomE2EEKey *string) error {
-	s.logger.Infof("Publishing start agent task request for service '%s' in room '%s'", serviceName, roomName)
+	s.logger.Infof("Publishing start agent task request for service '%s' in room '%s' for user '%s'", serviceName, roomName, userId)
 	payload := &InsightsTaskPayload{
 		Task:        TaskStart,
 		ServiceName: serviceName,
