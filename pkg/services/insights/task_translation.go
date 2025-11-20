@@ -28,52 +28,41 @@ func NewTranslationTask(serviceConfig *config.ServiceConfig, providerAccount *co
 }
 
 // RunStateless implements the insights.Task interface for stateless execution.
-func (t *TranslationTask) RunStateless(ctx context.Context, options []byte) error {
+func (t *TranslationTask) RunStateless(ctx context.Context, options []byte) (interface{}, error) {
 	var opts insights.TranslationTaskOptions
 	if err := json.Unmarshal(options, &opts); err != nil {
-		return fmt.Errorf("failed to unmarshal translation options: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal translation options: %w", err)
 	}
 
 	if opts.Text == "" || len(opts.TargetLangs) == 0 {
-		return errors.New("text and at least one target_lang are required for translation")
+		return nil, errors.New("text and at least one target_lang are required for translation")
 	}
 
 	// Use the factory to create a provider instance.
 	provider, err := NewProvider(t.service.Provider, t.account, t.service, t.logger)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	opCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	// Call the provider's TranslateText method
-	resultChan, err := provider.TranslateText(opCtx, opts.Text, opts.SourceLang, opts.TargetLangs)
+	// Call the provider's synchronous TranslateText method
+	result, err := provider.TranslateText(opCtx, opts.Text, opts.SourceLang, opts.TargetLangs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	go func() {
-		select {
-		case result, ok := <-resultChan:
-			if !ok {
-				// This can happen if an error occurred inside the goroutine (e.g., network error).
-				// Check your logs for more details.
-				fmt.Println("Translation channel closed without a result.")
-				return
-			}
+	// Success! We have the result directly.
+	// The goroutine is no longer needed.
+	fmt.Println("\n--- Translation Successful ---")
+	fmt.Printf("Original Text: '%s' (from %s)\n", result.Text, result.SourceLang)
+	fmt.Println("Translations:")
+	for lang, translatedText := range result.Translations {
+		fmt.Printf("  - %s: '%s'\n", lang, translatedText)
+	}
 
-			// Success! We have the result.
-			fmt.Println("\n--- Translation Successful ---")
-			fmt.Printf("Original Text: '%s' (from %s)\n", result.Text, result.SourceLang)
-			fmt.Println("Translations:")
-			for lang, translatedText := range result.Translations {
-				fmt.Printf("  - %s: '%s'\n", lang, translatedText)
-			}
-		}
-	}()
-
-	return nil
+	return result, nil
 }
 
 // RunAudioStream is not implemented for TranslationTask as it's a stateless service.

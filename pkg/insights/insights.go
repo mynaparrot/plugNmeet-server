@@ -65,7 +65,7 @@ type Provider interface {
 
 	// TranslateText performs stateless translation of a given text string to one or more languages.
 	// It returns a channel that will yield a single result and then close.
-	TranslateText(ctx context.Context, text, sourceLang string, targetLangs []string) (<-chan *TextTranslationResult, error)
+	TranslateText(ctx context.Context, text, sourceLang string, targetLangs []string) (*TextTranslationResult, error)
 
 	// GetSupportedLanguages is primarily for Transcription & Translation services.
 	GetSupportedLanguages(serviceName string) []LanguageInfo
@@ -77,5 +77,5 @@ type Task interface {
 	RunAudioStream(ctx context.Context, audioStream <-chan []byte, roomName, identity string, options []byte) error
 
 	// RunStateless executes a single, stateless task (e.g., text translation).
-	RunStateless(ctx context.Context, options []byte) error
+	RunStateless(ctx context.Context, options []byte) (interface{}, error)
 }

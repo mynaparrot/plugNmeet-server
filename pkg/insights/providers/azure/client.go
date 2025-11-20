@@ -23,7 +23,7 @@ type AzureProvider struct {
 }
 
 // NewProvider now accepts the full configuration structs.
-func NewProvider(providerAccount *config.ProviderAccount, serviceConfig *config.ServiceConfig, log *logrus.Entry) (*AzureProvider, error) {
+func NewProvider(providerAccount *config.ProviderAccount, serviceConfig *config.ServiceConfig, log *logrus.Entry) (insights.Provider, error) {
 	return &AzureProvider{
 		account: providerAccount,
 		service: serviceConfig,
@@ -55,7 +55,7 @@ func (p *AzureProvider) CreateTranscription(ctx context.Context, roomID, userID 
 }
 
 // TranslateText implements the insights.Provider interface for stateless text translation.
-func (p *AzureProvider) TranslateText(ctx context.Context, text, sourceLang string, targetLangs []string) (<-chan *insights.TextTranslationResult, error) {
+func (p *AzureProvider) TranslateText(ctx context.Context, text, sourceLang string, targetLangs []string) (*insights.TextTranslationResult, error) {
 	if p.account.Credentials.APIKey == "" {
 		return nil, fmt.Errorf("azure API key is not configured")
 	}
@@ -66,81 +66,63 @@ func (p *AzureProvider) TranslateText(ctx context.Context, text, sourceLang stri
 		return nil, fmt.Errorf("at least one target language is required")
 	}
 
-	results := make(chan *insights.TextTranslationResult, 1)
+	// Construct the 'to' query parameter for multiple languages
+	endpoint := fmt.Sprintf("https://api.cognitive.microsofttranslator.com/translate?api-version=3.0&from=%s&to=%s", sourceLang, strings.Join(targetLangs, "&to="))
+	requestBody, err := json.Marshal([]struct {
+		Text string `json:"Text"`
+	}{{Text: text}})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal azure translation request body: %w", err)
+	}
 
-	go func() {
-		defer close(results)
+	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(requestBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create azure translation http request: %w", err)
+	}
 
-		// Construct the 'to' query parameter for multiple languages
-		endpoint := fmt.Sprintf("https://api.cognitive.microsofttranslator.com/translate?api-version=3.0&from=%s&to=%s", sourceLang, strings.Join(targetLangs, "&to="))
-		requestBody, err := json.Marshal([]struct {
-			Text string `json:"Text"`
-		}{{Text: text}})
-		if err != nil {
-			p.logger.WithError(err).Error("failed to marshal azure translation request body")
-			return
-		}
+	req.Header.Set("Ocp-Apim-Subscription-Key", p.account.Credentials.APIKey)
+	req.Header.Set("Ocp-Apim-Subscription-Region", p.account.Credentials.Region)
+	req.Header.Set("Content-Type", "application/json")
 
-		req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(requestBody))
-		if err != nil {
-			p.logger.WithError(err).Error("failed to create azure translation http request")
-			return
-		}
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute azure translation request: %w", err)
+	}
+	defer resp.Body.Close()
 
-		req.Header.Set("Ocp-Apim-Subscription-Key", p.account.Credentials.APIKey)
-		req.Header.Set("Ocp-Apim-Subscription-Region", p.account.Credentials.Region)
-		req.Header.Set("Content-Type", "application/json")
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("azure translation request failed with status %d: %s", resp.StatusCode, string(bodyBytes))
+	}
 
-		client := &http.Client{Timeout: 10 * time.Second}
-		resp, err := client.Do(req)
-		if err != nil {
-			p.logger.WithError(err).Error("failed to execute azure translation request")
-			return
-		}
-		defer resp.Body.Close()
+	var azureResponse []struct {
+		Translations []struct {
+			Text string `json:"text"`
+			To   string `json:"to"`
+		} `json:"translations"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&azureResponse); err != nil {
+		return nil, fmt.Errorf("failed to decode azure translation response: %w", err)
+	}
 
-		if resp.StatusCode != http.StatusOK {
-			bodyBytes, _ := io.ReadAll(resp.Body)
-			p.logger.Errorf("azure translation request failed with status %d: %s", resp.StatusCode, string(bodyBytes))
-			return
-		}
+	if len(azureResponse) == 0 || len(azureResponse[0].Translations) == 0 {
+		return nil, fmt.Errorf("received an empty or invalid translation from azure")
+	}
 
-		var azureResponse []struct {
-			Translations []struct {
-				Text string `json:"text"`
-				To   string `json:"to"`
-			} `json:"translations"`
-		}
-		if err := json.NewDecoder(resp.Body).Decode(&azureResponse); err != nil {
-			p.logger.WithError(err).Error("failed to decode azure translation response")
-			return
-		}
+	// Populate the translations map
+	translations := make(map[string]string)
+	for _, trans := range azureResponse[0].Translations {
+		translations[trans.To] = trans.Text
+	}
 
-		if len(azureResponse) == 0 || len(azureResponse[0].Translations) == 0 {
-			p.logger.Error("received an empty or invalid translation from azure")
-			return
-		}
+	result := &insights.TextTranslationResult{
+		Text:         text,
+		SourceLang:   sourceLang,
+		Translations: translations,
+	}
 
-		// Populate the translations map
-		translations := make(map[string]string)
-		for _, trans := range azureResponse[0].Translations {
-			translations[trans.To] = trans.Text
-		}
-
-		result := &insights.TextTranslationResult{
-			Text:         text,
-			SourceLang:   sourceLang,
-			Translations: translations,
-		}
-
-		select {
-		case results <- result:
-		case <-ctx.Done():
-			return
-		}
-	}()
-
-	return results, nil
+	return result, nil
 }
 
 // GetSupportedLanguages implements the insights.Provider interface.
