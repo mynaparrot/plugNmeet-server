@@ -9,6 +9,7 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
@@ -18,8 +19,8 @@ import (
 const (
 	InsightsNatsChannel           = "plug-n-meet-insights"
 	TaskConfigureAgent            = "configureAgent"
-	TaskStart                     = "start"
-	TaskEnd                       = "end"
+	TaskUserStart                 = "userStart"
+	TaskUserEnd                   = "userEnd"
 	TaskEndRoomAgentByServiceName = "endRoomAgentByServiceName"
 	TaskEndRoomAllAgents          = "endRoomAllAgents"
 )
@@ -30,13 +31,15 @@ type AgentTaskResponse struct {
 }
 
 type InsightsTaskPayload struct {
-	Task        string          `json:"task"`
-	ServiceName string          `json:"service_name"`
-	RoomName    string          `json:"room_name"`
-	UserID      string          `json:"user_id"`
-	Options     []byte          `json:"options"`
-	RoomE2EEKey *string         `json:"room_e2ee_key"`
-	TargetUsers map[string]bool `json:"target_users,omitempty"` // NEW
+	Task        string               `json:"task"`
+	ServiceType insights.ServiceType `json:"service_type"`
+	RoomId      string               `json:"room_id"`
+	UserId      string               `json:"user_id"`
+	Options     []byte               `json:"options"`
+	RoomE2EEKey *string              `json:"room_e2ee_key"`
+	TargetUsers map[string]bool      `json:"target_users,omitempty"`
+	AgentName   *string              `json:"agent_name,omitempty"`
+	HiddenAgent bool                 `json:"hidden_agent"`
 }
 
 type InsightsModel struct {
@@ -61,20 +64,9 @@ func NewInsightsModel(ctx context.Context, conf *config.AppConfig, redisService 
 }
 
 // ConfigureAgent sends a configuration task and waits for confirmation.
-func (s *InsightsModel) ConfigureAgent(serviceName, roomName string, allowedUsers []string, timeout time.Duration) error {
-	s.logger.Infof("Sending request to configure agent for service '%s' in room '%s'", serviceName, roomName)
+func (s *InsightsModel) ConfigureAgent(payload *InsightsTaskPayload, timeout time.Duration) error {
+	s.logger.Infof("Sending request to configure agent for service '%s' in room '%s'", payload.ServiceType, payload.RoomId)
 
-	usersMap := make(map[string]bool)
-	for _, user := range allowedUsers {
-		usersMap[user] = true
-	}
-
-	payload := &InsightsTaskPayload{
-		Task:        TaskConfigureAgent,
-		ServiceName: serviceName,
-		RoomName:    roomName,
-		TargetUsers: usersMap,
-	}
 	p, err := json.Marshal(payload)
 	if err != nil {
 		return err
@@ -99,16 +91,9 @@ func (s *InsightsModel) ConfigureAgent(serviceName, roomName string, allowedUser
 }
 
 // ActivateAgentTaskForUser publishes a 'start' message to activate a room agent for a long-running task for a specific user.
-func (s *InsightsModel) ActivateAgentTaskForUser(serviceName, roomName, userId string, options []byte, roomE2EEKey *string, timeout time.Duration) error {
-	s.logger.Infof("Publishing start agent task request for service '%s' in room '%s' for user '%s'", serviceName, roomName, userId)
-	payload := &InsightsTaskPayload{
-		Task:        TaskStart,
-		ServiceName: serviceName,
-		RoomName:    roomName,
-		UserID:      userId,
-		Options:     options,
-		RoomE2EEKey: roomE2EEKey,
-	}
+func (s *InsightsModel) ActivateAgentTaskForUser(payload *InsightsTaskPayload, timeout time.Duration) error {
+	s.logger.Infof("Publishing start agent task request for service '%s' in room '%s' for user '%s'", payload.ServiceType, payload.RoomId, payload.UserId)
+
 	p, err := json.Marshal(payload)
 	if err != nil {
 		return err
@@ -132,14 +117,9 @@ func (s *InsightsModel) ActivateAgentTaskForUser(serviceName, roomName, userId s
 }
 
 // EndAgentTaskForUser now only publishes an 'end' message.
-func (s *InsightsModel) EndAgentTaskForUser(serviceName, roomName, userId string, timeout time.Duration) error {
-	s.logger.Infof("Publishing end task request for service '%s' in room '%s' for user '%s'", serviceName, roomName, userId)
-	payload := &InsightsTaskPayload{
-		Task:        TaskEnd,
-		ServiceName: serviceName,
-		RoomName:    roomName,
-		UserID:      userId,
-	}
+func (s *InsightsModel) EndAgentTaskForUser(payload *InsightsTaskPayload, timeout time.Duration) error {
+	s.logger.Infof("Publishing end task request for service '%s' in room '%s' for user '%s'", payload.ServiceType, payload.RoomId, payload.UserId)
+
 	p, err := json.Marshal(payload)
 	if err != nil {
 		return err
@@ -162,12 +142,13 @@ func (s *InsightsModel) EndAgentTaskForUser(serviceName, roomName, userId string
 	return nil // Success!
 }
 
-func (s *InsightsModel) EndRoomAgentTaskByServiceNameAndWait(serviceName, roomName string, timeout time.Duration) error {
-	s.logger.Infof("Publishing end task request for service '%s' in room '%s'", serviceName, roomName)
+func (s *InsightsModel) EndRoomAgentTaskByServiceName(serviceType insights.ServiceType, roomName string, timeout time.Duration) error {
+	s.logger.Infof("Publishing end task request for service '%s' in room '%s'", serviceType, roomName)
+
 	payload := &InsightsTaskPayload{
 		Task:        TaskEndRoomAgentByServiceName,
-		ServiceName: serviceName,
-		RoomName:    roomName,
+		ServiceType: serviceType,
+		RoomId:      roomName,
 	}
 	p, err := json.Marshal(payload)
 	if err != nil {
@@ -205,17 +186,17 @@ func (s *InsightsModel) EndRoomAllAgentTasks(roomName string) error {
 }
 
 // ActivateTextTask performs a direct, stateless text-based task using the configured provider.
-func (s *InsightsModel) ActivateTextTask(ctx context.Context, serviceName string, options []byte) (interface{}, error) {
+func (s *InsightsModel) ActivateTextTask(ctx context.Context, serviceType insights.ServiceType, options []byte) (interface{}, error) {
 	// 1. Get the configuration for the requested service.
-	targetAccount, serviceConfig, err := s.conf.Insights.GetProviderAccountForService(serviceName)
+	targetAccount, serviceConfig, err := s.conf.Insights.GetProviderAccountForService(serviceType)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get provider account for service '%s': %w", serviceName, err)
+		return nil, fmt.Errorf("failed to get provider account for service '%s': %w", serviceType, err)
 	}
 
 	// 2. Create the appropriate task using the factory.
-	task, err := insightsservice.NewTask(serviceName, serviceConfig, targetAccount, s.logger)
+	task, err := insightsservice.NewTask(serviceType, serviceConfig, targetAccount, s.logger)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create task for service '%s': %w", serviceName, err)
+		return nil, fmt.Errorf("failed to create task for service '%s': %w", serviceType, err)
 	}
 
 	// 3. Run the stateless task and return the results channel.
@@ -223,23 +204,23 @@ func (s *InsightsModel) ActivateTextTask(ctx context.Context, serviceName string
 }
 
 // GetSupportedLanguagesForService returns the list of supported languages for a single, specific service.
-func (s *InsightsModel) GetSupportedLanguagesForService(serviceName string) ([]*plugnmeet.InsightsSupportedLangInfo, error) {
+func (s *InsightsModel) GetSupportedLanguagesForService(serviceType insights.ServiceType) ([]*plugnmeet.InsightsSupportedLangInfo, error) {
 	// 1. Get the configuration for the requested service.
-	targetAccount, serviceConfig, err := s.conf.Insights.GetProviderAccountForService(serviceName)
+	targetAccount, serviceConfig, err := s.conf.Insights.GetProviderAccountForService(serviceType)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get provider account for service '%s': %w", serviceName, err)
+		return nil, fmt.Errorf("failed to get provider account for service '%s': %w", serviceType, err)
 	}
 
 	// 2. Create a new provider instance on-the-fly.
 	provider, err := insightsservice.NewProvider(serviceConfig.Provider, targetAccount, serviceConfig, s.logger)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create provider for service '%s': %w", serviceName, err)
+		return nil, fmt.Errorf("failed to create provider for service '%s': %w", serviceType, err)
 	}
 
 	// 3. Call the provider's GetSupportedLanguages method and return the results.
 	// Here, we assume the 'serviceName' from the config (e.g., "transcription", "translation")
 	// is the canonical name the provider understands.
-	return provider.GetSupportedLanguages(serviceName), nil
+	return provider.GetSupportedLanguages(serviceType), nil
 }
 
 func (s *InsightsModel) Shutdown() {

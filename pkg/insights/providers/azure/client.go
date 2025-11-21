@@ -128,8 +128,8 @@ func (p *AzureProvider) TranslateText(ctx context.Context, text, sourceLang stri
 
 // GetSupportedLanguages implements the insights.Provider interface.
 // It looks up the service name in the hard-coded map from languages.go.
-func (p *AzureProvider) GetSupportedLanguages(serviceName string) []*plugnmeet.InsightsSupportedLangInfo {
-	if langs, ok := supportedLanguages[serviceName]; ok {
+func (p *AzureProvider) GetSupportedLanguages(serviceType insights.ServiceType) []*plugnmeet.InsightsSupportedLangInfo {
+	if langs, ok := supportedLanguages[serviceType]; ok {
 		service := make([]*plugnmeet.InsightsSupportedLangInfo, len(langs))
 		for i := range langs {
 			service[i] = &langs[i]

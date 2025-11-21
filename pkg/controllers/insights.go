@@ -132,7 +132,7 @@ func (i *InsightsController) HandleGetSupportedLangs(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	langs, err := i.insightsModel.GetSupportedLanguagesForService(string(serviceType))
+	langs, err := i.insightsModel.GetSupportedLanguagesForService(serviceType)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}

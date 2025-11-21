@@ -89,7 +89,7 @@ type Provider interface {
 	TranslateText(ctx context.Context, text, sourceLang string, targetLangs []string) (*plugnmeet.InsightsTextTranslationResult, error)
 
 	// GetSupportedLanguages is primarily for Transcription & Translation services.
-	GetSupportedLanguages(serviceName string) []*plugnmeet.InsightsSupportedLangInfo
+	GetSupportedLanguages(serviceType ServiceType) []*plugnmeet.InsightsSupportedLangInfo
 }
 
 // Task defines the interface for any runnable, self-contained AI task.

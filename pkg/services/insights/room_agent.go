@@ -40,25 +40,25 @@ type RoomAgent struct {
 	allowedUsers    map[string]bool   // Admin-defined permissions
 	activeUserTasks map[string][]byte // User-driven state
 	task            insights.Task     // The single task this agent is responsible for.
-	ServiceName     string
+	ServiceType     insights.ServiceType
 	e2eeKey         *string
 }
 
 // NewRoomAgent creates a single-purpose agent.
-func NewRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, logger *logrus.Entry, roomName, serviceName string, e2eeKey *string) (*RoomAgent, error) {
+func NewRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, logger *logrus.Entry, roomName string, serviceType insights.ServiceType, e2eeKey, agentName *string, isHidden bool) (*RoomAgent, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	log := logger.WithFields(logrus.Fields{
 		"room":       roomName,
-		"service":    serviceName,
+		"service":    serviceType,
 		"providerId": providerAccount.ID,
 		"serviceId":  serviceConfig.ID,
 	})
 
 	// Create a single task for this agent's one and only service.
-	task, err := NewTask(serviceName, serviceConfig, providerAccount, log)
+	task, err := NewTask(serviceType, serviceConfig, providerAccount, log)
 	if err != nil {
 		cancel()
-		return nil, fmt.Errorf("could not create task for service '%s': %w", serviceName, err)
+		return nil, fmt.Errorf("could not create task for service '%s': %w", serviceType, err)
 	}
 
 	agent := &RoomAgent{
@@ -69,17 +69,24 @@ func NewRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *co
 		activePipelines: make(map[string]*activePipeline),
 		allowedUsers:    make(map[string]bool),
 		activeUserTasks: make(map[string][]byte),
-		ServiceName:     serviceName,
+		ServiceType:     serviceType,
 		task:            task,
 		e2eeKey:         e2eeKey,
 	}
 
 	c := &plugnmeet.PlugNmeetTokenClaims{
 		RoomId:   roomName,
-		UserId:   fmt.Sprintf("insights-%s-%s", serviceName, uuid.NewString()),
+		UserId:   fmt.Sprintf("%s%s_%s", config.AgentUserUserIdPrefix, serviceType, uuid.NewString()),
 		IsAdmin:  true,
-		IsHidden: true,
+		IsHidden: isHidden,
 	}
+	if agentName != nil && *agentName != "" {
+		c.Name = *agentName
+	}
+
+	// TODO: if not hidden then we'll need to display this user in the session
+	// so, need to add this user to nats KV as normal user
+
 	token, err := auth.GenerateLivekitAccessToken(agent.conf.LivekitInfo.ApiKey, agent.conf.LivekitInfo.Secret, time.Minute*5, c)
 	if err != nil {
 		return nil, err
@@ -256,7 +263,7 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 	go func() {
 		err := a.task.RunAudioStream(ctx, transcoder.AudioStream(), a.Room.Name(), rp.Identity(), options)
 		if err != nil && !errors.Is(err, context.Canceled) {
-			a.logger.WithError(err).Errorf("insights task %s failed", a.ServiceName)
+			a.logger.WithError(err).Errorf("insights task %s failed", a.ServiceType)
 		}
 	}()
 

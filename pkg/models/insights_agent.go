@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/nats-io/nats.go"
@@ -14,8 +15,8 @@ import (
 
 // getAgentKey creates a unique identifier for an agent using the new robust format.
 // NEW FORMAT: {roomId}@{serviceName}
-func getAgentKey(roomName, serviceName string) string {
-	return fmt.Sprintf("%s@%s", roomName, serviceName)
+func getAgentKey(roomName string, serviceType insights.ServiceType) string {
+	return fmt.Sprintf("%s@%s", roomName, serviceType)
 }
 
 // HandleIncomingAgentTask is the core logic that runs on every server.
@@ -41,23 +42,23 @@ func (s *InsightsModel) HandleIncomingAgentTask(msg *nats.Msg) {
 		}
 	}
 
-	if payload.Task == TaskEnd {
-		if ok := s.endLocalAgentTask(payload.ServiceName, payload.RoomName, payload.UserID); ok {
+	if payload.Task == TaskUserEnd {
+		if ok := s.endLocalAgentTask(payload.ServiceType, payload.RoomId, payload.UserId); ok {
 			reply(true, "agent task ended for user successfully")
 		}
 		return
 	} else if payload.Task == TaskEndRoomAgentByServiceName {
-		if ok := s.removeAgentForRoom(payload.ServiceName, payload.RoomName); ok {
+		if ok := s.removeAgentForRoom(payload.ServiceType, payload.RoomId); ok {
 			reply(true, "agent removed successfully")
 		}
 		return
 	} else if payload.Task == TaskEndRoomAllAgents {
-		s.removeAgentsForRoom(payload.RoomName)
+		s.removeAgentsForRoom(payload.RoomId)
 		return
 	}
 
 	if payload.Task == TaskConfigureAgent {
-		key := getAgentKey(payload.RoomName, payload.ServiceName)
+		key := getAgentKey(payload.RoomId, payload.ServiceType)
 
 		// 1. Check if we are the leader and the agent is already running locally.
 		s.lock.RLock()
@@ -101,8 +102,8 @@ func (s *InsightsModel) HandleIncomingAgentTask(msg *nats.Msg) {
 			reply(true, "agent configured successfully")
 		}
 
-	} else if payload.Task == TaskStart {
-		key := getAgentKey(payload.RoomName, payload.ServiceName)
+	} else if payload.Task == TaskUserStart {
+		key := getAgentKey(payload.RoomId, payload.ServiceType)
 		s.lock.RLock()
 		agent, ok := s.roomAgents[key]
 		s.lock.RUnlock()
@@ -112,9 +113,9 @@ func (s *InsightsModel) HandleIncomingAgentTask(msg *nats.Msg) {
 			return
 		}
 
-		err := agent.ActivateTaskForUser(payload.UserID, payload.Options)
+		err := agent.ActivateTaskForUser(payload.UserId, payload.Options)
 		if err != nil {
-			s.logger.WithError(err).Errorf("failed to activate task for user %s", payload.UserID)
+			s.logger.WithError(err).Errorf("failed to activate task for user %s", payload.UserId)
 			reply(false, "failed to manage local agent")
 			return
 		}
@@ -124,7 +125,7 @@ func (s *InsightsModel) HandleIncomingAgentTask(msg *nats.Msg) {
 
 // manageLocalAgent now only creates the agent. The user activation is separate.
 func (s *InsightsModel) manageLocalAgent(payload *InsightsTaskPayload, lock *redisservice.Lock) error {
-	key := getAgentKey(payload.RoomName, payload.ServiceName)
+	key := getAgentKey(payload.RoomId, payload.ServiceType)
 
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -134,16 +135,16 @@ func (s *InsightsModel) manageLocalAgent(payload *InsightsTaskPayload, lock *red
 		return nil
 	}
 
-	s.logger.Infof("no agent found for service '%s' in room %s, creating a new one", payload.ServiceName, payload.RoomName)
+	s.logger.Infof("no agent found for service '%s' in room %s, creating a new one", payload.ServiceType, payload.RoomId)
 
 	// Use the new helper method to get both configs
-	targetAccount, serviceConfig, err := s.conf.Insights.GetProviderAccountForService(payload.ServiceName)
+	targetAccount, serviceConfig, err := s.conf.Insights.GetProviderAccountForService(payload.ServiceType)
 	if err != nil {
 		_ = lock.Unlock(s.ctx)
 		return err
 	}
 
-	agent, err := insightsservice.NewRoomAgent(s.ctx, s.conf, serviceConfig, targetAccount, s.logger, payload.RoomName, payload.ServiceName, payload.RoomE2EEKey)
+	agent, err := insightsservice.NewRoomAgent(s.ctx, s.conf, serviceConfig, targetAccount, s.logger, payload.RoomId, payload.ServiceType, payload.RoomE2EEKey, nil, true)
 	if err != nil {
 		_ = lock.Unlock(s.ctx)
 		return fmt.Errorf("failed to create insights agent: %w", err)
@@ -159,19 +160,19 @@ func (s *InsightsModel) superviseAgent(agent *insightsservice.RoomAgent, lock *r
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 
-	s.logger.Infof("Supervisor started for agent '%s' in room '%s'", agent.ServiceName, agent.Room.Name())
-	key := getAgentKey(agent.Room.Name(), agent.ServiceName)
+	s.logger.Infof("Supervisor started for agent '%s' in room '%s'", agent.ServiceType, agent.Room.Name())
+	key := getAgentKey(agent.Room.Name(), agent.ServiceType)
 
 	for {
 		select {
 		case <-ticker.C:
 			if err := lock.Refresh(s.ctx); err != nil {
-				s.logger.Warnf("Lost leadership for agent '%s', shutting down.", agent.ServiceName)
+				s.logger.Warnf("Lost leadership for agent '%s', shutting down.", agent.ServiceType)
 				s.shutdownAndRemoveAgent(key)
 				return
 			}
 		case <-agent.Ctx.Done():
-			s.logger.Infof("Agent for '%s' has shut down, releasing leadership.", agent.ServiceName)
+			s.logger.Infof("Agent for '%s' has shut down, releasing leadership.", agent.ServiceType)
 			_ = lock.Unlock(s.ctx)
 			s.shutdownAndRemoveAgent(key)
 			return
@@ -180,8 +181,8 @@ func (s *InsightsModel) superviseAgent(agent *insightsservice.RoomAgent, lock *r
 }
 
 // endLocalAgentTask is the internal method for the leader to use.
-func (s *InsightsModel) endLocalAgentTask(serviceName, roomName, userId string) bool {
-	key := getAgentKey(roomName, serviceName)
+func (s *InsightsModel) endLocalAgentTask(serviceType insights.ServiceType, roomName, userId string) bool {
+	key := getAgentKey(roomName, serviceType)
 	s.lock.RLock()
 	agent, ok := s.roomAgents[key]
 	s.lock.RUnlock()
@@ -208,9 +209,9 @@ func (s *InsightsModel) shutdownAndRemoveAgent(key string) bool {
 	return ok
 }
 
-func (s *InsightsModel) removeAgentForRoom(serviceName, roomName string) bool {
-	s.logger.Infof("removing agent for service '%s' in room '%s'", serviceName, roomName)
-	key := getAgentKey(roomName, serviceName)
+func (s *InsightsModel) removeAgentForRoom(serviceType insights.ServiceType, roomName string) bool {
+	s.logger.Infof("removing agent for service '%s' in room '%s'", serviceType, roomName)
+	key := getAgentKey(roomName, serviceType)
 	return s.shutdownAndRemoveAgent(key)
 }
 

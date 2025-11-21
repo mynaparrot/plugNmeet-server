@@ -1,12 +1,16 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
+)
 
 // InsightsConfig is the main config block for the insights feature.
 type InsightsConfig struct {
 	// The key is the provider type ("azure", "google"), the value is a list of accounts.
-	Providers map[string][]ProviderAccount `yaml:"providers"`
-	Services  map[string]ServiceConfig     `yaml:"services"`
+	Providers map[string][]ProviderAccount           `yaml:"providers"`
+	Services  map[insights.ServiceType]ServiceConfig `yaml:"services"`
 }
 
 // ProviderAccount defines a single, uniquely identified set of credentials for a provider.
@@ -31,17 +35,17 @@ type CredentialsConfig struct {
 }
 
 // GetProviderAccountForService is a helper to find the correct provider account configuration for a given service.
-func (c *InsightsConfig) GetProviderAccountForService(serviceName string) (*ProviderAccount, *ServiceConfig, error) {
+func (c *InsightsConfig) GetProviderAccountForService(serviceType insights.ServiceType) (*ProviderAccount, *ServiceConfig, error) {
 	// 1. Get the service configuration
-	serviceConfig, configOk := c.Services[serviceName]
+	serviceConfig, configOk := c.Services[serviceType]
 	if !configOk {
-		return nil, nil, fmt.Errorf("service '%s' is not defined in config", serviceName)
+		return nil, nil, fmt.Errorf("service '%s' is not defined in config", serviceType)
 	}
 
 	// 2. Get the list of accounts for the provider type
 	providerAccounts, providerOk := c.Providers[serviceConfig.Provider]
 	if !providerOk {
-		return nil, nil, fmt.Errorf("provider '%s' (referenced by service '%s') is not defined in config", serviceConfig.Provider, serviceName)
+		return nil, nil, fmt.Errorf("provider '%s' (referenced by service '%s') is not defined in config", serviceConfig.Provider, serviceType)
 	}
 
 	// 3. Find the specific account within the list by its ID.

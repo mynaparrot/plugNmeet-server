@@ -20,7 +20,20 @@ func (s *InsightsModel) TranscriptionConfigure(req *plugnmeet.InsightsTranscript
 		return fmt.Errorf("insights feature wasn't enabled")
 	}
 
-	err = s.ConfigureAgent("transcription", roomId, req.AllowedSpeechUsers, 5*time.Second)
+	usersMap := make(map[string]bool)
+	for _, user := range req.AllowedSpeechUsers {
+		usersMap[user] = true
+	}
+
+	payload := &InsightsTaskPayload{
+		Task:        TaskConfigureAgent,
+		ServiceType: insights.ServiceTypeTranscription,
+		RoomId:      roomId,
+		TargetUsers: usersMap,
+		HiddenAgent: true,
+	}
+
+	err = s.ConfigureAgent(payload, 5*time.Second)
 	if err != nil {
 		return err
 	}
@@ -39,7 +52,7 @@ func (s *InsightsModel) TranscriptionConfigure(req *plugnmeet.InsightsTranscript
 }
 
 func (s *InsightsModel) EndTranscription(roomId string) error {
-	err := s.EndRoomAgentTaskByServiceNameAndWait("transcription", roomId, 5*time.Second)
+	err := s.EndRoomAgentTaskByServiceName(insights.ServiceTypeTranscription, roomId, 5*time.Second)
 	if err != nil {
 		return err
 	}
@@ -79,15 +92,29 @@ func (s *InsightsModel) TranscriptionUserSession(req *plugnmeet.InsightsTranscri
 		if metadata.RoomFeatures.EndToEndEncryptionFeatures.IsEnabled {
 			roomE2EEKey = metadata.RoomFeatures.EndToEndEncryptionFeatures.EncryptionKey
 		}
+		payload := &InsightsTaskPayload{
+			Task:        TaskUserStart,
+			ServiceType: insights.ServiceTypeTranscription,
+			RoomId:      roomId,
+			UserId:      userId,
+			Options:     optionsBytes,
+			RoomE2EEKey: roomE2EEKey,
+		}
 
-		err = s.ActivateAgentTaskForUser("transcription", roomId, userId, optionsBytes, roomE2EEKey, time.Second*5)
+		err = s.ActivateAgentTaskForUser(payload, time.Second*5)
 		if err != nil {
 			return err
 		}
 		return nil
 
 	} else if req.Action == plugnmeet.InsightsUserSessionAction_USER_SESSION_ACTION_STOP {
-		err := s.EndAgentTaskForUser("transcription", roomId, userId, time.Second*5)
+		payload := &InsightsTaskPayload{
+			Task:        TaskUserEnd,
+			ServiceType: insights.ServiceTypeTranscription,
+			RoomId:      roomId,
+			UserId:      userId,
+		}
+		err := s.EndAgentTaskForUser(payload, time.Second*5)
 		if err != nil {
 			return err
 		}
