@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"time"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
@@ -118,6 +120,19 @@ func (i *InsightsController) HandleEndTranscription(c *fiber.Ctx) error {
 	}
 
 	return utils.SendCommonProtobufResponse(c, true, "success")
+}
+
+func (i *InsightsController) HandleGetTranscriptionUserTaskStatus(c *fiber.Ctx) error {
+	roomId := c.Locals("roomId")
+	requestedUserId := c.Locals("requestedUserId")
+
+	res, err := i.insightsModel.GetUserTaskStatus(insights.ServiceTypeTranscription, roomId.(string), requestedUserId.(string), time.Second*5)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	c.Set("Content-Type", "application/protobuf")
+	return c.Send(res)
 }
 
 func (i *InsightsController) HandleGetSupportedLangs(c *fiber.Ctx) error {

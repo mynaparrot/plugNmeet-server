@@ -155,7 +155,6 @@ func (a *RoomAgent) ActivateTaskForUser(userId string, options []byte) error {
 	a.lock.Unlock()
 
 	a.logger.Infof("activated task for participant %s", userId)
-	fmt.Println("a.Room.ConnectionState ====>>>> ", a.Room.ConnectionState())
 
 	// Attempt to subscribe immediately if the track is already available.
 	for _, p := range a.Room.GetRemoteParticipants() {
@@ -168,6 +167,15 @@ func (a *RoomAgent) ActivateTaskForUser(userId string, options []byte) error {
 		}
 	}
 	return nil
+}
+
+// GetUserTaskOptions safely checks if a user has an active task and returns the options.
+// It returns the options and a boolean indicating if the user was found.
+func (a *RoomAgent) GetUserTaskOptions(userId string) (insights.ServiceType, []byte, bool) {
+	a.lock.RLock()
+	defer a.lock.RUnlock()
+	options, ok := a.activeUserTasks[userId]
+	return a.ServiceType, options, ok
 }
 
 // EndTasksForUser stops the task for a specific user.

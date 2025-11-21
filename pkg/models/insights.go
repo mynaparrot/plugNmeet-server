@@ -21,6 +21,7 @@ const (
 	TaskConfigureAgent            = "configureAgent"
 	TaskUserStart                 = "userStart"
 	TaskUserEnd                   = "userEnd"
+	TaskGetUserStatus             = "getUserStatus"
 	TaskEndRoomAgentByServiceName = "endRoomAgentByServiceName"
 	TaskEndRoomAllAgents          = "endRoomAllAgents"
 )

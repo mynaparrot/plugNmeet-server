@@ -138,3 +138,24 @@ func (s *InsightsModel) TranscriptionUserSession(req *plugnmeet.InsightsTranscri
 
 	return fmt.Errorf("unknown action '%s'", req.Action.String())
 }
+
+// GetUserTaskStatus sends a request to the leader agent and waits for the user's task status.
+func (s *InsightsModel) GetUserTaskStatus(serviceType insights.ServiceType, roomId, userId string, timeout time.Duration) ([]byte, error) {
+	payload := &insights.InsightsTaskPayload{
+		Task:        TaskGetUserStatus,
+		ServiceType: serviceType,
+		RoomId:      roomId,
+		UserId:      userId,
+	}
+	p, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	msg, err := s.conf.NatsConn.Request(InsightsNatsChannel, p, timeout)
+	if err != nil {
+		return nil, fmt.Errorf("NATS request for user status failed: %w", err)
+	}
+
+	return msg.Data, nil
+}

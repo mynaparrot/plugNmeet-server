@@ -7,10 +7,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/nats-io/nats.go"
+	"google.golang.org/protobuf/proto"
 )
 
 // getAgentKey creates a unique identifier for an agent using the new robust format.
@@ -66,6 +68,35 @@ func (s *InsightsModel) HandleIncomingAgentTask(msg *nats.Msg) {
 		return
 	} else if payload.Task == TaskEndRoomAllAgents {
 		s.removeAgentsForRoom(payload.RoomId)
+		return
+	} else if payload.Task == TaskGetUserStatus {
+		key := getAgentKey(payload.RoomId, payload.ServiceType)
+		s.lock.RLock()
+		agent, ok := s.roomAgents[key]
+		s.lock.RUnlock()
+
+		if ok { // This server is the leader
+			serviceType, opts, isActive := agent.GetUserTaskOptions(payload.UserId)
+			t, _ := insights.FromServiceType(serviceType)
+			res := &plugnmeet.InsightsGetUserStatusRes{
+				ServiceType: t,
+				IsActive:    isActive,
+			}
+			switch serviceType {
+			case insights.ServiceTypeTranscription:
+				options := &insights.TranscriptionOptions{}
+				if err := json.Unmarshal(opts, &options); err == nil {
+					res.SpokenLang = &options.SpokenLang
+				}
+			}
+			if marshal, err := proto.Marshal(res); err == nil {
+				err := msg.Respond(marshal)
+				if err != nil {
+					s.logger.WithError(err).Error("failed to respond to user status request")
+				}
+			}
+		}
+		// Non-leaders simply ignore the request and do not reply.
 		return
 	}
 

@@ -48,6 +48,19 @@ func ToServiceType(t plugnmeet.InsightsServiceType) (ServiceType, error) {
 	}
 }
 
+// FromServiceType translates our internal Go type back to the Protobuf enum.
+// This is useful for constructing Protobuf messages to be sent from the server.
+func FromServiceType(t ServiceType) (plugnmeet.InsightsServiceType, error) {
+	switch t {
+	case ServiceTypeTranscription:
+		return plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_TRANSCRIPTION, nil
+	case ServiceTypeTranslation:
+		return plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_TRANSLATION, nil
+	default:
+		return plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_UNSPECIFIED, fmt.Errorf("unknown or unsupported insights service type: %s", t)
+	}
+}
+
 type InsightsTaskPayload struct {
 	Task        string          `json:"task"`
 	ServiceType ServiceType     `json:"service_type"`
