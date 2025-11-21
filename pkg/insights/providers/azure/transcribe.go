@@ -98,13 +98,14 @@ func (c *transcribeClient) CreateTranscription(mainCtx context.Context, roomId, 
 
 	recognizer.Recognizing(func(e speech.TranslationRecognitionEventArgs) {
 		result := &plugnmeet.InsightsTranscriptionResult{
-			Lang:         spokenLang,
+			FromUserId:   userId,
+			Lang:         GetLocaleFromCode(spokenLang),
 			Text:         e.Result.Text,
 			IsPartial:    true,
 			Translations: make(map[string]string),
 		}
 		for lang, text := range e.Result.GetTranslations() {
-			result.Translations[lang] = text
+			result.Translations[GetLocaleFromCode(lang)] = text
 		}
 		resultsChan <- &insights.TranscriptionEvent{
 			Type:   insights.EventTypePartialResult,
@@ -114,13 +115,14 @@ func (c *transcribeClient) CreateTranscription(mainCtx context.Context, roomId, 
 
 	recognizer.Recognized(func(e speech.TranslationRecognitionEventArgs) {
 		result := &plugnmeet.InsightsTranscriptionResult{
-			Lang:         spokenLang,
+			FromUserId:   userId,
+			Lang:         GetLocaleFromCode(spokenLang),
 			Text:         e.Result.Text,
 			IsPartial:    false,
 			Translations: make(map[string]string),
 		}
 		for lang, text := range e.Result.GetTranslations() {
-			result.Translations[lang] = text
+			result.Translations[GetLocaleFromCode(lang)] = text
 		}
 		resultsChan <- &insights.TranscriptionEvent{
 			Type:   insights.EventTypeFinalResult,

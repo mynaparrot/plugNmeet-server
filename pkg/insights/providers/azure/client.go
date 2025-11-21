@@ -33,7 +33,7 @@ func NewProvider(providerAccount *config.ProviderAccount, serviceConfig *config.
 }
 
 // CreateTranscription now uses the stored credentials and parses the options.
-func (p *AzureProvider) CreateTranscription(ctx context.Context, roomID, userID string, options []byte) (insights.TranscriptionStream, error) {
+func (p *AzureProvider) CreateTranscription(ctx context.Context, roomId, userId string, options []byte) (insights.TranscriptionStream, error) {
 	opts := &insights.TranscriptionOptions{
 		SpokenLang: "en-US",
 	}
@@ -52,7 +52,7 @@ func (p *AzureProvider) CreateTranscription(ctx context.Context, roomID, userID 
 		return nil, err
 	}
 
-	return transcribeClient.CreateTranscription(ctx, roomID, userID, opts.SpokenLang, opts.TransLangs)
+	return transcribeClient.CreateTranscription(ctx, roomId, userId, opts.SpokenLang, opts.TransLangs)
 }
 
 // TranslateText implements the insights.Provider interface for stateless text translation.

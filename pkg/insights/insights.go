@@ -82,7 +82,7 @@ type TranscriptionStream interface {
 // Provider is the master interface for all AI services.
 type Provider interface {
 	// CreateTranscription initializes a real-time transcription stream for speech-to-text.
-	CreateTranscription(ctx context.Context, roomID, userID string, options []byte) (TranscriptionStream, error)
+	CreateTranscription(ctx context.Context, roomId, userId string, options []byte) (TranscriptionStream, error)
 
 	// TranslateText performs stateless translation of a given text string to one or more languages.
 	// It returns a channel that will yield a single result and then close.
@@ -95,7 +95,7 @@ type Provider interface {
 // Task defines the interface for any runnable, self-contained AI task.
 type Task interface {
 	// RunAudioStream starts the task's processing pipeline for a continuous audio stream.
-	RunAudioStream(ctx context.Context, audioStream <-chan []byte, roomName, identity string, options []byte) error
+	RunAudioStream(ctx context.Context, audioStream <-chan []byte, roomId, userId string, options []byte) error
 
 	// RunStateless executes a single, stateless task (e.g., text translation).
 	RunStateless(ctx context.Context, options []byte) (interface{}, error)

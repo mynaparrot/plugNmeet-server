@@ -5,6 +5,28 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 )
 
+// transcriptionLocaleMap will store code -> locale for fast lookups.
+var transcriptionLocaleMap map[string]string
+
+func init() {
+	// Initialize the map once at package startup.
+	transcriptionLocaleMap = make(map[string]string)
+	langs := supportedLanguages[insights.ServiceTypeTranscription]
+	for i := range langs {
+		transcriptionLocaleMap[langs[i].Code] = langs[i].Locale
+	}
+}
+
+// GetLocaleFromCode performs an efficient lookup to get a locale from a language code.
+// It returns the original code if no specific locale is found.
+func GetLocaleFromCode(code string) string {
+	if locale, ok := transcriptionLocaleMap[code]; ok {
+		return locale
+	}
+	// Fallback to returning the code itself if not found.
+	return code
+}
+
 // supportedLanguages holds the static list of languages for Azure services.
 // The key is the service name (e.g., "transcription", "translation").
 var supportedLanguages = map[insights.ServiceType][]plugnmeet.InsightsSupportedLangInfo{

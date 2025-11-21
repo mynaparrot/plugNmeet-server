@@ -144,7 +144,7 @@ func (s *InsightsModel) manageLocalAgent(payload *InsightsTaskPayload, lock *red
 		return err
 	}
 
-	agent, err := insightsservice.NewRoomAgent(s.ctx, s.conf, serviceConfig, targetAccount, s.logger, payload.RoomId, payload.ServiceType, payload.RoomE2EEKey, nil, true)
+	agent, err := insightsservice.NewRoomAgent(s.ctx, s.conf, serviceConfig, targetAccount, s.natsService, s.redisService, s.logger, payload.RoomId, payload.ServiceType, payload.RoomE2EEKey, nil, true)
 	if err != nil {
 		_ = lock.Unlock(s.ctx)
 		return fmt.Errorf("failed to create insights agent: %w", err)

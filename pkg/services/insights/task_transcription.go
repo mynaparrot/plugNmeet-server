@@ -3,36 +3,43 @@ package insightsservice
 import (
 	"context"
 	"errors"
-	"fmt"
 
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
+	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type TranscriptionTask struct {
-	service *config.ServiceConfig
-	account *config.ProviderAccount
-	logger  *logrus.Entry
+	service      *config.ServiceConfig
+	account      *config.ProviderAccount
+	natsService  *natsservice.NatsService
+	redisService *redisservice.RedisService
+	logger       *logrus.Entry
 }
 
-func NewTranscriptionTask(serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, logger *logrus.Entry) (insights.Task, error) {
+func NewTranscriptionTask(serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, natsService *natsservice.NatsService, redisService *redisservice.RedisService, logger *logrus.Entry) (insights.Task, error) {
 	return &TranscriptionTask{
-		service: serviceConfig,
-		account: providerAccount,
-		logger:  logger,
+		service:      serviceConfig,
+		account:      providerAccount,
+		natsService:  natsService,
+		redisService: redisService,
+		logger:       logger.WithField("service-task", "transcription"),
 	}, nil
 }
 
 // RunAudioStream implements the insights.Task interface.
-func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-chan []byte, roomID, identity string, options []byte) error {
+func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-chan []byte, roomId, userId string, options []byte) error {
 	// Use the factory to create a provider instance.
 	provider, err := NewProvider(t.service.Provider, t.account, t.service, t.logger)
 	if err != nil {
 		return err
 	}
 
-	stream, err := provider.CreateTranscription(ctx, roomID, identity, options)
+	stream, err := provider.CreateTranscription(ctx, roomId, userId, options)
 	if err != nil {
 		return err
 	}
@@ -59,22 +66,38 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 	// Goroutine to process results
 	go func() {
 		defer func() {
-			fmt.Println("closed session")
+			if _, err := t.redisService.SpeechToTextUsersUsage(roomId, userId, plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED); err != nil {
+				t.logger.WithError(err).Errorln("update user usage failed")
+			}
+
+			if err := t.natsService.BroadcastSystemNotificationToRoom(roomId, "speech-services.service-stopped", plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_INFO, false, &userId); err != nil {
+				t.logger.WithError(err).Errorln("error broadcasting system notification")
+			}
 		}()
 
 		// The loop will automatically break when the channel is closed.
 		for event := range stream.Results() {
 			switch event.Type {
 			case insights.EventTypePartialResult, insights.EventTypeFinalResult:
-				fmt.Printf("Result Received: %+v\n", event.Result)
+				marshal, err := protojson.Marshal(event.Result)
+				if err != nil {
+					return
+				}
+				if err = t.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_TRANSCRIPTION_OUTPUT_TEXT, roomId, marshal, nil); err != nil {
+					t.logger.WithError(err).Errorln("error broadcasting transcription result")
+				}
 
 			case insights.EventTypeSessionStarted:
-				fmt.Println("Event: Session Started")
+				if _, err := t.redisService.SpeechToTextUsersUsage(roomId, userId, plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_STARTED); err != nil {
+					t.logger.WithError(err).Errorln("update user usage failed")
+				}
+
+				if err := t.natsService.BroadcastSystemNotificationToRoom(roomId, "speech-services.speech-to-text-ready", plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_INFO, false, &userId); err != nil {
+					t.logger.WithError(err).Errorln("error broadcasting system notification")
+				}
 
 			case insights.EventTypeSessionStopped:
-				// This event is now guaranteed to be received before the channel closes.
-				fmt.Println("Event: Session Stopped")
-
+				t.logger.Infoln("transcription session stopped")
 			case insights.EventTypeError:
 				t.logger.Errorln("insights provider error: ", event.Error)
 			}

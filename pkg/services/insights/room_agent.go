@@ -11,6 +11,8 @@ import (
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
+	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/pion/webrtc/v4"
 	"github.com/sirupsen/logrus"
 
@@ -45,7 +47,7 @@ type RoomAgent struct {
 }
 
 // NewRoomAgent creates a single-purpose agent.
-func NewRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, logger *logrus.Entry, roomName string, serviceType insights.ServiceType, e2eeKey, agentName *string, isHidden bool) (*RoomAgent, error) {
+func NewRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, natsService *natsservice.NatsService, redisService *redisservice.RedisService, logger *logrus.Entry, roomName string, serviceType insights.ServiceType, e2eeKey, agentName *string, isHidden bool) (*RoomAgent, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	log := logger.WithFields(logrus.Fields{
 		"service":     "room-agent",
@@ -56,7 +58,7 @@ func NewRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *co
 	})
 
 	// Create a single task for this agent's one and only service.
-	task, err := NewTask(serviceType, serviceConfig, providerAccount, log)
+	task, err := NewTask(serviceType, serviceConfig, providerAccount, natsService, redisService, log)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("could not create task for service '%s': %w", serviceType, err)
@@ -153,6 +155,7 @@ func (a *RoomAgent) ActivateTaskForUser(userId string, options []byte) error {
 	a.lock.Unlock()
 
 	a.logger.Infof("activated task for participant %s", userId)
+	fmt.Println("a.Room.ConnectionState ====>>>> ", a.Room.ConnectionState())
 
 	// Attempt to subscribe immediately if the track is already available.
 	for _, p := range a.Room.GetRemoteParticipants() {

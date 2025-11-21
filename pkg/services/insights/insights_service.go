@@ -6,6 +6,8 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights/providers/azure"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
+	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
 )
 
@@ -23,10 +25,10 @@ func NewProvider(providerType string, providerAccount *config.ProviderAccount, s
 }
 
 // NewTask is a factory that returns the correct Task implementation.
-func NewTask(serviceType insights.ServiceType, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, logger *logrus.Entry) (insights.Task, error) {
+func NewTask(serviceType insights.ServiceType, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, natsService *natsservice.NatsService, redisService *redisservice.RedisService, logger *logrus.Entry) (insights.Task, error) {
 	switch serviceType {
 	case insights.ServiceTypeTranscription:
-		return NewTranscriptionTask(serviceConfig, providerAccount, logger)
+		return NewTranscriptionTask(serviceConfig, providerAccount, natsService, redisService, logger)
 	case insights.ServiceTypeTranslation:
 		return NewTranslationTask(serviceConfig, providerAccount, logger)
 	default:
