@@ -47,21 +47,21 @@ type RoomAgent struct {
 }
 
 // NewRoomAgent creates a single-purpose agent.
-func NewRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, natsService *natsservice.NatsService, redisService *redisservice.RedisService, logger *logrus.Entry, roomName string, serviceType insights.ServiceType, e2eeKey, agentName *string, isHidden bool) (*RoomAgent, error) {
+func NewRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, natsService *natsservice.NatsService, redisService *redisservice.RedisService, logger *logrus.Entry, payload *insights.InsightsTaskPayload) (*RoomAgent, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	log := logger.WithFields(logrus.Fields{
 		"service":     "room-agent",
-		"room":        roomName,
-		"serviceType": serviceType,
+		"roomId":      payload.RoomId,
+		"serviceType": payload.ServiceType,
 		"providerId":  providerAccount.ID,
 		"serviceId":   serviceConfig.ID,
 	})
 
 	// Create a single task for this agent's one and only service.
-	task, err := NewTask(serviceType, serviceConfig, providerAccount, natsService, redisService, log)
+	task, err := NewTask(payload.ServiceType, serviceConfig, providerAccount, natsService, redisService, log)
 	if err != nil {
 		cancel()
-		return nil, fmt.Errorf("could not create task for service '%s': %w", serviceType, err)
+		return nil, fmt.Errorf("could not create task for service '%s': %w", payload.ServiceType, err)
 	}
 
 	agent := &RoomAgent{
@@ -72,19 +72,19 @@ func NewRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *co
 		activePipelines: make(map[string]*activePipeline),
 		allowedUsers:    make(map[string]bool),
 		activeUserTasks: make(map[string][]byte),
-		ServiceType:     serviceType,
+		ServiceType:     payload.ServiceType,
 		task:            task,
-		e2eeKey:         e2eeKey,
+		e2eeKey:         payload.RoomE2EEKey,
 	}
 
 	c := &plugnmeet.PlugNmeetTokenClaims{
-		RoomId:   roomName,
-		UserId:   fmt.Sprintf("%s%s_%s", config.AgentUserUserIdPrefix, serviceType, uuid.NewString()),
+		RoomId:   payload.RoomId,
+		UserId:   fmt.Sprintf("%s%s_%s", config.AgentUserUserIdPrefix, payload.ServiceType, uuid.NewString()),
 		IsAdmin:  true,
-		IsHidden: isHidden,
+		IsHidden: payload.HiddenAgent,
 	}
-	if agentName != nil && *agentName != "" {
-		c.Name = *agentName
+	if payload.AgentName != nil && *payload.AgentName != "" {
+		c.Name = *payload.AgentName
 	}
 
 	// TODO: if not hidden then we'll need to display this user in the session
@@ -112,7 +112,7 @@ func NewRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *co
 	}
 
 	agent.Room = room
-	log.Infof("successfully connected with room %s", roomName)
+	log.Infof("successfully connected with room %s", payload.RoomId)
 
 	return agent, nil
 }

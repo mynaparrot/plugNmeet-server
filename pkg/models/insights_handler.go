@@ -25,7 +25,7 @@ func (s *InsightsModel) TranscriptionConfigure(req *plugnmeet.InsightsTranscript
 		usersMap[user] = true
 	}
 
-	payload := &InsightsTaskPayload{
+	payload := &insights.InsightsTaskPayload{
 		Task:        TaskConfigureAgent,
 		ServiceType: insights.ServiceTypeTranscription,
 		RoomId:      roomId,
@@ -92,7 +92,7 @@ func (s *InsightsModel) TranscriptionUserSession(req *plugnmeet.InsightsTranscri
 		if metadata.RoomFeatures.EndToEndEncryptionFeatures.IsEnabled {
 			roomE2EEKey = metadata.RoomFeatures.EndToEndEncryptionFeatures.EncryptionKey
 		}
-		payload := &InsightsTaskPayload{
+		payload := &insights.InsightsTaskPayload{
 			Task:        TaskUserStart,
 			ServiceType: insights.ServiceTypeTranscription,
 			RoomId:      roomId,
@@ -108,7 +108,7 @@ func (s *InsightsModel) TranscriptionUserSession(req *plugnmeet.InsightsTranscri
 		return nil
 
 	} else if req.Action == plugnmeet.InsightsUserSessionAction_USER_SESSION_ACTION_STOP {
-		payload := &InsightsTaskPayload{
+		payload := &insights.InsightsTaskPayload{
 			Task:        TaskUserEnd,
 			ServiceType: insights.ServiceTypeTranscription,
 			RoomId:      roomId,

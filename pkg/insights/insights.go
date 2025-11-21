@@ -48,6 +48,18 @@ func ToServiceType(t plugnmeet.InsightsServiceType) (ServiceType, error) {
 	}
 }
 
+type InsightsTaskPayload struct {
+	Task        string          `json:"task"`
+	ServiceType ServiceType     `json:"service_type"`
+	RoomId      string          `json:"room_id"`
+	UserId      string          `json:"user_id"`
+	Options     []byte          `json:"options"`
+	RoomE2EEKey *string         `json:"room_e2ee_key"`
+	TargetUsers map[string]bool `json:"target_users,omitempty"`
+	AgentName   *string         `json:"agent_name,omitempty"`
+	HiddenAgent bool            `json:"hidden_agent"`
+}
+
 // TranscriptionOptions defines the structure for options passed to the transcription service.
 type TranscriptionOptions struct {
 	SpokenLang string   `json:"spokenLang"`

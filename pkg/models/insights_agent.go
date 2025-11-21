@@ -21,7 +21,7 @@ func getAgentKey(roomName string, serviceType insights.ServiceType) string {
 
 // HandleIncomingAgentTask is the core logic that runs on every server.
 func (s *InsightsModel) HandleIncomingAgentTask(msg *nats.Msg) {
-	payload := new(InsightsTaskPayload)
+	payload := new(insights.InsightsTaskPayload)
 	err := json.Unmarshal(msg.Data, &payload)
 	if err != nil {
 		s.logger.WithError(err).Error("failed to unmarshal insights task payload")
@@ -124,7 +124,7 @@ func (s *InsightsModel) HandleIncomingAgentTask(msg *nats.Msg) {
 }
 
 // manageLocalAgent now only creates the agent. The user activation is separate.
-func (s *InsightsModel) manageLocalAgent(payload *InsightsTaskPayload, lock *redisservice.Lock) error {
+func (s *InsightsModel) manageLocalAgent(payload *insights.InsightsTaskPayload, lock *redisservice.Lock) error {
 	key := getAgentKey(payload.RoomId, payload.ServiceType)
 
 	s.lock.Lock()
@@ -144,7 +144,7 @@ func (s *InsightsModel) manageLocalAgent(payload *InsightsTaskPayload, lock *red
 		return err
 	}
 
-	agent, err := insightsservice.NewRoomAgent(s.ctx, s.conf, serviceConfig, targetAccount, s.natsService, s.redisService, s.logger, payload.RoomId, payload.ServiceType, payload.RoomE2EEKey, nil, true)
+	agent, err := insightsservice.NewRoomAgent(s.ctx, s.conf, serviceConfig, targetAccount, s.natsService, s.redisService, s.logger, payload)
 	if err != nil {
 		_ = lock.Unlock(s.ctx)
 		return fmt.Errorf("failed to create insights agent: %w", err)

@@ -30,18 +30,6 @@ type AgentTaskResponse struct {
 	Msg    string `json:"msg"`
 }
 
-type InsightsTaskPayload struct {
-	Task        string               `json:"task"`
-	ServiceType insights.ServiceType `json:"service_type"`
-	RoomId      string               `json:"room_id"`
-	UserId      string               `json:"user_id"`
-	Options     []byte               `json:"options"`
-	RoomE2EEKey *string              `json:"room_e2ee_key"`
-	TargetUsers map[string]bool      `json:"target_users,omitempty"`
-	AgentName   *string              `json:"agent_name,omitempty"`
-	HiddenAgent bool                 `json:"hidden_agent"`
-}
-
 type InsightsModel struct {
 	ctx          context.Context
 	conf         *config.AppConfig
@@ -64,7 +52,7 @@ func NewInsightsModel(ctx context.Context, conf *config.AppConfig, redisService 
 }
 
 // ConfigureAgent sends a configuration task and waits for confirmation.
-func (s *InsightsModel) ConfigureAgent(payload *InsightsTaskPayload, timeout time.Duration) error {
+func (s *InsightsModel) ConfigureAgent(payload *insights.InsightsTaskPayload, timeout time.Duration) error {
 	s.logger.Infof("Sending request to configure agent for service '%s' in room '%s'", payload.ServiceType, payload.RoomId)
 
 	p, err := json.Marshal(payload)
@@ -91,7 +79,7 @@ func (s *InsightsModel) ConfigureAgent(payload *InsightsTaskPayload, timeout tim
 }
 
 // ActivateAgentTaskForUser publishes a 'start' message to activate a room agent for a long-running task for a specific user.
-func (s *InsightsModel) ActivateAgentTaskForUser(payload *InsightsTaskPayload, timeout time.Duration) error {
+func (s *InsightsModel) ActivateAgentTaskForUser(payload *insights.InsightsTaskPayload, timeout time.Duration) error {
 	s.logger.Infof("Publishing start agent task request for service '%s' in room '%s' for user '%s'", payload.ServiceType, payload.RoomId, payload.UserId)
 
 	p, err := json.Marshal(payload)
@@ -117,7 +105,7 @@ func (s *InsightsModel) ActivateAgentTaskForUser(payload *InsightsTaskPayload, t
 }
 
 // EndAgentTaskForUser now only publishes an 'end' message.
-func (s *InsightsModel) EndAgentTaskForUser(payload *InsightsTaskPayload, timeout time.Duration) error {
+func (s *InsightsModel) EndAgentTaskForUser(payload *insights.InsightsTaskPayload, timeout time.Duration) error {
 	s.logger.Infof("Publishing end task request for service '%s' in room '%s' for user '%s'", payload.ServiceType, payload.RoomId, payload.UserId)
 
 	p, err := json.Marshal(payload)
@@ -145,7 +133,7 @@ func (s *InsightsModel) EndAgentTaskForUser(payload *InsightsTaskPayload, timeou
 func (s *InsightsModel) EndRoomAgentTaskByServiceName(serviceType insights.ServiceType, roomName string, timeout time.Duration) error {
 	s.logger.Infof("Publishing end task request for service '%s' in room '%s'", serviceType, roomName)
 
-	payload := &InsightsTaskPayload{
+	payload := &insights.InsightsTaskPayload{
 		Task:        TaskEndRoomAgentByServiceName,
 		ServiceType: serviceType,
 		RoomId:      roomName,
@@ -175,7 +163,7 @@ func (s *InsightsModel) EndRoomAgentTaskByServiceName(serviceType insights.Servi
 // EndRoomAllAgentTasks will close everything for this room
 func (s *InsightsModel) EndRoomAllAgentTasks(roomName string) error {
 	s.logger.Infof("Publishing end all room tasks request for room '%s'", roomName)
-	payload := &InsightsTaskPayload{
+	payload := &insights.InsightsTaskPayload{
 		Task: TaskEndRoomAllAgents,
 	}
 	p, err := json.Marshal(payload)
