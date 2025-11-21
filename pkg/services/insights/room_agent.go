@@ -48,10 +48,11 @@ type RoomAgent struct {
 func NewRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, logger *logrus.Entry, roomName string, serviceType insights.ServiceType, e2eeKey, agentName *string, isHidden bool) (*RoomAgent, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	log := logger.WithFields(logrus.Fields{
-		"room":       roomName,
-		"service":    serviceType,
-		"providerId": providerAccount.ID,
-		"serviceId":  serviceConfig.ID,
+		"service":     "room-agent",
+		"room":        roomName,
+		"serviceType": serviceType,
+		"providerId":  providerAccount.ID,
+		"serviceId":   serviceConfig.ID,
 	})
 
 	// Create a single task for this agent's one and only service.
