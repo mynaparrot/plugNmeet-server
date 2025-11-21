@@ -83,7 +83,7 @@ func (i *InsightsController) HandleTranscriptionConfigure(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	return utils.SendCommonProtobufResponse(c, false, "success")
+	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
 func (i *InsightsController) HandleTranscriptionUserSession(c *fiber.Ctx) error {
@@ -117,7 +117,7 @@ func (i *InsightsController) HandleEndTranscription(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	return utils.SendCommonProtobufResponse(c, false, "success")
+	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
 func (i *InsightsController) HandleGetSupportedLangs(c *fiber.Ctx) error {
