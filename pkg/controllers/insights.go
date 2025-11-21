@@ -1,8 +1,6 @@
 package controllers
 
 import (
-	"encoding/json"
-
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
@@ -88,52 +86,22 @@ func (i *InsightsController) HandleTranscriptionConfigure(c *fiber.Ctx) error {
 	return utils.SendCommonProtobufResponse(c, false, "success")
 }
 
-func (i *InsightsController) HandleTranscriptionState(c *fiber.Ctx) error {
+func (i *InsightsController) HandleTranscriptionUserSession(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
 
-	req := new(plugnmeet.InsightsTranscriptionStateReq)
+	req := new(plugnmeet.InsightsTranscriptionUserSessionReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	if req.State == plugnmeet.InsightsTranscriptionState_INSIGHTS_TRANSCRIPTION_STATE_START {
-		metadata, err := i.natsService.GetRoomMetadataStruct(roomId.(string))
-		if err != nil {
-			return utils.SendCommonProtobufResponse(c, false, err.Error())
-		}
-		options := insights.TranscriptionOptions{
-			SpokenLang: req.SpokenLang,
-		}
-		if metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.IsEnabledTranslation {
-			options.TransLangs = metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.AllowedTransLangs
-		}
-		optionsBytes, err := json.Marshal(options)
-		if err != nil {
-			return utils.SendCommonProtobufResponse(c, false, err.Error())
-		}
-
-		var roomE2EEKey *string = nil
-		if metadata.RoomFeatures.EndToEndEncryptionFeatures.IsEnabled {
-			roomE2EEKey = metadata.RoomFeatures.EndToEndEncryptionFeatures.EncryptionKey
-		}
-
-		err = i.insightsModel.ActivateAgentTaskForUser("transcription", roomId.(string), requestedUserId.(string), optionsBytes, roomE2EEKey)
-		if err != nil {
-			return utils.SendCommonProtobufResponse(c, false, err.Error())
-		}
-		return utils.SendCommonProtobufResponse(c, true, "success")
-
-	} else if req.State == plugnmeet.InsightsTranscriptionState_INSIGHTS_TRANSCRIPTION_STATE_STOP {
-		err := i.insightsModel.EndAgentTaskForUser("transcription", roomId.(string), requestedUserId.(string))
-		if err != nil {
-			return utils.SendCommonProtobufResponse(c, false, err.Error())
-		}
-		return utils.SendCommonProtobufResponse(c, true, "success")
+	err = i.insightsModel.TranscriptionUserSession(req, roomId.(string), requestedUserId.(string))
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	return utils.SendCommonProtobufResponse(c, false, "unknown state")
+	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
 func (i *InsightsController) HandleEndTranscription(c *fiber.Ctx) error {

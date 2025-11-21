@@ -42,11 +42,14 @@ func (s *InsightsModel) HandleIncomingAgentTask(msg *nats.Msg) {
 	}
 
 	if payload.Task == TaskEnd {
-		s.endLocalAgentTask(payload.ServiceName, payload.RoomName, payload.UserID)
+		if ok := s.endLocalAgentTask(payload.ServiceName, payload.RoomName, payload.UserID); ok {
+			reply(true, "agent task ended for user successfully")
+		}
 		return
 	} else if payload.Task == TaskEndRoomAgentByServiceName {
-		s.removeAgentForRoom(payload.ServiceName, payload.RoomName)
-		reply(true, "agent removed successfully")
+		if ok := s.removeAgentForRoom(payload.ServiceName, payload.RoomName); ok {
+			reply(true, "agent removed successfully")
+		}
 		return
 	} else if payload.Task == TaskEndRoomAllAgents {
 		s.removeAgentsForRoom(payload.RoomName)
@@ -105,12 +108,17 @@ func (s *InsightsModel) HandleIncomingAgentTask(msg *nats.Msg) {
 		s.lock.RUnlock()
 
 		if !ok {
+			// not exist in this server
 			return
 		}
+
 		err := agent.ActivateTaskForUser(payload.UserID, payload.Options)
 		if err != nil {
 			s.logger.WithError(err).Errorf("failed to activate task for user %s", payload.UserID)
+			reply(false, "failed to manage local agent")
+			return
 		}
+		reply(true, "agent configured successfully")
 	}
 }
 
@@ -172,7 +180,7 @@ func (s *InsightsModel) superviseAgent(agent *insightsservice.RoomAgent, lock *r
 }
 
 // endLocalAgentTask is the internal method for the leader to use.
-func (s *InsightsModel) endLocalAgentTask(serviceName, roomName, userId string) {
+func (s *InsightsModel) endLocalAgentTask(serviceName, roomName, userId string) bool {
 	key := getAgentKey(roomName, serviceName)
 	s.lock.RLock()
 	agent, ok := s.roomAgents[key]
@@ -181,10 +189,11 @@ func (s *InsightsModel) endLocalAgentTask(serviceName, roomName, userId string) 
 	if ok {
 		agent.EndTasksForUser(userId)
 	}
+	return ok
 }
 
 // shutdownAndRemoveAgent is the internal method that safely shuts down and removes a single agent.
-func (s *InsightsModel) shutdownAndRemoveAgent(key string) {
+func (s *InsightsModel) shutdownAndRemoveAgent(key string) bool {
 	s.lock.Lock()
 	agent, ok := s.roomAgents[key]
 	if ok {
@@ -196,12 +205,13 @@ func (s *InsightsModel) shutdownAndRemoveAgent(key string) {
 		agent.Shutdown()
 		s.logger.Infof("removed and shut down agent for key %s", key)
 	}
+	return ok
 }
 
-func (s *InsightsModel) removeAgentForRoom(serviceName, roomName string) {
+func (s *InsightsModel) removeAgentForRoom(serviceName, roomName string) bool {
 	s.logger.Infof("removing agent for service '%s' in room '%s'", serviceName, roomName)
 	key := getAgentKey(roomName, serviceName)
-	s.shutdownAndRemoveAgent(key)
+	return s.shutdownAndRemoveAgent(key)
 }
 
 // removeAgentsForRoom now uses the new shutdownAndRemoveAgent method.

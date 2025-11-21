@@ -60,8 +60,8 @@ func NewInsightsModel(ctx context.Context, conf *config.AppConfig, redisService 
 	}
 }
 
-// ConfigureAgentAndWait sends a configuration task and waits for confirmation.
-func (s *InsightsModel) ConfigureAgentAndWait(serviceName, roomName string, allowedUsers []string, timeout time.Duration) error {
+// ConfigureAgent sends a configuration task and waits for confirmation.
+func (s *InsightsModel) ConfigureAgent(serviceName, roomName string, allowedUsers []string, timeout time.Duration) error {
 	s.logger.Infof("Sending request to configure agent for service '%s' in room '%s'", serviceName, roomName)
 
 	usersMap := make(map[string]bool)
@@ -99,7 +99,7 @@ func (s *InsightsModel) ConfigureAgentAndWait(serviceName, roomName string, allo
 }
 
 // ActivateAgentTaskForUser publishes a 'start' message to activate a room agent for a long-running task for a specific user.
-func (s *InsightsModel) ActivateAgentTaskForUser(serviceName, roomName, userId string, options []byte, roomE2EEKey *string) error {
+func (s *InsightsModel) ActivateAgentTaskForUser(serviceName, roomName, userId string, options []byte, roomE2EEKey *string, timeout time.Duration) error {
 	s.logger.Infof("Publishing start agent task request for service '%s' in room '%s' for user '%s'", serviceName, roomName, userId)
 	payload := &InsightsTaskPayload{
 		Task:        TaskStart,
@@ -113,11 +113,26 @@ func (s *InsightsModel) ActivateAgentTaskForUser(serviceName, roomName, userId s
 	if err != nil {
 		return err
 	}
-	return s.conf.NatsConn.Publish(InsightsNatsChannel, p)
+
+	msg, err := s.conf.NatsConn.Request(InsightsNatsChannel, p, timeout)
+	if err != nil {
+		return fmt.Errorf("NATS request failed: %w", err)
+	}
+
+	var res AgentTaskResponse
+	if err := json.Unmarshal(msg.Data, &res); err != nil {
+		return fmt.Errorf("failed to parse response from agent: %w", err)
+	}
+
+	if !res.Status {
+		return fmt.Errorf("agent failed to process task: %s", res.Msg)
+	}
+
+	return nil
 }
 
 // EndAgentTaskForUser now only publishes an 'end' message.
-func (s *InsightsModel) EndAgentTaskForUser(serviceName, roomName, userId string) error {
+func (s *InsightsModel) EndAgentTaskForUser(serviceName, roomName, userId string, timeout time.Duration) error {
 	s.logger.Infof("Publishing end task request for service '%s' in room '%s' for user '%s'", serviceName, roomName, userId)
 	payload := &InsightsTaskPayload{
 		Task:        TaskEnd,
@@ -129,7 +144,22 @@ func (s *InsightsModel) EndAgentTaskForUser(serviceName, roomName, userId string
 	if err != nil {
 		return err
 	}
-	return s.conf.NatsConn.Publish(InsightsNatsChannel, p)
+
+	msg, err := s.conf.NatsConn.Request(InsightsNatsChannel, p, timeout)
+	if err != nil {
+		return fmt.Errorf("NATS request failed: %w", err)
+	}
+
+	var res AgentTaskResponse
+	if err := json.Unmarshal(msg.Data, &res); err != nil {
+		return fmt.Errorf("failed to parse response from agent: %w", err)
+	}
+
+	if !res.Status {
+		return fmt.Errorf("agent failed to process task: %s", res.Msg)
+	}
+
+	return nil // Success!
 }
 
 func (s *InsightsModel) EndRoomAgentTaskByServiceNameAndWait(serviceName, roomName string, timeout time.Duration) error {
