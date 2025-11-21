@@ -14,6 +14,9 @@ func (s *InsightsModel) TranscriptionConfigure(req *plugnmeet.InsightsTranscript
 	if err != nil {
 		return err
 	}
+	if metadata == nil {
+		return fmt.Errorf("empty room medata")
+	}
 
 	insightsFeatures := metadata.RoomFeatures.InsightsFeatures
 	if !insightsFeatures.IsAllow || !insightsFeatures.TranscriptionFeatures.IsAllow {
@@ -56,9 +59,17 @@ func (s *InsightsModel) EndTranscription(roomId string) error {
 	if err != nil {
 		return err
 	}
+	return s.broadcastEndTranscription(roomId)
+}
+
+func (s *InsightsModel) broadcastEndTranscription(roomId string) error {
 	metadata, err := s.natsService.GetRoomMetadataStruct(roomId)
 	if err != nil {
 		return err
+	}
+	if metadata == nil || !metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.IsEnabled {
+		// already ended or room closed
+		return nil
 	}
 
 	metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.IsEnabled = false
@@ -77,6 +88,10 @@ func (s *InsightsModel) TranscriptionUserSession(req *plugnmeet.InsightsTranscri
 		if err != nil {
 			return err
 		}
+		if metadata == nil {
+			return fmt.Errorf("empty room medata")
+		}
+
 		options := insights.TranscriptionOptions{
 			SpokenLang: *req.SpokenLang,
 		}

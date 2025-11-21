@@ -19,6 +19,18 @@ func getAgentKey(roomName string, serviceType insights.ServiceType) string {
 	return fmt.Sprintf("%s@%s", roomName, serviceType)
 }
 
+// parseAgentKey safely extracts the roomId and serviceName from the new key format.
+func parseAgentKey(key string) (roomId string, serviceType insights.ServiceType, err error) {
+	parts := strings.SplitN(key, "@", 2)
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid agent key format: expected 'roomId@serviceName', got '%s'", key)
+	}
+	if parts[0] == "" || parts[1] == "" {
+		return "", "", fmt.Errorf("invalid agent key format: empty roomId or serviceName in key '%s'", key)
+	}
+	return parts[0], insights.ServiceType(parts[1]), nil
+}
+
 // HandleIncomingAgentTask is the core logic that runs on every server.
 func (s *InsightsModel) HandleIncomingAgentTask(msg *nats.Msg) {
 	payload := new(insights.InsightsTaskPayload)
@@ -155,24 +167,24 @@ func (s *InsightsModel) manageLocalAgent(payload *insights.InsightsTaskPayload, 
 	return nil
 }
 
-// superviseAgent is the "Janitor" that maintains leadership.
+// superviseAgent is the "Janitor" that maintains leadership and health.
 func (s *InsightsModel) superviseAgent(agent *insightsservice.RoomAgent, lock *redisservice.Lock) {
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 
-	s.logger.Infof("Supervisor started for agent '%s' in room '%s'", agent.ServiceType, agent.Room.Name())
 	key := getAgentKey(agent.Room.Name(), agent.ServiceType)
+	s.logger.Infof("Supervisor started for agent '%s'", key)
 
 	for {
 		select {
 		case <-ticker.C:
 			if err := lock.Refresh(s.ctx); err != nil {
-				s.logger.Warnf("Lost leadership for agent '%s', shutting down.", agent.ServiceType)
+				s.logger.Warnf("Lost leadership for agent '%s', shutting down.", key)
 				s.shutdownAndRemoveAgent(key)
 				return
 			}
 		case <-agent.Ctx.Done():
-			s.logger.Infof("Agent for '%s' has shut down, releasing leadership.", agent.ServiceType)
+			s.logger.Infof("Agent for '%s' context was canceled, shutting down.", key)
 			_ = lock.Unlock(s.ctx)
 			s.shutdownAndRemoveAgent(key)
 			return
@@ -205,6 +217,17 @@ func (s *InsightsModel) shutdownAndRemoveAgent(key string) bool {
 	if ok {
 		agent.Shutdown()
 		s.logger.Infof("removed and shut down agent for key %s", key)
+
+		roomId, serviceType, err := parseAgentKey(key)
+		if err != nil {
+			s.logger.WithError(err).Error("could not parse agent key during shutdown")
+			return ok
+		}
+
+		switch serviceType {
+		case insights.ServiceTypeTranscription:
+			_ = s.broadcastEndTranscription(roomId)
+		}
 	}
 	return ok
 }
