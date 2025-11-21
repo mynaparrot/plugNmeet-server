@@ -152,7 +152,7 @@ func (s *InsightsModel) GetUserTaskStatus(serviceType insights.ServiceType, room
 		return nil, err
 	}
 
-	msg, err := s.conf.NatsConn.Request(InsightsNatsChannel, p, timeout)
+	msg, err := s.appConfig.NatsConn.Request(InsightsNatsChannel, p, timeout)
 	if err != nil {
 		return nil, fmt.Errorf("NATS request for user status failed: %w", err)
 	}

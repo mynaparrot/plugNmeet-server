@@ -9,6 +9,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
+	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 )
@@ -208,6 +209,17 @@ func (m *RoomModel) setRoomDefaults(r *plugnmeet.CreateRoomReq) {
 
 	if r.Metadata.IsBreakoutRoom && r.Metadata.RoomFeatures.EnableAnalytics {
 		r.Metadata.RoomFeatures.EnableAnalytics = false
+	}
+
+	if r.Metadata.RoomFeatures.InsightsFeatures != nil {
+		maxSelectedTransLangs := 2
+		if _, serviceCnf, err := m.app.Insights.GetProviderAccountForService(insights.ServiceTypeTranscription); err == nil {
+			if num, ok := serviceCnf.Options["max_selected_trans_langs"]; ok {
+				maxSelectedTransLangs = num.(int)
+				fmt.Println("maxSelectedTransLangs===>", maxSelectedTransLangs)
+			}
+		}
+		r.Metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.MaxSelectedTransLangs = int32(maxSelectedTransLangs)
 	}
 }
 

@@ -50,7 +50,7 @@ func (s *InsightsModel) HandleIncomingAgentTask(msg *nats.Msg) {
 		}
 		res := &AgentTaskResponse{Status: status, Msg: message}
 		resBytes, _ := json.Marshal(res)
-		err := s.conf.NatsConn.Publish(msg.Reply, resBytes)
+		err := s.appConfig.NatsConn.Publish(msg.Reply, resBytes)
 		if err != nil {
 			s.logger.WithError(err).Error("failed to publish reply")
 		}
@@ -181,13 +181,13 @@ func (s *InsightsModel) manageLocalAgent(payload *insights.InsightsTaskPayload, 
 	s.logger.Infof("no agent found for service '%s' in room %s, creating a new one", payload.ServiceType, payload.RoomId)
 
 	// Use the new helper method to get both configs
-	targetAccount, serviceConfig, err := s.conf.Insights.GetProviderAccountForService(payload.ServiceType)
+	targetAccount, serviceConfig, err := s.appConfig.Insights.GetProviderAccountForService(payload.ServiceType)
 	if err != nil {
 		_ = lock.Unlock(s.ctx)
 		return err
 	}
 
-	agent, err := insightsservice.NewRoomAgent(s.ctx, s.conf, serviceConfig, targetAccount, s.natsService, s.redisService, s.logger, payload)
+	agent, err := insightsservice.NewRoomAgent(s.ctx, s.appConfig, serviceConfig, targetAccount, s.natsService, s.redisService, s.logger, payload)
 	if err != nil {
 		_ = lock.Unlock(s.ctx)
 		return fmt.Errorf("failed to create insights agent: %w", err)

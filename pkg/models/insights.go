@@ -33,7 +33,7 @@ type AgentTaskResponse struct {
 
 type InsightsModel struct {
 	ctx          context.Context
-	conf         *config.AppConfig
+	appConfig    *config.AppConfig
 	logger       *logrus.Entry
 	lock         sync.RWMutex
 	roomAgents   map[string]*insightsservice.RoomAgent // Maps a unique key (roomName@serviceName) to a dedicated agent
@@ -41,10 +41,10 @@ type InsightsModel struct {
 	natsService  *natsservice.NatsService
 }
 
-func NewInsightsModel(ctx context.Context, conf *config.AppConfig, redisService *redisservice.RedisService, natsService *natsservice.NatsService, logger *logrus.Logger) *InsightsModel {
+func NewInsightsModel(ctx context.Context, appConfig *config.AppConfig, redisService *redisservice.RedisService, natsService *natsservice.NatsService, logger *logrus.Logger) *InsightsModel {
 	return &InsightsModel{
 		ctx:          ctx,
-		conf:         conf,
+		appConfig:    appConfig,
 		redisService: redisService,
 		natsService:  natsService,
 		roomAgents:   make(map[string]*insightsservice.RoomAgent),
@@ -62,7 +62,7 @@ func (s *InsightsModel) ConfigureAgent(payload *insights.InsightsTaskPayload, ti
 	}
 
 	// Use nats request/reply
-	msg, err := s.conf.NatsConn.Request(InsightsNatsChannel, p, timeout)
+	msg, err := s.appConfig.NatsConn.Request(InsightsNatsChannel, p, timeout)
 	if err != nil {
 		return fmt.Errorf("NATS request failed: %w", err)
 	}
@@ -88,7 +88,7 @@ func (s *InsightsModel) ActivateAgentTaskForUser(payload *insights.InsightsTaskP
 		return err
 	}
 
-	msg, err := s.conf.NatsConn.Request(InsightsNatsChannel, p, timeout)
+	msg, err := s.appConfig.NatsConn.Request(InsightsNatsChannel, p, timeout)
 	if err != nil {
 		return fmt.Errorf("NATS request failed: %w", err)
 	}
@@ -114,7 +114,7 @@ func (s *InsightsModel) EndAgentTaskForUser(payload *insights.InsightsTaskPayloa
 		return err
 	}
 
-	msg, err := s.conf.NatsConn.Request(InsightsNatsChannel, p, timeout)
+	msg, err := s.appConfig.NatsConn.Request(InsightsNatsChannel, p, timeout)
 	if err != nil {
 		return fmt.Errorf("NATS request failed: %w", err)
 	}
@@ -144,7 +144,7 @@ func (s *InsightsModel) EndRoomAgentTaskByServiceName(serviceType insights.Servi
 		return err
 	}
 
-	msg, err := s.conf.NatsConn.Request(InsightsNatsChannel, p, timeout)
+	msg, err := s.appConfig.NatsConn.Request(InsightsNatsChannel, p, timeout)
 	if err != nil {
 		return fmt.Errorf("NATS request failed: %w", err)
 	}
@@ -171,13 +171,13 @@ func (s *InsightsModel) EndRoomAllAgentTasks(roomName string) error {
 	if err != nil {
 		return err
 	}
-	return s.conf.NatsConn.Publish(InsightsNatsChannel, p)
+	return s.appConfig.NatsConn.Publish(InsightsNatsChannel, p)
 }
 
 // ActivateTextTask performs a direct, stateless text-based task using the configured provider.
 func (s *InsightsModel) ActivateTextTask(ctx context.Context, serviceType insights.ServiceType, options []byte) (interface{}, error) {
 	// 1. Get the configuration for the requested service.
-	targetAccount, serviceConfig, err := s.conf.Insights.GetProviderAccountForService(serviceType)
+	targetAccount, serviceConfig, err := s.appConfig.Insights.GetProviderAccountForService(serviceType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get provider account for service '%s': %w", serviceType, err)
 	}
@@ -195,7 +195,7 @@ func (s *InsightsModel) ActivateTextTask(ctx context.Context, serviceType insigh
 // GetSupportedLanguagesForService returns the list of supported languages for a single, specific service.
 func (s *InsightsModel) GetSupportedLanguagesForService(serviceType insights.ServiceType) ([]*plugnmeet.InsightsSupportedLangInfo, error) {
 	// 1. Get the configuration for the requested service.
-	targetAccount, serviceConfig, err := s.conf.Insights.GetProviderAccountForService(serviceType)
+	targetAccount, serviceConfig, err := s.appConfig.Insights.GetProviderAccountForService(serviceType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get provider account for service '%s': %w", serviceType, err)
 	}
