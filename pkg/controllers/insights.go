@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -158,5 +159,35 @@ func (i *InsightsController) HandleGetSupportedLangs(c *fiber.Ctx) error {
 		Languages: langs,
 	}
 
+	return utils.SendProtobufResponse(c, res)
+}
+
+func (i *InsightsController) HandleExecuteTranslation(c *fiber.Ctx) error {
+	req := new(plugnmeet.InsightsTranslateTextReq)
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	opts := insights.TranslationTaskOptions{
+		Text:        req.Text,
+		SourceLang:  req.SourceLang,
+		TargetLangs: req.TargetLangs,
+	}
+	options, err := json.Marshal(opts)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	result, err := i.insightsModel.ActivateTextTask(c.UserContext(), insights.ServiceTypeTranslation, options)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	res := &plugnmeet.InsightsTranslateTextRes{
+		Status: true,
+		Msg:    "success",
+		Result: result.(*plugnmeet.InsightsTextTranslationResult),
+	}
 	return utils.SendProtobufResponse(c, res)
 }

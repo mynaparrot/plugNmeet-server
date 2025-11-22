@@ -199,11 +199,12 @@ insights:
           region: "eastus"
       #  options: {} # Generic options for this provider account, e.g., custom endpoints
 
-      - id: "westeu_premium"
+      - id: "transGlobal"
         credentials:
-          api_key: "YOUR_AZURE_KEY_2"
-          region: "westeurope"
-      #  options: {}
+          api_key: "YOUR_AZURE_KEY_1"
+          region: "global"
+        options:
+            endpoint: "https://api.cognitive.microsofttranslator.com/translate?api-version=3.0"
 
   # 2. Define the services that USE the providers.
   # The key ("transcription", "translation") is the service name.
@@ -217,6 +218,4 @@ insights:
 
     translation:
       provider: "azure"
-      id: "westeu_premium"
-      options:
-        model: "default"
+      id: "transGlobal"

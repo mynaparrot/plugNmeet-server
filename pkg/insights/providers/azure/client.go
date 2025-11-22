@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
+	"net/url"
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -66,9 +66,22 @@ func (p *AzureProvider) TranslateText(ctx context.Context, text, sourceLang stri
 	if len(targetLangs) == 0 {
 		return nil, fmt.Errorf("at least one target language is required")
 	}
+	endpoint, ok := p.account.Options["endpoint"]
+	if !ok {
+		return nil, fmt.Errorf("azure endpoint is not configured")
+	}
 
-	// Construct the 'to' query parameter for multiple languages
-	endpoint := fmt.Sprintf("https://api.cognitive.microsofttranslator.com/translate?api-version=3.0&from=%s&to=%s", sourceLang, strings.Join(targetLangs, "&to="))
+	u, err := url.Parse(endpoint.(string))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse azure translation endpoint: %w", err)
+	}
+	q := u.Query()
+	q.Add("from", sourceLang)
+	for _, l := range targetLangs {
+		q.Add("to", l)
+	}
+	u.RawQuery = q.Encode()
+
 	requestBody, err := json.Marshal([]struct {
 		Text string `json:"Text"`
 	}{{Text: text}})
@@ -76,7 +89,7 @@ func (p *AzureProvider) TranslateText(ctx context.Context, text, sourceLang stri
 		return nil, fmt.Errorf("failed to marshal azure translation request body: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(requestBody))
+	req, err := http.NewRequestWithContext(ctx, "POST", u.String(), bytes.NewBuffer(requestBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create azure translation http request: %w", err)
 	}
@@ -118,7 +131,7 @@ func (p *AzureProvider) TranslateText(ctx context.Context, text, sourceLang stri
 	}
 
 	result := &plugnmeet.InsightsTextTranslationResult{
-		OriginalText: text,
+		SourceText:   text,
 		SourceLang:   sourceLang,
 		Translations: translations,
 	}
