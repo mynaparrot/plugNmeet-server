@@ -11,6 +11,7 @@ require (
 	github.com/goccy/go-json v0.10.5
 	github.com/gofiber/fiber/v2 v2.52.9
 	github.com/gofiber/template/html/v2 v2.1.3
+	github.com/gofiber/template/html/v3 v3.0.0
 	github.com/google/uuid v1.6.0
 	github.com/google/wire v0.7.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
