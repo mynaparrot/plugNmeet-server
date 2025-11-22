@@ -4,7 +4,7 @@ services:
     ports:
       - "6379:6379/tcp"
   db:
-    image: mariadb:12.0
+    image: mariadb:12.1
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: 12345
