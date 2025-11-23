@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -71,14 +70,6 @@ func (i *InsightsController) HandleTranscriptionConfigure(c *fiber.Ctx) error {
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
-	}
-
-	metadata, err := i.natsService.GetRoomMetadataStruct(roomId.(string))
-	if err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
-	}
-	if !metadata.RoomFeatures.InsightsFeatures.IsAllow || !metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.IsAllow {
-		return utils.SendCommonProtobufResponse(c, false, "insights feature wasn't enabled")
 	}
 
 	err = i.insightsModel.TranscriptionConfigure(req, roomId.(string))
@@ -162,32 +153,58 @@ func (i *InsightsController) HandleGetSupportedLangs(c *fiber.Ctx) error {
 	return utils.SendProtobufResponse(c, res)
 }
 
-func (i *InsightsController) HandleExecuteTranslation(c *fiber.Ctx) error {
+func (i *InsightsController) HandleChatTranslationConfigure(c *fiber.Ctx) error {
+	if i.app.Insights == nil {
+		return utils.SendCommonProtobufResponse(c, false, "insights feature wasn't configured")
+	}
+	isAdmin := c.Locals("isAdmin")
+	roomId := c.Locals("roomId")
+
+	if !isAdmin.(bool) {
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
+	}
+
+	req := new(plugnmeet.InsightsChatTranslationConfigReq)
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	err = i.insightsModel.ChatTranslationConfigure(req, roomId.(string))
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	return utils.SendCommonProtobufResponse(c, true, "success")
+}
+
+func (i *InsightsController) HandleExecuteChatTranslation(c *fiber.Ctx) error {
+	roomId := c.Locals("roomId")
+
 	req := new(plugnmeet.InsightsTranslateTextReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	opts := insights.TranslationTaskOptions{
-		Text:        req.Text,
-		SourceLang:  req.SourceLang,
-		TargetLangs: req.TargetLangs,
-	}
-	options, err := json.Marshal(opts)
+	result, err := i.insightsModel.ExecuteChatTranslation(c.UserContext(), req, roomId.(string))
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	result, err := i.insightsModel.ActivateTextTask(c.UserContext(), insights.ServiceTypeTranslation, options)
+	return utils.SendProtobufResponse(c, result)
+}
+
+func (i *InsightsController) HandleEndChatTranslation(c *fiber.Ctx) error {
+	isAdmin := c.Locals("isAdmin")
+	roomId := c.Locals("roomId")
+
+	if !isAdmin.(bool) {
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
+	}
+	err := i.insightsModel.ChatEndTranslation(roomId.(string))
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
-
-	res := &plugnmeet.InsightsTranslateTextRes{
-		Status: true,
-		Msg:    "success",
-		Result: result.(*plugnmeet.InsightsTextTranslationResult),
-	}
-	return utils.SendProtobufResponse(c, res)
+	return utils.SendCommonProtobufResponse(c, true, "success")
 }

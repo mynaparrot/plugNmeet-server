@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -16,6 +17,10 @@ func (s *InsightsModel) TranscriptionConfigure(req *plugnmeet.InsightsTranscript
 	}
 	if metadata == nil {
 		return fmt.Errorf("empty room medata")
+	}
+
+	if !metadata.RoomFeatures.InsightsFeatures.IsAllow || !metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.IsAllow {
+		return fmt.Errorf("insights feature wasn't enabled")
 	}
 
 	insightsFeatures := metadata.RoomFeatures.InsightsFeatures
@@ -158,4 +163,80 @@ func (s *InsightsModel) GetUserTaskStatus(serviceType insights.ServiceType, room
 	}
 
 	return msg.Data, nil
+}
+
+func (s *InsightsModel) ChatTranslationConfigure(req *plugnmeet.InsightsChatTranslationConfigReq, roomId string) error {
+	metadata, err := s.natsService.GetRoomMetadataStruct(roomId)
+	if err != nil {
+		return err
+	}
+	if metadata == nil {
+		return fmt.Errorf("empty room medata")
+	}
+
+	insightsFeatures := metadata.RoomFeatures.InsightsFeatures
+	if !insightsFeatures.IsAllow || !insightsFeatures.ChatTranslationFeatures.IsAllow {
+		return fmt.Errorf("insights feature wasn't enabled")
+	}
+
+	if len(req.AllowedTransLangs) > int(insightsFeatures.ChatTranslationFeatures.MaxSelectedTransLangs) {
+		return fmt.Errorf("max allowed selected languages exceeded")
+	}
+
+	insightsFeatures.ChatTranslationFeatures.IsEnabled = true
+	insightsFeatures.ChatTranslationFeatures.AllowedTransLangs = req.AllowedTransLangs
+	insightsFeatures.ChatTranslationFeatures.DefaultLang = req.DefaultLang
+
+	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
+}
+
+func (s *InsightsModel) ExecuteChatTranslation(ctx context.Context, req *plugnmeet.InsightsTranslateTextReq, roomId string) (*plugnmeet.InsightsTranslateTextRes, error) {
+	metadata, err := s.natsService.GetRoomMetadataStruct(roomId)
+	if err != nil {
+		return nil, err
+	}
+	if metadata == nil {
+		return nil, fmt.Errorf("empty room medata")
+	}
+
+	insightsFeatures := metadata.RoomFeatures.InsightsFeatures
+	if !insightsFeatures.IsAllow || !insightsFeatures.ChatTranslationFeatures.IsAllow {
+		return nil, fmt.Errorf("feature wasn't enabled")
+	}
+
+	opts := insights.TranslationTaskOptions{
+		Text:        req.Text,
+		SourceLang:  req.SourceLang,
+		TargetLangs: req.TargetLangs,
+	}
+	options, err := json.Marshal(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := s.ActivateTextTask(ctx, insights.ServiceTypeTranslation, options)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &plugnmeet.InsightsTranslateTextRes{
+		Status: true,
+		Msg:    "success",
+		Result: result.(*plugnmeet.InsightsTextTranslationResult),
+	}
+	return res, nil
+}
+
+func (s *InsightsModel) ChatEndTranslation(roomId string) error {
+	metadata, err := s.natsService.GetRoomMetadataStruct(roomId)
+	if err != nil {
+		return err
+	}
+	if metadata == nil {
+		return fmt.Errorf("empty room medata")
+	}
+
+	metadata.RoomFeatures.InsightsFeatures.ChatTranslationFeatures.IsEnabled = false
+
+	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
 }
