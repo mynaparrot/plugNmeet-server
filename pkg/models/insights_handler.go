@@ -197,7 +197,7 @@ func (s *InsightsModel) ChatTranslationConfigure(req *plugnmeet.InsightsChatTran
 	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
 }
 
-func (s *InsightsModel) ExecuteChatTranslation(ctx context.Context, req *plugnmeet.InsightsTranslateTextReq, roomId string) (*plugnmeet.InsightsTranslateTextRes, error) {
+func (s *InsightsModel) ExecuteChatTranslation(ctx context.Context, req *plugnmeet.InsightsTranslateTextReq, roomId, userId string) (*plugnmeet.InsightsTranslateTextRes, error) {
 	metadata, err := s.natsService.GetRoomMetadataStruct(roomId)
 	if err != nil {
 		return nil, err
@@ -224,6 +224,10 @@ func (s *InsightsModel) ExecuteChatTranslation(ctx context.Context, req *plugnme
 	result, err := s.ActivateTextTask(ctx, insights.ServiceTypeTranslation, options)
 	if err != nil {
 		return nil, err
+	}
+
+	if err := s.redisService.UpdateChatTranslationUsage(ctx, roomId, userId, len(opts.Text)); err != nil {
+		s.logger.WithError(err).Error("failed to update chat translation usage")
 	}
 
 	res := &plugnmeet.InsightsTranslateTextRes{

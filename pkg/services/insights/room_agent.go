@@ -42,6 +42,7 @@ type RoomAgent struct {
 	allowedUsers    map[string]bool   // Admin-defined permissions
 	activeUserTasks map[string][]byte // User-driven state
 	task            insights.Task     // The single task this agent is responsible for.
+	redisService    *redisservice.RedisService
 	natsService     *natsservice.NatsService
 	payload         *insights.InsightsTaskPayload
 
@@ -77,6 +78,7 @@ func NewRoomAgent(ctx context.Context, appConf *config.AppConfig, serviceConfig 
 		task:            task,
 		payload:         payload,
 		natsService:     natsService,
+		redisService:    redisService,
 	}
 
 	c := &plugnmeet.PlugNmeetTokenClaims{
@@ -142,7 +144,7 @@ func (a *RoomAgent) startSynthesisTask() error {
 	}
 
 	// 3. Create the new synthesis task.
-	a.synthesisTask = NewTranscriptionSynthesisTask(a.Ctx, a.conf, a.logger, synthProvider, synthServiceConfig, a.Room.Name(), a.payload.RoomE2EEKey, a.natsService, a.payload.AllowedTransLangs)
+	a.synthesisTask = NewTranscriptionSynthesisTask(a.Ctx, a.conf, a.logger, synthProvider, synthServiceConfig, a.redisService, a.natsService, a.Room.Name(), a.payload.AllowedTransLangs, a.payload.RoomE2EEKey)
 
 	// 4. Run the task in a goroutine.
 	go a.synthesisTask.Run()

@@ -180,6 +180,7 @@ func (i *InsightsController) HandleChatTranslationConfigure(c *fiber.Ctx) error 
 
 func (i *InsightsController) HandleExecuteChatTranslation(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
+	requestedUserId := c.Locals("requestedUserId")
 
 	req := new(plugnmeet.InsightsTranslateTextReq)
 	err := proto.Unmarshal(c.Body(), req)
@@ -187,7 +188,7 @@ func (i *InsightsController) HandleExecuteChatTranslation(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	result, err := i.insightsModel.ExecuteChatTranslation(c.UserContext(), req, roomId.(string))
+	result, err := i.insightsModel.ExecuteChatTranslation(c.UserContext(), req, roomId.(string), requestedUserId.(string))
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}

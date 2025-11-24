@@ -19,6 +19,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
+	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -79,6 +80,7 @@ type TranscriptionSynthesisTask struct {
 	roomId        string
 	e2eeKey       *string
 	natsService   *natsservice.NatsService
+	redisService  *redisservice.RedisService
 	transLangs    []string
 	voiceMappings map[string]string
 
@@ -86,21 +88,22 @@ type TranscriptionSynthesisTask struct {
 	workers map[string]*ttsWorker // map[language] -> ttsWorker
 }
 
-func NewTranscriptionSynthesisTask(ctx context.Context, appCnf *config.AppConfig, logger *logrus.Entry, provider insights.Provider, serviceConfig *config.ServiceConfig, roomId string, e2eeKey *string, natsService *natsservice.NatsService, transLangs []string) *TranscriptionSynthesisTask {
+func NewTranscriptionSynthesisTask(ctx context.Context, appCnf *config.AppConfig, logger *logrus.Entry, provider insights.Provider, serviceConfig *config.ServiceConfig, redisService *redisservice.RedisService, natsService *natsservice.NatsService, roomId string, transLangs []string, e2eeKey *string) *TranscriptionSynthesisTask {
 	ctx, cancel := context.WithCancel(ctx)
 
 	return &TranscriptionSynthesisTask{
 		ctx:           ctx,
 		cancel:        cancel,
 		appCnf:        appCnf,
-		logger:        logger.WithField("sub-task", "transcription-synthesis"),
 		provider:      provider,
 		roomId:        roomId,
 		e2eeKey:       e2eeKey,
 		natsService:   natsService,
+		redisService:  redisService,
 		transLangs:    transLangs,
 		voiceMappings: serviceConfig.GetVoiceMappings(),
 		workers:       make(map[string]*ttsWorker),
+		logger:        logger.WithField("sub-task", "transcription-synthesis"),
 	}
 }
 
@@ -119,7 +122,7 @@ func (t *TranscriptionSynthesisTask) Run() {
 			return
 		}
 
-		t.dispatch(res.Translations)
+		t.dispatch(res.FromUserId, res.Translations)
 	})
 
 	if err != nil {
@@ -143,7 +146,7 @@ func (t *TranscriptionSynthesisTask) Run() {
 }
 
 // dispatch sends translated text to the appropriate worker queue.
-func (t *TranscriptionSynthesisTask) dispatch(translations map[string]string) {
+func (t *TranscriptionSynthesisTask) dispatch(fromUserId string, translations map[string]string) {
 	for lang, text := range translations {
 		if text == "" {
 			continue
@@ -162,6 +165,9 @@ func (t *TranscriptionSynthesisTask) dispatch(translations map[string]string) {
 				t.logger.WithError(err).Errorf("failed to create reconciled tts worker for language %s", lang)
 				continue
 			}
+		}
+		if err := t.redisService.UpdateTTSServiceUsage(t.ctx, t.roomId, fromUserId, lang, len(text)); err != nil {
+			t.logger.WithError(err).Error("failed to update TTS service usage")
 		}
 		// Send text to the worker's queue. This is non-blocking.
 		worker.workQueue <- text
