@@ -42,9 +42,8 @@ type RoomAgent struct {
 	allowedUsers    map[string]bool   // Admin-defined permissions
 	activeUserTasks map[string][]byte // User-driven state
 	task            insights.Task     // The single task this agent is responsible for.
-	ServiceType     insights.ServiceType
-	e2eeKey         *string
 	natsService     *natsservice.NatsService
+	payload         *insights.InsightsTaskPayload
 
 	synthesisTask *TranscriptionSynthesisTask
 }
@@ -75,9 +74,8 @@ func NewRoomAgent(ctx context.Context, appConf *config.AppConfig, serviceConfig 
 		activePipelines: make(map[string]*activePipeline),
 		allowedUsers:    make(map[string]bool),
 		activeUserTasks: make(map[string][]byte),
-		ServiceType:     payload.ServiceType,
 		task:            task,
-		e2eeKey:         payload.RoomE2EEKey,
+		payload:         payload,
 		natsService:     natsService,
 	}
 
@@ -119,7 +117,7 @@ func NewRoomAgent(ctx context.Context, appConf *config.AppConfig, serviceConfig 
 	log.Infof("successfully connected with room %s", payload.RoomId)
 
 	// Start the synthesis task if enabled
-	if payload.EnabledTranscriptionTransSynthesis {
+	if payload.EnabledTranscriptionTransSynthesis && len(payload.AllowedTransLangs) > 0 {
 		err := agent.startSynthesisTask()
 		if err != nil {
 			log.WithError(err).Error("failed to start synthesis task")
@@ -144,13 +142,17 @@ func (a *RoomAgent) startSynthesisTask() error {
 	}
 
 	// 3. Create the new synthesis task.
-	a.synthesisTask = NewTranscriptionSynthesisTask(a.Ctx, a.conf, a.logger, synthProvider, synthServiceConfig, a.Room.Name(), a.e2eeKey, a.natsService)
+	a.synthesisTask = NewTranscriptionSynthesisTask(a.Ctx, a.conf, a.logger, synthProvider, synthServiceConfig, a.Room.Name(), a.payload.RoomE2EEKey, a.natsService, a.payload.AllowedTransLangs)
 
 	// 4. Run the task in a goroutine.
 	go a.synthesisTask.Run()
 	a.logger.Info("synthesis task started")
 
 	return nil
+}
+
+func (a *RoomAgent) GetServiceType() insights.ServiceType {
+	return a.payload.ServiceType
 }
 
 // UpdateAllowedUsers is the new reconciliation logic.
@@ -211,7 +213,7 @@ func (a *RoomAgent) GetUserTaskOptions(userId string) (insights.ServiceType, []b
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 	options, ok := a.activeUserTasks[userId]
-	return a.ServiceType, options, ok
+	return a.payload.ServiceType, options, ok
 }
 
 // EndTasksForUser stops the task for a specific user.
@@ -231,6 +233,17 @@ func (a *RoomAgent) endTasksForUser(userId string) {
 	if ok {
 		pipeline.cancel()
 		a.logger.WithField("userId", userId).Infoln("stopped insights task for participant")
+
+		go func(uId string) {
+			if rp := a.Room.GetParticipantByIdentity(uId); rp != nil {
+				if tp := rp.GetTrackPublication(livekit.TrackSource_MICROPHONE); tp != nil {
+					if rt, ok := tp.(*lksdk.RemoteTrackPublication); ok {
+						// we'll need to unsubscribe the track
+						_ = rt.SetSubscribed(false)
+					}
+				}
+			}
+		}(userId)
 	}
 }
 
@@ -276,11 +289,11 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 
 	var decryptor lkmedia.Decryptor
 	if publication.TrackInfo().GetEncryption() != livekit.Encryption_NONE {
-		if a.e2eeKey == nil || *a.e2eeKey == "" {
+		if a.payload.RoomE2EEKey == nil || *a.payload.RoomE2EEKey == "" {
 			a.logger.Errorln("received an encrypted track but no key was provided, so not continuing")
 			return
 		} else {
-			key, err := lksdk.DeriveKeyFromString(*a.e2eeKey)
+			key, err := lksdk.DeriveKeyFromString(*a.payload.RoomE2EEKey)
 			if err != nil {
 				a.logger.WithError(err).Error("failed to derive key")
 				return
@@ -311,7 +324,7 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 	go func() {
 		err := a.task.RunAudioStream(ctx, transcoder.AudioStream(), a.Room.Name(), rp.Identity(), options)
 		if err != nil && !errors.Is(err, context.Canceled) {
-			a.logger.WithError(err).Errorf("insights task %s failed", a.ServiceType)
+			a.logger.WithError(err).Errorf("insights task %s failed", a.payload.ServiceType)
 		}
 	}()
 

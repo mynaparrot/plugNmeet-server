@@ -74,6 +74,7 @@ type InsightsTaskPayload struct {
 	Options                            []byte          `json:"options"`
 	RoomE2EEKey                        *string         `json:"room_e2ee_key"`
 	TargetUsers                        map[string]bool `json:"target_users,omitempty"`
+	AllowedTransLangs                  []string        `json:"allowed_trans_langs,omitempty"`
 	EnabledTranscriptionTransSynthesis bool            `json:"enabled_transcription_trans_synthesis"`
 	AgentName                          *string         `json:"agent_name,omitempty"`
 	HiddenAgent                        bool            `json:"hidden_agent"`

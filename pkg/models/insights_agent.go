@@ -203,7 +203,7 @@ func (s *InsightsModel) superviseAgent(agent *insightsservice.RoomAgent, lock *r
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 
-	key := getAgentKey(agent.Room.Name(), agent.ServiceType)
+	key := getAgentKey(agent.Room.Name(), agent.GetServiceType())
 	s.logger.Infof("Supervisor started for agent '%s'", key)
 
 	for {

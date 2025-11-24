@@ -53,6 +53,7 @@ func (s *InsightsModel) TranscriptionConfigure(req *plugnmeet.InsightsTranscript
 		RoomId:                             roomId,
 		TargetUsers:                        usersMap,
 		HiddenAgent:                        true,
+		AllowedTransLangs:                  insightsFeatures.TranscriptionFeatures.AllowedTransLangs,
 		EnabledTranscriptionTransSynthesis: insightsFeatures.TranscriptionFeatures.IsEnabledSpeechSynthesis,
 	}
 

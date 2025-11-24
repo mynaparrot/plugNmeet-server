@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"time"
 
@@ -78,13 +79,14 @@ type TranscriptionSynthesisTask struct {
 	roomId        string
 	e2eeKey       *string
 	natsService   *natsservice.NatsService
+	transLangs    []string
 	voiceMappings map[string]string
 
 	lock    sync.RWMutex
 	workers map[string]*ttsWorker // map[language] -> ttsWorker
 }
 
-func NewTranscriptionSynthesisTask(ctx context.Context, appCnf *config.AppConfig, logger *logrus.Entry, provider insights.Provider, serviceConfig *config.ServiceConfig, roomId string, e2eeKey *string, natsService *natsservice.NatsService) *TranscriptionSynthesisTask {
+func NewTranscriptionSynthesisTask(ctx context.Context, appCnf *config.AppConfig, logger *logrus.Entry, provider insights.Provider, serviceConfig *config.ServiceConfig, roomId string, e2eeKey *string, natsService *natsservice.NatsService, transLangs []string) *TranscriptionSynthesisTask {
 	ctx, cancel := context.WithCancel(ctx)
 
 	return &TranscriptionSynthesisTask{
@@ -96,12 +98,13 @@ func NewTranscriptionSynthesisTask(ctx context.Context, appCnf *config.AppConfig
 		roomId:        roomId,
 		e2eeKey:       e2eeKey,
 		natsService:   natsService,
+		transLangs:    transLangs,
 		voiceMappings: serviceConfig.GetVoiceMappings(),
 		workers:       make(map[string]*ttsWorker),
 	}
 }
 
-// Run subscribes to NATS and starts the main orchestration loop.
+// Run creates all workers and then subscribes to NATS to start the main orchestration loop.
 func (t *TranscriptionSynthesisTask) Run() {
 	sub, err := t.appCnf.NatsConn.Subscribe(fmt.Sprintf(SynthesisChannel, t.roomId), func(msg *nats.Msg) {
 		res := new(plugnmeet.InsightsTranscriptionResult)
@@ -125,6 +128,15 @@ func (t *TranscriptionSynthesisTask) Run() {
 	}
 	t.logger.Infof("successfully connected with NATS for synthesis channel: '%s'", sub.Subject)
 
+	// Eagerly create all workers for the configured languages now that NATS is connected.
+	for _, lang := range t.transLangs {
+		_, err := t.createWorker(lang)
+		if err != nil {
+			t.logger.WithError(err).Errorf("failed to create initial tts worker for language %s", lang)
+			// We continue even if one fails, others might succeed.
+		}
+	}
+
 	// Wait for the context to be canceled, then unsubscribe
 	<-t.ctx.Done()
 	_ = sub.Unsubscribe()
@@ -142,10 +154,12 @@ func (t *TranscriptionSynthesisTask) dispatch(translations map[string]string) {
 		t.lock.RUnlock()
 
 		if !ok {
+			// This is a reconciliation step. If a worker wasn't created at startup, create it now.
+			t.logger.Warnf("worker for language %s not found, creating it on-the-fly", lang)
 			var err error
 			worker, err = t.createWorker(lang)
 			if err != nil {
-				t.logger.WithError(err).Errorf("failed to create tts worker for language %s", lang)
+				t.logger.WithError(err).Errorf("failed to create reconciled tts worker for language %s", lang)
 				continue
 			}
 		}
@@ -166,15 +180,14 @@ func (t *TranscriptionSynthesisTask) createWorker(language string) (*ttsWorker, 
 
 	// Get the voice from the mapping. It's okay if it's empty, the provider will use its default.
 	voice := t.voiceMappings[language]
-
-	// 1. Generate identity and token for the new participant
 	workerIdentity := fmt.Sprintf("%s-%s", config.TTSAgentUserIdPrefix, language)
-	workerName := fmt.Sprintf("Translator (%s)", language)
+	workerName := fmt.Sprintf("Translator-%s", strings.ToUpper(language))
 
 	log := t.logger.WithFields(logrus.Fields{
 		"userId": workerIdentity,
 		"name":   workerName,
 	})
+	// Create this user to Nats KV first
 	mt := plugnmeet.UserMetadata{
 		IsAdmin:         true,
 		RecordWebcam:    proto.Bool(false),
@@ -191,6 +204,7 @@ func (t *TranscriptionSynthesisTask) createWorker(language string) (*ttsWorker, 
 	}
 	log.Info("successfully added tts participant to NATS user bucket")
 
+	// Generate identity and token for the new participant
 	claims := &plugnmeet.PlugNmeetTokenClaims{
 		RoomId:   t.roomId,
 		UserId:   workerIdentity,
@@ -202,7 +216,7 @@ func (t *TranscriptionSynthesisTask) createWorker(language string) (*ttsWorker, 
 		return nil, fmt.Errorf("failed to generate token for tts worker: %w", err)
 	}
 
-	// 2. Create and connect a new room object for the worker
+	// Create and connect a new room object for the worker
 	workerRoom := lksdk.NewRoom(&lksdk.RoomCallback{
 		OnDisconnected: func() {
 			log.Infoln("tts worker disconnected from room")
@@ -218,7 +232,21 @@ func (t *TranscriptionSynthesisTask) createWorker(language string) (*ttsWorker, 
 		return nil, fmt.Errorf("tts worker failed to join room: %w", err)
 	}
 
-	// 3. Create track options, including encryptor if E2EE is enabled
+	// Do proper user status update
+	err = t.natsService.UpdateUserStatus(t.roomId, workerIdentity, natsservice.UserStatusOnline)
+	if err != nil {
+		return nil, err
+	}
+	userInfo, err := t.natsService.GetUserInfo(t.roomId, workerIdentity)
+	if err != nil {
+		return nil, err
+	}
+	err = t.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_JOINED, t.roomId, userInfo, workerIdentity)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create track options, including encryptor if E2EE is enabled
 	var trackOpts []lkmedia.PCMLocalTrackOption
 	pubOpts := &lksdk.TrackPublicationOptions{
 		Name:   language,
@@ -242,14 +270,14 @@ func (t *TranscriptionSynthesisTask) createWorker(language string) (*ttsWorker, 
 		pubOpts.Encryption = livekit.Encryption_GCM
 	}
 
-	// 4. Create the local audio track
+	// Create the local audio track
 	track, err := lkmedia.NewPCMLocalTrack(16000, 1, nil, trackOpts...)
 	if err != nil {
 		workerRoom.Disconnect()
 		return nil, fmt.Errorf("failed to create pcm track for tts worker: %w", err)
 	}
 
-	// 5. Publish the track
+	// Publish the track
 	if _, err = workerRoom.LocalParticipant.PublishTrack(track, pubOpts); err != nil {
 		track.Close()
 		workerRoom.Disconnect()
