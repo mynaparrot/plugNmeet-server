@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/Microsoft/cognitive-services-speech-sdk-go/audio"
+	"github.com/Microsoft/cognitive-services-speech-sdk-go/speech"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 )
 
@@ -41,4 +42,23 @@ func (s *azureTranscribeStream) SetProperty(key string, value string) error {
 // Results implements the TranscriptionStream interface.
 func (s *azureTranscribeStream) Results() <-chan *insights.TranscriptionEvent {
 	return s.results
+}
+
+// azureTTSStream wraps the Azure AudioDataStream and the underlying result
+// to ensure all resources are properly closed when the consumer is done.
+type azureTTSStream struct {
+	stream  *speech.AudioDataStream
+	outcome *speech.SpeechSynthesisOutcome
+}
+
+// Read reads data from the audio stream.
+func (s *azureTTSStream) Read(p []byte) (n int, err error) {
+	return s.stream.Read(p)
+}
+
+// Close closes the audio stream and the underlying synthesis result, releasing all resources.
+func (s *azureTTSStream) Close() error {
+	s.stream.Close()
+	s.outcome.Close()
+	return nil
 }

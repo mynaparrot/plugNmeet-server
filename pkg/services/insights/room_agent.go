@@ -44,10 +44,13 @@ type RoomAgent struct {
 	task            insights.Task     // The single task this agent is responsible for.
 	ServiceType     insights.ServiceType
 	e2eeKey         *string
+	natsService     *natsservice.NatsService
+
+	synthesisTask *TranscriptionSynthesisTask
 }
 
 // NewRoomAgent creates a single-purpose agent.
-func NewRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, natsService *natsservice.NatsService, redisService *redisservice.RedisService, logger *logrus.Entry, payload *insights.InsightsTaskPayload) (*RoomAgent, error) {
+func NewRoomAgent(ctx context.Context, appConf *config.AppConfig, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, natsService *natsservice.NatsService, redisService *redisservice.RedisService, logger *logrus.Entry, payload *insights.InsightsTaskPayload) (*RoomAgent, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	log := logger.WithFields(logrus.Fields{
 		"service":     "room-agent",
@@ -58,7 +61,7 @@ func NewRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *co
 	})
 
 	// Create a single task for this agent's one and only service.
-	task, err := NewTask(payload.ServiceType, serviceConfig, providerAccount, natsService, redisService, log)
+	task, err := NewTask(payload.ServiceType, appConf, serviceConfig, providerAccount, natsService, redisService, log)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("could not create task for service '%s': %w", payload.ServiceType, err)
@@ -67,7 +70,7 @@ func NewRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *co
 	agent := &RoomAgent{
 		Ctx:             ctx,
 		cancel:          cancel,
-		conf:            conf,
+		conf:            appConf,
 		logger:          log,
 		activePipelines: make(map[string]*activePipeline),
 		allowedUsers:    make(map[string]bool),
@@ -75,6 +78,7 @@ func NewRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *co
 		ServiceType:     payload.ServiceType,
 		task:            task,
 		e2eeKey:         payload.RoomE2EEKey,
+		natsService:     natsService,
 	}
 
 	c := &plugnmeet.PlugNmeetTokenClaims{
@@ -114,7 +118,39 @@ func NewRoomAgent(ctx context.Context, conf *config.AppConfig, serviceConfig *co
 	agent.Room = room
 	log.Infof("successfully connected with room %s", payload.RoomId)
 
+	// Start the synthesis task if enabled
+	if payload.EnabledTranscriptionTransSynthesis {
+		err := agent.startSynthesisTask()
+		if err != nil {
+			log.WithError(err).Error("failed to start synthesis task")
+			// We don't fail the whole agent, just log the error
+		}
+	}
+
 	return agent, nil
+}
+
+func (a *RoomAgent) startSynthesisTask() error {
+	// 1. Get the configuration for the speech-synthesis service.
+	synthAccount, synthServiceConfig, err := a.conf.Insights.GetProviderAccountForService(insights.ServiceTypeSpeechSynthesis)
+	if err != nil {
+		return fmt.Errorf("failed to get provider account for speech-synthesis: %w", err)
+	}
+
+	// 2. Create a new provider instance specifically for synthesis.
+	synthProvider, err := NewProvider(synthServiceConfig.Provider, synthAccount, synthServiceConfig, a.logger)
+	if err != nil {
+		return fmt.Errorf("failed to create provider for speech-synthesis: %w", err)
+	}
+
+	// 3. Create the new synthesis task.
+	a.synthesisTask = NewTranscriptionSynthesisTask(a.Ctx, a.conf, a.logger, synthProvider, synthServiceConfig, a.Room.Name(), a.e2eeKey, a.natsService)
+
+	// 4. Run the task in a goroutine.
+	go a.synthesisTask.Run()
+	a.logger.Info("synthesis task started")
+
+	return nil
 }
 
 // UpdateAllowedUsers is the new reconciliation logic.
@@ -304,6 +340,9 @@ func (a *RoomAgent) onTrackUnsubscribed(track *webrtc.TrackRemote, publication *
 // Shutdown gracefully closes the agent.
 func (a *RoomAgent) Shutdown() {
 	a.logger.Infoln("received shutdown signal, disconnecting room agent")
+	if a.synthesisTask != nil {
+		a.synthesisTask.Shutdown()
+	}
 	a.cancel()
 	if a.Room != nil {
 		a.Room.Disconnect()

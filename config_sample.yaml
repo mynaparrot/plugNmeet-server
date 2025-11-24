@@ -221,3 +221,13 @@ insights:
       id: "transGlobal"
       options:
         max_selected_trans_langs: 5
+
+    speech-synthesis:
+      provider: "azure"
+      id: "eastus_standard"
+      options:
+        "en": "en-US-JennyNeural"
+        "bn": "bn-IN-TanishaaNeural"
+        "fr": "fr-FR-DeniseNeural"
+        "de": "de-DE-KatjaNeural"
+        "es": "es-ES-ElviraNeural"

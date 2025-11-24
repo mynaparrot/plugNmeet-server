@@ -25,10 +25,10 @@ func NewProvider(providerType string, providerAccount *config.ProviderAccount, s
 }
 
 // NewTask is a factory that returns the correct Task implementation.
-func NewTask(serviceType insights.ServiceType, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, natsService *natsservice.NatsService, redisService *redisservice.RedisService, logger *logrus.Entry) (insights.Task, error) {
+func NewTask(serviceType insights.ServiceType, appConf *config.AppConfig, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, natsService *natsservice.NatsService, redisService *redisservice.RedisService, logger *logrus.Entry) (insights.Task, error) {
 	switch serviceType {
 	case insights.ServiceTypeTranscription:
-		return NewTranscriptionTask(serviceConfig, providerAccount, natsService, redisService, logger)
+		return NewTranscriptionTask(appConf, serviceConfig, providerAccount, natsService, redisService, logger)
 	case insights.ServiceTypeTranslation:
 		return NewTranslationTask(serviceConfig, providerAccount, logger)
 	default:

@@ -27,6 +27,25 @@ type ServiceConfig struct {
 	Options  map[string]interface{} `yaml:"options"` // Generic options, e.g., model
 }
 
+// GetVoiceMappings safely extracts the voice mappings and the default voice from the generic options map.
+func (sc *ServiceConfig) GetVoiceMappings() (mappings map[string]string, defaultVoice string) {
+	mappings = make(map[string]string)
+	if sc.Options == nil {
+		return
+	}
+
+	for key, val := range sc.Options {
+		if v, ok := val.(string); ok {
+			if key == "default_voice" {
+				defaultVoice = v
+			} else {
+				mappings[key] = v
+			}
+		}
+	}
+	return
+}
+
 // CredentialsConfig now only contains the most common credential fields.
 // can use the Options field if needed extra data
 type CredentialsConfig struct {

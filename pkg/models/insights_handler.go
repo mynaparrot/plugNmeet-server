@@ -28,24 +28,6 @@ func (s *InsightsModel) TranscriptionConfigure(req *plugnmeet.InsightsTranscript
 		return fmt.Errorf("insights feature wasn't enabled")
 	}
 
-	usersMap := make(map[string]bool)
-	for _, user := range req.AllowedSpeechUsers {
-		usersMap[user] = true
-	}
-
-	payload := &insights.InsightsTaskPayload{
-		Task:        TaskConfigureAgent,
-		ServiceType: insights.ServiceTypeTranscription,
-		RoomId:      roomId,
-		TargetUsers: usersMap,
-		HiddenAgent: true,
-	}
-
-	err = s.ConfigureAgent(payload, 5*time.Second)
-	if err != nil {
-		return err
-	}
-
 	insightsFeatures.TranscriptionFeatures.IsEnabled = true
 	insightsFeatures.TranscriptionFeatures.AllowedSpokenLangs = req.AllowedSpokenLangs
 	insightsFeatures.TranscriptionFeatures.AllowedSpeechUsers = req.AllowedSpeechUsers
@@ -54,6 +36,29 @@ func (s *InsightsModel) TranscriptionConfigure(req *plugnmeet.InsightsTranscript
 	if insightsFeatures.TranscriptionFeatures.IsAllowTranslation {
 		insightsFeatures.TranscriptionFeatures.IsEnabledTranslation = req.IsEnabledTranslation
 		insightsFeatures.TranscriptionFeatures.AllowedTransLangs = req.AllowedTransLangs
+	}
+
+	if insightsFeatures.TranscriptionFeatures.IsAllowSpeechSynthesis {
+		insightsFeatures.TranscriptionFeatures.IsEnabledSpeechSynthesis = req.IsEnabledSpeechSynthesis
+	}
+
+	usersMap := make(map[string]bool)
+	for _, user := range req.AllowedSpeechUsers {
+		usersMap[user] = true
+	}
+
+	payload := &insights.InsightsTaskPayload{
+		Task:                               TaskConfigureAgent,
+		ServiceType:                        insights.ServiceTypeTranscription,
+		RoomId:                             roomId,
+		TargetUsers:                        usersMap,
+		HiddenAgent:                        true,
+		EnabledTranscriptionTransSynthesis: insightsFeatures.TranscriptionFeatures.IsEnabledSpeechSynthesis,
+	}
+
+	err = s.ConfigureAgent(payload, 5*time.Second)
+	if err != nil {
+		return err
 	}
 
 	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
@@ -79,6 +84,7 @@ func (s *InsightsModel) broadcastEndTranscription(roomId string) error {
 
 	metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.IsEnabled = false
 	metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.IsEnabledTranslation = false
+	metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.IsEnabledSpeechSynthesis = false
 
 	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
 }

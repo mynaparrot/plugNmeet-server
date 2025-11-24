@@ -34,9 +34,7 @@ func NewProvider(providerAccount *config.ProviderAccount, serviceConfig *config.
 
 // CreateTranscription now uses the stored credentials and parses the options.
 func (p *AzureProvider) CreateTranscription(ctx context.Context, roomId, userId string, options []byte) (insights.TranscriptionStream, error) {
-	opts := &insights.TranscriptionOptions{
-		SpokenLang: "en-US",
-	}
+	opts := &insights.TranscriptionOptions{}
 	if len(options) > 0 {
 		if err := json.Unmarshal(options, opts); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal transcription options: %w", err)
@@ -137,6 +135,22 @@ func (p *AzureProvider) TranslateText(ctx context.Context, text, sourceLang stri
 	}
 
 	return result, nil
+}
+
+// SynthesizeText creates a ttsClient and uses it to synthesize the text.
+func (p *AzureProvider) SynthesizeText(ctx context.Context, options []byte) (io.ReadCloser, error) {
+	opts := &insights.SynthesisTaskOptions{}
+	if err := json.Unmarshal(options, opts); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal synthesis options: %w", err)
+	}
+
+	// Create a new ttsClient for this specific task, using the stored credentials.
+	tts, err := newTTSClient(&p.account.Credentials, p.logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tts client: %w", err)
+	}
+
+	return tts.SynthesizeText(ctx, opts.Text, opts.Language, opts.Voice)
 }
 
 // GetSupportedLanguages implements the insights.Provider interface.

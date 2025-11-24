@@ -3,6 +3,7 @@ package insightsservice
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -14,6 +15,7 @@ import (
 )
 
 type TranscriptionTask struct {
+	appConf      *config.AppConfig
 	service      *config.ServiceConfig
 	account      *config.ProviderAccount
 	natsService  *natsservice.NatsService
@@ -21,8 +23,9 @@ type TranscriptionTask struct {
 	logger       *logrus.Entry
 }
 
-func NewTranscriptionTask(serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, natsService *natsservice.NatsService, redisService *redisservice.RedisService, logger *logrus.Entry) (insights.Task, error) {
+func NewTranscriptionTask(appConf *config.AppConfig, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, natsService *natsservice.NatsService, redisService *redisservice.RedisService, logger *logrus.Entry) (insights.Task, error) {
 	return &TranscriptionTask{
+		appConf:      appConf,
 		service:      serviceConfig,
 		account:      providerAccount,
 		natsService:  natsService,
@@ -75,7 +78,9 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 			}
 		}()
 
-		// The loop will automatically break when the channel is closed.
+		synthesisChannel := fmt.Sprintf(SynthesisChannel, roomId)
+
+		// The loop will automatically break when the SynthesisChannel is closed.
 		for event := range stream.Results() {
 			switch event.Type {
 			case insights.EventTypePartialResult, insights.EventTypeFinalResult:
@@ -85,6 +90,13 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 				}
 				if err = t.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_TRANSCRIPTION_OUTPUT_TEXT, roomId, marshal, nil); err != nil {
 					t.logger.WithError(err).Errorln("error broadcasting transcription result")
+				}
+
+				// If we have a final result, publish it to the dedicated synthesis SynthesisChannel.
+				if event.Type == insights.EventTypeFinalResult {
+					if err = t.appConf.NatsConn.Publish(synthesisChannel, marshal); err != nil {
+						t.logger.WithError(err).Errorln("error publishing to synthesis SynthesisChannel")
+					}
 				}
 
 			case insights.EventTypeSessionStarted:

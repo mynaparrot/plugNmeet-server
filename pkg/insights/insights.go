@@ -31,8 +31,9 @@ type TranscriptionEvent struct {
 type ServiceType string
 
 const (
-	ServiceTypeTranscription ServiceType = "transcription"
-	ServiceTypeTranslation   ServiceType = "translation"
+	ServiceTypeTranscription   ServiceType = "transcription"
+	ServiceTypeTranslation     ServiceType = "translation"
+	ServiceTypeSpeechSynthesis ServiceType = "speech-synthesis"
 )
 
 // ToServiceType translates the Protobuf enum to our internal Go type.
@@ -43,6 +44,8 @@ func ToServiceType(t plugnmeet.InsightsServiceType) (ServiceType, error) {
 		return ServiceTypeTranscription, nil
 	case plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_TRANSLATION:
 		return ServiceTypeTranslation, nil
+	case plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_SPEECH_SYNTHESIS:
+		return ServiceTypeSpeechSynthesis, nil
 	default:
 		return "", fmt.Errorf("unknown or unsupported insights service type: %s", t.String())
 	}
@@ -56,21 +59,24 @@ func FromServiceType(t ServiceType) (plugnmeet.InsightsServiceType, error) {
 		return plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_TRANSCRIPTION, nil
 	case ServiceTypeTranslation:
 		return plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_TRANSLATION, nil
+	case ServiceTypeSpeechSynthesis:
+		return plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_SPEECH_SYNTHESIS, nil
 	default:
 		return plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_UNSPECIFIED, fmt.Errorf("unknown or unsupported insights service type: %s", t)
 	}
 }
 
 type InsightsTaskPayload struct {
-	Task        string          `json:"task"`
-	ServiceType ServiceType     `json:"service_type"`
-	RoomId      string          `json:"room_id"`
-	UserId      string          `json:"user_id"`
-	Options     []byte          `json:"options"`
-	RoomE2EEKey *string         `json:"room_e2ee_key"`
-	TargetUsers map[string]bool `json:"target_users,omitempty"`
-	AgentName   *string         `json:"agent_name,omitempty"`
-	HiddenAgent bool            `json:"hidden_agent"`
+	Task                               string          `json:"task"`
+	ServiceType                        ServiceType     `json:"service_type"`
+	RoomId                             string          `json:"room_id"`
+	UserId                             string          `json:"user_id"`
+	Options                            []byte          `json:"options"`
+	RoomE2EEKey                        *string         `json:"room_e2ee_key"`
+	TargetUsers                        map[string]bool `json:"target_users,omitempty"`
+	EnabledTranscriptionTransSynthesis bool            `json:"enabled_transcription_trans_synthesis"`
+	AgentName                          *string         `json:"agent_name,omitempty"`
+	HiddenAgent                        bool            `json:"hidden_agent"`
 }
 
 // TranscriptionOptions defines the structure for options passed to the transcription service.
@@ -84,6 +90,13 @@ type TranslationTaskOptions struct {
 	Text        string   `json:"text"`
 	SourceLang  string   `json:"source_lang"`
 	TargetLangs []string `json:"target_langs"`
+}
+
+// SynthesisTaskOptions defines the structure for options passed to the speech synthesis service.
+type SynthesisTaskOptions struct {
+	Text     string `json:"text"`
+	Language string `json:"language"`
+	Voice    string `json:"voice"`
 }
 
 // TranscriptionStream defines a universal, bidirectional interface for a live transcription.
@@ -112,6 +125,9 @@ type Provider interface {
 	// TranslateText performs stateless translation of a given text string to one or more languages.
 	// It returns a channel that will yield a single result and then close.
 	TranslateText(ctx context.Context, text, sourceLang string, targetLangs []string) (*plugnmeet.InsightsTextTranslationResult, error)
+
+	// SynthesizeText performs stateless text-to-speech synthesis.
+	SynthesizeText(ctx context.Context, options []byte) (io.ReadCloser, error)
 
 	// GetSupportedLanguages is primarily for Transcription & Translation services.
 	GetSupportedLanguages(serviceType ServiceType) []*plugnmeet.InsightsSupportedLangInfo
