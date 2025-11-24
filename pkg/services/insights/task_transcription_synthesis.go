@@ -79,7 +79,6 @@ type TranscriptionSynthesisTask struct {
 	e2eeKey       *string
 	natsService   *natsservice.NatsService
 	voiceMappings map[string]string
-	defaultVoice  string
 
 	lock    sync.RWMutex
 	workers map[string]*ttsWorker // map[language] -> ttsWorker
@@ -87,7 +86,6 @@ type TranscriptionSynthesisTask struct {
 
 func NewTranscriptionSynthesisTask(ctx context.Context, appCnf *config.AppConfig, logger *logrus.Entry, provider insights.Provider, serviceConfig *config.ServiceConfig, roomId string, e2eeKey *string, natsService *natsservice.NatsService) *TranscriptionSynthesisTask {
 	ctx, cancel := context.WithCancel(ctx)
-	mappings, defaultVoice := serviceConfig.GetVoiceMappings()
 
 	return &TranscriptionSynthesisTask{
 		ctx:           ctx,
@@ -98,8 +96,7 @@ func NewTranscriptionSynthesisTask(ctx context.Context, appCnf *config.AppConfig
 		roomId:        roomId,
 		e2eeKey:       e2eeKey,
 		natsService:   natsService,
-		voiceMappings: mappings,
-		defaultVoice:  defaultVoice,
+		voiceMappings: serviceConfig.GetVoiceMappings(),
 		workers:       make(map[string]*ttsWorker),
 	}
 }
@@ -167,13 +164,8 @@ func (t *TranscriptionSynthesisTask) createWorker(language string) (*ttsWorker, 
 		return w, nil
 	}
 
-	voice, ok := t.voiceMappings[language]
-	if !ok {
-		if t.defaultVoice == "" {
-			return nil, fmt.Errorf("no voice mapping for language %s and no default voice configured", language)
-		}
-		voice = t.defaultVoice
-	}
+	// Get the voice from the mapping. It's okay if it's empty, the provider will use its default.
+	voice := t.voiceMappings[language]
 
 	// 1. Generate identity and token for the new participant
 	workerIdentity := fmt.Sprintf("%s-%s", config.TTSAgentUserIdPrefix, language)
@@ -200,7 +192,7 @@ func (t *TranscriptionSynthesisTask) createWorker(language string) (*ttsWorker, 
 	log.Info("successfully added tts participant to NATS user bucket")
 
 	claims := &plugnmeet.PlugNmeetTokenClaims{
-		RoomId:   t.roomId, // Changed
+		RoomId:   t.roomId,
 		UserId:   workerIdentity,
 		IsHidden: false,
 		Name:     workerName,

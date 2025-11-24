@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 )
@@ -27,23 +28,22 @@ type ServiceConfig struct {
 	Options  map[string]interface{} `yaml:"options"` // Generic options, e.g., model
 }
 
-// GetVoiceMappings safely extracts the voice mappings and the default voice from the generic options map.
-func (sc *ServiceConfig) GetVoiceMappings() (mappings map[string]string, defaultVoice string) {
-	mappings = make(map[string]string)
+// GetVoiceMappings safely extracts the voice mappings from the generic options map.
+func (sc *ServiceConfig) GetVoiceMappings() map[string]string {
+	mappings := make(map[string]string)
 	if sc.Options == nil {
-		return
+		return mappings
 	}
 
 	for key, val := range sc.Options {
 		if v, ok := val.(string); ok {
-			if key == "default_voice" {
-				defaultVoice = v
-			} else {
-				mappings[key] = v
+			if strings.HasPrefix(key, "voice-") {
+				lang := strings.TrimPrefix(key, "voice-")
+				mappings[lang] = v
 			}
 		}
 	}
-	return
+	return mappings
 }
 
 // CredentialsConfig now only contains the most common credential fields.
