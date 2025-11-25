@@ -29,7 +29,7 @@ func newTranscribeClient(creds *config.CredentialsConfig, model string, log *log
 	return &transcribeClient{
 		creds: creds,
 		model: model,
-		log:   log,
+		log:   log.WithField("service", "azure-transcribe"),
 	}, nil
 }
 

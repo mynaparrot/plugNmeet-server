@@ -25,7 +25,7 @@ func newTTSClient(creds *config.CredentialsConfig, log *logrus.Entry) (*ttsClien
 
 	return &ttsClient{
 		creds: creds,
-		log:   log,
+		log:   log.WithField("service", "azure-tts"),
 	}, nil
 }
 
@@ -37,6 +37,12 @@ func (c *ttsClient) SynthesizeText(ctx context.Context, text, language, voice st
 		return nil, fmt.Errorf("failed to create azure speech config: %w", err)
 	}
 	defer conf.Close()
+
+	if language == "zh-Hans" {
+		language = "zh-CN"
+	} else if language == "zh-Hant" {
+		language = "zh-TW"
+	}
 
 	err = conf.SetSpeechSynthesisLanguage(language)
 	if err != nil {

@@ -9,15 +9,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/livekit/media-sdk"
-	"github.com/livekit/protocol/livekit"
 	lkLogger "github.com/livekit/protocol/logger"
 	lksdk "github.com/livekit/server-sdk-go/v2"
-	lkmedia "github.com/livekit/server-sdk-go/v2/pkg/media"
 	"github.com/mynaparrot/plugnmeet-protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
+	inMedia "github.com/mynaparrot/plugnmeet-server/pkg/insights/media"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/nats-io/nats.go"
@@ -27,48 +25,6 @@ import (
 )
 
 const SynthesisChannel = "plug-n-meet-transcription-output-%s"
-
-// audioTrackWriter is an adapter to make *lkmedia.PCMLocalTrack implement io.Writer.
-type audioTrackWriter struct {
-	track *lkmedia.PCMLocalTrack
-}
-
-// Write converts the raw PCM byte slice and writes it to the track.
-func (w *audioTrackWriter) Write(data []byte) (n int, err error) {
-	// The data from Azure is 16kHz 16-bit mono PCM.
-	// We need to convert it to []int16 for the PCMLocalTrack.
-	numSamples := len(data) / 2
-	if numSamples == 0 {
-		return len(data), nil
-	}
-
-	samples := make([]int16, numSamples)
-	for i := 0; i < numSamples; i++ {
-		// Assuming little-endian byte order for 16-bit PCM
-		samples[i] = int16(data[i*2]) | int16(data[i*2+1])<<8
-	}
-
-	mediaSample := media.PCM16Sample(samples)
-	err = w.track.WriteSample(mediaSample)
-	if err != nil {
-		return 0, err
-	}
-
-	return len(data), nil
-}
-
-// ttsWorker manages the synthesis queue and a dedicated LiveKit participant for a single language.
-type ttsWorker struct {
-	ctx       context.Context
-	cancel    context.CancelFunc
-	provider  insights.Provider
-	room      *lksdk.Room // The worker's own room connection
-	track     *lkmedia.PCMLocalTrack
-	workQueue chan string
-	language  string
-	voice     string
-	logger    *logrus.Entry
-}
 
 // TranscriptionSynthesisTask listens for translation results and dispatches them to language-specific workers for synthesis.
 type TranscriptionSynthesisTask struct {
@@ -253,41 +209,9 @@ func (t *TranscriptionSynthesisTask) createWorker(language string) (*ttsWorker, 
 	}
 
 	// Create track options, including encryptor if E2EE is enabled
-	var trackOpts []lkmedia.PCMLocalTrackOption
-	pubOpts := &lksdk.TrackPublicationOptions{
-		Name:   language,
-		Source: livekit.TrackSource_MICROPHONE,
-	}
-
-	if t.e2eeKey != nil && *t.e2eeKey != "" {
-		key, err := lksdk.DeriveKeyFromString(*t.e2eeKey)
-		if err != nil {
-			workerRoom.Disconnect()
-			return nil, fmt.Errorf("failed to derive key for tts encryptor: %w", err)
-		}
-		// Use 0 for the key ID as per the GCM standard
-		encryptor, err := lkmedia.NewGCMEncryptor(key, 0)
-		if err != nil {
-			workerRoom.Disconnect()
-			return nil, fmt.Errorf("failed to create tts encryptor: %w", err)
-		}
-		trackOpts = append(trackOpts, lkmedia.WithEncryptor(encryptor))
-		// Set the encryption type on the publication options
-		pubOpts.Encryption = livekit.Encryption_GCM
-	}
-
-	// Create the local audio track
-	track, err := lkmedia.NewPCMLocalTrack(16000, 1, nil, trackOpts...)
+	publisher, err := inMedia.NewAudioPublisher(workerRoom, language, 16000, 1, t.e2eeKey)
 	if err != nil {
-		workerRoom.Disconnect()
-		return nil, fmt.Errorf("failed to create pcm track for tts worker: %w", err)
-	}
-
-	// Publish the track
-	if _, err = workerRoom.LocalParticipant.PublishTrack(track, pubOpts); err != nil {
-		track.Close()
-		workerRoom.Disconnect()
-		return nil, fmt.Errorf("tts worker failed to publish track: %w", err)
+		return nil, err
 	}
 
 	ctx, cancel := context.WithCancel(t.ctx)
@@ -296,7 +220,7 @@ func (t *TranscriptionSynthesisTask) createWorker(language string) (*ttsWorker, 
 		cancel:    cancel,
 		provider:  t.provider,
 		room:      workerRoom,
-		track:     track,
+		publisher: publisher,
 		workQueue: make(chan string, 10),
 		language:  language,
 		voice:     voice,
@@ -310,11 +234,45 @@ func (t *TranscriptionSynthesisTask) createWorker(language string) (*ttsWorker, 
 	return worker, nil
 }
 
+// Shutdown gracefully stops the TranscriptionSynthesisTask and all its workers.
+func (t *TranscriptionSynthesisTask) Shutdown() {
+	t.cancel() // This will stop the NATS subscription and all worker contexts
+
+	// Collect workers first to avoid holding lock during disconnect
+	t.lock.RLock()
+	workersToClose := make([]*ttsWorker, 0, len(t.workers))
+	for _, worker := range t.workers {
+		workersToClose = append(workersToClose, worker)
+	}
+	t.lock.RUnlock()
+
+	// Now cancel context
+	for _, worker := range workersToClose {
+		worker.cancel()
+	}
+
+	t.logger.Info("transcription synthesis task shut down")
+}
+
+// ttsWorker manages the synthesis queue and a dedicated LiveKit participant for a single language.
+type ttsWorker struct {
+	ctx       context.Context
+	cancel    context.CancelFunc
+	provider  insights.Provider
+	room      *lksdk.Room
+	publisher *inMedia.AudioPublisher
+	workQueue chan string
+	language  string
+	voice     string
+	logger    *logrus.Entry
+}
+
 // run is the main loop for a ttsWorker. It processes the queue.
 func (w *ttsWorker) run() {
-	defer w.track.Close()
-	defer w.room.Disconnect()
-	writer := &audioTrackWriter{track: w.track}
+	defer func() {
+		w.publisher.Close()
+		w.room.Disconnect()
+	}()
 
 	for {
 		select {
@@ -338,7 +296,7 @@ func (w *ttsWorker) run() {
 				continue
 			}
 
-			_, err = io.Copy(writer, audioStream)
+			_, err = io.Copy(w.publisher, audioStream)
 			_ = audioStream.Close()
 
 			if err != nil && err != io.EOF {
@@ -346,24 +304,4 @@ func (w *ttsWorker) run() {
 			}
 		}
 	}
-}
-
-// Shutdown gracefully stops the TranscriptionSynthesisTask and all its workers.
-func (t *TranscriptionSynthesisTask) Shutdown() {
-	t.cancel() // This will stop the NATS subscription and all worker contexts
-
-	// Collect workers first to avoid holding lock during disconnect
-	t.lock.RLock()
-	workersToClose := make([]*ttsWorker, 0, len(t.workers))
-	for _, worker := range t.workers {
-		workersToClose = append(workersToClose, worker)
-	}
-	t.lock.RUnlock()
-
-	// Now disconnect them without holding the lock
-	for _, worker := range workersToClose {
-		worker.room.Disconnect()
-	}
-
-	t.logger.Info("transcription synthesis task shut down")
 }
