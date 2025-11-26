@@ -193,7 +193,7 @@ func (s *InsightsModel) ActivateTextTask(ctx context.Context, serviceType insigh
 }
 
 // GetSupportedLanguagesForService returns the list of supported languages for a single, specific service.
-func (s *InsightsModel) GetSupportedLanguagesForService(serviceType insights.ServiceType) ([]*plugnmeet.InsightsSupportedLangInfo, error) {
+func (s *InsightsModel) GetSupportedLanguagesForService(ctx context.Context, serviceType insights.ServiceType) ([]*plugnmeet.InsightsSupportedLangInfo, error) {
 	// 1. Get the configuration for the requested service.
 	targetAccount, serviceConfig, err := s.appConfig.Insights.GetProviderAccountForService(serviceType)
 	if err != nil {
@@ -201,7 +201,7 @@ func (s *InsightsModel) GetSupportedLanguagesForService(serviceType insights.Ser
 	}
 
 	// 2. Create a new provider instance on-the-fly.
-	provider, err := insightsservice.NewProvider(serviceConfig.Provider, targetAccount, serviceConfig, s.logger)
+	provider, err := insightsservice.NewProvider(ctx, serviceConfig.Provider, targetAccount, serviceConfig, s.logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create provider for service '%s': %w", serviceType, err)
 	}

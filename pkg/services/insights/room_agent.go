@@ -138,7 +138,7 @@ func (a *RoomAgent) startSynthesisTask() error {
 	}
 
 	// 2. Create a new provider instance specifically for synthesis.
-	synthProvider, err := NewProvider(synthServiceConfig.Provider, synthAccount, synthServiceConfig, a.logger)
+	synthProvider, err := NewProvider(a.Ctx, synthServiceConfig.Provider, synthAccount, synthServiceConfig, a.logger)
 	if err != nil {
 		return fmt.Errorf("failed to create provider for speech-synthesis: %w", err)
 	}

@@ -167,3 +167,11 @@ func (p *AzureProvider) GetSupportedLanguages(serviceType insights.ServiceType) 
 	// Return an empty slice if the service is not found for this provider.
 	return make([]*plugnmeet.InsightsSupportedLangInfo, 0)
 }
+
+func (p *AzureProvider) AITextChatStream(ctx context.Context, chatModel string, history []*plugnmeet.InsightsAITextChatContent) (<-chan *plugnmeet.InsightsAITextChatStreamResult, error) {
+	return nil, nil
+}
+
+func (p *AzureProvider) AIChatTextSummarize(ctx context.Context, summarizeModel string, history []*plugnmeet.InsightsAITextChatContent) (summaryText string, promptTokens uint32, completionTokens uint32, err error) {
+	return "", 0, 0, nil
+}

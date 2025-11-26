@@ -37,7 +37,7 @@ func NewTranscriptionTask(appConf *config.AppConfig, serviceConfig *config.Servi
 // RunAudioStream implements the insights.Task interface.
 func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-chan []byte, roomId, userId string, options []byte) error {
 	// Use the factory to create a provider instance.
-	provider, err := NewProvider(t.service.Provider, t.account, t.service, t.logger)
+	provider, err := NewProvider(ctx, t.service.Provider, t.account, t.service, t.logger)
 	if err != nil {
 		return err
 	}

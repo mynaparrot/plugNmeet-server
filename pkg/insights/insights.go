@@ -30,10 +30,19 @@ type TranscriptionEvent struct {
 // ServiceType defines the canonical name for an insights service.
 type ServiceType string
 
+// AITaskType defines the type of task for AI text chat.
+type AITaskType string
+
 const (
 	ServiceTypeTranscription   ServiceType = "transcription"
 	ServiceTypeTranslation     ServiceType = "translation"
 	ServiceTypeSpeechSynthesis ServiceType = "speech-synthesis"
+	ServiceTypeAITextChat      ServiceType = "ai_text_chat"
+
+	// AITaskTypeChat is for regular chat interactions.
+	AITaskTypeChat AITaskType = "chat"
+	// AITaskTypeSummarize is for summarization tasks.
+	AITaskTypeSummarize AITaskType = "summarize"
 )
 
 // ToServiceType translates the Protobuf enum to our internal Go type.
@@ -46,6 +55,8 @@ func ToServiceType(t plugnmeet.InsightsServiceType) (ServiceType, error) {
 		return ServiceTypeTranslation, nil
 	case plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_SPEECH_SYNTHESIS:
 		return ServiceTypeSpeechSynthesis, nil
+	case plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_AI_TEXT_CHAT:
+		return ServiceTypeAITextChat, nil
 	default:
 		return "", fmt.Errorf("unknown or unsupported insights service type: %s", t.String())
 	}
@@ -61,6 +72,8 @@ func FromServiceType(t ServiceType) (plugnmeet.InsightsServiceType, error) {
 		return plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_TRANSLATION, nil
 	case ServiceTypeSpeechSynthesis:
 		return plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_SPEECH_SYNTHESIS, nil
+	case ServiceTypeAITextChat:
+		return plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_AI_TEXT_CHAT, nil
 	default:
 		return plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_UNSPECIFIED, fmt.Errorf("unknown or unsupported insights service type: %s", t)
 	}
@@ -132,6 +145,12 @@ type Provider interface {
 
 	// GetSupportedLanguages is primarily for Transcription & Translation services.
 	GetSupportedLanguages(serviceType ServiceType) []*plugnmeet.InsightsSupportedLangInfo
+
+	// AITextChatStream sends a prompt with history and streams back the AI's response.
+	AITextChatStream(ctx context.Context, chatModel string, history []*plugnmeet.InsightsAITextChatContent) (<-chan *plugnmeet.InsightsAITextChatStreamResult, error)
+
+	// AIChatTextSummarize summarizes a conversation history.
+	AIChatTextSummarize(ctx context.Context, summarizeModel string, history []*plugnmeet.InsightsAITextChatContent) (summaryText string, promptTokens uint32, completionTokens uint32, err error)
 }
 
 // Task defines the interface for any runnable, self-contained AI task.
