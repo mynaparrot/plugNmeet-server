@@ -229,6 +229,13 @@ func (r *router) registerAPIRoutes() {
 	chatTranslation.Post("/end", r.ctrl.InsightsController.HandleEndChatTranslation)
 	chatTranslation.Post("/execute", r.ctrl.InsightsController.HandleExecuteChatTranslation)
 
+	ai := insights.Group("/ai")
+
+	aiTextChat := ai.Group("/textChat")
+	aiTextChat.Post("/configure", r.ctrl.InsightsController.HandleAITextChatConfigure)
+	aiTextChat.Post("/execute", r.ctrl.InsightsController.HandleExecuteAITextChat)
+	aiTextChat.Post("/end", r.ctrl.InsightsController.HandleEndAITextChat)
+
 	// for resumable.js need both GET and POST  methods.
 	// https://github.com/23/resumable.js#how-do-i-set-it-up-with-my-server
 	api.Get("/fileUpload", r.ctrl.FileController.HandleFileUpload)

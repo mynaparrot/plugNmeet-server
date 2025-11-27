@@ -203,7 +203,66 @@ func (i *InsightsController) HandleEndChatTranslation(c *fiber.Ctx) error {
 	if !isAdmin.(bool) {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
+
 	err := i.insightsModel.ChatEndTranslation(roomId.(string))
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+	return utils.SendCommonProtobufResponse(c, true, "success")
+}
+
+func (i *InsightsController) HandleAITextChatConfigure(c *fiber.Ctx) error {
+	if i.app.Insights == nil {
+		return utils.SendCommonProtobufResponse(c, false, "insights feature wasn't configured")
+	}
+	isAdmin := c.Locals("isAdmin")
+	roomId := c.Locals("roomId")
+
+	if !isAdmin.(bool) {
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
+	}
+
+	req := new(plugnmeet.InsightsAITextChatConfigReq)
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	err = i.insightsModel.AITextChatConfigure(req, roomId.(string))
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	return utils.SendCommonProtobufResponse(c, true, "success")
+}
+
+func (i *InsightsController) HandleExecuteAITextChat(c *fiber.Ctx) error {
+	roomId := c.Locals("roomId")
+	requestedUserId := c.Locals("requestedUserId")
+
+	req := new(plugnmeet.InsightsAITextChatContent)
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	err = i.insightsModel.ExecuteAITextChat(req, roomId.(string), requestedUserId.(string))
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	return utils.SendCommonProtobufResponse(c, true, "success")
+}
+
+func (i *InsightsController) HandleEndAITextChat(c *fiber.Ctx) error {
+	isAdmin := c.Locals("isAdmin")
+	roomId := c.Locals("roomId")
+
+	if !isAdmin.(bool) {
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
+	}
+
+	err := i.insightsModel.EndAITextChat(roomId.(string))
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}

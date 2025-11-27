@@ -19,10 +19,6 @@ func (s *InsightsModel) TranscriptionConfigure(req *plugnmeet.InsightsTranscript
 		return fmt.Errorf("empty room medata")
 	}
 
-	if !metadata.RoomFeatures.InsightsFeatures.IsAllow || !metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.IsAllow {
-		return fmt.Errorf("insights feature wasn't enabled")
-	}
-
 	insightsFeatures := metadata.RoomFeatures.InsightsFeatures
 	if !insightsFeatures.IsAllow || !insightsFeatures.TranscriptionFeatures.IsAllow {
 		return fmt.Errorf("insights feature wasn't enabled")
@@ -248,6 +244,74 @@ func (s *InsightsModel) ChatEndTranslation(roomId string) error {
 	}
 
 	metadata.RoomFeatures.InsightsFeatures.ChatTranslationFeatures.IsEnabled = false
+
+	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
+}
+
+func (s *InsightsModel) AITextChatConfigure(req *plugnmeet.InsightsAITextChatConfigReq, roomId string) error {
+	metadata, err := s.natsService.GetRoomMetadataStruct(roomId)
+	if err != nil {
+		return err
+	}
+	if metadata == nil {
+		return fmt.Errorf("empty room medata")
+	}
+
+	insightsFeatures := metadata.RoomFeatures.InsightsFeatures
+	if !insightsFeatures.IsAllow || !insightsFeatures.AiTextChatFeatures.IsAllow {
+		return fmt.Errorf("insights feature wasn't enabled")
+	}
+
+	insightsFeatures.AiTextChatFeatures.IsEnabled = true
+	insightsFeatures.AiTextChatFeatures.IsAllowedEveryone = req.IsAllowedEveryone
+	insightsFeatures.AiTextChatFeatures.AllowedUserIds = req.AllowedUserIds
+
+	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
+}
+
+func (s *InsightsModel) ExecuteAITextChat(req *plugnmeet.InsightsAITextChatContent, roomId, userId string) error {
+	metadata, err := s.natsService.GetRoomMetadataStruct(roomId)
+	if err != nil {
+		return err
+	}
+	if metadata == nil {
+		return fmt.Errorf("empty room medata")
+	}
+
+	insightsFeatures := metadata.RoomFeatures.InsightsFeatures
+	if !insightsFeatures.IsAllow || !insightsFeatures.AiTextChatFeatures.IsAllow {
+		return fmt.Errorf("insights feature wasn't enabled")
+	}
+
+	aiTextChatFeatures := insightsFeatures.AiTextChatFeatures
+	foundUser := aiTextChatFeatures.IsAllowedEveryone
+
+	if !aiTextChatFeatures.IsAllowedEveryone {
+		for _, id := range aiTextChatFeatures.AllowedUserIds {
+			if id == userId {
+				foundUser = true
+				break
+			}
+		}
+	}
+
+	if !foundUser {
+		return fmt.Errorf("you're not allowed to use this service")
+	}
+
+	return s.AITextChatRequest(roomId, userId, req.Text)
+}
+
+func (s *InsightsModel) EndAITextChat(roomId string) error {
+	metadata, err := s.natsService.GetRoomMetadataStruct(roomId)
+	if err != nil {
+		return err
+	}
+	if metadata == nil {
+		return fmt.Errorf("empty room medata")
+	}
+
+	metadata.RoomFeatures.InsightsFeatures.AiTextChatFeatures.IsEnabled = false
 
 	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
 }

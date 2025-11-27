@@ -65,7 +65,7 @@ func (s *InsightsModel) AITextChatRequest(roomId, userId, prompt string) error {
 				break
 			}
 			fullResponse.WriteString(res.Text)
-			fmt.Printf("Stream chunk for %s: %s\n", res.Id, res.Text)
+			fmt.Printf(res.Text)
 		}
 
 		// Append AI response to history
