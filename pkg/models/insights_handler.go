@@ -258,13 +258,14 @@ func (s *InsightsModel) AITextChatConfigure(req *plugnmeet.InsightsAITextChatCon
 	}
 
 	insightsFeatures := metadata.RoomFeatures.InsightsFeatures
-	if !insightsFeatures.IsAllow || !insightsFeatures.AiTextChatFeatures.IsAllow {
+	if !insightsFeatures.IsAllow || !insightsFeatures.AiFeatures.IsAllow || !insightsFeatures.AiFeatures.AiTextChatFeatures.IsAllow {
 		return fmt.Errorf("insights feature wasn't enabled")
 	}
+	aiTextChatFeatures := insightsFeatures.AiFeatures.AiTextChatFeatures
 
-	insightsFeatures.AiTextChatFeatures.IsEnabled = true
-	insightsFeatures.AiTextChatFeatures.IsAllowedEveryone = req.IsAllowedEveryone
-	insightsFeatures.AiTextChatFeatures.AllowedUserIds = req.AllowedUserIds
+	aiTextChatFeatures.IsEnabled = true
+	aiTextChatFeatures.IsAllowedEveryone = req.IsAllowedEveryone
+	aiTextChatFeatures.AllowedUserIds = req.AllowedUserIds
 
 	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
 }
@@ -279,11 +280,10 @@ func (s *InsightsModel) ExecuteAITextChat(req *plugnmeet.InsightsAITextChatConte
 	}
 
 	insightsFeatures := metadata.RoomFeatures.InsightsFeatures
-	if !insightsFeatures.IsAllow || !insightsFeatures.AiTextChatFeatures.IsAllow {
+	if !insightsFeatures.IsAllow || !insightsFeatures.AiFeatures.IsAllow || !insightsFeatures.AiFeatures.AiTextChatFeatures.IsAllow {
 		return fmt.Errorf("insights feature wasn't enabled")
 	}
-
-	aiTextChatFeatures := insightsFeatures.AiTextChatFeatures
+	aiTextChatFeatures := insightsFeatures.AiFeatures.AiTextChatFeatures
 	foundUser := aiTextChatFeatures.IsAllowedEveryone
 
 	if !aiTextChatFeatures.IsAllowedEveryone {
@@ -311,7 +311,7 @@ func (s *InsightsModel) EndAITextChat(roomId string) error {
 		return fmt.Errorf("empty room medata")
 	}
 
-	metadata.RoomFeatures.InsightsFeatures.AiTextChatFeatures.IsEnabled = false
+	metadata.RoomFeatures.InsightsFeatures.AiFeatures.AiTextChatFeatures.IsEnabled = false
 
 	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
 }
