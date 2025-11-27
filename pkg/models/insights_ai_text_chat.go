@@ -9,6 +9,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 const (
@@ -62,10 +63,15 @@ func (s *InsightsModel) AITextChatRequest(roomId, userId, prompt string) error {
 				promptTokens = res.PromptTokens
 				completionTokens = res.CompletionTokens
 				totalTokens = res.TotalTokens
-				break
 			}
 			fullResponse.WriteString(res.Text)
-			fmt.Printf(res.Text)
+
+			if marshal, err := protojson.Marshal(res); err == nil {
+				err := s.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_RESP_INSIGHTS_AI_TEXT_CHAT, roomId, string(marshal), &userId)
+				if err != nil {
+					s.logger.WithError(err).Error("failed to broadcast system event")
+				}
+			}
 		}
 
 		// Append AI response to history

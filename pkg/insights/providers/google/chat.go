@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -55,8 +56,9 @@ func newChatStream(ctx context.Context, client *genai.Client, model string, hist
 				}
 
 				resultChan <- &plugnmeet.InsightsAITextChatStreamResult{
-					Id:   streamId,
-					Text: textContent.String(),
+					Id:        streamId,
+					Text:      textContent.String(),
+					CreatedAt: fmt.Sprintf("%d", time.Now().UnixMilli()),
 				}
 			}
 		}
@@ -75,6 +77,7 @@ func newChatStream(ctx context.Context, client *genai.Client, model string, hist
 			PromptTokens:     promptTokens,
 			CompletionTokens: completionTokens,
 			TotalTokens:      totalTokens,
+			CreatedAt:        fmt.Sprintf("%d", time.Now().UnixMilli()),
 		}
 	}()
 
