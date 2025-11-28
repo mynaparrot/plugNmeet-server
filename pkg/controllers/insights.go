@@ -19,7 +19,7 @@ import (
 type InsightsController struct {
 	app             *config.AppConfig
 	agentTaskSub    *nats.Subscription
-	summarizeJobSub *nats.Subscription // New subscription for summarization jobs
+	summarizeJobSub *nats.Subscription
 	natsService     *natsservice.NatsService
 	logger          *logrus.Entry
 	insightsModel   *models.InsightsModel
