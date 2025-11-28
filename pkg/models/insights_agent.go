@@ -111,7 +111,11 @@ func (s *InsightsModel) HandleIncomingAgentTask(msg *nats.Msg) {
 		if ok {
 			// We are the leader. This is an UPDATE request.
 			s.logger.Infof("updating configuration for running agent: %s", key)
-			agent.UpdateAllowedUsers(payload.TargetUsers)
+			if payload.CaptureAllParticipantsTracks {
+				agent.ActivateRoomWideTask()
+			} else {
+				agent.UpdateAllowedUsers(payload.TargetUsers)
+			}
 			reply(true, "agent configured successfully")
 			return // The update is done.
 		}
@@ -141,7 +145,11 @@ func (s *InsightsModel) HandleIncomingAgentTask(msg *nats.Msg) {
 			s.lock.RLock()
 			newAgent, _ := s.roomAgents[key]
 			s.lock.RUnlock()
-			newAgent.UpdateAllowedUsers(payload.TargetUsers)
+			if payload.CaptureAllParticipantsTracks {
+				newAgent.ActivateRoomWideTask()
+			} else {
+				newAgent.UpdateAllowedUsers(payload.TargetUsers)
+			}
 			reply(true, "agent configured successfully")
 		}
 

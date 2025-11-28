@@ -31,6 +31,9 @@ type activePipeline struct {
 	identity   string
 }
 
+// RoomAgent is a LiveKit client that acts on behalf of a specific insights service for a single room.
+// It can either subscribe to specific user tracks or all tracks in the room,
+// process the audio, and forward it to a designated insights.Task.
 type RoomAgent struct {
 	Ctx             context.Context
 	cancel          context.CancelFunc
@@ -49,7 +52,7 @@ type RoomAgent struct {
 	synthesisTask *TranscriptionSynthesisTask
 }
 
-// NewRoomAgent creates a single-purpose agent.
+// NewRoomAgent creates and connects a new RoomAgent to a LiveKit room.
 func NewRoomAgent(ctx context.Context, appConf *config.AppConfig, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, natsService *natsservice.NatsService, redisService *redisservice.RedisService, logger *logrus.Entry, payload *insights.InsightsTaskPayload) (*RoomAgent, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	log := logger.WithFields(logrus.Fields{
@@ -91,9 +94,6 @@ func NewRoomAgent(ctx context.Context, appConf *config.AppConfig, serviceConfig 
 		c.Name = *payload.AgentName
 	}
 
-	// TODO: if not hidden then we'll need to display this user in the session
-	// so, need to add this user to nats KV as normal user
-
 	token, err := auth.GenerateLivekitAccessToken(agent.conf.LivekitInfo.ApiKey, agent.conf.LivekitInfo.Secret, time.Minute*5, c)
 	if err != nil {
 		return nil, err
@@ -130,6 +130,7 @@ func NewRoomAgent(ctx context.Context, appConf *config.AppConfig, serviceConfig 
 	return agent, nil
 }
 
+// startSynthesisTask initializes and runs the text-to-speech synthesis task if enabled.
 func (a *RoomAgent) startSynthesisTask() error {
 	// 1. Get the configuration for the speech-synthesis service.
 	synthAccount, synthServiceConfig, err := a.conf.Insights.GetProviderAccountForService(insights.ServiceTypeSpeechSynthesis)
@@ -153,12 +154,19 @@ func (a *RoomAgent) startSynthesisTask() error {
 	return nil
 }
 
+// GetServiceType returns the specific insights service this agent is responsible for.
 func (a *RoomAgent) GetServiceType() insights.ServiceType {
 	return a.payload.ServiceType
 }
 
-// UpdateAllowedUsers is the new reconciliation logic.
+// UpdateAllowedUsers sets the list of users who are permitted to start tasks with this agent.
+// It also reconciles the state by stopping tasks for any users who are no longer allowed.
 func (a *RoomAgent) UpdateAllowedUsers(allowed map[string]bool) {
+	if a.payload.CaptureAllParticipantsTracks {
+		a.logger.Warn("UpdateAllowedUsers called while in room-wide capture mode, ignoring.")
+		return
+	}
+
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
@@ -174,8 +182,31 @@ func (a *RoomAgent) UpdateAllowedUsers(allowed map[string]bool) {
 	}
 }
 
-// ActivateTaskForUser now checks for permission first.
+// ActivateRoomWideTask enables the agent to subscribe to all current and future audio tracks in the room.
+func (a *RoomAgent) ActivateRoomWideTask() {
+	if !a.payload.CaptureAllParticipantsTracks {
+		a.logger.Error("ActivateRoomWideTask called but agent is not in room-wide capture mode.")
+		return
+	}
+	a.logger.Info("activating room-wide track capture")
+
+	// Subscribe to all existing participants' audio tracks.
+	for _, p := range a.Room.GetRemoteParticipants() {
+		for _, pub := range p.TrackPublications() {
+			if pub.Kind() == lksdk.TrackKindAudio {
+				_ = pub.(*lksdk.RemoteTrackPublication).SetSubscribed(true)
+			}
+		}
+	}
+}
+
+// ActivateTaskForUser enables the agent to subscribe to a specific user's audio track.
+// It first checks if the user is in the allowed list.
 func (a *RoomAgent) ActivateTaskForUser(userId string, options []byte) error {
+	if a.payload.CaptureAllParticipantsTracks {
+		return fmt.Errorf("cannot activate task for a single user while in room-wide capture mode")
+	}
+
 	a.lock.Lock()
 
 	if _, isAllowed := a.allowedUsers[userId]; !isAllowed {
@@ -209,8 +240,7 @@ func (a *RoomAgent) ActivateTaskForUser(userId string, options []byte) error {
 	return nil
 }
 
-// GetUserTaskOptions safely checks if a user has an active task and returns the options.
-// It returns the options and a boolean indicating if the user was found.
+// GetUserTaskOptions returns the options for a user's active task and a boolean indicating if a task is active.
 func (a *RoomAgent) GetUserTaskOptions(userId string) (insights.ServiceType, []byte, bool) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
@@ -218,15 +248,14 @@ func (a *RoomAgent) GetUserTaskOptions(userId string) (insights.ServiceType, []b
 	return a.payload.ServiceType, options, ok
 }
 
-// EndTasksForUser stops the task for a specific user.
+// EndTasksForUser stops all processing pipelines for a specific user.
 func (a *RoomAgent) EndTasksForUser(userId string) {
 	a.lock.Lock()
 	a.endTasksForUser(userId)
 	a.lock.Unlock()
 }
 
-// endTasksForUser is the internal, non-locking version.
-// it's assumed that the caller has hold mutex lock.
+// endTasksForUser is the internal, non-locking version of EndTasksForUser.
 func (a *RoomAgent) endTasksForUser(userId string) {
 	delete(a.activeUserTasks, userId)
 	pipeline, ok := a.activePipelines[userId]
@@ -249,7 +278,7 @@ func (a *RoomAgent) endTasksForUser(userId string) {
 	}
 }
 
-// onTrackPublished now checks the activeUserTasks map.
+// onTrackPublished is a LiveKit callback that triggers when a remote participant publishes a track.
 func (a *RoomAgent) onTrackPublished(publication *lksdk.RemoteTrackPublication, rp *lksdk.RemoteParticipant) {
 	if publication.Kind() != lksdk.TrackKindAudio {
 		return
@@ -260,6 +289,11 @@ func (a *RoomAgent) onTrackPublished(publication *lksdk.RemoteTrackPublication, 
 		"name":   publication.Name(),
 	}).Infoln("onTrackPublished fired")
 
+	if a.payload.CaptureAllParticipantsTracks {
+		_ = publication.SetSubscribed(true)
+		return
+	}
+
 	a.lock.RLock()
 	_, ok := a.activeUserTasks[rp.Identity()]
 	a.lock.RUnlock()
@@ -269,7 +303,8 @@ func (a *RoomAgent) onTrackPublished(publication *lksdk.RemoteTrackPublication, 
 	}
 }
 
-// onTrackSubscribed now uses the activeUserTasks map and does NOT delete from it.
+// onTrackSubscribed is a LiveKit callback that triggers when the agent successfully subscribes to a track.
+// It creates the audio processing pipeline and starts the insights.Task.
 func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lksdk.RemoteTrackPublication, rp *lksdk.RemoteParticipant) {
 	if track.Codec().MimeType != webrtc.MimeTypeOpus {
 		return
@@ -281,13 +316,26 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 		"encryption": publication.TrackInfo().Encryption,
 	}).Infoln("onTrackSubscribed fired")
 
-	a.lock.Lock()
-	defer a.lock.Unlock()
+	var options []byte
+	var ok bool
 
-	options, ok := a.activeUserTasks[rp.Identity()]
+	// No lock needed to read the immutable payload.
+	if a.payload.CaptureAllParticipantsTracks {
+		options = a.payload.Options
+		ok = true
+	} else {
+		// A lock is still needed here to safely access the mutable activeUserTasks map.
+		a.lock.RLock()
+		options, ok = a.activeUserTasks[rp.Identity()]
+		a.lock.RUnlock()
+	}
+
 	if !ok {
 		return
 	}
+
+	a.lock.Lock()
+	defer a.lock.Unlock()
 
 	var decryptor lkmedia.Decryptor
 	if publication.TrackInfo().GetEncryption() != livekit.Encryption_NONE {
@@ -333,9 +381,15 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 	a.logger.Infof("activated task for participant %s", rp.Identity())
 }
 
-// onTrackUnsubscribed cleans up the processing pipeline for a user's track,
-// but preserves their "active" status in case they reconnect.
+// onTrackUnsubscribed is a LiveKit callback that triggers when a track is unsubscribed.
+// It cleans up the audio processing pipeline for that track.
 func (a *RoomAgent) onTrackUnsubscribed(track *webrtc.TrackRemote, publication *lksdk.RemoteTrackPublication, rp *lksdk.RemoteParticipant) {
+	a.logger.WithFields(logrus.Fields{
+		"userId": rp.Identity(),
+		"kind":   publication.Kind(),
+		"name":   publication.Name(),
+	}).Infoln("onTrackUnsubscribed fired, closing related pipeline if exists")
+
 	a.lock.Lock()
 	pipeline, ok := a.activePipelines[rp.Identity()]
 	// Remove from the map of active pipelines.
@@ -352,7 +406,7 @@ func (a *RoomAgent) onTrackUnsubscribed(track *webrtc.TrackRemote, publication *
 	a.logger.WithField("userId", rp.Identity()).Infoln("stopped insights task pipeline due to track unsubscription")
 }
 
-// Shutdown gracefully closes the agent.
+// Shutdown gracefully disconnects the agent from the LiveKit room and cancels all running tasks.
 func (a *RoomAgent) Shutdown() {
 	a.logger.Infoln("received shutdown signal, disconnecting room agent")
 	if a.synthesisTask != nil {
@@ -364,7 +418,7 @@ func (a *RoomAgent) Shutdown() {
 	}
 }
 
-// onDisconnected is a final cleanup step.
+// onDisconnected is a LiveKit callback that triggers when the agent is disconnected from the room.
 func (a *RoomAgent) onDisconnected() {
 	a.logger.Infoln("agent disconnected from room")
 	a.cancel()
