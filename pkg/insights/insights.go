@@ -34,10 +34,11 @@ type ServiceType string
 type AITaskType string
 
 const (
-	ServiceTypeTranscription   ServiceType = "transcription"
-	ServiceTypeTranslation     ServiceType = "translation"
-	ServiceTypeSpeechSynthesis ServiceType = "speech-synthesis"
-	ServiceTypeAITextChat      ServiceType = "ai_text_chat"
+	ServiceTypeTranscription      ServiceType = "transcription"
+	ServiceTypeTranslation        ServiceType = "translation"
+	ServiceTypeSpeechSynthesis    ServiceType = "speech-synthesis"
+	ServiceTypeAITextChat         ServiceType = "ai_text_chat"
+	ServiceTypeMeetingSummarizing ServiceType = "meeting_summarizing"
 
 	// AITaskTypeChat is for regular chat interactions.
 	AITaskTypeChat AITaskType = "chat"

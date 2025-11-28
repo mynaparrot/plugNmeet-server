@@ -212,7 +212,7 @@ insights:
           api_key: "YOUR_GEMINI_API_KEY_HERE"
 
   # 2. Define the services that USE the providers.
-  # The key ("transcription", "translation", "ai_text_chat") is the service name.
+  # The key ("transcription", "translation", "ai_text_chat", "meeting_summarizing") is the service name.
   services:
     transcription:
       provider: "azure"         # The provider TYPE to use
@@ -244,3 +244,13 @@ insights:
         chat_model: "gemini-2.5-pro"
         summarize_model: "gemini-2.0-flash"
         context_window: 5 # Number of recent messages to keep before summarizing
+
+    meeting_summarizing:
+      provider: "google"
+      id: "default-gemini-creds"
+      options:
+        # The root path where all recorded meeting audio will be stored.
+        # Each meeting will have its own subdirectory: {storage_path}/{room_id}/
+        storage_path: "/app/recording_files/insights_audio"
+        # The model to be used for the final summarization (in a future phase).
+        summarize_model: "gemini-1.5-pro"

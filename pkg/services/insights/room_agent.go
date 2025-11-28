@@ -64,7 +64,7 @@ func NewRoomAgent(ctx context.Context, appConf *config.AppConfig, serviceConfig 
 	})
 
 	// Create a single task for this agent's one and only service.
-	task, err := NewTask(payload.ServiceType, appConf, serviceConfig, providerAccount, natsService, redisService, log)
+	task, err := NewTask(ctx, payload.ServiceType, appConf, serviceConfig, providerAccount, natsService, redisService, log)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("could not create task for service '%s': %w", payload.ServiceType, err)

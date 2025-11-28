@@ -29,12 +29,14 @@ func NewProvider(ctx context.Context, providerType string, providerAccount *conf
 }
 
 // NewTask is a factory that returns the correct Task implementation.
-func NewTask(serviceType insights.ServiceType, appConf *config.AppConfig, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, natsService *natsservice.NatsService, redisService *redisservice.RedisService, logger *logrus.Entry) (insights.Task, error) {
+func NewTask(ctx context.Context, serviceType insights.ServiceType, appConf *config.AppConfig, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, natsService *natsservice.NatsService, redisService *redisservice.RedisService, logger *logrus.Entry) (insights.Task, error) {
 	switch serviceType {
 	case insights.ServiceTypeTranscription:
 		return NewTranscriptionTask(appConf, serviceConfig, providerAccount, natsService, redisService, logger)
 	case insights.ServiceTypeTranslation:
 		return NewTranslationTask(serviceConfig, providerAccount, logger)
+	case insights.ServiceTypeMeetingSummarizing:
+		return NewMeetingSummarizingTask(ctx, appConf, serviceConfig, logger)
 	default:
 		return nil, fmt.Errorf("unknown insights service task: %s", serviceType)
 	}

@@ -183,7 +183,7 @@ func (s *InsightsModel) ActivateTextTask(ctx context.Context, serviceType insigh
 	}
 
 	// 2. Create the appropriate task using the factory.
-	task, err := insightsservice.NewTask(serviceType, s.appConfig, serviceConfig, targetAccount, s.natsService, s.redisService, s.logger)
+	task, err := insightsservice.NewTask(ctx, serviceType, s.appConfig, serviceConfig, targetAccount, s.natsService, s.redisService, s.logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create task for service '%s': %w", serviceType, err)
 	}
