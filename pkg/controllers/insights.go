@@ -63,7 +63,7 @@ func (i *InsightsController) SubscribeToSummarizeJobs() {
 			return
 		}
 		// Pass the payload to a new model method for processing.
-		i.insightsModel.HandleSummarizeJob(&payload)
+		i.insightsModel.StartProcessingSummarizeJob(&payload)
 	})
 	if err != nil {
 		i.logger.WithError(err).Fatalln("failed to subscribe to NATS for summarize jobs")
@@ -294,6 +294,46 @@ func (i *InsightsController) HandleEndAITextChat(c *fiber.Ctx) error {
 	}
 
 	err := i.insightsModel.EndAITextChat(roomId.(string))
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+	return utils.SendCommonProtobufResponse(c, true, "success")
+}
+
+func (i *InsightsController) HandleAIMeetingSummarizationConfig(c *fiber.Ctx) error {
+	if i.app.Insights == nil {
+		return utils.SendCommonProtobufResponse(c, false, "insights feature wasn't configured")
+	}
+	isAdmin := c.Locals("isAdmin")
+	roomId := c.Locals("roomId")
+
+	if !isAdmin.(bool) {
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
+	}
+
+	req := new(plugnmeet.InsightsAIMeetingSummarizationConfigReq)
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	err = i.insightsModel.AIMeetingSummarizationConfig(req, roomId.(string))
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	return utils.SendCommonProtobufResponse(c, true, "success")
+}
+
+func (i *InsightsController) HandleEndAIMeetingSummarization(c *fiber.Ctx) error {
+	isAdmin := c.Locals("isAdmin")
+	roomId := c.Locals("roomId")
+
+	if !isAdmin.(bool) {
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
+	}
+
+	err := i.insightsModel.EndEndAIMeetingSummarization(roomId.(string))
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}

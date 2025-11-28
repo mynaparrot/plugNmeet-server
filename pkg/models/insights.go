@@ -229,8 +229,8 @@ func (s *InsightsModel) Shutdown() {
 	s.logger.Infoln("Insights Service shutdown complete.")
 }
 
-// HandleSummarizeJob will be called by the NATS subscription in the controller.
-func (s *InsightsModel) HandleSummarizeJob(payload *insights.SummarizeJobPayload) {
+// StartProcessingSummarizeJob will be called by the NATS subscription in the controller.
+func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJobPayload) {
 	log := s.logger.WithFields(logrus.Fields{
 		"roomId":   payload.RoomId,
 		"filePath": payload.FilePath,

@@ -9,20 +9,20 @@ import (
 )
 
 // StartBatchSummarizeAudioFile implements the provider interface using the correct Gemini batch API.
-func (p *GoogleProvider) StartBatchSummarizeAudioFile(ctx context.Context, filePath, summarizeModel, summarizationContext string) (string, string, error) {
+func (p *GoogleProvider) StartBatchSummarizeAudioFile(ctx context.Context, filePath, summarizeModel, summarizationPrompt string) (string, string, error) {
 	// 1. Upload the file to Google Cloud Storage.
 	f, err := p.client.Files.UploadFromPath(ctx, filePath, nil)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to upload file to google: %w", err)
 	}
-	if summarizationContext == "" {
-		summarizationContext = "Summarize this meeting conversation. Identify all key decisions and create a list of action items with assigned owners."
+	if summarizationPrompt == "" {
+		summarizationPrompt = "Summarize this meeting conversation. Identify all key decisions and create a list of action items with assigned owners."
 	}
 
 	parts := []*genai.Part{
 		genai.NewPartFromURI(f.URI, f.MIMEType),
 		genai.NewPartFromText("\n\n"),
-		genai.NewPartFromText(summarizationContext),
+		genai.NewPartFromText(summarizationPrompt),
 	}
 
 	// 2. Construct the inlined request for the batch job.

@@ -252,5 +252,5 @@ insights:
         # The root path where all recorded meeting audio will be stored.
         # Each meeting will have its own subdirectory: {storage_path}/{room_id}/
         storage_path: "/app/recording_files/insights_audio"
-        # The model to be used for the final summarization (in a future phase).
+        # The model to be used for the final summarization.
         summarize_model: "gemini-1.5-pro"

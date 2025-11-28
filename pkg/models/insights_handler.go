@@ -315,3 +315,55 @@ func (s *InsightsModel) EndAITextChat(roomId string) error {
 
 	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
 }
+
+func (s *InsightsModel) AIMeetingSummarizationConfig(req *plugnmeet.InsightsAIMeetingSummarizationConfigReq, roomId string) error {
+	metadata, err := s.natsService.GetRoomMetadataStruct(roomId)
+	if err != nil {
+		return err
+	}
+	if metadata == nil {
+		return fmt.Errorf("empty room medata")
+	}
+
+	insightsFeatures := metadata.RoomFeatures.InsightsFeatures
+	if !insightsFeatures.IsAllow || !insightsFeatures.AiFeatures.IsAllow || !insightsFeatures.AiFeatures.MeetingSummarizationFeatures.IsAllow {
+		return fmt.Errorf("insights feature wasn't enabled")
+	}
+	aiMeetingSummarizationFeatures := insightsFeatures.AiFeatures.MeetingSummarizationFeatures
+
+	aiMeetingSummarizationFeatures.IsEnabled = true
+	aiMeetingSummarizationFeatures.SummarizationPrompt = req.SummarizationPrompt
+
+	payload := &insights.InsightsTaskPayload{
+		Task:                         TaskConfigureAgent,
+		ServiceType:                  insights.ServiceTypeMeetingSummarizing,
+		RoomId:                       roomId,
+		CaptureAllParticipantsTracks: true,
+		HiddenAgent:                  true,
+	}
+
+	err = s.ConfigureAgent(payload, 5*time.Second)
+	if err != nil {
+		return err
+	}
+
+	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
+}
+
+func (s *InsightsModel) EndEndAIMeetingSummarization(roomId string) error {
+	metadata, err := s.natsService.GetRoomMetadataStruct(roomId)
+	if err != nil {
+		return err
+	}
+	if metadata == nil {
+		return fmt.Errorf("empty room medata")
+	}
+
+	err = s.EndRoomAgentTaskByServiceName(insights.ServiceTypeMeetingSummarizing, roomId, 5*time.Second)
+	if err != nil {
+		return err
+	}
+
+	metadata.RoomFeatures.InsightsFeatures.AiFeatures.MeetingSummarizationFeatures.IsEnabled = false
+	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
+}

@@ -68,6 +68,8 @@ func ToServiceType(t plugnmeet.InsightsServiceType) (ServiceType, error) {
 		return ServiceTypeSpeechSynthesis, nil
 	case plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_AI_TEXT_CHAT:
 		return ServiceTypeAITextChat, nil
+	case plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_MEETING_SUMMARIZING:
+		return ServiceTypeMeetingSummarizing, nil
 	default:
 		return "", fmt.Errorf("unknown or unsupported insights service type: %s", t.String())
 	}
@@ -85,6 +87,8 @@ func FromServiceType(t ServiceType) (plugnmeet.InsightsServiceType, error) {
 		return plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_SPEECH_SYNTHESIS, nil
 	case ServiceTypeAITextChat:
 		return plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_AI_TEXT_CHAT, nil
+	case ServiceTypeMeetingSummarizing:
+		return plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_MEETING_SUMMARIZING, nil
 	default:
 		return plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_UNSPECIFIED, fmt.Errorf("unknown or unsupported insights service type: %s", t)
 	}
@@ -98,7 +102,7 @@ type InsightsTaskPayload struct {
 	Options                            []byte          `json:"options"`
 	RoomE2EEKey                        *string         `json:"room_e2ee_key"`
 	TargetUsers                        map[string]bool `json:"target_users,omitempty"`
-	CaptureAllParticipantsTracks       bool            `json:"capture_all_participants_tracks,omitempty"` // Renamed field
+	CaptureAllParticipantsTracks       bool            `json:"capture_all_participants_tracks,omitempty"`
 	AllowedTransLangs                  []string        `json:"allowed_trans_langs,omitempty"`
 	EnabledTranscriptionTransSynthesis bool            `json:"enabled_transcription_trans_synthesis"`
 	AgentName                          *string         `json:"agent_name,omitempty"`
@@ -188,7 +192,7 @@ type Provider interface {
 
 	// StartBatchSummarizeAudioFile uploads a local audio file and starts an asynchronous summarization job.
 	// It returns a provider-specific job ID for later status checking.
-	StartBatchSummarizeAudioFile(ctx context.Context, filePath, summarizeModel, summarizationContext string) (jobId string, fileName string, err error)
+	StartBatchSummarizeAudioFile(ctx context.Context, filePath, summarizeModel, summarizationPrompt string) (jobId string, fileName string, err error)
 
 	// CheckBatchJobStatus checks the status of a previously started batch job.
 	CheckBatchJobStatus(ctx context.Context, jobId string) (*BatchJobResponse, error)
