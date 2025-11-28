@@ -47,7 +47,6 @@ func (p *GoogleProvider) AIChatTextSummarize(ctx context.Context, summarizeModel
 	return summarize(ctx, p.client, summarizeModel, history)
 }
 
-// The following methods are not implemented by the Google provider for this service.
 func (p *GoogleProvider) CreateTranscription(ctx context.Context, roomId, userId string, options []byte) (insights.TranscriptionStream, error) {
 	return nil, fmt.Errorf("CreateTranscription is not implemented for the google provider")
 }

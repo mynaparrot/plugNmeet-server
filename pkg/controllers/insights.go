@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -16,11 +17,12 @@ import (
 )
 
 type InsightsController struct {
-	app           *config.AppConfig
-	sub           *nats.Subscription
-	natsService   *natsservice.NatsService
-	logger        *logrus.Entry
-	insightsModel *models.InsightsModel
+	app             *config.AppConfig
+	agentTaskSub    *nats.Subscription
+	summarizeJobSub *nats.Subscription // New subscription for summarization jobs
+	natsService     *natsservice.NatsService
+	logger          *logrus.Entry
+	insightsModel   *models.InsightsModel
 }
 
 func NewInsightsController(app *config.AppConfig, natsService *natsservice.NatsService, im *models.InsightsModel, logger *logrus.Logger) *InsightsController {
@@ -30,6 +32,11 @@ func NewInsightsController(app *config.AppConfig, natsService *natsservice.NatsS
 		insightsModel: im,
 		logger:        logger.WithField("controller", "insights"),
 	}
+}
+
+func (i *InsightsController) StartSubscription() {
+	go i.SubscribeToAgentTaskRequests()
+	go i.SubscribeToSummarizeJobs()
 }
 
 // SubscribeToAgentTaskRequests is the central handler for all incoming agent tasks.
@@ -43,13 +50,37 @@ func (i *InsightsController) SubscribeToAgentTaskRequests() {
 		i.logger.WithError(err).Fatalln("failed to subscribe to NATS for insights tasks")
 	}
 	i.logger.Infof("successfully connected with %s channel", sub.Subject)
-	i.sub = sub
+	i.agentTaskSub = sub
+}
+
+// SubscribeToSummarizeJobs sets up a queue subscription to handle summarization jobs.
+func (i *InsightsController) SubscribeToSummarizeJobs() {
+	sub, err := i.app.NatsConn.QueueSubscribe(insights.SummarizeJobQueue, "pnm-summarize-worker-group", func(msg *nats.Msg) {
+		var payload insights.SummarizeJobPayload
+		err := json.Unmarshal(msg.Data, &payload)
+		if err != nil {
+			i.logger.WithError(err).Error("failed to unmarshal summarize job payload")
+			return
+		}
+		// Pass the payload to a new model method for processing.
+		i.insightsModel.HandleSummarizeJob(&payload)
+	})
+	if err != nil {
+		i.logger.WithError(err).Fatalln("failed to subscribe to NATS for summarize jobs")
+	}
+	i.logger.Infof("successfully connected with %s queue", sub.Subject)
+	i.summarizeJobSub = sub
 }
 
 func (i *InsightsController) Shutdown() {
-	if i.sub != nil {
-		if err := i.sub.Unsubscribe(); err != nil {
-			i.logger.WithError(err).Errorln("failed to unsubscribe from NATS")
+	if i.agentTaskSub != nil {
+		if err := i.agentTaskSub.Unsubscribe(); err != nil {
+			i.logger.WithError(err).Errorln("failed to unsubscribe from agent tasks")
+		}
+	}
+	if i.summarizeJobSub != nil {
+		if err := i.summarizeJobSub.Unsubscribe(); err != nil {
+			i.logger.WithError(err).Errorln("failed to unsubscribe from summarize jobs")
 		}
 	}
 	i.insightsModel.Shutdown()

@@ -52,7 +52,7 @@ func (a *Application) Boot() {
 	// This blocks until `wg.Done()` is called inside BootUp.
 	wg.Wait()
 
-	go a.Controllers.InsightsController.SubscribeToAgentTaskRequests()
+	a.Controllers.InsightsController.StartSubscription()
 	go a.janitorModel.StartJanitor()
 }
 

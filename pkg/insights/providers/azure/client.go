@@ -175,3 +175,15 @@ func (p *AzureProvider) AITextChatStream(ctx context.Context, chatModel string, 
 func (p *AzureProvider) AIChatTextSummarize(ctx context.Context, summarizeModel string, history []*plugnmeet.InsightsAITextChatContent) (summaryText string, promptTokens uint32, completionTokens uint32, err error) {
 	return "", 0, 0, nil
 }
+
+func (p *AzureProvider) StartBatchSummarizeAudioFile(ctx context.Context, filePath, summarizeModel, summarizationContext string) (string, string, error) {
+	return "", "", nil
+}
+
+func (p *AzureProvider) CheckBatchJobStatus(ctx context.Context, jobId string) (*insights.BatchJobResponse, error) {
+	return nil, nil
+}
+
+func (p *AzureProvider) DeleteUploadedFile(ctx context.Context, fileName string) error {
+	return nil
+}

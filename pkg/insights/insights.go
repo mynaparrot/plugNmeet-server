@@ -8,8 +8,14 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 )
 
+const (
+	SummarizeJobQueue           = "pnm.insights.jobs.summarize"
+	PendingSummarizeJobRedisKey = "pnm:insights:pending_summarize_jobs"
+)
+
 // EventType defines the type of transcription lifecycle event.
 type EventType string
+type BatchJobStatus string
 
 const (
 	EventTypeSessionStarted EventType = "session_started"
@@ -18,6 +24,10 @@ const (
 
 	EventTypePartialResult EventType = "partial_result"
 	EventTypeFinalResult   EventType = "final_result"
+
+	BatchJobStatusCompleted BatchJobStatus = "completed"
+	BatchJobStatusFailed    BatchJobStatus = "failed"
+	BatchJobStatusRunning   BatchJobStatus = "running"
 )
 
 // TranscriptionEvent is the universal message sent over the results channel.
@@ -115,6 +125,28 @@ type SynthesisTaskOptions struct {
 	Voice    string `json:"voice"`
 }
 
+type SummarizeJobPayload struct {
+	RoomId   string `json:"room_id"`
+	FilePath string `json:"file_path"`
+}
+
+type SummarizePendingJobPayload struct {
+	JobId            string `json:"job_id"`
+	FileName         string `json:"file_name"`
+	OriginalFilePath string `json:"original_file_path"`
+	CreatedAt        string `json:"created_at"`
+}
+
+// BatchJobResponse is a universal struct to hold the result of a batch job status check.
+type BatchJobResponse struct {
+	Status           BatchJobStatus
+	Error            string
+	Summary          string
+	PromptTokens     uint32
+	CompletionTokens uint32
+	TotalTokens      uint32
+}
+
 // TranscriptionStream defines a universal, bidirectional interface for a live transcription.
 // It is the contract that all providers must fulfill to offer real-time STT.
 // The user of this interface can Write() audio to the stream and will receive
@@ -153,6 +185,16 @@ type Provider interface {
 
 	// AIChatTextSummarize summarizes a conversation history.
 	AIChatTextSummarize(ctx context.Context, summarizeModel string, history []*plugnmeet.InsightsAITextChatContent) (summaryText string, promptTokens uint32, completionTokens uint32, err error)
+
+	// StartBatchSummarizeAudioFile uploads a local audio file and starts an asynchronous summarization job.
+	// It returns a provider-specific job ID for later status checking.
+	StartBatchSummarizeAudioFile(ctx context.Context, filePath, summarizeModel, summarizationContext string) (jobId string, fileName string, err error)
+
+	// CheckBatchJobStatus checks the status of a previously started batch job.
+	CheckBatchJobStatus(ctx context.Context, jobId string) (*BatchJobResponse, error)
+
+	// DeleteUploadedFile deletes a file that was previously uploaded to the provider's storage.
+	DeleteUploadedFile(ctx context.Context, fileName string) error
 }
 
 // Task defines the interface for any runnable, self-contained AI task.

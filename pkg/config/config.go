@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -20,6 +21,7 @@ import (
 var dbTablePrefix string
 
 type AppConfig struct {
+	ctx         context.Context
 	RDS         *redis.Client
 	DB          *gorm.DB
 	Logger      *logrus.Logger
@@ -202,12 +204,13 @@ type NatsInfoRecorder struct {
 	TranscodingJobs string `yaml:"transcoding_jobs_subject"`
 }
 
-func New(appCnf *AppConfig) (*AppConfig, error) {
+func New(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 	// default validation of token is 10 minutes
 	if appCnf.Client.TokenValidity == nil || *appCnf.Client.TokenValidity < 0 {
 		validity := time.Minute * 10
 		appCnf.Client.TokenValidity = &validity
 	}
+	appCnf.ctx = ctx
 
 	// set default values
 	if appCnf.AnalyticsSettings != nil {
@@ -261,6 +264,10 @@ func New(appCnf *AppConfig) (*AppConfig, error) {
 	}
 
 	return appCnf, nil
+}
+
+func (a *AppConfig) GetApplicationCtx() context.Context {
+	return a.ctx
 }
 
 // readClientFiles will read client files and cache it at startup

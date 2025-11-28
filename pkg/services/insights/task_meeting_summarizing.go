@@ -3,6 +3,7 @@ package insightsservice
 import (
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -18,7 +19,7 @@ import (
 )
 
 type MeetingSummarizingTask struct {
-	ctx     context.Context
+	ctx     context.Context // The agent's main context
 	appConf *config.AppConfig
 	service *config.ServiceConfig
 	logger  *logrus.Entry
@@ -83,7 +84,7 @@ func (t *MeetingSummarizingTask) RunAudioStream(participantCtx context.Context, 
 
 		// This goroutine listens for the AGENT's shutdown signal.
 		go func() {
-			<-t.ctx.Done()
+			<-t.ctx.Done() // Use the main agent context here.
 			if t.mixer != nil {
 				t.mixer.Stop()
 			}
@@ -111,7 +112,7 @@ func (t *MeetingSummarizingTask) RunAudioStream(participantCtx context.Context, 
 
 	for {
 		select {
-		case <-participantCtx.Done():
+		case <-participantCtx.Done(): // Use the per-participant context here.
 			log.Info("stopping audio stream for user")
 			return nil
 		case pcmBytes, ok := <-audioStream:
@@ -131,9 +132,25 @@ func (t *MeetingSummarizingTask) RunAudioStream(participantCtx context.Context, 
 }
 
 // doRoomSummarizing will be called when the file is closed.
+// It publishes a job to the NATS queue for a worker to process.
 func (t *MeetingSummarizingTask) doRoomSummarizing(roomId, filePath string) {
-	t.logger.Infof("file writing finished for %s with file %s. starting post-processing.", roomId, filePath)
-	// Post-processing logic will go here in the future.
+	t.logger.Infof("file writing finished for %s. publishing summarization job.", filePath)
+
+	payload := insights.SummarizeJobPayload{
+		RoomId:   roomId,
+		FilePath: filePath,
+	}
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		t.logger.WithError(err).Error("failed to marshal summarization job payload")
+		return
+	}
+
+	// Publish to the NATS queue.
+	err = t.appConf.NatsConn.Publish(insights.SummarizeJobQueue, payloadBytes)
+	if err != nil {
+		t.logger.WithError(err).Error("failed to publish summarization job")
+	}
 }
 
 // RunStateless is not implemented for this task.
