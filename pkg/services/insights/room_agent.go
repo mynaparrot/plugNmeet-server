@@ -372,7 +372,7 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 
 	// Launch the agent's single, pre-created task.
 	go func() {
-		err := a.task.RunAudioStream(ctx, transcoder.AudioStream(), a.Room.Name(), rp.Identity(), options)
+		err := a.task.RunAudioStream(ctx, transcoder.AudioStream(), a.payload.RoomTableId, a.Room.Name(), rp.Identity(), options)
 		if err != nil && !errors.Is(err, context.Canceled) {
 			a.logger.WithError(err).Errorf("insights task %s failed", a.payload.ServiceType)
 		}

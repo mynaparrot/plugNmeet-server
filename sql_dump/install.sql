@@ -62,3 +62,19 @@ CREATE TABLE IF NOT EXISTS `pnm_room_analytics` (
      ON DELETE RESTRICT
      ON UPDATE CASCADE
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `pnm_room_artifacts` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `artifact_id` VARCHAR(36) NOT NULL,
+  `room_table_id` INT(11) NOT NULL,
+  `room_id` VARCHAR(255) NOT NULL,
+  `type` VARCHAR(100) NOT NULL,
+  `metadata` JSON DEFAULT NULL,
+  `creation_time` BIGINT NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_artifact_id` (`artifact_id`),
+  KEY `idx_room_id` (`room_id`),
+  KEY `idx_type` (`type`),
+  FOREIGN KEY (`room_table_id`) REFERENCES `pnm_room_info` (`id`)
+    ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

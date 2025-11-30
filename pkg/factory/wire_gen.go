@@ -96,7 +96,8 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 		HealthCheckController:  healthCheckController,
 		InsightsController:     insightsController,
 	}
-	janitorModel := models.NewJanitorModel(ctx, appConfig, databaseService, redisService, natsService, livekitService, roomModel, roomDurationModel, logger)
+	artifactModel := models.NewArtifactModel(appConfig, databaseService, webhookNotifier)
+	janitorModel := models.NewJanitorModel(ctx, appConfig, databaseService, redisService, natsService, livekitService, roomModel, roomDurationModel, artifactModel, logger)
 	application := &Application{
 		Controllers:  applicationControllers,
 		AppConfig:    appConfig,
@@ -123,7 +124,7 @@ func provideBreakoutRoomModel(rm *models.RoomModel, natsService *natsservice.Nat
 }
 
 // build the dependency set for models
-var modelSet = wire.NewSet(models.NewAnalyticsModel, models.NewAuthModel, models.NewInsightsModel, models.NewBBBApiWrapperModel, models.NewRoomDurationModel, models.NewEtherpadModel, models.NewExDisplayModel, models.NewExMediaModel, models.NewFileModel, models.NewIngressModel, models.NewLtiV1Model, models.NewNatsModel, models.NewPollModel, models.NewRecorderModel, models.NewRecordingModel, models.NewRoomModel, provideBreakoutRoomModel, models.NewJanitorModel, models.NewSpeechToTextModel, models.NewUserModel, models.NewWaitingRoomModel, models.NewWebhookModel)
+var modelSet = wire.NewSet(models.NewAnalyticsModel, models.NewAuthModel, models.NewInsightsModel, models.NewBBBApiWrapperModel, models.NewRoomDurationModel, models.NewEtherpadModel, models.NewExDisplayModel, models.NewExMediaModel, models.NewFileModel, models.NewIngressModel, models.NewLtiV1Model, models.NewNatsModel, models.NewPollModel, models.NewRecorderModel, models.NewRecordingModel, models.NewRoomModel, provideBreakoutRoomModel, models.NewArtifactModel, models.NewJanitorModel, models.NewSpeechToTextModel, models.NewUserModel, models.NewWaitingRoomModel, models.NewWebhookModel)
 
 // build the dependency set for controllers
 var controllerSet = wire.NewSet(controllers.NewAnalyticsController, controllers.NewAuthController, controllers.NewBBBController, controllers.NewBreakoutRoomController, controllers.NewHealthCheckController, controllers.NewEtherpadController, controllers.NewExDisplayController, controllers.NewExMediaController, controllers.NewFileController, controllers.NewIngressController, controllers.NewLtiV1Controller, controllers.NewPollsController, controllers.NewRecorderController, controllers.NewRecordingController, controllers.NewRoomController, controllers.NewSpeechToTextController, controllers.NewUserController, controllers.NewWaitingRoomController, controllers.NewWebhookController, controllers.NewNatsController, controllers.NewInsightsController)

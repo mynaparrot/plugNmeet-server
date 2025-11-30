@@ -57,6 +57,7 @@ var modelSet = wire.NewSet(
 	models.NewRecordingModel,
 	models.NewRoomModel,
 	provideBreakoutRoomModel,
+	models.NewArtifactModel,
 	models.NewJanitorModel,
 	models.NewSpeechToTextModel,
 	models.NewUserModel,

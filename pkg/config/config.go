@@ -41,6 +41,7 @@ type AppConfig struct {
 	SharedNotePad                SharedNotePad                `yaml:"shared_notepad"`
 	AzureCognitiveServicesSpeech AzureCognitiveServicesSpeech `yaml:"azure_cognitive_services_speech"`
 	AnalyticsSettings            *AnalyticsSettings           `yaml:"analytics_settings"`
+	ArtifactsSettings            *ArtifactsSettings           `yaml:"artifacts_settings"`
 	NatsInfo                     NatsInfo                     `yaml:"nats_info"`
 	Insights                     *InsightsConfig              `yaml:"insights"`
 }
@@ -121,6 +122,11 @@ type AnalyticsSettings struct {
 	Enabled        bool           `yaml:"enabled"`
 	FilesStorePath *string        `yaml:"files_store_path"`
 	TokenValidity  *time.Duration `yaml:"token_validity"`
+}
+
+type ArtifactsSettings struct {
+	StoragePath   *string        `yaml:"storage_path"`
+	TokenValidity *time.Duration `yaml:"token_validity"`
 }
 
 type ChatParticipant struct {
@@ -231,6 +237,33 @@ func New(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to create analytics directory %s: %w", p, err)
 			}
+		}
+	}
+
+	// Add initialization logic for ArtifactsSettings
+	if appCnf.ArtifactsSettings == nil {
+		// If the whole block is missing, create it
+		appCnf.ArtifactsSettings = &ArtifactsSettings{}
+	}
+	if appCnf.ArtifactsSettings.StoragePath == nil {
+		// Set the default path if it's not specified
+		p := "./artifacts"
+		appCnf.ArtifactsSettings.StoragePath = &p
+	}
+	if appCnf.ArtifactsSettings.TokenValidity == nil {
+		d := time.Minute * 10
+		appCnf.ArtifactsSettings.TokenValidity = &d
+	}
+
+	p := *appCnf.ArtifactsSettings.StoragePath
+	if strings.HasPrefix(p, "./") {
+		p = filepath.Join(appCnf.RootWorkingDir, p)
+	}
+
+	if _, err := os.Stat(p); os.IsNotExist(err) {
+		err = os.MkdirAll(p, os.ModePerm)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create artifacts directory %s: %w", p, err)
 		}
 	}
 

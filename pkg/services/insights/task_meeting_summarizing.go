@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	lkMedia "github.com/livekit/media-sdk"
 	"github.com/livekit/media-sdk/mixer"
 	"github.com/livekit/media-sdk/rtp"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights/media"
@@ -41,17 +43,11 @@ func NewMeetingSummarizingTask(ctx context.Context, appConf *config.AppConfig, s
 }
 
 // RunAudioStream now correctly handles the per-participant context.
-func (t *MeetingSummarizingTask) RunAudioStream(participantCtx context.Context, audioStream <-chan lkMedia.PCM16Sample, roomId, userId string, options []byte) error {
+func (t *MeetingSummarizingTask) RunAudioStream(participantCtx context.Context, audioStream <-chan lkMedia.PCM16Sample, roomTableId uint64, roomId, userId string, options []byte) error {
 	var initErr error
 	t.initOnce.Do(func() {
-		storagePath, ok := t.service.Options["storage_path"].(string)
-		if !ok {
-			initErr = errors.New("storage_path not configured for meeting_summarizing service")
-			t.logger.Error(initErr)
-			return
-		}
+		outputDir := filepath.Join(*t.appConf.ArtifactsSettings.StoragePath, strings.ToLower(plugnmeet.RoomArtifactType_MEETING_SUMMARY.String()), roomId)
 
-		outputDir := filepath.Join(storagePath, roomId)
 		if err := os.MkdirAll(outputDir, 0755); err != nil {
 			initErr = fmt.Errorf("failed to create output directory: %w", err)
 			t.logger.Error(initErr)
@@ -69,7 +65,7 @@ func (t *MeetingSummarizingTask) RunAudioStream(participantCtx context.Context, 
 		}
 
 		writer, err := media.NewWAVWriter(file, 16000, 1, func() {
-			t.doRoomSummarizing(roomId, outputFile, options)
+			t.doRoomSummarizing(roomTableId, roomId, outputFile, options)
 		})
 		if err != nil {
 			initErr = fmt.Errorf("failed to create WAV file writer: %w", err)
@@ -139,13 +135,14 @@ func (t *MeetingSummarizingTask) RunAudioStream(participantCtx context.Context, 
 
 // doRoomSummarizing will be called when the file is closed.
 // It publishes a job to the NATS queue for a worker to process.
-func (t *MeetingSummarizingTask) doRoomSummarizing(roomId, filePath string, options []byte) {
+func (t *MeetingSummarizingTask) doRoomSummarizing(roomTableId uint64, roomId, filePath string, options []byte) {
 	t.logger.Infof("file writing finished for %s. publishing summarization job.", filePath)
 
 	payload := insights.SummarizeJobPayload{
-		RoomId:   roomId,
-		FilePath: filePath,
-		Options:  options,
+		RoomTableId: roomTableId,
+		RoomId:      roomId,
+		FilePath:    filePath,
+		Options:     options,
 	}
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {

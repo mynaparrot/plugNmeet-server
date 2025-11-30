@@ -2,7 +2,6 @@ package models
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
@@ -68,9 +67,13 @@ func (m *JanitorModel) CheckInsightsPendingSummarizeJobs() {
 		switch res.Status {
 		case insights.BatchJobStatusCompleted:
 			log.Infof("job %s completed successfully", payload.JobId)
-			// TODO: Save the summary (res.Summary) to the database.
-			fmt.Println(fmt.Sprintf("%+v", payload))
-			log.Infof("Summary for job %s: %s", payload.JobId, res.Summary)
+
+			err := m.artifactModel.CreateMeetingSummaryArtifact(payload.RoomTableId, res.Summary, res.PromptTokens, res.CompletionTokens, res.TotalTokens, payload.JobId, payload.FileName)
+			if err != nil {
+				log.WithError(err).Error("failed to create meeting summary artifact")
+				return
+			}
+
 			cleanup()
 
 		case insights.BatchJobStatusFailed:

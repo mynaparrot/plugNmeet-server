@@ -11,7 +11,7 @@ import (
 )
 
 func (s *InsightsModel) TranscriptionConfigure(req *plugnmeet.InsightsTranscriptionConfigReq, roomId string) error {
-	metadata, err := s.natsService.GetRoomMetadataStruct(roomId)
+	roomInfo, metadata, err := s.natsService.GetRoomInfoWithMetadata(roomId)
 	if err != nil {
 		return err
 	}
@@ -47,6 +47,7 @@ func (s *InsightsModel) TranscriptionConfigure(req *plugnmeet.InsightsTranscript
 		Task:                               TaskConfigureAgent,
 		ServiceType:                        insights.ServiceTypeTranscription,
 		RoomId:                             roomId,
+		RoomTableId:                        roomInfo.DbTableId,
 		TargetUsers:                        usersMap,
 		HiddenAgent:                        true,
 		AllowedTransLangs:                  insightsFeatures.TranscriptionFeatures.AllowedTransLangs,
@@ -317,11 +318,11 @@ func (s *InsightsModel) EndAITextChat(roomId string) error {
 }
 
 func (s *InsightsModel) AIMeetingSummarizationConfig(req *plugnmeet.InsightsAIMeetingSummarizationConfigReq, roomId string) error {
-	metadata, err := s.natsService.GetRoomMetadataStruct(roomId)
+	roomInfo, metadata, err := s.natsService.GetRoomInfoWithMetadata(roomId)
 	if err != nil {
 		return err
 	}
-	if metadata == nil {
+	if roomInfo == nil {
 		return fmt.Errorf("empty room medata")
 	}
 
@@ -338,6 +339,7 @@ func (s *InsightsModel) AIMeetingSummarizationConfig(req *plugnmeet.InsightsAIMe
 		Task:                         TaskConfigureAgent,
 		ServiceType:                  insights.ServiceTypeMeetingSummarizing,
 		RoomId:                       roomId,
+		RoomTableId:                  roomInfo.DbTableId,
 		CaptureAllParticipantsTracks: true,
 		HiddenAgent:                  true,
 		Options:                      []byte(aiMeetingSummarizationFeatures.SummarizationPrompt),

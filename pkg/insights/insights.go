@@ -99,6 +99,7 @@ type InsightsTaskPayload struct {
 	Task                               string          `json:"task"`
 	ServiceType                        ServiceType     `json:"service_type"`
 	RoomId                             string          `json:"room_id"`
+	RoomTableId                        uint64          `json:"room_table_id"`
 	UserId                             string          `json:"user_id"`
 	Options                            []byte          `json:"options"`
 	RoomE2EEKey                        *string         `json:"room_e2ee_key"`
@@ -131,12 +132,14 @@ type SynthesisTaskOptions struct {
 }
 
 type SummarizeJobPayload struct {
-	RoomId   string `json:"room_id"`
-	FilePath string `json:"file_path"`
-	Options  []byte `json:"options"`
+	RoomTableId uint64 `json:"room_table_id"`
+	RoomId      string `json:"room_id"`
+	FilePath    string `json:"file_path"`
+	Options     []byte `json:"options"`
 }
 
 type SummarizePendingJobPayload struct {
+	RoomTableId      uint64 `json:"room_table_id"`
 	JobId            string `json:"job_id"`
 	FileName         string `json:"file_name"`
 	OriginalFilePath string `json:"original_file_path"`
@@ -206,7 +209,7 @@ type Provider interface {
 // Task defines the interface for any runnable, self-contained AI task.
 type Task interface {
 	// RunAudioStream starts the task's processing pipeline for a continuous audio stream.
-	RunAudioStream(ctx context.Context, audioStream <-chan media.PCM16Sample, roomId, userId string, options []byte) error
+	RunAudioStream(ctx context.Context, audioStream <-chan media.PCM16Sample, roomTableId uint64, roomId, userId string, options []byte) error
 
 	// RunStateless executes a single, stateless task (e.g., text translation).
 	RunStateless(ctx context.Context, options []byte) (interface{}, error)

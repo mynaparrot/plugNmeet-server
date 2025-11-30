@@ -187,6 +187,12 @@ analytics_settings:
   files_store_path: ./analytics
   token_validity: 30m
 
+artifacts_settings:
+  # The root path where all generated artifacts (summaries, etc.) will be stored.
+  # Each room will have its own subdirectory: {storage_path}/{service_type}/{room_id}/
+  storage_path: "./artifacts"
+  token_validity: 10m
+
 insights:
   # 1. Define all available provider accounts ONCE.
   # The key ("azure", "google") is the provider TYPE.
@@ -249,8 +255,5 @@ insights:
       provider: "google"
       id: "default-gemini-creds"
       options:
-        # The root path where all recorded meeting audio will be stored.
-        # Each meeting will have its own subdirectory: {storage_path}/{room_id}/
-        storage_path: "/app/recording_files/insights_audio"
         # The model to be used for the final summarization.
-        summarize_model: "gemini-1.5-pro"
+        summarize_model: "gemini-2.0-flash"

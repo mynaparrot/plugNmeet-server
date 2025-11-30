@@ -232,9 +232,10 @@ func (s *InsightsModel) Shutdown() {
 // StartProcessingSummarizeJob will be called by the NATS subscription in the controller.
 func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJobPayload) {
 	log := s.logger.WithFields(logrus.Fields{
-		"roomId":   payload.RoomId,
-		"filePath": payload.FilePath,
-		"service":  "meeting_summarizing",
+		"roomTableId": payload.RoomTableId,
+		"roomId":      payload.RoomId,
+		"filePath":    payload.FilePath,
+		"service":     "meeting_summarizing",
 	})
 	log.Infoln("received new meeting summarization job")
 
@@ -268,6 +269,7 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 	log.Infof("successfully added batch job with ID: %s for fileName: %s", jobId, fileName)
 
 	pendingJob := &insights.SummarizePendingJobPayload{
+		RoomTableId:      payload.RoomTableId,
 		JobId:            jobId,
 		FileName:         fileName,
 		OriginalFilePath: payload.FilePath,
