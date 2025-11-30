@@ -19,7 +19,7 @@ func (p *GoogleProvider) StartBatchSummarizeAudioFile(ctx context.Context, fileP
 		"model":    summarizeModel,
 	})
 	if userPrompt == "" {
-		userPrompt = "Summarize this meeting conversation. Identify all key decisions and create a list of action items with assigned owners."
+		userPrompt = "Summarize this meeting conversation. Identify all key decisions and create a list of action items."
 	}
 	log.Infof("using summarizationPrompt: '%s'", userPrompt)
 
