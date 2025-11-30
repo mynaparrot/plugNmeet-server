@@ -347,7 +347,13 @@ func (s *InsightsModel) AIMeetingSummarizationConfig(req *plugnmeet.InsightsAIMe
 		return err
 	}
 
-	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
+	err = s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
+	if err != nil {
+		return err
+	}
+
+	// notify everyone about this
+	return s.natsService.BroadcastSystemNotificationToRoom(roomId, "insights.meeting-summarization.enabled-notification-all", plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_INFO, true, nil)
 }
 
 func (s *InsightsModel) EndEndAIMeetingSummarization(roomId string) error {
