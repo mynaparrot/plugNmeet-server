@@ -340,6 +340,7 @@ func (s *InsightsModel) AIMeetingSummarizationConfig(req *plugnmeet.InsightsAIMe
 		RoomId:                       roomId,
 		CaptureAllParticipantsTracks: true,
 		HiddenAgent:                  true,
+		Options:                      []byte(aiMeetingSummarizationFeatures.SummarizationPrompt),
 	}
 
 	err = s.ConfigureAgent(payload, 5*time.Second)

@@ -2,42 +2,63 @@ package google
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/genai"
 )
 
 // StartBatchSummarizeAudioFile implements the provider interface using the correct Gemini batch API.
-func (p *GoogleProvider) StartBatchSummarizeAudioFile(ctx context.Context, filePath, summarizeModel, summarizationPrompt string) (string, string, error) {
+func (p *GoogleProvider) StartBatchSummarizeAudioFile(ctx context.Context, filePath, summarizeModel, userPrompt string) (string, string, error) {
+	log := p.logger.WithFields(logrus.Fields{
+		"filePath": filePath,
+		"model":    summarizeModel,
+	})
+	if userPrompt == "" {
+		userPrompt = "Summarize this meeting conversation. Identify all key decisions and create a list of action items with assigned owners."
+	}
+	log.Infof("using summarizationPrompt: '%s'", userPrompt)
+
+	summarizationPrompt := fmt.Sprintf("You are a professional meeting summarization assistant. Your response must be a single, valid JSON object with one key: 'summary'. The value of the 'summary' key should be the result of the following user instruction:\n\n---\n\n%s", userPrompt)
+
 	// 1. Upload the file to Google Cloud Storage.
 	f, err := p.client.Files.UploadFromPath(ctx, filePath, nil)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to upload file to google: %w", err)
 	}
-	if summarizationPrompt == "" {
-		summarizationPrompt = "Summarize this meeting conversation. Identify all key decisions and create a list of action items with assigned owners."
-	}
+	log = log.WithFields(logrus.Fields{
+		"url":            f.URI,
+		"mime-type":      f.MIMEType,
+		"expirationTime": f.ExpirationTime.Format(time.RFC3339),
+	})
+	log.Infoln("successfully uploaded file")
 
-	parts := []*genai.Part{
-		genai.NewPartFromURI(f.URI, f.MIMEType),
-		genai.NewPartFromText("\n\n"),
-		genai.NewPartFromText(summarizationPrompt),
+	contents := []*genai.Content{
+		genai.NewContentFromParts([]*genai.Part{
+			genai.NewPartFromURI(f.URI, f.MIMEType),
+		}, genai.RoleUser),
 	}
-
-	// 2. Construct the inlined request for the batch job.
-	inlineRequests := []*genai.InlinedRequest{
-		{
-			Contents: []*genai.Content{
-				{
-					Parts: parts,
-					Role:  "user",
-				},
+	config := &genai.GenerateContentConfig{
+		SystemInstruction: &genai.Content{
+			Parts: []*genai.Part{
+				genai.NewPartFromText(summarizationPrompt),
 			},
 		},
 	}
 
-	// 3. Create the batch job using the correct client.Batches.Create method.
+	// Construct the inlined request for the batch job.
+	inlineRequests := []*genai.InlinedRequest{
+		{
+			Contents: contents,
+			Config:   config,
+		},
+	}
+
+	// Create the batch job using the correct client.Batches.Create method.
 	batchJob, err := p.client.Batches.Create(
 		ctx,
 		summarizeModel,
@@ -49,6 +70,7 @@ func (p *GoogleProvider) StartBatchSummarizeAudioFile(ctx context.Context, fileP
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create batch job: %w", err)
 	}
+	log.WithField("job-id", batchJob.Name).Infoln("successfully created batch job")
 
 	return batchJob.Name, f.Name, nil
 }
@@ -65,14 +87,37 @@ func (p *GoogleProvider) CheckBatchJobStatus(ctx context.Context, jobId string) 
 	}
 
 	if job.State == genai.JobStateSucceeded {
-		res.Status = "COMPLETED"
 		inlinedResponses := job.Dest.InlinedResponses
-		// Assuming the first response is the one we want.
+		// from the batch API, we'll always get the result in the first response
 		if len(inlinedResponses) > 0 {
 			inlinedRes := inlinedResponses[0]
-			candidate := inlinedRes.Response.Candidates[0]
-			if candidate.Content != nil && len(candidate.Content.Parts) > 0 {
-				res.Summary = candidate.Content.Parts[0].Text
+			if inlinedRes.Error != nil {
+				res.Error = fmt.Sprintf("%v: %s", inlinedRes.Error.Code, inlinedRes.Error.Message)
+				res.Status = insights.BatchJobStatusFailed
+				return res, nil
+			}
+
+			if len(inlinedRes.Response.Candidates) > 0 {
+				candidate := inlinedRes.Response.Candidates[0]
+				if candidate.Content != nil && len(candidate.Content.Parts) > 0 {
+					part := candidate.Content.Parts[0]
+					jsonString := strings.TrimSpace(part.Text)
+					jsonString = strings.TrimPrefix(jsonString, "```json")
+					jsonString = strings.TrimSuffix(jsonString, "```")
+
+					var summaryData struct {
+						Summary string `json:"summary"`
+					}
+
+					if err := json.Unmarshal([]byte(jsonString), &summaryData); err == nil {
+						res.Summary = summaryData.Summary
+					} else {
+						// Fallback if the model didn't return perfect JSON
+						p.logger.WithError(err).Warn("failed to unmarshal summary JSON, using raw text as fallback")
+						res.Summary = part.Text
+					}
+					res.Status = insights.BatchJobStatusCompleted
+				}
 			}
 			if inlinedRes.Response.UsageMetadata != nil {
 				res.PromptTokens = uint32(inlinedRes.Response.UsageMetadata.PromptTokenCount)

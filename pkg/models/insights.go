@@ -236,7 +236,7 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 		"filePath": payload.FilePath,
 		"service":  "meeting_summarizing",
 	})
-	log.Infoln("received summarization job")
+	log.Infoln("received new meeting summarization job")
 
 	// 1. Get the configuration for the service.
 	targetAccount, serviceConfig, err := s.appConfig.Insights.GetProviderAccountForService(insights.ServiceTypeMeetingSummarizing)
@@ -257,19 +257,21 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 		log.Error("summarize_model not configured for meeting_summarizing service")
 		return
 	}
-	summarizationContext := "Summarize this meeting audio. Identify all key decisions and create a list of action items with assigned owners."
+	userPrompt := string(payload.Options)
 
 	// 3. Start the batch job.
-	jobId, fileName, err := provider.StartBatchSummarizeAudioFile(s.ctx, payload.FilePath, summarizeModel, summarizationContext)
+	jobId, fileName, err := provider.StartBatchSummarizeAudioFile(s.ctx, payload.FilePath, summarizeModel, userPrompt)
 	if err != nil {
 		log.WithError(err).Error("failed to start batch summarization job")
 		return
 	}
+	log.Infof("successfully added batch job with ID: %s for fileName: %s", jobId, fileName)
 
 	pendingJob := &insights.SummarizePendingJobPayload{
-		JobId:     jobId,
-		FileName:  fileName,
-		CreatedAt: time.Now().Format(time.RFC3339),
+		JobId:            jobId,
+		FileName:         fileName,
+		OriginalFilePath: payload.FilePath,
+		CreatedAt:        time.Now().Format(time.RFC3339),
 	}
 
 	marshal, err := json.Marshal(&pendingJob)
@@ -278,12 +280,16 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 		return
 	}
 
+	data := map[string]string{
+		jobId: string(marshal),
+	}
+
 	// 4. Store the job ID in Redis for the janitor to track.
-	err = s.appConfig.RDS.HSet(s.ctx, insights.PendingSummarizeJobRedisKey, marshal).Err()
+	err = s.appConfig.RDS.HSet(s.ctx, insights.PendingSummarizeJobRedisKey, data).Err()
 	if err != nil {
 		log.WithError(err).Error("failed to store pending summarization job in Redis")
 		return
 	}
 
-	log.Infof("successfully started batch job with ID: %s for fileName: %s", jobId, fileName)
+	log.Infof("successfully registered new batch job with ID: %s for fileName: %s", jobId, fileName)
 }

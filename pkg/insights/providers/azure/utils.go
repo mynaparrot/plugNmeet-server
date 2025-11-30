@@ -2,9 +2,11 @@ package azure
 
 import (
 	"context"
+	"encoding/binary"
 
 	"github.com/Microsoft/cognitive-services-speech-sdk-go/audio"
 	"github.com/Microsoft/cognitive-services-speech-sdk-go/speech"
+	"github.com/livekit/media-sdk"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 )
 
@@ -16,13 +18,15 @@ type azureTranscribeStream struct {
 	results    chan *insights.TranscriptionEvent
 }
 
-// Write implements the io.Writer interface by calling the underlying push stream's Write method.
-func (s *azureTranscribeStream) Write(p []byte) (n int, err error) {
-	err = s.pushStream.Write(p)
-	if err != nil {
-		return 0, err
+// WriteSample now implements the new interface method.
+// It converts the PCM sample to bytes before sending it to Azure.
+func (s *azureTranscribeStream) WriteSample(sample media.PCM16Sample) error {
+	// Convert the PCM sample back to bytes for the provider's writer interface.
+	byteSlice := make([]byte, len(sample)*2)
+	for i, val := range sample {
+		binary.LittleEndian.PutUint16(byteSlice[i*2:], uint16(val))
 	}
-	return len(p), nil
+	return s.pushStream.Write(byteSlice)
 }
 
 // Close implements the io.Closer interface. It stops the recognizer and closes the stream.

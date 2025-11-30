@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/livekit/media-sdk"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
@@ -35,7 +36,7 @@ func NewTranscriptionTask(appConf *config.AppConfig, serviceConfig *config.Servi
 }
 
 // RunAudioStream implements the insights.Task interface.
-func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-chan []byte, roomId, userId string, options []byte) error {
+func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-chan media.PCM16Sample, roomId, userId string, options []byte) error {
 	// Use the factory to create a provider instance.
 	provider, err := NewProvider(ctx, t.service.Provider, t.account, t.service, t.logger)
 	if err != nil {
@@ -54,11 +55,11 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 			select {
 			case <-ctx.Done():
 				return
-			case audioChunk, ok := <-audioStream:
+			case pcmSample, ok := <-audioStream:
 				if !ok {
 					return
 				}
-				if _, err := stream.Write(audioChunk); err != nil {
+				if err := stream.WriteSample(pcmSample); err != nil {
 					t.logger.WithError(err).Error("error writing audio to provider")
 					return
 				}

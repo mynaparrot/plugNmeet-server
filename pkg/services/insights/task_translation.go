@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/livekit/media-sdk"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/sirupsen/logrus"
@@ -57,6 +58,6 @@ func (t *TranslationTask) RunStateless(ctx context.Context, options []byte) (int
 }
 
 // RunAudioStream is not implemented for TranslationTask as it's a stateless service.
-func (t *TranslationTask) RunAudioStream(ctx context.Context, audioStream <-chan []byte, roomName, identity string, options []byte) error {
+func (t *TranslationTask) RunAudioStream(ctx context.Context, audioStream <-chan media.PCM16Sample, roomName, identity string, options []byte) error {
 	return errors.New("RunAudioStream is not supported for a translation task")
 }

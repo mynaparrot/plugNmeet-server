@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/livekit/media-sdk"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 )
 
@@ -132,6 +133,7 @@ type SynthesisTaskOptions struct {
 type SummarizeJobPayload struct {
 	RoomId   string `json:"room_id"`
 	FilePath string `json:"file_path"`
+	Options  []byte `json:"options"`
 }
 
 type SummarizePendingJobPayload struct {
@@ -156,8 +158,8 @@ type BatchJobResponse struct {
 // The user of this interface can Write() audio to the stream and will receive
 // results by reading from the Results() channel.
 type TranscriptionStream interface {
-	// Writer accepts a chunk of audio data to be sent to the provider.
-	io.Writer
+	// WriteSample accepts a chunk of audio data to be sent to the provider.
+	WriteSample(sample media.PCM16Sample) error
 
 	// Closer signals that the audio stream is finished and no more data will be sent.
 	io.Closer
@@ -192,7 +194,7 @@ type Provider interface {
 
 	// StartBatchSummarizeAudioFile uploads a local audio file and starts an asynchronous summarization job.
 	// It returns a provider-specific job ID for later status checking.
-	StartBatchSummarizeAudioFile(ctx context.Context, filePath, summarizeModel, summarizationPrompt string) (jobId string, fileName string, err error)
+	StartBatchSummarizeAudioFile(ctx context.Context, filePath, summarizeModel, userPrompt string) (jobId string, fileName string, err error)
 
 	// CheckBatchJobStatus checks the status of a previously started batch job.
 	CheckBatchJobStatus(ctx context.Context, jobId string) (*BatchJobResponse, error)
@@ -204,7 +206,7 @@ type Provider interface {
 // Task defines the interface for any runnable, self-contained AI task.
 type Task interface {
 	// RunAudioStream starts the task's processing pipeline for a continuous audio stream.
-	RunAudioStream(ctx context.Context, audioStream <-chan []byte, roomId, userId string, options []byte) error
+	RunAudioStream(ctx context.Context, audioStream <-chan media.PCM16Sample, roomId, userId string, options []byte) error
 
 	// RunStateless executes a single, stateless task (e.g., text translation).
 	RunStateless(ctx context.Context, options []byte) (interface{}, error)

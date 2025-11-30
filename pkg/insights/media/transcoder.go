@@ -22,7 +22,7 @@ const (
 // pcmWriter implements the media.Writer interface. It receives resampled
 // PCM audio from a PCMRemoteTrack and writes it directly to a Go channel.
 type pcmWriter struct {
-	audioChan chan []byte
+	audioChan chan media.PCM16Sample
 	isClosed  bool
 	lock      sync.Mutex
 }
@@ -30,7 +30,7 @@ type pcmWriter struct {
 // newPCMWriter creates a new writer.
 func newPCMWriter() *pcmWriter {
 	return &pcmWriter{
-		audioChan: make(chan []byte),
+		audioChan: make(chan media.PCM16Sample),
 	}
 }
 
@@ -44,17 +44,7 @@ func (w *pcmWriter) WriteSample(sample media.PCM16Sample) error {
 		return io.EOF
 	}
 
-	// Create a byte slice of the correct size.
-	byteSlice := make([]byte, sample.Size())
-
-	// Use the efficient CopyTo method.
-	_, err := sample.CopyTo(byteSlice)
-	if err != nil {
-		return err
-	}
-
-	// Send the final byte slice to our output channel.
-	w.audioChan <- byteSlice
+	w.audioChan <- sample
 	return nil
 }
 
@@ -106,7 +96,7 @@ func NewTranscoder(ctx context.Context, track *webrtc.TrackRemote, decryptor lkm
 }
 
 // AudioStream returns the read-only channel of transcoded audio.
-func (t *Transcoder) AudioStream() <-chan []byte {
+func (t *Transcoder) AudioStream() <-chan media.PCM16Sample {
 	return t.writer.audioChan
 }
 

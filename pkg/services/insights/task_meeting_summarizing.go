@@ -2,7 +2,6 @@ package insightsservice
 
 import (
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,7 +10,9 @@ import (
 	"sync"
 	"time"
 
+	lkMedia "github.com/livekit/media-sdk"
 	"github.com/livekit/media-sdk/mixer"
+	"github.com/livekit/media-sdk/rtp"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights/media"
@@ -25,7 +26,7 @@ type MeetingSummarizingTask struct {
 	logger  *logrus.Entry
 
 	mixer    *mixer.Mixer
-	writer   *media.PCMFileWriter
+	writer   *media.WAVWriter
 	initOnce sync.Once
 }
 
@@ -40,7 +41,7 @@ func NewMeetingSummarizingTask(ctx context.Context, appConf *config.AppConfig, s
 }
 
 // RunAudioStream now correctly handles the per-participant context.
-func (t *MeetingSummarizingTask) RunAudioStream(participantCtx context.Context, audioStream <-chan []byte, roomId, userId string, options []byte) error {
+func (t *MeetingSummarizingTask) RunAudioStream(participantCtx context.Context, audioStream <-chan lkMedia.PCM16Sample, roomId, userId string, options []byte) error {
 	var initErr error
 	t.initOnce.Do(func() {
 		storagePath, ok := t.service.Options["storage_path"].(string)
@@ -58,21 +59,26 @@ func (t *MeetingSummarizingTask) RunAudioStream(participantCtx context.Context, 
 		}
 
 		timestamp := time.Now().Unix()
-		outputFile := filepath.Join(outputDir, fmt.Sprintf("mixed_audio_%d.pcm", timestamp))
+		outputFile := filepath.Join(outputDir, fmt.Sprintf("mixed_audio_%d.wav", timestamp))
 
-		writer, err := media.NewPCMFileWriter(outputFile, media.WithOnCloseCallback(func() {
-			t.doRoomSummarizing(roomId, outputFile)
-		}))
+		file, err := os.Create(outputFile)
 		if err != nil {
-			initErr = fmt.Errorf("failed to create PCM file writer: %w", err)
+			initErr = fmt.Errorf("failed to create output file: %w", err)
+			t.logger.Error(initErr)
+			return
+		}
+
+		writer, err := media.NewWAVWriter(file, 16000, 1, func() {
+			t.doRoomSummarizing(roomId, outputFile, options)
+		})
+		if err != nil {
+			initErr = fmt.Errorf("failed to create WAV file writer: %w", err)
 			t.logger.Error(initErr)
 			return
 		}
 		t.writer = writer
 
-		const sampleRate = 48000
-		const bufferDuration = 20 * time.Millisecond
-		newMixer, err := mixer.NewMixer(writer, bufferDuration, nil, 1, sampleRate)
+		newMixer, err := mixer.NewMixer(writer, rtp.DefFrameDur, nil, 1, mixer.DefaultInputBufferFrames)
 		if err != nil {
 			initErr = fmt.Errorf("failed to create newMixer: %w", err)
 			t.logger.Error(initErr)
@@ -86,7 +92,12 @@ func (t *MeetingSummarizingTask) RunAudioStream(participantCtx context.Context, 
 		go func() {
 			<-t.ctx.Done() // Use the main agent context here.
 			if t.mixer != nil {
+				t.logger.Infoln("stopping mixer")
 				t.mixer.Stop()
+				err := t.writer.Close()
+				if err != nil {
+					t.logger.WithError(err).Error("failed to close writer")
+				}
 			}
 		}()
 	})
@@ -112,18 +123,13 @@ func (t *MeetingSummarizingTask) RunAudioStream(participantCtx context.Context, 
 
 	for {
 		select {
-		case <-participantCtx.Done(): // Use the per-participant context here.
+		case <-participantCtx.Done(): // per-participant context here.
 			log.Info("stopping audio stream for user")
 			return nil
-		case pcmBytes, ok := <-audioStream:
+		case pcmSample, ok := <-audioStream:
 			if !ok {
 				return nil
 			}
-			pcmSample := make([]int16, len(pcmBytes)/2)
-			for i := 0; i < len(pcmSample); i++ {
-				pcmSample[i] = int16(binary.LittleEndian.Uint16(pcmBytes[i*2:]))
-			}
-
 			if err := input.WriteSample(pcmSample); err != nil {
 				log.WithError(err).Error("failed to write sample to mixer")
 			}
@@ -133,12 +139,13 @@ func (t *MeetingSummarizingTask) RunAudioStream(participantCtx context.Context, 
 
 // doRoomSummarizing will be called when the file is closed.
 // It publishes a job to the NATS queue for a worker to process.
-func (t *MeetingSummarizingTask) doRoomSummarizing(roomId, filePath string) {
+func (t *MeetingSummarizingTask) doRoomSummarizing(roomId, filePath string, options []byte) {
 	t.logger.Infof("file writing finished for %s. publishing summarization job.", filePath)
 
 	payload := insights.SummarizeJobPayload{
 		RoomId:   roomId,
 		FilePath: filePath,
+		Options:  options,
 	}
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
