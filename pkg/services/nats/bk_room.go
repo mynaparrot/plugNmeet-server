@@ -13,6 +13,7 @@ func (s *NatsService) InsertOrUpdateBreakoutRoom(parentRoomId, bkRoomId string, 
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
 		Replicas: s.app.NatsInfo.NumReplicas,
 		Bucket:   fmt.Sprintf(breakoutRoomBucket, parentRoomId),
+		TTL:      DefaultTTL,
 	})
 	if err != nil {
 		return err

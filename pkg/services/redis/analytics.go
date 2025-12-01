@@ -9,7 +9,11 @@ func (s *RedisService) AnalyticsGetKeyType(key string) (string, error) {
 }
 
 func (s *RedisService) AddAnalyticsHSETType(key string, val map[string]string) error {
-	_, err := s.rc.HSet(s.ctx, key, val).Result()
+	pipe := s.rc.Pipeline()
+	pipe.HSet(s.ctx, key, val)
+	pipe.Expire(s.ctx, key, time.Hour*24)
+
+	_, err := pipe.Exec(s.ctx)
 	if err != nil {
 		return err
 	}
@@ -21,7 +25,11 @@ func (s *RedisService) GetAnalyticsAllHashTypeVals(key string) (map[string]strin
 }
 
 func (s *RedisService) IncrementAnalyticsVal(key string, val int64) error {
-	_, err := s.rc.IncrBy(s.ctx, key, val).Result()
+	pipe := s.rc.Pipeline()
+	pipe.IncrBy(s.ctx, key, val)
+	pipe.Expire(s.ctx, key, time.Hour*24)
+
+	_, err := pipe.Exec(s.ctx)
 	if err != nil {
 		return err
 	}
@@ -29,7 +37,7 @@ func (s *RedisService) IncrementAnalyticsVal(key string, val int64) error {
 }
 
 func (s *RedisService) AddAnalyticsStringType(key, val string) error {
-	_, err := s.rc.Set(s.ctx, key, val, time.Duration(0)).Result()
+	_, err := s.rc.Set(s.ctx, key, val, time.Hour*24).Result()
 	if err != nil {
 		return err
 	}
@@ -41,7 +49,11 @@ func (s *RedisService) GetAnalyticsStringTypeVal(key string) (string, error) {
 }
 
 func (s *RedisService) AddAnalyticsUser(key string, val map[string]string) error {
-	_, err := s.rc.HSet(s.ctx, key, val).Result()
+	pipe := s.rc.Pipeline()
+	pipe.HSet(s.ctx, key, val)
+	pipe.Expire(s.ctx, key, time.Hour*24)
+
+	_, err := pipe.Exec(s.ctx)
 	if err != nil {
 		return err
 	}

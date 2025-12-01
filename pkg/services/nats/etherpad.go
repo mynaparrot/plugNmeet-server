@@ -17,6 +17,7 @@ func (s *NatsService) AddRoomInEtherpad(nodeId, roomId string) error {
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
 		Replicas: s.app.NatsInfo.NumReplicas,
 		Bucket:   fmt.Sprintf(EtherpadKvKey, nodeId),
+		TTL:      DefaultTTL,
 	})
 	if err != nil {
 		return err

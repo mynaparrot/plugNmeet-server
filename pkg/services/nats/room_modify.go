@@ -35,6 +35,7 @@ func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeo
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
 		Replicas: s.app.NatsInfo.NumReplicas,
 		Bucket:   bucket,
+		TTL:      DefaultTTL,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create or update KV bucket: %w", err)

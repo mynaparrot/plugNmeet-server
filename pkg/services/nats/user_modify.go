@@ -47,6 +47,7 @@ func (s *NatsService) AddUser(roomId, userId, name string, isAdmin, isPresenter 
 	roomKV, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
 		Replicas: s.app.NatsInfo.NumReplicas,
 		Bucket:   bucket,
+		TTL:      DefaultTTL,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create room user bucket: %w", err)
@@ -64,6 +65,7 @@ func (s *NatsService) AddUser(roomId, userId, name string, isAdmin, isPresenter 
 	userKV, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
 		Replicas: s.app.NatsInfo.NumReplicas,
 		Bucket:   bucket,
+		TTL:      DefaultTTL,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create user info bucket: %w", err)
