@@ -55,7 +55,7 @@ func (s *RedisService) HandleTranscriptionUsage(roomId, userId string, isStarted
 
 	pipe := s.rc.TxPipeline()
 	pipe.HIncrBy(s.ctx, usageKey, userId, duration)
-	pipe.HIncrBy(s.ctx, usageKey, "total_usage", duration)
+	pipe.HIncrBy(s.ctx, usageKey, TotalUsageField, duration)
 	pipe.Expire(s.ctx, usageKey, 24*time.Hour)
 	_, err = pipe.Exec(s.ctx)
 

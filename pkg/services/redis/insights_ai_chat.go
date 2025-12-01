@@ -15,6 +15,10 @@ import (
 
 const (
 	AiTextChatRedisKey = Prefix + "insights:aiTextChat"
+
+	AiTextChatTotalPromptTokenFields     = "total_%s_prompt_tokens"
+	AiTextChatTotalCompletionTokenFields = "total_%s_completion_tokens"
+	AiTextChatTotalTokenFields           = "total_%s_tokens"
 )
 
 func (s *RedisService) GetAITextChatSummary(ctx context.Context, roomId, userId string) (string, error) {
@@ -87,9 +91,9 @@ func (s *RedisService) UpdateAITextChatUsage(ctx context.Context, roomId, userId
 	pipe.HIncrBy(ctx, key, userTotalKey, int64(totalTokens))
 
 	// Global, per-task tracking
-	totalPromptKey := fmt.Sprintf("total_%s_prompt_tokens", taskType)
-	totalCompletionKey := fmt.Sprintf("total_%s_completion_tokens", taskType)
-	totalTokensKey := fmt.Sprintf("total_%s_tokens", taskType)
+	totalPromptKey := fmt.Sprintf(AiTextChatTotalPromptTokenFields, taskType)
+	totalCompletionKey := fmt.Sprintf(AiTextChatTotalCompletionTokenFields, taskType)
+	totalTokensKey := fmt.Sprintf(AiTextChatTotalTokenFields, taskType)
 
 	pipe.HIncrBy(ctx, key, totalPromptKey, int64(promptTokens))
 	pipe.HIncrBy(ctx, key, totalCompletionKey, int64(completionTokens))

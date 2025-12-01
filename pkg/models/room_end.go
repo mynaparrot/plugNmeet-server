@@ -45,7 +45,7 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 	if info == nil {
 		if roomDbInfo.IsRunning == 1 {
 			log.Warn("Room active in DB but not in NATS during EndRoom. Marking as ended and cleaning up.")
-			go m.OnAfterRoomEnded(roomDbInfo.RoomId, roomDbInfo.Sid, "", "") // Metadata might be empty
+			go m.OnAfterRoomEnded(roomDbInfo.ID, roomDbInfo.RoomId, roomDbInfo.Sid, "", "") // Metadata might be empty
 		}
 		return true, "room ended (NATS info was missing, cleanup initiated)"
 	}
@@ -61,11 +61,11 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 	}
 
 	// Step 7: Trigger the main asynchronous cleanup process in a separate goroutine.
-	go m.OnAfterRoomEnded(info.RoomId, info.RoomSid, info.Metadata, info.Status)
+	go m.OnAfterRoomEnded(info.DbTableId, info.RoomId, info.RoomSid, info.Metadata, info.Status)
 	return true, "success"
 }
 
-func (m *RoomModel) OnAfterRoomEnded(roomID, roomSID, metadata, roomStatus string) {
+func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata, roomStatus string) {
 	log := m.logger.WithFields(logrus.Fields{
 		"room_id":     roomID,
 		"room_sid":    roomSID,
@@ -156,7 +156,7 @@ func (m *RoomModel) OnAfterRoomEnded(roomID, roomSID, metadata, roomStatus strin
 	}
 
 	// Step 13: End all the agent tasks for this room.
-	m.insightsModel.OnAfterRoomEnded(roomID)
+	m.insightsModel.OnAfterRoomEnded(dbTableId, roomID, roomSID)
 
 	// Step 14: Perform the final NATS cleanup, deleting room-specific streams and KV stores.
 	m.natsService.OnAfterSessionEndCleanup(roomID)

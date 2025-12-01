@@ -18,7 +18,7 @@ func (s *RedisService) UpdateChatTranslationUsage(ctx context.Context, roomId, u
 	key := fmt.Sprintf("%s:%s:usage", ChatTranslationRedisKey, roomId)
 	pipe := s.rc.TxPipeline()
 	pipe.HIncrBy(ctx, key, userId, int64(incBy))
-	pipe.HIncrBy(ctx, key, "total_usage", int64(incBy))
+	pipe.HIncrBy(ctx, key, TotalUsageField, int64(incBy))
 	pipe.Expire(ctx, key, time.Hour*24)
 	_, err := pipe.Exec(ctx)
 	return err

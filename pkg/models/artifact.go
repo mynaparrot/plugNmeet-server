@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	dbservice "github.com/mynaparrot/plugnmeet-server/pkg/services/db"
+	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
 )
 
@@ -21,16 +23,20 @@ const (
 )
 
 type ArtifactModel struct {
+	ctx             context.Context
 	app             *config.AppConfig
 	ds              *dbservice.DatabaseService
+	rs              *redisservice.RedisService
 	webhookNotifier *helpers.WebhookNotifier
 	log             *logrus.Entry
 }
 
-func NewArtifactModel(app *config.AppConfig, ds *dbservice.DatabaseService, webhookNotifier *helpers.WebhookNotifier) *ArtifactModel {
+func NewArtifactModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, redisService *redisservice.RedisService, webhookNotifier *helpers.WebhookNotifier) *ArtifactModel {
 	return &ArtifactModel{
+		ctx:             ctx,
 		app:             app,
 		ds:              ds,
+		rs:              redisService,
 		webhookNotifier: webhookNotifier,
 		log:             app.Logger.WithField("model", "artifact"),
 	}
@@ -74,6 +80,34 @@ func (m *ArtifactModel) MoveToTrash(filePath string) (string, error) {
 
 	m.log.Infof("moved artifact file %s to trash at %s", filePath, trashPath)
 	return trashPath, nil
+}
+
+// CreateAllRoomUsageArtifacts is responsible for creating artifact records for all usage-based services
+// when a room ends.
+func (m *ArtifactModel) CreateAllRoomUsageArtifacts(roomId, roomSid string, roomTableId uint64, log *logrus.Entry) {
+	log = log.WithFields(logrus.Fields{
+		"method": "CreateAllRoomUsageArtifacts",
+	})
+
+	// Speech Transcription
+	if err := m.createSpeechTranscriptionUsageArtifact(roomId, roomSid, roomTableId, log); err != nil {
+		log.WithError(err).Error("failed to create speech transcription usage artifact")
+	}
+
+	// Chat Translation
+	if err := m.createChatTranslationUsageArtifact(roomId, roomSid, roomTableId, log); err != nil {
+		log.WithError(err).Error("failed to create chat translation usage artifact")
+	}
+
+	// Synthesized Speech
+	if err := m.createSynthesizedSpeechUsageArtifact(roomId, roomSid, roomTableId, log); err != nil {
+		log.WithError(err).Error("failed to create synthesized speech usage artifact")
+	}
+
+	// AI Text Chat Usage (chat + summary)
+	if err := m.createAITextChatUsageArtifacts(roomId, roomSid, roomTableId, log); err != nil {
+		log.WithError(err).Error("failed to create AI text chat session usage artifact")
+	}
 }
 
 func (m *ArtifactModel) sendWebhookNotification(eventName ArtifactEventName, roomSid string, artifact *dbmodels.RoomArtifact, metadata *plugnmeet.RoomArtifactMetadata) {

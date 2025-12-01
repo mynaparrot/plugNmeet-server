@@ -298,16 +298,17 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 	log.Infof("successfully registered new batch job with ID: %s for fileName: %s", jobId, fileName)
 }
 
-func (s *InsightsModel) OnAfterRoomEnded(roomId string) {
+func (s *InsightsModel) OnAfterRoomEnded(dbTableId uint64, roomId, roomSid string) {
 	log := s.logger.WithFields(logrus.Fields{
-		"room_id": roomId,
-		"method":  "OnAfterRoomEnded",
+		"room_id":       roomId,
+		"room_sid":      roomSid,
+		"room_table_id": dbTableId,
+		"method":        "OnAfterRoomEnded",
 	})
 
 	if err := s.EndRoomAllAgentTasks(roomId); err != nil {
 		log.WithError(err).Error("Error in agent task cleanup")
 	}
 
-	//TODO: update artifacts with all usages
-	// speech to text, chat translation, text to speech, AI Chat usage
+	s.artifactModel.CreateAllRoomUsageArtifacts(roomId, roomSid, dbTableId, log)
 }
