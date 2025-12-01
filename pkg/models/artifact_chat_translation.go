@@ -63,5 +63,8 @@ func (m *ArtifactModel) createChatTranslationUsageArtifact(roomId, roomSid strin
 	m.sendWebhookNotification(ArtifactCreated, roomSid, artifact, metadata)
 	log.Infof("successfully created chat translation artifact for room %s", roomId)
 
+	// 6. Add to analytics
+	m.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_CHAT_TRANSLATION_TOTAL_USAGE, nil, &total)
+
 	return nil
 }

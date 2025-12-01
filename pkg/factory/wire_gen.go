@@ -41,7 +41,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	etherpadModel := models.NewEtherpadModel(ctx, appConfig, databaseService, redisService, natsService, analyticsModel, logger)
 	pollModel := models.NewPollModel(appConfig, databaseService, redisService, natsService, analyticsModel, logger)
 	speechToTextModel := models.NewSpeechToTextModel(appConfig, databaseService, redisService, natsService, analyticsModel, webhookNotifier, logger)
-	artifactModel := models.NewArtifactModel(ctx, appConfig, databaseService, redisService, webhookNotifier)
+	artifactModel := models.NewArtifactModel(ctx, appConfig, databaseService, redisService, webhookNotifier, analyticsModel)
 	insightsModel := models.NewInsightsModel(ctx, appConfig, redisService, natsService, artifactModel, logger)
 	roomModel := models.NewRoomModel(ctx, appConfig, databaseService, redisService, livekitService, natsService, webhookNotifier, userModel, recorderModel, fileModel, roomDurationModel, etherpadModel, pollModel, speechToTextModel, analyticsModel, insightsModel, logger)
 	authController := controllers.NewAuthController(appConfig, natsService, authModel, roomModel)

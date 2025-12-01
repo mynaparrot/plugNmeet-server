@@ -59,6 +59,10 @@ func (s *InsightsModel) TranscriptionConfigure(req *plugnmeet.InsightsTranscript
 		return err
 	}
 
+	// analytics
+	val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()
+	s.artifactModel.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_TRANSCRIPTION_STATUS, &val, nil)
+
 	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
 }
 
@@ -67,6 +71,11 @@ func (s *InsightsModel) EndTranscription(roomId string) error {
 	if err != nil {
 		return err
 	}
+
+	// analytics
+	val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()
+	s.artifactModel.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_TRANSCRIPTION_STATUS, &val, nil)
+
 	return s.broadcastEndTranscription(roomId)
 }
 
@@ -191,6 +200,10 @@ func (s *InsightsModel) ChatTranslationConfigure(req *plugnmeet.InsightsChatTran
 	insightsFeatures.ChatTranslationFeatures.AllowedTransLangs = req.AllowedTransLangs
 	insightsFeatures.ChatTranslationFeatures.DefaultLang = req.DefaultLang
 
+	// analytics
+	val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()
+	s.artifactModel.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_CHAT_TRANSLATION_STATUS, &val, nil)
+
 	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
 }
 
@@ -244,6 +257,10 @@ func (s *InsightsModel) ChatEndTranslation(roomId string) error {
 		return fmt.Errorf("empty room medata")
 	}
 
+	// analytics
+	val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()
+	s.artifactModel.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_CHAT_TRANSLATION_STATUS, &val, nil)
+
 	metadata.RoomFeatures.InsightsFeatures.ChatTranslationFeatures.IsEnabled = false
 
 	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
@@ -267,6 +284,10 @@ func (s *InsightsModel) AITextChatConfigure(req *plugnmeet.InsightsAITextChatCon
 	aiTextChatFeatures.IsEnabled = true
 	aiTextChatFeatures.IsAllowedEveryone = req.IsAllowedEveryone
 	aiTextChatFeatures.AllowedUserIds = req.AllowedUserIds
+
+	// analytics
+	val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()
+	s.artifactModel.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_AI_TEXT_CHAT_STATUS, &val, nil)
 
 	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
 }
@@ -312,6 +333,10 @@ func (s *InsightsModel) EndAITextChat(roomId string) error {
 		return fmt.Errorf("empty room medata")
 	}
 
+	// analytics
+	val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()
+	s.artifactModel.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_AI_TEXT_CHAT_STATUS, &val, nil)
+
 	metadata.RoomFeatures.InsightsFeatures.AiFeatures.AiTextChatFeatures.IsEnabled = false
 
 	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
@@ -355,6 +380,10 @@ func (s *InsightsModel) AIMeetingSummarizationConfig(req *plugnmeet.InsightsAIMe
 		return err
 	}
 
+	// analytics
+	val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()
+	s.artifactModel.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_AI_MEETING_SUMMARIZATION_STATUS, &val, nil)
+
 	// notify everyone about this
 	return s.natsService.BroadcastSystemNotificationToRoom(roomId, "insights.meeting-summarization.enabled-notification-all", plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_INFO, true, nil)
 }
@@ -372,6 +401,10 @@ func (s *InsightsModel) EndEndAIMeetingSummarization(roomId string) error {
 	if err != nil {
 		return err
 	}
+
+	// analytics
+	val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()
+	s.artifactModel.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_AI_MEETING_SUMMARIZATION_STATUS, &val, nil)
 
 	metadata.RoomFeatures.InsightsFeatures.AiFeatures.MeetingSummarizationFeatures.IsEnabled = false
 	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)

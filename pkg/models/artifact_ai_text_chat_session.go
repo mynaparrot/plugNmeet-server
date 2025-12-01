@@ -57,6 +57,8 @@ func (m *ArtifactModel) createAITextChatUsageArtifacts(roomId, roomSid string, r
 		if err != nil {
 			log.WithError(err).Error("failed to create AI text chat interaction artifact")
 		}
+		// 6. Add to analytics
+		m.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_AI_TEXT_CHAT_INTERACTION_TOTAL_USAGE, nil, &totalChatTokens)
 	}
 
 	// 3. Handle the 'summarize' interaction artifact.
@@ -90,6 +92,8 @@ func (m *ArtifactModel) createAITextChatUsageArtifacts(roomId, roomSid string, r
 		if err != nil {
 			log.WithError(err).Error("failed to create AI text chat summarization artifact")
 		}
+		// 6. Add to analytics
+		m.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_AI_TEXT_CHAT_SUMMARIZATION_TOTAL_USAGE, nil, &totalSummarizeTokens)
 	}
 
 	return nil

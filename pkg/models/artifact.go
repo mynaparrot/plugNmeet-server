@@ -28,16 +28,18 @@ type ArtifactModel struct {
 	ds              *dbservice.DatabaseService
 	rs              *redisservice.RedisService
 	webhookNotifier *helpers.WebhookNotifier
+	analyticsModel  *AnalyticsModel
 	log             *logrus.Entry
 }
 
-func NewArtifactModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, redisService *redisservice.RedisService, webhookNotifier *helpers.WebhookNotifier) *ArtifactModel {
+func NewArtifactModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, redisService *redisservice.RedisService, webhookNotifier *helpers.WebhookNotifier, analyticsModel *AnalyticsModel) *ArtifactModel {
 	return &ArtifactModel{
 		ctx:             ctx,
 		app:             app,
 		ds:              ds,
 		rs:              redisService,
 		webhookNotifier: webhookNotifier,
+		analyticsModel:  analyticsModel,
 		log:             app.Logger.WithField("model", "artifact"),
 	}
 }
@@ -131,4 +133,16 @@ func (m *ArtifactModel) sendWebhookNotification(eventName ArtifactEventName, roo
 			m.log.WithError(err).Errorln("error sending room created webhook")
 		}
 	}
+}
+
+func (m *ArtifactModel) HandleAnalyticsEvent(roomId string, eventName plugnmeet.AnalyticsEvents, hSetValue *string, eventValueInteger *int64) {
+	d := &plugnmeet.AnalyticsDataMsg{
+		EventType:         plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
+		EventName:         eventName,
+		RoomId:            roomId,
+		HsetValue:         hSetValue,
+		EventValueInteger: eventValueInteger,
+	}
+
+	m.analyticsModel.HandleEvent(d)
 }

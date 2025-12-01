@@ -59,6 +59,10 @@ func (m *ArtifactModel) createSpeechTranscriptionUsageArtifact(roomId, roomSid s
 
 	// 5. Send webhook notification.
 	m.sendWebhookNotification(ArtifactCreated, roomSid, artifact, metadata)
+
+	// 6. Add to analytics
+	m.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_TRANSCRIPTION_TOTAL_USAGE, nil, &total)
+
 	log.Infof("successfully created speech transcription artifact for room %s", roomId)
 
 	return nil
