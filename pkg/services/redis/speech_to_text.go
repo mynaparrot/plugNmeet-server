@@ -1,7 +1,6 @@
 package redisservice
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"strconv"
@@ -12,9 +11,7 @@ import (
 )
 
 const (
-	SpeechServiceRedisKey   = Prefix + "speechService"
-	TTSServiceRedisKey      = Prefix + "ttsService"
-	ChatTranslationRedisKey = Prefix + "chatTranslationService"
+	SpeechServiceRedisKey = Prefix + "speechService"
 )
 
 func (s *RedisService) SpeechToTextGetConnectionsByKeyId(keyId string) (string, error) {
@@ -151,25 +148,4 @@ func (s *RedisService) SpeechToTextDeleteRoom(roomId string) error {
 		return err
 	}
 	return nil
-}
-
-func (s *RedisService) UpdateChatTranslationUsage(ctx context.Context, roomId, userId string, incBy int) error {
-	key := fmt.Sprintf("%s:%s:usage", ChatTranslationRedisKey, roomId)
-	pipe := s.rc.TxPipeline()
-	pipe.HIncrBy(ctx, key, userId, int64(incBy))
-	pipe.HIncrBy(ctx, key, "total_usage", int64(incBy))
-	pipe.Expire(ctx, key, time.Hour*24)
-	_, err := pipe.Exec(ctx)
-	return err
-}
-
-func (s *RedisService) UpdateTTSServiceUsage(ctx context.Context, roomId, userId, language string, incBy int) error {
-	key := fmt.Sprintf("%s:%s:usage", TTSServiceRedisKey, roomId)
-	pipe := s.rc.TxPipeline()
-	pipe.HIncrBy(ctx, key, userId, int64(incBy))
-	pipe.HIncrBy(ctx, key, language, int64(incBy))
-	pipe.HIncrBy(ctx, key, "total_usage", int64(incBy))
-	pipe.Expire(ctx, key, time.Hour*24)
-	_, err := pipe.Exec(ctx)
-	return err
 }
