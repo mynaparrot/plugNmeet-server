@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	TranscriptionSessionsKey = "pnm:insights:transcription_sessions:%s"
-	TranscriptionUsageKey    = "pnm:insights:transcription_usage:%s"
+	TranscriptionSessionsKey = Prefix + "insights:transcription_sessions:%s"
+	TranscriptionUsageKey    = Prefix + "insights:transcription_usage:%s"
 )
 
 // HandleTranscriptionUsage manages the lifecycle of a user's transcription session.
