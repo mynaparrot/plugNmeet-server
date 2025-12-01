@@ -3,20 +3,24 @@ package dbservice
 import (
 	"errors"
 
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"gorm.io/gorm"
 )
 
 // GetArtifacts retrieves a paginated and sorted list of artifacts,
 // optionally filtered by room IDs, and returns the total count.
-func (s *DatabaseService) GetArtifacts(roomIds []string, offset, limit uint64, direction *string) ([]*dbmodels.RoomArtifact, int64, error) {
+func (s *DatabaseService) GetArtifacts(roomIds []string, artifactType *plugnmeet.RoomArtifactType, offset, limit uint64, direction *string) ([]*dbmodels.RoomArtifact, int64, error) {
 	var artifacts []*dbmodels.RoomArtifact
 	var total int64
 
 	tx := s.db.Model(&dbmodels.RoomArtifact{})
 
 	if len(roomIds) > 0 {
-		tx = tx.Where("room_id IN ?", roomIds)
+		tx.Where("room_id IN ?", roomIds)
+	}
+	if artifactType != nil {
+		tx.Where("type = ?", *artifactType)
 	}
 
 	// Get the total count before applying limit and offset
@@ -25,17 +29,21 @@ func (s *DatabaseService) GetArtifacts(roomIds []string, offset, limit uint64, d
 		return nil, 0, err
 	}
 
+	if total == 0 {
+		return artifacts, 0, nil
+	}
+
 	if direction != nil && (*direction == "ASC" || *direction == "DESC") {
-		tx = tx.Order("id " + *direction)
+		tx.Order("id " + *direction)
 	} else {
-		tx = tx.Order("id DESC")
+		tx.Order("id DESC")
 	}
 
 	if limit > 0 {
-		tx = tx.Limit(int(limit))
+		tx.Limit(int(limit))
 	}
 	if offset > 0 {
-		tx = tx.Offset(int(offset))
+		tx.Offset(int(offset))
 	}
 
 	err = tx.Find(&artifacts).Error
@@ -50,7 +58,10 @@ func (s *DatabaseService) GetArtifacts(roomIds []string, offset, limit uint64, d
 // It returns (nil, nil) if the record is not found.
 func (s *DatabaseService) GetRoomArtifactByArtifactID(artifactID string) (*dbmodels.RoomArtifact, error) {
 	var artifact dbmodels.RoomArtifact
-	result := s.db.Where("artifact_id = ?", artifactID).First(&artifact)
+	cond := &dbmodels.RoomArtifact{
+		ArtifactId: artifactID,
+	}
+	result := s.db.Where(cond).First(&artifact)
 
 	switch {
 	case errors.Is(result.Error, gorm.ErrRecordNotFound):

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -192,6 +193,9 @@ func (a *RoomAgent) ActivateRoomWideTask() {
 
 	// Subscribe to all existing participants' audio tracks.
 	for _, p := range a.Room.GetRemoteParticipants() {
+		if a.isSystemAgent(p.Identity()) {
+			continue
+		}
 		for _, pub := range p.TrackPublications() {
 			if pub.Kind() == lksdk.TrackKindAudio {
 				_ = pub.(*lksdk.RemoteTrackPublication).SetSubscribed(true)
@@ -229,6 +233,9 @@ func (a *RoomAgent) ActivateTaskForUser(userId string, options []byte) error {
 
 	// Attempt to subscribe immediately if the track is already available.
 	for _, p := range a.Room.GetRemoteParticipants() {
+		if a.isSystemAgent(p.Identity()) {
+			continue
+		}
 		if p.Identity() == userId {
 			for _, pub := range p.TrackPublications() {
 				if pub.Kind() == lksdk.TrackKindAudio {
@@ -283,11 +290,17 @@ func (a *RoomAgent) onTrackPublished(publication *lksdk.RemoteTrackPublication, 
 	if publication.Kind() != lksdk.TrackKindAudio {
 		return
 	}
-	a.logger.WithFields(logrus.Fields{
+	log := a.logger.WithFields(logrus.Fields{
 		"userId": rp.Identity(),
 		"kind":   publication.Kind(),
 		"name":   publication.Name(),
-	}).Infoln("onTrackPublished fired")
+	})
+	log.Infoln("onTrackPublished fired")
+
+	if a.isSystemAgent(rp.Identity()) {
+		log.Infoln("ignoring track from system agent")
+		return
+	}
 
 	if a.payload.CaptureAllParticipantsTracks {
 		_ = publication.SetSubscribed(true)
@@ -422,4 +435,15 @@ func (a *RoomAgent) Shutdown() {
 func (a *RoomAgent) onDisconnected() {
 	a.logger.Infoln("agent disconnected from room")
 	a.cancel()
+}
+
+// isSystemAgent can use to ignore user's track to consider
+func (a *RoomAgent) isSystemAgent(userId string) bool {
+	switch {
+	case strings.HasPrefix(userId, config.TTSAgentUserIdPrefix),
+		strings.HasPrefix(userId, config.AgentUserUserIdPrefix):
+		return true
+	}
+
+	return false
 }

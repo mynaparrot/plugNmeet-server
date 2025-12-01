@@ -111,7 +111,7 @@ func (m *JanitorModel) runJanitorTasks() {
 	nextUserCheck := time.Now().Add(time.Minute)
 	nextRoomCheck := time.Now().Add(5 * time.Minute)
 	nextBackupCheck := time.Now().Add(time.Hour)
-	nextSummarizeCheck := time.Now().Add(10 * time.Second)
+	nextSummarizeCheck := time.Now().Add(5 * time.Minute)
 
 	for {
 		select {
@@ -137,7 +137,7 @@ func (m *JanitorModel) runJanitorTasks() {
 			}
 			if now.After(nextSummarizeCheck) {
 				m.CheckInsightsPendingSummarizeJobs()
-				nextSummarizeCheck = time.Now().Add(30 * time.Second)
+				nextSummarizeCheck = time.Now().Add(5 * time.Minute)
 			}
 		case <-renewalTicker.C:
 			// Copy the lock value to a local var to avoid holding the lock during a network call.

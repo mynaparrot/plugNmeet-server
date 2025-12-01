@@ -22,5 +22,6 @@ nats_server.conf
 /tmp/
 /recorder/
 /analytics/
+/artifacts/
 
 !test/*

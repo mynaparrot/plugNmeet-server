@@ -16,13 +16,17 @@ import (
 
 // FetchArtifacts fetches records from the DB and formats them for the API response.
 func (m *ArtifactModel) FetchArtifacts(req *plugnmeet.FetchArtifactsReq) (*plugnmeet.FetchArtifactsResult, error) {
+	if len(req.RoomIds) == 0 {
+		return nil, fmt.Errorf("at least one room id is required")
+	}
+
 	if req.Limit <= 0 {
 		req.Limit = 20
 	} else if req.Limit > 100 {
 		req.Limit = 100
 	}
 
-	dbArtifacts, total, err := m.ds.GetArtifacts(req.RoomIds, req.From, req.Limit, &req.OrderBy)
+	dbArtifacts, total, err := m.ds.GetArtifacts(req.RoomIds, req.Type, req.From, req.Limit, &req.OrderBy)
 	if err != nil {
 		return nil, err
 	}
@@ -32,6 +36,7 @@ func (m *ArtifactModel) FetchArtifacts(req *plugnmeet.FetchArtifactsReq) (*plugn
 		From:           req.From,
 		Limit:          req.Limit,
 		OrderBy:        req.OrderBy,
+		Type:           req.Type,
 	}
 
 	for _, dbArtifact := range dbArtifacts {
@@ -75,7 +80,7 @@ func (m *ArtifactModel) GetArtifactDownloadToken(req *plugnmeet.GetArtifactDownl
 		return "", err
 	}
 	if artifact == nil {
-		return "", errors.New("artifact not found")
+		return "", fmt.Errorf("artifact not found with ID: %s", req.ArtifactId)
 	}
 
 	if !m.isDownloadable(artifact.Type) {

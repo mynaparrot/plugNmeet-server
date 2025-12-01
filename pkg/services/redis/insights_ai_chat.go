@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -16,18 +17,22 @@ import (
 const (
 	AiTextChatRedisKey = Prefix + "insights:aiTextChat"
 
+	aiTextChatUsageKey   = AiTextChatRedisKey + ":usage:%s"
+	aiTextChatContextKey = AiTextChatRedisKey + ":context:%s:%s"
+	aiTextChatSummaryKey = AiTextChatRedisKey + ":summary:%s:%s"
+
 	AiTextChatTotalPromptTokenFields     = "total_%s_prompt_tokens"
 	AiTextChatTotalCompletionTokenFields = "total_%s_completion_tokens"
 	AiTextChatTotalTokenFields           = "total_%s_tokens"
 )
 
 func (s *RedisService) GetAITextChatSummary(ctx context.Context, roomId, userId string) (string, error) {
-	key := fmt.Sprintf("%s:summary:%s:%s", AiTextChatRedisKey, roomId, userId)
+	key := fmt.Sprintf(aiTextChatSummaryKey, roomId, userId)
 	return s.rc.Get(ctx, key).Result()
 }
 
 func (s *RedisService) GetAITextChatContext(ctx context.Context, roomId, userId string, start, stop int64) ([]*plugnmeet.InsightsAITextChatContent, error) {
-	key := fmt.Sprintf("%s:context:%s:%s", AiTextChatRedisKey, roomId, userId)
+	key := fmt.Sprintf(aiTextChatContextKey, roomId, userId)
 	res, err := s.rc.LRange(ctx, key, start, stop).Result()
 	if err != nil {
 		return nil, err
@@ -47,12 +52,12 @@ func (s *RedisService) GetAITextChatContext(ctx context.Context, roomId, userId 
 }
 
 func (s *RedisService) SetAITextChatSummary(ctx context.Context, roomId, userId, summary string) error {
-	key := fmt.Sprintf("%s:summary:%s:%s", AiTextChatRedisKey, roomId, userId)
+	key := fmt.Sprintf(aiTextChatSummaryKey, roomId, userId)
 	return s.rc.Set(ctx, key, summary, 24*time.Hour).Err()
 }
 
 func (s *RedisService) AppendToAITextChatContext(ctx context.Context, roomId, userId string, messages ...*plugnmeet.InsightsAITextChatContent) error {
-	key := fmt.Sprintf("%s:context:%s:%s", AiTextChatRedisKey, roomId, userId)
+	key := fmt.Sprintf(aiTextChatContextKey, roomId, userId)
 	pipe := s.rc.TxPipeline()
 
 	for _, msg := range messages {
@@ -68,17 +73,17 @@ func (s *RedisService) AppendToAITextChatContext(ctx context.Context, roomId, us
 }
 
 func (s *RedisService) DeleteAITextChatContext(ctx context.Context, roomId, userId string) error {
-	key := fmt.Sprintf("%s:context:%s:%s", AiTextChatRedisKey, roomId, userId)
+	key := fmt.Sprintf(aiTextChatContextKey, roomId, userId)
 	return s.rc.Del(ctx, key).Err()
 }
 
 func (s *RedisService) GetAITextChatContextLength(ctx context.Context, roomId, userId string) (int64, error) {
-	key := fmt.Sprintf("%s:context:%s:%s", AiTextChatRedisKey, roomId, userId)
+	key := fmt.Sprintf(aiTextChatContextKey, roomId, userId)
 	return s.rc.LLen(ctx, key).Result()
 }
 
 func (s *RedisService) UpdateAITextChatUsage(ctx context.Context, roomId, userId string, taskType insights.AITaskType, promptTokens, completionTokens, totalTokens uint32) error {
-	key := fmt.Sprintf("%s:usage:%s", AiTextChatRedisKey, roomId)
+	key := fmt.Sprintf(aiTextChatUsageKey, roomId)
 	pipe := s.rc.TxPipeline()
 
 	// Per-user, per-task tracking
@@ -105,29 +110,18 @@ func (s *RedisService) UpdateAITextChatUsage(ctx context.Context, roomId, userId
 }
 
 // GetAITextChatRoomUsage retrieves all AI text chat token usage for a room.
-// If cleanup is true, it deletes the key after retrieval.
+// If cleanup is true, it deletes the key after retrieval, including user-specific context and summary keys.
 func (s *RedisService) GetAITextChatRoomUsage(ctx context.Context, roomId string, cleanup bool) (map[string]int64, error) {
-	key := fmt.Sprintf("%s:usage:%s", AiTextChatRedisKey, roomId)
-	var res *redis.MapStringStringCmd
+	usageHashKey := fmt.Sprintf(aiTextChatUsageKey, roomId)
 
-	_, err := s.rc.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
-		res = pipe.HGetAll(ctx, key)
-		if cleanup {
-			pipe.Del(ctx, key)
-		}
-		return nil
-	})
-
+	rawMap, err := s.rc.HGetAll(ctx, usageHashKey).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		return nil, err
 	}
 
-	rawMap, err := res.Result()
-	if err != nil {
-		return nil, err
-	}
-
 	usageMap := make(map[string]int64, len(rawMap))
+	userIds := make(map[string]struct{}) // To store unique user IDs for cleanup
+
 	for k, v := range rawMap {
 		val, err := strconv.ParseInt(v, 10, 64)
 		if err != nil {
@@ -135,6 +129,32 @@ func (s *RedisService) GetAITextChatRoomUsage(ctx context.Context, roomId string
 			continue
 		}
 		usageMap[k] = val
+
+		// Extract userId from keys like "userId:taskType:prompt"
+		if !strings.HasPrefix(k, "total_") {
+			parts := strings.Split(k, ":")
+			if len(parts) > 0 {
+				userIds[parts[0]] = struct{}{}
+			}
+		}
+	}
+
+	if cleanup && len(usageMap) > 0 {
+		pipe := s.rc.TxPipeline()
+		pipe.Del(ctx, usageHashKey)
+
+		for userId := range userIds {
+			contextKey := fmt.Sprintf(aiTextChatContextKey, roomId, userId)
+			pipe.Del(ctx, contextKey)
+
+			summaryKey := fmt.Sprintf(aiTextChatSummaryKey, roomId, userId)
+			pipe.Del(ctx, summaryKey)
+		}
+
+		_, err := pipe.Exec(ctx)
+		if err != nil {
+			s.logger.WithError(err).Errorf("failed to clean up AI text chat Redis keys for room %s", roomId)
+		}
 	}
 
 	return usageMap, nil

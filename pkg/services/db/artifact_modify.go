@@ -26,7 +26,7 @@ func (s *DatabaseService) DeleteArtifactByArtifactId(artifactId string) (int64, 
 		return 0, err
 	}
 	if artifact == nil {
-		return 0, nil
+		return 0, fmt.Errorf("artifact not found with ID: %s", artifactId)
 	}
 
 	// double check to prevent deletion of certain artifact types.

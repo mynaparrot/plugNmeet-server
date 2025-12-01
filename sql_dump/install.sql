@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS `pnm_room_artifacts` (
   `artifact_id` VARCHAR(36) NOT NULL,
   `room_table_id` INT(11) NOT NULL,
   `room_id` VARCHAR(255) NOT NULL,
-  `type` VARCHAR(100) NOT NULL,
+  `type` INT(11) NOT NULL,
   `metadata` JSON DEFAULT NULL,
   `creation_time` BIGINT NOT NULL,
   PRIMARY KEY (`id`),
