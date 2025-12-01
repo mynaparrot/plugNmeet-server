@@ -125,8 +125,11 @@ type AnalyticsSettings struct {
 }
 
 type ArtifactsSettings struct {
-	StoragePath   *string        `yaml:"storage_path"`
-	TokenValidity *time.Duration `yaml:"token_validity"`
+	StoragePath                *string        `yaml:"storage_path"`
+	TokenValidity              *time.Duration `yaml:"token_validity"`
+	EnableDelArtifactsBackup   bool           `yaml:"enable_del_artifacts_backup"`
+	DelArtifactsBackupPath     string         `yaml:"del_artifacts_backup_path"`
+	DelArtifactsBackupDuration time.Duration  `yaml:"del_artifacts_backup_duration"`
 }
 
 type ChatParticipant struct {
@@ -240,31 +243,10 @@ func New(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 		}
 	}
 
-	// Add initialization logic for ArtifactsSettings
-	if appCnf.ArtifactsSettings == nil {
-		// If the whole block is missing, create it
-		appCnf.ArtifactsSettings = &ArtifactsSettings{}
-	}
-	if appCnf.ArtifactsSettings.StoragePath == nil {
-		// Set the default path if it's not specified
-		p := "./artifacts"
-		appCnf.ArtifactsSettings.StoragePath = &p
-	}
-	if appCnf.ArtifactsSettings.TokenValidity == nil {
-		d := time.Minute * 10
-		appCnf.ArtifactsSettings.TokenValidity = &d
-	}
-
-	p := *appCnf.ArtifactsSettings.StoragePath
-	if strings.HasPrefix(p, "./") {
-		p = filepath.Join(appCnf.RootWorkingDir, p)
-	}
-
-	if _, err := os.Stat(p); os.IsNotExist(err) {
-		err = os.MkdirAll(p, os.ModePerm)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create artifacts directory %s: %w", p, err)
-		}
+	// setup everything for artifacts
+	err := handleArtifactsSettings(appCnf)
+	if err != nil {
+		return nil, err
 	}
 
 	// set default
@@ -291,12 +273,64 @@ func New(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 	}
 
 	// read client files and cache it
-	err := readClientFiles(appCnf)
+	err = readClientFiles(appCnf)
 	if err != nil {
 		return nil, err
 	}
 
 	return appCnf, nil
+}
+
+func handleArtifactsSettings(appCnf *AppConfig) error {
+	// Add initialization logic for ArtifactsSettings
+	if appCnf.ArtifactsSettings == nil {
+		// If the whole block is missing, create it
+		appCnf.ArtifactsSettings = &ArtifactsSettings{
+			EnableDelArtifactsBackup: true,
+		}
+	}
+	if appCnf.ArtifactsSettings.StoragePath == nil {
+		// Set the default path if it's not specified
+		p := "./artifacts"
+		appCnf.ArtifactsSettings.StoragePath = &p
+	}
+	if appCnf.ArtifactsSettings.TokenValidity == nil {
+		d := time.Minute * 10
+		appCnf.ArtifactsSettings.TokenValidity = &d
+	}
+
+	p := *appCnf.ArtifactsSettings.StoragePath
+	if strings.HasPrefix(p, "./") {
+		p = filepath.Join(appCnf.RootWorkingDir, p)
+	}
+
+	if _, err := os.Stat(p); os.IsNotExist(err) {
+		err = os.MkdirAll(p, os.ModePerm)
+		if err != nil {
+			return fmt.Errorf("failed to create artifacts directory %s: %w", p, err)
+		}
+	}
+
+	// Add new logic for the backup path
+	if appCnf.ArtifactsSettings.EnableDelArtifactsBackup {
+		if appCnf.ArtifactsSettings.DelArtifactsBackupDuration == 0 {
+			appCnf.ArtifactsSettings.DelArtifactsBackupDuration = time.Hour * 72
+		}
+		if appCnf.ArtifactsSettings.DelArtifactsBackupPath == "" {
+			// Default to a "trash" subdirectory inside the main storage path
+			appCnf.ArtifactsSettings.DelArtifactsBackupPath = filepath.Join(*appCnf.ArtifactsSettings.StoragePath, "trash")
+		}
+
+		trashPath := appCnf.ArtifactsSettings.DelArtifactsBackupPath
+		if strings.HasPrefix(trashPath, "./") {
+			trashPath = filepath.Join(appCnf.RootWorkingDir, trashPath)
+		}
+		err := os.MkdirAll(trashPath, 0755)
+		if err != nil {
+			return fmt.Errorf("failed to create artifacts backup directory %s: %w", trashPath, err)
+		}
+	}
+	return nil
 }
 
 func (a *AppConfig) GetApplicationCtx() context.Context {

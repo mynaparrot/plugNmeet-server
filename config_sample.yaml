@@ -192,6 +192,13 @@ artifacts_settings:
   # Each room will have its own subdirectory: {storage_path}/{service_type}/{room_id}/
   storage_path: "./artifacts"
   token_validity: 10m
+  # If true, deleted artifacts will be moved to a backup directory instead of being immediately removed.
+  enable_del_artifacts_backup: true
+  # Optional: Specify a separate path for deleted artifact backups.
+  # Default is a "trash" folder inside the main storage_path.
+  del_artifacts_backup_path: "./artifacts/trash"
+  # Duration to retain deleted artifacts in backup, in hours. Default is 72 hours (3 days).
+  del_artifacts_backup_duration: 72h
 
 insights:
   # 1. Define all available provider accounts ONCE.

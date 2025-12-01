@@ -2,7 +2,6 @@ package models
 
 import (
 	"encoding/json"
-	"os"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
@@ -54,9 +53,9 @@ func (m *JanitorModel) CheckInsightsPendingSummarizeJobs() {
 			if err := provider.DeleteUploadedFile(m.ctx, payload.FileName); err != nil {
 				log.WithError(err).Errorf("failed to delete provider file %s for job %s", payload.FileName, payload.JobId)
 			}
-			// Delete from our local storage
-			if err := os.Remove(payload.OriginalFilePath); err != nil {
-				log.WithError(err).Errorf("failed to delete local file %s for job %s", payload.OriginalFilePath, payload.JobId)
+			// move local file to trash
+			if _, err := m.artifactModel.MoveToTrash(payload.OriginalFilePath); err != nil {
+				log.WithError(err).Errorf("failed to move local file %s to trash for job %s", payload.OriginalFilePath, payload.JobId)
 			}
 			// Delete from Redis
 			if err := m.app.RDS.HDel(m.ctx, insights.PendingSummarizeJobRedisKey, id).Err(); err != nil {

@@ -156,9 +156,7 @@ func (m *RoomModel) OnAfterRoomEnded(roomID, roomSID, metadata, roomStatus strin
 	}
 
 	// Step 13: End all the agent tasks for this room.
-	if err = m.insightsModel.EndRoomAllAgentTasks(roomID); err != nil {
-		log.WithError(err).Error("Error in agent task cleanup")
-	}
+	m.insightsModel.OnAfterRoomEnded(roomID)
 
 	// Step 14: Perform the final NATS cleanup, deleting room-specific streams and KV stores.
 	m.natsService.OnAfterSessionEndCleanup(roomID)

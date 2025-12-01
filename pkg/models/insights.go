@@ -32,23 +32,25 @@ type AgentTaskResponse struct {
 }
 
 type InsightsModel struct {
-	ctx          context.Context
-	appConfig    *config.AppConfig
-	logger       *logrus.Entry
-	lock         sync.RWMutex
-	roomAgents   map[string]*insightsservice.RoomAgent // Maps a unique key (roomName@serviceName) to a dedicated agent
-	redisService *redisservice.RedisService
-	natsService  *natsservice.NatsService
+	ctx           context.Context
+	appConfig     *config.AppConfig
+	logger        *logrus.Entry
+	lock          sync.RWMutex
+	roomAgents    map[string]*insightsservice.RoomAgent // Maps a unique key (roomName@serviceName) to a dedicated agent
+	redisService  *redisservice.RedisService
+	natsService   *natsservice.NatsService
+	artifactModel *ArtifactModel
 }
 
-func NewInsightsModel(ctx context.Context, appConfig *config.AppConfig, redisService *redisservice.RedisService, natsService *natsservice.NatsService, logger *logrus.Logger) *InsightsModel {
+func NewInsightsModel(ctx context.Context, appConfig *config.AppConfig, redisService *redisservice.RedisService, natsService *natsservice.NatsService, artifactModel *ArtifactModel, logger *logrus.Logger) *InsightsModel {
 	return &InsightsModel{
-		ctx:          ctx,
-		appConfig:    appConfig,
-		redisService: redisService,
-		natsService:  natsService,
-		roomAgents:   make(map[string]*insightsservice.RoomAgent),
-		logger:       logger.WithField("model", "insights"),
+		ctx:           ctx,
+		appConfig:     appConfig,
+		redisService:  redisService,
+		natsService:   natsService,
+		roomAgents:    make(map[string]*insightsservice.RoomAgent),
+		artifactModel: artifactModel,
+		logger:        logger.WithField("model", "insights"),
 	}
 }
 
@@ -294,4 +296,18 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 	}
 
 	log.Infof("successfully registered new batch job with ID: %s for fileName: %s", jobId, fileName)
+}
+
+func (s *InsightsModel) OnAfterRoomEnded(roomId string) {
+	log := s.logger.WithFields(logrus.Fields{
+		"room_id": roomId,
+		"method":  "OnAfterRoomEnded",
+	})
+
+	if err := s.EndRoomAllAgentTasks(roomId); err != nil {
+		log.WithError(err).Error("Error in agent task cleanup")
+	}
+
+	//TODO: update artifacts with all usages
+	// speech to text, chat translation, text to speech, AI Chat usage
 }

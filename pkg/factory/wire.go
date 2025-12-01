@@ -41,6 +41,7 @@ func provideBreakoutRoomModel(rm *models.RoomModel, natsService *natsservice.Nat
 // build the dependency set for models
 var modelSet = wire.NewSet(
 	models.NewAnalyticsModel,
+	models.NewArtifactModel,
 	models.NewAuthModel,
 	models.NewInsightsModel,
 	models.NewBBBApiWrapperModel,
@@ -57,7 +58,6 @@ var modelSet = wire.NewSet(
 	models.NewRecordingModel,
 	models.NewRoomModel,
 	provideBreakoutRoomModel,
-	models.NewArtifactModel,
 	models.NewJanitorModel,
 	models.NewSpeechToTextModel,
 	models.NewUserModel,
