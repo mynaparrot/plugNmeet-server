@@ -68,6 +68,7 @@ var modelSet = wire.NewSet(
 // build the dependency set for controllers
 var controllerSet = wire.NewSet(
 	controllers.NewAnalyticsController,
+	controllers.NewArtifactController,
 	controllers.NewAuthController,
 	controllers.NewBBBController,
 	controllers.NewBreakoutRoomController,

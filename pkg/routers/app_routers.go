@@ -100,6 +100,7 @@ func (r *router) registerBaseRoutes() {
 	r.app.Get("/download/uploadedFile/:sid/*", r.ctrl.FileController.HandleDownloadUploadedFile)
 	r.app.Get("/download/recording/:token", r.ctrl.RecordingController.HandleDownloadRecording)
 	r.app.Get("/download/analytics/:token", r.ctrl.AnalyticsController.HandleDownloadAnalytics)
+	r.app.Get("/download/artifact/:token", r.ctrl.ArtifactController.HandleDownloadArtifact)
 	r.app.Get("/healthCheck", r.ctrl.HealthCheckController.HandleHealthCheck)
 }
 
@@ -139,6 +140,11 @@ func (r *router) registerAuthRoutes() {
 	analytics.Post("/fetch", r.ctrl.AnalyticsController.HandleFetchAnalytics)
 	analytics.Post("/delete", r.ctrl.AnalyticsController.HandleDeleteAnalytics)
 	analytics.Post("/getDownloadToken", r.ctrl.AnalyticsController.HandleGetAnalyticsDownloadToken)
+
+	artifact := auth.Group("/artifact")
+	artifact.Post("/fetch", r.ctrl.ArtifactController.HandleFetchArtifacts)
+	artifact.Post("/delete", r.ctrl.ArtifactController.HandleDeleteArtifact)
+	artifact.Post("/getDownloadToken", r.ctrl.ArtifactController.HandleGetArtifactDownloadToken)
 
 	recorder := auth.Group("/recorder")
 	recorder.Post("/notify", r.ctrl.RecorderController.HandleRecorderEvents)

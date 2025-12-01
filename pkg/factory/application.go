@@ -32,6 +32,7 @@ type ApplicationControllers struct {
 	NatsController         *controllers.NatsController
 	HealthCheckController  *controllers.HealthCheckController
 	InsightsController     *controllers.InsightsController
+	ArtifactController     *controllers.ArtifactController
 }
 
 // Application is the root struct holding all dependencies.

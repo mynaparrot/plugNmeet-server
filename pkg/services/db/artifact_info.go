@@ -26,9 +26,9 @@ func (s *DatabaseService) GetArtifacts(roomIds []string, offset, limit uint64, d
 	}
 
 	if direction != nil && (*direction == "ASC" || *direction == "DESC") {
-		tx = tx.Order("creation_time " + *direction)
+		tx = tx.Order("id " + *direction)
 	} else {
-		tx = tx.Order("creation_time DESC")
+		tx = tx.Order("id DESC")
 	}
 
 	if limit > 0 {

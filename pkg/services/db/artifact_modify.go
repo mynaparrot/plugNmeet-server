@@ -1,7 +1,7 @@
 package dbservice
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
@@ -26,13 +26,12 @@ func (s *DatabaseService) DeleteArtifactByArtifactId(artifactId string) (int64, 
 		return 0, err
 	}
 	if artifact == nil {
-		// Record not found, so 0 rows affected.
 		return 0, nil
 	}
 
-	//  prevent deletion of certain artifact types.
-	if artifact.Type != plugnmeet.RoomArtifactType_MEETING_SUMMARY {
-		return 0, errors.New("deleting this type of artifact is not allowed")
+	// double check to prevent deletion of certain artifact types.
+	if !s.IsAllowToDeleteArtifact(artifact.Type) {
+		return 0, fmt.Errorf("deleting '%s' type of artifact is not allowed", artifact.Type)
 	}
 
 	// If we get here, it's allowed.
@@ -42,4 +41,12 @@ func (s *DatabaseService) DeleteArtifactByArtifactId(artifactId string) (int64, 
 	}
 
 	return result.RowsAffected, nil
+}
+func (s *DatabaseService) IsAllowToDeleteArtifact(artifactType plugnmeet.RoomArtifactType) bool {
+	switch artifactType {
+	case plugnmeet.RoomArtifactType_MEETING_SUMMARY:
+		return true
+	}
+
+	return false
 }
