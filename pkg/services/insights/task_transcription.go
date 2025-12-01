@@ -70,7 +70,7 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 	// Goroutine to process results
 	go func() {
 		defer func() {
-			if _, err := t.redisService.SpeechToTextUsersUsage(roomId, userId, plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED); err != nil {
+			if _, err := t.redisService.HandleTranscriptionUsage(roomId, userId, false); err != nil {
 				t.logger.WithError(err).Errorln("update user usage failed")
 			}
 
@@ -101,7 +101,7 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 				}
 
 			case insights.EventTypeSessionStarted:
-				if _, err := t.redisService.SpeechToTextUsersUsage(roomId, userId, plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_STARTED); err != nil {
+				if _, err := t.redisService.HandleTranscriptionUsage(roomId, userId, true); err != nil {
 					t.logger.WithError(err).Errorln("update user usage failed")
 				}
 

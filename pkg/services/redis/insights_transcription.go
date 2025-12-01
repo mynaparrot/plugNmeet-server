@@ -16,22 +16,22 @@ const (
 )
 
 // HandleTranscriptionUsage manages the lifecycle of a user's transcription session.
-func (s *RedisService) HandleTranscriptionUsage(ctx context.Context, roomId, userId string, isStarted bool) (int64, error) {
+func (s *RedisService) HandleTranscriptionUsage(roomId, userId string, isStarted bool) (int64, error) {
 	sessionsKey := fmt.Sprintf(TranscriptionSessionsKey, roomId)
 	usageKey := fmt.Sprintf(TranscriptionUsageKey, roomId)
 
 	if isStarted {
 		pipe := s.rc.TxPipeline()
-		pipe.HSet(ctx, sessionsKey, userId, time.Now().Unix())
-		pipe.Expire(ctx, sessionsKey, 24*time.Hour)
-		_, err := pipe.Exec(ctx)
+		pipe.HSet(s.ctx, sessionsKey, userId, time.Now().Unix())
+		pipe.Expire(s.ctx, sessionsKey, 24*time.Hour)
+		_, err := pipe.Exec(s.ctx)
 		if err != nil {
 			return 0, err
 		}
 		return 0, nil
 	}
 
-	startTimeStr, err := s.rc.HGet(ctx, sessionsKey, userId).Result()
+	startTimeStr, err := s.rc.HGet(s.ctx, sessionsKey, userId).Result()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
 			return 0, nil
@@ -39,7 +39,7 @@ func (s *RedisService) HandleTranscriptionUsage(ctx context.Context, roomId, use
 		return 0, err
 	}
 
-	if err := s.rc.HDel(ctx, sessionsKey, userId).Err(); err != nil {
+	if err := s.rc.HDel(s.ctx, sessionsKey, userId).Err(); err != nil {
 		s.logger.WithError(err).Error("failed to delete active transcription session")
 	}
 
@@ -54,10 +54,10 @@ func (s *RedisService) HandleTranscriptionUsage(ctx context.Context, roomId, use
 	}
 
 	pipe := s.rc.TxPipeline()
-	pipe.HIncrBy(ctx, usageKey, userId, duration)
-	pipe.HIncrBy(ctx, usageKey, "total_usage", duration)
-	pipe.Expire(ctx, usageKey, 24*time.Hour)
-	_, err = pipe.Exec(ctx)
+	pipe.HIncrBy(s.ctx, usageKey, userId, duration)
+	pipe.HIncrBy(s.ctx, usageKey, "total_usage", duration)
+	pipe.Expire(s.ctx, usageKey, 24*time.Hour)
+	_, err = pipe.Exec(s.ctx)
 
 	if err != nil {
 		return 0, err
