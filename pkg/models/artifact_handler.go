@@ -43,11 +43,11 @@ func (m *ArtifactModel) FetchArtifacts(req *plugnmeet.FetchArtifactsReq) (*plugn
 		metadata := new(plugnmeet.RoomArtifactMetadata)
 		if err := protojson.Unmarshal([]byte(dbArtifact.Metadata), metadata); err == nil {
 			result.ArtifactsList = append(result.ArtifactsList, &plugnmeet.ArtifactInfo{
-				ArtifactId:   dbArtifact.ArtifactId,
-				RoomId:       dbArtifact.RoomId,
-				Type:         dbArtifact.Type,
-				CreationTime: dbArtifact.CreationTime,
-				Metadata:     metadata,
+				ArtifactId: dbArtifact.ArtifactId,
+				RoomId:     dbArtifact.RoomId,
+				Type:       dbArtifact.Type,
+				Created:    dbArtifact.Created.Format(time.RFC3339),
+				Metadata:   metadata,
 			})
 		}
 	}

@@ -133,6 +133,7 @@ func (m *JanitorModel) runJanitorTasks() {
 			}
 			if now.After(nextBackupCheck) {
 				m.checkDelRecordingBackupPath()
+				m.checkDelArtifactsBackupPath()
 				nextBackupCheck = time.Now().Add(time.Hour)
 			}
 			if now.After(nextSummarizeCheck) {

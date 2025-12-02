@@ -86,6 +86,14 @@ func (m *ArtifactModel) MoveToTrash(filePath string) (string, error) {
 		return "", err
 	}
 
+	// Update the modification time otherwise janitor will delete it based on old value.
+	currentTime := time.Now().UTC()
+	err = os.Chtimes(trashPath, currentTime, currentTime)
+	if err != nil {
+		// Log a warning and continue.
+		m.log.WithError(err).Warnf("failed to update modification time for moved artifact: %s", trashPath)
+	}
+
 	m.log.Infof("moved artifact file %s to trash at %s", filePath, trashPath)
 	return trashPath, nil
 }
@@ -164,12 +172,11 @@ func (m *ArtifactModel) createAndSaveArtifact(roomId, roomSid string, roomTableI
 	}
 
 	artifact := &dbmodels.RoomArtifact{
-		ArtifactId:   uuid.NewString(),
-		RoomTableID:  roomTableId,
-		RoomId:       roomId,
-		Type:         artifactType,
-		Metadata:     string(metadataBytes),
-		CreationTime: time.Now().Unix(),
+		ArtifactId:  uuid.NewString(),
+		RoomTableID: roomTableId,
+		RoomId:      roomId,
+		Type:        artifactType,
+		Metadata:    string(metadataBytes),
 	}
 
 	_, err = m.ds.CreateRoomArtifact(artifact)
