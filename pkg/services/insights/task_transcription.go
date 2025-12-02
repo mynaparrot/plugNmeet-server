@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/livekit/media-sdk"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -98,6 +99,11 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 					if err = t.appConf.NatsConn.Publish(synthesisChannel, marshal); err != nil {
 						t.logger.WithError(err).Errorln("error publishing to synthesis SynthesisChannel")
 					}
+					if event.Result.AllowedTranscriptionStorage {
+						if err = t.natsService.AddTranscriptionChunk(roomId, userId, event.Result.FromUserName, event.Result.Lang, event.Result.Text); err != nil {
+							t.logger.WithError(err).Errorln("error adding transcription chunk")
+						}
+					}
 				}
 
 			case insights.EventTypeSessionStarted:
@@ -105,9 +111,11 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 					t.logger.WithError(err).Errorln("update user usage failed")
 				}
 
-				if err := t.natsService.BroadcastSystemNotificationToRoom(roomId, "speech-services.speech-to-text-ready", plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_INFO, false, &userId); err != nil {
-					t.logger.WithError(err).Errorln("error broadcasting system notification")
-				}
+				time.AfterFunc(time.Second*3, func() {
+					if err := t.natsService.BroadcastSystemNotificationToRoom(roomId, "speech-services.speech-to-text-ready", plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_INFO, false, &userId); err != nil {
+						t.logger.WithError(err).Errorln("error broadcasting system notification")
+					}
+				})
 
 			case insights.EventTypeSessionStopped:
 				t.logger.Infoln("transcription session stopped")

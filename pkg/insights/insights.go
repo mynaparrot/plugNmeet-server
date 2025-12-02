@@ -113,8 +113,10 @@ type InsightsTaskPayload struct {
 
 // TranscriptionOptions defines the structure for options passed to the transcription service.
 type TranscriptionOptions struct {
-	SpokenLang string   `json:"spokenLang"`
-	TransLangs []string `json:"transLangs"`
+	SpokenLang                  string   `json:"spokenLang"`
+	TransLangs                  []string `json:"transLangs"`
+	UserName                    string   `json:"userName"`
+	AllowedTranscriptionStorage bool     `json:"allowedTranscriptionStorage"`
 }
 
 // TranslationTaskOptions defines the structure for options passed to the translation service.

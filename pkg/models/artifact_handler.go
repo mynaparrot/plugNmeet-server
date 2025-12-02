@@ -169,7 +169,8 @@ func (m *ArtifactModel) DeleteArtifact(req *plugnmeet.DeleteArtifactReq) error {
 
 func (m *ArtifactModel) isDownloadable(artifactType plugnmeet.RoomArtifactType) bool {
 	switch artifactType {
-	case plugnmeet.RoomArtifactType_MEETING_SUMMARY:
+	case plugnmeet.RoomArtifactType_MEETING_SUMMARY,
+		plugnmeet.RoomArtifactType_SPEECH_TRANSCRIPTION:
 		return true
 	}
 

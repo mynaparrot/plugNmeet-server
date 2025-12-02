@@ -3,15 +3,11 @@ package models
 import (
 	"fmt"
 	"strings"
-	"time"
 
-	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // createAITextChatUsageArtifacts creates artifact records for AI text chat usage.
@@ -53,7 +49,7 @@ func (m *ArtifactModel) createAITextChatUsageArtifacts(roomId, roomSid string, r
 			},
 		}
 		// Create and save the artifact for chat interactions.
-		err := m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_AI_TEXT_CHAT_INTERACTION, metadata, log)
+		err := m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_AI_TEXT_CHAT_INTERACTION_USAGE, metadata, log)
 		if err != nil {
 			log.WithError(err).Error("failed to create AI text chat interaction artifact")
 		}
@@ -88,7 +84,7 @@ func (m *ArtifactModel) createAITextChatUsageArtifacts(roomId, roomSid string, r
 			},
 		}
 		// Create and save the artifact for summarization.
-		err := m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_AI_TEXT_CHAT_SUMMARIZATION, metadata, log)
+		err := m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_AI_TEXT_CHAT_SUMMARIZATION_USAGE, metadata, log)
 		if err != nil {
 			log.WithError(err).Error("failed to create AI text chat summarization artifact")
 		}
@@ -96,31 +92,5 @@ func (m *ArtifactModel) createAITextChatUsageArtifacts(roomId, roomSid string, r
 		m.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_AI_TEXT_CHAT_SUMMARIZATION_TOTAL_USAGE, nil, &totalSummarizeTokens)
 	}
 
-	return nil
-}
-
-// createAndSaveArtifact is a helper to reduce code duplication.
-func (m *ArtifactModel) createAndSaveArtifact(roomId, roomSid string, roomTableId uint64, artifactType plugnmeet.RoomArtifactType, metadata *plugnmeet.RoomArtifactMetadata, log *logrus.Entry) error {
-	metadataBytes, err := protojson.Marshal(metadata)
-	if err != nil {
-		return fmt.Errorf("failed to marshal metadata: %w", err)
-	}
-
-	artifact := &dbmodels.RoomArtifact{
-		ArtifactId:   uuid.NewString(),
-		RoomTableID:  roomTableId,
-		RoomId:       roomId,
-		Type:         artifactType,
-		Metadata:     string(metadataBytes),
-		CreationTime: time.Now().Unix(),
-	}
-
-	_, err = m.ds.CreateRoomArtifact(artifact)
-	if err != nil {
-		return fmt.Errorf("failed to create room artifact record: %w", err)
-	}
-
-	m.sendWebhookNotification(ArtifactCreated, roomSid, artifact, metadata)
-	log.Infof("successfully created %s artifact for room %s", artifactType.String(), roomId)
 	return nil
 }

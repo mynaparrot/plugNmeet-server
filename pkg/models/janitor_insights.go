@@ -67,7 +67,7 @@ func (m *JanitorModel) CheckInsightsPendingSummarizeJobs() {
 		case insights.BatchJobStatusCompleted:
 			log.Infof("job %s completed successfully", payload.JobId)
 
-			err := m.artifactModel.CreateMeetingSummaryArtifact(payload.RoomTableId, res.Summary, res.PromptTokens, res.CompletionTokens, res.TotalTokens, payload.JobId, payload.FileName)
+			err := m.artifactModel.CreateMeetingSummaryArtifact(payload.RoomTableId, res.Summary, res.PromptTokens, res.CompletionTokens, res.TotalTokens, payload.JobId, payload.FileName, log)
 			if err != nil {
 				log.WithError(err).Error("failed to create meeting summary artifact")
 				return

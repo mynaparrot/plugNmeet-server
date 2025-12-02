@@ -6,14 +6,18 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	dbservice "github.com/mynaparrot/plugnmeet-server/pkg/services/db"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type ArtifactEventName string
@@ -27,17 +31,19 @@ type ArtifactModel struct {
 	app             *config.AppConfig
 	ds              *dbservice.DatabaseService
 	rs              *redisservice.RedisService
+	natsService     *natsservice.NatsService
 	webhookNotifier *helpers.WebhookNotifier
 	analyticsModel  *AnalyticsModel
 	log             *logrus.Entry
 }
 
-func NewArtifactModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, redisService *redisservice.RedisService, webhookNotifier *helpers.WebhookNotifier, analyticsModel *AnalyticsModel) *ArtifactModel {
+func NewArtifactModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, redisService *redisservice.RedisService, natsService *natsservice.NatsService, webhookNotifier *helpers.WebhookNotifier, analyticsModel *AnalyticsModel) *ArtifactModel {
 	return &ArtifactModel{
 		ctx:             ctx,
 		app:             app,
 		ds:              ds,
 		rs:              redisService,
+		natsService:     natsService,
 		webhookNotifier: webhookNotifier,
 		analyticsModel:  analyticsModel,
 		log:             app.Logger.WithField("model", "artifact"),
@@ -95,6 +101,9 @@ func (m *ArtifactModel) CreateAllRoomUsageArtifacts(roomId, roomSid string, room
 	if err := m.createSpeechTranscriptionUsageArtifact(roomId, roomSid, roomTableId, log); err != nil {
 		log.WithError(err).Error("failed to create speech transcription usage artifact")
 	}
+	if err := m.createSpeechTranscriptionFileArtifact(roomId, roomSid, roomTableId, log); err != nil {
+		log.WithError(err).Error("failed to create speech transcription usage artifact")
+	}
 
 	// Chat Translation
 	if err := m.createChatTranslationUsageArtifact(roomId, roomSid, roomTableId, log); err != nil {
@@ -145,4 +154,30 @@ func (m *ArtifactModel) HandleAnalyticsEvent(roomId string, eventName plugnmeet.
 	}
 
 	m.analyticsModel.HandleEvent(d)
+}
+
+// createAndSaveArtifact is a helper to save data to DB
+func (m *ArtifactModel) createAndSaveArtifact(roomId, roomSid string, roomTableId uint64, artifactType plugnmeet.RoomArtifactType, metadata *plugnmeet.RoomArtifactMetadata, log *logrus.Entry) error {
+	metadataBytes, err := protojson.Marshal(metadata)
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+
+	artifact := &dbmodels.RoomArtifact{
+		ArtifactId:   uuid.NewString(),
+		RoomTableID:  roomTableId,
+		RoomId:       roomId,
+		Type:         artifactType,
+		Metadata:     string(metadataBytes),
+		CreationTime: time.Now().Unix(),
+	}
+
+	_, err = m.ds.CreateRoomArtifact(artifact)
+	if err != nil {
+		return fmt.Errorf("failed to create room artifact record: %w", err)
+	}
+
+	m.sendWebhookNotification(ArtifactCreated, roomSid, artifact, metadata)
+	log.Infof("successfully created %s artifact for room %s", artifactType.String(), roomId)
+	return nil
 }

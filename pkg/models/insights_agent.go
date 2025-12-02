@@ -87,6 +87,7 @@ func (s *InsightsModel) HandleIncomingAgentTask(msg *nats.Msg) {
 				options := &insights.TranscriptionOptions{}
 				if err := json.Unmarshal(opts, &options); err == nil {
 					res.SpokenLang = &options.SpokenLang
+					res.AllowedTranscriptionStorage = &options.AllowedTranscriptionStorage
 				}
 			}
 			if marshal, err := proto.Marshal(res); err == nil {

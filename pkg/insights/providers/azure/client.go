@@ -50,7 +50,7 @@ func (p *AzureProvider) CreateTranscription(ctx context.Context, roomId, userId 
 		return nil, err
 	}
 
-	return transcribeClient.CreateTranscription(ctx, roomId, userId, opts.SpokenLang, opts.TransLangs)
+	return transcribeClient.CreateTranscription(ctx, roomId, userId, opts)
 }
 
 // TranslateText implements the insights.Provider interface for stateless text translation.

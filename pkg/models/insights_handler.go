@@ -110,8 +110,18 @@ func (s *InsightsModel) TranscriptionUserSession(req *plugnmeet.InsightsTranscri
 			return fmt.Errorf("empty room medata")
 		}
 
+		userInfo, err := s.natsService.GetUserInfo(roomId, userId)
+		if err != nil {
+			return err
+		}
+		if userInfo == nil {
+			return fmt.Errorf("empty user info")
+		}
+
 		options := insights.TranscriptionOptions{
-			SpokenLang: *req.SpokenLang,
+			SpokenLang:                  *req.SpokenLang,
+			UserName:                    userInfo.Name,
+			AllowedTranscriptionStorage: req.AllowedTranscriptionStorage,
 		}
 		if metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.IsEnabledTranslation {
 			options.TransLangs = metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.AllowedTransLangs

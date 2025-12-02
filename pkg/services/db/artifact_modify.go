@@ -44,7 +44,8 @@ func (s *DatabaseService) DeleteArtifactByArtifactId(artifactId string) (int64, 
 }
 func (s *DatabaseService) IsAllowToDeleteArtifact(artifactType plugnmeet.RoomArtifactType) bool {
 	switch artifactType {
-	case plugnmeet.RoomArtifactType_MEETING_SUMMARY:
+	case plugnmeet.RoomArtifactType_MEETING_SUMMARY,
+		plugnmeet.RoomArtifactType_SPEECH_TRANSCRIPTION:
 		return true
 	}
 

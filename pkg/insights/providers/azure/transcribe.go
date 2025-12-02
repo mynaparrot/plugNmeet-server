@@ -33,11 +33,14 @@ func newTranscribeClient(creds *config.CredentialsConfig, model string, log *log
 	}, nil
 }
 
-func (c *transcribeClient) CreateTranscription(mainCtx context.Context, roomId, userId, spokenLang string, transLangs []string) (insights.TranscriptionStream, error) {
+func (c *transcribeClient) CreateTranscription(mainCtx context.Context, roomId, userId string, opts *insights.TranscriptionOptions) (insights.TranscriptionStream, error) {
 	log := c.log.WithFields(logrus.Fields{
-		"method": "CreateTranscription",
-		"roomId": roomId,
-		"userId": userId,
+		"method":     "CreateTranscription",
+		"roomId":     roomId,
+		"userId":     userId,
+		"lang":       opts.SpokenLang,
+		"transLangs": opts.TransLangs,
+		"storage":    opts.AllowedTranscriptionStorage,
 	})
 	log.Infoln("starting transcription")
 
@@ -61,12 +64,12 @@ func (c *transcribeClient) CreateTranscription(mainCtx context.Context, roomId, 
 		return nil, err
 	}
 
-	err = cnf.SetSpeechRecognitionLanguage(spokenLang)
+	err = cnf.SetSpeechRecognitionLanguage(opts.SpokenLang)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, lang := range transLangs {
+	for _, lang := range opts.TransLangs {
 		err := cnf.AddTargetLanguage(lang)
 		if err != nil {
 			return nil, err
@@ -98,11 +101,13 @@ func (c *transcribeClient) CreateTranscription(mainCtx context.Context, roomId, 
 
 	recognizer.Recognizing(func(e speech.TranslationRecognitionEventArgs) {
 		result := &plugnmeet.InsightsTranscriptionResult{
-			FromUserId:   userId,
-			Lang:         GetLocaleFromCode(spokenLang),
-			Text:         e.Result.Text,
-			IsPartial:    true,
-			Translations: make(map[string]string),
+			FromUserId:                  userId,
+			FromUserName:                opts.UserName,
+			Lang:                        GetLocaleFromCode(opts.SpokenLang),
+			Text:                        e.Result.Text,
+			IsPartial:                   true,
+			AllowedTranscriptionStorage: opts.AllowedTranscriptionStorage,
+			Translations:                make(map[string]string),
 		}
 		for lang, text := range e.Result.GetTranslations() {
 			result.Translations[GetLocaleFromCode(lang)] = text
@@ -115,11 +120,13 @@ func (c *transcribeClient) CreateTranscription(mainCtx context.Context, roomId, 
 
 	recognizer.Recognized(func(e speech.TranslationRecognitionEventArgs) {
 		result := &plugnmeet.InsightsTranscriptionResult{
-			FromUserId:   userId,
-			Lang:         GetLocaleFromCode(spokenLang),
-			Text:         e.Result.Text,
-			IsPartial:    false,
-			Translations: make(map[string]string),
+			FromUserId:                  userId,
+			FromUserName:                opts.UserName,
+			Lang:                        GetLocaleFromCode(opts.SpokenLang),
+			Text:                        e.Result.Text,
+			IsPartial:                   false,
+			AllowedTranscriptionStorage: opts.AllowedTranscriptionStorage,
+			Translations:                make(map[string]string),
 		}
 		for lang, text := range e.Result.GetTranslations() {
 			result.Translations[GetLocaleFromCode(lang)] = text
