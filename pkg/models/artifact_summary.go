@@ -10,6 +10,7 @@ import (
 )
 
 // CreateMeetingSummaryArtifact handles the business logic of creating a meeting summary artifact.
+// It creates two separate artifacts: one for the downloadable file and one for the usage record.
 func (m *ArtifactModel) CreateMeetingSummaryArtifact(roomTableId uint64, summaryText string, promptTokens, completionTokens, totalTokens uint32, providerJobId, providerFileName string, log *logrus.Entry) error {
 	log = log.WithField("method", "CreateMeetingSummaryArtifact")
 
@@ -22,33 +23,41 @@ func (m *ArtifactModel) CreateMeetingSummaryArtifact(roomTableId uint64, summary
 		return fmt.Errorf("room not found for room %d", roomTableId)
 	}
 
+	// --- Create the downloadable file artifact ---
 	summaryFileName := fmt.Sprintf("summary_%d.txt", time.Now().Unix())
-	// Construct the relative path and the full absolute path for writing.
 	relativePath, absolutePath, err := m.buildPath(summaryFileName, roomInfo.RoomId, plugnmeet.RoomArtifactType_MEETING_SUMMARY)
 	if err != nil {
 		return err
 	}
 
-	// Add a header to the summary text with the room ID.
 	fileContent := fmt.Sprintf("Meeting Summary for: %s\n\n---\n\n%s", roomInfo.RoomId, summaryText)
-
-	// Write the file using the absolute path.
 	err = os.WriteFile(absolutePath, []byte(fileContent), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write summary file: %w", err)
 	}
 
-	// Prepare metadata for the database using the universal protobuf message.
-	metadata := &plugnmeet.RoomArtifactMetadata{
+	fileMetadata := &plugnmeet.RoomArtifactMetadata{
 		ProviderJobInfo: &plugnmeet.RoomArtifactProviderJobInfo{
 			JobId:    providerJobId,
 			FileName: providerFileName,
 		},
 		FileInfo: &plugnmeet.RoomArtifactFileInfo{
-			// Store the clean, relative path in the database.
 			FilePath: relativePath,
 			FileSize: int64(len(fileContent)),
 			MimeType: "text/plain",
+		},
+	}
+
+	err = m.createAndSaveArtifact(roomInfo.RoomId, roomInfo.Sid, roomTableId, plugnmeet.RoomArtifactType_MEETING_SUMMARY, fileMetadata, log)
+	if err != nil {
+		log.WithError(err).Error("failed to create meeting summary file artifact")
+	}
+
+	// --- Create the non-deletable usage artifact ---
+	usageMetadata := &plugnmeet.RoomArtifactMetadata{
+		ProviderJobInfo: &plugnmeet.RoomArtifactProviderJobInfo{
+			JobId:    providerJobId,
+			FileName: providerFileName,
 		},
 		UsageDetails: &plugnmeet.RoomArtifactMetadata_TokenUsage{
 			TokenUsage: &plugnmeet.RoomArtifactTokenUsage{
@@ -59,6 +68,10 @@ func (m *ArtifactModel) CreateMeetingSummaryArtifact(roomTableId uint64, summary
 		},
 	}
 
-	// save to database and send notification
-	return m.createAndSaveArtifact(roomInfo.RoomId, roomInfo.Sid, roomTableId, plugnmeet.RoomArtifactType_MEETING_SUMMARY, metadata, log)
+	err = m.createAndSaveArtifact(roomInfo.RoomId, roomInfo.Sid, roomTableId, plugnmeet.RoomArtifactType_MEETING_SUMMARY_USAGE, usageMetadata, log)
+	if err != nil {
+		log.WithError(err).Error("failed to create meeting summary usage artifact")
+	}
+
+	return err
 }
