@@ -30,8 +30,8 @@ func (s *DatabaseService) DeleteArtifactByArtifactId(artifactId string) (int64, 
 	}
 
 	// double check to prevent deletion of certain artifact types.
-	if !s.IsAllowToDeleteArtifact(artifact.Type) {
-		return 0, fmt.Errorf("deleting '%s' type of artifact is not allowed", artifact.Type)
+	if !s.IsAllowToDeleteArtifact(plugnmeet.RoomArtifactType(artifact.Type)) {
+		return 0, fmt.Errorf("deleting '%s' type of artifact is not allowed", artifact.Type.ToString())
 	}
 
 	// If we get here, it's allowed.

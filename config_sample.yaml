@@ -233,12 +233,18 @@ insights:
       options:
         model: "default"          # A model ID specific to this service
         max_selected_trans_langs: 2
+      pricing:
+        default: # Corresponds to the model name in options
+          price_per_hour: 1.00
 
     translation:
       provider: "azure"
       id: "transGlobal"
       options:
         max_selected_trans_langs: 5
+      pricing:
+        default: # A generic key for services with one pricing model
+          price_per_million_characters: 10.00 # Example for Standard tier
 
     speech-synthesis:
       provider: "azure"
@@ -249,6 +255,9 @@ insights:
         voice-fr: "fr-FR-DeniseNeural"
         voice-de: "de-DE-KatjaNeural"
         voice-es: "es-ES-ElviraNeural"
+      pricing:
+        default: # A generic key for services with one pricing model
+          price_per_million_characters: 16.00 # Example for Neural voice
 
     ai_text_chat:
       provider: "google"
@@ -257,6 +266,13 @@ insights:
         chat_model: "gemini-2.5-pro"
         summarize_model: "gemini-2.0-flash"
         context_window: 5 # Number of recent messages to keep before summarizing
+      pricing:
+        gemini-2.5-pro:
+          input_price_per_million_tokens: 3.50
+          output_price_per_million_tokens: 10.50
+        gemini-2.0-flash:
+          input_price_per_million_tokens: 0.35
+          output_price_per_million_tokens: 0.70
 
     meeting_summarizing:
       provider: "google"
@@ -264,3 +280,7 @@ insights:
       options:
         # The model to be used for the final summarization.
         summarize_model: "gemini-2.0-flash"
+      pricing:
+        gemini-2.0-flash:
+          input_price_per_million_tokens: 0.35
+          output_price_per_million_tokens: 0.70

@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -139,7 +140,7 @@ func (m *ArtifactModel) sendWebhookNotification(eventName ArtifactEventName, roo
 				RoomId: &artifact.RoomId,
 			},
 			RoomArtifact: &plugnmeet.RoomArtifactWebhookEvent{
-				Type:       artifact.Type,
+				Type:       plugnmeet.RoomArtifactType(artifact.Type),
 				ArtifactId: artifact.ArtifactId,
 				Metadata:   metadata,
 			},
@@ -175,7 +176,7 @@ func (m *ArtifactModel) createAndSaveArtifact(roomId, roomSid string, roomTableI
 		ArtifactId:  uuid.NewString(),
 		RoomTableID: roomTableId,
 		RoomId:      roomId,
-		Type:        artifactType,
+		Type:        dbmodels.RoomArtifactType(artifactType),
 		Metadata:    string(metadataBytes),
 	}
 
@@ -187,4 +188,10 @@ func (m *ArtifactModel) createAndSaveArtifact(roomId, roomSid string, roomTableI
 	m.sendWebhookNotification(ArtifactCreated, roomSid, artifact, metadata)
 	log.Infof("successfully created %s artifact for room %s", artifactType.String(), roomId)
 	return nil
+}
+
+func roundAndPointer(val float64, precision int) *float64 {
+	multiplier := math.Pow10(precision)
+	rounded := math.Round(val*multiplier) / multiplier
+	return &rounded
 }

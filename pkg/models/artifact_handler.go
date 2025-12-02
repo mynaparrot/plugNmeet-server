@@ -45,7 +45,7 @@ func (m *ArtifactModel) FetchArtifacts(req *plugnmeet.FetchArtifactsReq) (*plugn
 			result.ArtifactsList = append(result.ArtifactsList, &plugnmeet.ArtifactInfo{
 				ArtifactId: dbArtifact.ArtifactId,
 				RoomId:     dbArtifact.RoomId,
-				Type:       dbArtifact.Type,
+				Type:       plugnmeet.RoomArtifactType(dbArtifact.Type),
 				Created:    dbArtifact.Created.Format(time.RFC3339),
 				Metadata:   metadata,
 			})
@@ -83,8 +83,8 @@ func (m *ArtifactModel) GetArtifactDownloadToken(req *plugnmeet.GetArtifactDownl
 		return "", fmt.Errorf("artifact not found with ID: %s", req.ArtifactId)
 	}
 
-	if !m.isDownloadable(artifact.Type) {
-		return "", fmt.Errorf("'%s' artifact type is not downloadable", artifact.Type)
+	if !m.isDownloadable(plugnmeet.RoomArtifactType(artifact.Type)) {
+		return "", fmt.Errorf("'%s' artifact type is not downloadable", artifact.Type.ToString())
 	}
 
 	var metadata plugnmeet.RoomArtifactMetadata
@@ -141,8 +141,8 @@ func (m *ArtifactModel) DeleteArtifact(req *plugnmeet.DeleteArtifactReq) error {
 	}
 
 	// Check if the artifact type is deletable.
-	if !m.ds.IsAllowToDeleteArtifact(artifact.Type) {
-		return fmt.Errorf("deleting '%s' artifact type is not allowed", artifact.Type)
+	if !m.ds.IsAllowToDeleteArtifact(plugnmeet.RoomArtifactType(artifact.Type)) {
+		return fmt.Errorf("deleting '%s' artifact type is not allowed", artifact.Type.ToString())
 	}
 
 	var metadata plugnmeet.RoomArtifactMetadata

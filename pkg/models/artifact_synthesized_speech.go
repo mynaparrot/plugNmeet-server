@@ -2,6 +2,7 @@ package models
 
 import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
 )
@@ -22,11 +23,23 @@ func (m *ArtifactModel) createSynthesizedSpeechUsageArtifact(roomId, roomSid str
 
 	// 2. Prepare the metadata message.
 	total, _ := usageMap[redisservice.TotalUsageField]
+
+	// 3. Get pricing & calculate cost
+	var cost float64
+	pricing, err := m.app.Insights.GetServiceModelPricing(insights.ServiceTypeSpeechSynthesis, "default")
+	if err == nil {
+		// price is per million characters
+		cost = (float64(total) / 1000000) * pricing.PricePerMillionCharacters
+	} else {
+		log.WithError(err).Warn("could not calculate cost for speech-synthesis")
+	}
+
 	metadata := &plugnmeet.RoomArtifactMetadata{
 		UsageDetails: &plugnmeet.RoomArtifactMetadata_CharacterCountUsage{
 			CharacterCountUsage: &plugnmeet.RoomArtifactCharacterCountUsage{
-				TotalCharacters: uint32(total),
-				Breakdown:       usageMap,
+				TotalCharacters:              uint32(total),
+				Breakdown:                    usageMap,
+				TotalCharactersEstimatedCost: roundAndPointer(cost, 6),
 			},
 		},
 	}

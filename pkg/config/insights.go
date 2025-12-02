@@ -7,6 +7,15 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 )
 
+// ModelPricing holds pricing information for a service.
+type ModelPricing struct {
+	InputPricePerMillionTokens  float64 `yaml:"input_price_per_million_tokens"`
+	OutputPricePerMillionTokens float64 `yaml:"output_price_per_million_tokens"`
+	PricePerMinute              float64 `yaml:"price_per_minute"`
+	PricePerMillionCharacters   float64 `yaml:"price_per_million_characters"`
+	PricePerHour                float64 `yaml:"price_per_hour"`
+}
+
 // InsightsConfig is the main config block for the insights feature.
 type InsightsConfig struct {
 	// The key is the provider type ("azure", "google"), the value is a list of accounts.
@@ -23,9 +32,10 @@ type ProviderAccount struct {
 
 // ServiceConfig now references a provider type and a specific account ID.
 type ServiceConfig struct {
-	Provider string                 `yaml:"provider"`
-	ID       string                 `yaml:"id"`
-	Options  map[string]interface{} `yaml:"options"` // Generic options, e.g., model
+	Provider string                  `yaml:"provider"`
+	ID       string                  `yaml:"id"`
+	Options  map[string]interface{}  `yaml:"options"` // Generic options, e.g., model
+	Pricing  map[string]ModelPricing `yaml:"pricing"`
 }
 
 // GetVoiceMappings safely extracts the voice mappings from the generic options map.
@@ -76,4 +86,31 @@ func (c *InsightsConfig) GetProviderAccountForService(serviceType insights.Servi
 	}
 
 	return nil, nil, fmt.Errorf("account with id '%s' not found for provider '%s'", serviceConfig.ID, serviceConfig.Provider)
+}
+
+// GetServiceModelPricing is a helper to get pricing for a specific model within a service.
+// If a price for the specific modelName is not found, it will fall back to looking for a "default" price.
+func (c *InsightsConfig) GetServiceModelPricing(serviceType insights.ServiceType, modelName string) (*ModelPricing, error) {
+	// 1. Get the service configuration
+	serviceConfig, configOk := c.Services[serviceType]
+	if !configOk {
+		return nil, fmt.Errorf("service '%s' is not defined in config", serviceType)
+	}
+
+	// 2. Check if the pricing block exists.
+	if serviceConfig.Pricing == nil {
+		return nil, fmt.Errorf("pricing config block not found for service '%s'", serviceType)
+	}
+
+	// 3. Find the pricing for the specific model.
+	if pricing, ok := serviceConfig.Pricing[modelName]; ok {
+		return &pricing, nil
+	}
+
+	// 4. If a specific model price is not found, fall back to "default".
+	if pricing, ok := serviceConfig.Pricing["default"]; ok {
+		return &pricing, nil
+	}
+
+	return nil, fmt.Errorf("pricing config not found for model '%s' (or default) in service '%s'", modelName, serviceType)
 }

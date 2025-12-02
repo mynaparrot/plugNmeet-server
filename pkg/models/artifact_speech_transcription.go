@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
@@ -31,11 +32,24 @@ func (m *ArtifactModel) createSpeechTranscriptionUsageArtifact(roomId, roomSid s
 
 	// 2. Prepare the metadata message.
 	total, _ := usageMap[redisservice.TotalUsageField]
+
+	// 3. Get pricing & calculate cost
+	var cost float64
+	pricing, err := m.app.Insights.GetServiceModelPricing(insights.ServiceTypeTranscription, "default")
+	if err == nil {
+		// Convert the hourly price to a per-second price first for a clean calculation.
+		pricePerSecond := pricing.PricePerHour / 3600
+		cost = float64(total) * pricePerSecond
+	} else {
+		log.WithError(err).Warn("could not calculate cost for transcription")
+	}
+
 	metadata := &plugnmeet.RoomArtifactMetadata{
 		UsageDetails: &plugnmeet.RoomArtifactMetadata_DurationUsage{
 			DurationUsage: &plugnmeet.RoomArtifactDurationUsage{
-				DurationSec: uint32(total),
-				Breakdown:   usageMap,
+				DurationSec:              uint32(total),
+				Breakdown:                usageMap,
+				DurationSecEstimatedCost: roundAndPointer(cost, 6),
 			},
 		},
 	}
