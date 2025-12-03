@@ -18,7 +18,9 @@ func (s *InsightsModel) TranscriptionConfigure(req *plugnmeet.InsightsTranscript
 	if metadata == nil {
 		return fmt.Errorf("empty room medata")
 	}
-	if metadata.RoomFeatures.EndToEndEncryptionFeatures.EnabledSelfInsertEncryptionKey {
+
+	endToEndEncryptionFeatures := metadata.RoomFeatures.EndToEndEncryptionFeatures
+	if endToEndEncryptionFeatures.EnabledSelfInsertEncryptionKey {
 		return fmt.Errorf("insights.feature-disable-while-e2ee-self-key-enabled")
 	}
 
@@ -51,6 +53,7 @@ func (s *InsightsModel) TranscriptionConfigure(req *plugnmeet.InsightsTranscript
 		ServiceType:                        insights.ServiceTypeTranscription,
 		RoomId:                             roomId,
 		RoomTableId:                        roomInfo.DbTableId,
+		RoomE2EEKey:                        endToEndEncryptionFeatures.EncryptionKey,
 		TargetUsers:                        usersMap,
 		HiddenAgent:                        true,
 		AllowedTransLangs:                  insightsFeatures.TranscriptionFeatures.AllowedTransLangs,
@@ -137,17 +140,12 @@ func (s *InsightsModel) TranscriptionUserSession(req *plugnmeet.InsightsTranscri
 			return err
 		}
 
-		var roomE2EEKey *string = nil
-		if metadata.RoomFeatures.EndToEndEncryptionFeatures.IsEnabled {
-			roomE2EEKey = metadata.RoomFeatures.EndToEndEncryptionFeatures.EncryptionKey
-		}
 		payload := &insights.InsightsTaskPayload{
 			Task:        TaskUserStart,
 			ServiceType: insights.ServiceTypeTranscription,
 			RoomId:      roomId,
 			UserId:      userId,
 			Options:     optionsBytes,
-			RoomE2EEKey: roomE2EEKey,
 		}
 
 		err = s.ActivateAgentTaskForUser(payload, time.Second*5)
@@ -366,7 +364,9 @@ func (s *InsightsModel) AIMeetingSummarizationConfig(req *plugnmeet.InsightsAIMe
 	if roomInfo == nil {
 		return fmt.Errorf("empty room medata")
 	}
-	if metadata.RoomFeatures.EndToEndEncryptionFeatures.EnabledSelfInsertEncryptionKey {
+
+	endToEndEncryptionFeatures := metadata.RoomFeatures.EndToEndEncryptionFeatures
+	if endToEndEncryptionFeatures.EnabledSelfInsertEncryptionKey {
 		return fmt.Errorf("insights.feature-disable-while-e2ee-self-key-enabled")
 	}
 
@@ -384,6 +384,7 @@ func (s *InsightsModel) AIMeetingSummarizationConfig(req *plugnmeet.InsightsAIMe
 		ServiceType:                  insights.ServiceTypeMeetingSummarizing,
 		RoomId:                       roomId,
 		RoomTableId:                  roomInfo.DbTableId,
+		RoomE2EEKey:                  endToEndEncryptionFeatures.EncryptionKey,
 		CaptureAllParticipantsTracks: true,
 		HiddenAgent:                  true,
 		Options:                      []byte(aiMeetingSummarizationFeatures.SummarizationPrompt),

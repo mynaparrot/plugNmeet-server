@@ -126,8 +126,8 @@ func (s *InsightsModel) HandleIncomingAgentTask(msg *nats.Msg) {
 		time.Sleep(time.Duration(rand.Intn(250)) * time.Millisecond)
 
 		// Now, try to become the leader.
-		lock := s.redisService.NewLock(key, 30*time.Second)
-		isLeader, err := lock.TryLock(s.ctx)
+		redisLock := s.redisService.NewLock(key, 30*time.Second)
+		isLeader, err := redisLock.TryLock(s.ctx)
 		if err != nil {
 			s.logger.WithError(err).Error("failed leader election attempt")
 			reply(false, "failed leader election attempt")
@@ -137,7 +137,7 @@ func (s *InsightsModel) HandleIncomingAgentTask(msg *nats.Msg) {
 		if isLeader {
 			s.logger.Infof("Acquired leadership for agent '%s'", key)
 			// Create the agent...
-			if err := s.manageLocalAgent(payload, lock); err != nil {
+			if err := s.manageLocalAgent(payload, redisLock); err != nil {
 				s.logger.WithError(err).Error("failed to manage local agent")
 				reply(false, "failed to manage local agent")
 				return
@@ -176,7 +176,7 @@ func (s *InsightsModel) HandleIncomingAgentTask(msg *nats.Msg) {
 }
 
 // manageLocalAgent now only creates the agent. The user activation is separate.
-func (s *InsightsModel) manageLocalAgent(payload *insights.InsightsTaskPayload, lock *redisservice.Lock) error {
+func (s *InsightsModel) manageLocalAgent(payload *insights.InsightsTaskPayload, redisLock *redisservice.Lock) error {
 	key := getAgentKey(payload.RoomId, payload.ServiceType)
 
 	s.lock.Lock()
@@ -192,23 +192,23 @@ func (s *InsightsModel) manageLocalAgent(payload *insights.InsightsTaskPayload, 
 	// Use the new helper method to get both configs
 	targetAccount, serviceConfig, err := s.appConfig.Insights.GetProviderAccountForService(payload.ServiceType)
 	if err != nil {
-		_ = lock.Unlock(s.ctx)
+		_ = redisLock.Unlock(s.ctx)
 		return err
 	}
 
 	agent, err := insightsservice.NewRoomAgent(s.ctx, s.appConfig, serviceConfig, targetAccount, s.natsService, s.redisService, s.logger, payload)
 	if err != nil {
-		_ = lock.Unlock(s.ctx)
+		_ = redisLock.Unlock(s.ctx)
 		return fmt.Errorf("failed to create insights agent: %w", err)
 	}
 	s.roomAgents[key] = agent
 
-	go s.superviseAgent(agent, lock)
+	go s.superviseAgent(agent, redisLock)
 	return nil
 }
 
 // superviseAgent is the "Janitor" that maintains leadership and health.
-func (s *InsightsModel) superviseAgent(agent *insightsservice.RoomAgent, lock *redisservice.Lock) {
+func (s *InsightsModel) superviseAgent(agent *insightsservice.RoomAgent, redisLock *redisservice.Lock) {
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 
@@ -218,14 +218,14 @@ func (s *InsightsModel) superviseAgent(agent *insightsservice.RoomAgent, lock *r
 	for {
 		select {
 		case <-ticker.C:
-			if err := lock.Refresh(s.ctx); err != nil {
+			if err := redisLock.Refresh(s.ctx); err != nil {
 				s.logger.Warnf("Lost leadership for agent '%s', shutting down.", key)
 				s.shutdownAndRemoveAgent(key)
 				return
 			}
 		case <-agent.Ctx.Done():
 			s.logger.Infof("Agent for '%s' context was canceled, shutting down.", key)
-			_ = lock.Unlock(s.ctx)
+			_ = redisLock.Unlock(s.ctx)
 			s.shutdownAndRemoveAgent(key)
 			return
 		}

@@ -111,7 +111,7 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 					t.logger.WithError(err).Errorln("update user usage failed")
 				}
 
-				time.AfterFunc(time.Second*3, func() {
+				time.AfterFunc(time.Second*5, func() {
 					if err := t.natsService.BroadcastSystemNotificationToRoom(roomId, "speech-services.speech-to-text-ready", plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_INFO, false, &userId); err != nil {
 						t.logger.WithError(err).Errorln("error broadcasting system notification")
 					}

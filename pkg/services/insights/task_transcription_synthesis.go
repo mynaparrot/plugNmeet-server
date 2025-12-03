@@ -178,22 +178,6 @@ func (t *TranscriptionSynthesisTask) createWorker(language string) (*ttsWorker, 
 		return nil, fmt.Errorf("failed to generate token for tts worker: %w", err)
 	}
 
-	// Create and connect a new room object for the worker
-	workerRoom := lksdk.NewRoom(&lksdk.RoomCallback{
-		OnDisconnected: func() {
-			log.Infoln("tts worker disconnected from room")
-		},
-		ParticipantCallback: lksdk.ParticipantCallback{
-			OnLocalTrackPublished: func(publication *lksdk.LocalTrackPublication, lp *lksdk.LocalParticipant) {
-				log.Infof("successfully published track %s to room, Encryption_Type: %s", publication.TrackInfo().Name, publication.TrackInfo().Encryption)
-			},
-		},
-	})
-	workerRoom.SetLogger(lkLogger.GetLogger())
-	if err = workerRoom.JoinWithToken(t.appCnf.LivekitInfo.Host, token, lksdk.WithAutoSubscribe(false)); err != nil {
-		return nil, fmt.Errorf("tts worker failed to join room: %w", err)
-	}
-
 	// Do proper user status update
 	err = t.natsService.UpdateUserStatus(t.roomId, workerIdentity, natsservice.UserStatusOnline)
 	if err != nil {
@@ -207,6 +191,26 @@ func (t *TranscriptionSynthesisTask) createWorker(language string) (*ttsWorker, 
 	if err != nil {
 		return nil, err
 	}
+	log.Info("successfully added user info & broadcasted user status")
+
+	// Create and connect a new room object for the worker
+	workerRoom := lksdk.NewRoom(&lksdk.RoomCallback{
+		OnDisconnected: func() {
+			log.Infoln("tts worker disconnected from room")
+		},
+		ParticipantCallback: lksdk.ParticipantCallback{
+			OnLocalTrackPublished: func(publication *lksdk.LocalTrackPublication, lp *lksdk.LocalParticipant) {
+				log.Infof("successfully published track %s to room, Encryption_Type: %s", publication.TrackInfo().Name, publication.TrackInfo().Encryption)
+			},
+		},
+	})
+	workerRoom.SetLogger(lkLogger.GetLogger())
+	if err = workerRoom.JoinWithToken(t.appCnf.LivekitInfo.Host, token, lksdk.WithAutoSubscribe(false)); err != nil {
+		// make user offline
+		err = t.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_DISCONNECTED, t.roomId, userInfo, workerIdentity)
+		return nil, fmt.Errorf("tts worker failed to join room: %w", err)
+	}
+	log.Info("successfully joined tts worker in the livekit room")
 
 	// Create track options, including encryptor if E2EE is enabled
 	publisher, err := inMedia.NewAudioPublisher(workerRoom, language, 16000, 1, t.e2eeKey)

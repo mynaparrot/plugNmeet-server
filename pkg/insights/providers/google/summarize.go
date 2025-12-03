@@ -23,7 +23,7 @@ func (p *GoogleProvider) StartBatchSummarizeAudioFile(ctx context.Context, fileP
 	}
 	log.Infof("using summarizationPrompt: '%s'", userPrompt)
 
-	summarizationPrompt := fmt.Sprintf("You are a professional meeting summarization assistant. Your response must be a single, valid JSON object with one key: 'summary'. The value of the 'summary' key should be the result of the following user instruction:\n\n---\n\n%s", userPrompt)
+	summarizationPrompt := fmt.Sprintf("You are a professional meeting summarization assistant. Your response must be a single, valid JSON object with one key: 'summary'. The value of the 'summary' key should be a clean, well-formatted HTML string using basic tags like <h3> for section headings, <ul>, <li>, <p>, and <strong>. The user's instruction for the summary is: \n\n---\n\n%s", userPrompt)
 
 	// 1. Upload the file to Google Cloud Storage.
 	f, err := p.client.Files.UploadFromPath(ctx, filePath, nil)
