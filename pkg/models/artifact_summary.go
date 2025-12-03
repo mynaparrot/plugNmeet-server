@@ -11,7 +11,7 @@ import (
 )
 
 // CreateMeetingSummaryArtifact handles the business logic of creating a meeting summary artifact.
-// It creates two separate artifacts: one for the downloadable file and one for the usage record.
+// It creates a file artifact, then a usage artifact that references the file.
 func (m *ArtifactModel) CreateMeetingSummaryArtifact(roomTableId uint64, summaryText string, promptTokens, completionTokens, totalTokens uint32, providerJobId, providerFileName string, log *logrus.Entry) error {
 	log = log.WithField("method", "CreateMeetingSummaryArtifact")
 
@@ -24,7 +24,7 @@ func (m *ArtifactModel) CreateMeetingSummaryArtifact(roomTableId uint64, summary
 		return fmt.Errorf("room not found for room %d", roomTableId)
 	}
 
-	// --- Create the downloadable file artifact ---
+	// --- Create the downloadable file artifact FIRST ---
 	summaryFileName := fmt.Sprintf("summary_%d.txt", time.Now().Unix())
 	relativePath, absolutePath, err := m.buildPath(summaryFileName, roomInfo.RoomId, plugnmeet.RoomArtifactType_MEETING_SUMMARY)
 	if err != nil {
@@ -49,12 +49,13 @@ func (m *ArtifactModel) CreateMeetingSummaryArtifact(roomTableId uint64, summary
 		},
 	}
 
-	err = m.createAndSaveArtifact(roomInfo.RoomId, roomInfo.Sid, roomTableId, plugnmeet.RoomArtifactType_MEETING_SUMMARY, fileMetadata, log)
+	// Create the file artifact and get its ID.
+	fileArtifact, err := m.createAndSaveArtifact(roomInfo.RoomId, roomInfo.Sid, roomTableId, plugnmeet.RoomArtifactType_MEETING_SUMMARY, fileMetadata, log)
 	if err != nil {
-		log.WithError(err).Error("failed to create meeting summary file artifact")
+		return fmt.Errorf("failed to create meeting summary file artifact: %w", err)
 	}
 
-	// --- Create the non-deletable usage artifact ---
+	// --- Create the non-deletable usage artifact, linking it to the file artifact ---
 
 	// 1. Get pricing & calculate cost
 	var promptCost, completionCost, totalCost float64
@@ -76,7 +77,7 @@ func (m *ArtifactModel) CreateMeetingSummaryArtifact(roomTableId uint64, summary
 		}
 	}
 
-	// 2. Prepare metadata
+	// 2. Prepare usage metadata
 	usageMetadata := &plugnmeet.RoomArtifactMetadata{
 		ProviderJobInfo: &plugnmeet.RoomArtifactProviderJobInfo{
 			JobId:    providerJobId,
@@ -92,9 +93,12 @@ func (m *ArtifactModel) CreateMeetingSummaryArtifact(roomTableId uint64, summary
 				TotalTokensEstimatedCost:      roundAndPointer(totalCost, 6),
 			},
 		},
+		// Link this usage artifact back to the file artifact.
+		ReferenceArtifactId: &fileArtifact.ArtifactId,
 	}
 
-	err = m.createAndSaveArtifact(roomInfo.RoomId, roomInfo.Sid, roomTableId, plugnmeet.RoomArtifactType_MEETING_SUMMARY_USAGE, usageMetadata, log)
+	// 3. Create the usage artifact.
+	_, err = m.createAndSaveArtifact(roomInfo.RoomId, roomInfo.Sid, roomTableId, plugnmeet.RoomArtifactType_MEETING_SUMMARY_USAGE, usageMetadata, log)
 	if err != nil {
 		log.WithError(err).Error("failed to create meeting summary usage artifact")
 	}

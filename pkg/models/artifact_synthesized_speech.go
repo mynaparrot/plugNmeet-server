@@ -46,5 +46,6 @@ func (m *ArtifactModel) createSynthesizedSpeechUsageArtifact(roomId, roomSid str
 
 	m.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_SYNTHESIZED_SPEECH_TOTAL_USAGE, nil, &total)
 
-	return m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_SYNTHESIZED_SPEECH_USAGE, metadata, log)
+	_, err = m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_SYNTHESIZED_SPEECH_USAGE, metadata, log)
+	return err
 }

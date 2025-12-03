@@ -106,11 +106,14 @@ func (m *ArtifactModel) CreateAllRoomUsageArtifacts(roomId, roomSid string, room
 		"method": "CreateAllRoomUsageArtifacts",
 	})
 
-	// Speech Transcription
-	if err := m.createSpeechTranscriptionUsageArtifact(roomId, roomSid, roomTableId, log); err != nil {
-		log.WithError(err).Error("failed to create speech transcription usage artifact")
+	// Speech Transcription file
+	transFileArtifactId, err := m.createSpeechTranscriptionFileArtifact(roomId, roomSid, roomTableId, log)
+	if err != nil {
+		log.WithError(err).Error("failed to create speech transcription artifact")
 	}
-	if err := m.createSpeechTranscriptionFileArtifact(roomId, roomSid, roomTableId, log); err != nil {
+
+	// Speech Transcription
+	if err := m.createSpeechTranscriptionUsageArtifact(roomId, roomSid, roomTableId, transFileArtifactId, log); err != nil {
 		log.WithError(err).Error("failed to create speech transcription usage artifact")
 	}
 
@@ -165,11 +168,11 @@ func (m *ArtifactModel) HandleAnalyticsEvent(roomId string, eventName plugnmeet.
 	m.analyticsModel.HandleEvent(d)
 }
 
-// createAndSaveArtifact is a helper to save data to DB
-func (m *ArtifactModel) createAndSaveArtifact(roomId, roomSid string, roomTableId uint64, artifactType plugnmeet.RoomArtifactType, metadata *plugnmeet.RoomArtifactMetadata, log *logrus.Entry) error {
+// createAndSaveArtifact is a helper to save data to DB.
+func (m *ArtifactModel) createAndSaveArtifact(roomId, roomSid string, roomTableId uint64, artifactType plugnmeet.RoomArtifactType, metadata *plugnmeet.RoomArtifactMetadata, log *logrus.Entry) (*dbmodels.RoomArtifact, error) {
 	metadataBytes, err := protojson.Marshal(metadata)
 	if err != nil {
-		return fmt.Errorf("failed to marshal metadata: %w", err)
+		return nil, fmt.Errorf("failed to marshal metadata: %w", err)
 	}
 
 	artifact := &dbmodels.RoomArtifact{
@@ -182,12 +185,12 @@ func (m *ArtifactModel) createAndSaveArtifact(roomId, roomSid string, roomTableI
 
 	_, err = m.ds.CreateRoomArtifact(artifact)
 	if err != nil {
-		return fmt.Errorf("failed to create room artifact record: %w", err)
+		return nil, fmt.Errorf("failed to create room artifact record: %w", err)
 	}
 
 	m.sendWebhookNotification(ArtifactCreated, roomSid, artifact, metadata)
-	log.Infof("successfully created %s artifact for room %s", artifactType.String(), roomId)
-	return nil
+	log.Infof("successfully created %s artifact (id: %s) for room %s", artifactType.String(), artifact.ArtifactId, roomId)
+	return artifact, nil
 }
 
 func roundAndPointer(val float64, precision int) *float64 {

@@ -17,8 +17,7 @@ import (
 )
 
 // createSpeechTranscriptionUsageArtifact creates an artifact record for a speech transcription session.
-// It's designed to be called when a room ends.
-func (m *ArtifactModel) createSpeechTranscriptionUsageArtifact(roomId, roomSid string, roomTableId uint64, log *logrus.Entry) error {
+func (m *ArtifactModel) createSpeechTranscriptionUsageArtifact(roomId, roomSid string, roomTableId uint64, fileArtifactId *string, log *logrus.Entry) error {
 	// 1. Atomically get usage data from Redis and clean up the key.
 	usageMap, err := m.rs.GetTranscriptionRoomUsage(m.ctx, roomId, true)
 	if err != nil {
@@ -52,10 +51,12 @@ func (m *ArtifactModel) createSpeechTranscriptionUsageArtifact(roomId, roomSid s
 				DurationSecEstimatedCost: roundAndPointer(cost, 6),
 			},
 		},
+		// Link this usage artifact back to the file artifact.
+		ReferenceArtifactId: fileArtifactId,
 	}
 
 	// Create and save the artifact for chat interactions.
-	err = m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_SPEECH_TRANSCRIPTION_USAGE, metadata, log)
+	_, err = m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_SPEECH_TRANSCRIPTION_USAGE, metadata, log)
 	if err != nil {
 		log.WithError(err).Error("failed to create speech transcription usage artifact")
 	}
@@ -78,15 +79,15 @@ func formatVTTTimestamp(d time.Duration) string {
 	return fmt.Sprintf("%02d:%02d:%02d.%03d", hours, minutes, seconds, milliseconds)
 }
 
-// createSpeechTranscriptionFileArtifact creates a downloadable VTT artifact file.
-func (m *ArtifactModel) createSpeechTranscriptionFileArtifact(roomId, roomSid string, roomTableId uint64, log *logrus.Entry) error {
+// createSpeechTranscriptionFileArtifact creates a downloadable VTT artifact file
+func (m *ArtifactModel) createSpeechTranscriptionFileArtifact(roomId, roomSid string, roomTableId uint64, log *logrus.Entry) (artifactId *string, err error) {
 	// 1. Get all transcription chunks from NATS KV.
 	chunks, err := m.natsService.GetTranscriptionChunks(roomId)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(chunks) == 0 {
-		return nil // No chunks stored.
+		return nil, nil // No chunks stored.
 	}
 
 	// 2. Clean up the NATS bucket.
@@ -97,7 +98,7 @@ func (m *ArtifactModel) createSpeechTranscriptionFileArtifact(roomId, roomSid st
 	for k := range chunks {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys) // Lexicographical sort works because the keys are just timestamps.
+	sort.Strings(keys)
 
 	// 4. Format the chunks into a VTT file.
 	var fileContent strings.Builder
@@ -118,15 +119,12 @@ func (m *ArtifactModel) createSpeechTranscriptionFileArtifact(roomId, roomSid st
 			firstTimestamp = ts
 		}
 
-		// Calculate elapsed time from the start of the transcription.
 		elapsedTime := time.Duration(ts - firstTimestamp)
-
 		var startTime time.Duration
 		if i > 0 {
 			startTime = previousEndTime
 		}
 
-		// Format for VTT.
 		vttStartTime := formatVTTTimestamp(startTime)
 		vttEndTime := formatVTTTimestamp(elapsedTime)
 
@@ -137,22 +135,22 @@ func (m *ArtifactModel) createSpeechTranscriptionFileArtifact(roomId, roomSid st
 		previousEndTime = elapsedTime
 	}
 
-	if fileContent.Len() <= 40 { // Approx length of a header with no content
-		return nil // Nothing to write
+	if fileContent.Len() <= 40 {
+		return nil, nil
 	}
 
 	// 5. Build the file path and write the file.
-	fileName := fmt.Sprintf("transcription_%d.vtt", time.Now().Unix()) // .vtt extension
+	fileName := fmt.Sprintf("transcription_%d.vtt", time.Now().Unix())
 	relativePath, absolutePath, err := m.buildPath(fileName, roomId, plugnmeet.RoomArtifactType_SPEECH_TRANSCRIPTION)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	err = os.WriteFile(absolutePath, []byte(fileContent.String()), 0644)
 	if err != nil {
-		return fmt.Errorf("failed to write transcription file: %w", err)
+		return nil, fmt.Errorf("failed to write transcription file: %w", err)
 	}
 
-	// 6. Prepare the metadata.
+	// 6. Prepare the metadata for the file artifact.
 	metadata := &plugnmeet.RoomArtifactMetadata{
 		FileInfo: &plugnmeet.RoomArtifactFileInfo{
 			FilePath: relativePath,
@@ -161,6 +159,11 @@ func (m *ArtifactModel) createSpeechTranscriptionFileArtifact(roomId, roomSid st
 		},
 	}
 
-	// 7. Create the database record.
-	return m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_SPEECH_TRANSCRIPTION, metadata, log)
+	// 7. Create the file artifact and get its ID.
+	fileArtifact, err := m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_SPEECH_TRANSCRIPTION, metadata, log)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create speech transcription file artifact: %w", err)
+	}
+
+	return &fileArtifact.ArtifactId, nil
 }
