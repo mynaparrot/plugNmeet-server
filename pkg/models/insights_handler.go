@@ -18,6 +18,9 @@ func (s *InsightsModel) TranscriptionConfigure(req *plugnmeet.InsightsTranscript
 	if metadata == nil {
 		return fmt.Errorf("empty room medata")
 	}
+	if metadata.RoomFeatures.EndToEndEncryptionFeatures.EnabledSelfInsertEncryptionKey {
+		return fmt.Errorf("insights.feature-disable-while-e2ee-self-key-enabled")
+	}
 
 	insightsFeatures := metadata.RoomFeatures.InsightsFeatures
 	if !insightsFeatures.IsAllow || !insightsFeatures.TranscriptionFeatures.IsAllow {
@@ -108,6 +111,9 @@ func (s *InsightsModel) TranscriptionUserSession(req *plugnmeet.InsightsTranscri
 		}
 		if metadata == nil {
 			return fmt.Errorf("empty room medata")
+		}
+		if metadata.RoomFeatures.EndToEndEncryptionFeatures.EnabledSelfInsertEncryptionKey {
+			return fmt.Errorf("insights.feature-disable-while-e2ee-self-key-enabled")
 		}
 
 		userInfo, err := s.natsService.GetUserInfo(roomId, userId)
@@ -359,6 +365,9 @@ func (s *InsightsModel) AIMeetingSummarizationConfig(req *plugnmeet.InsightsAIMe
 	}
 	if roomInfo == nil {
 		return fmt.Errorf("empty room medata")
+	}
+	if metadata.RoomFeatures.EndToEndEncryptionFeatures.EnabledSelfInsertEncryptionKey {
+		return fmt.Errorf("insights.feature-disable-while-e2ee-self-key-enabled")
 	}
 
 	insightsFeatures := metadata.RoomFeatures.InsightsFeatures
