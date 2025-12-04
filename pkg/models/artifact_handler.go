@@ -16,17 +16,13 @@ import (
 
 // FetchArtifacts fetches records from the DB and formats them for the API response.
 func (m *ArtifactModel) FetchArtifacts(req *plugnmeet.FetchArtifactsReq) (*plugnmeet.FetchArtifactsResult, error) {
-	if len(req.RoomIds) == 0 {
-		return nil, fmt.Errorf("at least one room id is required")
-	}
-
 	if req.Limit <= 0 {
 		req.Limit = 20
 	} else if req.Limit > 100 {
 		req.Limit = 100
 	}
 
-	dbArtifacts, total, err := m.ds.GetArtifacts(req.RoomIds, req.Type, req.From, req.Limit, &req.OrderBy)
+	dbArtifacts, total, err := m.ds.GetArtifacts(req.RoomIds, req.RoomSid, req.Type, req.From, req.Limit, &req.OrderBy)
 	if err != nil {
 		return nil, err
 	}
@@ -53,6 +49,45 @@ func (m *ArtifactModel) FetchArtifacts(req *plugnmeet.FetchArtifactsReq) (*plugn
 	}
 
 	return result, nil
+}
+
+func (m *ArtifactModel) GetArtifactDetails(artifactId string) (*plugnmeet.ArtifactDetailsRes, error) {
+	dbArtifact, roomInfo, err := m.ds.GetRoomArtifactDetails(artifactId)
+	if err != nil {
+		return nil, err
+	}
+
+	metadata := new(plugnmeet.RoomArtifactMetadata)
+	err = protojson.Unmarshal([]byte(dbArtifact.Metadata), metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &plugnmeet.ArtifactDetailsRes{
+		Status: true,
+		Msg:    "success",
+		ArtifactInfo: &plugnmeet.ArtifactInfo{
+			ArtifactId: dbArtifact.ArtifactId,
+			RoomId:     dbArtifact.RoomId,
+			Type:       plugnmeet.RoomArtifactType(dbArtifact.Type),
+			Created:    dbArtifact.Created.Format(time.RFC3339),
+			Metadata:   metadata,
+		},
+	}
+
+	if roomInfo != nil {
+		res.RoomInfo = &plugnmeet.PastRoomInfo{
+			RoomTitle:          roomInfo.RoomTitle,
+			RoomId:             roomInfo.RoomId,
+			RoomSid:            roomInfo.Sid,
+			JoinedParticipants: roomInfo.JoinedParticipants,
+			WebhookUrl:         roomInfo.WebhookUrl,
+			Created:            roomInfo.Created.Format("2006-01-02 15:04:05"),
+			Ended:              roomInfo.Ended.Format("2006-01-02 15:04:05"),
+		}
+	}
+
+	return res, nil
 }
 
 // generateToken now generates a JWT with a file path.

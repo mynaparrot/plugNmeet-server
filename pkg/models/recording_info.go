@@ -90,7 +90,7 @@ func (m *RecordingModel) RecordingInfo(req *plugnmeet.RecordingInfoReq) (*plugnm
 				Ended:              roomInfo.Ended.Format("2006-01-02 15:04:05"),
 			}
 			if an, err := m.ds.GetAnalyticByRoomTableId(roomInfo.ID); err == nil && an != nil {
-				pastRoomInfo.AnalyticsFileId = an.FileID
+				pastRoomInfo.AnalyticsFileId = &an.FileID
 			}
 		}
 	}

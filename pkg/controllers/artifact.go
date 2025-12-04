@@ -79,6 +79,19 @@ func (ac *ArtifactController) HandleDownloadArtifact(c *fiber.Ctx) error {
 	return c.SendFile(filePath, false)
 }
 
+func (ac *ArtifactController) HandleGetArtifactInfo(c *fiber.Ctx) error {
+	req := new(plugnmeet.ArtifactDetailsReq)
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
+
+	res, err := ac.ArtifactModel.GetArtifactDetails(req.ArtifactId)
+	if err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
+	return utils.SendProtoJsonResponse(c, res)
+}
+
 // HandleDeleteArtifact deletes an artifact.
 func (ac *ArtifactController) HandleDeleteArtifact(c *fiber.Ctx) error {
 	req := new(plugnmeet.DeleteArtifactReq)

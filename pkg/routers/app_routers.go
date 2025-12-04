@@ -143,6 +143,7 @@ func (r *router) registerAuthRoutes() {
 
 	artifact := auth.Group("/artifact")
 	artifact.Post("/fetch", r.ctrl.ArtifactController.HandleFetchArtifacts)
+	artifact.Post("/artifactInfo", r.ctrl.ArtifactController.HandleGetArtifactInfo)
 	artifact.Post("/delete", r.ctrl.ArtifactController.HandleDeleteArtifact)
 	artifact.Post("/getDownloadToken", r.ctrl.ArtifactController.HandleGetArtifactDownloadToken)
 

@@ -2,6 +2,7 @@ package dbservice
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
@@ -9,16 +10,27 @@ import (
 )
 
 // GetArtifacts retrieves a paginated and sorted list of artifacts,
-// optionally filtered by room IDs, and returns the total count.
-func (s *DatabaseService) GetArtifacts(roomIds []string, artifactType *plugnmeet.RoomArtifactType, offset, limit uint64, direction *string) ([]*dbmodels.RoomArtifact, int64, error) {
+// optionally filtered by room IDs, roomSid and artifact type, and returns the total count.
+func (s *DatabaseService) GetArtifacts(roomIds []string, roomSid *string, artifactType *plugnmeet.RoomArtifactType, offset, limit uint64, direction *string) ([]*dbmodels.RoomArtifact, int64, error) {
 	var artifacts []*dbmodels.RoomArtifact
 	var total int64
 
 	tx := s.db.Model(&dbmodels.RoomArtifact{})
 
-	if len(roomIds) > 0 {
+	if roomSid != nil {
+		isRunning := 0
+		roomInfo, err := s.GetRoomInfoBySid(*roomSid, &isRunning)
+		if err != nil {
+			return nil, 0, err
+		}
+		if roomInfo == nil {
+			return nil, 0, fmt.Errorf("room not found with sid: %s", *roomSid)
+		}
+		tx.Where("room_table_id = ?", roomInfo.ID)
+	} else if len(roomIds) > 0 {
 		tx.Where("room_id IN ?", roomIds)
 	}
+
 	if artifactType != nil {
 		tx.Where("type = ?", *artifactType)
 	}
@@ -71,4 +83,21 @@ func (s *DatabaseService) GetRoomArtifactByArtifactID(artifactID string) (*dbmod
 	}
 
 	return &artifact, nil
+}
+
+func (s *DatabaseService) GetRoomArtifactDetails(artifactID string) (*dbmodels.RoomArtifact, *dbmodels.RoomInfo, error) {
+	artifact, err := s.GetRoomArtifactByArtifactID(artifactID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if artifact == nil {
+		return nil, nil, fmt.Errorf("artifact not found with ID: %s", artifactID)
+	}
+
+	roomInfo, err := s.GetRoomInfoByTableId(artifact.RoomTableID)
+	if err != nil {
+		// it should not happen but we're fine
+	}
+
+	return artifact, roomInfo, nil
 }
