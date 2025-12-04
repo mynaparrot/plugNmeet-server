@@ -200,29 +200,31 @@ func (fc *FileController) HandleGetRoomFilesByType(c *fiber.Ctx) error {
 // HandleGetClientFiles gets the client CSS and JS files.
 // this also depends on config's readClientFiles method
 func (fc *FileController) HandleGetClientFiles(c *fiber.Ctx) error {
-	var css, js []string
+	var cssFiles, jsFiles []string
 
 	if fc.AppConfig.Client.Debug {
 		var err error
-		css, err = utils.GetFilesFromDir(fc.AppConfig.Client.Path+"/assets/css", ".css", "des")
+		cssFiles, err = utils.GetFilesFromDir(fc.AppConfig.Client.Path+"/assets/css", ".css", "des")
 		if err != nil {
 			fc.logger.WithError(err).Errorln("error getting css files")
 		}
 
-		js, err = utils.GetFilesFromDir(fc.AppConfig.Client.Path+"/assets/js", ".js", "asc")
+		jsFiles, err = utils.GetFilesFromDir(fc.AppConfig.Client.Path+"/assets/js", ".js", "asc")
 		if err != nil {
 			fc.logger.WithError(err).Errorln("error getting js files")
 		}
 	} else {
-		css = fc.AppConfig.ClientFiles["css"]
-		js = fc.AppConfig.ClientFiles["js"]
+		cssFiles = fc.AppConfig.ClientFiles["css"]
+		jsFiles = fc.AppConfig.ClientFiles["js"]
 	}
 
 	return utils.SendProtoJsonResponse(c, &plugnmeet.GetClientFilesRes{
-		Status: true,
-		Msg:    "success",
-		Css:    css,
-		Js:     js,
+		Status:   true,
+		Msg:      "success",
+		Css:      cssFiles,
+		Js:       jsFiles,
+		JsFiles:  jsFiles,
+		CssFiles: cssFiles,
 	})
 }
 
