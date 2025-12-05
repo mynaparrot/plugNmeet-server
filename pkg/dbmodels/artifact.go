@@ -49,13 +49,15 @@ func (t *RoomArtifactType) Scan(value interface{}) error {
 }
 
 type RoomArtifact struct {
-	ID          uint64           `gorm:"primarykey"`
-	ArtifactId  string           `gorm:"column:artifact_id;not null;uniqueIndex"`
-	RoomTableID uint64           `gorm:"column:room_table_id;not null;index"`
-	RoomId      string           `gorm:"column:room_id;not null;index"`
-	Type        RoomArtifactType `gorm:"column:type;type:varchar(100);not null;index"`
+	ID          uint64           `gorm:"column:id;primaryKey;autoIncrement"`
+	ArtifactId  string           `gorm:"column:artifact_id;type:varchar(64);not null;uniqueIndex:idx_artifact_id"`
+	RoomTableID uint64           `gorm:"column:room_table_id;type:int(11);not null"`
+	RoomId      string           `gorm:"column:room_id;type:varchar(255);not null;index:idx_room_id"`
+	Type        RoomArtifactType `gorm:"column:type;type:varchar(100);not null;index:idx_type"`
 	Metadata    string           `gorm:"column:metadata;type:json"`
-	Created     time.Time        `gorm:"column:created;not null;autoCreateTime"`
+	Created     time.Time        `gorm:"column:created;type:datetime;not null;autoCreateTime"`
+
+	RoomInfo RoomInfo `gorm:"foreignKey:room_table_id;references:id;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT"`
 }
 
 func (t *RoomArtifact) TableName() string {
