@@ -188,7 +188,7 @@ func (m *RoomModel) FetchPastRooms(r *plugnmeet.FetchPastRoomsReq) (*plugnmeet.F
 			Ended:              rr.Ended.Format(time.RFC3339),
 		}
 		if an, err := m.ds.GetAnalyticByRoomTableId(rr.ID); err == nil && an != nil {
-			room.AnalyticsFileId = &an.FileID
+			room.AnalyticsFileId = &an.ArtifactId
 		}
 		list = append(list, room)
 	}

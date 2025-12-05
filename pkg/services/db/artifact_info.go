@@ -32,7 +32,8 @@ func (s *DatabaseService) GetArtifacts(roomIds []string, roomSid *string, artifa
 	}
 
 	if artifactType != nil {
-		tx.Where("type = ?", *artifactType)
+		// Convert the enum to its string name for the query
+		tx.Where("type = ?", plugnmeet.RoomArtifactType_name[int32(*artifactType)])
 	}
 
 	// Get the total count before applying limit and offset
@@ -100,4 +101,22 @@ func (s *DatabaseService) GetRoomArtifactDetails(artifactID string) (*dbmodels.R
 	}
 
 	return artifact, roomInfo, nil
+}
+
+func (s *DatabaseService) GetAnalyticByRoomTableId(roomTableId uint64) (*dbmodels.RoomArtifact, error) {
+	artifact := new(dbmodels.RoomArtifact)
+	cond := &dbmodels.RoomArtifact{
+		RoomTableID: roomTableId,
+		Type:        dbmodels.RoomArtifactType(plugnmeet.RoomArtifactType_MEETING_ANALYTICS),
+	}
+
+	result := s.db.Where(cond).Take(artifact)
+	switch {
+	case errors.Is(result.Error, gorm.ErrRecordNotFound):
+		return nil, nil
+	case result.Error != nil:
+		return nil, result.Error
+	}
+
+	return artifact, nil
 }

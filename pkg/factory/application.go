@@ -37,10 +37,11 @@ type ApplicationControllers struct {
 
 // Application is the root struct holding all dependencies.
 type Application struct {
-	Controllers  *ApplicationControllers
-	AppConfig    *config.AppConfig
-	Ctx          context.Context
-	janitorModel *models.JanitorModel
+	Controllers   *ApplicationControllers
+	AppConfig     *config.AppConfig
+	Ctx           context.Context
+	janitorModel  *models.JanitorModel
+	artifactModel *models.ArtifactModel
 }
 
 func (a *Application) Boot() {
@@ -55,6 +56,10 @@ func (a *Application) Boot() {
 
 	a.Controllers.InsightsController.StartSubscription()
 	go a.janitorModel.StartJanitor()
+
+	// to migrate old analytics to new artifact
+	// will be removed in the future
+	go a.artifactModel.MigrateAnalyticsToArtifacts()
 }
 
 func (a *Application) Shutdown() {

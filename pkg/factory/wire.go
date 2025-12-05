@@ -38,10 +38,18 @@ func provideBreakoutRoomModel(rm *models.RoomModel, natsService *natsservice.Nat
 	return bm
 }
 
+func provideArtifactModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, redisService *redisservice.RedisService, natsService *natsservice.NatsService, webhookNotifier *helpers.WebhookNotifier, analyticsModel *models.AnalyticsModel) *models.ArtifactModel {
+	// create the artifact model, which requires analyticsModel
+	artifactModel := models.NewArtifactModel(ctx, app, ds, redisService, natsService, webhookNotifier, analyticsModel)
+	// now complete the circular dependency by setting artifactModel on analyticsModel
+	analyticsModel.SetArtifactModel(artifactModel)
+	return artifactModel
+}
+
 // build the dependency set for models
 var modelSet = wire.NewSet(
 	models.NewAnalyticsModel,
-	models.NewArtifactModel,
+	provideArtifactModel,
 	models.NewAuthModel,
 	models.NewInsightsModel,
 	models.NewBBBApiWrapperModel,

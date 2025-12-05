@@ -182,10 +182,6 @@ shared_notepad:
 
 analytics_settings:
   enabled: true
-  # If multiple plugNmeet servers are used, ensure all can access this directory.
-  # Otherwise, file retrieval may fail. This path can be an NFS or other network-accessible location.
-  files_store_path: ./analytics
-  token_validity: 30m
 
 artifacts_settings:
   # The root path where all generated artifacts (summaries, etc.) will be stored.

@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS `pnm_room_analytics` (
 
 CREATE TABLE IF NOT EXISTS `pnm_room_artifacts` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `artifact_id` VARCHAR(36) NOT NULL,
+  `artifact_id` VARCHAR(64) NOT NULL,
   `room_table_id` INT(11) NOT NULL,
   `room_id` VARCHAR(255) NOT NULL,
   `type` VARCHAR(100) NOT NULL,

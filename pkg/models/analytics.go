@@ -24,6 +24,7 @@ type AnalyticsModel struct {
 	natsService     *natsservice.NatsService
 	webhookNotifier *helpers.WebhookNotifier
 	logger          *logrus.Entry
+	artifactModel   *ArtifactModel
 }
 
 func NewAnalyticsModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, webhookNotifier *helpers.WebhookNotifier, logger *logrus.Logger) *AnalyticsModel {
@@ -36,4 +37,10 @@ func NewAnalyticsModel(ctx context.Context, app *config.AppConfig, ds *dbservice
 		webhookNotifier: webhookNotifier,
 		logger:          logger.WithField("model", "analytics"),
 	}
+}
+
+// SetArtifactModel sets the ArtifactModel to resolve the circular dependency.
+// This will be called by the dependency injector.
+func (m *AnalyticsModel) SetArtifactModel(am *ArtifactModel) {
+	m.artifactModel = am
 }
