@@ -44,13 +44,19 @@ func NewMeetingSummarizingTask(ctx context.Context, appConf *config.AppConfig, s
 
 // RunAudioStream now correctly handles the per-participant context.
 func (t *MeetingSummarizingTask) RunAudioStream(participantCtx context.Context, audioStream <-chan lkMedia.PCM16Sample, roomTableId uint64, roomId, userId string, options []byte) error {
+	log := t.logger.WithFields(logrus.Fields{
+		"method":      "RunAudioStream",
+		"roomId":      roomId,
+		"roomTableId": roomTableId,
+	})
+
 	var initErr error
 	t.initOnce.Do(func() {
 		outputDir := filepath.Join(*t.appConf.ArtifactsSettings.StoragePath, strings.ToLower(plugnmeet.RoomArtifactType_MEETING_SUMMARY.String()), roomId)
 
 		if err := os.MkdirAll(outputDir, 0755); err != nil {
 			initErr = fmt.Errorf("failed to create output directory: %w", err)
-			t.logger.Error(initErr)
+			log.Error(initErr)
 			return
 		}
 
@@ -60,7 +66,7 @@ func (t *MeetingSummarizingTask) RunAudioStream(participantCtx context.Context, 
 		file, err := os.Create(outputFile)
 		if err != nil {
 			initErr = fmt.Errorf("failed to create output file: %w", err)
-			t.logger.Error(initErr)
+			log.Error(initErr)
 			return
 		}
 
@@ -69,7 +75,7 @@ func (t *MeetingSummarizingTask) RunAudioStream(participantCtx context.Context, 
 		})
 		if err != nil {
 			initErr = fmt.Errorf("failed to create WAV file writer: %w", err)
-			t.logger.Error(initErr)
+			log.Error(initErr)
 			return
 		}
 		t.writer = writer
@@ -77,22 +83,22 @@ func (t *MeetingSummarizingTask) RunAudioStream(participantCtx context.Context, 
 		newMixer, err := mixer.NewMixer(writer, rtp.DefFrameDur, nil, 1, mixer.DefaultInputBufferFrames)
 		if err != nil {
 			initErr = fmt.Errorf("failed to create newMixer: %w", err)
-			t.logger.Error(initErr)
+			log.Error(initErr)
 			return
 		}
 
 		t.mixer = newMixer
-		t.logger.Infof("newMixer initialized, writing to %s", outputFile)
+		log.Infof("newMixer initialized, writing to %s", outputFile)
 
 		// This goroutine listens for the AGENT's shutdown signal.
 		go func() {
 			<-t.ctx.Done() // Use the main agent context here.
 			if t.mixer != nil {
-				t.logger.Infoln("stopping mixer")
+				log.Infoln("stopping mixer")
 				t.mixer.Stop()
 				err := t.writer.Close()
 				if err != nil {
-					t.logger.WithError(err).Error("failed to close writer")
+					log.WithError(err).Error("failed to close writer")
 				}
 			}
 		}()
@@ -111,23 +117,19 @@ func (t *MeetingSummarizingTask) RunAudioStream(participantCtx context.Context, 
 	}
 	defer t.mixer.RemoveInput(input)
 
-	log := t.logger.WithFields(logrus.Fields{
-		"roomId": roomId,
-		"userId": userId,
-	})
-	log.Info("starting audio stream for user")
+	log.Infof("starting audio stream for user '%s'", userId)
 
 	for {
 		select {
 		case <-participantCtx.Done(): // per-participant context here.
-			log.Info("stopping audio stream for user")
+			log.Infof("stopping audio stream for user '%s'", userId)
 			return nil
 		case pcmSample, ok := <-audioStream:
 			if !ok {
 				return nil
 			}
 			if err := input.WriteSample(pcmSample); err != nil {
-				log.WithError(err).Error("failed to write sample to mixer")
+				log.WithError(err).Errorf("failed to write sample to mixer for user '%s'", userId)
 			}
 		}
 	}
@@ -136,7 +138,12 @@ func (t *MeetingSummarizingTask) RunAudioStream(participantCtx context.Context, 
 // doRoomSummarizing will be called when the file is closed.
 // It publishes a job to the NATS queue for a worker to process.
 func (t *MeetingSummarizingTask) doRoomSummarizing(roomTableId uint64, roomId, filePath string, options []byte) {
-	t.logger.Infof("file writing finished for %s. publishing summarization job.", filePath)
+	log := t.logger.WithFields(logrus.Fields{
+		"method":      "doRoomSummarizing",
+		"roomId":      roomId,
+		"roomTableId": roomTableId,
+	})
+	log.Infof("file writing finished for %s. publishing summarization job.", filePath)
 
 	payload := insights.SummarizeJobPayload{
 		RoomTableId: roomTableId,
@@ -146,14 +153,14 @@ func (t *MeetingSummarizingTask) doRoomSummarizing(roomTableId uint64, roomId, f
 	}
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
-		t.logger.WithError(err).Error("failed to marshal summarization job payload")
+		log.WithError(err).Error("failed to marshal summarization job payload")
 		return
 	}
 
 	// Publish to the NATS queue.
 	err = t.appConf.NatsConn.Publish(insights.SummarizeJobQueue, payloadBytes)
 	if err != nil {
-		t.logger.WithError(err).Error("failed to publish summarization job")
+		log.WithError(err).Error("failed to publish summarization job")
 	}
 }
 

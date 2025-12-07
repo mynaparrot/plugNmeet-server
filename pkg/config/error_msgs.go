@@ -1,5 +1,7 @@
 package config
 
+import "errors"
+
 const (
 	RequestedRoomNotExist            = "requested room does not exist"
 	OnlyAdminCanRequest              = "only admin can send this request"
@@ -12,3 +14,5 @@ const (
 	VerificationFailed               = "verification failed"
 	UserIdOrEmailRequired            = "either value of user_id or lis_person_contact_email_primary  required"
 )
+
+var NoOnlineUserFound = errors.New("no online user found")

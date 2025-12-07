@@ -18,7 +18,7 @@ func (m *RecordingModel) FetchRecordings(r *plugnmeet.FetchRecordingsReq) (*plug
 		r.OrderBy = "DESC"
 	}
 
-	data, total, err := m.ds.GetRecordings(r.RoomIds, uint64(r.From), uint64(r.Limit), &r.OrderBy)
+	data, total, err := m.ds.GetRecordings(r.RoomIds, r.RoomSid, uint64(r.From), uint64(r.Limit), &r.OrderBy)
 	if err != nil {
 		return nil, err
 	}

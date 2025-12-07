@@ -33,7 +33,7 @@ func (s *DatabaseService) GetArtifacts(roomIds []string, roomSid *string, artifa
 
 	if artifactType != nil {
 		// Convert the enum to its string name for the query
-		tx.Where("type = ?", plugnmeet.RoomArtifactType_name[int32(*artifactType)])
+		tx.Where("type = ?", artifactType.String())
 	}
 
 	// Get the total count before applying limit and offset
@@ -46,22 +46,18 @@ func (s *DatabaseService) GetArtifacts(roomIds []string, roomSid *string, artifa
 		return artifacts, 0, nil
 	}
 
-	if direction != nil && (*direction == "ASC" || *direction == "DESC") {
-		tx.Order("id " + *direction)
-	} else {
-		tx.Order("id DESC")
+	if limit == 0 {
+		limit = 20
 	}
 
-	if limit > 0 {
-		tx.Limit(int(limit))
-	}
-	if offset > 0 {
-		tx.Offset(int(offset))
+	orderBy := "DESC"
+	if direction != nil && *direction == "ASC" {
+		orderBy = "ASC"
 	}
 
-	err = tx.Find(&artifacts).Error
-	if err != nil {
-		return nil, 0, err
+	result := tx.Offset(int(offset)).Limit(int(limit)).Order("id " + orderBy).Find(&artifacts)
+	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return nil, 0, result.Error
 	}
 
 	return artifacts, total, nil

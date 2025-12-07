@@ -22,7 +22,7 @@ func (t RoomArtifactType) Value() (driver.Value, error) {
 	return s, nil
 }
 
-func (t RoomArtifactType) ToString() string {
+func (t RoomArtifactType) String() string {
 	return plugnmeet.RoomArtifactType_name[int32(t)]
 }
 
@@ -55,7 +55,7 @@ type RoomArtifact struct {
 	RoomId      string           `gorm:"column:room_id;type:varchar(255);not null;index:idx_room_id"`
 	Type        RoomArtifactType `gorm:"column:type;type:varchar(100);not null;index:idx_type"`
 	Metadata    string           `gorm:"column:metadata;type:json"`
-	Created     time.Time        `gorm:"column:created;type:datetime;not null;autoCreateTime"`
+	Created     time.Time        `gorm:"column:created;type:datetime;not null;default:current_timestamp();autoCreateTime"`
 
 	RoomInfo RoomInfo `gorm:"foreignKey:room_table_id;references:id;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT"`
 }

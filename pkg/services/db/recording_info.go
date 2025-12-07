@@ -7,17 +7,24 @@ import (
 	"gorm.io/gorm"
 )
 
-func (s *DatabaseService) GetRecordings(roomIds []string, offset, limit uint64, direction *string) ([]dbmodels.Recording, int64, error) {
+func (s *DatabaseService) GetRecordings(roomIds []string, roomSid *string, offset, limit uint64, direction *string) ([]dbmodels.Recording, int64, error) {
 	var recordings []dbmodels.Recording
 	var total int64
 
 	d := s.db.Model(&dbmodels.Recording{})
-	if len(roomIds) > 0 {
+
+	if roomSid != nil {
+		d.Where("room_sid = ?", *roomSid)
+	} else if len(roomIds) > 0 {
 		d.Where("room_id IN ?", roomIds)
 	}
 
 	if err := d.Count(&total).Error; err != nil {
 		return nil, 0, err
+	}
+
+	if total == 0 {
+		return recordings, 0, nil
 	}
 
 	if limit == 0 {

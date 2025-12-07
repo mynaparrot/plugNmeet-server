@@ -87,7 +87,7 @@ func NewRoomAgent(ctx context.Context, appConf *config.AppConfig, serviceConfig 
 
 	c := &plugnmeet.PlugNmeetTokenClaims{
 		RoomId:   payload.RoomId,
-		UserId:   fmt.Sprintf("%s%s_%s", config.AgentUserUserIdPrefix, payload.ServiceType, uuid.NewString()),
+		UserId:   fmt.Sprintf("%s%s-%s", config.AgentUserUserIdPrefix, payload.ServiceType, uuid.NewString()),
 		IsAdmin:  true,
 		IsHidden: payload.HiddenAgent,
 	}

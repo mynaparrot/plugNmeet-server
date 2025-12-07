@@ -20,7 +20,7 @@ type RoomInfo struct {
 	WebhookUrl         string    `gorm:"column:webhook_url;type:varchar(255);not null;default:''"`
 	IsBreakoutRoom     int       `gorm:"column:is_breakout_room;type:int(1);not null;default:0"`
 	ParentRoomID       string    `gorm:"column:parent_room_id;type:varchar(64);not null;default:''"`
-	CreationTime       int64     `gorm:"column:creation_time;type:int(10);not null;default:0"`
+	CreationTime       int64     `gorm:"column:creation_time;type:int(10);not null;autoCreateTime"`
 	Created            time.Time `gorm:"column:created;type:datetime;not null;default:current_timestamp()"`
 	Ended              time.Time `gorm:"column:ended;type:datetime;not null;default:'0000-00-00 00:00:00'"`
 	Modified           time.Time `gorm:"column:modified;type:datetime;not null;default:'0000-00-00 00:00:00';autoUpdateTime"`

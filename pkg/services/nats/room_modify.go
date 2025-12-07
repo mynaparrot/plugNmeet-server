@@ -148,19 +148,9 @@ func (s *NatsService) UpdateRoomStatus(roomId string, status string) error {
 
 // OnAfterSessionEndCleanup performs cleanup after a session ends
 func (s *NatsService) OnAfterSessionEndCleanup(roomId string) {
-	if err := s.DeleteRoom(roomId); err != nil {
-		s.logger.WithError(err).Errorf("failed to delete room %s with error", roomId)
-	}
-
-	if err := s.DeleteAllRoomUsersWithConsumer(roomId); err != nil {
-		s.logger.WithError(err).Errorf("failed to delete room %s users", roomId)
-	}
-
-	if err := s.DeleteRoomNatsStream(roomId); err != nil {
-		s.logger.WithError(err).Errorf("failed to delete room %s", roomId)
-	}
-
-	if err := s.DeleteAllRoomFiles(roomId); err != nil {
-		s.logger.WithError(err).Errorf("failed to delete room %s files bucket", roomId)
-	}
+	// silently delete everything without log
+	_ = s.DeleteRoom(roomId)
+	_ = s.DeleteAllRoomUsersWithConsumer(roomId)
+	_ = s.DeleteRoomNatsStream(roomId)
+	_ = s.DeleteAllRoomFiles(roomId)
 }

@@ -119,9 +119,9 @@ type AzureSubscriptionKey struct {
 }
 
 type AnalyticsSettings struct {
-	Enabled        bool           `yaml:"enabled"`
-	FilesStorePath *string        `yaml:"files_store_path"`
-	TokenValidity  *time.Duration `yaml:"token_validity"`
+	Enabled bool `yaml:"enabled"`
+	// Deprecated: Use ArtifactsSettings instead.
+	FilesStorePath *string `yaml:"files_store_path"`
 }
 
 type ArtifactsSettings struct {
@@ -223,23 +223,10 @@ func New(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 
 	// set default values
 	if appCnf.AnalyticsSettings != nil {
+		//TODO: deprecated, will remove in future
 		if appCnf.AnalyticsSettings.FilesStorePath == nil {
 			p := "./analytics"
 			appCnf.AnalyticsSettings.FilesStorePath = &p
-			d := time.Minute * 30
-			appCnf.AnalyticsSettings.TokenValidity = &d
-		}
-
-		p := *appCnf.AnalyticsSettings.FilesStorePath
-		if strings.HasPrefix(p, "./") {
-			p = filepath.Join(appCnf.RootWorkingDir, p)
-		}
-
-		if _, err := os.Stat(p); os.IsNotExist(err) {
-			err = os.MkdirAll(p, os.ModePerm)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create analytics directory %s: %w", p, err)
-			}
 		}
 	}
 

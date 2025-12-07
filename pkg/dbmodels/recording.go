@@ -1,7 +1,7 @@
 package dbmodels
 
 import (
-	"database/sql" // Added import for sql.NullString
+	"database/sql"
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -16,7 +16,7 @@ type Recording struct {
 	FilePath         string         `gorm:"column:file_path;type:varchar(255);not null"`
 	Size             float64        `gorm:"column:size;type:double;not null"`
 	Published        int64          `gorm:"column:published;type:int(1);not null;default:1"`
-	CreationTime     int64          `gorm:"column:creation_time;type:int(10);not null;default:0"`
+	CreationTime     int64          `gorm:"column:creation_time;type:int(10);not null;autoCreateTime"`
 	RoomCreationTime int64          `gorm:"column:room_creation_time;type:int(10);not null;default:0"`
 	Created          time.Time      `gorm:"column:created;type:datetime;not null;default:current_timestamp()"`
 	Modified         time.Time      `gorm:"column:modified;type:datetime;not null;default:'0000-00-00 00:00:00';autoUpdateTime"`

@@ -101,7 +101,7 @@ func (m *ArtifactModel) generateToken(filePath string) (string, error) {
 	cl := jwt.Claims{
 		Issuer:    m.app.Client.ApiKey,
 		NotBefore: jwt.NewNumericDate(time.Now().UTC()),
-		Expiry:    jwt.NewNumericDate(time.Now().UTC().Add(*m.app.AnalyticsSettings.TokenValidity)),
+		Expiry:    jwt.NewNumericDate(time.Now().UTC().Add(*m.app.ArtifactsSettings.TokenValidity)),
 		Subject:   filePath,
 	}
 
@@ -119,7 +119,7 @@ func (m *ArtifactModel) GetArtifactDownloadToken(req *plugnmeet.GetArtifactDownl
 	}
 
 	if !m.isDownloadable(plugnmeet.RoomArtifactType(artifact.Type)) {
-		return "", fmt.Errorf("'%s' artifact type is not downloadable", artifact.Type.ToString())
+		return "", fmt.Errorf("'%s' artifact type is not downloadable", artifact.Type)
 	}
 
 	var metadata plugnmeet.RoomArtifactMetadata
@@ -177,7 +177,7 @@ func (m *ArtifactModel) DeleteArtifact(req *plugnmeet.DeleteArtifactReq) error {
 
 	// Check if the artifact type is deletable.
 	if !m.ds.IsAllowToDeleteArtifact(plugnmeet.RoomArtifactType(artifact.Type)) {
-		return fmt.Errorf("deleting '%s' artifact type is not allowed", artifact.Type.ToString())
+		return fmt.Errorf("deleting '%s' artifact type is not allowed", artifact.Type)
 	}
 
 	var metadata plugnmeet.RoomArtifactMetadata
