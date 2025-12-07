@@ -29,16 +29,17 @@ type AppConfig struct {
 	JetStream   jetstream.JetStream
 	ClientFiles map[string][]string
 
-	RootWorkingDir               string
-	Client                       ClientInfo                   `yaml:"client"`
-	RoomDefaultSettings          *utils.RoomDefaultSettings   `yaml:"room_default_settings"`
-	LogSettings                  logging.LogSettings          `yaml:"log_settings"`
-	LivekitInfo                  LivekitInfo                  `yaml:"livekit_info"`
-	RedisInfo                    RedisInfo                    `yaml:"redis_info"`
-	DatabaseInfo                 DatabaseInfo                 `yaml:"database_info"`
-	UploadFileSettings           UploadFileSettings           `yaml:"upload_file_settings"`
-	RecorderInfo                 RecorderInfo                 `yaml:"recorder_info"`
-	SharedNotePad                SharedNotePad                `yaml:"shared_notepad"`
+	RootWorkingDir      string
+	Client              ClientInfo                 `yaml:"client"`
+	RoomDefaultSettings *utils.RoomDefaultSettings `yaml:"room_default_settings"`
+	LogSettings         logging.LogSettings        `yaml:"log_settings"`
+	LivekitInfo         LivekitInfo                `yaml:"livekit_info"`
+	RedisInfo           RedisInfo                  `yaml:"redis_info"`
+	DatabaseInfo        DatabaseInfo               `yaml:"database_info"`
+	UploadFileSettings  UploadFileSettings         `yaml:"upload_file_settings"`
+	RecorderInfo        RecorderInfo               `yaml:"recorder_info"`
+	SharedNotePad       SharedNotePad              `yaml:"shared_notepad"`
+	//deprecated: use insights features
 	AzureCognitiveServicesSpeech AzureCognitiveServicesSpeech `yaml:"azure_cognitive_services_speech"`
 	AnalyticsSettings            *AnalyticsSettings           `yaml:"analytics_settings"`
 	ArtifactsSettings            *ArtifactsSettings           `yaml:"artifacts_settings"`
