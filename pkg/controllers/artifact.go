@@ -80,12 +80,12 @@ func (ac *ArtifactController) HandleDownloadArtifact(c *fiber.Ctx) error {
 }
 
 func (ac *ArtifactController) HandleGetArtifactInfo(c *fiber.Ctx) error {
-	req := new(plugnmeet.ArtifactDetailsReq)
+	req := new(plugnmeet.ArtifactInfoReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	res, err := ac.ArtifactModel.GetArtifactDetails(req.ArtifactId)
+	res, err := ac.ArtifactModel.GetArtifactInfoByArtifactId(req.ArtifactId)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}

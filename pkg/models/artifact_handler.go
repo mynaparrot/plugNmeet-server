@@ -51,7 +51,7 @@ func (m *ArtifactModel) FetchArtifacts(req *plugnmeet.FetchArtifactsReq) (*plugn
 	return result, nil
 }
 
-func (m *ArtifactModel) GetArtifactDetails(artifactId string) (*plugnmeet.ArtifactDetailsRes, error) {
+func (m *ArtifactModel) GetArtifactInfoByArtifactId(artifactId string) (*plugnmeet.ArtifactInfoRes, error) {
 	dbArtifact, roomInfo, err := m.ds.GetRoomArtifactDetails(artifactId)
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func (m *ArtifactModel) GetArtifactDetails(artifactId string) (*plugnmeet.Artifa
 		return nil, err
 	}
 
-	res := &plugnmeet.ArtifactDetailsRes{
+	res := &plugnmeet.ArtifactInfoRes{
 		Status: true,
 		Msg:    "success",
 		ArtifactInfo: &plugnmeet.ArtifactInfo{
