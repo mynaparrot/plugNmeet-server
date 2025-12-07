@@ -69,7 +69,7 @@ func (m *ArtifactModel) CreateAnalyticsArtifact(roomTableId uint64, jsonData []b
 }
 
 //-- Migration logic here--
-// will remove in future
+// TODO: will remove in future
 
 // copyFile performs a copy of a file from a source to a destination.
 func copyFile(src, dst string) error {

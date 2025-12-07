@@ -51,6 +51,8 @@ func (m *AnalyticsModel) SetArtifactModel(am *ArtifactModel) {
 	m.artifactModel = am
 }
 
+// insertEventData stores an analytics event in Redis based on its type.
+// It uses HSET for events with timestamps and INCRBY or SET for simpler counter or string values.
 func (m *AnalyticsModel) insertEventData(d *plugnmeet.AnalyticsDataMsg, key string) {
 	if d.EventValueInteger == nil && d.EventValueString == nil {
 		// so this will be HSET type
@@ -89,6 +91,8 @@ func (m *AnalyticsModel) insertEventData(d *plugnmeet.AnalyticsDataMsg, key stri
 	}
 }
 
+// handleFirstTimeUserJoined records a user's information in Redis the first time they join.
+// It also triggers the insertion of the user_joined event.
 func (m *AnalyticsModel) handleFirstTimeUserJoined(d *plugnmeet.AnalyticsDataMsg, key string) {
 	umeta := new(plugnmeet.UserMetadata)
 	// Use getter for safety and log potential errors.
@@ -131,6 +135,8 @@ func (m *AnalyticsModel) handleFirstTimeUserJoined(d *plugnmeet.AnalyticsDataMsg
 	m.insertEventData(d, userEventKey)
 }
 
+// HandleEvent is the main entry point for processing incoming analytics events.
+// It sets the event timestamp and routes the event to the appropriate handler based on its type.
 func (m *AnalyticsModel) HandleEvent(d *plugnmeet.AnalyticsDataMsg) {
 	if m.app.AnalyticsSettings == nil ||
 		!m.app.AnalyticsSettings.Enabled {
@@ -147,6 +153,7 @@ func (m *AnalyticsModel) HandleEvent(d *plugnmeet.AnalyticsDataMsg) {
 	}
 }
 
+// handleRoomTypeEvents processes events that are scoped to a room.
 func (m *AnalyticsModel) handleRoomTypeEvents(d *plugnmeet.AnalyticsDataMsg) {
 	if d.EventName == plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_UNKNOWN {
 		return
@@ -162,6 +169,7 @@ func (m *AnalyticsModel) handleRoomTypeEvents(d *plugnmeet.AnalyticsDataMsg) {
 	}
 }
 
+// handleUserTypeEvents processes events that are scoped to a specific user within a room.
 func (m *AnalyticsModel) handleUserTypeEvents(d *plugnmeet.AnalyticsDataMsg) {
 	if d.EventName == plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_UNKNOWN {
 		return
@@ -170,6 +178,9 @@ func (m *AnalyticsModel) handleUserTypeEvents(d *plugnmeet.AnalyticsDataMsg) {
 	m.insertEventData(d, key)
 }
 
+// FetchAnalytics retrieves a paginated list of analytics files.
+// Deprecated: For backward compatibility, it fetches data from both the new artifacts system
+// and the old analytics table, then merges and sorts the results.
 func (m *AnalyticsModel) FetchAnalytics(r *plugnmeet.FetchAnalyticsReq) (*plugnmeet.FetchAnalyticsResult, error) {
 	if r.Limit <= 0 {
 		r.Limit = 20

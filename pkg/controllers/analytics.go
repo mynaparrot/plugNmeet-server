@@ -49,6 +49,7 @@ func validateRequest(msg proto.Message) error {
 }
 
 // HandleFetchAnalytics fetches analytics data.
+// Deprecated: only for backward compatibility
 func (ac *AnalyticsController) HandleFetchAnalytics(c *fiber.Ctx) error {
 	req := new(plugnmeet.FetchAnalyticsReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
@@ -72,6 +73,7 @@ func (ac *AnalyticsController) HandleFetchAnalytics(c *fiber.Ctx) error {
 }
 
 // HandleDeleteAnalytics deletes analytics data.
+// Deprecated: only for backward compatibility
 func (ac *AnalyticsController) HandleDeleteAnalytics(c *fiber.Ctx) error {
 	req := new(plugnmeet.DeleteAnalyticsReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
@@ -90,6 +92,7 @@ func (ac *AnalyticsController) HandleDeleteAnalytics(c *fiber.Ctx) error {
 }
 
 // HandleGetAnalyticsDownloadToken generates a download token for analytics.
+// Deprecated: only for backward compatibility
 func (ac *AnalyticsController) HandleGetAnalyticsDownloadToken(c *fiber.Ctx) error {
 	req := new(plugnmeet.GetAnalyticsDownloadTokenReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
@@ -113,6 +116,7 @@ func (ac *AnalyticsController) HandleGetAnalyticsDownloadToken(c *fiber.Ctx) err
 }
 
 // HandleDownloadAnalytics handles the download of an analytics file.
+// Deprecated: only for backward compatibility
 func (ac *AnalyticsController) HandleDownloadAnalytics(c *fiber.Ctx) error {
 	token := c.Params("token")
 	if len(token) == 0 {
