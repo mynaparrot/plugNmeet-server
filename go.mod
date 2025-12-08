@@ -2,8 +2,6 @@ module github.com/mynaparrot/plugnmeet-server
 
 go 1.25.1
 
-replace github.com/mynaparrot/plugnmeet-protocol => ../protocol
-
 require (
 	buf.build/go/protovalidate v1.0.0
 	github.com/Microsoft/cognitive-services-speech-sdk-go v1.43.0
@@ -11,6 +9,7 @@ require (
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/gabriel-vasile/mimetype v1.4.11
 	github.com/go-jose/go-jose/v4 v4.1.3
+	github.com/go-sql-driver/mysql v1.9.3
 	github.com/goccy/go-json v0.10.5
 	github.com/gofiber/fiber/v2 v2.52.9
 	github.com/gofiber/template/html/v2 v2.1.3
@@ -20,7 +19,7 @@ require (
 	github.com/livekit/media-sdk v0.0.0-20251114100349-04e36dff48cc
 	github.com/livekit/protocol v1.43.0
 	github.com/livekit/server-sdk-go/v2 v2.12.8
-	github.com/mynaparrot/plugnmeet-protocol v1.0.16-0.20251102174458-b05bfab82689
+	github.com/mynaparrot/plugnmeet-protocol v1.0.16-0.20251207160802-476976b6ab5e
 	github.com/nats-io/jwt/v2 v2.8.0
 	github.com/nats-io/nats.go v1.47.0
 	github.com/nats-io/nkeys v0.4.11
@@ -64,7 +63,6 @@ require (
 	github.com/go-jose/go-jose/v3 v3.0.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/go-sql-driver/mysql v1.9.3 // indirect
 	github.com/gofiber/template v1.8.3 // indirect
 	github.com/gofiber/utils v1.1.0 // indirect
 	github.com/google/cel-go v0.26.1 // indirect
