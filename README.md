@@ -8,7 +8,7 @@ Have questions or ideas? [Join our developer community on Discord](https://disco
 
 ## Key Features
 
-*   **High-Performance & Scalable**: Built with Go and LiveKit, ensuring a robust system that can be distributed as a [single binary](https://github.com/mynaparrot/plugNmeet-server/releases).
+*   **High-Performance & Scalable**: Built with Go and LiveKit, ensuring a robust system that can be distributed as a single binary.
 *   **Adaptive Streaming**: **Simulcast** and **Dynacast** support ensures stable calls even on poor networks. Supported codecs include `H264`, `VP8`, `VP9`, and `AV1`.
 *   **Rich Collaboration Tools**: Engage users with HD audio/video, screen sharing, virtual backgrounds, a collaborative whiteboard with office file support (PDF, DOCX, PPTX), shared notepad, polls, and breakout rooms.
 *   **Secure Communication**: Features WebRTC-based encryption by default, with optional **End-to-End Encryption (E2EE)** for media and data channels (`Chromium 83+, Chrome, Edge, Safari, Firefox 117+`).
@@ -76,11 +76,7 @@ docker run --rm -p 8080:8080 \
     --config /config.yaml \
 ```
 
-You can also
-follow [docker-compose_sample.yaml](https://raw.githubusercontent.com/mynaparrot/plugNmeet-server/main/docker-compose_sample.yaml)
-file.
-
-You can manually download server from [release](https://github.com/mynaparrot/plugNmeet-server/releases) page too.
+You can also follow [docker-compose_sample.yaml](https://raw.githubusercontent.com/mynaparrot/plugNmeet-server/main/docker-compose_sample.yaml) file.
 
 ## Development
 

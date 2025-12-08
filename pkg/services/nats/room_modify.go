@@ -56,7 +56,6 @@ func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeo
 	if err != nil {
 		return fmt.Errorf("failed to marshal metadata: %w", err)
 	}
-	fmt.Println("mt=>>>", mt)
 
 	// Prepare room data
 	data := map[string]string{
