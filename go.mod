@@ -17,7 +17,7 @@ require (
 	github.com/google/wire v0.7.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/media-sdk v0.0.0-20251114100349-04e36dff48cc
-	github.com/livekit/protocol v1.43.0
+	github.com/livekit/protocol v1.43.4
 	github.com/livekit/server-sdk-go/v2 v2.12.8
 	github.com/mynaparrot/plugnmeet-protocol v1.0.16-0.20251207160802-476976b6ab5e
 	github.com/nats-io/jwt/v2 v2.8.0
@@ -126,7 +126,7 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	go.uber.org/zap/exp v0.3.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
-	golang.org/x/crypto v0.44.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/exp v0.0.0-20251113190631-e25ba8c21ef6 // indirect
 	golang.org/x/mod v0.30.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
