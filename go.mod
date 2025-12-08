@@ -22,7 +22,7 @@ require (
 	github.com/mynaparrot/plugnmeet-protocol v1.0.16-0.20251207160802-476976b6ab5e
 	github.com/nats-io/jwt/v2 v2.8.0
 	github.com/nats-io/nats.go v1.47.0
-	github.com/nats-io/nkeys v0.4.11
+	github.com/nats-io/nkeys v0.4.12
 	github.com/pion/webrtc/v4 v4.1.6
 	github.com/redis/go-redis/v9 v9.16.0
 	github.com/sirupsen/logrus v1.9.3
@@ -126,7 +126,7 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	go.uber.org/zap/exp v0.3.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
-	golang.org/x/crypto v0.44.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/exp v0.0.0-20251113190631-e25ba8c21ef6 // indirect
 	golang.org/x/mod v0.30.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
