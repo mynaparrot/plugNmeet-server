@@ -65,3 +65,5 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Run the entrypoint script, which sets up the environment and runs the binary
 ENTRYPOINT ["docker-entrypoint.sh"]
+# Add the CMD to be executed by the entrypoint
+CMD ["plugnmeet-server"]

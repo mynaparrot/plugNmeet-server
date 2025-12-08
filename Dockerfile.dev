@@ -22,13 +22,15 @@ RUN go install github.com/air-verse/air@latest
 
 ENV CGO_CFLAGS="-I$SPEECHSDK_ROOT/include/c_api"
 ENV CGO_LDFLAGS="-L$SPEECHSDK_ROOT/lib/x64 -lMicrosoft.CognitiveServices.Speech.core"
-# Set LD_LIBRARY_PATH in a way that is robust and linter-friendly.
-# This file will be sourced by the shell, correctly setting the path.
-RUN echo "export LD_LIBRARY_PATH=\"$SPEECHSDK_ROOT/lib/x64\${LD_LIBRARY_PATH:+:\$LD_LIBRARY_PATH}\"" > /etc/profile.d/speechsdk.sh
 
 #COPY . .
 COPY go.mod go.mod
 COPY go.sum go.sum
 RUN go mod download
 
+# Add the entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["air"]

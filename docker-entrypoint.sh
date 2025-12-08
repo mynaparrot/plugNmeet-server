@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # This script sets the correct Speech SDK library path based on the
-# architecture and then executes the main application.
+# architecture and then executes the command passed to it.
 
 set -e
 
@@ -16,4 +16,5 @@ esac
 
 export LD_LIBRARY_PATH="/opt/speechsdk/lib/${SPEECHSDK_ARCH_DIR}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 
-exec plugnmeet-server "$@"
+# Execute the command passed as arguments to the script.
+exec "$@"
