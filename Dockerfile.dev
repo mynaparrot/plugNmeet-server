@@ -1,6 +1,7 @@
 FROM golang:1.25
 
-ENV SPEECHSDK_ROOT="/root/speechsdk"
+# Align with production Dockerfile and entrypoint script
+ENV SPEECHSDK_ROOT="/opt/speechsdk"
 RUN mkdir -p $SPEECHSDK_ROOT && \
     wget -O SpeechSDK-Linux.tar.gz https://aka.ms/csspeech/linuxbinary && \
     tar --strip 1 -xzf SpeechSDK-Linux.tar.gz -C "$SPEECHSDK_ROOT" && \
@@ -21,6 +22,7 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
 RUN go install github.com/air-verse/air@latest
 
 ENV CGO_CFLAGS="-I$SPEECHSDK_ROOT/include/c_api"
+# Note: This assumes a dev architecture of x64. The entrypoint script is more robust for runtime.
 ENV CGO_LDFLAGS="-L$SPEECHSDK_ROOT/lib/x64 -lMicrosoft.CognitiveServices.Speech.core"
 
 #COPY . .

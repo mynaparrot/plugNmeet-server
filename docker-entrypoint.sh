@@ -1,7 +1,8 @@
 #!/bin/sh
 
 # This script sets the correct Speech SDK library path based on the
-# architecture and then executes the command passed to it.
+# architecture, updates the system's linker cache, and then executes
+# the command passed to it.
 
 set -e
 
@@ -14,7 +15,11 @@ case "$ARCH" in
     *) echo "FATAL: Unsupported architecture for Speech SDK: $ARCH"; exit 1 ;;
 esac
 
-export LD_LIBRARY_PATH="/opt/speechsdk/lib/${SPEECHSDK_ARCH_DIR}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+# Add the correct library path to a temporary ld.so.conf.d file
+echo "/opt/speechsdk/lib/${SPEECHSDK_ARCH_DIR}" > /etc/ld.so.conf.d/speechsdk.conf
+
+# Update the linker cache
+ldconfig
 
 # Execute the command passed as arguments to the script.
 exec "$@"
