@@ -1,6 +1,6 @@
 # Plug-N-Meet - A Scalable, Customizable, Open-Source Web Conferencing System
 
-Plug-N-Meet is a powerful, open-source web conferencing solution built on the high-performance WebRTC infrastructure of [LiveKit](https://github.com/livekit/livekit-server). Designed for scalability and easy customization, Plug-N-Meet allows you to seamlessly integrate a feature-rich, self-hosted video conferencing experience into any existing website, application, or system.
+Plug-N-Meet is a powerful, open-source web conferencing solution built on the high-performance WebRTC infrastructure of [LiveKit](https://github.com/livekit/livekit-server). Designed for scalability and easy customization, Plug-N-Meet allows you to seamlessly integrate a feature-rich, self-hosted, and AI-powered video conferencing experience into any existing website, application, or system.
 
 Have questions or ideas? [Join our developer community on Discord](https://discord.gg/2X2ZaCHu4C) to connect with the team and discuss your suggestions.
 
@@ -15,7 +15,7 @@ Have questions or ideas? [Join our developer community on Discord](https://disco
 *   **Flexible Integration**: Easily integrate with any website or system using our straightforward API and SDKs.
 *   **Deep Customization**: Easily customize the UI, features, branding, and URLs to match your application's look and feel.
 *   **Advanced Features**: Includes MP4 recording, RTMP broadcasting, RTMP/WHIP ingress, a customizable waiting room, and detailed participant analytics.
-*   **Accessibility**: Real-time speech-to-text and translation powered by Microsoft Azure.
+*   **AI Meeting Agent**: Turn your meetings into actionable intelligence. Our powerful AI agent provides live spoken translations, real-time transcription, automated summaries, **and many more...**
 *   **Cross-Device Compatibility**: Works on all modern browsers, including Chrome, Firefox, and Safari for iOS.
 
 And many more!
