@@ -1,12 +1,12 @@
 package natsservice
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -60,7 +60,7 @@ func (s *NatsService) BroadcastSystemEventToEveryoneExceptUserId(event plugnmeet
 		return err
 	}
 	if ids == nil || len(ids) == 0 {
-		return errors.New("no online user found")
+		return config.NoOnlineUserFound
 	}
 
 	for _, id := range ids {

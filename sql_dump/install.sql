@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS `pnm_recordings` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `record_id` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
   `room_id` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `room_sid` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `room_sid` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
   `recorder_id` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `file_path` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `size` double NOT NULL,
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS `pnm_recordings` (
   `created` datetime NOT NULL DEFAULT current_timestamp(),
   `modified` datetime NOT NULL DEFAULT '0000-00-00 00:00:00' ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
-  UNIQUE KEY `record_id` (`record_id`),
+  UNIQUE KEY `idx_record_id` (`record_id`),
   KEY `idx_room_id` (`room_id`),
   FOREIGN KEY (room_sid) REFERENCES `pnm_room_info` (sid)
      ON DELETE RESTRICT
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS `pnm_recordings` (
 
 CREATE TABLE IF NOT EXISTS `pnm_room_analytics` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `room_table_id` int(11) NULL,
+  `room_table_id` int(11) NOT NULL,
   `room_id` varchar(64) NOT NULL,
   `file_id` varchar(255) NOT NULL,
   `file_name` varchar(255) NOT NULL,
@@ -62,3 +62,20 @@ CREATE TABLE IF NOT EXISTS `pnm_room_analytics` (
      ON DELETE RESTRICT
      ON UPDATE CASCADE
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `pnm_room_artifacts` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `artifact_id` VARCHAR(64) NOT NULL,
+  `room_table_id` INT(11) NOT NULL,
+  `room_id` VARCHAR(255) NOT NULL,
+  `type` VARCHAR(100) NOT NULL,
+  `metadata` JSON DEFAULT NULL,
+  `created` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_artifact_id` (`artifact_id`),
+  KEY `idx_room_id` (`room_id`),
+  KEY `idx_type` (`type`),
+  FOREIGN KEY (`room_table_id`) REFERENCES `pnm_room_info` (`id`)
+    ON DELETE RESTRICT
+    ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

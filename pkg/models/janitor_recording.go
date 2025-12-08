@@ -15,7 +15,7 @@ func (m *JanitorModel) checkDelRecordingBackupPath() {
 	}
 	log := m.logger.WithField("task", "checkDelRecordingBackupPath")
 
-	checkTime := time.Now().Add(-m.app.RecorderInfo.DelRecordingBackupDuration)
+	checkTime := time.Now().UTC().Add(-m.app.RecorderInfo.DelRecordingBackupDuration)
 	entries, err := os.ReadDir(m.app.RecorderInfo.DelRecordingBackupPath)
 	if err != nil {
 		log.WithError(err).Errorln("failed to read recording backup directory")

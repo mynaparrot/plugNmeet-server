@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -80,10 +79,7 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 		return
 	}
 
-	fileId := fmt.Sprintf("%s-%d", room.Sid, room.CreationTime)
-	path := fmt.Sprintf("%s/%s.json", *m.app.AnalyticsSettings.FilesStorePath, fileId)
-
-	stat, err := m.exportAnalyticsToFile(room, path, metadata, log)
+	jsonData, err := m.exportAnalyticsToJSON(room, metadata, log)
 	if err != nil {
 		log.WithError(err).Error("failed to export analytics to file")
 		return
@@ -95,18 +91,19 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 	// and won't record to DB
 	if metadata.RoomFeatures.EnableAnalytics {
 		// record in db
-		_, err = m.AddAnalyticsFileToDB(room.ID, room.CreationTime, room.RoomId, fileId, stat)
+		artifact, err := m.artifactModel.CreateAnalyticsArtifact(room.ID, jsonData, log)
 		if err != nil {
-			log.WithError(err).Error("failed to add analytics file to db")
+			log.WithError(err).Error("failed to create analytics artifact")
+		} else {
+			// notify
+			go m.sendToWebhookNotifier(room.RoomId, room.Sid, "analytics_proceeded", artifact.ArtifactId)
 		}
-		// notify
-		go m.sendToWebhookNotifier(room.RoomId, room.Sid, "analytics_proceeded", fileId)
 	} else {
 		log.Debug("analytics feature was not enabled for this room, file not saved to DB")
 	}
 }
 
-func (m *AnalyticsModel) exportAnalyticsToFile(room *dbmodels.RoomInfo, path string, metadata *plugnmeet.RoomMetadata, log *logrus.Entry) (os.FileInfo, error) {
+func (m *AnalyticsModel) exportAnalyticsToJSON(room *dbmodels.RoomInfo, metadata *plugnmeet.RoomMetadata, log *logrus.Entry) ([]byte, error) {
 	roomInfo := &plugnmeet.AnalyticsRoomInfo{
 		RoomId:       room.RoomId,
 		RoomTitle:    room.RoomTitle,
@@ -178,7 +175,7 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *dbmodels.RoomInfo, path str
 		usersInfo = append(usersInfo, userInfo)
 	}
 
-	var stat os.FileInfo
+	var marshal []byte
 	// it's not possible to get room metadata as always
 	// so, if room didn't have activated analytics feature,
 	// we will simply won't create the file & delete all records
@@ -191,20 +188,9 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *dbmodels.RoomInfo, path str
 			EmitUnpopulated: true,
 			UseProtoNames:   true,
 		}
-		marshal, err := op.Marshal(result)
+		marshal, err = op.Marshal(result)
 		if err != nil {
 			log.WithError(err).Error("failed to marshal analytics result")
-			return nil, err
-		}
-
-		err = os.WriteFile(path, marshal, 0644)
-		if err != nil {
-			log.WithError(err).Error("failed to write analytics file")
-			return nil, err
-		}
-		stat, err = os.Stat(path)
-		if err != nil {
-			log.WithError(err).Error("failed to stat new analytics file")
 			return nil, err
 		}
 	}
@@ -218,7 +204,7 @@ func (m *AnalyticsModel) exportAnalyticsToFile(room *dbmodels.RoomInfo, path str
 		log.WithError(err).Error("failed to delete analytics keys from redis")
 	}
 
-	return stat, err
+	return marshal, err
 }
 
 func (m *AnalyticsModel) processEventKey(key, prefix string, eventList *[]*plugnmeet.AnalyticsEventData) {

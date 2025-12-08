@@ -3,6 +3,7 @@ package redisservice
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/redis/go-redis/v9"
@@ -18,7 +19,11 @@ const (
 )
 
 func (s *RedisService) CreateRoomPoll(roomId string, val map[string]string) error {
-	_, err := s.rc.HSet(s.ctx, pollsKey+roomId, val).Result()
+	pipe := s.rc.Pipeline()
+	pipe.HSet(s.ctx, pollsKey+roomId, val)
+	pipe.Expire(s.ctx, pollsKey+roomId, time.Hour*24)
+
+	_, err := pipe.Exec(s.ctx)
 	if err != nil {
 		return err
 	}
@@ -56,12 +61,17 @@ func (s *RedisService) AddPollResponse(r *plugnmeet.SubmitPollResponseReq) error
 		// Queue commands directly on the transaction object.
 		// Add user to the set of voters.
 		tx.SAdd(s.ctx, votedUsersKey, r.UserId)
+		tx.Expire(s.ctx, votedUsersKey, time.Hour*24)
+
 		// Add the vote details to a list.
 		tx.RPush(s.ctx, allRespondentsKey, voteData)
+		tx.Expire(s.ctx, allRespondentsKey, time.Hour*24)
+
 		// Increment the total response counter.
 		tx.HIncrBy(s.ctx, respondentsKey, PollTotalRespField, 1)
 		// Increment the specific option counter.
 		tx.HIncrBy(s.ctx, respondentsKey, fmt.Sprintf("%d%s", r.SelectedOption, PollCountSuffix), 1)
+		tx.Expire(s.ctx, respondentsKey, time.Hour*24)
 		// The commands will be executed when the function returns.
 
 		return nil

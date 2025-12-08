@@ -38,10 +38,20 @@ func provideBreakoutRoomModel(rm *models.RoomModel, natsService *natsservice.Nat
 	return bm
 }
 
+func provideArtifactModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, redisService *redisservice.RedisService, natsService *natsservice.NatsService, webhookNotifier *helpers.WebhookNotifier, analyticsModel *models.AnalyticsModel) *models.ArtifactModel {
+	// create the artifact model, which requires analyticsModel
+	artifactModel := models.NewArtifactModel(ctx, app, ds, redisService, natsService, webhookNotifier, analyticsModel)
+	// now complete the circular dependency by setting artifactModel on analyticsModel
+	analyticsModel.SetArtifactModel(artifactModel)
+	return artifactModel
+}
+
 // build the dependency set for models
 var modelSet = wire.NewSet(
 	models.NewAnalyticsModel,
+	provideArtifactModel,
 	models.NewAuthModel,
+	models.NewInsightsModel,
 	models.NewBBBApiWrapperModel,
 	models.NewRoomDurationModel,
 	models.NewEtherpadModel,
@@ -66,6 +76,7 @@ var modelSet = wire.NewSet(
 // build the dependency set for controllers
 var controllerSet = wire.NewSet(
 	controllers.NewAnalyticsController,
+	controllers.NewArtifactController,
 	controllers.NewAuthController,
 	controllers.NewBBBController,
 	controllers.NewBreakoutRoomController,
@@ -85,6 +96,7 @@ var controllerSet = wire.NewSet(
 	controllers.NewWaitingRoomController,
 	controllers.NewWebhookController,
 	controllers.NewNatsController,
+	controllers.NewInsightsController,
 )
 
 // NewAppFactory is the injector function that wire will implement.

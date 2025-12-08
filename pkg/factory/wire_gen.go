@@ -29,9 +29,12 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	client := appConfig.RDS
 	redisService := redisservice.New(ctx, client, logger)
 	natsService := natsservice.New(ctx, appConfig, logger)
-	livekitService := livekitservice.New(ctx, appConfig, logger)
 	webhookNotifier := helpers.GetWebhookNotifier(ctx, appConfig, databaseService, natsService, logger)
 	analyticsModel := models.NewAnalyticsModel(ctx, appConfig, databaseService, redisService, natsService, webhookNotifier, logger)
+	artifactModel := provideArtifactModel(ctx, appConfig, databaseService, redisService, natsService, webhookNotifier, analyticsModel)
+	analyticsController := controllers.NewAnalyticsController(analyticsModel, artifactModel)
+	authModel := models.NewAuthModel(appConfig, natsService, logger)
+	livekitService := livekitservice.New(ctx, appConfig, logger)
 	userModel := models.NewUserModel(appConfig, databaseService, redisService, livekitService, natsService, analyticsModel, logger)
 	recorderModel := models.NewRecorderModel(appConfig, databaseService, redisService, natsService, userModel, logger)
 	fileModel := models.NewFileModel(ctx, appConfig, databaseService, natsService, logger)
@@ -39,10 +42,8 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	etherpadModel := models.NewEtherpadModel(ctx, appConfig, databaseService, redisService, natsService, analyticsModel, logger)
 	pollModel := models.NewPollModel(appConfig, databaseService, redisService, natsService, analyticsModel, logger)
 	speechToTextModel := models.NewSpeechToTextModel(appConfig, databaseService, redisService, natsService, analyticsModel, webhookNotifier, logger)
-	roomModel := models.NewRoomModel(ctx, appConfig, databaseService, redisService, livekitService, natsService, webhookNotifier, userModel, recorderModel, fileModel, roomDurationModel, etherpadModel, pollModel, speechToTextModel, analyticsModel, logger)
-	janitorModel := models.NewJanitorModel(ctx, appConfig, databaseService, redisService, natsService, livekitService, roomModel, roomDurationModel, logger)
-	analyticsController := controllers.NewAnalyticsController(analyticsModel)
-	authModel := models.NewAuthModel(appConfig, natsService, logger)
+	insightsModel := models.NewInsightsModel(ctx, appConfig, redisService, natsService, artifactModel, logger)
+	roomModel := models.NewRoomModel(ctx, appConfig, databaseService, redisService, livekitService, natsService, webhookNotifier, userModel, recorderModel, fileModel, roomDurationModel, etherpadModel, pollModel, speechToTextModel, analyticsModel, insightsModel, logger)
 	authController := controllers.NewAuthController(appConfig, natsService, authModel, roomModel)
 	recordingModel := models.NewRecordingModel(appConfig, databaseService, redisService, natsService, analyticsModel, webhookNotifier, logger)
 	bbbApiWrapperModel := models.NewBBBApiWrapperModel(appConfig, databaseService, redisService, recordingModel, logger)
@@ -72,6 +73,8 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	webhookController := controllers.NewWebhookController(authModel, webhookModel)
 	natsController := controllers.NewNatsController(appConfig, natsService, authModel, natsModel, logger)
 	healthCheckController := controllers.NewHealthCheckController(appConfig)
+	insightsController := controllers.NewInsightsController(appConfig, natsService, insightsModel, logger)
+	artifactController := controllers.NewArtifactController(artifactModel)
 	applicationControllers := &ApplicationControllers{
 		AnalyticsController:    analyticsController,
 		AuthController:         authController,
@@ -93,12 +96,16 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 		WebhookController:      webhookController,
 		NatsController:         natsController,
 		HealthCheckController:  healthCheckController,
+		InsightsController:     insightsController,
+		ArtifactController:     artifactController,
 	}
+	janitorModel := models.NewJanitorModel(ctx, appConfig, databaseService, redisService, natsService, livekitService, roomModel, roomDurationModel, artifactModel, logger)
 	application := &Application{
-		JanitorModel: janitorModel,
-		Controllers:  applicationControllers,
-		AppConfig:    appConfig,
-		Ctx:          ctx,
+		Controllers:   applicationControllers,
+		AppConfig:     appConfig,
+		Ctx:           ctx,
+		janitorModel:  janitorModel,
+		artifactModel: artifactModel,
 	}
 	return application, nil
 }
@@ -119,8 +126,16 @@ func provideBreakoutRoomModel(rm *models.RoomModel, natsService *natsservice.Nat
 	return bm
 }
 
+func provideArtifactModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, redisService *redisservice.RedisService, natsService *natsservice.NatsService, webhookNotifier *helpers.WebhookNotifier, analyticsModel *models.AnalyticsModel) *models.ArtifactModel {
+
+	artifactModel := models.NewArtifactModel(ctx, app, ds, redisService, natsService, webhookNotifier, analyticsModel)
+
+	analyticsModel.SetArtifactModel(artifactModel)
+	return artifactModel
+}
+
 // build the dependency set for models
-var modelSet = wire.NewSet(models.NewAnalyticsModel, models.NewAuthModel, models.NewBBBApiWrapperModel, models.NewRoomDurationModel, models.NewEtherpadModel, models.NewExDisplayModel, models.NewExMediaModel, models.NewFileModel, models.NewIngressModel, models.NewLtiV1Model, models.NewNatsModel, models.NewPollModel, models.NewRecorderModel, models.NewRecordingModel, models.NewRoomModel, provideBreakoutRoomModel, models.NewJanitorModel, models.NewSpeechToTextModel, models.NewUserModel, models.NewWaitingRoomModel, models.NewWebhookModel)
+var modelSet = wire.NewSet(models.NewAnalyticsModel, provideArtifactModel, models.NewAuthModel, models.NewInsightsModel, models.NewBBBApiWrapperModel, models.NewRoomDurationModel, models.NewEtherpadModel, models.NewExDisplayModel, models.NewExMediaModel, models.NewFileModel, models.NewIngressModel, models.NewLtiV1Model, models.NewNatsModel, models.NewPollModel, models.NewRecorderModel, models.NewRecordingModel, models.NewRoomModel, provideBreakoutRoomModel, models.NewJanitorModel, models.NewSpeechToTextModel, models.NewUserModel, models.NewWaitingRoomModel, models.NewWebhookModel)
 
 // build the dependency set for controllers
-var controllerSet = wire.NewSet(controllers.NewAnalyticsController, controllers.NewAuthController, controllers.NewBBBController, controllers.NewBreakoutRoomController, controllers.NewHealthCheckController, controllers.NewEtherpadController, controllers.NewExDisplayController, controllers.NewExMediaController, controllers.NewFileController, controllers.NewIngressController, controllers.NewLtiV1Controller, controllers.NewPollsController, controllers.NewRecorderController, controllers.NewRecordingController, controllers.NewRoomController, controllers.NewSpeechToTextController, controllers.NewUserController, controllers.NewWaitingRoomController, controllers.NewWebhookController, controllers.NewNatsController)
+var controllerSet = wire.NewSet(controllers.NewAnalyticsController, controllers.NewArtifactController, controllers.NewAuthController, controllers.NewBBBController, controllers.NewBreakoutRoomController, controllers.NewHealthCheckController, controllers.NewEtherpadController, controllers.NewExDisplayController, controllers.NewExMediaController, controllers.NewFileController, controllers.NewIngressController, controllers.NewLtiV1Controller, controllers.NewPollsController, controllers.NewRecorderController, controllers.NewRecordingController, controllers.NewRoomController, controllers.NewSpeechToTextController, controllers.NewUserController, controllers.NewWaitingRoomController, controllers.NewWebhookController, controllers.NewNatsController, controllers.NewInsightsController)

@@ -60,16 +60,21 @@ func (m *RecordingModel) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error 
 			}
 
 			// otherwise during cleanup will be hard to detect
-			newTime := time.Now()
+			newTime := time.Now().UTC()
 			if err := os.Chtimes(toFile, newTime, newTime); err != nil {
 				log.WithError(err).Warnln("failed to update file modification time for backup")
 			}
 
 			// now the JSON file
-			err = os.Rename(filePath+".json", toFile+".json")
+			metadataFile := toFile + ".json"
+			err = os.Rename(filePath+".json", metadataFile)
 			if err != nil {
 				// just log
 				log.WithError(err).Warnln("error moving json info file to backup")
+			} else {
+				if err := os.Chtimes(metadataFile, newTime, newTime); err != nil {
+					log.WithError(err).Warnln("failed to update file modification time for backup")
+				}
 			}
 
 		} else {

@@ -42,7 +42,7 @@ func startServer(configFile string) {
 	}
 
 	// 3. Initialize the configuration, setting default values and creating necessary directories.
-	appCnf, err = config.New(appCnf)
+	appCnf, err = config.New(ctx, appCnf)
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to initialize config")
 	}

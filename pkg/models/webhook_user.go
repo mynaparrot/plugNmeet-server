@@ -44,10 +44,10 @@ func (m *WebhookModel) participantJoined(event *livekit.WebhookEvent) {
 		log.WithError(err).Errorln("error incrementing num participants")
 	}
 
-	if strings.HasPrefix(event.Participant.Identity, config.IngressUserIdPrefix) {
-		// if user was ingress user then we'll have to do it manually
+	if strings.HasPrefix(event.Participant.Identity, config.IngressUserIdPrefix) || strings.HasPrefix(event.Participant.Identity, config.TTSAgentUserIdPrefix) {
+		// if user was internal agent user then we'll have to do it manually
 		// because that user will not use plugNmeet client interface
-		log.Info("ingress participant joined, triggering OnAfterUserJoined manually")
+		log.Infof("internal agent participant joined, triggering OnAfterUserJoined manually")
 		m.nm.OnAfterUserJoined(event.Room.Name, event.Participant.Identity)
 	}
 
@@ -89,10 +89,10 @@ func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 		log.WithError(err).Errorln("error decrementing num participants")
 	}
 
-	if strings.HasPrefix(event.Participant.Identity, config.IngressUserIdPrefix) {
-		// if user was ingress user then we'll have to do it manually
+	if strings.HasPrefix(event.Participant.Identity, config.IngressUserIdPrefix) || strings.HasPrefix(event.Participant.Identity, config.TTSAgentUserIdPrefix) {
+		// if user was internal agent user then we'll have to do it manually
 		// because that user did not use plugNmeet client interface
-		log.Info("ingress participant left, triggering OnAfterUserDisconnected manually")
+		log.Info("internal agent participant joined left, triggering OnAfterUserDisconnected manually")
 		m.nm.OnAfterUserDisconnected(event.Room.Name, event.Participant.Identity)
 	}
 	// webhook notification

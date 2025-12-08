@@ -9,6 +9,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
+	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 )
@@ -194,7 +195,34 @@ func (m *RoomModel) setRoomDefaults(r *plugnmeet.CreateRoomReq) {
 		}
 	}
 
-	// Azure cognitive services
+	if r.Metadata.IsBreakoutRoom && r.Metadata.RoomFeatures.EnableAnalytics {
+		r.Metadata.RoomFeatures.EnableAnalytics = false
+	}
+
+	if r.Metadata.RoomFeatures.InsightsFeatures != nil {
+		if m.app.Insights == nil {
+			r.Metadata.RoomFeatures.InsightsFeatures.IsAllow = false
+		} else {
+			maxSelectedTranscriptionTransLangs := 2
+			maxSelectedChatTransLangs := 5
+
+			if _, serviceCnf, err := m.app.Insights.GetProviderAccountForService(insights.ServiceTypeTranscription); err == nil {
+				if num, ok := serviceCnf.Options["max_selected_trans_langs"]; ok {
+					maxSelectedTranscriptionTransLangs = num.(int)
+				}
+			}
+			if _, serviceCnf, err := m.app.Insights.GetProviderAccountForService(insights.ServiceTypeTranslation); err == nil {
+				if num, ok := serviceCnf.Options["max_selected_trans_langs"]; ok {
+					maxSelectedChatTransLangs = num.(int)
+				}
+			}
+
+			r.Metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.MaxSelectedTransLangs = int32(maxSelectedTranscriptionTransLangs)
+			r.Metadata.RoomFeatures.InsightsFeatures.ChatTranslationFeatures.MaxSelectedTransLangs = int32(maxSelectedChatTransLangs)
+		}
+	}
+
+	//TODO: remove, Azure cognitive services
 	azu := m.app.AzureCognitiveServicesSpeech
 	if !azu.Enabled {
 		r.Metadata.RoomFeatures.SpeechToTextTranslationFeatures.IsAllow = false
@@ -204,10 +232,6 @@ func (m *RoomModel) setRoomDefaults(r *plugnmeet.CreateRoomReq) {
 			maxAllow = azu.MaxNumTranLangsAllowSelecting
 		}
 		r.Metadata.RoomFeatures.SpeechToTextTranslationFeatures.MaxNumTranLangsAllowSelecting = maxAllow
-	}
-
-	if r.Metadata.IsBreakoutRoom && r.Metadata.RoomFeatures.EnableAnalytics {
-		r.Metadata.RoomFeatures.EnableAnalytics = false
 	}
 }
 
@@ -242,7 +266,7 @@ func (m *RoomModel) prepareRoomDbInfo(r *plugnmeet.CreateRoomReq, existing *dbmo
 // prepareWhiteboardPreloadFile preload whiteboard file
 func (m *RoomModel) prepareWhiteboardPreloadFile(meta *plugnmeet.RoomMetadata, roomId, roomSid string, log *logrus.Entry) {
 	wbf := meta.RoomFeatures.WhiteboardFeatures
-	if wbf == nil || !wbf.AllowedWhiteboard || wbf.PreloadFile == nil || *wbf.PreloadFile == "" {
+	if wbf == nil || !wbf.IsAllow || wbf.PreloadFile == nil || *wbf.PreloadFile == "" {
 		return
 	}
 	preloadFile := *wbf.PreloadFile

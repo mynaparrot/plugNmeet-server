@@ -21,6 +21,7 @@ func NewSpeechToTextController(m *models.SpeechToTextModel) *SpeechToTextControl
 }
 
 // HandleSpeechToTextTranslationServiceStatus handles enabling/disabling speech-to-text services.
+// deprecated: use insights transcription
 func (stc *SpeechToTextController) HandleSpeechToTextTranslationServiceStatus(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
@@ -44,6 +45,7 @@ func (stc *SpeechToTextController) HandleSpeechToTextTranslationServiceStatus(c 
 }
 
 // HandleGenerateAzureToken handles generating an Azure token for speech services.
+// deprecated: use insights transcription
 func (stc *SpeechToTextController) HandleGenerateAzureToken(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
@@ -64,6 +66,7 @@ func (stc *SpeechToTextController) HandleGenerateAzureToken(c *fiber.Ctx) error 
 }
 
 // HandleSpeechServiceUserStatus handles updating a user's speech service status.
+// deprecated: use insights transcription
 func (stc *SpeechToTextController) HandleSpeechServiceUserStatus(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
@@ -89,6 +92,7 @@ func (stc *SpeechToTextController) HandleSpeechServiceUserStatus(c *fiber.Ctx) e
 }
 
 // HandleRenewAzureToken handles renewing an Azure token.
+// deprecated: use insights transcription
 func (stc *SpeechToTextController) HandleRenewAzureToken(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")

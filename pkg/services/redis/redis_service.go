@@ -8,7 +8,8 @@ import (
 )
 
 const (
-	Prefix = "pnm:"
+	Prefix          = "pnm:"
+	TotalUsageField = "total_usage"
 )
 
 type RedisService struct {

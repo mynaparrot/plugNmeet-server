@@ -17,12 +17,14 @@ var unmarshalOpts = protojson.UnmarshalOptions{
 // AnalyticsController holds the dependencies for analytics-related handlers.
 type AnalyticsController struct {
 	AnalyticsModel *models.AnalyticsModel
+	artifactModel  *models.ArtifactModel
 }
 
 // NewAnalyticsController creates a new AnalyticsController.
-func NewAnalyticsController(am *models.AnalyticsModel) *AnalyticsController {
+func NewAnalyticsController(am *models.AnalyticsModel, artifactModel *models.ArtifactModel) *AnalyticsController {
 	return &AnalyticsController{
 		AnalyticsModel: am,
+		artifactModel:  artifactModel,
 	}
 }
 
@@ -47,6 +49,7 @@ func validateRequest(msg proto.Message) error {
 }
 
 // HandleFetchAnalytics fetches analytics data.
+// Deprecated: only for backward compatibility
 func (ac *AnalyticsController) HandleFetchAnalytics(c *fiber.Ctx) error {
 	req := new(plugnmeet.FetchAnalyticsReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
@@ -70,13 +73,17 @@ func (ac *AnalyticsController) HandleFetchAnalytics(c *fiber.Ctx) error {
 }
 
 // HandleDeleteAnalytics deletes analytics data.
+// Deprecated: only for backward compatibility
 func (ac *AnalyticsController) HandleDeleteAnalytics(c *fiber.Ctx) error {
 	req := new(plugnmeet.DeleteAnalyticsReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	err := ac.AnalyticsModel.DeleteAnalytics(req)
+	newReq := &plugnmeet.DeleteArtifactReq{
+		ArtifactId: req.FileId,
+	}
+	err := ac.artifactModel.DeleteArtifact(newReq)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
@@ -85,13 +92,17 @@ func (ac *AnalyticsController) HandleDeleteAnalytics(c *fiber.Ctx) error {
 }
 
 // HandleGetAnalyticsDownloadToken generates a download token for analytics.
+// Deprecated: only for backward compatibility
 func (ac *AnalyticsController) HandleGetAnalyticsDownloadToken(c *fiber.Ctx) error {
 	req := new(plugnmeet.GetAnalyticsDownloadTokenReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	token, err := ac.AnalyticsModel.GetAnalyticsDownloadToken(req)
+	newReq := &plugnmeet.GetArtifactDownloadTokenReq{
+		ArtifactId: req.FileId,
+	}
+	token, err := ac.artifactModel.GetArtifactDownloadToken(newReq)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
@@ -105,17 +116,18 @@ func (ac *AnalyticsController) HandleGetAnalyticsDownloadToken(c *fiber.Ctx) err
 }
 
 // HandleDownloadAnalytics handles the download of an analytics file.
+// Deprecated: only for backward compatibility
 func (ac *AnalyticsController) HandleDownloadAnalytics(c *fiber.Ctx) error {
 	token := c.Params("token")
 	if len(token) == 0 {
-		return c.Status(fiber.StatusUnauthorized).SendString("token require or invalid url")
+		return c.Status(fiber.StatusUnauthorized).SendString("token required or invalid url")
 	}
 
-	file, status, err := ac.AnalyticsModel.VerifyAnalyticsToken(token)
+	filePath, fileName, err := ac.artifactModel.VerifyArtifactDownloadJWT(token)
 	if err != nil {
-		return c.Status(status).SendString(err.Error())
+		return c.Status(fiber.StatusBadRequest).SendString(err.Error())
 	}
 
-	c.Attachment(file)
-	return c.SendFile(file, false)
+	c.Attachment(fileName)
+	return c.SendFile(filePath, false)
 }

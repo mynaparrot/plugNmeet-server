@@ -21,6 +21,7 @@ func (s *NatsService) AddRoomFile(roomId string, meta *plugnmeet.RoomUploadedFil
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
 		Replicas: s.app.NatsInfo.NumReplicas,
 		Bucket:   fmt.Sprintf(RoomFilesBucket, roomId),
+		TTL:      DefaultTTL,
 	})
 	if err != nil {
 		return err

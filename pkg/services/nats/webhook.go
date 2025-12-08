@@ -13,6 +13,7 @@ func (s *NatsService) AddWebhookData(roomId string, val []byte) error {
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
 		Replicas: s.app.NatsInfo.NumReplicas,
 		Bucket:   WebhookKvKey,
+		TTL:      DefaultTTL,
 	})
 	if err != nil {
 		return err

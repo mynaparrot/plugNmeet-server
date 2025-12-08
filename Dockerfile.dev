@@ -1,5 +1,11 @@
 FROM golang:1.25
 
+ENV SPEECHSDK_ROOT="/root/speechsdk"
+RUN mkdir -p $SPEECHSDK_ROOT && \
+    wget -O SpeechSDK-Linux.tar.gz https://aka.ms/csspeech/linuxbinary && \
+    tar --strip 1 -xzf SpeechSDK-Linux.tar.gz -C "$SPEECHSDK_ROOT" && \
+    rm SpeechSDK-Linux.tar.gz
+
 WORKDIR /app
 
 RUN export DEBIAN_FRONTEND=noninteractive; \
@@ -7,15 +13,22 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
     apt install --no-install-recommends -y build-essential libreoffice mupdf-tools && \
     apt install --no-install-recommends -y fontconfig fonts-dejavu fonts-dejavu-extra \
     fonts-noto fonts-noto-cjk fonts-liberation fonts-liberation2 fonts-linuxlibertine \
-    fonts-sil-gentium fonts-sil-gentium-basic && \
+    fonts-sil-gentium fonts-sil-gentium-basic ca-certificates \
+    libasound2-dev libopus-dev libopusfile-dev libssl-dev libsoxr-dev && \
     apt clean && \
     rm -rf /var/lib/apt/lists/*
-    
+
 RUN go install github.com/air-verse/air@latest
+
+ENV CGO_CFLAGS="-I$SPEECHSDK_ROOT/include/c_api"
+ENV CGO_LDFLAGS="-L$SPEECHSDK_ROOT/lib/x64 -lMicrosoft.CognitiveServices.Speech.core"
+# Set LD_LIBRARY_PATH in a way that is robust and linter-friendly.
+# This file will be sourced by the shell, correctly setting the path.
+RUN echo "export LD_LIBRARY_PATH=\"$SPEECHSDK_ROOT/lib/x64\${LD_LIBRARY_PATH:+:\$LD_LIBRARY_PATH}\"" > /etc/profile.d/speechsdk.sh
 
 #COPY . .
 COPY go.mod go.mod
 COPY go.sum go.sum
 RUN go mod download
 
-CMD air
+CMD ["air"]

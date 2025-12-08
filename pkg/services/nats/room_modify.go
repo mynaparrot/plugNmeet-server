@@ -35,6 +35,7 @@ func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeo
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
 		Replicas: s.app.NatsInfo.NumReplicas,
 		Bucket:   bucket,
+		TTL:      DefaultTTL,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create or update KV bucket: %w", err)
@@ -55,6 +56,7 @@ func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeo
 	if err != nil {
 		return fmt.Errorf("failed to marshal metadata: %w", err)
 	}
+	fmt.Println("mt=>>>", mt)
 
 	// Prepare room data
 	data := map[string]string{
@@ -147,19 +149,9 @@ func (s *NatsService) UpdateRoomStatus(roomId string, status string) error {
 
 // OnAfterSessionEndCleanup performs cleanup after a session ends
 func (s *NatsService) OnAfterSessionEndCleanup(roomId string) {
-	if err := s.DeleteRoom(roomId); err != nil {
-		s.logger.WithError(err).Errorf("failed to delete room %s with error", roomId)
-	}
-
-	if err := s.DeleteAllRoomUsersWithConsumer(roomId); err != nil {
-		s.logger.WithError(err).Errorf("failed to delete room %s users", roomId)
-	}
-
-	if err := s.DeleteRoomNatsStream(roomId); err != nil {
-		s.logger.WithError(err).Errorf("failed to delete room %s", roomId)
-	}
-
-	if err := s.DeleteAllRoomFiles(roomId); err != nil {
-		s.logger.WithError(err).Errorf("failed to delete room %s files bucket", roomId)
-	}
+	// silently delete everything without log
+	_ = s.DeleteRoom(roomId)
+	_ = s.DeleteAllRoomUsersWithConsumer(roomId)
+	_ = s.DeleteRoomNatsStream(roomId)
+	_ = s.DeleteAllRoomFiles(roomId)
 }

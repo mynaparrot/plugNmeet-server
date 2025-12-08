@@ -79,12 +79,12 @@ func (m *EtherpadModel) addPadToRoomMetadata(roomId string, selectedHost *config
 	}
 
 	f := &plugnmeet.SharedNotePadFeatures{
-		AllowedSharedNotePad: meta.RoomFeatures.SharedNotePadFeatures.AllowedSharedNotePad,
-		IsActive:             true,
-		NodeId:               selectedHost.Id,
-		Host:                 selectedHost.Host,
-		NotePadId:            *c.PadId,
-		ReadOnlyPadId:        *c.ReadonlyPadId,
+		IsAllow:       meta.RoomFeatures.SharedNotePadFeatures.IsAllow,
+		IsActive:      true,
+		NodeId:        selectedHost.Id,
+		Host:          selectedHost.Host,
+		NotePadId:     *c.PadId,
+		ReadOnlyPadId: *c.ReadonlyPadId,
 	}
 	meta.RoomFeatures.SharedNotePadFeatures = f
 

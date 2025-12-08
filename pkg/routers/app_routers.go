@@ -100,6 +100,7 @@ func (r *router) registerBaseRoutes() {
 	r.app.Get("/download/uploadedFile/:sid/*", r.ctrl.FileController.HandleDownloadUploadedFile)
 	r.app.Get("/download/recording/:token", r.ctrl.RecordingController.HandleDownloadRecording)
 	r.app.Get("/download/analytics/:token", r.ctrl.AnalyticsController.HandleDownloadAnalytics)
+	r.app.Get("/download/artifact/:token", r.ctrl.ArtifactController.HandleDownloadArtifact)
 	r.app.Get("/healthCheck", r.ctrl.HealthCheckController.HandleHealthCheck)
 }
 
@@ -139,6 +140,12 @@ func (r *router) registerAuthRoutes() {
 	analytics.Post("/fetch", r.ctrl.AnalyticsController.HandleFetchAnalytics)
 	analytics.Post("/delete", r.ctrl.AnalyticsController.HandleDeleteAnalytics)
 	analytics.Post("/getDownloadToken", r.ctrl.AnalyticsController.HandleGetAnalyticsDownloadToken)
+
+	artifact := auth.Group("/artifact")
+	artifact.Post("/fetch", r.ctrl.ArtifactController.HandleFetchArtifacts)
+	artifact.Post("/artifactInfo", r.ctrl.ArtifactController.HandleGetArtifactInfo)
+	artifact.Post("/delete", r.ctrl.ArtifactController.HandleDeleteArtifact)
+	artifact.Post("/getDownloadToken", r.ctrl.ArtifactController.HandleGetArtifactDownloadToken)
 
 	recorder := auth.Group("/recorder")
 	recorder.Post("/notify", r.ctrl.RecorderController.HandleRecorderEvents)
@@ -213,6 +220,32 @@ func (r *router) registerAPIRoutes() {
 	speech.Post("/azureToken", r.ctrl.SpeechToTextController.HandleGenerateAzureToken)
 	speech.Post("/userStatus", r.ctrl.SpeechToTextController.HandleSpeechServiceUserStatus)
 	speech.Post("/renewToken", r.ctrl.SpeechToTextController.HandleRenewAzureToken)
+
+	insights := api.Group("/insights")
+	insights.Post("/supportedLangs", r.ctrl.InsightsController.HandleGetSupportedLangs)
+
+	transcription := insights.Group("/transcription")
+	transcription.Post("/configure", r.ctrl.InsightsController.HandleTranscriptionConfigure)
+	transcription.Post("/end", r.ctrl.InsightsController.HandleEndTranscription)
+	transcription.Post("/userSession", r.ctrl.InsightsController.HandleTranscriptionUserSession)
+	transcription.Post("/userStatus", r.ctrl.InsightsController.HandleGetTranscriptionUserTaskStatus)
+
+	translation := insights.Group("/translation")
+	chatTranslation := translation.Group("/chat")
+	chatTranslation.Post("/configure", r.ctrl.InsightsController.HandleChatTranslationConfigure)
+	chatTranslation.Post("/end", r.ctrl.InsightsController.HandleEndChatTranslation)
+	chatTranslation.Post("/execute", r.ctrl.InsightsController.HandleExecuteChatTranslation)
+
+	ai := insights.Group("/ai")
+
+	aiTextChat := ai.Group("/textChat")
+	aiTextChat.Post("/configure", r.ctrl.InsightsController.HandleAITextChatConfigure)
+	aiTextChat.Post("/execute", r.ctrl.InsightsController.HandleExecuteAITextChat)
+	aiTextChat.Post("/end", r.ctrl.InsightsController.HandleEndAITextChat)
+
+	aiMeetingSummarization := ai.Group("/meetingSummarization")
+	aiMeetingSummarization.Post("/configure", r.ctrl.InsightsController.HandleAIMeetingSummarizationConfig)
+	aiMeetingSummarization.Post("/end", r.ctrl.InsightsController.HandleEndAIMeetingSummarization)
 
 	// for resumable.js need both GET and POST  methods.
 	// https://github.com/23/resumable.js#how-do-i-set-it-up-with-my-server

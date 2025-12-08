@@ -28,8 +28,8 @@ func (m *JanitorModel) checkOnlineUsersStatus() {
 					"roomId": roomId,
 					"userId": u,
 				})
-				if strings.HasPrefix(u, config.IngressUserIdPrefix) {
-					// we won't get ping from ingress user
+				if strings.HasPrefix(u, config.IngressUserIdPrefix) || strings.HasPrefix(u, config.TTSAgentUserIdPrefix) {
+					// we won't get ping from internal user
 					// so, we can't check from here.
 					continue
 				}

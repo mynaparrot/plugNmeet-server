@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -20,6 +21,7 @@ import (
 var dbTablePrefix string
 
 type AppConfig struct {
+	ctx         context.Context
 	RDS         *redis.Client
 	DB          *gorm.DB
 	Logger      *logrus.Logger
@@ -27,19 +29,22 @@ type AppConfig struct {
 	JetStream   jetstream.JetStream
 	ClientFiles map[string][]string
 
-	RootWorkingDir               string
-	Client                       ClientInfo                   `yaml:"client"`
-	RoomDefaultSettings          *utils.RoomDefaultSettings   `yaml:"room_default_settings"`
-	LogSettings                  logging.LogSettings          `yaml:"log_settings"`
-	LivekitInfo                  LivekitInfo                  `yaml:"livekit_info"`
-	RedisInfo                    RedisInfo                    `yaml:"redis_info"`
-	DatabaseInfo                 DatabaseInfo                 `yaml:"database_info"`
-	UploadFileSettings           UploadFileSettings           `yaml:"upload_file_settings"`
-	RecorderInfo                 RecorderInfo                 `yaml:"recorder_info"`
-	SharedNotePad                SharedNotePad                `yaml:"shared_notepad"`
+	RootWorkingDir      string
+	Client              ClientInfo                 `yaml:"client"`
+	RoomDefaultSettings *utils.RoomDefaultSettings `yaml:"room_default_settings"`
+	LogSettings         logging.LogSettings        `yaml:"log_settings"`
+	LivekitInfo         LivekitInfo                `yaml:"livekit_info"`
+	RedisInfo           RedisInfo                  `yaml:"redis_info"`
+	DatabaseInfo        DatabaseInfo               `yaml:"database_info"`
+	UploadFileSettings  UploadFileSettings         `yaml:"upload_file_settings"`
+	RecorderInfo        RecorderInfo               `yaml:"recorder_info"`
+	SharedNotePad       SharedNotePad              `yaml:"shared_notepad"`
+	//deprecated: use insights features
 	AzureCognitiveServicesSpeech AzureCognitiveServicesSpeech `yaml:"azure_cognitive_services_speech"`
 	AnalyticsSettings            *AnalyticsSettings           `yaml:"analytics_settings"`
+	ArtifactsSettings            *ArtifactsSettings           `yaml:"artifacts_settings"`
 	NatsInfo                     NatsInfo                     `yaml:"nats_info"`
+	Insights                     *InsightsConfig              `yaml:"insights"`
 }
 
 type ClientInfo struct {
@@ -115,9 +120,17 @@ type AzureSubscriptionKey struct {
 }
 
 type AnalyticsSettings struct {
-	Enabled        bool           `yaml:"enabled"`
-	FilesStorePath *string        `yaml:"files_store_path"`
-	TokenValidity  *time.Duration `yaml:"token_validity"`
+	Enabled bool `yaml:"enabled"`
+	// Deprecated: Use ArtifactsSettings instead.
+	FilesStorePath *string `yaml:"files_store_path"`
+}
+
+type ArtifactsSettings struct {
+	StoragePath                *string        `yaml:"storage_path"`
+	TokenValidity              *time.Duration `yaml:"token_validity"`
+	EnableDelArtifactsBackup   bool           `yaml:"enable_del_artifacts_backup"`
+	DelArtifactsBackupPath     string         `yaml:"del_artifacts_backup_path"`
+	DelArtifactsBackupDuration time.Duration  `yaml:"del_artifacts_backup_duration"`
 }
 
 type ChatParticipant struct {
@@ -201,33 +214,27 @@ type NatsInfoRecorder struct {
 	TranscodingJobs string `yaml:"transcoding_jobs_subject"`
 }
 
-func New(appCnf *AppConfig) (*AppConfig, error) {
+func New(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 	// default validation of token is 10 minutes
 	if appCnf.Client.TokenValidity == nil || *appCnf.Client.TokenValidity < 0 {
 		validity := time.Minute * 10
 		appCnf.Client.TokenValidity = &validity
 	}
+	appCnf.ctx = ctx
 
 	// set default values
 	if appCnf.AnalyticsSettings != nil {
+		//TODO: deprecated, will remove in future
 		if appCnf.AnalyticsSettings.FilesStorePath == nil {
 			p := "./analytics"
 			appCnf.AnalyticsSettings.FilesStorePath = &p
-			d := time.Minute * 30
-			appCnf.AnalyticsSettings.TokenValidity = &d
 		}
+	}
 
-		p := *appCnf.AnalyticsSettings.FilesStorePath
-		if strings.HasPrefix(p, "./") {
-			p = filepath.Join(appCnf.RootWorkingDir, p)
-		}
-
-		if _, err := os.Stat(p); os.IsNotExist(err) {
-			err = os.MkdirAll(p, os.ModePerm)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create analytics directory %s: %w", p, err)
-			}
-		}
+	// setup everything for artifacts
+	err := handleArtifactsSettings(appCnf)
+	if err != nil {
+		return nil, err
 	}
 
 	// set default
@@ -254,12 +261,68 @@ func New(appCnf *AppConfig) (*AppConfig, error) {
 	}
 
 	// read client files and cache it
-	err := readClientFiles(appCnf)
+	err = readClientFiles(appCnf)
 	if err != nil {
 		return nil, err
 	}
 
 	return appCnf, nil
+}
+
+func handleArtifactsSettings(appCnf *AppConfig) error {
+	// Add initialization logic for ArtifactsSettings
+	if appCnf.ArtifactsSettings == nil {
+		// If the whole block is missing, create it
+		appCnf.ArtifactsSettings = &ArtifactsSettings{
+			EnableDelArtifactsBackup: true,
+		}
+	}
+	if appCnf.ArtifactsSettings.StoragePath == nil {
+		// Set the default path if it's not specified
+		p := "./artifacts"
+		appCnf.ArtifactsSettings.StoragePath = &p
+	}
+	if appCnf.ArtifactsSettings.TokenValidity == nil {
+		d := time.Minute * 10
+		appCnf.ArtifactsSettings.TokenValidity = &d
+	}
+
+	p := *appCnf.ArtifactsSettings.StoragePath
+	if strings.HasPrefix(p, "./") {
+		p = filepath.Join(appCnf.RootWorkingDir, p)
+	}
+
+	if _, err := os.Stat(p); os.IsNotExist(err) {
+		err = os.MkdirAll(p, os.ModePerm)
+		if err != nil {
+			return fmt.Errorf("failed to create artifacts directory %s: %w", p, err)
+		}
+	}
+
+	// Add new logic for the backup path
+	if appCnf.ArtifactsSettings.EnableDelArtifactsBackup {
+		if appCnf.ArtifactsSettings.DelArtifactsBackupDuration == 0 {
+			appCnf.ArtifactsSettings.DelArtifactsBackupDuration = time.Hour * 72
+		}
+		if appCnf.ArtifactsSettings.DelArtifactsBackupPath == "" {
+			// Default to a "trash" subdirectory inside the main storage path
+			appCnf.ArtifactsSettings.DelArtifactsBackupPath = filepath.Join(*appCnf.ArtifactsSettings.StoragePath, "trash")
+		}
+
+		trashPath := appCnf.ArtifactsSettings.DelArtifactsBackupPath
+		if strings.HasPrefix(trashPath, "./") {
+			trashPath = filepath.Join(appCnf.RootWorkingDir, trashPath)
+		}
+		err := os.MkdirAll(trashPath, 0755)
+		if err != nil {
+			return fmt.Errorf("failed to create artifacts backup directory %s: %w", trashPath, err)
+		}
+	}
+	return nil
+}
+
+func (a *AppConfig) GetApplicationCtx() context.Context {
+	return a.ctx
 }
 
 // readClientFiles will read client files and cache it at startup

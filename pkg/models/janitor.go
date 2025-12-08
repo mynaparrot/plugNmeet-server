@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
+	dbservice "github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	livekitservice "github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
@@ -27,8 +27,9 @@ type JanitorModel struct {
 	lk          *livekitservice.LivekitService
 	rm          *RoomModel
 
-	rmDuration *RoomDurationModel
-	logger     *logrus.Entry
+	rmDuration    *RoomDurationModel
+	artifactModel *ArtifactModel
+	logger        *logrus.Entry
 
 	// leader election for janitor
 	leaderLockVal string
@@ -37,20 +38,21 @@ type JanitorModel struct {
 }
 
 // NewJanitorModel creates a new JanitorModel.
-func NewJanitorModel(mainCtx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, lk *livekitservice.LivekitService, rm *RoomModel, rmDuration *RoomDurationModel, logger *logrus.Logger) *JanitorModel {
+func NewJanitorModel(mainCtx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, lk *livekitservice.LivekitService, rm *RoomModel, rmDuration *RoomDurationModel, artifactModel *ArtifactModel, logger *logrus.Logger) *JanitorModel {
 	ctx, cancel := context.WithCancel(mainCtx)
 
 	return &JanitorModel{
-		ctx:         ctx,
-		cancel:      cancel,
-		app:         app,
-		ds:          ds,
-		rs:          rs,
-		lk:          lk,
-		rm:          rm,
-		rmDuration:  rmDuration,
-		natsService: natsService,
-		logger:      logger.WithField("model", "janitor"),
+		ctx:           ctx,
+		cancel:        cancel,
+		app:           app,
+		ds:            ds,
+		rs:            rs,
+		lk:            lk,
+		rm:            rm,
+		artifactModel: artifactModel,
+		rmDuration:    rmDuration,
+		natsService:   natsService,
+		logger:        logger.WithField("model", "janitor"),
 
 		leaderLockTTL: 1 * time.Minute,
 		leaderRenewal: 30 * time.Second,
@@ -109,6 +111,7 @@ func (m *JanitorModel) runJanitorTasks() {
 	nextUserCheck := time.Now().Add(time.Minute)
 	nextRoomCheck := time.Now().Add(5 * time.Minute)
 	nextBackupCheck := time.Now().Add(time.Hour)
+	nextSummarizeCheck := time.Now().Add(5 * time.Minute)
 
 	for {
 		select {
@@ -130,7 +133,12 @@ func (m *JanitorModel) runJanitorTasks() {
 			}
 			if now.After(nextBackupCheck) {
 				m.checkDelRecordingBackupPath()
+				m.checkDelArtifactsBackupPath()
 				nextBackupCheck = time.Now().Add(time.Hour)
+			}
+			if now.After(nextSummarizeCheck) {
+				m.CheckInsightsPendingSummarizeJobs()
+				nextSummarizeCheck = time.Now().Add(5 * time.Minute)
 			}
 		case <-renewalTicker.C:
 			// Copy the lock value to a local var to avoid holding the lock during a network call.

@@ -3,6 +3,7 @@ package redisservice
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -13,7 +14,11 @@ const (
 
 func (s *RedisService) AddRoomWithDurationInfo(roomId string, vals interface{}) error {
 	key := fmt.Sprintf("%s:%s", RoomWithDurationInfoKey, roomId)
-	_, err := s.rc.HSet(s.ctx, key, vals).Result()
+
+	pipe := s.rc.Pipeline()
+	pipe.HSet(s.ctx, key, vals)
+	pipe.Expire(s.ctx, key, time.Hour*24)
+	_, err := pipe.Exec(s.ctx)
 	if err != nil {
 		return err
 	}
@@ -21,7 +26,12 @@ func (s *RedisService) AddRoomWithDurationInfo(roomId string, vals interface{}) 
 }
 
 func (s *RedisService) SetRoomDuration(roomId, durationField string, val uint64) error {
-	_, err := s.rc.HSet(s.ctx, fmt.Sprintf("%s:%s", RoomWithDurationInfoKey, roomId), durationField, val).Result()
+	key := fmt.Sprintf("%s:%s", RoomWithDurationInfoKey, roomId)
+
+	pipe := s.rc.Pipeline()
+	pipe.HSet(s.ctx, key, durationField, val)
+	pipe.Expire(s.ctx, key, time.Hour*24)
+	_, err := pipe.Exec(s.ctx)
 	if err != nil {
 		return err
 	}

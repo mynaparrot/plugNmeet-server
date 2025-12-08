@@ -2,6 +2,7 @@ package natsservice
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -14,7 +15,8 @@ import (
 )
 
 const (
-	Prefix = "pnm-"
+	Prefix     = "pnm-"
+	DefaultTTL = time.Hour * 24
 )
 
 var protoJsonOpts = protojson.MarshalOptions{

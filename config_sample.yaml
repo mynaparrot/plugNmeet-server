@@ -180,24 +180,103 @@ shared_notepad:
       client_id: "plugNmeet"
       client_secret: "lmpGEH0MxrBg7ymsbSh9TU1d6VHRMk"
 
-azure_cognitive_services_speech:
-  enabled: false
-  # Maximum number of translation languages that can be selected. Default is 2.
-  # Pricing may vary with more languages. Refer to Azure pricing documentation.
-  max_num_tran_langs: 2
-  subscription_keys:
-    -
-      # Refer to the note at the top of this file regarding valid IDs.
-      id: "key_1"
-      # Documentation: https://learn.microsoft.com/en-us/azure/cognitive-services/speech-service/get-started-text-to-speech
-      subscription_key: "your_key_here"
-      service_region: westus2
-      # Azure limits concurrent connections per key. Contact Azure to confirm your limit. Default is 20.
-      max_connection: 20
-
 analytics_settings:
   enabled: true
-  # If multiple plugNmeet servers are used, ensure all can access this directory.
-  # Otherwise, file retrieval may fail. This path can be an NFS or other network-accessible location.
-  files_store_path: ./analytics
-  token_validity: 30m
+
+artifacts_settings:
+  # The root path where all generated artifacts (summaries, etc.) will be stored.
+  # Each room will have its own subdirectory: {storage_path}/{service_type}/{room_id}/
+  storage_path: "./artifacts"
+  token_validity: 10m
+  # If true, deleted artifacts will be moved to a backup directory instead of being immediately removed.
+  enable_del_artifacts_backup: true
+  # Optional: Specify a separate path for deleted artifact backups.
+  # Default is a "trash" folder inside the main storage_path.
+  del_artifacts_backup_path: "./artifacts/trash"
+  # Duration to retain deleted artifacts in backup, in hours. Default is 72 hours (3 days).
+  del_artifacts_backup_duration: 72h
+
+insights:
+  # 1. Define all available provider accounts ONCE.
+  # The key ("azure", "google") is the provider TYPE.
+  providers:
+    azure:
+      # A list of uniquely identified accounts for this provider.
+      - id: "eastus_standard" # A unique name you choose for this account
+        credentials:
+          api_key: "YOUR_AZURE_KEY_1"
+          region: "eastus"
+      #  options: {} # Generic options for this provider account, e.g., custom endpoints
+
+      - id: "transGlobal"
+        credentials:
+          api_key: "YOUR_AZURE_KEY_1"
+          region: "global"
+        options:
+            endpoint: "https://api.cognitive.microsofttranslator.com/translate?api-version=3.0"
+
+    google:
+      - id: "default-gemini-creds"
+        credentials:
+          api_key: "YOUR_GEMINI_API_KEY_HERE"
+
+  # 2. Define the services that USE the providers.
+  # The key ("transcription", "translation", "ai_text_chat", "meeting_summarizing") is the service name.
+  services:
+    transcription:
+      provider: "azure"         # The provider TYPE to use
+      id: "eastus_standard" # The specific account ID to use from the list above
+      options:
+        model: "default"          # A model ID specific to this service
+        max_selected_trans_langs: 2
+      pricing:
+        default: # Corresponds to the model name in options
+          price_per_hour: 1.00
+
+    translation:
+      provider: "azure"
+      id: "transGlobal"
+      options:
+        max_selected_trans_langs: 5
+      pricing:
+        default: # A generic key for services with one pricing model
+          price_per_million_characters: 10.00 # Example for Standard tier
+
+    speech-synthesis:
+      provider: "azure"
+      id: "eastus_standard"
+      options:
+        voice-en: "en-US-JennyNeural"
+        voice-bn: "bn-IN-TanishaaNeural"
+        voice-fr: "fr-FR-DeniseNeural"
+        voice-de: "de-DE-KatjaNeural"
+        voice-es: "es-ES-ElviraNeural"
+      pricing:
+        default: # A generic key for services with one pricing model
+          price_per_million_characters: 16.00 # Example for Neural voice
+
+    ai_text_chat:
+      provider: "google"
+      id: "default-gemini-creds"
+      options:
+        chat_model: "gemini-2.5-pro"
+        summarize_model: "gemini-2.0-flash"
+        context_window: 5 # Number of recent messages to keep before summarizing
+      pricing:
+        gemini-2.5-pro:
+          input_price_per_million_tokens: 3.50
+          output_price_per_million_tokens: 10.50
+        gemini-2.0-flash:
+          input_price_per_million_tokens: 0.35
+          output_price_per_million_tokens: 0.70
+
+    meeting_summarizing:
+      provider: "google"
+      id: "default-gemini-creds"
+      options:
+        # The model to be used for the final summarization.
+        summarize_model: "gemini-2.0-flash"
+      pricing:
+        gemini-2.0-flash:
+          input_price_per_million_tokens: 0.35
+          output_price_per_million_tokens: 0.70
