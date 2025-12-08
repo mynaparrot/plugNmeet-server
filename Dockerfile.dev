@@ -1,5 +1,7 @@
 FROM golang:1.25
 
+ARG TARGETARCH
+
 # Align with production Dockerfile and entrypoint script
 ENV SPEECHSDK_ROOT="/opt/speechsdk"
 RUN mkdir -p $SPEECHSDK_ROOT && \
@@ -21,9 +23,13 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
 
 RUN go install github.com/air-verse/air@latest
 
-ENV CGO_CFLAGS="-I$SPEECHSDK_ROOT/include/c_api"
-# Note: This assumes a dev architecture of x64. The entrypoint script is more robust for runtime.
-ENV CGO_LDFLAGS="-L$SPEECHSDK_ROOT/lib/x64 -lMicrosoft.CognitiveServices.Speech.core"
+RUN case "$TARGETARCH" in \
+        "amd64") SPEECHSDK_ARCH_DIR="x64" ;; \
+        "arm64") SPEECHSDK_ARCH_DIR="arm64" ;; \
+        *) echo "Unsupported architecture for Speech SDK: $TARGETARCH"; exit 1 ;; \
+    esac && \
+    CGO_CFLAGS="-I$SPEECHSDK_ROOT/include/c_api" \
+    CGO_LDFLAGS="-L$SPEECHSDK_ROOT/lib/${SPEECHSDK_ARCH_DIR} -lMicrosoft.CognitiveServices.Speech.core"
 
 #COPY . .
 COPY go.mod go.mod
