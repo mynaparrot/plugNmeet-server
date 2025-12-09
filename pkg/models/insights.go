@@ -17,7 +17,6 @@ import (
 )
 
 const (
-	InsightsNatsChannel           = "plug-n-meet-insights"
 	TaskConfigureAgent            = "configureAgent"
 	TaskUserStart                 = "userStart"
 	TaskUserEnd                   = "userEnd"
@@ -64,7 +63,7 @@ func (s *InsightsModel) ConfigureAgent(payload *insights.InsightsTaskPayload, ti
 	}
 
 	// Use nats request/reply
-	msg, err := s.appConfig.NatsConn.Request(InsightsNatsChannel, p, timeout)
+	msg, err := s.appConfig.NatsConn.Request(insights.InsightsNatsChannel, p, timeout)
 	if err != nil {
 		return fmt.Errorf("NATS request failed: %w", err)
 	}
@@ -90,7 +89,7 @@ func (s *InsightsModel) ActivateAgentTaskForUser(payload *insights.InsightsTaskP
 		return err
 	}
 
-	msg, err := s.appConfig.NatsConn.Request(InsightsNatsChannel, p, timeout)
+	msg, err := s.appConfig.NatsConn.Request(insights.InsightsNatsChannel, p, timeout)
 	if err != nil {
 		return fmt.Errorf("NATS request failed: %w", err)
 	}
@@ -116,7 +115,7 @@ func (s *InsightsModel) EndAgentTaskForUser(payload *insights.InsightsTaskPayloa
 		return err
 	}
 
-	msg, err := s.appConfig.NatsConn.Request(InsightsNatsChannel, p, timeout)
+	msg, err := s.appConfig.NatsConn.Request(insights.InsightsNatsChannel, p, timeout)
 	if err != nil {
 		return fmt.Errorf("NATS request failed: %w", err)
 	}
@@ -146,7 +145,7 @@ func (s *InsightsModel) EndRoomAgentTaskByServiceName(serviceType insights.Servi
 		return err
 	}
 
-	msg, err := s.appConfig.NatsConn.Request(InsightsNatsChannel, p, timeout)
+	msg, err := s.appConfig.NatsConn.Request(insights.InsightsNatsChannel, p, timeout)
 	if err != nil {
 		return fmt.Errorf("NATS request failed: %w", err)
 	}
@@ -173,7 +172,7 @@ func (s *InsightsModel) EndRoomAllAgentTasks(roomName string) error {
 	if err != nil {
 		return err
 	}
-	return s.appConfig.NatsConn.Publish(InsightsNatsChannel, p)
+	return s.appConfig.NatsConn.Publish(insights.InsightsNatsChannel, p)
 }
 
 // ActivateTextTask performs a direct, stateless text-based task using the configured provider.

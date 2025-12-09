@@ -80,9 +80,9 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 			}
 		}()
 
-		synthesisChannel := fmt.Sprintf(SynthesisChannel, roomId)
+		synthesisChannel := fmt.Sprintf(insights.SynthesisNatsChannel, roomId)
 
-		// The loop will automatically break when the SynthesisChannel is closed.
+		// The loop will automatically break when the SynthesisNatsChannel is closed.
 		for event := range stream.Results() {
 			switch event.Type {
 			case insights.EventTypePartialResult, insights.EventTypeFinalResult:
@@ -94,10 +94,10 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 					t.logger.WithError(err).Errorln("error broadcasting transcription result")
 				}
 
-				// If we have a final result, publish it to the dedicated synthesis SynthesisChannel.
+				// If we have a final result, publish it to the dedicated synthesis SynthesisNatsChannel.
 				if event.Type == insights.EventTypeFinalResult {
 					if err = t.appConf.NatsConn.Publish(synthesisChannel, marshal); err != nil {
-						t.logger.WithError(err).Errorln("error publishing to synthesis SynthesisChannel")
+						t.logger.WithError(err).Errorln("error publishing to synthesis SynthesisNatsChannel")
 					}
 					if event.Result.AllowedTranscriptionStorage {
 						if err = t.natsService.AddTranscriptionChunk(roomId, userId, event.Result.FromUserName, event.Result.Lang, event.Result.Text); err != nil {

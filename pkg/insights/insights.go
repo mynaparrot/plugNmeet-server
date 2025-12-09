@@ -10,6 +10,8 @@ import (
 )
 
 const (
+	InsightsNatsChannel         = "plug-n-meet-insights"
+	SynthesisNatsChannel        = "plug-n-meet-transcription-output-%s"
 	SummarizeJobQueue           = "pnm.insights.jobs.summarize"
 	PendingSummarizeJobRedisKey = "pnm:insights:pending_summarize_jobs"
 )

@@ -23,8 +23,9 @@ const (
 // PCM audio from a PCMRemoteTrack and writes it directly to a Go channel.
 type pcmWriter struct {
 	audioChan chan media.PCM16Sample
+	closeOnce sync.Once
+	mu        sync.Mutex
 	isClosed  bool
-	lock      sync.Mutex
 }
 
 // newPCMWriter creates a new writer.
@@ -37,26 +38,32 @@ func newPCMWriter() *pcmWriter {
 // WriteSample is called by the PCMRemoteTrack. The sample is already
 // resampled to our target sample rate.
 func (w *pcmWriter) WriteSample(sample media.PCM16Sample) error {
-	w.lock.Lock()
-	defer w.lock.Unlock()
+	w.mu.Lock()
+	defer w.mu.Unlock()
 
 	if w.isClosed {
 		return io.EOF
 	}
 
-	w.audioChan <- sample
-	return nil
+	// Use a non-blocking write to avoid stalling the media pipeline.
+	select {
+	case w.audioChan <- sample:
+		return nil
+	default:
+		// Channel is full, drop the sample.
+		return nil
+	}
 }
 
-// Close closes the writer and the underlying channel.
+// Close closes the writer and the underlying channel safely using sync.Once.
 func (w *pcmWriter) Close() error {
-	w.lock.Lock()
-	defer w.lock.Unlock()
+	w.closeOnce.Do(func() {
+		w.mu.Lock()
+		defer w.mu.Unlock()
 
-	if !w.isClosed {
 		w.isClosed = true
 		close(w.audioChan)
-	}
+	})
 	return nil
 }
 
@@ -78,6 +85,8 @@ func NewTranscoder(ctx context.Context, track *webrtc.TrackRemote, decryptor lkm
 
 	pcmTrack, err := lkmedia.NewPCMRemoteTrack(track, writer, opts...)
 	if err != nil {
+		// If creation fails, we must close the writer we just created.
+		_ = writer.Close()
 		return nil, err
 	}
 
@@ -86,10 +95,13 @@ func NewTranscoder(ctx context.Context, track *webrtc.TrackRemote, decryptor lkm
 		pcmTrack: pcmTrack,
 	}
 
-	// Start a goroutine to automatically close the transcoder when the context is done.
+	// Start a goroutine to automatically close all resources when the context is done.
 	go func() {
 		<-ctx.Done()
+		// Close the track first to stop the flow of samples.
 		pcmTrack.Close()
+		// Then, close our writer to signal the end of the stream to consumers.
+		_ = writer.Close()
 	}()
 
 	return t, nil
@@ -103,7 +115,8 @@ func (t *Transcoder) AudioStream() <-chan media.PCM16Sample {
 // --- Publisher for outgoing audio ---
 
 type AudioPublisher struct {
-	track *lkmedia.PCMLocalTrack
+	track     *lkmedia.PCMLocalTrack
+	closeOnce sync.Once
 }
 
 // NewAudioPublisher creates and publishes a new local audio track to the room.
@@ -186,9 +199,11 @@ func (p *AudioPublisher) WriteSample(sample media.PCM16Sample) error {
 	return p.track.WriteSample(sample)
 }
 
-// Close unpublishes and closes the local track.
+// Close unpublishes and closes the local track safely using sync.Once.
 func (p *AudioPublisher) Close() {
-	if p.track != nil {
-		_ = p.track.Close()
-	}
+	p.closeOnce.Do(func() {
+		if p.track != nil {
+			_ = p.track.Close()
+		}
+	})
 }

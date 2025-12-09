@@ -20,11 +20,10 @@ import (
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/singleflight"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
-
-const SynthesisChannel = "plug-n-meet-transcription-output-%s"
 
 // TranscriptionSynthesisTask listens for translation results and dispatches them to language-specific workers for synthesis.
 type TranscriptionSynthesisTask struct {
@@ -42,6 +41,7 @@ type TranscriptionSynthesisTask struct {
 
 	lock    sync.RWMutex
 	workers map[string]*ttsWorker // map[language] -> ttsWorker
+	sf      singleflight.Group
 }
 
 func NewTranscriptionSynthesisTask(ctx context.Context, appCnf *config.AppConfig, logger *logrus.Entry, provider insights.Provider, serviceConfig *config.ServiceConfig, redisService *redisservice.RedisService, natsService *natsservice.NatsService, roomId string, transLangs []string, e2eeKey *string) *TranscriptionSynthesisTask {
@@ -65,7 +65,7 @@ func NewTranscriptionSynthesisTask(ctx context.Context, appCnf *config.AppConfig
 
 // Run creates all workers and then subscribes to NATS to start the main orchestration loop.
 func (t *TranscriptionSynthesisTask) Run() {
-	sub, err := t.appCnf.NatsConn.Subscribe(fmt.Sprintf(SynthesisChannel, t.roomId), func(msg *nats.Msg) {
+	sub, err := t.appCnf.NatsConn.Subscribe(fmt.Sprintf(insights.SynthesisNatsChannel, t.roomId), func(msg *nats.Msg) {
 		res := new(plugnmeet.InsightsTranscriptionResult)
 		err := protojson.Unmarshal(msg.Data, res)
 		if err != nil {
@@ -130,57 +130,74 @@ func (t *TranscriptionSynthesisTask) dispatch(fromUserId string, translations ma
 	}
 }
 
-// createAgentWorker creates a new worker, including a new LiveKit participant, and a processing goroutine.
+// createAgentWorker creates a new worker using singleflight to prevent duplicate creation.
 func (t *TranscriptionSynthesisTask) createAgentWorker(language string) (*ttsWorker, error) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	// Double-check if another thread created it while we were waiting for the lock
+	// Fast path: Check if the worker already exists with a read lock.
+	t.lock.RLock()
 	if w, ok := t.workers[language]; ok {
+		t.lock.RUnlock()
 		return w, nil
 	}
+	t.lock.RUnlock()
 
-	// Get the voice from the mapping. It's okay if it's empty, the provider will use its default.
-	voice := t.voiceMappings[language]
-	agentIdentity := fmt.Sprintf("%s%s", config.TTSAgentUserIdPrefix, language)
-	agentName := fmt.Sprintf("Translator-%s", strings.ToUpper(language))
+	// Worker doesn't exist. Use singleflight to ensure the creation logic
+	// runs only once for this language.
+	v, err, _ := t.sf.Do(language, func() (interface{}, error) {
+		// This function is now guaranteed to run only once for a given language
+		// across all concurrent goroutines.
 
-	log := t.logger.WithFields(logrus.Fields{
-		"agent_identity": agentIdentity,
-		"agent_name":     agentName,
-		"language":       language,
-		"voice":          voice,
+		// All expensive I/O happens here, inside the singleflight guard.
+		voice := t.voiceMappings[language]
+		agentIdentity := fmt.Sprintf("%s%s", config.TTSAgentUserIdPrefix, language)
+		agentName := fmt.Sprintf("Translator-%s", strings.ToUpper(language))
+
+		log := t.logger.WithFields(logrus.Fields{
+			"agent_identity": agentIdentity,
+			"agent_name":     agentName,
+			"language":       language,
+			"voice":          voice,
+		})
+
+		workerRoom, err := t.connectAgentToRoom(agentIdentity, agentName, log)
+		if err != nil {
+			return nil, err
+		}
+
+		publisher, err := inMedia.NewAudioPublisher(workerRoom, language, 16000, 1, t.e2eeKey)
+		if err != nil {
+			workerRoom.Disconnect() // Clean up
+			return nil, err
+		}
+
+		ctx, cancel := context.WithCancel(t.ctx)
+		worker := &ttsWorker{
+			ctx:       ctx,
+			cancel:    cancel,
+			provider:  t.provider,
+			room:      workerRoom,
+			publisher: publisher,
+			workQueue: make(chan string, 10),
+			language:  language,
+			voice:     voice,
+			logger:    t.logger.WithField("tts_language", language),
+		}
+
+		// Now, safely add the newly created worker to the shared map.
+		t.lock.Lock()
+		t.workers[language] = worker
+		t.lock.Unlock()
+
+		go worker.run(log)
+		log.Infof("created new tts agent participant for language %s with voice %s", language, voice)
+
+		return worker, nil
 	})
 
-	workerRoom, err := t.connectAgentToRoom(agentIdentity, agentName, log)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create track options, including encryptor if E2EE is enabled
-	publisher, err := inMedia.NewAudioPublisher(workerRoom, language, 16000, 1, t.e2eeKey)
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, cancel := context.WithCancel(t.ctx)
-	worker := &ttsWorker{
-		ctx:       ctx,
-		cancel:    cancel,
-		provider:  t.provider,
-		room:      workerRoom,
-		publisher: publisher,
-		workQueue: make(chan string, 10),
-		language:  language,
-		voice:     voice,
-		logger:    t.logger.WithField("tts_language", language),
-	}
-
-	go worker.run(log)
-	t.workers[language] = worker
-	log.Infof("created new tts agent participant for language %s with voice %s", language, voice)
-
-	return worker, nil
+	return v.(*ttsWorker), nil
 }
 
 func (t *TranscriptionSynthesisTask) connectAgentToRoom(agentIdentity, agentName string, log *logrus.Entry) (*lksdk.Room, error) {

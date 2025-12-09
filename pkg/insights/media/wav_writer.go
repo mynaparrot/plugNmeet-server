@@ -19,6 +19,8 @@ type WAVWriter struct {
 	// Add a mutex to protect concurrent access to numBytes
 	mu       sync.Mutex
 	numBytes uint32
+
+	closeOnce sync.Once
 }
 
 // NewWAVWriter creates a new WAVWriter.
@@ -54,17 +56,21 @@ func (w *WAVWriter) WriteSample(sample media.PCM16Sample) error {
 
 // Close finalizes the WAV file by updating the header with the correct sizes.
 func (w *WAVWriter) Close() error {
-	if err := w.updateHeader(); err != nil {
-		return err
-	}
-	if w.onClose != nil {
-		w.onClose()
-	}
-	// If the underlying writer is a file, close it.
-	if f, ok := w.writer.(*os.File); ok {
-		return f.Close()
-	}
-	return nil
+	var err error
+	w.closeOnce.Do(func() {
+		if e := w.updateHeader(); e != nil {
+			err = e
+			return
+		}
+		if w.onClose != nil {
+			w.onClose()
+		}
+		// If the underlying writer is a file, close it.
+		if f, ok := w.writer.(*os.File); ok {
+			err = f.Close()
+		}
+	})
+	return err
 }
 
 // SampleRate returns the sample rate of the audio.

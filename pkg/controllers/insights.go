@@ -41,7 +41,7 @@ func (i *InsightsController) StartSubscription() {
 
 // SubscribeToAgentTaskRequests is the central handler for all incoming agent tasks.
 func (i *InsightsController) SubscribeToAgentTaskRequests() {
-	sub, err := i.app.NatsConn.Subscribe(models.InsightsNatsChannel, func(msg *nats.Msg) {
+	sub, err := i.app.NatsConn.Subscribe(insights.InsightsNatsChannel, func(msg *nats.Msg) {
 		// Pass the raw message directly to the model's handler.
 		// The model is now responsible for unmarshalling and replying.
 		i.insightsModel.HandleIncomingAgentTask(msg)
