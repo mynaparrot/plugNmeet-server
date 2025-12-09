@@ -181,12 +181,17 @@ shared_notepad:
       client_secret: "lmpGEH0MxrBg7ymsbSh9TU1d6VHRMk"
 
 analytics_settings:
+  # Enable to generate a detailed analytics file after each session.
+  # This file contains valuable metadata about user engagement, such as join/leave times,
+  # feature usage, and total speaking duration, helping you understand how your
+  # platform is being used.
   enabled: true
 
 artifacts_settings:
   # The root path where all generated artifacts (summaries, etc.) will be stored.
   # Each room will have its own subdirectory: {storage_path}/{service_type}/{room_id}/
   storage_path: "./artifacts"
+  # Download token validity duration in minutes. Default is 10 minutes.
   token_validity: 10m
   # If true, deleted artifacts will be moved to a backup directory instead of being immediately removed.
   enable_del_artifacts_backup: true

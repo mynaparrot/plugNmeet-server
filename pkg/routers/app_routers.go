@@ -132,9 +132,11 @@ func (r *router) registerAuthRoutes() {
 
 	recording := auth.Group("/recording")
 	recording.Post("/fetch", r.ctrl.RecordingController.HandleFetchRecordings)
-	recording.Post("/recordingInfo", r.ctrl.RecordingController.HandleRecordingInfo)
+	recording.Post("/info", r.ctrl.RecordingController.HandleRecordingInfo)
 	recording.Post("/delete", r.ctrl.RecordingController.HandleDeleteRecording)
 	recording.Post("/getDownloadToken", r.ctrl.RecordingController.HandleGetDownloadToken)
+	// deprecated: use /info
+	recording.Post("/recordingInfo", r.ctrl.RecordingController.HandleRecordingInfo)
 
 	analytics := auth.Group("/analytics")
 	analytics.Post("/fetch", r.ctrl.AnalyticsController.HandleFetchAnalytics)
@@ -143,7 +145,7 @@ func (r *router) registerAuthRoutes() {
 
 	artifact := auth.Group("/artifact")
 	artifact.Post("/fetch", r.ctrl.ArtifactController.HandleFetchArtifacts)
-	artifact.Post("/artifactInfo", r.ctrl.ArtifactController.HandleGetArtifactInfo)
+	artifact.Post("/info", r.ctrl.ArtifactController.HandleGetArtifactInfo)
 	artifact.Post("/delete", r.ctrl.ArtifactController.HandleDeleteArtifact)
 	artifact.Post("/getDownloadToken", r.ctrl.ArtifactController.HandleGetArtifactDownloadToken)
 
