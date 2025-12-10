@@ -18,8 +18,7 @@ func (s *DatabaseService) GetArtifacts(roomIds []string, roomSid *string, artifa
 	tx := s.db.Model(&dbmodels.RoomArtifact{})
 
 	if roomSid != nil {
-		isRunning := 0
-		roomInfo, err := s.GetRoomInfoBySid(*roomSid, &isRunning)
+		roomInfo, err := s.GetRoomInfoBySid(*roomSid, nil)
 		if err != nil {
 			return nil, 0, err
 		}

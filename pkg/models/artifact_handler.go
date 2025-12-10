@@ -16,14 +16,13 @@ import (
 
 // FetchArtifacts fetches records from the DB and formats them for the API response.
 func (m *ArtifactModel) FetchArtifacts(req *plugnmeet.FetchArtifactsReq) (*plugnmeet.FetchArtifactsResult, error) {
-	if req.RoomSid == nil && len(req.RoomIds) == 0 {
-		return nil, errors.New("either room_sid or at least one room_id in room_ids is required")
-	}
-
 	if req.Limit <= 0 {
 		req.Limit = 20
 	} else if req.Limit > 100 {
 		req.Limit = 100
+	}
+	if req.OrderBy == "" {
+		req.OrderBy = "DESC"
 	}
 
 	dbArtifacts, total, err := m.ds.GetArtifacts(req.RoomIds, req.RoomSid, req.Type, req.From, req.Limit, &req.OrderBy)
