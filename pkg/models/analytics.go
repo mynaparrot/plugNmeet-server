@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -189,6 +190,9 @@ func (m *AnalyticsModel) FetchAnalytics(r *plugnmeet.FetchAnalyticsReq) (*plugnm
 	}
 	if r.OrderBy == "" {
 		r.OrderBy = "DESC"
+	}
+	if len(r.RoomIds) == 0 {
+		return nil, errors.New("at least one room_id in room_ids is required")
 	}
 
 	// 1. Fetch from the new artifacts system
