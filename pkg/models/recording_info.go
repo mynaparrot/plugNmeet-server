@@ -1,12 +1,17 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 )
 
 func (m *RecordingModel) FetchRecordings(r *plugnmeet.FetchRecordingsReq) (*plugnmeet.FetchRecordingsResult, error) {
+	if r.RoomSid == nil && len(r.RoomIds) == 0 {
+		return nil, errors.New("either room_sid or at least one room_id in room_ids is required")
+	}
+
 	if r.Limit <= 0 {
 		r.Limit = 20
 	}
