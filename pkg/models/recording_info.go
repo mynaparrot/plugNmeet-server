@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func (m *RecordingModel) FetchRecordings(r *plugnmeet.FetchRecordingsReq) (*plugnmeet.FetchRecordingsResult, error) {
@@ -31,6 +32,12 @@ func (m *RecordingModel) FetchRecordings(r *plugnmeet.FetchRecordingsReq) (*plug
 			FileSize:         float32(v.Size),
 			CreationTime:     v.CreationTime,
 			RoomCreationTime: v.RoomCreationTime,
+		}
+		if v.Metadata != "" {
+			metadata := new(plugnmeet.RecordingMetadata)
+			if err = protojson.Unmarshal([]byte(v.Metadata), metadata); err == nil {
+				recording.Metadata = metadata
+			}
 		}
 		recordings = append(recordings, recording)
 	}
@@ -63,6 +70,12 @@ func (m *RecordingModel) FetchRecording(recordId string) (*plugnmeet.RecordingIn
 		FileSize:         float32(v.Size),
 		CreationTime:     v.CreationTime,
 		RoomCreationTime: v.RoomCreationTime,
+	}
+	if v.Metadata != "" {
+		metadata := new(plugnmeet.RecordingMetadata)
+		if err = protojson.Unmarshal([]byte(v.Metadata), metadata); err == nil {
+			recording.Metadata = metadata
+		}
 	}
 
 	return recording, nil

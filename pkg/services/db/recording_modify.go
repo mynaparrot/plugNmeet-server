@@ -31,3 +31,10 @@ func (s *DatabaseService) DeleteRecording(recordId string) (int64, error) {
 
 	return result.RowsAffected, nil
 }
+
+// UpdateRecordingMetadata updates the metadata for a specific recording.
+func (s *DatabaseService) UpdateRecordingMetadata(recordID, metadata string) error {
+	return s.db.Model(&dbmodels.Recording{}).
+		Where("record_id = ?", recordID).
+		Update("metadata", metadata).Error
+}

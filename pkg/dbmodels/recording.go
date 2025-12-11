@@ -16,6 +16,7 @@ type Recording struct {
 	FilePath         string         `gorm:"column:file_path;type:varchar(255);not null"`
 	Size             float64        `gorm:"column:size;type:double;not null"`
 	Published        int64          `gorm:"column:published;type:int(1);not null;default:1"`
+	Metadata         string         `gorm:"column:metadata;type:json"`
 	CreationTime     int64          `gorm:"column:creation_time;type:int(10);not null;autoCreateTime"`
 	RoomCreationTime int64          `gorm:"column:room_creation_time;type:int(10);not null;default:0"`
 	Created          time.Time      `gorm:"column:created;type:datetime;not null;default:current_timestamp()"`

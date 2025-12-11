@@ -52,7 +52,7 @@ func (m *RecordingModel) recordingStarted(r *plugnmeet.RecorderToPlugNmeet) {
 	log.Infoln("finished processing recording_started event")
 }
 
-func (m *RecordingModel) addRecordingInfoToDB(r *plugnmeet.RecorderToPlugNmeet, roomCreationTime int64) (int64, error) {
+func (m *RecordingModel) addRecordingInfoToDB(r *plugnmeet.RecorderToPlugNmeet, roomInfo *dbmodels.RoomInfo) (int64, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId":      r.RoomId,
 		"recordingId": r.RecordingId,
@@ -72,7 +72,14 @@ func (m *RecordingModel) addRecordingInfoToDB(r *plugnmeet.RecorderToPlugNmeet, 
 		RecorderID:       r.RecorderId,
 		Size:             helpers.ToFixed(float64(r.FileSize), 2),
 		FilePath:         r.FilePath,
-		RoomCreationTime: roomCreationTime,
+		RoomCreationTime: roomInfo.CreationTime,
+	}
+
+	metadata := &plugnmeet.RecordingMetadata{
+		Title: &roomInfo.RoomTitle,
+	}
+	if marshal, err := protojson.Marshal(metadata); err == nil {
+		data.Metadata = string(marshal)
 	}
 
 	_, err := m.ds.InsertRecordingData(data)
@@ -110,7 +117,7 @@ func (m *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet, 
 		FileSize:         r.FileSize,
 		CreationTime:     creation,
 	}
-	op := protojson.MarshalOptions{
+	var op = protojson.MarshalOptions{
 		EmitUnpopulated: true,
 		UseProtoNames:   true,
 	}
@@ -127,4 +134,85 @@ func (m *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet, 
 		return
 	}
 	log.Infoln("successfully created recording info file")
+}
+
+// UpdateRecordingMetadata updates the metadata of a specific recording.
+// It intelligently handles partial updates based on the provided fields:
+// - To update a field, provide a new value.
+// - To clear a text field (like Title), provide an empty string "".
+// - To clear subtitles, provide an empty array [].
+// - If a field is omitted (i.e., nil), its existing value is kept.
+//
+// NOTE: If you add a new field to the RecordingMetadata protobuf,
+// you must add a new block here to handle its update.
+func (m *RecordingModel) UpdateRecordingMetadata(req *plugnmeet.UpdateRecordingMetadataReq) error {
+	// 1. Fetch the existing recording info.
+	recording, err := m.FetchRecording(req.GetRecordId())
+	if err != nil {
+		return err
+	}
+
+	// 2. Prepare the metadata struct.
+	// If existing metadata is nil, initialize it.
+	existingMeta := recording.Metadata
+	if existingMeta == nil {
+		existingMeta = &plugnmeet.RecordingMetadata{}
+	}
+
+	// Nothing to do if no metadata is provided in the request.
+	if req.Metadata == nil {
+		return nil // Or return a specific message/error if you prefer
+	}
+
+	// 3. Apply changes from the request.
+	var modified bool
+
+	// Compare and update Title
+	if req.Metadata.Title != nil {
+		if existingMeta.Title == nil || *existingMeta.Title != *req.Metadata.Title {
+			existingMeta.Title = req.Metadata.Title
+			modified = true
+		}
+	}
+
+	// Compare and update Description
+	if req.Metadata.Description != nil {
+		if existingMeta.Description == nil || *existingMeta.Description != *req.Metadata.Description {
+			existingMeta.Description = req.Metadata.Description
+			modified = true
+		}
+	}
+
+	// Compare and update Subtitles
+	if req.Metadata.Subtitles != nil {
+		existingMeta.Subtitles = req.Metadata.Subtitles
+		modified = true
+	}
+
+	// Compare and update ExtraData
+	if req.Metadata.ExtraData != nil {
+		if existingMeta.ExtraData == nil || *existingMeta.ExtraData != *req.Metadata.ExtraData {
+			existingMeta.ExtraData = req.Metadata.ExtraData
+			modified = true
+		}
+	}
+
+	// 4. If no changes were made, we can exit early.
+	if !modified {
+		return nil
+	}
+
+	// 5. Marshal the newly updated metadata back into a JSON string.
+	updatedMetadataBytes, err := protojson.Marshal(existingMeta)
+	if err != nil {
+		return fmt.Errorf("failed to marshal updated metadata: %w", err)
+	}
+
+	// 6. Save the updated JSON string to the database.
+	err = m.ds.UpdateRecordingMetadata(recording.RecordId, string(updatedMetadataBytes))
+	if err != nil {
+		return fmt.Errorf("failed to save updated metadata to database: %w", err)
+	}
+
+	return nil
 }

@@ -57,6 +57,21 @@ func (rc *RecordingController) HandleRecordingInfo(c *fiber.Ctx) error {
 	return utils.SendProtoJsonResponse(c, result)
 }
 
+// HandleUpdateRecordingMetadata handles update metadata information for a single recording.
+func (rc *RecordingController) HandleUpdateRecordingMetadata(c *fiber.Ctx) error {
+	req := new(plugnmeet.UpdateRecordingMetadataReq)
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
+
+	err := rc.RecordingModel.UpdateRecordingMetadata(req)
+	if err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+	}
+
+	return utils.SendCommonProtoJsonResponse(c, true, "success")
+}
+
 // HandleDeleteRecording handles deleting a recording.
 func (rc *RecordingController) HandleDeleteRecording(c *fiber.Ctx) error {
 	req := new(plugnmeet.DeleteRecordingReq)

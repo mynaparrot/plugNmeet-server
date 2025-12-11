@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS `pnm_recordings` (
   `file_path` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `size` double NOT NULL,
   `published` int(1) NOT NULL DEFAULT 1,
+  `metadata` JSON DEFAULT NULL,
   `creation_time` int(10) NOT NULL DEFAULT 0,
   `room_creation_time` int(10) NOT NULL DEFAULT 0,
   `created` datetime NOT NULL DEFAULT current_timestamp(),

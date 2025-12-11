@@ -133,6 +133,7 @@ func (r *router) registerAuthRoutes() {
 	recording := auth.Group("/recording")
 	recording.Post("/fetch", r.ctrl.RecordingController.HandleFetchRecordings)
 	recording.Post("/info", r.ctrl.RecordingController.HandleRecordingInfo)
+	recording.Post("/updateMetadata", r.ctrl.RecordingController.HandleUpdateRecordingMetadata)
 	recording.Post("/delete", r.ctrl.RecordingController.HandleDeleteRecording)
 	recording.Post("/getDownloadToken", r.ctrl.RecordingController.HandleGetDownloadToken)
 	// deprecated: use /info

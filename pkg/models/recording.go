@@ -54,7 +54,7 @@ func (m *RecordingModel) HandleRecorderResp(r *plugnmeet.RecorderToPlugNmeet, ro
 		go m.sendToWebhookNotifier(r)
 
 	case plugnmeet.RecordingTasks_RECORDING_PROCEEDED:
-		creation, err := m.addRecordingInfoToDB(r, roomInfo.CreationTime)
+		creation, err := m.addRecordingInfoToDB(r, roomInfo)
 		if err != nil {
 			m.logger.WithError(err).Errorln("error adding recording info to db")
 		}
