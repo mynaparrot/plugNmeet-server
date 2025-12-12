@@ -3,7 +3,7 @@ module github.com/mynaparrot/plugnmeet-server
 go 1.25.1
 
 require (
-	buf.build/go/protovalidate v1.0.1
+	buf.build/go/protovalidate v1.1.0
 	github.com/Microsoft/cognitive-services-speech-sdk-go v1.43.0
 	github.com/ansrivas/fiberprometheus/v2 v2.14.0
 	github.com/cavaliergopher/grab/v3 v3.0.1
@@ -27,8 +27,8 @@ require (
 	github.com/redis/go-redis/v9 v9.17.2
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/sync v0.18.0
-	google.golang.org/genai v1.37.0
+	golang.org/x/sync v0.19.0
+	google.golang.org/genai v1.39.0
 	google.golang.org/protobuf v1.36.10
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/mysql v1.6.0
@@ -37,7 +37,7 @@ require (
 )
 
 require (
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.10-20250912141014-52f32327d4b0.1 // indirect
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.10-20251209175733-2a1774d88802.1 // indirect
 	buf.build/go/protoyaml v0.6.0 // indirect
 	cel.dev/expr v0.25.1 // indirect
 	cloud.google.com/go v0.123.0 // indirect
@@ -65,7 +65,7 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gofiber/template v1.8.3 // indirect
-	github.com/gofiber/utils v1.1.0 // indirect
+	github.com/gofiber/utils v1.2.0 // indirect
 	github.com/google/cel-go v0.26.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
