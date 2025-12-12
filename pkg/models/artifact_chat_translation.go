@@ -45,7 +45,7 @@ func (m *ArtifactModel) createChatTranslationUsageArtifact(roomId, roomSid strin
 	}
 
 	// save to database and send notification
-	_, err = m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_CHAT_TRANSLATION_USAGE, metadata, log)
+	_, err = m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_CHAT_TRANSLATION_USAGE, metadata, false, log)
 	if err != nil {
 		return err
 	}

@@ -56,7 +56,7 @@ func (m *ArtifactModel) createSpeechTranscriptionUsageArtifact(roomId, roomSid s
 	}
 
 	// Create and save the artifact for chat interactions.
-	_, err = m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_SPEECH_TRANSCRIPTION_USAGE, metadata, log)
+	_, err = m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_SPEECH_TRANSCRIPTION_USAGE, metadata, false, log)
 	if err != nil {
 		log.WithError(err).Error("failed to create speech transcription usage artifact")
 	}
@@ -160,7 +160,7 @@ func (m *ArtifactModel) createSpeechTranscriptionFileArtifact(roomId, roomSid st
 	}
 
 	// 7. Create the file artifact and get its ID.
-	fileArtifact, err := m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_SPEECH_TRANSCRIPTION, metadata, log)
+	fileArtifact, err := m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_SPEECH_TRANSCRIPTION, metadata, false, log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create speech transcription file artifact: %w", err)
 	}

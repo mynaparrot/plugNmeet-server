@@ -50,7 +50,7 @@ func (m *ArtifactModel) CreateMeetingSummaryArtifact(roomTableId uint64, summary
 	}
 
 	// Create the file artifact and get its ID.
-	fileArtifact, err := m.createAndSaveArtifact(roomInfo.RoomId, roomInfo.Sid, roomTableId, plugnmeet.RoomArtifactType_MEETING_SUMMARY, fileMetadata, log)
+	fileArtifact, err := m.createAndSaveArtifact(roomInfo.RoomId, roomInfo.Sid, roomTableId, plugnmeet.RoomArtifactType_MEETING_SUMMARY, fileMetadata, true, log)
 	if err != nil {
 		return fmt.Errorf("failed to create meeting summary file artifact: %w", err)
 	}
@@ -98,7 +98,7 @@ func (m *ArtifactModel) CreateMeetingSummaryArtifact(roomTableId uint64, summary
 	}
 
 	// 3. Create the usage artifact.
-	_, err = m.createAndSaveArtifact(roomInfo.RoomId, roomInfo.Sid, roomTableId, plugnmeet.RoomArtifactType_MEETING_SUMMARY_USAGE, usageMetadata, log)
+	_, err = m.createAndSaveArtifact(roomInfo.RoomId, roomInfo.Sid, roomTableId, plugnmeet.RoomArtifactType_MEETING_SUMMARY_USAGE, usageMetadata, true, log)
 	if err != nil {
 		log.WithError(err).Error("failed to create meeting summary usage artifact")
 	}

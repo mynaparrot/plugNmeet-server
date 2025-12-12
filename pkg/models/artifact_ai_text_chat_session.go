@@ -74,7 +74,7 @@ func (m *ArtifactModel) createAITextChatUsageArtifacts(roomId, roomSid string, r
 				},
 			},
 		}
-		_, err = m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_AI_TEXT_CHAT_INTERACTION_USAGE, metadata, log)
+		_, err = m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_AI_TEXT_CHAT_INTERACTION_USAGE, metadata, false, log)
 		if err != nil {
 			log.WithError(err).Error("failed to create AI text chat interaction artifact")
 		}
@@ -126,7 +126,7 @@ func (m *ArtifactModel) createAITextChatUsageArtifacts(roomId, roomSid string, r
 				},
 			},
 		}
-		_, err = m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_AI_TEXT_CHAT_SUMMARIZATION_USAGE, metadata, log)
+		_, err = m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_AI_TEXT_CHAT_SUMMARIZATION_USAGE, metadata, false, log)
 		if err != nil {
 			log.WithError(err).Error("failed to create AI text chat summarization artifact")
 		}

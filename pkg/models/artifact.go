@@ -133,7 +133,7 @@ func (m *ArtifactModel) CreateAllRoomUsageArtifacts(roomId, roomSid string, room
 	}
 }
 
-func (m *ArtifactModel) sendWebhookNotification(eventName ArtifactEventName, roomSid string, artifact *dbmodels.RoomArtifact, metadata *plugnmeet.RoomArtifactMetadata) {
+func (m *ArtifactModel) sendWebhookNotification(eventName ArtifactEventName, roomSid string, artifact *dbmodels.RoomArtifact, metadata *plugnmeet.RoomArtifactMetadata, forceSend bool) {
 	if m.webhookNotifier != nil {
 		e := string(eventName)
 		msg := &plugnmeet.CommonNotifyEvent{
@@ -148,8 +148,12 @@ func (m *ArtifactModel) sendWebhookNotification(eventName ArtifactEventName, roo
 				Metadata:   metadata,
 			},
 		}
-
-		err := m.webhookNotifier.SendWebhookEvent(msg)
+		var err error
+		if forceSend {
+			m.webhookNotifier.ForceToPutInQueue(msg)
+		} else {
+			err = m.webhookNotifier.SendWebhookEvent(msg)
+		}
 		if err != nil {
 			m.log.WithError(err).Errorln("error sending room created webhook")
 		}
@@ -169,7 +173,7 @@ func (m *ArtifactModel) HandleAnalyticsEvent(roomId string, eventName plugnmeet.
 }
 
 // createAndSaveArtifact is a helper to save data to DB.
-func (m *ArtifactModel) createAndSaveArtifact(roomId, roomSid string, roomTableId uint64, artifactType plugnmeet.RoomArtifactType, metadata *plugnmeet.RoomArtifactMetadata, log *logrus.Entry) (*dbmodels.RoomArtifact, error) {
+func (m *ArtifactModel) createAndSaveArtifact(roomId, roomSid string, roomTableId uint64, artifactType plugnmeet.RoomArtifactType, metadata *plugnmeet.RoomArtifactMetadata, forceSend bool, log *logrus.Entry) (*dbmodels.RoomArtifact, error) {
 	metadataBytes, err := protojson.Marshal(metadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal metadata: %w", err)
@@ -188,7 +192,7 @@ func (m *ArtifactModel) createAndSaveArtifact(roomId, roomSid string, roomTableI
 		return nil, fmt.Errorf("failed to create room artifact record: %w", err)
 	}
 
-	m.sendWebhookNotification(ArtifactCreated, roomSid, artifact, metadata)
+	m.sendWebhookNotification(ArtifactCreated, roomSid, artifact, metadata, forceSend)
 	log.Infof("successfully created %s artifact (id: %s) for room %s", artifactType.String(), artifact.ArtifactId, roomId)
 	return artifact, nil
 }

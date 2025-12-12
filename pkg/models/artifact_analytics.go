@@ -55,7 +55,7 @@ func (m *ArtifactModel) CreateAnalyticsArtifact(roomTableId uint64, jsonData []b
 		},
 	}
 
-	artifact, err := m.createAndSaveArtifact(roomInfo.RoomId, roomInfo.Sid, roomTableId, plugnmeet.RoomArtifactType_MEETING_ANALYTICS, metadata, log)
+	artifact, err := m.createAndSaveArtifact(roomInfo.RoomId, roomInfo.Sid, roomTableId, plugnmeet.RoomArtifactType_MEETING_ANALYTICS, metadata, false, log)
 	if err != nil {
 		// If creating the artifact fails, we should try to remove the file we just created.
 		log.WithError(err).Error("failed to create analytics artifact in database")
