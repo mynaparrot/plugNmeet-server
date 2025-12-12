@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"reflect"
+	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
@@ -77,6 +79,11 @@ func (m *RecordingModel) addRecordingInfoToDB(r *plugnmeet.RecorderToPlugNmeet, 
 
 	metadata := &plugnmeet.RecordingMetadata{
 		Title: &roomInfo.RoomTitle,
+		ExtraData: map[string]string{
+			"meeting-title":   roomInfo.RoomTitle,
+			"meeting-created": fmt.Sprintf(roomInfo.Created.Format(time.RFC3339)),
+			"meeting-ended":   fmt.Sprint(roomInfo.Ended.Format(time.RFC3339)),
+		},
 	}
 	if marshal, err := protojson.Marshal(metadata); err == nil {
 		data.Metadata = string(marshal)
@@ -140,7 +147,7 @@ func (m *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet, 
 // It intelligently handles partial updates based on the provided fields:
 // - To update a field, provide a new value.
 // - To clear a text field (like Title), provide an empty string "".
-// - To clear subtitles, provide an empty array [].
+// - To clear a specific map entry (like a subtitle), provide an empty object for that key.
 // - If a field is omitted (i.e., nil), its existing value is kept.
 //
 // NOTE: If you add a new field to the RecordingMetadata protobuf,
@@ -153,47 +160,95 @@ func (m *RecordingModel) UpdateRecordingMetadata(req *plugnmeet.UpdateRecordingM
 	}
 
 	// 2. Prepare the metadata struct.
-	// If existing metadata is nil, initialize it.
 	existingMeta := recording.Metadata
 	if existingMeta == nil {
 		existingMeta = &plugnmeet.RecordingMetadata{}
 	}
 
-	// Nothing to do if no metadata is provided in the request.
 	if req.Metadata == nil {
-		return nil // Or return a specific message/error if you prefer
+		return nil
 	}
 
-	// 3. Apply changes from the request.
 	var modified bool
 
-	// Compare and update Title
+	// Handle Title
 	if req.Metadata.Title != nil {
-		if existingMeta.Title == nil || *existingMeta.Title != *req.Metadata.Title {
-			existingMeta.Title = req.Metadata.Title
-			modified = true
+		newValue := req.Metadata.Title
+		if *newValue == "" {
+			if existingMeta.Title != nil {
+				existingMeta.Title = nil
+				modified = true
+			}
+		} else {
+			if existingMeta.Title == nil || *existingMeta.Title != *newValue {
+				existingMeta.Title = newValue
+				modified = true
+			}
 		}
 	}
 
-	// Compare and update Description
+	// Handle Description
 	if req.Metadata.Description != nil {
-		if existingMeta.Description == nil || *existingMeta.Description != *req.Metadata.Description {
-			existingMeta.Description = req.Metadata.Description
-			modified = true
+		newValue := req.Metadata.Description
+		if *newValue == "" {
+			if existingMeta.Description != nil {
+				existingMeta.Description = nil
+				modified = true
+			}
+		} else {
+			if existingMeta.Description == nil || *existingMeta.Description != *newValue {
+				existingMeta.Description = newValue
+				modified = true
+			}
 		}
 	}
 
-	// Compare and update Subtitles
+	// Handle Subtitles (Patching)
 	if req.Metadata.Subtitles != nil {
-		existingMeta.Subtitles = req.Metadata.Subtitles
-		modified = true
+		for key, value := range req.Metadata.Subtitles {
+			// A subtitle is empty for deletion if it's nil or has no label and no URL.
+			isEmpty := value == nil || (value.Label == "" || value.Url == "")
+
+			if isEmpty {
+				// It's a delete request.
+				if existingMeta.Subtitles != nil { // Can't delete from a nil map
+					if _, ok := existingMeta.Subtitles[key]; ok {
+						delete(existingMeta.Subtitles, key)
+						modified = true
+					}
+				}
+			} else {
+				// It's an update/insert request.
+				if existingMeta.Subtitles == nil {
+					existingMeta.Subtitles = make(map[string]*plugnmeet.RecordingSubtitle)
+				}
+
+				if !reflect.DeepEqual(existingMeta.Subtitles[key], value) {
+					existingMeta.Subtitles[key] = value
+					modified = true
+				}
+			}
+		}
 	}
 
-	// Compare and update ExtraData
+	// Handle ExtraData (Patching)
 	if req.Metadata.ExtraData != nil {
-		if existingMeta.ExtraData == nil || *existingMeta.ExtraData != *req.Metadata.ExtraData {
-			existingMeta.ExtraData = req.Metadata.ExtraData
-			modified = true
+		if existingMeta.ExtraData == nil {
+			existingMeta.ExtraData = make(map[string]string)
+		}
+		for key, value := range req.Metadata.ExtraData {
+			// If the value is empty, it's a request to delete.
+			if value == "" {
+				if _, ok := existingMeta.ExtraData[key]; ok {
+					delete(existingMeta.ExtraData, key)
+					modified = true
+				}
+			} else { // Otherwise, it's an update/insert.
+				if existingMeta.ExtraData[key] != value {
+					existingMeta.ExtraData[key] = value
+					modified = true
+				}
+			}
 		}
 	}
 
