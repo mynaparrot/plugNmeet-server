@@ -1,25 +1,24 @@
 #!/bin/sh
-
-# This script sets the correct Speech SDK library path based on the
-# architecture, updates the system's linker cache, and then executes
-# the command passed to it.
-
 set -e
 
-# Determine architecture at runtime inside the container.
+# 1. Determine architecture at runtime
 ARCH=$(dpkg --print-architecture)
-
 case "$ARCH" in
     "amd64") SPEECHSDK_ARCH_DIR="x64" ;;
     "arm64") SPEECHSDK_ARCH_DIR="arm64" ;;
-    *) echo "FATAL: Unsupported architecture for Speech SDK: $ARCH"; exit 1 ;;
+    *)
+        echo "FATAL: Unsupported architecture for Speech SDK: $ARCH"
+        exit 1
+        ;;
 esac
 
-# Add the correct library path to a temporary ld.so.conf.d file
+# 2. Configure the system's runtime linker cache for the application
 echo "/opt/speechsdk/lib/${SPEECHSDK_ARCH_DIR}" > /etc/ld.so.conf.d/speechsdk.conf
-
-# Update the linker cache
 ldconfig
 
-# Execute the command passed as arguments to the script.
+# 3. Export CGO flags for build tools like 'air'
+export CGO_CFLAGS="-I/opt/speechsdk/include/c_api"
+export CGO_LDFLAGS="-L/opt/speechsdk/lib/${SPEECHSDK_ARCH_DIR} -lMicrosoft.CognitiveServices.Speech.core"
+
+# 4. Execute the main command (e.g., "plugnmeet-server" or "air")
 exec "$@"

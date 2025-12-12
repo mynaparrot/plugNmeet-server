@@ -23,14 +23,6 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
 
 RUN go install github.com/air-verse/air@latest
 
-RUN case "$TARGETARCH" in \
-        "amd64") SPEECHSDK_ARCH_DIR="x64" ;; \
-        "arm64") SPEECHSDK_ARCH_DIR="arm64" ;; \
-        *) echo "Unsupported architecture for Speech SDK: $TARGETARCH"; exit 1 ;; \
-    esac && \
-    CGO_CFLAGS="-I$SPEECHSDK_ROOT/include/c_api" \
-    CGO_LDFLAGS="-L$SPEECHSDK_ROOT/lib/${SPEECHSDK_ARCH_DIR} -lMicrosoft.CognitiveServices.Speech.core"
-
 #COPY . .
 COPY go.mod go.mod
 COPY go.sum go.sum
