@@ -8,15 +8,15 @@ Have questions or ideas? [Join our developer community on Discord](https://disco
 
 ## Key Features
 
-*   **High-Performance & Scalable**: Built with Go and LiveKit, ensuring a robust system that can be distributed as a single binary.
-*   **Adaptive Streaming**: **Simulcast** and **Dynacast** support ensures stable calls even on poor networks. Supported codecs include `H264`, `VP8`, `VP9`, and `AV1`.
+*   **High-Performance & Scalable**: Built with Go and leveraging the power of LiveKit, ensuring a robust and lightweight system.
+*   **Adaptive Streaming**: **Simulcast** and **Dynacast** support ensures stable calls even on poor networks by intelligently managing video quality and bandwidth. Supported codecs include `H264`, `VP8`, `VP9`, and `AV1`.
 *   **Rich Collaboration Tools**: Engage users with HD audio/video, screen sharing, virtual backgrounds, a collaborative whiteboard with office file support (PDF, DOCX, PPTX), shared notepad, polls, and breakout rooms.
-*   **Secure Communication**: Features WebRTC-based encryption by default, with optional **End-to-End Encryption (E2EE)** for media and data channels (`Chromium 83+, Chrome, Edge, Safari, Firefox 117+`).
-*   **Flexible Integration**: Easily integrate with any website or system using our straightforward API and SDKs.
-*   **Deep Customization**: Easily customize the UI, features, branding, and URLs to match your application's look and feel.
-*   **Advanced Features**: Includes MP4 recording, RTMP broadcasting, RTMP/WHIP ingress, a customizable waiting room, and detailed participant analytics.
-*   **AI Meeting Agent**: Turn your meetings into actionable intelligence. Our powerful AI agent provides live spoken translations, real-time transcription, automated summaries, **and many more...**
-*   **Cross-Device Compatibility**: Works on all modern browsers, including Chrome, Firefox, and Safari for iOS.
+*   **Secure & Private Communication**: Features WebRTC-based encryption by default, with optional **End-to-End Encryption (E2EE)** for all media and data channels, ensuring conversations remain confidential.
+*   **AI-Powered Meeting Intelligence**: Turn meetings into actionable intelligence. The AI agent provides live spoken translations, real-time transcription, and automated summaries with action items, all accessible via the Artifacts API.
+*   **Flexible Integration**: Easily integrate with any website or system using our straightforward API and SDKs for PHP and JavaScript. Ready-to-use plugins are available for **WordPress**, **Moodle**, and **Joomla**.
+*   **Deep Customization**: Easily customize the UI, features, branding, and URLs to match your application's look and feel without modifying core code.
+*   **Advanced Broadcasting & Recording**: Includes reliable MP4 recording, RTMP/RTMPS broadcasting to services like YouTube, and RTMP/WHIP ingress for professional production tools like OBS.
+*   **Cross-Device Compatibility**: Works on all modern browsers, including Chrome, Firefox, and Safari for iOS, with no downloads required.
 
 And many more!
 
