@@ -1,10 +1,10 @@
 services:
   redis:
-    image: redis:8
+    image: redis:8.4
     ports:
       - "6379:6379/tcp"
   db:
-    image: mariadb:12.0
+    image: mariadb:12.1
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: 12345
@@ -55,7 +55,7 @@ services:
 #      - /usr/share/fonts/:/usr/share/fonts/:ro
 #      - /etc/fonts/:/etc/fonts/:ro
 #      - /usr/share/fontconfig/:/usr/share/fontconfig/:ro
-#      - /var/cache/fontconfig/:/var/cache/fontconfig/:ro   
+#      - /var/cache/fontconfig/:/var/cache/fontconfig/:ro
     depends_on:
       - redis
   plugnmeet-api:
