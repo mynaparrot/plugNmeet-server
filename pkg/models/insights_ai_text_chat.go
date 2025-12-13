@@ -91,8 +91,7 @@ func (s *InsightsModel) AITextChatRequest(roomId, userId, prompt string) error {
 		}
 
 		// Trigger background summarization
-		go s.CheckAndSummarize(s.ctx, roomId, userId)
-
+		s.CheckAndSummarize(s.ctx, roomId, userId)
 	}()
 
 	return nil // Success, request accepted
