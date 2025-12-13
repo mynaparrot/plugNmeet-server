@@ -7,7 +7,7 @@ require (
 	github.com/Microsoft/cognitive-services-speech-sdk-go v1.43.0
 	github.com/ansrivas/fiberprometheus/v2 v2.14.0
 	github.com/cavaliergopher/grab/v3 v3.0.1
-	github.com/gabriel-vasile/mimetype v1.4.11
+	github.com/gabriel-vasile/mimetype v1.4.12
 	github.com/go-jose/go-jose/v4 v4.1.3
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/goccy/go-json v0.10.5
