@@ -203,16 +203,18 @@ func (bc *BBBController) HandleBBBJoin(c *fiber.Ctx) error {
 	ex := new(bbbapiwrapper.CreateMeetingDefaultExtraData)
 	customDesign := new(plugnmeet.CustomDesignParams)
 	if metadata.ExtraData != nil {
-		err = json.Unmarshal([]byte(*metadata.ExtraData), ex)
-		if err != nil {
-			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
-		}
-		if ex.Logo != "" {
-			customDesign.CustomLogo = &ex.Logo
-		}
-		styleUrl := c.Query("userdata-bbb_custom_style_url")
-		if styleUrl != "" {
-			customDesign.CustomCssUrl = &styleUrl
+		if data, ok := metadata.ExtraData[bbbapiwrapper.BbbExtraDataTag]; ok {
+			err = json.Unmarshal([]byte(data), ex)
+			if err != nil {
+				return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
+			}
+			if ex.Logo != "" {
+				customDesign.CustomLogo = &ex.Logo
+			}
+			styleUrl := c.Query("userdata-bbb_custom_style_url")
+			if styleUrl != "" {
+				customDesign.CustomCssUrl = &styleUrl
+			}
 		}
 	}
 
