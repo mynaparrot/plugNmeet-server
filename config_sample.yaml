@@ -202,6 +202,7 @@ artifacts_settings:
   del_artifacts_backup_duration: 72h
 
 insights:
+  enabled: true
   # 1. Define all available provider accounts ONCE.
   # The key ("azure", "google") is the provider TYPE.
   providers:

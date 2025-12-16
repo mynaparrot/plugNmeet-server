@@ -18,9 +18,10 @@ type ModelPricing struct {
 
 // InsightsConfig is the main config block for the insights feature.
 type InsightsConfig struct {
+	Enabled bool `json:"enabled,omitempty"`
 	// The key is the provider type ("azure", "google"), the value is a list of accounts.
-	Providers map[string][]ProviderAccount           `yaml:"providers"`
-	Services  map[insights.ServiceType]ServiceConfig `yaml:"services"`
+	Providers map[string][]ProviderAccount           `yaml:"providers" json:"providers,omitempty"`
+	Services  map[insights.ServiceType]ServiceConfig `yaml:"services" json:"services,omitempty"`
 }
 
 // ProviderAccount defines a single, uniquely identified set of credentials for a provider.

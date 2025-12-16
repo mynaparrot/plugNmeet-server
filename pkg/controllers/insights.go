@@ -87,7 +87,7 @@ func (i *InsightsController) Shutdown() {
 }
 
 func (i *InsightsController) HandleTranscriptionConfigure(c *fiber.Ctx) error {
-	if i.app.Insights == nil {
+	if i.app.Insights == nil || !i.app.Insights.Enabled {
 		return utils.SendCommonProtobufResponse(c, false, "insights feature wasn't configured")
 	}
 	isAdmin := c.Locals("isAdmin")
@@ -185,7 +185,7 @@ func (i *InsightsController) HandleGetSupportedLangs(c *fiber.Ctx) error {
 }
 
 func (i *InsightsController) HandleChatTranslationConfigure(c *fiber.Ctx) error {
-	if i.app.Insights == nil {
+	if i.app.Insights == nil || !i.app.Insights.Enabled {
 		return utils.SendCommonProtobufResponse(c, false, "insights feature wasn't configured")
 	}
 	isAdmin := c.Locals("isAdmin")
@@ -243,7 +243,7 @@ func (i *InsightsController) HandleEndChatTranslation(c *fiber.Ctx) error {
 }
 
 func (i *InsightsController) HandleAITextChatConfigure(c *fiber.Ctx) error {
-	if i.app.Insights == nil {
+	if i.app.Insights == nil || !i.app.Insights.Enabled {
 		return utils.SendCommonProtobufResponse(c, false, "insights feature wasn't configured")
 	}
 	isAdmin := c.Locals("isAdmin")
@@ -301,7 +301,7 @@ func (i *InsightsController) HandleEndAITextChat(c *fiber.Ctx) error {
 }
 
 func (i *InsightsController) HandleAIMeetingSummarizationConfig(c *fiber.Ctx) error {
-	if i.app.Insights == nil {
+	if i.app.Insights == nil || !i.app.Insights.Enabled {
 		return utils.SendCommonProtobufResponse(c, false, "insights feature wasn't configured")
 	}
 	isAdmin := c.Locals("isAdmin")

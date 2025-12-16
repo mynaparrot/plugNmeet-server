@@ -176,6 +176,10 @@ func (m *RoomModel) setRoomDefaults(r *plugnmeet.CreateRoomReq) {
 	utils.SetRoomDefaultLockSettings(r)
 	utils.SetDefaultRoomSettings(m.app.RoomDefaultSettings, r)
 
+	if r.Metadata.RoomFeatures.InsightsFeatures.IsAllow && (m.app.Insights == nil || !m.app.Insights.Enabled) {
+		r.Metadata.RoomFeatures.InsightsFeatures.IsAllow = false
+	}
+
 	// copyright
 	copyrightConf := m.app.Client.CopyrightConf
 	if copyrightConf == nil {
