@@ -18,7 +18,7 @@ func (s *RedisService) UpdateTTSServiceUsage(ctx context.Context, roomId, userId
 	key := fmt.Sprintf("%s:%s:usage", TTSServiceRedisKey, roomId)
 	pipe := s.rc.TxPipeline()
 	pipe.HIncrBy(ctx, key, userId, int64(incBy))
-	pipe.HIncrBy(ctx, key, language, int64(incBy))
+	pipe.HIncrBy(ctx, key, fmt.Sprintf("lang:%s", language), int64(incBy))
 	pipe.HIncrBy(ctx, key, TotalUsageField, int64(incBy))
 	pipe.Expire(ctx, key, time.Hour*24)
 	_, err := pipe.Exec(ctx)
