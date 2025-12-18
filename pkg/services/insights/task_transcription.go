@@ -43,6 +43,11 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 	if err != nil {
 		return err
 	}
+	log := t.logger.WithFields(logrus.Fields{
+		"method":      "RunAudioStream",
+		"roomId":      roomId,
+		"roomTableId": roomTableId,
+	})
 
 	stream, err := provider.CreateTranscription(ctx, roomId, userId, options)
 	if err != nil {
@@ -58,10 +63,11 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 				return
 			case pcmSample, ok := <-audioStream:
 				if !ok {
+					log.Infoln("audio stream closed")
 					return
 				}
 				if err := stream.WriteSample(pcmSample); err != nil {
-					t.logger.WithError(err).Error("error writing audio to provider")
+					log.WithError(err).Error("error writing audio to provider")
 					return
 				}
 			}
@@ -72,11 +78,11 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 	go func() {
 		defer func() {
 			if _, err := t.redisService.HandleTranscriptionUsage(roomId, userId, false); err != nil {
-				t.logger.WithError(err).Errorln("update user usage failed")
+				log.WithError(err).Errorln("update user usage failed")
 			}
 
 			if err := t.natsService.BroadcastSystemNotificationToRoom(roomId, "speech-services.service-stopped", plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_INFO, false, &userId); err != nil {
-				t.logger.WithError(err).Errorln("error broadcasting system notification")
+				log.WithError(err).Errorln("error broadcasting system notification")
 			}
 		}()
 
@@ -91,36 +97,36 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 					return
 				}
 				if err = t.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_TRANSCRIPTION_OUTPUT_TEXT, roomId, marshal, nil); err != nil {
-					t.logger.WithError(err).Errorln("error broadcasting transcription result")
+					log.WithError(err).Errorln("error broadcasting transcription result")
 				}
 
 				// If we have a final result, publish it to the dedicated synthesis SynthesisNatsChannel.
 				if event.Type == insights.EventTypeFinalResult {
 					if err = t.appConf.NatsConn.Publish(synthesisChannel, marshal); err != nil {
-						t.logger.WithError(err).Errorln("error publishing to synthesis SynthesisNatsChannel")
+						log.WithError(err).Errorln("error publishing to synthesis SynthesisNatsChannel")
 					}
 					if event.Result.AllowedTranscriptionStorage {
 						if err = t.natsService.AddTranscriptionChunk(roomId, userId, event.Result.FromUserName, event.Result.Lang, event.Result.Text); err != nil {
-							t.logger.WithError(err).Errorln("error adding transcription chunk")
+							log.WithError(err).Errorln("error adding transcription chunk")
 						}
 					}
 				}
 
 			case insights.EventTypeSessionStarted:
 				if _, err := t.redisService.HandleTranscriptionUsage(roomId, userId, true); err != nil {
-					t.logger.WithError(err).Errorln("update user usage failed")
+					log.WithError(err).Errorln("update user usage failed")
 				}
 
 				time.AfterFunc(time.Second*5, func() {
 					if err := t.natsService.BroadcastSystemNotificationToRoom(roomId, "speech-services.speech-to-text-ready", plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_INFO, false, &userId); err != nil {
-						t.logger.WithError(err).Errorln("error broadcasting system notification")
+						log.WithError(err).Errorln("error broadcasting system notification")
 					}
 				})
 
 			case insights.EventTypeSessionStopped:
-				t.logger.Infoln("transcription session stopped")
+				log.Infoln("transcription session stopped")
 			case insights.EventTypeError:
-				t.logger.Errorln("insights provider error: ", event.Error)
+				log.Errorln("insights provider error: ", event.Error)
 			}
 		}
 	}()
