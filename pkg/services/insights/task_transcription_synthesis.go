@@ -163,6 +163,8 @@ func (t *TranscriptionSynthesisTask) createAgentWorker(language string) (*ttsWor
 			return nil, err
 		}
 
+		// wait before publishing
+		time.Sleep(time.Second * 2)
 		publisher, err := inMedia.NewAudioPublisher(workerRoom, language, 16000, 1, t.e2eeKey)
 		if err != nil {
 			workerRoom.Disconnect() // Clean up
