@@ -1,5 +1,48 @@
 # Changelog
 
+## [2.0.0](https://github.com/mynaparrot/plugNmeet-server/compare/v1.9.4...v2.0.0) (2025-12-20)
+
+
+### ⚠ BREAKING CHANGES
+
+* breaking changes in new UI + API
+
+### Features
+
+* ability to download transcription in vtt format ([bab5746](https://github.com/mynaparrot/plugNmeet-server/commit/bab5746c161da3349b0e358e33e242ca16a2640f))
+* breaking changes in new UI + API ([e637442](https://github.com/mynaparrot/plugNmeet-server/commit/e63744216cda41c92192c84f8c7449289bcba1dc))
+* chat with AI ([13ede93](https://github.com/mynaparrot/plugNmeet-server/commit/13ede937c144f772d5fed9ba033819b27ab1f3bf))
+* DB auto migration ([c66f2ba](https://github.com/mynaparrot/plugNmeet-server/commit/c66f2baf790e304667e03ce2096e3684046c41ae))
+* estimated cost calculation ([0b48530](https://github.com/mynaparrot/plugNmeet-server/commit/0b485303766be50cee9218c83850c1548d4a05e9))
+* Insights framework ([5b35582](https://github.com/mynaparrot/plugNmeet-server/commit/5b355825c52ead3bbfb7f939dd5d6a60b9836df0))
+* meeting summerization ([53985c9](https://github.com/mynaparrot/plugNmeet-server/commit/53985c9eaae0372d33df0e9eb0e7cc0d74e9d934))
+* **recording:** recording metadata ([404de39](https://github.com/mynaparrot/plugNmeet-server/commit/404de3956ae7496b6a2c1cabc7a25009d03a7ccd))
+* server config option to enable/disable `insights` ([e8808c5](https://github.com/mynaparrot/plugNmeet-server/commit/e8808c59ec50a2241a96bf3927cd1adf6a7ebaf2))
+
+
+### Bug Fixes
+
+* added option to request/response media server info ([72d1082](https://github.com/mynaparrot/plugNmeet-server/commit/72d10826397b9cf36c7fd4ac169a160b3c464153))
+* adjusted with new API ([ddde79e](https://github.com/mynaparrot/plugNmeet-server/commit/ddde79e9a5a26f81c17279928fe7ffd88abd7a5d))
+* **api:** prevent to list without roomId or roomSid ([4c3b60e](https://github.com/mynaparrot/plugNmeet-server/commit/4c3b60e41564852e699298b6926ac880a7ceeecd))
+* bump deps ([62fd2ca](https://github.com/mynaparrot/plugNmeet-server/commit/62fd2caa1ba203b32b716ffaded97b6d25eb4178))
+* bump proto ([57345c7](https://github.com/mynaparrot/plugNmeet-server/commit/57345c7839378cd6a24be15f3ade8529b4cc1dcd))
+* bump proto ([9475dec](https://github.com/mynaparrot/plugNmeet-server/commit/9475decaadefe211872befb9bee4b6c13ae8dcbe))
+* dependencies update ([5017670](https://github.com/mynaparrot/plugNmeet-server/commit/5017670fdee65f8a93e892055c291ea51e625a2a))
+* **deps:** update module github.com/gabriel-vasile/mimetype to v1.4.11 ([aecb7f7](https://github.com/mynaparrot/plugNmeet-server/commit/aecb7f731ec4d71b4e9a3c83039920ff3d2b465f))
+* **deps:** update module github.com/gabriel-vasile/mimetype to v1.4.11 ([e41faa3](https://github.com/mynaparrot/plugNmeet-server/commit/e41faa376273c02dfadbb477b5c04672173717af))
+* docker dev build ([8651446](https://github.com/mynaparrot/plugNmeet-server/commit/8651446e85742d88b2a9f3eb2120599d7c81e61a))
+* docker run ([b4cf071](https://github.com/mynaparrot/plugNmeet-server/commit/b4cf071d9b64412493a819fa57a141bd262f8287))
+* language segment ([f3fe1d0](https://github.com/mynaparrot/plugNmeet-server/commit/f3fe1d07f6ec972f6b49a0551ee15d5e032b254e))
+* meeting summary webhook wasn't sending ([a3c6389](https://github.com/mynaparrot/plugNmeet-server/commit/a3c63898c542f47d02ee08e8644623a53f4422b6))
+* **refactor:** few optimization ([6053166](https://github.com/mynaparrot/plugNmeet-server/commit/6053166d30d8f555b1e0f2ce061e52c4d90759a2))
+* reverted back restrictions ([7a75f1b](https://github.com/mynaparrot/plugNmeet-server/commit/7a75f1b82628333a890fb44fefb14d7c951f4f98))
+* rolled backed SDK version ([9c32bbd](https://github.com/mynaparrot/plugNmeet-server/commit/9c32bbd8deea7b217b003632f2ec877572c00039))
+* the same summary was triggered multiple times ([f688b38](https://github.com/mynaparrot/plugNmeet-server/commit/f688b383d70d8256d6a515116cc023cfaa172451))
+* update BBB metadata to match with new format ([28c6a96](https://github.com/mynaparrot/plugNmeet-server/commit/28c6a96832feeb18bef7e19e8c7c1d34d5afadf3))
+* use correct ARCH ([b2da2a5](https://github.com/mynaparrot/plugNmeet-server/commit/b2da2a5f328d6d6e5cadb0d7854d3ed59f38ec49))
+* use the same pattern ([92b4ea9](https://github.com/mynaparrot/plugNmeet-server/commit/92b4ea9b007ada8725af041b976bca313accf253))
+
 ## [1.9.4](https://github.com/mynaparrot/plugNmeet-server/compare/v1.9.3...v1.9.4) (2025-10-28)
 
 
