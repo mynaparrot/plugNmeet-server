@@ -231,6 +231,17 @@ func New(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 		}
 	}
 
+	if strings.HasPrefix(appCnf.LogSettings.LogFile, "./") {
+		appCnf.LogSettings.LogFile = filepath.Join(appCnf.RootWorkingDir, appCnf.LogSettings.LogFile)
+	}
+	if strings.HasPrefix(appCnf.UploadFileSettings.Path, "./") {
+		appCnf.UploadFileSettings.Path = filepath.Join(appCnf.RootWorkingDir, appCnf.UploadFileSettings.Path)
+	}
+	if strings.HasPrefix(appCnf.RecorderInfo.RecordingFilesPath, "./") {
+		appCnf.RecorderInfo.RecordingFilesPath = filepath.Join(appCnf.RootWorkingDir, appCnf.RecorderInfo.RecordingFilesPath)
+		appCnf.RecorderInfo.DelRecordingBackupPath = filepath.Join(appCnf.RootWorkingDir, appCnf.RecorderInfo.DelRecordingBackupPath)
+	}
+
 	// setup everything for artifacts
 	err := handleArtifactsSettings(appCnf)
 	if err != nil {
@@ -333,6 +344,10 @@ func readClientFiles(a *AppConfig) error {
 	// otherwise changes of files won't be loaded
 	if a.Client.Debug {
 		return nil
+	}
+
+	if strings.HasPrefix(a.Client.Path, "./") {
+		a.Client.Path = filepath.Join(a.RootWorkingDir, a.Client.Path)
 	}
 
 	cssPath := filepath.Join(a.Client.Path, "assets", "css")

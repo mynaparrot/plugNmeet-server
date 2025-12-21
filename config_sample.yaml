@@ -4,7 +4,7 @@
 client:
   port: 8080
   debug: true
-  path: "/app/client/dist"
+  path: "./client/dist"
   ## Required for authentication. Use a securely generated random secret.
   # Example:
   # Openssl rand -hex 32
@@ -156,7 +156,7 @@ upload_file_settings:
 
 recorder_info:
   # This path must match the recorder's copy_to_dir > main_path setting.
-  recording_files_path: "/app/recording_files"
+  recording_files_path: "./recording_files"
   token_validity: 30m
   # If true, deleted recordings will be moved to a backup directory instead of being immediately removed.
   # But it will be removed from the database only.
@@ -164,7 +164,7 @@ recorder_info:
   enable_del_recording_backup: true
   # Optional: Specify a separate path for deleted recording backups.
   # Uses os.Rename for fast path changes. Ensure both paths are on the same disk to avoid cross-device errors.
-  del_recording_backup_path: "/app/recording_files/del_backup"
+  del_recording_backup_path: "./recording_files/del_backup"
   # Duration to retain deleted recordings in backup, in hours. Default is 72 hours (3 days).
   del_recording_backup_duration: 72h
 
