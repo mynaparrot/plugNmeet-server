@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/mynaparrot/plugNmeet-server/compare/v2.0.0...v2.0.1) (2025-12-21)
+
+
+### Bug Fixes
+
+* dir navigation problem ([cd2f301](https://github.com/mynaparrot/plugNmeet-server/commit/cd2f30117189990a89c94795e37184d907cb331b))
+
 ## [2.0.0](https://github.com/mynaparrot/plugNmeet-server/compare/v1.9.4...v2.0.0) (2025-12-20)
 
 
