@@ -20,5 +20,8 @@ ldconfig
 export CGO_CFLAGS="-I/opt/speechsdk/include/c_api"
 export CGO_LDFLAGS="-L/opt/speechsdk/lib/${SPEECHSDK_ARCH_DIR} -lMicrosoft.CognitiveServices.Speech.core"
 
-# 4. Execute the main command (e.g., "plugnmeet-server" or "air")
+# 4. Change to the application directory
+cd /app
+
+# 5. Execute the main command (e.g., "plugnmeet-server" or "air")
 exec "$@"
