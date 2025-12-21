@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.2](https://github.com/mynaparrot/plugNmeet-server/compare/v2.0.1...v2.0.2) (2025-12-21)
+
+
+### Bug Fixes
+
+* incorrect path problem ([375fb1f](https://github.com/mynaparrot/plugNmeet-server/commit/375fb1f8897af9669ae20f03449e5c2a8415176a))
+
 ## [2.0.1](https://github.com/mynaparrot/plugNmeet-server/compare/v2.0.0...v2.0.1) (2025-12-21)
 
 
