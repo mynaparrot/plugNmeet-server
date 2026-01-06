@@ -8,6 +8,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights/providers/azure"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights/providers/google"
+	"github.com/mynaparrot/plugnmeet-server/pkg/insights/providers/openai"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
@@ -23,6 +24,8 @@ func NewProvider(ctx context.Context, providerType string, providerAccount *conf
 		return azure.NewProvider(providerAccount, serviceConfig, log)
 	case "google":
 		return google.NewProvider(ctx, providerAccount, serviceConfig, log)
+	case "openai":
+		return openai.NewProvider(ctx, providerAccount, serviceConfig, log)
 	default:
 		return nil, fmt.Errorf("unknown AI provider type: %s", providerType)
 	}
