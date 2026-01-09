@@ -219,12 +219,13 @@ func (fc *FileController) HandleGetClientFiles(c *fiber.Ctx) error {
 	}
 
 	return utils.SendProtoJsonResponse(c, &plugnmeet.GetClientFilesRes{
-		Status:   true,
-		Msg:      "success",
-		Css:      cssFiles,
-		Js:       jsFiles,
-		JsFiles:  jsFiles,
-		CssFiles: cssFiles,
+		Status:           true,
+		Msg:              "success",
+		Css:              cssFiles,
+		Js:               jsFiles,
+		JsFiles:          jsFiles,
+		CssFiles:         cssFiles,
+		StaticAssetsPath: fc.AppConfig.Client.AssetHost,
 	})
 }
 

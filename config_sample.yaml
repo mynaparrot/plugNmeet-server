@@ -5,6 +5,11 @@ client:
   port: 8080
   debug: true
   path: "./client/dist"
+  # To serve static assets (JS, CSS) from a CDN, uncomment and set this to your CDN's base URL.
+  # This URL will be sent as the 'static_assets_path' field in the /getClientFiles API response.
+  # The client is responsible for using this path to construct the final asset URLs.
+  # e.g., "https://my-cdn.com/plugnmeet-assets"
+  #asset_host: ""
   ## Required for authentication. Use a securely generated random secret.
   # Example:
   # Openssl rand -hex 32

@@ -51,6 +51,7 @@ type ClientInfo struct {
 	Port           int            `yaml:"port"`
 	Debug          bool           `yaml:"debug"`
 	Path           string         `yaml:"path"`
+	AssetHost      *string        `yaml:"asset_host"`
 	ApiKey         string         `yaml:"api_key"`
 	Secret         string         `yaml:"secret"`
 	TokenValidity  *time.Duration `yaml:"token_validity"`
