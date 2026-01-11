@@ -79,9 +79,6 @@ func (m *NatsModel) HandleSystemApiTasks(msg *nats.Msg) {
 	switch task := req.ApiTask.(type) {
 	case *plugnmeet.NatsSystemApiWorker_CreateConsumerWithPermission:
 		payload := task.CreateConsumerWithPermission
-
-		// Now you can safely use the payload
-		m.logger.Printf("Received task for room %s and user %s", payload.RoomId, payload.UserId)
 		res := m.HandleConsumerCreationWithPermission(payload.RoomId, payload.UserId)
 		marshal, err := proto.Marshal(res)
 		if err != nil {

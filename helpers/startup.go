@@ -4,9 +4,10 @@ import (
 	"context"
 	"os"
 
+	infraDb "github.com/mynaparrot/plugnmeet-protocol/infra/database"
 	infraNats "github.com/mynaparrot/plugnmeet-protocol/infra/nats"
+	infraRedis "github.com/mynaparrot/plugnmeet-protocol/infra/redis"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/factory"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"gopkg.in/yaml.v3"
 )
@@ -37,16 +38,18 @@ func ReadYamlConfigFile(file string) (*config.AppConfig, error) {
 
 func PrepareServer(ctx context.Context, appCnf *config.AppConfig) error {
 	// orm
-	err := factory.NewDatabaseConnection(ctx, appCnf)
+	db, err := infraDb.NewDatabaseConnection(ctx, appCnf.DatabaseInfo, appCnf.Client.Debug, appCnf.Logger)
 	if err != nil {
 		return err
 	}
+	appCnf.DB = db
 
 	// set redis connection
-	err = factory.NewRedisConnection(ctx, appCnf)
+	rds, err := infraRedis.NewRedisConnection(ctx, appCnf.RedisInfo, appCnf.Logger)
 	if err != nil {
 		return err
 	}
+	appCnf.RDS = rds
 
 	// nats
 	nc, js, err := infraNats.NewNatsConnection(appCnf.NatsInfo)
