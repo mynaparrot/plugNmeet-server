@@ -8,7 +8,6 @@ const (
 	IngressUserIdPrefix                  = "ingres_"
 	AgentUserUserIdPrefix                = "pnm_agent-"
 	TTSAgentUserIdPrefix                 = "pnm_tts_agent-"
-	RecorderUserAuthName                 = "PLUGNMEET_RECORDER_AUTH"
 	MaxPreloadedWhiteboardFileSize int64 = 5 * 1000000 // limit to 5MB
 
 	// all the time.Sleep() values

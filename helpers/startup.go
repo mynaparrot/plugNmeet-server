@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 
+	infraNats "github.com/mynaparrot/plugnmeet-protocol/infra/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/factory"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
@@ -48,10 +49,12 @@ func PrepareServer(ctx context.Context, appCnf *config.AppConfig) error {
 	}
 
 	// nats
-	err = factory.NewNatsConnection(appCnf)
+	nc, js, err := infraNats.NewNatsConnection(appCnf.NatsInfo)
 	if err != nil {
 		return err
 	}
+	appCnf.NatsConn = nc
+	appCnf.JetStream = js
 
 	// initialize nats Cache Service
 	natsservice.InitNatsCacheService(appCnf, appCnf.Logger)

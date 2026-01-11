@@ -7,8 +7,10 @@ import (
 	livekitservice "github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 type NatsModel struct {
@@ -63,5 +65,33 @@ func (m *NatsModel) HandleFromClientToServerReq(roomId, userId string, req *plug
 			return
 		}
 		m.analyticsModel.HandleEvent(ad)
+	}
+}
+
+func (m *NatsModel) HandleSystemApiTasks(msg *nats.Msg) {
+	req := new(plugnmeet.NatsSystemApiWorker)
+	if err := proto.Unmarshal(msg.Data, req); err != nil {
+		m.logger.Errorln(err)
+		_ = msg.Respond([]byte(err.Error()))
+		return
+	}
+
+	switch task := req.ApiTask.(type) {
+	case *plugnmeet.NatsSystemApiWorker_CreateConsumerWithPermission:
+		payload := task.CreateConsumerWithPermission
+
+		// Now you can safely use the payload
+		m.logger.Printf("Received task for room %s and user %s", payload.RoomId, payload.UserId)
+		res := m.HandleConsumerCreationWithPermission(payload.RoomId, payload.UserId)
+		marshal, err := proto.Marshal(res)
+		if err != nil {
+			m.logger.Errorln(err)
+			_ = msg.Respond([]byte(err.Error()))
+			return
+		}
+		_ = msg.Respond(marshal)
+
+	default:
+		m.logger.Printf("Received unknown task type: %T", task)
 	}
 }

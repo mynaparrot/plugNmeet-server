@@ -9,12 +9,14 @@ import (
 	"strings"
 	"time"
 
+	infraNats "github.com/mynaparrot/plugnmeet-protocol/infra/nats"
 	"github.com/mynaparrot/plugnmeet-protocol/logging"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 )
 
@@ -43,7 +45,7 @@ type AppConfig struct {
 	AzureCognitiveServicesSpeech AzureCognitiveServicesSpeech `yaml:"azure_cognitive_services_speech"`
 	AnalyticsSettings            *AnalyticsSettings           `yaml:"analytics_settings"`
 	ArtifactsSettings            *ArtifactsSettings           `yaml:"artifacts_settings"`
-	NatsInfo                     NatsInfo                     `yaml:"nats_info"`
+	NatsInfo                     *infraNats.NatsInfo          `yaml:"nats_info"`
 	Insights                     *InsightsConfig              `yaml:"insights"`
 }
 
@@ -185,36 +187,6 @@ type RedisInfo struct {
 	SentinelAddresses []string `yaml:"sentinel_addresses"`
 }
 
-type NatsInfo struct {
-	NatsUrls                 []string         `yaml:"nats_urls"`
-	NatsWSUrls               []string         `yaml:"nats_ws_urls"`
-	Account                  string           `yaml:"account"`
-	User                     string           `yaml:"user"`
-	Password                 string           `yaml:"password"`
-	Nkey                     *string          `yaml:"nkey"`
-	AuthCalloutIssuerPrivate string           `yaml:"auth_callout_issuer_private"`
-	AuthCalloutXkeyPrivate   *string          `yaml:"auth_callout_xkey_private"`
-	NumReplicas              int              `yaml:"num_replicas"`
-	Subjects                 NatsSubjects     `yaml:"subjects"`
-	Recorder                 NatsInfoRecorder `yaml:"recorder"`
-}
-
-type NatsSubjects struct {
-	SystemApiWorker string `yaml:"system_api_worker"`
-	SystemJsWorker  string `yaml:"system_js_worker"`
-	SystemPublic    string `yaml:"system_public"`
-	SystemPrivate   string `yaml:"system_private"`
-	Chat            string `yaml:"chat"`
-	Whiteboard      string `yaml:"whiteboard"`
-	DataChannel     string `yaml:"data_channel"`
-}
-
-type NatsInfoRecorder struct {
-	RecorderChannel string `yaml:"recorder_channel"`
-	RecorderInfoKv  string `yaml:"recorder_info_kv"`
-	TranscodingJobs string `yaml:"transcoding_jobs_subject"`
-}
-
 func New(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 	// default validation of token is 10 minutes
 	if appCnf.Client.TokenValidity == nil || *appCnf.Client.TokenValidity < 0 {
@@ -267,6 +239,9 @@ func New(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 
 	if appCnf.DatabaseInfo.Prefix != "" {
 		dbTablePrefix = appCnf.DatabaseInfo.Prefix
+	}
+	if appCnf.NatsInfo.AuthCalloutEnabled == nil {
+		appCnf.NatsInfo.AuthCalloutEnabled = proto.Bool(true)
 	}
 	if appCnf.NatsInfo.Recorder.TranscodingJobs == "" {
 		appCnf.NatsInfo.Recorder.TranscodingJobs = "pnm-RecorderTranscoderJobs"

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	natsInfr "github.com/mynaparrot/plugnmeet-protocol/infra/nats"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
@@ -37,8 +38,8 @@ const (
 	natsAuthServiceQueueGroup = prefix + "auth-queue"
 	// nats connection event queue
 	natsConnectionEventQueueGroup = prefix + "conn-event-queue"
+	natsSysApiWorkerQueueGroup    = prefix + "sys-api-queue"
 	websocketClientType           = "websocket"
-	transcoderConsumerDurable     = "transcoderWorker"
 )
 
 type natsJob struct {
@@ -119,7 +120,7 @@ func (c *NatsController) BootUp(ctx context.Context, wg *sync.WaitGroup) {
 	}
 
 	_, err = transcoderStream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
-		Durable:   transcoderConsumerDurable,
+		Durable:   natsInfr.TranscoderConsumerDurable,
 		AckPolicy: jetstream.AckExplicitPolicy,
 	})
 	if err != nil {
@@ -131,30 +132,37 @@ func (c *NatsController) BootUp(ctx context.Context, wg *sync.WaitGroup) {
 	if err != nil {
 		c.logger.WithError(err).Fatal("error subscribing to users connection events")
 	}
+	// subscribe to system api worker
+	sysApiWorker, err := c.subscribeToSystemApiWorker()
+	if err != nil {
+		c.logger.WithError(err).Fatal("error subscribing to system api worker")
+	}
 
 	// auth service
-	authService := NewNatsAuthController(c.app, c.natsService, c.authModel, c.issuerKeyPair, c.curveKeyPair, c.logger)
-	_, err = micro.AddService(c.app.NatsConn, micro.Config{
-		Name:        natsAuthServiceName,
-		Version:     version.Version,
-		Description: "Handle authorization of pnm nats client",
-		QueueGroup:  natsAuthServiceQueueGroup,
-		Endpoint: &micro.EndpointConfig{
-			Subject: natsAuthServiceEndpointSubject,
-			Handler: micro.HandlerFunc(authService.Handle),
-		},
-	})
-
-	if err != nil {
-		c.logger.WithError(err).Fatal("error adding auth service")
+	if *c.app.NatsInfo.AuthCalloutEnabled {
+		authService := natsInfr.NewNatsAuthController(c.app.Client.ApiKey, c.app.Client.Secret, c.app.NatsInfo, c.app.NatsConn, c.issuerKeyPair, c.curveKeyPair, c.logger)
+		_, err = micro.AddService(c.app.NatsConn, micro.Config{
+			Name:        natsAuthServiceName,
+			Version:     version.Version,
+			Description: "Handle authorization of pnm nats client",
+			QueueGroup:  natsAuthServiceQueueGroup,
+			Endpoint: &micro.EndpointConfig{
+				Subject: natsAuthServiceEndpointSubject,
+				Handler: micro.HandlerFunc(authService.Handle),
+			},
+		})
+		if err != nil {
+			c.logger.WithError(err).Fatal("error adding auth service")
+		}
 	}
-	wg.Done()
 
+	wg.Done()
 	// Keep the application running until context remain valid
 	<-ctx.Done()
 
 	sysWorkerCon.Stop()
 	_ = con.Unsubscribe()
+	_ = sysApiWorker.Unsubscribe()
 }
 
 func (c *NatsController) worker() {
@@ -215,7 +223,7 @@ func (c *NatsController) handleUserConnectionEvent(data []byte, isConnect bool) 
 			log.WithError(err).Errorln("failed to parse claims from connection event")
 			return
 		}
-		if claims.GetName() != config.RecorderUserAuthName {
+		if claims.GetName() != natsInfr.RecorderUserAuthName {
 			if isConnect {
 				c.natsModel.OnAfterUserJoined(claims.GetRoomId(), claims.GetUserId())
 			} else {
@@ -256,4 +264,10 @@ func (c *NatsController) subscribeToSystemWorker(ctx context.Context, stream jet
 	}))
 
 	return consumeContext, err
+}
+
+func (c *NatsController) subscribeToSystemApiWorker() (*nats.Subscription, error) {
+	return c.app.NatsConn.QueueSubscribe(c.app.NatsInfo.Subjects.SystemApiWorker, natsSysApiWorkerQueueGroup, func(msg *nats.Msg) {
+		c.natsModel.HandleSystemApiTasks(msg)
+	})
 }

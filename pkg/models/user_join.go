@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	natsInfr "github.com/mynaparrot/plugnmeet-protocol/infra/nats"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
@@ -31,8 +32,8 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 	_ = waitUntilRoomCreationCompletes(ctx, m.rs, g.GetRoomId(), log)
 
 	// Step 2: Validate the user's name to prevent conflicts with reserved system names.
-	if g.GetUserInfo().GetName() == config.RecorderUserAuthName {
-		err := fmt.Errorf("name: %s is reserved for internal use only", config.RecorderUserAuthName)
+	if g.GetUserInfo().GetName() == natsInfr.RecorderUserAuthName {
+		err := fmt.Errorf("name: %s is reserved for internal use only", natsInfr.RecorderUserAuthName)
 		log.WithError(err).Warnln()
 		return "", err
 	}

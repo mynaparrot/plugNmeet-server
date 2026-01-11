@@ -1,12 +1,14 @@
 package models
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
+	"github.com/nats-io/jwt/v2"
 )
 
 func (m *NatsModel) RenewPNMToken(roomId, userId, token string) {
@@ -50,4 +52,70 @@ func (m *NatsModel) HandleClientPing(roomId, userId string) {
 	if err != nil {
 		m.logger.Errorln(fmt.Sprintf("error updating user last ping for %s; roomId: %s; msg: %s", userId, roomId, err.Error()))
 	}
+}
+
+func (m *NatsModel) HandleConsumerCreationWithPermission(roomId, userId string) *plugnmeet.ApiWorkerTaskCreateConsumerWithPermissionRes {
+	res := new(plugnmeet.ApiWorkerTaskCreateConsumerWithPermissionRes)
+
+	userInfo, err := m.natsService.GetUserInfo(roomId, userId)
+	if err != nil {
+		res.Msg = err.Error()
+		return res
+	}
+	if userInfo == nil {
+		res.Msg = fmt.Sprintf("user info not found for userId: %s, roomId: %s", userId, roomId)
+		return res
+	}
+
+	allowPub := jwt.StringList{
+		"$JS.API.INFO",
+		fmt.Sprintf("$JS.API.STREAM.INFO.%s", roomId),
+		// allow sending messages to the system
+		fmt.Sprintf("%s.%s.%s", m.app.NatsInfo.Subjects.SystemJsWorker, roomId, userId),
+	}
+
+	chatPermission, err := m.natsService.CreateChatConsumer(roomId, userId)
+	if err != nil {
+		res.Msg = err.Error()
+		return res
+	}
+	allowPub.Add(chatPermission...)
+
+	sysPublicPermission, err := m.natsService.CreateSystemPublicConsumer(roomId, userId)
+	if err != nil {
+		res.Msg = err.Error()
+		return res
+	}
+	allowPub.Add(sysPublicPermission...)
+
+	sysPrivatePermission, err := m.natsService.CreateSystemPrivateConsumer(roomId, userId)
+	if err != nil {
+		res.Msg = err.Error()
+		return res
+	}
+	allowPub.Add(sysPrivatePermission...)
+
+	whiteboardPermission, err := m.natsService.CreateWhiteboardConsumer(roomId, userId)
+	if err != nil {
+		res.Msg = err.Error()
+		return res
+	}
+	allowPub.Add(whiteboardPermission...)
+
+	dataChannelPermission, err := m.natsService.CreateDataChannelConsumer(roomId, userId)
+	if err != nil {
+		res.Msg = err.Error()
+		return res
+	}
+	allowPub.Add(dataChannelPermission...)
+
+	marshal, err := json.Marshal(allowPub)
+	if err != nil {
+		res.Msg = err.Error()
+		return res
+	}
+
+	res.Status = true
+	res.Msg = string(marshal)
+	return res
 }
