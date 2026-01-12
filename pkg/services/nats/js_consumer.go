@@ -87,6 +87,9 @@ func (s *NatsService) CreateWhiteboardConsumer(roomId, userId string) (jwt.Strin
 		fmt.Sprintf("$JS.API.CONSUMER.MSG.NEXT.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.Whiteboard, userId),
 		fmt.Sprintf("%s:%s.%s", roomId, s.app.NatsInfo.Subjects.Whiteboard, userId),
 		fmt.Sprintf("$JS.ACK.%s.%s:%s.>", roomId, s.app.NatsInfo.Subjects.Whiteboard, userId),
+
+		// To allows both publishing and subscribing to the shared room channel.
+		fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.Whiteboard, roomId),
 	}
 
 	return permission, nil

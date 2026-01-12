@@ -192,6 +192,7 @@ func (s *NatsAuthController) setPermissionForClient(data *plugnmeet.PlugNmeetTok
 		Sub: jwt.Permission{
 			Allow: jwt.StringList{
 				"_INBOX.>", // otherwise break request-reply patterns
+				fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.Whiteboard, roomId),
 			},
 		},
 	}
