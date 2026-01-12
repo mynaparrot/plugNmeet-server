@@ -14,8 +14,6 @@ func (s *NatsService) CreateRoomNatsStreams(roomId string) error {
 			fmt.Sprintf("%s:%s.*", roomId, s.app.NatsInfo.Subjects.Chat),
 			fmt.Sprintf("%s:%s.*", roomId, s.app.NatsInfo.Subjects.SystemPublic),
 			fmt.Sprintf("%s:%s.*.*", roomId, s.app.NatsInfo.Subjects.SystemPrivate),
-			fmt.Sprintf("%s:%s.*", roomId, s.app.NatsInfo.Subjects.Whiteboard),
-			fmt.Sprintf("%s:%s.*", roomId, s.app.NatsInfo.Subjects.DataChannel),
 		},
 	})
 	if err != nil {

@@ -70,57 +70,8 @@ func (s *NatsService) CreateSystemPrivateConsumer(roomId, userId string) (jwt.St
 	return permission, nil
 }
 
-func (s *NatsService) CreateWhiteboardConsumer(roomId, userId string) (jwt.StringList, error) {
-	_, err := s.js.CreateOrUpdateConsumer(s.ctx, roomId, jetstream.ConsumerConfig{
-		Durable:       fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.Whiteboard, userId),
-		DeliverPolicy: jetstream.DeliverNewPolicy,
-		FilterSubjects: []string{
-			fmt.Sprintf("%s:%s.>", roomId, s.app.NatsInfo.Subjects.Whiteboard),
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	permission := jwt.StringList{
-		fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.Whiteboard, userId),
-		fmt.Sprintf("$JS.API.CONSUMER.MSG.NEXT.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.Whiteboard, userId),
-		fmt.Sprintf("%s:%s.%s", roomId, s.app.NatsInfo.Subjects.Whiteboard, userId),
-		fmt.Sprintf("$JS.ACK.%s.%s:%s.>", roomId, s.app.NatsInfo.Subjects.Whiteboard, userId),
-
-		// To allows both publishing and subscribing to the shared room channel.
-		fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.Whiteboard, roomId),
-	}
-
-	return permission, nil
-}
-
-func (s *NatsService) CreateDataChannelConsumer(roomId, userId string) (jwt.StringList, error) {
-	_, err := s.js.CreateOrUpdateConsumer(s.ctx, roomId, jetstream.ConsumerConfig{
-		Durable:       fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.DataChannel, userId),
-		DeliverPolicy: jetstream.DeliverNewPolicy,
-		FilterSubjects: []string{
-			fmt.Sprintf("%s:%s.>", roomId, s.app.NatsInfo.Subjects.DataChannel),
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	permission := jwt.StringList{
-		fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.DataChannel, userId),
-		fmt.Sprintf("$JS.API.CONSUMER.MSG.NEXT.%s.%s:%s", roomId, s.app.NatsInfo.Subjects.DataChannel, userId),
-		fmt.Sprintf("%s:%s.%s", roomId, s.app.NatsInfo.Subjects.DataChannel, userId),
-		fmt.Sprintf("$JS.ACK.%s.%s:%s.>", roomId, s.app.NatsInfo.Subjects.DataChannel, userId),
-	}
-
-	return permission, nil
-}
-
 func (s *NatsService) DeleteConsumer(roomId, userId string) {
 	_ = s.js.DeleteConsumer(s.ctx, roomId, fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.Chat, userId))
 	_ = s.js.DeleteConsumer(s.ctx, roomId, fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.SystemPublic, userId))
 	_ = s.js.DeleteConsumer(s.ctx, roomId, fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.SystemPrivate, userId))
-	_ = s.js.DeleteConsumer(s.ctx, roomId, fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.Whiteboard, userId))
-	_ = s.js.DeleteConsumer(s.ctx, roomId, fmt.Sprintf("%s:%s", s.app.NatsInfo.Subjects.DataChannel, userId))
 }

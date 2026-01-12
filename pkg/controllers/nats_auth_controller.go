@@ -172,17 +172,10 @@ func (s *NatsAuthController) setPermissionForClient(data *plugnmeet.PlugNmeetTok
 	}
 	allowPub.Add(sysPrivatePermission...)
 
-	whiteboardPermission, err := s.natsService.CreateWhiteboardConsumer(roomId, userId)
-	if err != nil {
-		return err
-	}
-	allowPub.Add(whiteboardPermission...)
-
-	dataChannelPermission, err := s.natsService.CreateDataChannelConsumer(roomId, userId)
-	if err != nil {
-		return err
-	}
-	allowPub.Add(dataChannelPermission...)
+	// to allow to publish in whiteboard channel in core pub/sub
+	allowPub.Add(fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.Whiteboard, roomId))
+	// to allow to publish in DataChannel channel in core pub/sub
+	allowPub.Add(fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.DataChannel, roomId))
 
 	// Assign Permissions
 	claims.Permissions = jwt.Permissions{
@@ -192,7 +185,10 @@ func (s *NatsAuthController) setPermissionForClient(data *plugnmeet.PlugNmeetTok
 		Sub: jwt.Permission{
 			Allow: jwt.StringList{
 				"_INBOX.>", // otherwise break request-reply patterns
+				// allow to publish in whiteboard channel
 				fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.Whiteboard, roomId),
+				// allow to publish in DataChannel channel
+				fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.DataChannel, roomId),
 			},
 		},
 	}
