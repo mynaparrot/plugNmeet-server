@@ -14,7 +14,7 @@ type Recording struct {
 	RoomSid          sql.NullString `gorm:"column:room_sid;type:varchar(64);not null"`
 	RecorderID       string         `gorm:"column:recorder_id;type:varchar(36);not null"`
 	FilePath         string         `gorm:"column:file_path;type:varchar(255);not null"`
-	Size             float64        `gorm:"column:size;type:double;not null"`
+	Size             float32        `gorm:"column:size;type:double;not null"`
 	Published        int64          `gorm:"column:published;type:int(1);not null;default:1"`
 	Metadata         string         `gorm:"column:metadata;type:json"`
 	CreationTime     int64          `gorm:"column:creation_time;type:int(10);not null;autoCreateTime"`

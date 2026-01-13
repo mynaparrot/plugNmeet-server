@@ -30,7 +30,7 @@ func (m *RecordingModel) FetchRecordings(r *plugnmeet.FetchRecordingsReq) (*plug
 			RoomId:           v.RoomID,
 			RoomSid:          v.RoomSid.String,
 			FilePath:         v.FilePath,
-			FileSize:         float32(helpers.ToFixed(v.Size, 2)),
+			FileSize:         helpers.ToFixed(v.Size, 2),
 			CreationTime:     v.CreationTime,
 			RoomCreationTime: v.RoomCreationTime,
 		}
@@ -68,7 +68,7 @@ func (m *RecordingModel) FetchRecording(recordId string) (*plugnmeet.RecordingIn
 		RoomId:           v.RoomID,
 		RoomSid:          v.RoomSid.String,
 		FilePath:         v.FilePath,
-		FileSize:         float32(helpers.ToFixed(v.Size, 2)),
+		FileSize:         helpers.ToFixed(v.Size, 2),
 		CreationTime:     v.CreationTime,
 		RoomCreationTime: v.RoomCreationTime,
 	}
