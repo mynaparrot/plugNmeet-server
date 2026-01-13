@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.3](https://github.com/mynaparrot/plugNmeet-server/compare/v2.0.2...v2.0.3) (2026-01-13)
+
+
+### Bug Fixes
+
+* added option to set CDN url for static_assets_path ([8b7a41a](https://github.com/mynaparrot/plugNmeet-server/commit/8b7a41a38ff725f737025f9ae8ed00a6f1b40dcc))
+* **refactor:** migrate whiteboard & dataChannel to use nats core pub/sub for low latency as jetstream seems very slow ([e7c1663](https://github.com/mynaparrot/plugNmeet-server/commit/e7c1663efe5450d98eec8fccc4fce850771c722a))
+* round filesize in 2 precision ([b0f4d92](https://github.com/mynaparrot/plugNmeet-server/commit/b0f4d92a35c9422ea2f881e8f732f58465dddbcf))
+* save original size ([1535d6b](https://github.com/mynaparrot/plugNmeet-server/commit/1535d6b159ea3eabc5484b0c87d75b79e77c40a5))
+* update `ToFixed` logic ([de0b8a2](https://github.com/mynaparrot/plugNmeet-server/commit/de0b8a29229ace10548bbc460737d2f34b44fbd0))
+
 ## [2.0.2](https://github.com/mynaparrot/plugNmeet-server/compare/v2.0.1...v2.0.2) (2025-12-21)
 
 
