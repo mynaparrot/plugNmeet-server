@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
@@ -25,12 +26,13 @@ func (m *RecordingModel) FetchRecordings(r *plugnmeet.FetchRecordingsReq) (*plug
 	recordings := make([]*plugnmeet.RecordingInfo, 0, len(data))
 
 	for _, v := range data {
+		size, _ := strconv.ParseFloat(v.Size, 32)
 		recording := &plugnmeet.RecordingInfo{
 			RecordId:         v.RecordID,
 			RoomId:           v.RoomID,
 			RoomSid:          v.RoomSid.String,
 			FilePath:         v.FilePath,
-			FileSize:         helpers.ToFixed(v.Size, 2),
+			FileSize:         helpers.ToFixed(float32(size), 2),
 			CreationTime:     v.CreationTime,
 			RoomCreationTime: v.RoomCreationTime,
 		}
@@ -63,12 +65,13 @@ func (m *RecordingModel) FetchRecording(recordId string) (*plugnmeet.RecordingIn
 	if v == nil {
 		return nil, fmt.Errorf("no info found")
 	}
+	size, _ := strconv.ParseFloat(v.Size, 32)
 	recording := &plugnmeet.RecordingInfo{
 		RecordId:         v.RecordID,
 		RoomId:           v.RoomID,
 		RoomSid:          v.RoomSid.String,
 		FilePath:         v.FilePath,
-		FileSize:         helpers.ToFixed(v.Size, 2),
+		FileSize:         helpers.ToFixed(float32(size), 2),
 		CreationTime:     v.CreationTime,
 		RoomCreationTime: v.RoomCreationTime,
 	}

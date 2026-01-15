@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -67,10 +68,11 @@ func (m *BBBApiWrapperModel) GetRecordings(host string, r *bbbapiwrapper.GetReco
 			}
 			recording.Participants = uint64(mInfo.JoinedParticipants)
 		}
-
-		if v.Size > 0 {
-			recording.RawSize = int64(v.Size * 1000000)
-			recording.Size = recording.RawSize
+		if size, err := strconv.ParseFloat(v.Size, 32); err == nil {
+			if size > 0 {
+				recording.RawSize = int64(size * 1000000)
+				recording.Size = recording.RawSize
+			}
 		}
 		recordings = append(recordings, recording)
 	}

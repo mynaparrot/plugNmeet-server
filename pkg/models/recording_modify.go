@@ -71,7 +71,7 @@ func (m *RecordingModel) addRecordingInfoToDB(r *plugnmeet.RecorderToPlugNmeet, 
 		RoomID:           r.RoomId,
 		RoomSid:          v,
 		RecorderID:       r.RecorderId,
-		Size:             r.FileSize,
+		Size:             fmt.Sprintf("%.2f", r.FileSize),
 		FilePath:         r.FilePath,
 		RoomCreationTime: roomInfo.CreationTime,
 	}
