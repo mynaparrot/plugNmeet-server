@@ -25,7 +25,6 @@ type ApplicationControllers struct {
 	RecorderController     *controllers.RecorderController
 	RecordingController    *controllers.RecordingController
 	RoomController         *controllers.RoomController
-	SpeechToTextController *controllers.SpeechToTextController
 	UserController         *controllers.UserController
 	WaitingRoomController  *controllers.WaitingRoomController
 	WebhookController      *controllers.WebhookController

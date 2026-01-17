@@ -168,6 +168,34 @@ func (r *router) registerBBBRoutes() {
 	bbb.All("/publishRecordings", r.ctrl.BBBController.HandleBBBPublishRecordings)
 }
 
+func (r *router) registerInsightsRegisterAPIRoutes(api fiber.Router) {
+	insights := api.Group("/insights")
+	insights.Post("/supportedLangs", r.ctrl.InsightsController.HandleGetSupportedLangs)
+
+	transcription := insights.Group("/transcription")
+	transcription.Post("/configure", r.ctrl.InsightsController.HandleTranscriptionConfigure)
+	transcription.Post("/end", r.ctrl.InsightsController.HandleEndTranscription)
+	transcription.Post("/userSession", r.ctrl.InsightsController.HandleTranscriptionUserSession)
+	transcription.Post("/userStatus", r.ctrl.InsightsController.HandleGetTranscriptionUserTaskStatus)
+
+	translation := insights.Group("/translation")
+	chatTranslation := translation.Group("/chat")
+	chatTranslation.Post("/configure", r.ctrl.InsightsController.HandleChatTranslationConfigure)
+	chatTranslation.Post("/end", r.ctrl.InsightsController.HandleEndChatTranslation)
+	chatTranslation.Post("/execute", r.ctrl.InsightsController.HandleExecuteChatTranslation)
+
+	ai := insights.Group("/ai")
+
+	aiTextChat := ai.Group("/textChat")
+	aiTextChat.Post("/configure", r.ctrl.InsightsController.HandleAITextChatConfigure)
+	aiTextChat.Post("/execute", r.ctrl.InsightsController.HandleExecuteAITextChat)
+	aiTextChat.Post("/end", r.ctrl.InsightsController.HandleEndAITextChat)
+
+	aiMeetingSummarization := ai.Group("/meetingSummarization")
+	aiMeetingSummarization.Post("/configure", r.ctrl.InsightsController.HandleAIMeetingSummarizationConfig)
+	aiMeetingSummarization.Post("/end", r.ctrl.InsightsController.HandleEndAIMeetingSummarization)
+}
+
 func (r *router) registerAPIRoutes() {
 	api := r.app.Group("/api", r.ctrl.AuthController.HandleVerifyHeaderToken)
 	api.Post("/verifyToken", r.ctrl.AuthController.HandleVerifyToken)
@@ -218,37 +246,8 @@ func (r *router) registerAPIRoutes() {
 	ingress := api.Group("/ingress")
 	ingress.Post("/create", r.ctrl.IngressController.HandleCreateIngress)
 
-	speech := api.Group("/speechServices")
-	speech.Post("/serviceStatus", r.ctrl.SpeechToTextController.HandleSpeechToTextTranslationServiceStatus)
-	speech.Post("/azureToken", r.ctrl.SpeechToTextController.HandleGenerateAzureToken)
-	speech.Post("/userStatus", r.ctrl.SpeechToTextController.HandleSpeechServiceUserStatus)
-	speech.Post("/renewToken", r.ctrl.SpeechToTextController.HandleRenewAzureToken)
-
-	insights := api.Group("/insights")
-	insights.Post("/supportedLangs", r.ctrl.InsightsController.HandleGetSupportedLangs)
-
-	transcription := insights.Group("/transcription")
-	transcription.Post("/configure", r.ctrl.InsightsController.HandleTranscriptionConfigure)
-	transcription.Post("/end", r.ctrl.InsightsController.HandleEndTranscription)
-	transcription.Post("/userSession", r.ctrl.InsightsController.HandleTranscriptionUserSession)
-	transcription.Post("/userStatus", r.ctrl.InsightsController.HandleGetTranscriptionUserTaskStatus)
-
-	translation := insights.Group("/translation")
-	chatTranslation := translation.Group("/chat")
-	chatTranslation.Post("/configure", r.ctrl.InsightsController.HandleChatTranslationConfigure)
-	chatTranslation.Post("/end", r.ctrl.InsightsController.HandleEndChatTranslation)
-	chatTranslation.Post("/execute", r.ctrl.InsightsController.HandleExecuteChatTranslation)
-
-	ai := insights.Group("/ai")
-
-	aiTextChat := ai.Group("/textChat")
-	aiTextChat.Post("/configure", r.ctrl.InsightsController.HandleAITextChatConfigure)
-	aiTextChat.Post("/execute", r.ctrl.InsightsController.HandleExecuteAITextChat)
-	aiTextChat.Post("/end", r.ctrl.InsightsController.HandleEndAITextChat)
-
-	aiMeetingSummarization := ai.Group("/meetingSummarization")
-	aiMeetingSummarization.Post("/configure", r.ctrl.InsightsController.HandleAIMeetingSummarizationConfig)
-	aiMeetingSummarization.Post("/end", r.ctrl.InsightsController.HandleEndAIMeetingSummarization)
+	// insights AI routers
+	r.registerInsightsRegisterAPIRoutes(api)
 
 	// for resumable.js need both GET and POST  methods.
 	// https://github.com/23/resumable.js#how-do-i-set-it-up-with-my-server

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/livekit/protocol/livekit"
-	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
@@ -98,9 +97,6 @@ func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 	// webhook notification
 	m.sendToWebhookNotifier(event)
 
-	// if we missed calculating this user's speech service usage stat
-	// for sudden disconnection
-	_ = m.sm.SpeechServiceUsersUsage(rInfo.RoomId, rInfo.RoomSid, event.Participant.Identity, plugnmeet.SpeechServiceUserStatusTasks_SPEECH_TO_TEXT_SESSION_ENDED)
 	log.Info("successfully processed participant_left webhook")
 
 	m.ensureUserIsOffline(event, log)

@@ -27,13 +27,12 @@ type RoomModel struct {
 	roomDuration    *RoomDurationModel
 	etherpadModel   *EtherpadModel
 	pollModel       *PollModel
-	speechToText    *SpeechToTextModel
 	analyticsModel  *AnalyticsModel
 	breakoutModel   *BreakoutRoomModel
 	insightsModel   *InsightsModel
 }
 
-func NewRoomModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService, natsService *natsservice.NatsService, webhookNotifier *helpers.WebhookNotifier, userModel *UserModel, recorderModel *RecorderModel, fileModel *FileModel, roomDuration *RoomDurationModel, etherpadModel *EtherpadModel, pollModel *PollModel, speechToText *SpeechToTextModel, analyticsModel *AnalyticsModel, insightsModel *InsightsModel, logger *logrus.Logger) *RoomModel {
+func NewRoomModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService, natsService *natsservice.NatsService, webhookNotifier *helpers.WebhookNotifier, userModel *UserModel, recorderModel *RecorderModel, fileModel *FileModel, roomDuration *RoomDurationModel, etherpadModel *EtherpadModel, pollModel *PollModel, analyticsModel *AnalyticsModel, insightsModel *InsightsModel, logger *logrus.Logger) *RoomModel {
 	return &RoomModel{
 		ctx:             ctx,
 		app:             app,
@@ -48,7 +47,6 @@ func NewRoomModel(ctx context.Context, app *config.AppConfig, ds *dbservice.Data
 		roomDuration:    roomDuration,
 		etherpadModel:   etherpadModel,
 		pollModel:       pollModel,
-		speechToText:    speechToText,
 		analyticsModel:  analyticsModel,
 		insightsModel:   insightsModel,
 		logger:          logger.WithField("model", "room"),

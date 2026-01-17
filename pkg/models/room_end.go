@@ -74,7 +74,7 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 	})
 	log.Info("Starting room cleanup")
 
-	// Step 1: Acquire a distributed lock to prevent race conditions with room creation.
+	// Acquire a distributed lock to prevent race conditions with room creation.
 	cleanupLockTTL := config.WaitBeforeTriggerOnAfterRoomEnded + (time.Second * 10)
 	lockAcquired, lockVal, errLock := m.rs.LockRoomCreation(m.ctx, roomID, cleanupLockTTL)
 
@@ -87,7 +87,7 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 	}
 	log.WithField("lockVal", lockVal).Info("room creation lock acquired")
 
-	// Step 2: Defer the lock release to ensure it's always unlocked, even if a panic occurs.
+	// Defer the lock release to ensure it's always unlocked, even if a panic occurs.
 	defer func() {
 		unlockCtx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
 		defer cancel()
@@ -98,7 +98,7 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 		}
 	}()
 
-	// Step 3: If the room wasn't ended via the API, ensure its status is updated in NATS
+	// If the room wasn't ended via the API, ensure its status is updated in NATS
 	// and that the session is terminated in LiveKit.
 	if roomStatus != natsservice.RoomStatusEnded {
 		err := m.natsService.UpdateRoomStatus(roomID, natsservice.RoomStatusEnded)
@@ -111,58 +111,53 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 		}
 	}
 
-	// Step 4: Mark the room as not running in the database.
+	// Mark the room as not running in the database.
 	_, err := m.ds.UpdateRoomStatus(&dbmodels.RoomInfo{RoomId: roomID, IsRunning: 0})
 	if err != nil {
 		log.WithError(err).Error("DB error updating status")
 	}
 
-	// Step 5: Clear any user blocklists associated with the room from NATS.
+	// Clear any user blocklists associated with the room from NATS.
 	m.natsService.DeleteRoomUsersBlockList(roomID)
 
-	// Step 6: Send a stop signal to any active recorders for this room.
+	// Send a stop signal to any active recorders for this room.
 	if err = m.recorderModel.SendMsgToRecorder(&plugnmeet.RecordingReq{Task: plugnmeet.RecordingTasks_STOP, Sid: roomSID, RoomId: roomID}); err != nil {
 		log.WithError(err).Error("Error sending stop to recorder")
 	}
 
-	// Step 7: If not configured to keep files, delete all uploaded files for this session.
+	// If not configured to keep files, delete all uploaded files for this session.
 	if !m.app.UploadFileSettings.KeepForever {
 		if err = m.fileModel.DeleteRoomUploadedDir(roomSID); err != nil {
 			log.WithError(err).Error("Error deleting uploads")
 		}
 	}
 
-	// Step 8: Remove the room from the duration checker if it was being monitored.
+	// Remove the room from the duration checker if it was being monitored.
 	if err = m.roomDuration.DeleteRoomWithDuration(roomID); err != nil {
 		log.WithError(err).Error("Error deleting room duration")
 	}
 
-	// Step 9: Clean up any associated Etherpad (shared notepad) pads.
+	// Clean up any associated Etherpad (shared notepad) pads.
 	_ = m.etherpadModel.CleanAfterRoomEnd(roomID, metadata)
 
-	// Step 10: Clean up any polls created during the session.
+	// Clean up any polls created during the session.
 	if err = m.pollModel.CleanUpPolls(roomID); err != nil {
 		log.WithError(err).Error("Error cleaning polls")
 	}
 
-	// Step 11: Perform post-end tasks for breakout rooms, if any.
+	// Perform post-end tasks for breakout rooms, if any.
 	if err = m.breakoutModel.PostTaskAfterRoomEndWebhook(m.ctx, roomID, metadata); err != nil {
 		log.WithError(err).Error("Error in breakout room post-end task")
 	}
 
-	// Step 12: Finalize and clean up any speech-to-text service usage stats.
-	if err = m.speechToText.OnAfterRoomEnded(roomID, roomSID); err != nil {
-		log.WithError(err).Error("Error in speech service cleanup")
-	}
-
-	// Step 13: End all the agent tasks for this room.
+	// End all the agent tasks for this room.
 	m.insightsModel.OnAfterRoomEnded(dbTableId, roomID, roomSID)
 
-	// Step 14: Perform the final NATS cleanup, deleting room-specific streams and KV stores.
+	// Perform the final NATS cleanup, deleting room-specific streams and KV stores.
 	m.natsService.OnAfterSessionEndCleanup(roomID)
 	log.Info("Room has been cleaned properly")
 
-	// Step 14: Schedule the analytics export to run after a delay.
+	// Schedule the analytics export to run after a delay.
 	// This is done asynchronously to allow the current cleanup lock to be released.
 	time.AfterFunc(config.WaitBeforeAnalyticsStartProcessing, func() {
 		// PrepareToExportAnalytics has it's own room creation locking logic
