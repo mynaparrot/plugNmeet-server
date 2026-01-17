@@ -207,35 +207,26 @@ func (m *RoomModel) setRoomDefaults(r *plugnmeet.CreateRoomReq) {
 		if m.app.Insights == nil {
 			r.Metadata.RoomFeatures.InsightsFeatures.IsAllow = false
 		} else {
-			maxSelectedTranscriptionTransLangs := 2
-			maxSelectedChatTransLangs := 5
-
-			if _, serviceCnf, err := m.app.Insights.GetProviderAccountForService(insights.ServiceTypeTranscription); err == nil {
-				if num, ok := serviceCnf.Options["max_selected_trans_langs"]; ok {
-					maxSelectedTranscriptionTransLangs = num.(int)
+			if r.Metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures != nil {
+				maxSelectedTranscriptionTransLangs := 2
+				if _, serviceCnf, err := m.app.Insights.GetProviderAccountForService(insights.ServiceTypeTranscription); err == nil {
+					if num, ok := serviceCnf.Options["max_selected_trans_langs"]; ok {
+						maxSelectedTranscriptionTransLangs = num.(int)
+					}
 				}
-			}
-			if _, serviceCnf, err := m.app.Insights.GetProviderAccountForService(insights.ServiceTypeTranslation); err == nil {
-				if num, ok := serviceCnf.Options["max_selected_trans_langs"]; ok {
-					maxSelectedChatTransLangs = num.(int)
-				}
+				r.Metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.MaxSelectedTransLangs = int32(maxSelectedTranscriptionTransLangs)
 			}
 
-			r.Metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.MaxSelectedTransLangs = int32(maxSelectedTranscriptionTransLangs)
-			r.Metadata.RoomFeatures.InsightsFeatures.ChatTranslationFeatures.MaxSelectedTransLangs = int32(maxSelectedChatTransLangs)
+			if r.Metadata.RoomFeatures.InsightsFeatures.ChatTranslationFeatures != nil {
+				maxSelectedChatTransLangs := 5
+				if _, serviceCnf, err := m.app.Insights.GetProviderAccountForService(insights.ServiceTypeTranslation); err == nil {
+					if num, ok := serviceCnf.Options["max_selected_trans_langs"]; ok {
+						maxSelectedChatTransLangs = num.(int)
+					}
+				}
+				r.Metadata.RoomFeatures.InsightsFeatures.ChatTranslationFeatures.MaxSelectedTransLangs = int32(maxSelectedChatTransLangs)
+			}
 		}
-	}
-
-	//TODO: remove, Azure cognitive services
-	azu := m.app.AzureCognitiveServicesSpeech
-	if !azu.Enabled {
-		r.Metadata.RoomFeatures.SpeechToTextTranslationFeatures.IsAllow = false
-	} else {
-		var maxAllow int32 = 2
-		if azu.MaxNumTranLangsAllowSelecting > 0 {
-			maxAllow = azu.MaxNumTranLangsAllowSelecting
-		}
-		r.Metadata.RoomFeatures.SpeechToTextTranslationFeatures.MaxNumTranLangsAllowSelecting = maxAllow
 	}
 }
 
