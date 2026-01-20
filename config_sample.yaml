@@ -64,6 +64,15 @@ livekit_info:
   api_key: "APIiYAA5w37Cfo2"
   secret: "6aNur7qqupeZhFYNOJVUyeXxXhVw8f4lm13pEDUx8SgB"
 
+livekit_sip_info:
+  enabled: true
+  trunk_name: "pnm-inbound-trunk"
+  phone_numbers: ["+3466056345"]
+#  allowed_ip_addresses: []
+#  auth_username: "test"
+#  auth_password: "test"
+#  media_encryption: 0
+
 redis_info:
   host: redis:6379
   username: ""
