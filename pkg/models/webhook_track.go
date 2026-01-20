@@ -17,6 +17,7 @@ func (m *WebhookModel) trackPublished(event *livekit.WebhookEvent) {
 		"participantId": event.Participant.Identity,
 		"trackId":       event.Track.Sid,
 		"event":         event.GetEvent(),
+		"source":        event.Track.Source,
 	})
 	log.Infoln("handling track_published webhook")
 
