@@ -8,6 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/nats-io/nats.go/jetstream"
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/proto"
 )
 
 // Constants for bucket naming and user metadata keys
@@ -253,6 +255,39 @@ func (s *NatsService) AddUserToBlockList(roomId, userId string) (uint64, error) 
 
 	// Add the user to the block list with the current timestamp
 	return blockListKV.PutString(s.ctx, userId, fmt.Sprintf("%d", time.Now().UnixMilli()))
+}
+
+func (s *NatsService) AddUserManuallyAndBroadcast(roomId, userId, name string, isAdmin, broadcast bool) error {
+	mt := plugnmeet.UserMetadata{
+		IsAdmin:         isAdmin,
+		RecordWebcam:    proto.Bool(false),
+		WaitForApproval: false,
+		LockSettings: &plugnmeet.LockSettings{
+			LockWebcam:     proto.Bool(false),
+			LockMicrophone: proto.Bool(false),
+		},
+	}
+	err := s.AddUser(roomId, userId, name, isAdmin, false, &mt)
+	if err != nil {
+		log.WithError(err).Errorln("failed to add ingress user to NATS")
+		return err
+	}
+	if !broadcast {
+		return nil
+	}
+
+	// Do proper user status update
+	err = s.UpdateUserStatus(roomId, userId, UserStatusOnline)
+	if err != nil {
+		return err
+	}
+
+	userInfo, err := s.GetUserInfo(roomId, userId)
+	if err != nil {
+		return err
+	}
+
+	return s.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_JOINED, roomId, userInfo, userId)
 }
 
 // DeleteRoomUsersBlockList deletes the block list for a room
