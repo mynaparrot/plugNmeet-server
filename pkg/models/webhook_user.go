@@ -43,14 +43,14 @@ func (m *WebhookModel) participantJoined(event *livekit.WebhookEvent) {
 		log.WithError(err).Errorln("error incrementing num participants")
 	}
 
-	if strings.HasPrefix(event.Participant.Identity, config.IngressUserIdPrefix) || strings.HasPrefix(event.Participant.Identity, config.TTSAgentUserIdPrefix) || strings.HasPrefix(event.Participant.Identity, config.SipUserIdPrefix) {
+	if m.isRequireManualTrigger(event.Participant.Identity) {
 		if strings.HasPrefix(event.Participant.Identity, config.SipUserIdPrefix) {
 			// for special case SIP
 			// our: sip_phoneNumber
 			// LK: sip_+phoneNumber
 			name := strings.TrimPrefix(event.Participant.Identity, "sip_")
 			event.Participant.Identity = strings.ReplaceAll(event.Participant.Identity, "+", "")
-			err := m.natsService.AddUserManuallyAndBroadcast(event.Room.GetName(), event.Participant.Identity, name, false, false)
+			_, err := m.natsService.AddUserManuallyAndBroadcast(event.Room.GetName(), event.Participant.Identity, name, false, false)
 			if err != nil {
 				log.WithError(err).Errorln("failed to add SIP user to NATS")
 			}
@@ -99,7 +99,7 @@ func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 		log.WithError(err).Errorln("error decrementing num participants")
 	}
 
-	if strings.HasPrefix(event.Participant.Identity, config.IngressUserIdPrefix) || strings.HasPrefix(event.Participant.Identity, config.TTSAgentUserIdPrefix) || strings.HasPrefix(event.Participant.Identity, config.SipUserIdPrefix) {
+	if m.isRequireManualTrigger(event.Participant.Identity) {
 		if strings.HasPrefix(event.Participant.Identity, config.SipUserIdPrefix) {
 			// for special case SIP
 			// our: sip_phoneNumber

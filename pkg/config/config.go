@@ -388,3 +388,7 @@ func FormatDBTable(table string) string {
 	}
 	return table
 }
+
+func IsUserIdInternal(userId string) bool {
+	return strings.HasPrefix(userId, IngressUserIdPrefix) || strings.HasPrefix(userId, AgentUserUserIdPrefix) || strings.HasPrefix(userId, SipUserIdPrefix) || strings.HasPrefix(userId, TTSAgentUserIdPrefix)
+}

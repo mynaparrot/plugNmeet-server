@@ -257,7 +257,7 @@ func (s *NatsService) AddUserToBlockList(roomId, userId string) (uint64, error) 
 	return blockListKV.PutString(s.ctx, userId, fmt.Sprintf("%d", time.Now().UnixMilli()))
 }
 
-func (s *NatsService) AddUserManuallyAndBroadcast(roomId, userId, name string, isAdmin, broadcast bool) error {
+func (s *NatsService) AddUserManuallyAndBroadcast(roomId, userId, name string, isAdmin, broadcast bool) (*plugnmeet.NatsKvUserInfo, error) {
 	mt := plugnmeet.UserMetadata{
 		IsAdmin:         isAdmin,
 		RecordWebcam:    proto.Bool(false),
@@ -270,24 +270,28 @@ func (s *NatsService) AddUserManuallyAndBroadcast(roomId, userId, name string, i
 	err := s.AddUser(roomId, userId, name, isAdmin, false, &mt)
 	if err != nil {
 		log.WithError(err).Errorln("failed to add ingress user to NATS")
-		return err
+		return nil, err
 	}
 	if !broadcast {
-		return nil
+		return nil, nil
 	}
 
 	// Do proper user status update
 	err = s.UpdateUserStatus(roomId, userId, UserStatusOnline)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	userInfo, err := s.GetUserInfo(roomId, userId)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return s.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_JOINED, roomId, userInfo, userId)
+	err = s.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_JOINED, roomId, userInfo, userId)
+	if err != nil {
+		return nil, err
+	}
+	return userInfo, nil
 }
 
 // DeleteRoomUsersBlockList deletes the block list for a room
