@@ -48,12 +48,13 @@ func (s *LivekitService) CreateSIPInboundTrunk() error {
 	}
 
 	if sipTrunkId == "" {
-		_, err := sipClient.CreateSIPInboundTrunk(s.ctx, &livekit.CreateSIPInboundTrunkRequest{
+		trunk, err := sipClient.CreateSIPInboundTrunk(s.ctx, &livekit.CreateSIPInboundTrunkRequest{
 			Trunk: trunkInfo,
 		})
 		if err != nil {
 			return err
 		}
+		sipTrunkId = trunk.SipTrunkId
 		s.logger.Infof("sip trunk created successfully with id: %s", sipTrunkId)
 	} else {
 		request := &livekit.UpdateSIPInboundTrunkRequest{
