@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/logging"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/nats-io/nats.go"
@@ -34,6 +35,7 @@ type AppConfig struct {
 	RoomDefaultSettings *utils.RoomDefaultSettings `yaml:"room_default_settings"`
 	LogSettings         logging.LogSettings        `yaml:"log_settings"`
 	LivekitInfo         LivekitInfo                `yaml:"livekit_info"`
+	LivekitSipInfo      *LivekitSipInfo            `yaml:"livekit_sip_info"`
 	RedisInfo           RedisInfo                  `yaml:"redis_info"`
 	DatabaseInfo        DatabaseInfo               `yaml:"database_info"`
 	UploadFileSettings  UploadFileSettings         `yaml:"upload_file_settings"`
@@ -77,6 +79,16 @@ type LivekitInfo struct {
 	Host   string `yaml:"host"`
 	ApiKey string `yaml:"api_key"`
 	Secret string `yaml:"secret"`
+}
+
+type LivekitSipInfo struct {
+	Enabled            bool                       `yaml:"enabled"`
+	TrunkName          string                     `yaml:"trunk_name"`
+	PhoneNumbers       []string                   `yaml:"phone_numbers"`
+	AllowedIpAddresses *[]string                  `yaml:"allowed_ip_addresses"`
+	AuthUsername       *string                    `yaml:"auth_username"`
+	AuthPassword       *string                    `yaml:"auth_password"`
+	MediaEncryption    livekit.SIPMediaEncryption `yaml:"media_encryption"`
 }
 
 type UploadFileSettings struct {

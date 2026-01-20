@@ -204,6 +204,8 @@ func (r *router) registerAPIRoutes() {
 	api.Post("/rtmp", r.ctrl.RecorderController.HandleRTMP)
 	api.Post("/endRoom", r.ctrl.RoomController.HandleEndRoomForAPI)
 	api.Post("/changeVisibility", r.ctrl.RoomController.HandleChangeVisibilityForAPI)
+	api.Post("/enableSipDialIn", r.ctrl.RoomController.HandleEnableRoomSipDialIn)
+
 	api.Post("/convertWhiteboardFile", r.ctrl.FileController.HandleConvertWhiteboardFile)
 	api.Post("/externalMediaPlayer", r.ctrl.ExMediaController.HandleExternalMediaPlayer)
 	api.Post("/externalDisplayLink", r.ctrl.ExDisplayController.HandleExternalDisplayLink)

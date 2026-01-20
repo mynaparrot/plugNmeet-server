@@ -45,6 +45,18 @@ services:
     depends_on:
       - redis
       - livekit
+  livekit-sip:
+    image: livekit/sip
+    ports:
+      - "5060:5060/tcp"
+      - "10000:10000/udp"
+    volumes:
+      - .:/app
+    command: --config "/app/sip.yaml"
+    depends_on:
+      - livekit
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
   etherpad:
     image: mynaparrot/plugnmeet-etherpad
     ports:

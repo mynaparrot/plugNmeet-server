@@ -1,0 +1,10 @@
+api_key: APIiYAA5w37Cfo2
+api_secret: 6aNur7qqupeZhFYNOJVUyeXxXhVw8f4lm13pEDUx8SgB
+ws_url: http://host.docker.internal:7880
+redis:
+  address: host.docker.internal:6379
+  db: 0
+
+log_level: debug
+sip_port: 5060
+rtp_port: 10000-20000

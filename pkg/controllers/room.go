@@ -164,3 +164,25 @@ func (rc *RoomController) HandleChangeVisibilityForAPI(c *fiber.Ctx) error {
 	status, msg := rc.RoomModel.ChangeVisibility(req)
 	return utils.SendCommonProtobufResponse(c, status, msg)
 }
+
+func (rc *RoomController) HandleEnableRoomSipDialIn(c *fiber.Ctx) error {
+	isAdmin := c.Locals("isAdmin")
+	roomId := c.Locals("roomId")
+
+	if !isAdmin.(bool) {
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
+	}
+
+	req := new(plugnmeet.EnableSipDialInReq)
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+	req.RoomId = roomId.(string)
+
+	err = rc.RoomModel.EnableRoomSipDialIn(req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+	return utils.SendCommonProtobufResponse(c, true, "success")
+}
