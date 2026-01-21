@@ -22,7 +22,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
 	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 )
 
 // TranscriptionSynthesisTask listens for translation results and dispatches them to language-specific workers for synthesis.
@@ -216,33 +215,7 @@ func (t *TranscriptionSynthesisTask) connectAgentToRoom(agentIdentity, agentName
 	}
 
 	// add user to our plugNmeet room manually
-	mt := plugnmeet.UserMetadata{
-		IsAdmin:         true,
-		RecordWebcam:    proto.Bool(false),
-		WaitForApproval: false,
-		LockSettings: &plugnmeet.LockSettings{
-			LockWebcam:     proto.Bool(false),
-			LockMicrophone: proto.Bool(false),
-		},
-	}
-	err = t.natsService.AddUser(t.roomId, agentIdentity, agentName, true, false, &mt)
-	if err != nil {
-		log.WithError(err).Errorln("failed to add ingress user to NATS")
-		return nil, err
-	}
-
-	// Do proper user status update
-	err = t.natsService.UpdateUserStatus(t.roomId, agentIdentity, natsservice.UserStatusOnline)
-	if err != nil {
-		return nil, err
-	}
-
-	userInfo, err := t.natsService.GetUserInfo(t.roomId, agentIdentity)
-	if err != nil {
-		return nil, err
-	}
-
-	err = t.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_JOINED, t.roomId, userInfo, agentIdentity)
+	userInfo, err := t.natsService.AddUserManuallyAndBroadcast(t.roomId, agentIdentity, agentName, true, true)
 	if err != nil {
 		return nil, err
 	}

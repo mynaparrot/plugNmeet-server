@@ -103,6 +103,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 		Ctx:           ctx,
 		janitorModel:  janitorModel,
 		artifactModel: artifactModel,
+		lkServices:    livekitService,
 	}
 	return application, nil
 }

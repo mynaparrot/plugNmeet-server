@@ -7,6 +7,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	livekitservice "github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 )
 
 // ApplicationControllers holds all the controllers.
@@ -41,9 +42,17 @@ type Application struct {
 	Ctx           context.Context
 	janitorModel  *models.JanitorModel
 	artifactModel *models.ArtifactModel
+	lkServices    *livekitservice.LivekitService
 }
 
 func (a *Application) Boot() {
+	if a.AppConfig.LivekitSipInfo != nil && a.AppConfig.LivekitSipInfo.Enabled {
+		err := a.lkServices.CreateSIPInboundTrunk()
+		if err != nil {
+			a.AppConfig.Logger.WithError(err).Fatalln("Failed to create SIP inbound trunk")
+		}
+	}
+
 	var wg sync.WaitGroup
 	// We need to wait for authService setup task to complete.
 	wg.Add(1)

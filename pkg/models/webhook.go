@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"strings"
 
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
@@ -98,4 +99,8 @@ func (m *WebhookModel) sendCustomTypeWebhook(event *livekit.WebhookEvent, eventN
 	if err != nil {
 		m.logger.Errorln(err)
 	}
+}
+
+func (m *WebhookModel) isRequireManualTrigger(userId string) bool {
+	return strings.HasPrefix(userId, config.IngressUserIdPrefix) || strings.HasPrefix(userId, config.TTSAgentUserIdPrefix) || strings.HasPrefix(userId, config.SipUserIdPrefix)
 }

@@ -80,6 +80,23 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 	})
 	log.Info("room info saved to db")
 
+	if !r.Metadata.IsBreakoutRoom {
+		sipDialInFeatures := r.Metadata.RoomFeatures.SipDialInFeatures
+		// in setRoomDefaults we've already verified if the feature can be enabled or not
+		if sipDialInFeatures.IsAllow && sipDialInFeatures.EnableDialInOnCreate {
+			ruleId, pin, err := m.lk.CreateSIPDispatchRule(r.RoomId, sipDialInFeatures.HidePhoneNumber, log)
+			if err != nil {
+				// just log as this isn't a critical error
+				log.WithError(err).Error("failed to create SIP dispatch rule")
+			} else {
+				sipDialInFeatures.IsActive = true
+				sipDialInFeatures.DispatchRuleId = &ruleId
+				sipDialInFeatures.Pin = &pin
+				sipDialInFeatures.PhoneNumbers = m.app.LivekitSipInfo.PhoneNumbers
+			}
+		}
+	}
+
 	// now create room bucket
 	err = m.natsService.AddRoom(roomDbInfo.ID, r.RoomId, sid, r.EmptyTimeout, r.MaxParticipants, r.Metadata)
 	if err != nil {
@@ -176,10 +193,6 @@ func (m *RoomModel) setRoomDefaults(r *plugnmeet.CreateRoomReq) {
 	utils.SetRoomDefaultLockSettings(r)
 	utils.SetDefaultRoomSettings(m.app.RoomDefaultSettings, r)
 
-	if r.Metadata.RoomFeatures.InsightsFeatures.IsAllow && (m.app.Insights == nil || !m.app.Insights.Enabled) {
-		r.Metadata.RoomFeatures.InsightsFeatures.IsAllow = false
-	}
-
 	// copyright
 	copyrightConf := m.app.Client.CopyrightConf
 	if copyrightConf == nil {
@@ -204,9 +217,10 @@ func (m *RoomModel) setRoomDefaults(r *plugnmeet.CreateRoomReq) {
 	}
 
 	if r.Metadata.RoomFeatures.InsightsFeatures != nil {
-		if m.app.Insights == nil {
+		if r.Metadata.RoomFeatures.InsightsFeatures.IsAllow && (m.app.Insights == nil || !m.app.Insights.Enabled) {
 			r.Metadata.RoomFeatures.InsightsFeatures.IsAllow = false
-		} else {
+		}
+		if r.Metadata.RoomFeatures.InsightsFeatures.IsAllow {
 			if r.Metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures != nil {
 				maxSelectedTranscriptionTransLangs := 2
 				if _, serviceCnf, err := m.app.Insights.GetProviderAccountForService(insights.ServiceTypeTranscription); err == nil {
@@ -226,6 +240,26 @@ func (m *RoomModel) setRoomDefaults(r *plugnmeet.CreateRoomReq) {
 				}
 				r.Metadata.RoomFeatures.InsightsFeatures.ChatTranslationFeatures.MaxSelectedTransLangs = int32(maxSelectedChatTransLangs)
 			}
+		}
+	}
+
+	if r.Metadata.RoomFeatures.SipDialInFeatures != nil {
+		if (m.app.LivekitSipInfo == nil || !m.app.LivekitSipInfo.Enabled) && r.Metadata.RoomFeatures.SipDialInFeatures.IsAllow {
+			r.Metadata.RoomFeatures.SipDialInFeatures.IsAllow = false
+		}
+	}
+
+	// handle if enabled e2ee
+	if r.Metadata.RoomFeatures.EndToEndEncryptionFeatures.IsEnabled {
+		r.Metadata.RoomFeatures.SipDialInFeatures.IsAllow = false
+		r.Metadata.RoomFeatures.IngressFeatures.IsAllow = false
+
+		insightsFeatures := r.Metadata.RoomFeatures.InsightsFeatures
+		if insightsFeatures.TranscriptionFeatures != nil {
+			insightsFeatures.TranscriptionFeatures.IsAllow = false
+		}
+		if insightsFeatures.AiFeatures != nil && insightsFeatures.AiFeatures.MeetingSummarizationFeatures != nil {
+			insightsFeatures.AiFeatures.MeetingSummarizationFeatures.IsAllow = false
 		}
 	}
 }

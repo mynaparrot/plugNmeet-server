@@ -155,6 +155,10 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 
 	// Perform the final NATS cleanup, deleting room-specific streams and KV stores.
 	m.natsService.OnAfterSessionEndCleanup(roomID)
+
+	// clean any SIP DispatchRule
+	m.lk.DeleteSIPDispatchRule(roomID, log)
+
 	log.Info("Room has been cleaned properly")
 
 	// Schedule the analytics export to run after a delay.

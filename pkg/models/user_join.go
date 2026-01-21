@@ -36,6 +36,11 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 		log.WithError(err).Warnln()
 		return "", err
 	}
+	if config.IsUserIdInternal(g.GetUserInfo().GetUserId()) {
+		err := fmt.Errorf("user_id: %s is reserved for internal use only", g.GetUserInfo().GetUserId())
+		log.WithError(err).Warnln()
+		return "", err
+	}
 
 	// Step 3: Fetch the current room information and metadata from NATS.
 	rInfo, meta, err := m.natsService.GetRoomInfoWithMetadata(g.GetRoomId())

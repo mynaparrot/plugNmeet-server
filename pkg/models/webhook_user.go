@@ -43,7 +43,22 @@ func (m *WebhookModel) participantJoined(event *livekit.WebhookEvent) {
 		log.WithError(err).Errorln("error incrementing num participants")
 	}
 
-	if strings.HasPrefix(event.Participant.Identity, config.IngressUserIdPrefix) || strings.HasPrefix(event.Participant.Identity, config.TTSAgentUserIdPrefix) {
+	if m.isRequireManualTrigger(event.Participant.Identity) {
+		if strings.HasPrefix(event.Participant.Identity, config.SipUserIdPrefix) {
+			// for special case SIP
+			// our: sip_phoneNumber
+			// LK: sip_+phoneNumber
+			event.Participant.Identity = strings.ReplaceAll(event.Participant.Identity, "+", "")
+			log.WithFields(logrus.Fields{
+				"sip_user_name": event.Participant.Name,
+				"sip_user_id":   event.Participant.Identity,
+			}).Infoln("triggering OnAfterUserJoined manually for SIP user")
+
+			_, err := m.natsService.AddUserManuallyAndBroadcast(event.Room.GetName(), event.Participant.Identity, event.Participant.Name, false, false)
+			if err != nil {
+				log.WithError(err).Errorln("failed to add SIP user to NATS")
+			}
+		}
 		// if user was internal agent user then we'll have to do it manually
 		// because that user will not use plugNmeet client interface
 		log.Infof("internal agent participant joined, triggering OnAfterUserJoined manually")
@@ -88,7 +103,13 @@ func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 		log.WithError(err).Errorln("error decrementing num participants")
 	}
 
-	if strings.HasPrefix(event.Participant.Identity, config.IngressUserIdPrefix) || strings.HasPrefix(event.Participant.Identity, config.TTSAgentUserIdPrefix) {
+	if m.isRequireManualTrigger(event.Participant.Identity) {
+		if strings.HasPrefix(event.Participant.Identity, config.SipUserIdPrefix) {
+			// for special case SIP
+			// our: sip_phoneNumber
+			// LK: sip_+phoneNumber
+			event.Participant.Identity = strings.ReplaceAll(event.Participant.Identity, "+", "")
+		}
 		// if user was internal agent user then we'll have to do it manually
 		// because that user did not use plugNmeet client interface
 		log.Info("internal agent participant joined left, triggering OnAfterUserDisconnected manually")

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/logging"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/nats-io/nats.go"
@@ -34,6 +35,7 @@ type AppConfig struct {
 	RoomDefaultSettings *utils.RoomDefaultSettings `yaml:"room_default_settings"`
 	LogSettings         logging.LogSettings        `yaml:"log_settings"`
 	LivekitInfo         LivekitInfo                `yaml:"livekit_info"`
+	LivekitSipInfo      *LivekitSipInfo            `yaml:"livekit_sip_info"`
 	RedisInfo           RedisInfo                  `yaml:"redis_info"`
 	DatabaseInfo        DatabaseInfo               `yaml:"database_info"`
 	UploadFileSettings  UploadFileSettings         `yaml:"upload_file_settings"`
@@ -77,6 +79,16 @@ type LivekitInfo struct {
 	Host   string `yaml:"host"`
 	ApiKey string `yaml:"api_key"`
 	Secret string `yaml:"secret"`
+}
+
+type LivekitSipInfo struct {
+	Enabled            bool                       `yaml:"enabled"`
+	TrunkName          string                     `yaml:"trunk_name"`
+	PhoneNumbers       []string                   `yaml:"phone_numbers"`
+	AllowedIpAddresses *[]string                  `yaml:"allowed_ip_addresses"`
+	AuthUsername       *string                    `yaml:"auth_username"`
+	AuthPassword       *string                    `yaml:"auth_password"`
+	MediaEncryption    livekit.SIPMediaEncryption `yaml:"media_encryption"`
 }
 
 type UploadFileSettings struct {
@@ -271,6 +283,14 @@ func New(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 	if appCnf.NatsInfo.Recorder.TranscodingJobs == "" {
 		appCnf.NatsInfo.Recorder.TranscodingJobs = "pnm-RecorderTranscoderJobs"
 	}
+	if appCnf.LivekitSipInfo != nil && appCnf.LivekitSipInfo.Enabled {
+		if len(appCnf.LivekitSipInfo.PhoneNumbers) == 0 {
+			return nil, fmt.Errorf("at least one SIP inbound phone number required in `phone_numbers`")
+		}
+		if appCnf.LivekitSipInfo.TrunkName == "" {
+			appCnf.LivekitSipInfo.TrunkName = "pnm-inbound-trunk"
+		}
+	}
 
 	// read client files and cache it
 	err = readClientFiles(appCnf)
@@ -375,4 +395,8 @@ func FormatDBTable(table string) string {
 		return dbTablePrefix + table
 	}
 	return table
+}
+
+func IsUserIdInternal(userId string) bool {
+	return strings.HasPrefix(userId, IngressUserIdPrefix) || strings.HasPrefix(userId, AgentUserUserIdPrefix) || strings.HasPrefix(userId, SipUserIdPrefix) || strings.HasPrefix(userId, TTSAgentUserIdPrefix)
 }

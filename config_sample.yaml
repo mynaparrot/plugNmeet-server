@@ -64,6 +64,21 @@ livekit_info:
   api_key: "APIiYAA5w37Cfo2"
   secret: "6aNur7qqupeZhFYNOJVUyeXxXhVw8f4lm13pEDUx8SgB"
 
+livekit_sip_info:
+  enabled: true
+  trunk_name: "pnm-inbound-trunk"
+  # List of allowed inbound phone numbers.
+  phone_numbers: ["+12674777275","+441883778715"]
+#  allowed_ip_addresses: []
+#  auth_username: "auth"
+#  auth_password: "password"
+#  # Media encryption (SRTP) policy for SIP calls.
+#  # 0 = Disabled: No encryption.
+#  # 1 = Allowed: Encrypt if supported, otherwise fallback to unencrypted.
+#  # 2 = Required: Encrypt always, reject call if not supported.
+#  # Default: 0
+#  media_encryption: 0
+
 redis_info:
   host: redis:6379
   username: ""
@@ -144,20 +159,7 @@ upload_file_settings:
   max_size_whiteboard_file: 30
   # If true, uploaded files will not be deleted after the session ends.
   keep_forever: false
-  allowed_types:
-    - "jpg"
-    - "png"
-    - "jpeg"
-    - "svg"
-    - "pdf"
-    - "docx"
-    - "txt"
-    - "xlsx"
-    - "pptx"
-    - "zip"
-    - "mp4"
-    - "webm"
-    - "mp3"
+  allowed_types: ["jpg","png","jpeg","svg","pdf","docx","txt","xlsx","pptx","zip","mp4","webm","mp3"]
 
 recorder_info:
   # This path must match the recorder's copy_to_dir > main_path setting.
