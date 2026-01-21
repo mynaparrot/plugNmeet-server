@@ -48,9 +48,8 @@ func (m *WebhookModel) participantJoined(event *livekit.WebhookEvent) {
 			// for special case SIP
 			// our: sip_phoneNumber
 			// LK: sip_+phoneNumber
-			name := strings.TrimPrefix(event.Participant.Identity, "sip_")
 			event.Participant.Identity = strings.ReplaceAll(event.Participant.Identity, "+", "")
-			_, err := m.natsService.AddUserManuallyAndBroadcast(event.Room.GetName(), event.Participant.Identity, name, false, false)
+			_, err := m.natsService.AddUserManuallyAndBroadcast(event.Room.GetName(), event.Participant.Identity, event.Participant.Name, false, false)
 			if err != nil {
 				log.WithError(err).Errorln("failed to add SIP user to NATS")
 			}
