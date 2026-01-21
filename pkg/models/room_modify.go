@@ -51,9 +51,11 @@ func (m *RoomModel) EnableRoomSipDialIn(r *plugnmeet.EnableSipDialInReq) error {
 		return fmt.Errorf("sip dial in is already enabled")
 	}
 	log := m.logger.WithFields(logrus.Fields{
-		"room_id": r.RoomId,
-		"method":  "EnableRoomSipDialIn",
+		"room_id":           r.RoomId,
+		"method":            "EnableRoomSipDialIn",
+		"hide_phone_number": r.HidePhoneNumber,
 	})
+	sipDialInFeatures.HidePhoneNumber = r.HidePhoneNumber
 
 	ruleId, pin, err := m.lk.CreateSIPDispatchRule(r.RoomId, sipDialInFeatures.HidePhoneNumber, log)
 	if err != nil {
