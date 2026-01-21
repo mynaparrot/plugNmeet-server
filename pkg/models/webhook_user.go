@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -51,9 +52,14 @@ func (m *WebhookModel) participantJoined(event *livekit.WebhookEvent) {
 			// LK: sip_+phoneNumber
 			name := event.Participant.Name
 			if meta.RoomFeatures.SipDialInFeatures.HidePhoneNumber {
+				fmt.Println("meta.RoomFeatures.SipDialInFeatures.HidePhoneNumber==>", meta.RoomFeatures.SipDialInFeatures.HidePhoneNumber, helpers.MaskPhoneNumber(name))
 				name = helpers.MaskPhoneNumber(name)
 			}
 			event.Participant.Identity = strings.ReplaceAll(event.Participant.Identity, "+", "")
+			log.WithFields(logrus.Fields{
+				"sip_user_name": name,
+				"sip_user_id":   event.Participant.Identity,
+			}).Infoln("triggering OnAfterUserJoined manually for SIP user")
 			_, err := m.natsService.AddUserManuallyAndBroadcast(event.Room.GetName(), event.Participant.Identity, name, false, false)
 			if err != nil {
 				log.WithError(err).Errorln("failed to add SIP user to NATS")
