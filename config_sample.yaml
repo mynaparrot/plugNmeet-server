@@ -67,7 +67,7 @@ livekit_info:
 livekit_sip_info:
   enabled: true
   trunk_name: "pnm-inbound-trunk"
-  # List of allowed inbound phone numbers. If empty, calls from any number will be accepted.
+  # List of allowed inbound phone numbers.
   phone_numbers: ["+12674777275","+441883778715"]
 #  allowed_ip_addresses: []
 #  auth_username: "auth"

@@ -283,6 +283,14 @@ func New(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 	if appCnf.NatsInfo.Recorder.TranscodingJobs == "" {
 		appCnf.NatsInfo.Recorder.TranscodingJobs = "pnm-RecorderTranscoderJobs"
 	}
+	if appCnf.LivekitSipInfo != nil && appCnf.LivekitSipInfo.Enabled {
+		if len(appCnf.LivekitSipInfo.PhoneNumbers) == 0 {
+			return nil, fmt.Errorf("at least one SIP inbound phone number required in `phone_numbers`")
+		}
+		if appCnf.LivekitSipInfo.TrunkName == "" {
+			appCnf.LivekitSipInfo.TrunkName = "pnm-inbound-trunk"
+		}
+	}
 
 	// read client files and cache it
 	err = readClientFiles(appCnf)
