@@ -6,7 +6,6 @@ import (
 
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 )
@@ -24,7 +23,7 @@ func (m *WebhookModel) participantJoined(event *livekit.WebhookEvent) {
 	})
 	log.Infoln("handling participant_joined webhook")
 
-	rInfo, meta, err := m.natsService.GetRoomInfoWithMetadata(event.Room.Name)
+	rInfo, err := m.natsService.GetRoomInfo(event.Room.Name)
 	if err != nil {
 		log.WithError(err).Errorln("failed to get room info from NATS")
 		return
@@ -49,16 +48,13 @@ func (m *WebhookModel) participantJoined(event *livekit.WebhookEvent) {
 			// for special case SIP
 			// our: sip_phoneNumber
 			// LK: sip_+phoneNumber
-			name := event.Participant.Name
-			if meta.RoomFeatures.SipDialInFeatures.HidePhoneNumber {
-				name = helpers.MaskPhoneNumber(name)
-			}
 			event.Participant.Identity = strings.ReplaceAll(event.Participant.Identity, "+", "")
 			log.WithFields(logrus.Fields{
-				"sip_user_name": name,
+				"sip_user_name": event.Participant.Name,
 				"sip_user_id":   event.Participant.Identity,
 			}).Infoln("triggering OnAfterUserJoined manually for SIP user")
-			_, err := m.natsService.AddUserManuallyAndBroadcast(event.Room.GetName(), event.Participant.Identity, name, false, false)
+
+			_, err := m.natsService.AddUserManuallyAndBroadcast(event.Room.GetName(), event.Participant.Identity, event.Participant.Name, false, false)
 			if err != nil {
 				log.WithError(err).Errorln("failed to add SIP user to NATS")
 			}

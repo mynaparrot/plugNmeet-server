@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"math"
 	"math/big"
-	"regexp"
 	"strings"
 )
 
@@ -48,27 +47,4 @@ func GenerateSipPin(length int) string {
 		builder.WriteRune(rune('0' + d))
 	}
 	return builder.String()
-}
-
-func MaskPhoneNumber(name string) string {
-	re := regexp.MustCompile(`\d`)
-	allDigits := re.FindAllString(name, -1)
-
-	if len(allDigits) <= 4 {
-		return name // Not enough digits to mask
-	}
-
-	totalDigits := len(allDigits)
-	digitCount := 0
-
-	masker := func(s string) string {
-		digitCount++
-		// Keep the first 2 and last 2 digits
-		if digitCount > 2 && digitCount <= totalDigits-2 {
-			return "X"
-		}
-		return s
-	}
-
-	return re.ReplaceAllStringFunc(name, masker)
 }
