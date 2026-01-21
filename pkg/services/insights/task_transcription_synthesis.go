@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	lkLogger "github.com/livekit/protocol/logger"
 	lksdk "github.com/livekit/server-sdk-go/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -233,7 +232,6 @@ func (t *TranscriptionSynthesisTask) connectAgentToRoom(agentIdentity, agentName
 		},
 	})
 
-	workerRoom.SetLogger(lkLogger.GetLogger())
 	if err = workerRoom.JoinWithToken(t.appCnf.LivekitInfo.Host, token, lksdk.WithAutoSubscribe(false)); err != nil {
 		// make user offline
 		err = t.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_DISCONNECTED, t.roomId, userInfo, agentIdentity)

@@ -17,7 +17,6 @@ import (
 	"github.com/pion/webrtc/v4"
 	"github.com/sirupsen/logrus"
 
-	lkLogger "github.com/livekit/protocol/logger"
 	lksdk "github.com/livekit/server-sdk-go/v2"
 	lkmedia "github.com/livekit/server-sdk-go/v2/pkg/media"
 
@@ -108,7 +107,6 @@ func NewRoomAgent(ctx context.Context, appConf *config.AppConfig, serviceConfig 
 		},
 		OnDisconnected: agent.onDisconnected,
 	})
-	room.SetLogger(lkLogger.GetLogger())
 
 	err = room.JoinWithToken(agent.conf.LivekitInfo.Host, token, lksdk.WithAutoSubscribe(false))
 	if err != nil {

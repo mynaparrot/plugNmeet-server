@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	lkLogger "github.com/livekit/protocol/logger"
 	"github.com/mynaparrot/plugnmeet-protocol/logging"
 	"github.com/mynaparrot/plugnmeet-server/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -53,6 +54,11 @@ func startServer(configFile string) {
 		logrus.WithError(err).Fatal("Failed to setup logger")
 	}
 	appCnf.Logger = logger
+	// to avoid pion logs
+	logConf := &lkLogger.Config{
+		Level: "warn",
+	}
+	lkLogger.InitFromConfig(logConf, "pnm")
 
 	// 5. Prepare server dependencies like database, Redis, and NATS connections.
 	err = helpers.PrepareServer(ctx, appCnf)
