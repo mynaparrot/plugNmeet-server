@@ -17,7 +17,7 @@ require (
 	github.com/google/wire v0.7.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/media-sdk v0.0.0-20251106223430-dd8f5e0de2cf
-	github.com/livekit/protocol v1.43.4
+	github.com/livekit/protocol v1.44.0
 	github.com/livekit/server-sdk-go/v2 v2.13.1
 	github.com/mynaparrot/plugnmeet-protocol v1.2.0
 	github.com/nats-io/jwt/v2 v2.8.0
