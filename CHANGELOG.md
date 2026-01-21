@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.1.0](https://github.com/mynaparrot/plugNmeet-server/compare/v2.0.3...v2.1.0) (2026-01-21)
+
+
+### Features
+
+* SIP dial in ([4d6e3bf](https://github.com/mynaparrot/plugNmeet-server/commit/4d6e3bf455bb6ebc93e812898bc0f0b6affbcfbc))
+* SIP dial in ([ede2dda](https://github.com/mynaparrot/plugNmeet-server/commit/ede2dda4e652c93925fa43d350c8aa82c6119ea0))
+
+
+### Bug Fixes
+
+* bump proto ([bd817d1](https://github.com/mynaparrot/plugNmeet-server/commit/bd817d19e51d5153674253dc3c518f21edf34607))
+* mask phone number in proper way ([0f39025](https://github.com/mynaparrot/plugNmeet-server/commit/0f39025cab3ef3d13128a1e53d58957fbf318986))
+* recording file size record ([8ad5b79](https://github.com/mynaparrot/plugNmeet-server/commit/8ad5b798b77af29d890d85b9dfed0e3dac1e1855))
+* removed deprecated `speechServices` ([30c1c10](https://github.com/mynaparrot/plugNmeet-server/commit/30c1c1043416819e51421968832267b5f3a5ecc2))
+* replace BBB `%%CONFNAME%%` with correct value ([ade869b](https://github.com/mynaparrot/plugNmeet-server/commit/ade869bd90a75d3d2816018f26781ba3ec3362fb))
+* runtime nil pointer error ([9dbc161](https://github.com/mynaparrot/plugNmeet-server/commit/9dbc161100221f18ef7529da0e20fdbbb2c5ef31))
+* SIP user name ([3c0107b](https://github.com/mynaparrot/plugNmeet-server/commit/3c0107b02976ee9c97825a9e8b992bef8dc40ad4))
+* use sip provided name ([bfc1c24](https://github.com/mynaparrot/plugNmeet-server/commit/bfc1c24557dc24b3bd434795372a3a0971e76861))
+
 ## [2.0.3](https://github.com/mynaparrot/plugNmeet-server/compare/v2.0.2...v2.0.3) (2026-01-13)
 
 
