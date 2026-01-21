@@ -51,15 +51,24 @@ func GenerateSipPin(length int) string {
 }
 
 func MaskPhoneNumber(name string) string {
-	re := regexp.MustCompile(`\d+`)
-	numberStr := re.FindString(name)
+	re := regexp.MustCompile(`\d`)
+	allDigits := re.FindAllString(name, -1)
 
-	if len(numberStr) > 4 {
-		firstPart := numberStr[:2]
-		lastPart := numberStr[len(numberStr)-2:]
-		maskedPart := strings.Repeat("X", len(numberStr)-4)
-		maskedNumber := firstPart + maskedPart + lastPart
-		name = strings.Replace(name, numberStr, maskedNumber, 1)
+	if len(allDigits) <= 4 {
+		return name // Not enough digits to mask
 	}
-	return name
+
+	totalDigits := len(allDigits)
+	digitCount := 0
+
+	masker := func(s string) string {
+		digitCount++
+		// Keep the first 2 and last 2 digits
+		if digitCount > 2 && digitCount <= totalDigits-2 {
+			return "X"
+		}
+		return s
+	}
+
+	return re.ReplaceAllStringFunc(name, masker)
 }
