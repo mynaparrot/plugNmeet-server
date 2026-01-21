@@ -51,6 +51,7 @@ func (m *WebhookModel) participantJoined(event *livekit.WebhookEvent) {
 			// our: sip_phoneNumber
 			// LK: sip_+phoneNumber
 			name := event.Participant.Name
+			fmt.Println(fmt.Sprintf("+%v", meta.RoomFeatures.SipDialInFeatures))
 			if meta.RoomFeatures.SipDialInFeatures.HidePhoneNumber {
 				fmt.Println("meta.RoomFeatures.SipDialInFeatures.HidePhoneNumber==>", meta.RoomFeatures.SipDialInFeatures.HidePhoneNumber, helpers.MaskPhoneNumber(name))
 				name = helpers.MaskPhoneNumber(name)
