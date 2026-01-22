@@ -130,7 +130,7 @@ func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 // from the media server is also correctly marked as offline in the signaling system,
 // fixing any discrepancies that might arise from race conditions.
 func (m *WebhookModel) ensureUserIsOffline(event *livekit.WebhookEvent, log *logrus.Entry) {
-	if strings.HasPrefix(event.Participant.Identity, config.IngressUserIdPrefix) {
+	if m.isRequireManualTrigger(event.Participant.Identity) {
 		// as we already proceeded
 		return
 	}
