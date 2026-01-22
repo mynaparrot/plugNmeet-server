@@ -84,13 +84,16 @@ func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 	log.Infoln("handling participant_left webhook")
 
 	rInfo, err := m.natsService.GetRoomInfo(event.Room.Name)
-	if err != nil {
-		log.WithError(err).Errorln("failed to get room info from NATS")
-		return
-	}
-	if rInfo == nil {
-		log.Warnln("room not found in NATS, skipping participant_left tasks")
-		return
+	if err != nil || rInfo == nil {
+		if err != nil {
+			log.WithError(err).Errorln("failed to get room info from NATS due to an error, falling back to redis")
+		}
+		// fallback to redis to retrieve room info
+		rInfo = m.rs.GetTemporaryRoomData(event.Room.Name)
+		if rInfo == nil {
+			log.Warnln("room not found in Nats or Redis, skipping participant_left tasks")
+			return
+		}
 	}
 
 	event.Room.Sid = rInfo.RoomSid
