@@ -93,8 +93,17 @@ func (ac *AuthController) HandleVerifyToken(c *fiber.Ctx) error {
 	if !rr.GetIsActive() {
 		return utils.SendCommonProtobufResponse(c, false, rr.Msg)
 	}
+	if rInfo == nil || meta == nil {
+		return utils.SendCommonProtobufResponse(c, false, "room not found")
+	}
+
 	if rInfo.MaxParticipants > 0 && roomDbInfo.JoinedParticipants >= int64(rInfo.MaxParticipants) {
 		return utils.SendCommonProtobufResponse(c, false, "notifications.max-num-participates-exceeded")
+	}
+
+	enabledSelfInsertEncryptionKey := false
+	if meta.RoomFeatures.EndToEndEncryptionFeatures.IsEnabled {
+		enabledSelfInsertEncryptionKey = meta.RoomFeatures.EndToEndEncryptionFeatures.EnabledSelfInsertEncryptionKey
 	}
 
 	v := version.Version
@@ -117,7 +126,7 @@ func (ac *AuthController) HandleVerifyToken(c *fiber.Ctx) error {
 			Whiteboard:      natsSubjs.Whiteboard,
 			DataChannel:     natsSubjs.DataChannel,
 		},
-		EnabledSelfInsertEncryptionKey: &meta.GetRoomFeatures().GetEndToEndEncryptionFeatures().EnabledSelfInsertEncryptionKey,
+		EnabledSelfInsertEncryptionKey: &enabledSelfInsertEncryptionKey,
 	}
 
 	return utils.SendProtobufResponse(c, res)
