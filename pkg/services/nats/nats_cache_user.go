@@ -18,15 +18,15 @@ func (ncs *NatsCacheService) AddRoomUserStatusWatcher(kv jetstream.KeyValue, buc
 		"room":   roomId,
 	})
 
-	ncs.userLock.Lock()
+	ncs.roomUsersStatusLock.Lock()
 	_, ok := ncs.roomUsersStatusStore[roomId]
 	if ok {
 		//already watching this room
-		ncs.userLock.Unlock()
+		ncs.roomUsersStatusLock.Unlock()
 		return
 	}
 	ncs.roomUsersStatusStore[roomId] = make(map[string]CachedRoomUserStatusEntry)
-	ncs.userLock.Unlock()
+	ncs.roomUsersStatusLock.Unlock()
 
 	opts := []jetstream.WatchOpt{jetstream.IncludeHistory()}
 	watcher, err := kv.WatchAll(ncs.serviceCtx, opts...)
@@ -56,13 +56,13 @@ func (ncs *NatsCacheService) AddRoomUserStatusWatcher(kv jetstream.KeyValue, buc
 				}
 				// here each user id is a separate key and status is the value
 				if entry != nil {
-					ncs.userLock.Lock()
+					ncs.roomUsersStatusLock.Lock()
 					// force push updated data
 					ncs.roomUsersStatusStore[roomId][entry.Key()] = CachedRoomUserStatusEntry{
 						Status:   string(entry.Value()),
 						Revision: entry.Revision(),
 					}
-					ncs.userLock.Unlock()
+					ncs.roomUsersStatusLock.Unlock()
 				}
 			}
 		}
@@ -70,8 +70,8 @@ func (ncs *NatsCacheService) AddRoomUserStatusWatcher(kv jetstream.KeyValue, buc
 }
 
 func (ncs *NatsCacheService) GetCachedRoomUserStatus(roomId, userId string) (string, uint64) {
-	ncs.userLock.RLock()
-	defer ncs.userLock.RUnlock()
+	ncs.roomUsersStatusLock.RLock()
+	defer ncs.roomUsersStatusLock.RUnlock()
 	if rm, found := ncs.roomUsersStatusStore[roomId]; found {
 		if entry, ok := rm[userId]; ok {
 			return entry.Status, entry.Revision
@@ -81,8 +81,8 @@ func (ncs *NatsCacheService) GetCachedRoomUserStatus(roomId, userId string) (str
 }
 
 func (ncs *NatsCacheService) GetUsersIdFromRoomStatusBucket(roomId, filterStatus string) []string {
-	ncs.userLock.RLock()
-	defer ncs.userLock.RUnlock()
+	ncs.roomUsersStatusLock.RLock()
+	defer ncs.roomUsersStatusLock.RUnlock()
 
 	var usersIds []string
 	if rm, found := ncs.roomUsersStatusStore[roomId]; found {
@@ -101,8 +101,8 @@ func (ncs *NatsCacheService) GetUsersIdFromRoomStatusBucket(roomId, filterStatus
 // remember each room has only one RoomUsersBucket bucket
 // in this bucket userId is key and status is value
 func (ncs *NatsCacheService) cleanRoomUserStatusCache(roomId string) {
-	ncs.userLock.Lock()
-	defer ncs.userLock.Unlock()
+	ncs.roomUsersStatusLock.Lock()
+	defer ncs.roomUsersStatusLock.Unlock()
 	delete(ncs.roomUsersStatusStore, roomId)
 }
 
@@ -115,7 +115,7 @@ func (ncs *NatsCacheService) AddUserInfoWatcher(kv jetstream.KeyValue, bucket, r
 		"user":   userId,
 	})
 
-	ncs.userLock.Lock()
+	ncs.roomUsersInfoLock.Lock()
 	rm, ok := ncs.roomUsersInfoStore[roomId]
 	if !ok {
 		ncs.roomUsersInfoStore[roomId] = make(map[string]CachedUserInfoEntry)
@@ -124,13 +124,13 @@ func (ncs *NatsCacheService) AddUserInfoWatcher(kv jetstream.KeyValue, bucket, r
 	_, ok = rm[userId]
 	if ok {
 		// already watching user info for this userId
-		ncs.userLock.Unlock()
+		ncs.roomUsersInfoLock.Unlock()
 		return
 	}
 	ncs.roomUsersInfoStore[roomId][userId] = CachedUserInfoEntry{
 		UserInfo: new(plugnmeet.NatsKvUserInfo),
 	}
-	ncs.userLock.Unlock()
+	ncs.roomUsersInfoLock.Unlock()
 
 	opts := []jetstream.WatchOpt{jetstream.IncludeHistory()}
 	watcher, err := kv.WatchAll(ncs.serviceCtx, opts...)
@@ -167,9 +167,20 @@ func (ncs *NatsCacheService) AddUserInfoWatcher(kv jetstream.KeyValue, bucket, r
 }
 
 func (ncs *NatsCacheService) updateUserInfoCache(entry jetstream.KeyValueEntry, roomId, userId string) {
-	ncs.userLock.Lock()
-	defer ncs.userLock.Unlock()
-	user := ncs.roomUsersInfoStore[roomId][userId]
+	ncs.roomUsersInfoLock.Lock()
+	defer ncs.roomUsersInfoLock.Unlock()
+
+	room, roomOk := ncs.roomUsersInfoStore[roomId]
+	if !roomOk {
+		// Room is no longer tracked, so we can ignore this update.
+		return
+	}
+
+	user, userOk := room[userId]
+	if !userOk {
+		// User is no longer tracked, so we can ignore this update.
+		return
+	}
 
 	val := string(entry.Value())
 	switch entry.Key() {
@@ -201,8 +212,8 @@ func (ncs *NatsCacheService) updateUserInfoCache(entry jetstream.KeyValueEntry, 
 }
 
 func (ncs *NatsCacheService) GetUserInfo(roomId, userId string) *plugnmeet.NatsKvUserInfo {
-	ncs.userLock.RLock()
-	defer ncs.userLock.RUnlock()
+	ncs.roomUsersInfoLock.RLock()
+	defer ncs.roomUsersInfoLock.RUnlock()
 	if rm, found := ncs.roomUsersInfoStore[roomId]; found {
 		if entry, ok := rm[userId]; ok && entry.UserInfo != nil {
 			// Return a copy to prevent modification of cached object if it's a pointer
@@ -214,8 +225,8 @@ func (ncs *NatsCacheService) GetUserInfo(roomId, userId string) *plugnmeet.NatsK
 }
 
 func (ncs *NatsCacheService) GetUserLastPingAt(roomId, userId string) int64 {
-	ncs.userLock.RLock()
-	defer ncs.userLock.RUnlock()
+	ncs.roomUsersInfoLock.RLock()
+	defer ncs.roomUsersInfoLock.RUnlock()
 	if rm, found := ncs.roomUsersInfoStore[roomId]; found {
 		if entry, ok := rm[userId]; ok {
 			return int64(entry.LastPingAt)
@@ -225,7 +236,7 @@ func (ncs *NatsCacheService) GetUserLastPingAt(roomId, userId string) int64 {
 }
 
 func (ncs *NatsCacheService) cleanUserInfoCache(roomId, userId string) {
-	ncs.userLock.Lock()
-	defer ncs.userLock.Unlock()
+	ncs.roomUsersInfoLock.Lock()
+	defer ncs.roomUsersInfoLock.Unlock()
 	delete(ncs.roomUsersInfoStore[roomId], userId)
 }

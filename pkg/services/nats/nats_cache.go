@@ -39,9 +39,11 @@ type NatsCacheService struct {
 	roomLock       sync.RWMutex
 	roomsInfoStore map[string]CachedRoomEntry
 
-	userLock             sync.RWMutex
+	roomUsersStatusLock  sync.RWMutex
 	roomUsersStatusStore map[string]map[string]CachedRoomUserStatusEntry
-	roomUsersInfoStore   map[string]map[string]CachedUserInfoEntry
+
+	roomUsersInfoLock  sync.RWMutex
+	roomUsersInfoStore map[string]map[string]CachedUserInfoEntry
 }
 
 func InitNatsCacheService(app *config.AppConfig, log *logrus.Logger) {
