@@ -73,6 +73,9 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) {
 		log.WithError(err).WithField("status", natsservice.UserStatusDisconnected).Warn("failed to update user status")
 	}
 
+	// update analytics for the user leaving.
+	m.updateUserLeftAnalytics(roomId, userId)
+
 	// Try to get user info for a richer disconnect message.
 	userInfo, err := m.natsService.GetUserInfo(roomId, userId)
 	if err != nil || userInfo == nil {
@@ -105,9 +108,6 @@ func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, userInfo *p
 
 	// User is still disconnected, so mark as offline.
 	_ = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusOffline)
-
-	// Send analytics for the user leaving.
-	m.updateUserLeftAnalytics(roomId, userId)
 
 	// Broadcast the final offline status.
 	if userInfo != nil {

@@ -98,6 +98,10 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 		}
 	}()
 
+	// to avoid race condition better wait few seconds
+	// so that all the users got disconnect properly
+	time.Sleep(config.WaitBeforeTriggerOnAfterRoomEnded)
+
 	// If the room wasn't ended via the API, ensure its status is updated in NATS
 	// and that the session is terminated in LiveKit.
 	if roomStatus != natsservice.RoomStatusEnded {
