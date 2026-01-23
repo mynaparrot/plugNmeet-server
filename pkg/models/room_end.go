@@ -125,7 +125,7 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 	m.natsService.DeleteRoomUsersBlockList(roomID)
 
 	// Send a stop signal to any active recorders for this room.
-	if err = m.recorderModel.SendMsgToRecorder(&plugnmeet.RecordingReq{Task: plugnmeet.RecordingTasks_STOP, Sid: roomSID, RoomId: roomID}); err != nil {
+	if err = m.recordingModel.DispatchRecorderTask(&plugnmeet.RecordingReq{Task: plugnmeet.RecordingTasks_STOP, Sid: roomSID, RoomId: roomID}); err != nil {
 		log.WithError(err).Error("Error sending stop to recorder")
 	}
 

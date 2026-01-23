@@ -18,24 +18,26 @@ type RecordingModel struct {
 	rs              *redisservice.RedisService
 	lk              *livekitservice.LivekitService
 	analyticsModel  *AnalyticsModel
+	um              *UserModel
 	webhookNotifier *helpers.WebhookNotifier
 	natsService     *natsservice.NatsService
 	logger          *logrus.Entry
 }
 
-func NewRecordingModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, analyticsModel *AnalyticsModel, webhookNotifier *helpers.WebhookNotifier, logger *logrus.Logger) *RecordingModel {
+func NewRecordingModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, analyticsModel *AnalyticsModel, um *UserModel, webhookNotifier *helpers.WebhookNotifier, logger *logrus.Logger) *RecordingModel {
 	return &RecordingModel{
 		app:             app,
 		ds:              ds,
 		rs:              rs,
 		analyticsModel:  analyticsModel,
+		um:              um,
 		webhookNotifier: webhookNotifier,
 		natsService:     natsService,
 		logger:          logger.WithField("model", "recording"),
 	}
 }
 
-func (m *RecordingModel) HandleRecorderResp(r *plugnmeet.RecorderToPlugNmeet, roomInfo *dbmodels.RoomInfo) {
+func (m *RecordingModel) ProcessRecorderEvent(r *plugnmeet.RecorderToPlugNmeet, roomInfo *dbmodels.RoomInfo) {
 	switch r.Task {
 	case plugnmeet.RecordingTasks_START_RECORDING:
 		m.recordingStarted(r)

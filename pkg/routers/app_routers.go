@@ -151,7 +151,7 @@ func (r *router) registerAuthRoutes() {
 	artifact.Post("/getDownloadToken", r.ctrl.ArtifactController.HandleGetArtifactDownloadToken)
 
 	recorder := auth.Group("/recorder")
-	recorder.Post("/notify", r.ctrl.RecorderController.HandleRecorderEvents)
+	recorder.Post("/notify", r.ctrl.RecordingController.HandleRecorderEvents)
 }
 
 func (r *router) registerBBBRoutes() {
@@ -200,8 +200,9 @@ func (r *router) registerAPIRoutes() {
 	api := r.app.Group("/api", r.ctrl.AuthController.HandleVerifyHeaderToken)
 	api.Post("/verifyToken", r.ctrl.AuthController.HandleVerifyToken)
 
-	api.Post("/recording", r.ctrl.RecorderController.HandleRecording)
-	api.Post("/rtmp", r.ctrl.RecorderController.HandleRTMP)
+	api.Post("/recording", r.ctrl.RecordingController.HandleRecorderTasks)
+	api.Post("/rtmp", r.ctrl.RecordingController.HandleRecorderTasks)
+
 	api.Post("/endRoom", r.ctrl.RoomController.HandleEndRoomForAPI)
 	api.Post("/changeVisibility", r.ctrl.RoomController.HandleChangeVisibilityForAPI)
 	api.Post("/enableSipDialIn", r.ctrl.RoomController.HandleEnableRoomSipDialIn)
