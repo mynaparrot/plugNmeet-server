@@ -151,7 +151,7 @@ func (r *router) registerAuthRoutes() {
 	artifact.Post("/getDownloadToken", r.ctrl.ArtifactController.HandleGetArtifactDownloadToken)
 
 	recorder := auth.Group("/recorder")
-	recorder.Post("/notify", r.ctrl.RecorderController.HandleRecorderEvents)
+	recorder.Post("/notify", r.ctrl.RecordingController.HandleRecorderEvents)
 }
 
 func (r *router) registerBBBRoutes() {
@@ -200,8 +200,9 @@ func (r *router) registerAPIRoutes() {
 	api := r.app.Group("/api", r.ctrl.AuthController.HandleVerifyHeaderToken)
 	api.Post("/verifyToken", r.ctrl.AuthController.HandleVerifyToken)
 
-	api.Post("/recording", r.ctrl.RecorderController.HandleRecording)
-	api.Post("/rtmp", r.ctrl.RecorderController.HandleRTMP)
+	api.Post("/recording", r.ctrl.RecordingController.HandleRecorderTasks)
+	api.Post("/rtmp", r.ctrl.RecordingController.HandleRecorderTasks)
+
 	api.Post("/endRoom", r.ctrl.RoomController.HandleEndRoomForAPI)
 	api.Post("/changeVisibility", r.ctrl.RoomController.HandleChangeVisibilityForAPI)
 	api.Post("/enableSipDialIn", r.ctrl.RoomController.HandleEnableRoomSipDialIn)
@@ -210,6 +211,10 @@ func (r *router) registerAPIRoutes() {
 
 	ingress := api.Group("/ingress")
 	ingress.Post("/create", r.ctrl.RoomController.HandleCreateIngress)
+
+	waitingRoom := api.Group("/waitingRoom")
+	waitingRoom.Post("/approveUsers", r.ctrl.RoomController.HandleApproveUsers)
+	waitingRoom.Post("/updateMsg", r.ctrl.RoomController.HandleUpdateWaitingRoomMessage)
 
 	api.Post("/convertWhiteboardFile", r.ctrl.FileController.HandleConvertWhiteboardFile)
 	api.Post("/updateLockSettings", r.ctrl.UserController.HandleUpdateUserLockSetting)
@@ -221,10 +226,6 @@ func (r *router) registerAPIRoutes() {
 	etherpad.Post("/create", r.ctrl.EtherpadController.HandleCreateEtherpad)
 	etherpad.Post("/cleanPad", r.ctrl.EtherpadController.HandleCleanPad)
 	etherpad.Post("/changeStatus", r.ctrl.EtherpadController.HandleChangeEtherpadStatus)
-
-	waitingRoom := api.Group("/waitingRoom")
-	waitingRoom.Post("/approveUsers", r.ctrl.WaitingRoomController.HandleApproveUsers)
-	waitingRoom.Post("/updateMsg", r.ctrl.WaitingRoomController.HandleUpdateWaitingRoomMessage)
 
 	polls := api.Group("/polls")
 	polls.Post("/activate", r.ctrl.PollsController.HandleActivatePolls)

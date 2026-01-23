@@ -6,7 +6,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 )
 
-func (m *WaitingRoomModel) ApproveWaitingUsers(r *plugnmeet.ApproveWaitingUsersReq) error {
+func (m *RoomModel) ApproveWaitingUsers(r *plugnmeet.ApproveWaitingUsersReq) error {
 	if r.UserId == "all" {
 		participants, err := m.natsService.GetOnlineUsersList(r.RoomId)
 		if err != nil {
@@ -32,7 +32,7 @@ func (m *WaitingRoomModel) ApproveWaitingUsers(r *plugnmeet.ApproveWaitingUsersR
 	return m.approveUser(r.RoomId, r.UserId, p.Metadata)
 }
 
-func (m *WaitingRoomModel) approveUser(roomId, userId, metadata string) error {
+func (m *RoomModel) approveUser(roomId, userId, metadata string) error {
 	mt, err := m.natsService.UnmarshalUserMetadata(metadata)
 	if err != nil {
 		return err
@@ -47,7 +47,7 @@ func (m *WaitingRoomModel) approveUser(roomId, userId, metadata string) error {
 	return nil
 }
 
-func (m *WaitingRoomModel) UpdateWaitingRoomMessage(r *plugnmeet.UpdateWaitingRoomMessageReq) error {
+func (m *RoomModel) UpdateWaitingRoomMessage(r *plugnmeet.UpdateWaitingRoomMessageReq) error {
 	roomMeta, err := m.natsService.GetRoomMetadataStruct(r.RoomId)
 	if err != nil {
 		return err

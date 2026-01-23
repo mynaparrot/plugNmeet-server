@@ -20,11 +20,9 @@ type ApplicationControllers struct {
 	FileController         *controllers.FileController
 	LtiV1Controller        *controllers.LtiV1Controller
 	PollsController        *controllers.PollsController
-	RecorderController     *controllers.RecorderController
 	RecordingController    *controllers.RecordingController
 	RoomController         *controllers.RoomController
 	UserController         *controllers.UserController
-	WaitingRoomController  *controllers.WaitingRoomController
 	WebhookController      *controllers.WebhookController
 	NatsController         *controllers.NatsController
 	HealthCheckController  *controllers.HealthCheckController

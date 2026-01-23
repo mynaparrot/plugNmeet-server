@@ -278,3 +278,51 @@ func (rc *RoomController) HandleExternalMediaPlayer(c *fiber.Ctx) error {
 
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
+
+// HandleApproveUsers handles approving users from the waiting room.
+func (rc *RoomController) HandleApproveUsers(c *fiber.Ctx) error {
+	roomId := c.Locals("roomId")
+	isAdmin := c.Locals("isAdmin")
+
+	if !isAdmin.(bool) {
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
+	}
+
+	req := new(plugnmeet.ApproveWaitingUsersReq)
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	req.RoomId = roomId.(string)
+	err = rc.RoomModel.ApproveWaitingUsers(req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	return utils.SendCommonProtobufResponse(c, true, "success")
+}
+
+// HandleUpdateWaitingRoomMessage handles updating the waiting room message.
+func (rc *RoomController) HandleUpdateWaitingRoomMessage(c *fiber.Ctx) error {
+	roomId := c.Locals("roomId")
+	isAdmin := c.Locals("isAdmin")
+
+	if !isAdmin.(bool) {
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
+	}
+
+	req := new(plugnmeet.UpdateWaitingRoomMessageReq)
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	req.RoomId = roomId.(string)
+	err = rc.RoomModel.UpdateWaitingRoomMessage(req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	return utils.SendCommonProtobufResponse(c, true, "success")
+}

@@ -22,7 +22,7 @@ type RoomModel struct {
 	webhookNotifier *helpers.WebhookNotifier
 	logger          *logrus.Entry
 	userModel       *UserModel
-	recorderModel   *RecorderModel
+	recordingModel  *RecordingModel
 	fileModel       *FileModel
 	etherpadModel   *EtherpadModel
 	pollModel       *PollModel
@@ -37,7 +37,7 @@ type updateRoomMetadataOpts struct {
 	url      *string
 }
 
-func NewRoomModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService, natsService *natsservice.NatsService, webhookNotifier *helpers.WebhookNotifier, userModel *UserModel, recorderModel *RecorderModel, fileModel *FileModel, etherpadModel *EtherpadModel, pollModel *PollModel, analyticsModel *AnalyticsModel, insightsModel *InsightsModel, logger *logrus.Logger) *RoomModel {
+func NewRoomModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService, natsService *natsservice.NatsService, webhookNotifier *helpers.WebhookNotifier, userModel *UserModel, recordingModel *RecordingModel, fileModel *FileModel, etherpadModel *EtherpadModel, pollModel *PollModel, analyticsModel *AnalyticsModel, insightsModel *InsightsModel, logger *logrus.Logger) *RoomModel {
 	return &RoomModel{
 		ctx:             ctx,
 		app:             app,
@@ -47,7 +47,7 @@ func NewRoomModel(ctx context.Context, app *config.AppConfig, ds *dbservice.Data
 		natsService:     natsService,
 		webhookNotifier: webhookNotifier,
 		userModel:       userModel,
-		recorderModel:   recorderModel,
+		recordingModel:  recordingModel,
 		fileModel:       fileModel,
 		etherpadModel:   etherpadModel,
 		pollModel:       pollModel,
