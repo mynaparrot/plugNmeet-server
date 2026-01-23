@@ -211,6 +211,10 @@ func (r *router) registerAPIRoutes() {
 	ingress := api.Group("/ingress")
 	ingress.Post("/create", r.ctrl.RoomController.HandleCreateIngress)
 
+	waitingRoom := api.Group("/waitingRoom")
+	waitingRoom.Post("/approveUsers", r.ctrl.RoomController.HandleApproveUsers)
+	waitingRoom.Post("/updateMsg", r.ctrl.RoomController.HandleUpdateWaitingRoomMessage)
+
 	api.Post("/convertWhiteboardFile", r.ctrl.FileController.HandleConvertWhiteboardFile)
 	api.Post("/updateLockSettings", r.ctrl.UserController.HandleUpdateUserLockSetting)
 	api.Post("/muteUnmuteTrack", r.ctrl.UserController.HandleMuteUnMuteTrack)
@@ -221,10 +225,6 @@ func (r *router) registerAPIRoutes() {
 	etherpad.Post("/create", r.ctrl.EtherpadController.HandleCreateEtherpad)
 	etherpad.Post("/cleanPad", r.ctrl.EtherpadController.HandleCleanPad)
 	etherpad.Post("/changeStatus", r.ctrl.EtherpadController.HandleChangeEtherpadStatus)
-
-	waitingRoom := api.Group("/waitingRoom")
-	waitingRoom.Post("/approveUsers", r.ctrl.WaitingRoomController.HandleApproveUsers)
-	waitingRoom.Post("/updateMsg", r.ctrl.WaitingRoomController.HandleUpdateWaitingRoomMessage)
 
 	polls := api.Group("/polls")
 	polls.Post("/activate", r.ctrl.PollsController.HandleActivatePolls)

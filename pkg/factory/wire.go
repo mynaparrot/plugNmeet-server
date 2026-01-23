@@ -64,7 +64,6 @@ var modelSet = wire.NewSet(
 	provideBreakoutRoomModel,
 	models.NewJanitorModel,
 	models.NewUserModel,
-	models.NewWaitingRoomModel,
 	models.NewWebhookModel,
 )
 
@@ -84,7 +83,6 @@ var controllerSet = wire.NewSet(
 	controllers.NewRecordingController,
 	controllers.NewRoomController,
 	controllers.NewUserController,
-	controllers.NewWaitingRoomController,
 	controllers.NewWebhookController,
 	controllers.NewNatsController,
 	controllers.NewInsightsController,
