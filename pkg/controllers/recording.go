@@ -136,7 +136,7 @@ func (rc *RecordingController) HandleRecorderTasks(c *fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 
-	if isAdmin != true {
+	if !isAdmin.(bool) {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can start recording")
 	}
 
@@ -148,12 +148,6 @@ func (rc *RecordingController) HandleRecorderTasks(c *fiber.Ctx) error {
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
-	}
-
-	if req.Task == plugnmeet.RecordingTasks_START_RTMP {
-		if req.RtmpUrl == nil {
-			return utils.SendCommonProtobufResponse(c, false, "rtmpUrl required")
-		}
 	}
 
 	// now need to check if meeting is running or not
@@ -171,16 +165,26 @@ func (rc *RecordingController) HandleRecorderTasks(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "roomId in token mismatched")
 	}
 
-	if room.IsRecording == 1 && req.Task == plugnmeet.RecordingTasks_START_RECORDING {
-		return utils.SendCommonProtobufResponse(c, false, "notifications.recording-already-running")
-	} else if room.IsRecording == 0 && req.Task == plugnmeet.RecordingTasks_STOP_RECORDING {
-		return utils.SendCommonProtobufResponse(c, false, "notifications.recording-not-running")
-	}
-
-	if room.IsActiveRtmp == 1 && req.Task == plugnmeet.RecordingTasks_START_RTMP {
-		return utils.SendCommonProtobufResponse(c, false, "notifications.rtmp-already-running")
-	} else if room.IsActiveRtmp == 0 && req.Task == plugnmeet.RecordingTasks_STOP_RTMP {
-		return utils.SendCommonProtobufResponse(c, false, "notifications.rtmp-not-running")
+	switch req.Task {
+	case plugnmeet.RecordingTasks_START_RECORDING:
+		if room.IsRecording == 1 {
+			return utils.SendCommonProtobufResponse(c, false, "notifications.recording-already-running")
+		}
+	case plugnmeet.RecordingTasks_STOP_RECORDING:
+		if room.IsRecording == 0 {
+			return utils.SendCommonProtobufResponse(c, false, "notifications.recording-not-running")
+		}
+	case plugnmeet.RecordingTasks_START_RTMP:
+		if req.RtmpUrl == nil {
+			return utils.SendCommonProtobufResponse(c, false, "rtmpUrl required")
+		}
+		if room.IsActiveRtmp == 1 {
+			return utils.SendCommonProtobufResponse(c, false, "notifications.rtmp-already-running")
+		}
+	case plugnmeet.RecordingTasks_STOP_RTMP:
+		if room.IsActiveRtmp == 0 {
+			return utils.SendCommonProtobufResponse(c, false, "notifications.rtmp-not-running")
+		}
 	}
 
 	req.RoomId = room.RoomId
