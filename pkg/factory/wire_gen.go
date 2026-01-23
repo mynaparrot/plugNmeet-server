@@ -50,8 +50,6 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	breakoutRoomModel := provideBreakoutRoomModel(roomModel, natsService)
 	breakoutRoomController := controllers.NewBreakoutRoomController(breakoutRoomModel)
 	etherpadController := controllers.NewEtherpadController(appConfig, etherpadModel, roomModel, databaseService)
-	exMediaModel := models.NewExMediaModel(appConfig, databaseService, redisService, natsService, analyticsModel, logger)
-	exMediaController := controllers.NewExMediaController(exMediaModel)
 	fileController := controllers.NewFileController(appConfig, fileModel, logger)
 	ltiV1Model := models.NewLtiV1Model(appConfig, roomModel, userModel)
 	ltiV1Controller := controllers.NewLtiV1Controller(ltiV1Model, roomModel, recordingModel)
@@ -75,7 +73,6 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 		BBBController:          bbbController,
 		BreakoutRoomController: breakoutRoomController,
 		EtherpadController:     etherpadController,
-		ExMediaController:      exMediaController,
 		FileController:         fileController,
 		LtiV1Controller:        ltiV1Controller,
 		PollsController:        pollsController,
@@ -127,7 +124,7 @@ func provideArtifactModel(ctx context.Context, app *config.AppConfig, ds *dbserv
 }
 
 // build the dependency set for models
-var modelSet = wire.NewSet(models.NewAnalyticsModel, provideArtifactModel, models.NewAuthModel, models.NewInsightsModel, models.NewBBBApiWrapperModel, models.NewRoomDurationModel, models.NewEtherpadModel, models.NewExMediaModel, models.NewFileModel, models.NewLtiV1Model, models.NewNatsModel, models.NewPollModel, models.NewRecorderModel, models.NewRecordingModel, models.NewRoomModel, provideBreakoutRoomModel, models.NewJanitorModel, models.NewUserModel, models.NewWaitingRoomModel, models.NewWebhookModel)
+var modelSet = wire.NewSet(models.NewAnalyticsModel, provideArtifactModel, models.NewAuthModel, models.NewInsightsModel, models.NewBBBApiWrapperModel, models.NewRoomDurationModel, models.NewEtherpadModel, models.NewFileModel, models.NewLtiV1Model, models.NewNatsModel, models.NewPollModel, models.NewRecorderModel, models.NewRecordingModel, models.NewRoomModel, provideBreakoutRoomModel, models.NewJanitorModel, models.NewUserModel, models.NewWaitingRoomModel, models.NewWebhookModel)
 
 // build the dependency set for controllers
-var controllerSet = wire.NewSet(controllers.NewAnalyticsController, controllers.NewArtifactController, controllers.NewAuthController, controllers.NewBBBController, controllers.NewBreakoutRoomController, controllers.NewHealthCheckController, controllers.NewEtherpadController, controllers.NewExMediaController, controllers.NewFileController, controllers.NewLtiV1Controller, controllers.NewPollsController, controllers.NewRecorderController, controllers.NewRecordingController, controllers.NewRoomController, controllers.NewUserController, controllers.NewWaitingRoomController, controllers.NewWebhookController, controllers.NewNatsController, controllers.NewInsightsController)
+var controllerSet = wire.NewSet(controllers.NewAnalyticsController, controllers.NewArtifactController, controllers.NewAuthController, controllers.NewBBBController, controllers.NewBreakoutRoomController, controllers.NewHealthCheckController, controllers.NewEtherpadController, controllers.NewFileController, controllers.NewLtiV1Controller, controllers.NewPollsController, controllers.NewRecorderController, controllers.NewRecordingController, controllers.NewRoomController, controllers.NewUserController, controllers.NewWaitingRoomController, controllers.NewWebhookController, controllers.NewNatsController, controllers.NewInsightsController)

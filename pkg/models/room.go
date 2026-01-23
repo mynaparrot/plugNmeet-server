@@ -32,6 +32,12 @@ type RoomModel struct {
 	insightsModel   *InsightsModel
 }
 
+type updateRoomMetadataOpts struct {
+	isActive *bool
+	sharedBy *string
+	url      *string
+}
+
 func NewRoomModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService, natsService *natsservice.NatsService, webhookNotifier *helpers.WebhookNotifier, userModel *UserModel, recorderModel *RecorderModel, fileModel *FileModel, roomDuration *RoomDurationModel, etherpadModel *EtherpadModel, pollModel *PollModel, analyticsModel *AnalyticsModel, insightsModel *InsightsModel, logger *logrus.Logger) *RoomModel {
 	return &RoomModel{
 		ctx:             ctx,

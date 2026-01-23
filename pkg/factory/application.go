@@ -17,7 +17,6 @@ type ApplicationControllers struct {
 	BBBController          *controllers.BBBController
 	BreakoutRoomController *controllers.BreakoutRoomController
 	EtherpadController     *controllers.EtherpadController
-	ExMediaController      *controllers.ExMediaController
 	FileController         *controllers.FileController
 	LtiV1Controller        *controllers.LtiV1Controller
 	PollsController        *controllers.PollsController

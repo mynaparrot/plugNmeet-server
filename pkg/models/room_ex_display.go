@@ -2,19 +2,31 @@ package models
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/sirupsen/logrus"
 )
 
-func (m *ExMediaModel) startPlayBack(req *plugnmeet.ExternalMediaPlayerReq) error {
+func (m *RoomModel) HandleExternalDisplayTask(req *plugnmeet.ExternalDisplayLinkReq) error {
+	switch req.Task {
+	case plugnmeet.ExternalDisplayLinkTask_START_EXTERNAL_LINK:
+		return m.startExternalDisplay(req)
+	case plugnmeet.ExternalDisplayLinkTask_STOP_EXTERNAL_LINK:
+		return m.endExternalDisplay(req)
+	}
+
+	return fmt.Errorf("not valid request")
+}
+
+func (m *RoomModel) startExternalDisplay(req *plugnmeet.ExternalDisplayLinkReq) error {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId": req.RoomId,
 		"userId": req.UserId,
 		"url":    req.GetUrl(),
-		"method": "startPlayBack",
+		"method": "startExternalDisplay",
 	})
-	log.Infoln("request to start external media playback")
+	log.Infoln("request to start external display link")
 
 	if req.Url != nil && *req.Url == "" {
 		err := errors.New("valid url required")
@@ -29,33 +41,32 @@ func (m *ExMediaModel) startPlayBack(req *plugnmeet.ExternalMediaPlayerReq) erro
 		url:      req.Url,
 		sharedBy: &req.UserId,
 	}
-	return m.updateRoomMetadata(req.RoomId, opts, log)
+	return m.updateExternalDisplayRoomMetadata(req.RoomId, opts, log)
 }
 
-func (m *ExMediaModel) endPlayBack(req *plugnmeet.ExternalMediaPlayerReq) error {
+func (m *RoomModel) endExternalDisplay(req *plugnmeet.ExternalDisplayLinkReq) error {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId": req.RoomId,
 		"userId": req.UserId,
-		"method": "endPlayBack",
+		"method": "endExternalDisplay",
 	})
-	log.Infoln("request to end external media playback")
+	log.Infoln("request to end external display link")
 
 	active := new(bool)
 
 	opts := &updateRoomMetadataOpts{
 		isActive: active,
 	}
-	return m.updateRoomMetadata(req.RoomId, opts, log)
+	return m.updateExternalDisplayRoomMetadata(req.RoomId, opts, log)
 }
 
-func (m *ExMediaModel) updateRoomMetadata(roomId string, opts *updateRoomMetadataOpts, log *logrus.Entry) error {
-	log.Info("updating room metadata for external media player")
+func (m *RoomModel) updateExternalDisplayRoomMetadata(roomId string, opts *updateRoomMetadataOpts, log *logrus.Entry) error {
+	log.Info("updating room metadata for external display")
 	roomMeta, err := m.natsService.GetRoomMetadataStruct(roomId)
 	if err != nil {
 		log.WithError(err).Error("failed to get room metadata")
 		return err
 	}
-
 	if roomMeta == nil {
 		err = errors.New("invalid nil room metadata information")
 		log.WithError(err).Error()
@@ -63,13 +74,13 @@ func (m *ExMediaModel) updateRoomMetadata(roomId string, opts *updateRoomMetadat
 	}
 
 	if opts.isActive != nil {
-		roomMeta.RoomFeatures.ExternalMediaPlayerFeatures.IsActive = *opts.isActive
+		roomMeta.RoomFeatures.DisplayExternalLinkFeatures.IsActive = *opts.isActive
 	}
 	if opts.url != nil {
-		roomMeta.RoomFeatures.ExternalMediaPlayerFeatures.Url = opts.url
+		roomMeta.RoomFeatures.DisplayExternalLinkFeatures.Link = opts.url
 	}
 	if opts.sharedBy != nil {
-		roomMeta.RoomFeatures.ExternalMediaPlayerFeatures.SharedBy = opts.sharedBy
+		roomMeta.RoomFeatures.DisplayExternalLinkFeatures.SharedBy = opts.sharedBy
 	}
 
 	err = m.natsService.UpdateAndBroadcastRoomMetadata(roomId, roomMeta)
@@ -81,15 +92,16 @@ func (m *ExMediaModel) updateRoomMetadata(roomId string, opts *updateRoomMetadat
 	val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()
 	d := &plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
-		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_EXTERNAL_MEDIA_PLAYER_STATUS,
+		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_EXTERNAL_DISPLAY_LINK_STATUS,
 		RoomId:    roomId,
 		HsetValue: &val,
 	}
-	if !roomMeta.RoomFeatures.ExternalMediaPlayerFeatures.IsActive {
+	if !roomMeta.RoomFeatures.DisplayExternalLinkFeatures.IsActive {
 		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()
-		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_EXTERNAL_MEDIA_PLAYER_STATUS
+		d.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_EXTERNAL_DISPLAY_LINK_STATUS
 		d.HsetValue = &val
 	}
+
 	m.analyticsModel.HandleEvent(d)
 
 	if err == nil {
