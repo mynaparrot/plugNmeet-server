@@ -2,12 +2,24 @@ package models
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/sirupsen/logrus"
 )
 
-func (m *ExDisplayModel) start(req *plugnmeet.ExternalDisplayLinkReq) error {
+func (m *RoomModel) HandleExternalDisplayTask(req *plugnmeet.ExternalDisplayLinkReq) error {
+	switch req.Task {
+	case plugnmeet.ExternalDisplayLinkTask_START_EXTERNAL_LINK:
+		return m.startExDisplay(req)
+	case plugnmeet.ExternalDisplayLinkTask_STOP_EXTERNAL_LINK:
+		return m.endExDisplay(req)
+	}
+
+	return fmt.Errorf("not valid request")
+}
+
+func (m *RoomModel) startExDisplay(req *plugnmeet.ExternalDisplayLinkReq) error {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId": req.RoomId,
 		"userId": req.UserId,
@@ -29,10 +41,10 @@ func (m *ExDisplayModel) start(req *plugnmeet.ExternalDisplayLinkReq) error {
 		url:      req.Url,
 		sharedBy: &req.UserId,
 	}
-	return m.updateRoomMetadata(req.RoomId, opts, log)
+	return m.updateendExDisplayRoomMetadata(req.RoomId, opts, log)
 }
 
-func (m *ExDisplayModel) end(req *plugnmeet.ExternalDisplayLinkReq) error {
+func (m *RoomModel) endExDisplay(req *plugnmeet.ExternalDisplayLinkReq) error {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId": req.RoomId,
 		"userId": req.UserId,
@@ -45,10 +57,10 @@ func (m *ExDisplayModel) end(req *plugnmeet.ExternalDisplayLinkReq) error {
 	opts := &updateRoomMetadataOpts{
 		isActive: active,
 	}
-	return m.updateRoomMetadata(req.RoomId, opts, log)
+	return m.updateendExDisplayRoomMetadata(req.RoomId, opts, log)
 }
 
-func (m *ExDisplayModel) updateRoomMetadata(roomId string, opts *updateRoomMetadataOpts, log *logrus.Entry) error {
+func (m *RoomModel) updateendExDisplayRoomMetadata(roomId string, opts *updateRoomMetadataOpts, log *logrus.Entry) error {
 	log.Info("updating room metadata for external display")
 	roomMeta, err := m.natsService.GetRoomMetadataStruct(roomId)
 	if err != nil {

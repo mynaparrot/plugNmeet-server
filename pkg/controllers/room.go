@@ -216,3 +216,34 @@ func (rc *RoomController) HandleCreateIngress(c *fiber.Ctx) error {
 
 	return utils.SendProtobufResponse(c, res)
 }
+
+// HandleExternalDisplayLink handles sharing an external display link.
+func (rc *RoomController) HandleExternalDisplayLink(c *fiber.Ctx) error {
+	isAdmin := c.Locals("isAdmin")
+	roomId := c.Locals("roomId")
+	requestedUserId := c.Locals("requestedUserId")
+
+	if !isAdmin.(bool) {
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
+	}
+
+	rid := roomId.(string)
+	if rid == "" {
+		return utils.SendCommonProtobufResponse(c, false, "roomId required")
+	}
+
+	req := new(plugnmeet.ExternalDisplayLinkReq)
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	req.RoomId = rid
+	req.UserId = requestedUserId.(string)
+	err = rc.RoomModel.HandleExternalDisplayTask(req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	return utils.SendCommonProtobufResponse(c, true, "success")
+}

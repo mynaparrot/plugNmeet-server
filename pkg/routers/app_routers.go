@@ -205,13 +205,13 @@ func (r *router) registerAPIRoutes() {
 	api.Post("/endRoom", r.ctrl.RoomController.HandleEndRoomForAPI)
 	api.Post("/changeVisibility", r.ctrl.RoomController.HandleChangeVisibilityForAPI)
 	api.Post("/enableSipDialIn", r.ctrl.RoomController.HandleEnableRoomSipDialIn)
+	api.Post("/externalDisplayLink", r.ctrl.RoomController.HandleExternalDisplayLink)
 
 	ingress := api.Group("/ingress")
 	ingress.Post("/create", r.ctrl.RoomController.HandleCreateIngress)
 
 	api.Post("/convertWhiteboardFile", r.ctrl.FileController.HandleConvertWhiteboardFile)
 	api.Post("/externalMediaPlayer", r.ctrl.ExMediaController.HandleExternalMediaPlayer)
-	api.Post("/externalDisplayLink", r.ctrl.ExDisplayController.HandleExternalDisplayLink)
 	api.Post("/updateLockSettings", r.ctrl.UserController.HandleUpdateUserLockSetting)
 	api.Post("/muteUnmuteTrack", r.ctrl.UserController.HandleMuteUnMuteTrack)
 	api.Post("/removeParticipant", r.ctrl.UserController.HandleRemoveParticipant)
