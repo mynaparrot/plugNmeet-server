@@ -2,10 +2,6 @@ module github.com/mynaparrot/plugnmeet-server
 
 go 1.25.5
 
-replace (
-	github.com/mynaparrot/plugnmeet-protocol => ../protocol
-)
-
 require (
 	buf.build/go/protovalidate v1.1.0
 	github.com/Microsoft/cognitive-services-speech-sdk-go v1.43.0
@@ -23,14 +19,13 @@ require (
 	github.com/livekit/media-sdk v0.0.0-20251106223430-dd8f5e0de2cf
 	github.com/livekit/protocol v1.43.4
 	github.com/livekit/server-sdk-go/v2 v2.13.1
-	github.com/mynaparrot/plugnmeet-protocol v1.2.0
+	github.com/mynaparrot/plugnmeet-protocol v1.2.1-0.20260123104149-8b8fbeaa37b5
 	github.com/nats-io/jwt/v2 v2.8.0
 	github.com/nats-io/nats.go v1.48.0
 	github.com/nats-io/nkeys v0.4.12
 	github.com/pion/webrtc/v4 v4.1.7
 	github.com/redis/go-redis/v9 v9.17.2
 	github.com/sirupsen/logrus v1.9.4
-	github.com/stretchr/testify v1.11.1
 	golang.org/x/sync v0.19.0
 	google.golang.org/genai v1.42.0
 	google.golang.org/protobuf v1.36.11
@@ -58,7 +53,6 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/clipperhouse/stringish v0.1.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.3.0 // indirect
-	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dennwc/iters v1.2.2 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
@@ -109,7 +103,6 @@ require (
 	github.com/pion/stun/v3 v3.0.2 // indirect
 	github.com/pion/transport/v3 v3.1.1 // indirect
 	github.com/pion/turn/v4 v4.1.3 // indirect
-	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.67.4 // indirect
