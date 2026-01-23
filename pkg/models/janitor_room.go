@@ -9,6 +9,19 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+func (m *JanitorModel) checkRoomWithDuration() {
+	rooms := m.rm.GetRoomsWithDurationMap()
+	for i, r := range rooms {
+		now := uint64(time.Now().Unix())
+		valid := r.StartedAt + (r.Duration * 60)
+		if now > valid {
+			_, _ = m.rm.EndRoom(context.Background(), &plugnmeet.RoomEndReq{
+				RoomId: i,
+			})
+		}
+	}
+}
+
 // activeRoomChecker will check & do reconciliation between DB & livekit
 func (m *JanitorModel) activeRoomChecker() {
 	log := m.logger.WithField("task", "activeRoomChecker")
