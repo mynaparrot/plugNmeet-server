@@ -137,7 +137,7 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 	}
 
 	// Remove the room from the duration checker if it was being monitored.
-	if err = m.roomDuration.DeleteRoomWithDuration(roomID); err != nil {
+	if err = m.DeleteRoomWithDuration(roomID); err != nil {
 		log.WithError(err).Error("Error deleting room duration")
 	}
 

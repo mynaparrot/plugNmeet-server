@@ -186,3 +186,95 @@ func (rc *RoomController) HandleEnableRoomSipDialIn(c *fiber.Ctx) error {
 	}
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
+
+func (rc *RoomController) HandleCreateIngress(c *fiber.Ctx) error {
+	roomId := c.Locals("roomId")
+	isAdmin := c.Locals("isAdmin")
+
+	if !isAdmin.(bool) {
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
+	}
+
+	req := new(plugnmeet.CreateIngressReq)
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	req.RoomId = roomId.(string)
+	f, err := rc.RoomModel.CreateIngress(req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	res := &plugnmeet.CreateIngressRes{
+		Status:    true,
+		Msg:       "success",
+		Url:       f.Url,
+		StreamKey: f.StreamKey,
+	}
+
+	return utils.SendProtobufResponse(c, res)
+}
+
+// HandleExternalDisplayLink handles sharing an external display link.
+func (rc *RoomController) HandleExternalDisplayLink(c *fiber.Ctx) error {
+	isAdmin := c.Locals("isAdmin")
+	roomId := c.Locals("roomId")
+	requestedUserId := c.Locals("requestedUserId")
+
+	if !isAdmin.(bool) {
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
+	}
+
+	rid := roomId.(string)
+	if rid == "" {
+		return utils.SendCommonProtobufResponse(c, false, "roomId required")
+	}
+
+	req := new(plugnmeet.ExternalDisplayLinkReq)
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	req.RoomId = rid
+	req.UserId = requestedUserId.(string)
+	err = rc.RoomModel.HandleExternalDisplayTask(req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	return utils.SendCommonProtobufResponse(c, true, "success")
+}
+
+// HandleExternalMediaPlayer handles external media player actions.
+func (rc *RoomController) HandleExternalMediaPlayer(c *fiber.Ctx) error {
+	isAdmin := c.Locals("isAdmin")
+	roomId := c.Locals("roomId")
+	requestedUserId := c.Locals("requestedUserId")
+
+	if !isAdmin.(bool) {
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
+	}
+
+	rid := roomId.(string)
+	if rid == "" {
+		return utils.SendCommonProtobufResponse(c, false, "roomId required")
+	}
+
+	req := new(plugnmeet.ExternalMediaPlayerReq)
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	req.RoomId = rid
+	req.UserId = requestedUserId.(string)
+	err = rc.RoomModel.HandleExternalMediaTask(req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	return utils.SendCommonProtobufResponse(c, true, "success")
+}

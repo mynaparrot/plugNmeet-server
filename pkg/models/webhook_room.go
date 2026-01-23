@@ -53,7 +53,7 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 	if meta.RoomFeatures.GetRoomDuration() > 0 {
 		log.WithField("duration", meta.RoomFeatures.GetRoomDuration()).Info("adding room to duration checker")
 		// we'll add room info in map
-		err := m.rmDuration.AddRoomWithDurationInfo(rInfo.RoomId, &RoomDurationInfo{
+		err := m.rm.AddRoomWithDurationInfo(rInfo.RoomId, &RoomDurationInfo{
 			Duration:  meta.RoomFeatures.GetRoomDuration(),
 			StartedAt: meta.StartedAt,
 		})

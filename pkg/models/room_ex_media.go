@@ -2,12 +2,24 @@ package models
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/sirupsen/logrus"
 )
 
-func (m *ExMediaModel) startPlayBack(req *plugnmeet.ExternalMediaPlayerReq) error {
+func (m *RoomModel) HandleExternalMediaTask(req *plugnmeet.ExternalMediaPlayerReq) error {
+	switch req.Task {
+	case plugnmeet.ExternalMediaPlayerTask_START_PLAYBACK:
+		return m.startExternalMediaPlayBack(req)
+	case plugnmeet.ExternalMediaPlayerTask_END_PLAYBACK:
+		return m.endExternalMediaPlayBack(req)
+	}
+
+	return fmt.Errorf("not valid request")
+}
+
+func (m *RoomModel) startExternalMediaPlayBack(req *plugnmeet.ExternalMediaPlayerReq) error {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId": req.RoomId,
 		"userId": req.UserId,
@@ -29,10 +41,10 @@ func (m *ExMediaModel) startPlayBack(req *plugnmeet.ExternalMediaPlayerReq) erro
 		url:      req.Url,
 		sharedBy: &req.UserId,
 	}
-	return m.updateRoomMetadata(req.RoomId, opts, log)
+	return m.updateExternalMediaRoomMetadata(req.RoomId, opts, log)
 }
 
-func (m *ExMediaModel) endPlayBack(req *plugnmeet.ExternalMediaPlayerReq) error {
+func (m *RoomModel) endExternalMediaPlayBack(req *plugnmeet.ExternalMediaPlayerReq) error {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId": req.RoomId,
 		"userId": req.UserId,
@@ -45,10 +57,10 @@ func (m *ExMediaModel) endPlayBack(req *plugnmeet.ExternalMediaPlayerReq) error 
 	opts := &updateRoomMetadataOpts{
 		isActive: active,
 	}
-	return m.updateRoomMetadata(req.RoomId, opts, log)
+	return m.updateExternalMediaRoomMetadata(req.RoomId, opts, log)
 }
 
-func (m *ExMediaModel) updateRoomMetadata(roomId string, opts *updateRoomMetadataOpts, log *logrus.Entry) error {
+func (m *RoomModel) updateExternalMediaRoomMetadata(roomId string, opts *updateRoomMetadataOpts, log *logrus.Entry) error {
 	log.Info("updating room metadata for external media player")
 	roomMeta, err := m.natsService.GetRoomMetadataStruct(roomId)
 	if err != nil {
