@@ -20,7 +20,6 @@ type ApplicationControllers struct {
 	ExDisplayController    *controllers.ExDisplayController
 	ExMediaController      *controllers.ExMediaController
 	FileController         *controllers.FileController
-	IngressController      *controllers.IngressController
 	LtiV1Controller        *controllers.LtiV1Controller
 	PollsController        *controllers.PollsController
 	RecorderController     *controllers.RecorderController

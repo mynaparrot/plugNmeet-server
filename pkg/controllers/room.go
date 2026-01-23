@@ -186,3 +186,33 @@ func (rc *RoomController) HandleEnableRoomSipDialIn(c *fiber.Ctx) error {
 	}
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
+
+func (rc *RoomController) HandleCreateIngress(c *fiber.Ctx) error {
+	roomId := c.Locals("roomId")
+	isAdmin := c.Locals("isAdmin")
+
+	if !isAdmin.(bool) {
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
+	}
+
+	req := new(plugnmeet.CreateIngressReq)
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	req.RoomId = roomId.(string)
+	f, err := rc.RoomModel.CreateIngress(req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	res := &plugnmeet.CreateIngressRes{
+		Status:    true,
+		Msg:       "success",
+		Url:       f.Url,
+		StreamKey: f.StreamKey,
+	}
+
+	return utils.SendProtobufResponse(c, res)
+}

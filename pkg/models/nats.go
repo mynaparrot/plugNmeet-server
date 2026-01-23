@@ -46,7 +46,7 @@ func (m *NatsModel) HandleFromClientToServerReq(roomId, userId string, req *plug
 	case plugnmeet.NatsMsgClientToServerEvents_REQ_JOINED_USERS_LIST:
 		m.HandleSendUsersList(roomId, userId)
 	case plugnmeet.NatsMsgClientToServerEvents_REQ_MEDIA_SERVER_DATA:
-		m.HandleMediaServerInfo(roomId, userId, nil, true)
+		m.HandleMediaServerInfo(roomId, userId, true)
 	case plugnmeet.NatsMsgClientToServerEvents_PING:
 		m.HandleClientPing(roomId, userId)
 	case plugnmeet.NatsMsgClientToServerEvents_REQ_RAISE_HAND:

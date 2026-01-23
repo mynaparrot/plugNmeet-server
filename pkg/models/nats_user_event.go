@@ -43,9 +43,6 @@ func (m *NatsModel) HandleInitialData(roomId, userId string) {
 	initial := &plugnmeet.NatsInitialData{
 		Room:      rInfo,
 		LocalUser: userInfo,
-		// for backward compatibility
-		// TODO: remove and use REQ_MEDIA_SERVER_DATA
-		MediaServerInfo: m.HandleMediaServerInfo(roomId, userId, userInfo, false),
 	}
 
 	// send important info first
@@ -76,21 +73,21 @@ func (m *NatsModel) HandleSendUsersList(roomId, userId string) {
 	}
 }
 
-func (m *NatsModel) HandleMediaServerInfo(roomId, userId string, userInfo *plugnmeet.NatsKvUserInfo, broadcast bool) *plugnmeet.MediaServerConnInfo {
+func (m *NatsModel) HandleMediaServerInfo(roomId, userId string, broadcast bool) *plugnmeet.MediaServerConnInfo {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId": roomId,
 		"userId": userId,
 		"method": "HandleMediaServerInfo",
 	})
 
-	var err error
-	if userInfo == nil {
-		userInfo, err = m.natsService.GetUserInfo(roomId, userId)
+	userInfo, err := m.natsService.GetUserInfo(roomId, userId)
+	if err != nil || userInfo == nil {
+		msg := "error getting user info"
 		if err != nil {
-			log.WithError(err).Errorln("error getting user info")
-			_ = m.natsService.NotifyErrorMsg(roomId, err.Error(), &userId)
-			return nil
+			log.WithError(err).Errorln(msg)
 		}
+		_ = m.natsService.NotifyErrorMsg(roomId, msg, &userId)
+		return nil
 	}
 
 	token, err := m.GenerateLivekitToken(roomId, userInfo)

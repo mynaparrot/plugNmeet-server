@@ -206,6 +206,9 @@ func (r *router) registerAPIRoutes() {
 	api.Post("/changeVisibility", r.ctrl.RoomController.HandleChangeVisibilityForAPI)
 	api.Post("/enableSipDialIn", r.ctrl.RoomController.HandleEnableRoomSipDialIn)
 
+	ingress := api.Group("/ingress")
+	ingress.Post("/create", r.ctrl.RoomController.HandleCreateIngress)
+
 	api.Post("/convertWhiteboardFile", r.ctrl.FileController.HandleConvertWhiteboardFile)
 	api.Post("/externalMediaPlayer", r.ctrl.ExMediaController.HandleExternalMediaPlayer)
 	api.Post("/externalDisplayLink", r.ctrl.ExDisplayController.HandleExternalDisplayLink)
@@ -244,9 +247,6 @@ func (r *router) registerAPIRoutes() {
 	breakoutRoom.Post("/sendMsg", r.ctrl.BreakoutRoomController.HandleSendBreakoutRoomMsg)
 	breakoutRoom.Post("/endRoom", r.ctrl.BreakoutRoomController.HandleEndBreakoutRoom)
 	breakoutRoom.Post("/endAllRooms", r.ctrl.BreakoutRoomController.HandleEndBreakoutRooms)
-
-	ingress := api.Group("/ingress")
-	ingress.Post("/create", r.ctrl.IngressController.HandleCreateIngress)
 
 	// insights AI routers
 	r.registerInsightsRegisterAPIRoutes(api)
