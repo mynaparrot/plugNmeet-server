@@ -8,7 +8,7 @@ import (
 )
 
 func (m *JanitorModel) checkRoomWithDuration() {
-	rooms := m.rmDuration.GetRoomsWithDurationMap()
+	rooms := m.rm.GetRoomsWithDurationMap()
 	for i, r := range rooms {
 		now := uint64(time.Now().Unix())
 		valid := r.StartedAt + (r.Duration * 60)

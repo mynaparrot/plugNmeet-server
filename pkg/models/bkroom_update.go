@@ -23,7 +23,7 @@ func (m *BreakoutRoomModel) IncreaseBreakoutRoomDuration(r *plugnmeet.IncreaseBr
 
 	// update in a room duration checker
 	log.Info("increasing duration in room duration checker")
-	newDuration, err := m.rDuration.IncreaseRoomDuration(r.BreakoutRoomId, r.Duration)
+	newDuration, err := m.rm.IncreaseRoomDuration(r.BreakoutRoomId, r.Duration)
 	if err != nil {
 		log.WithError(err).Error("failed to increase room duration")
 		return err

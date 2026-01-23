@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
+	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
 )
 
@@ -14,7 +16,37 @@ type RoomDurationInfo struct {
 	StartedAt uint64 `redis:"startedAt"`
 }
 
-func (m *RoomDurationModel) AddRoomWithDurationInfo(roomId string, r *RoomDurationInfo) error {
+func (m *RoomModel) GetRoomDurationInfo(roomId string) (*RoomDurationInfo, error) {
+	val := new(RoomDurationInfo)
+	err := m.rs.GetRoomWithDurationInfo(roomId, val)
+	if err != nil {
+		return nil, err
+	}
+	return val, nil
+}
+
+func (m *RoomModel) GetRoomsWithDurationMap() map[string]RoomDurationInfo {
+	roomsKey, err := m.rs.GetRoomsWithDurationKeys()
+	if err != nil {
+		return nil
+	}
+	out := make(map[string]RoomDurationInfo)
+	for _, key := range roomsKey {
+		var val RoomDurationInfo
+		err = m.rs.GetRoomWithDurationInfoByKey(key, &val)
+		if err != nil {
+			m.logger.Errorln(err)
+			continue
+		}
+
+		rId := strings.Replace(key, redisservice.RoomWithDurationInfoKey+":", "", 1)
+		out[rId] = val
+	}
+
+	return out
+}
+
+func (m *RoomModel) AddRoomWithDurationInfo(roomId string, r *RoomDurationInfo) error {
 	log := m.logger.WithField("roomId", roomId)
 	log.Info("adding room with duration info")
 
@@ -28,7 +60,7 @@ func (m *RoomDurationModel) AddRoomWithDurationInfo(roomId string, r *RoomDurati
 	return nil
 }
 
-func (m *RoomDurationModel) DeleteRoomWithDuration(roomId string) error {
+func (m *RoomModel) DeleteRoomWithDuration(roomId string) error {
 	log := m.logger.WithField("roomId", roomId)
 	log.Info("deleting room with duration")
 
@@ -42,7 +74,7 @@ func (m *RoomDurationModel) DeleteRoomWithDuration(roomId string) error {
 	return nil
 }
 
-func (m *RoomDurationModel) IncreaseRoomDuration(roomId string, duration uint64) (uint64, error) {
+func (m *RoomModel) IncreaseRoomDuration(roomId string, duration uint64) (uint64, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId":   roomId,
 		"duration": duration,
@@ -90,20 +122,20 @@ func (m *RoomDurationModel) IncreaseRoomDuration(roomId string, duration uint64)
 			err = errors.New("can't increase duration as breakout room has unlimited duration")
 			log.WithError(err).Warn()
 			return 0, err
-		} else {
-			log.Info(
-				"breakout room has duration, will compare with parent room")
-			// need to check how long time left for this room
-			now := uint64(time.Now().Unix())
-			valid := info.StartedAt + (info.Duration * 60)
-			d := ((valid - now) / 60) + duration
+		}
 
-			// we'll need to make sure that breakout room duration isn't bigger than main room duration
-			err = m.CompareDurationWithParentRoom(meta.ParentRoomId, d)
-			if err != nil {
-				log.WithError(err).Error("duration comparison with parent room failed")
-				return 0, err
-			}
+		log.Info(
+			"breakout room has duration, will compare with parent room")
+		// need to check how long time left for this room
+		now := uint64(time.Now().Unix())
+		valid := info.StartedAt + (info.Duration * 60)
+		d := ((valid - now) / 60) + duration
+
+		// we'll need to make sure that breakout room duration isn't bigger than main room duration
+		err = m.CompareDurationWithParentRoom(meta.ParentRoomId, d)
+		if err != nil {
+			log.WithError(err).Error("duration comparison with parent room failed")
+			return 0, err
 		}
 	}
 
@@ -128,7 +160,7 @@ func (m *RoomDurationModel) IncreaseRoomDuration(roomId string, duration uint64)
 	return d, nil
 }
 
-func (m *RoomDurationModel) CompareDurationWithParentRoom(mainRoomId string, duration uint64) error {
+func (m *RoomModel) CompareDurationWithParentRoom(mainRoomId string, duration uint64) error {
 	log := m.logger.WithFields(logrus.Fields{
 		"mainRoomId": mainRoomId,
 		"duration":   duration,

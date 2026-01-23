@@ -27,7 +27,6 @@ type JanitorModel struct {
 	lk          *livekitservice.LivekitService
 	rm          *RoomModel
 
-	rmDuration    *RoomDurationModel
 	artifactModel *ArtifactModel
 	logger        *logrus.Entry
 
@@ -38,7 +37,7 @@ type JanitorModel struct {
 }
 
 // NewJanitorModel creates a new JanitorModel.
-func NewJanitorModel(mainCtx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, lk *livekitservice.LivekitService, rm *RoomModel, rmDuration *RoomDurationModel, artifactModel *ArtifactModel, logger *logrus.Logger) *JanitorModel {
+func NewJanitorModel(mainCtx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, lk *livekitservice.LivekitService, rm *RoomModel, artifactModel *ArtifactModel, logger *logrus.Logger) *JanitorModel {
 	ctx, cancel := context.WithCancel(mainCtx)
 
 	return &JanitorModel{
@@ -50,7 +49,6 @@ func NewJanitorModel(mainCtx context.Context, app *config.AppConfig, ds *dbservi
 		lk:            lk,
 		rm:            rm,
 		artifactModel: artifactModel,
-		rmDuration:    rmDuration,
 		natsService:   natsService,
 		logger:        logger.WithField("model", "janitor"),
 

@@ -53,7 +53,6 @@ var modelSet = wire.NewSet(
 	models.NewAuthModel,
 	models.NewInsightsModel,
 	models.NewBBBApiWrapperModel,
-	models.NewRoomDurationModel,
 	models.NewEtherpadModel,
 	models.NewFileModel,
 	models.NewLtiV1Model,

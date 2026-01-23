@@ -38,11 +38,10 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	userModel := models.NewUserModel(appConfig, databaseService, redisService, livekitService, natsService, analyticsModel, logger)
 	recorderModel := models.NewRecorderModel(appConfig, databaseService, redisService, natsService, userModel, logger)
 	fileModel := models.NewFileModel(ctx, appConfig, databaseService, natsService, logger)
-	roomDurationModel := models.NewRoomDurationModel(appConfig, redisService, natsService, logger)
 	etherpadModel := models.NewEtherpadModel(ctx, appConfig, databaseService, redisService, natsService, analyticsModel, logger)
 	pollModel := models.NewPollModel(appConfig, databaseService, redisService, natsService, analyticsModel, logger)
 	insightsModel := models.NewInsightsModel(ctx, appConfig, redisService, natsService, artifactModel, logger)
-	roomModel := models.NewRoomModel(ctx, appConfig, databaseService, redisService, livekitService, natsService, webhookNotifier, userModel, recorderModel, fileModel, roomDurationModel, etherpadModel, pollModel, analyticsModel, insightsModel, logger)
+	roomModel := models.NewRoomModel(ctx, appConfig, databaseService, redisService, livekitService, natsService, webhookNotifier, userModel, recorderModel, fileModel, etherpadModel, pollModel, analyticsModel, insightsModel, logger)
 	authController := controllers.NewAuthController(appConfig, natsService, authModel, roomModel)
 	recordingModel := models.NewRecordingModel(appConfig, databaseService, redisService, natsService, analyticsModel, webhookNotifier, logger)
 	bbbApiWrapperModel := models.NewBBBApiWrapperModel(appConfig, databaseService, redisService, recordingModel, logger)
@@ -61,7 +60,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	waitingRoomModel := models.NewWaitingRoomModel(appConfig, redisService, natsService, logger)
 	waitingRoomController := controllers.NewWaitingRoomController(waitingRoomModel)
 	natsModel := models.NewNatsModel(appConfig, databaseService, redisService, natsService, livekitService, analyticsModel, authModel, userModel, logger)
-	webhookModel := models.NewWebhookModel(ctx, appConfig, databaseService, redisService, natsService, livekitService, roomModel, analyticsModel, roomDurationModel, breakoutRoomModel, natsModel, webhookNotifier, logger)
+	webhookModel := models.NewWebhookModel(ctx, appConfig, databaseService, redisService, natsService, livekitService, roomModel, analyticsModel, breakoutRoomModel, natsModel, webhookNotifier, logger)
 	webhookController := controllers.NewWebhookController(authModel, webhookModel)
 	natsController := controllers.NewNatsController(appConfig, natsService, authModel, natsModel, logger)
 	healthCheckController := controllers.NewHealthCheckController(appConfig)
@@ -87,7 +86,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 		InsightsController:     insightsController,
 		ArtifactController:     artifactController,
 	}
-	janitorModel := models.NewJanitorModel(ctx, appConfig, databaseService, redisService, natsService, livekitService, roomModel, roomDurationModel, artifactModel, logger)
+	janitorModel := models.NewJanitorModel(ctx, appConfig, databaseService, redisService, natsService, livekitService, roomModel, artifactModel, logger)
 	application := &Application{
 		Controllers:   applicationControllers,
 		AppConfig:     appConfig,
@@ -124,7 +123,7 @@ func provideArtifactModel(ctx context.Context, app *config.AppConfig, ds *dbserv
 }
 
 // build the dependency set for models
-var modelSet = wire.NewSet(models.NewAnalyticsModel, provideArtifactModel, models.NewAuthModel, models.NewInsightsModel, models.NewBBBApiWrapperModel, models.NewRoomDurationModel, models.NewEtherpadModel, models.NewFileModel, models.NewLtiV1Model, models.NewNatsModel, models.NewPollModel, models.NewRecorderModel, models.NewRecordingModel, models.NewRoomModel, provideBreakoutRoomModel, models.NewJanitorModel, models.NewUserModel, models.NewWaitingRoomModel, models.NewWebhookModel)
+var modelSet = wire.NewSet(models.NewAnalyticsModel, provideArtifactModel, models.NewAuthModel, models.NewInsightsModel, models.NewBBBApiWrapperModel, models.NewEtherpadModel, models.NewFileModel, models.NewLtiV1Model, models.NewNatsModel, models.NewPollModel, models.NewRecorderModel, models.NewRecordingModel, models.NewRoomModel, provideBreakoutRoomModel, models.NewJanitorModel, models.NewUserModel, models.NewWaitingRoomModel, models.NewWebhookModel)
 
 // build the dependency set for controllers
 var controllerSet = wire.NewSet(controllers.NewAnalyticsController, controllers.NewArtifactController, controllers.NewAuthController, controllers.NewBBBController, controllers.NewBreakoutRoomController, controllers.NewHealthCheckController, controllers.NewEtherpadController, controllers.NewFileController, controllers.NewLtiV1Controller, controllers.NewPollsController, controllers.NewRecorderController, controllers.NewRecordingController, controllers.NewRoomController, controllers.NewUserController, controllers.NewWaitingRoomController, controllers.NewWebhookController, controllers.NewNatsController, controllers.NewInsightsController)
