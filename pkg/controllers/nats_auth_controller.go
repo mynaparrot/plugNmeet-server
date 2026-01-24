@@ -154,23 +154,11 @@ func (s *NatsAuthController) setPermissionForClient(data *plugnmeet.PlugNmeetTok
 		fmt.Sprintf("%s.%s.%s", s.app.NatsInfo.Subjects.SystemJsWorker, roomId, userId),
 	}
 
-	chatPermission, err := s.natsService.CreateChatConsumer(roomId, userId)
+	consumerPermission, err := s.natsService.CreateUserConsumer(roomId, userId)
 	if err != nil {
 		return err
 	}
-	allowPub.Add(chatPermission...)
-
-	sysPublicPermission, err := s.natsService.CreateSystemPublicConsumer(roomId, userId)
-	if err != nil {
-		return err
-	}
-	allowPub.Add(sysPublicPermission...)
-
-	sysPrivatePermission, err := s.natsService.CreateSystemPrivateConsumer(roomId, userId)
-	if err != nil {
-		return err
-	}
-	allowPub.Add(sysPrivatePermission...)
+	allowPub.Add(consumerPermission...)
 
 	// to allow to publish in whiteboard channel in core pub/sub
 	allowPub.Add(fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.Whiteboard, roomId))

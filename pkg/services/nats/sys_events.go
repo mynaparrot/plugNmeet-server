@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/nats-io/nats.go/jetstream"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -46,12 +47,15 @@ func (s *NatsService) BroadcastSystemEventToRoom(event plugnmeet.NatsMsgServerTo
 		return err
 	}
 
-	sub := fmt.Sprintf("%s:%s.system", roomId, s.app.NatsInfo.Subjects.SystemPublic)
+	// Default to the public system subject for the room.
+	sub := fmt.Sprintf("%s.%s.system", s.app.NatsInfo.Subjects.SystemPublic, roomId)
 	if toUserId != nil {
-		sub = fmt.Sprintf("%s:%s.%s.system", roomId, s.app.NatsInfo.Subjects.SystemPrivate, *toUserId)
+		// If a user ID is provided, target the private system subject for that user.
+		sub = fmt.Sprintf("%s.%s.%s.system", s.app.NatsInfo.Subjects.SystemPrivate, roomId, *toUserId)
 	}
 
-	_, err = s.js.Publish(s.ctx, sub, message)
+	// Explicitly publish to our stream to ensure delivery.
+	_, err = s.js.Publish(s.ctx, sub, message, jetstream.WithExpectStream(PnmRoomStream))
 	return err
 }
 

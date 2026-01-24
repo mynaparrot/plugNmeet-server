@@ -6,14 +6,17 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 )
 
-func (s *NatsService) CreateRoomNatsStreams(roomId string) error {
+const PnmRoomStream = "pnm-room-stream"
+
+// CreateRoomNatsStreams will create a single stream for all rooms.
+func (s *NatsService) CreateRoomNatsStreams() error {
 	_, err := s.js.CreateOrUpdateStream(s.ctx, jetstream.StreamConfig{
-		Name:     roomId,
+		Name:     PnmRoomStream,
 		Replicas: s.app.NatsInfo.NumReplicas,
 		Subjects: []string{
-			fmt.Sprintf("%s:%s.*", roomId, s.app.NatsInfo.Subjects.Chat),
-			fmt.Sprintf("%s:%s.*", roomId, s.app.NatsInfo.Subjects.SystemPublic),
-			fmt.Sprintf("%s:%s.*.*", roomId, s.app.NatsInfo.Subjects.SystemPrivate),
+			fmt.Sprintf("%s.>", s.app.NatsInfo.Subjects.Chat),
+			fmt.Sprintf("%s.>", s.app.NatsInfo.Subjects.SystemPublic),
+			fmt.Sprintf("%s.>", s.app.NatsInfo.Subjects.SystemPrivate),
 		},
 	})
 	if err != nil {
@@ -24,5 +27,14 @@ func (s *NatsService) CreateRoomNatsStreams(roomId string) error {
 }
 
 func (s *NatsService) DeleteRoomNatsStream(roomId string) error {
-	return s.js.DeleteStream(s.ctx, roomId)
+	// Purge all subjects for the specific room under the new hierarchy.
+	stream, err := s.js.Stream(s.ctx, PnmRoomStream)
+	if err != nil {
+		return err
+	}
+	return stream.Purge(s.ctx,
+		jetstream.WithPurgeSubject(fmt.Sprintf("%s.%s.>", s.app.NatsInfo.Subjects.Chat, roomId)),
+		jetstream.WithPurgeSubject(fmt.Sprintf("%s.%s.>", s.app.NatsInfo.Subjects.SystemPublic, roomId)),
+		jetstream.WithPurgeSubject(fmt.Sprintf("%s.%s.>", s.app.NatsInfo.Subjects.SystemPrivate, roomId)),
+	)
 }

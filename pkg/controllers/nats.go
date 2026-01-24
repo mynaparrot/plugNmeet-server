@@ -100,6 +100,10 @@ func (c *NatsController) BootUp(ctx context.Context, wg *sync.WaitGroup) {
 	if err != nil {
 		c.logger.WithError(err).Fatal("error creating system worker stream")
 	}
+	err = c.natsService.CreateRoomNatsStreams()
+	if err != nil {
+		c.logger.WithError(err).Fatal("error creating room nats streams")
+	}
 
 	// now subscribe
 	sysWorkerCon, err := c.subscribeToSystemWorker(ctx, stream)

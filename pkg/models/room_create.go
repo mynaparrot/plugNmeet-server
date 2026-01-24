@@ -119,14 +119,6 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 	}
 	log.Info("room added to nats")
 
-	// create streams
-	err = m.natsService.CreateRoomNatsStreams(r.RoomId)
-	if err != nil {
-		log.WithError(err).Error("failed to create nats streams")
-		return nil, err
-	}
-	log.Info("nats streams created")
-
 	rInfo, err := m.natsService.GetRoomInfo(r.RoomId)
 	if err != nil || rInfo == nil {
 		return nil, fmt.Errorf("room not found in KV")
@@ -179,11 +171,7 @@ func (m *RoomModel) handleExistingRoom(r *plugnmeet.CreateRoomReq, roomDbInfo *d
 	}
 
 	// The room is active and matches the DB record.
-	log.Info("found matching active room in NATS, ensuring streams are active and returning info")
-	if err := m.natsService.CreateRoomNatsStreams(r.RoomId); err != nil {
-		log.WithError(err).Error("failed to ensure NATS streams are active")
-		return nil, err
-	}
+	log.Info("found matching active room in NATS, updating status")
 	if err := m.natsService.UpdateRoomStatus(r.RoomId, natsservice.RoomStatusActive); err != nil {
 		log.WithError(err).Error("failed to update room status to active")
 		return nil, err
