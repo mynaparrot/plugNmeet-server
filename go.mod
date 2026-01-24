@@ -27,7 +27,7 @@ require (
 	github.com/redis/go-redis/v9 v9.17.2
 	github.com/sirupsen/logrus v1.9.4
 	golang.org/x/sync v0.19.0
-	google.golang.org/genai v1.42.0
+	google.golang.org/genai v1.43.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/mysql v1.6.0
