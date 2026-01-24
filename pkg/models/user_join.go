@@ -111,6 +111,17 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 		log.WithError(err).Errorln()
 		return "", err
 	}
+	// Add an extra check to ensure our chosen separator pattern is not present.
+	if strings.Contains(g.UserInfo.UserId, natsservice.UserKeyFieldPrefix) {
+		err = fmt.Errorf("user_id cannot contain the reserved pattern '%s'", natsservice.UserKeyFieldPrefix)
+		log.WithError(err).Errorln()
+		return "", err
+	}
+	if strings.HasPrefix(g.UserInfo.UserId, natsservice.UserKeyUserIdPrefix) {
+		err = fmt.Errorf("user_id cannot start with the reserved pattern '%s'", natsservice.UserKeyUserIdPrefix)
+		log.WithError(err).Errorln()
+		return "", err
+	}
 
 	// Step 8: Assign permissions and lock settings based on whether the user is an admin.
 	if g.UserInfo.IsAdmin {

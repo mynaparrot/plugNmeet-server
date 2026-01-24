@@ -18,10 +18,10 @@ func (m *JanitorModel) checkOnlineUsersStatus() {
 
 	kl := m.app.JetStream.KeyValueStoreNames(context.Background())
 	for s := range kl.Name() {
-		if !strings.HasPrefix(s, natsservice.RoomUsersBucketPrefix) {
+		if !strings.HasPrefix(s, natsservice.ConsolidatedRoomBucketPrefix) {
 			continue
 		}
-		roomId := strings.ReplaceAll(s, natsservice.RoomUsersBucketPrefix, "")
+		roomId := strings.ReplaceAll(s, natsservice.ConsolidatedRoomBucketPrefix, "")
 		if users, err := m.natsService.GetOnlineUsersId(roomId); err == nil && users != nil && len(users) > 0 {
 			for _, u := range users {
 				userLog := log.WithFields(logrus.Fields{

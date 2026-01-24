@@ -3,6 +3,7 @@ package natsservice
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,12 +15,6 @@ import (
 
 // Constants for bucket naming and user metadata keys
 const (
-	RoomUsersBucketPrefix = Prefix + "roomUsers-"
-	RoomUsersBucket       = RoomUsersBucketPrefix + "%s"
-
-	userInfoBucketPrefix = Prefix + "userInfo-"
-	UserInfoBucket       = userInfoBucketPrefix + "r_%s-u_%s"
-
 	RoomUsersBlockList = Prefix + "usersBlockList-%s"
 
 	UserOnlineMaxPingDiff = time.Minute * 2
@@ -35,6 +30,7 @@ const (
 	UserReconnectedAt  = "reconnected_at"
 	UserDisconnectedAt = "disconnected_at"
 	UserLastPingAt     = "last_ping_at"
+	UserStatusKey      = "status" // Note: This is different from RoomStatusKey
 
 	UserStatusAdded        = "added"
 	UserStatusOnline       = "online"
@@ -42,35 +38,13 @@ const (
 	UserStatusOffline      = "offline"
 )
 
-// AddUser adds a new user to a room and stores their metadata
+// AddUser adds a new user to a room and stores their metadata in the consolidated bucket
 func (s *NatsService) AddUser(roomId, userId, name string, isAdmin, isPresenter bool, metadata *plugnmeet.UserMetadata) error {
-	// Create or update the room users bucket
-	bucket := fmt.Sprintf(RoomUsersBucket, roomId)
-	roomKV, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
-		Replicas: s.app.NatsInfo.NumReplicas,
-		Bucket:   bucket,
-		TTL:      DefaultTTL,
-	})
+	// Get the consolidated room bucket
+	kv, err := s.js.KeyValue(s.ctx, s.formatConsolidatedRoomBucket(roomId))
 	if err != nil {
-		return fmt.Errorf("failed to create room user bucket: %w", err)
-	}
-
-	// Add user status to the room bucket
-	if _, err := roomKV.PutString(s.ctx, userId, UserStatusAdded); err != nil {
-		return fmt.Errorf("failed to add user to room: %w", err)
-	}
-	// add watcher for user status bucket
-	s.cs.AddRoomUserStatusWatcher(roomKV, bucket, roomId)
-
-	// Create or update the user info bucket
-	bucket = fmt.Sprintf(UserInfoBucket, roomId, userId)
-	userKV, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
-		Replicas: s.app.NatsInfo.NumReplicas,
-		Bucket:   bucket,
-		TTL:      DefaultTTL,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create user info bucket: %w", err)
+		// If the bucket doesn't exist, it means the room wasn't created properly.
+		return fmt.Errorf("failed to get consolidated room bucket: %w", err)
 	}
 
 	// Marshal metadata
@@ -89,59 +63,53 @@ func (s *NatsService) AddUser(roomId, userId, name string, isAdmin, isPresenter 
 		UserIsPresenterKey: fmt.Sprintf("%v", isPresenter),
 		UserMetadataKey:    mt,
 		UserLastPingAt:     "0",
+		UserStatusKey:      UserStatusAdded,
 	}
 
-	// Store user data in the key-value store
+	// Store user data in the key-value store using the user-specific prefix
 	for k, v := range data {
-		if _, err := userKV.PutString(s.ctx, k, v); err != nil {
-			return fmt.Errorf("failed to add user to user bucket: %w", err)
+		if _, err := kv.PutString(s.ctx, s.formatUserKey(userId, k), v); err != nil {
+			return fmt.Errorf("failed to add user data to consolidated bucket for key %s: %w", k, err)
 		}
 	}
 
-	// add to user info watcher
-	s.cs.AddUserInfoWatcher(userKV, bucket, roomId, userId)
-
+	// The watcher for user info is the same as the room watcher now.
 	return nil
 }
 
 // UpdateUserStatus updates the status of a user in a room
 func (s *NatsService) UpdateUserStatus(roomId, userId string, status string) error {
-	// Retrieve the room users bucket
-	roomKV, err := s.js.KeyValue(s.ctx, fmt.Sprintf(RoomUsersBucket, roomId))
+	// Retrieve the consolidated room bucket
+	kv, err := s.js.KeyValue(s.ctx, s.formatConsolidatedRoomBucket(roomId))
 	if err != nil {
 		if errors.Is(err, jetstream.ErrBucketNotFound) {
-			return fmt.Errorf("no room users bucket found with roomId: %s", userId)
+			return fmt.Errorf("no consolidated room bucket found with roomId: %s", roomId)
 		}
 		return err
 	}
 
 	// Update user status in the room bucket
-	if _, err := roomKV.PutString(s.ctx, userId, status); err != nil {
+	if _, err := kv.PutString(s.ctx, s.formatUserKey(userId, UserStatusKey), status); err != nil {
 		return fmt.Errorf("failed to update user status: %w", err)
 	}
 
-	// Retrieve the user info bucket
-	userKV, err := s.js.KeyValue(s.ctx, fmt.Sprintf(UserInfoBucket, roomId, userId))
-	if err != nil {
-		return fmt.Errorf("failed to retrieve user info bucket: %w", err)
-	}
-
 	// Update user info based on status
+	now := fmt.Sprintf("%d", time.Now().UnixMilli())
 	switch status {
 	case UserStatusOnline:
 		// Check if user has joined before
-		joined, _ := userKV.Get(s.ctx, UserJoinedAt)
+		joined, _ := kv.Get(s.ctx, s.formatUserKey(userId, UserJoinedAt))
 		if joined != nil && len(joined.Value()) > 0 {
-			if _, err := userKV.PutString(s.ctx, UserReconnectedAt, fmt.Sprintf("%d", time.Now().UnixMilli())); err != nil {
+			if _, err := kv.PutString(s.ctx, s.formatUserKey(userId, UserReconnectedAt), now); err != nil {
 				return fmt.Errorf("failed to update reconnected time: %w", err)
 			}
 		} else {
-			if _, err := userKV.PutString(s.ctx, UserJoinedAt, fmt.Sprintf("%d", time.Now().UnixMilli())); err != nil {
+			if _, err := kv.PutString(s.ctx, s.formatUserKey(userId, UserJoinedAt), now); err != nil {
 				return fmt.Errorf("failed to update joined time: %w", err)
 			}
 		}
 	case UserStatusDisconnected, UserStatusOffline:
-		if _, err := userKV.PutString(s.ctx, UserDisconnectedAt, fmt.Sprintf("%d", time.Now().UnixMilli())); err != nil {
+		if _, err := kv.PutString(s.ctx, s.formatUserKey(userId, UserDisconnectedAt), now); err != nil {
 			return fmt.Errorf("failed to update disconnected time: %w", err)
 		}
 	}
@@ -183,42 +151,45 @@ func (s *NatsService) UpdateUserMetadata(roomId, userId string, metadata interfa
 	return marshal, nil
 }
 
-// DeleteUser removes a user from a room and deletes their metadata
+// DeleteUser marks a user as offline in the consolidated bucket.
+// Physical data deletion happens when the room bucket is deleted.
 func (s *NatsService) DeleteUser(roomId, userId string) {
-	// Retrieve and purge the user from the room users bucket
-	if roomKV, err := s.js.KeyValue(s.ctx, fmt.Sprintf(RoomUsersBucket, roomId)); err == nil {
-		_ = roomKV.Purge(s.ctx, userId)
-	}
-
-	// Delete the user info bucket
-	_ = s.js.DeleteKeyValue(s.ctx, fmt.Sprintf(UserInfoBucket, roomId, userId))
+	_ = s.UpdateUserStatus(roomId, userId, UserStatusOffline)
 }
 
-// DeleteAllRoomUsersWithConsumer deletes all users from a room and their associated consumers
-func (s *NatsService) DeleteAllRoomUsersWithConsumer(roomId string) error {
-	// Retrieve the room users bucket
-	roomKV, err := s.js.KeyValue(s.ctx, fmt.Sprintf(RoomUsersBucket, roomId))
+// deleteAllUserConsumers deletes all NATS consumers associated with users in a room.
+// This function is intended for internal use during room cleanup.
+func (s *NatsService) deleteAllUserConsumers(roomId string) error {
+	kv, err := s.js.KeyValue(s.ctx, s.formatConsolidatedRoomBucket(roomId))
 	if err != nil {
 		if errors.Is(err, jetstream.ErrBucketNotFound) {
-			return nil
+			return nil // Room bucket already gone, nothing to do.
 		}
 		return err
 	}
 
-	// List all user keys in the room users bucket
-	kl, err := roomKV.ListKeys(s.ctx)
+	// List all keys to find user-specific keys and extract user IDs.
+	keys, err := kv.ListKeys(s.ctx)
 	if err != nil {
-		return fmt.Errorf("failed to list user keys: %w", err)
+		return fmt.Errorf("failed to list keys for consumer deletion: %w", err)
 	}
 
-	// Delete each user's info bucket and associated consumer
-	for u := range kl.Keys() {
-		_ = s.js.DeleteKeyValue(s.ctx, fmt.Sprintf(UserInfoBucket, roomId, u))
-		s.DeleteConsumer(roomId, u)
-	}
+	deletedUsers := make(map[string]bool)
+	for key := range keys.Keys() {
+		if strings.HasPrefix(key, UserKeyUserIdPrefix) {
+			// Use robust parsing based on the "user-USERID_<userId>-FIELD_<field>" schema.
+			trimmed := strings.TrimPrefix(key, UserKeyUserIdPrefix)
+			parts := strings.SplitN(trimmed, UserKeyFieldPrefix, 2)
 
-	// Delete the room users bucket
-	_ = s.js.DeleteKeyValue(s.ctx, fmt.Sprintf(RoomUsersBucket, roomId))
+			if len(parts) == 2 {
+				userId := parts[0]
+				if !deletedUsers[userId] {
+					s.DeleteConsumer(roomId, userId)
+					deletedUsers[userId] = true
+				}
+			}
+		}
+	}
 
 	return nil
 }
@@ -226,16 +197,16 @@ func (s *NatsService) DeleteAllRoomUsersWithConsumer(roomId string) error {
 // UpdateUserKeyValue updates a specific key-value pair for a user
 func (s *NatsService) UpdateUserKeyValue(roomId, userId, key, val string) error {
 	// Retrieve the user info bucket
-	userKV, err := s.js.KeyValue(s.ctx, fmt.Sprintf(UserInfoBucket, roomId, userId))
+	userKV, err := s.js.KeyValue(s.ctx, s.formatConsolidatedRoomBucket(roomId))
 	if err != nil {
 		if errors.Is(err, jetstream.ErrBucketNotFound) {
-			return fmt.Errorf("no user found with userId: %s", userId)
+			return fmt.Errorf("no consolidated room bucket found with roomId: %s", roomId)
 		}
 		return err
 	}
 
 	// Update the key-value pair in the user info bucket
-	if _, err := userKV.PutString(s.ctx, key, val); err != nil {
+	if _, err := userKV.PutString(s.ctx, s.formatUserKey(userId, key), val); err != nil {
 		return fmt.Errorf("failed to update key-value pair: %w", err)
 	}
 

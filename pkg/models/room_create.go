@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,6 +22,19 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 		"method":        "CreateRoom",
 	})
 	log.Infoln("create room request")
+
+	// Validate the roomId to ensure it doesn't contain our internal patterns.
+	if strings.Contains(r.RoomId, natsservice.UserKeyFieldPrefix) {
+		err := fmt.Errorf("roomId cannot contain the reserved pattern '%s'", natsservice.UserKeyFieldPrefix)
+		log.WithError(err).Errorln()
+		return nil, err
+	}
+	if strings.HasPrefix(r.RoomId, natsservice.UserKeyUserIdPrefix) {
+		err := fmt.Errorf("roomId cannot start with the reserved pattern '%s'", natsservice.UserKeyUserIdPrefix)
+		log.WithError(err).Errorln()
+		return nil, err
+	}
+
 	// we'll lock the same room creation until the room is created
 	lockValue, err := acquireRoomCreationLockWithRetry(m.ctx, m.rs, r.GetRoomId(), log)
 	if err != nil {

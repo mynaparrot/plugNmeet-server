@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/nats-io/nats.go/jetstream"
@@ -13,20 +14,18 @@ import (
 // Returns an empty string if the user or room is not found.
 func (s *NatsService) GetRoomUserStatus(roomId, userId string) (string, error) {
 	var status string
-	if status, _ = s.cs.GetCachedRoomUserStatus(roomId, userId); status != "" {
+	if status = s.cs.GetCachedRoomUserStatus(roomId, userId); status != "" {
 		return status, nil
 	}
 
-	bucket := fmt.Sprintf(RoomUsersBucket, roomId)
+	bucket := s.formatConsolidatedRoomBucket(roomId)
 	kv, err := s.getKV(bucket)
 	if err != nil || kv == nil {
 		return "", err
 	}
 
-	// So, for some reason, not found in cache, then may be user wasn't added to this room. So, we will start watching
-	s.cs.AddRoomUserStatusWatcher(kv, bucket, roomId)
-
-	return s.getStringValue(kv, userId)
+	// The watcher is now on the consolidated bucket, started during room creation.
+	return s.getStringValue(kv, s.formatUserKey(userId, UserStatusKey))
 }
 
 // GetUserInfo retrieves detailed information about a user in a specific room.
@@ -36,34 +35,32 @@ func (s *NatsService) GetUserInfo(roomId, userId string) (*plugnmeet.NatsKvUserI
 		return info, nil
 	}
 
-	bucket := fmt.Sprintf(UserInfoBucket, roomId, userId)
+	bucket := s.formatConsolidatedRoomBucket(roomId)
 	kv, err := s.getKV(bucket)
 	if err != nil || kv == nil {
 		return nil, err
 	}
 
 	info := &plugnmeet.NatsKvUserInfo{}
-	info.UserId, _ = s.getStringValue(kv, UserIdKey)
-	info.UserSid, _ = s.getStringValue(kv, UserSidKey)
-	info.Name, _ = s.getStringValue(kv, UserNameKey)
-	info.RoomId, _ = s.getStringValue(kv, UserRoomIdKey)
-	info.Metadata, _ = s.getStringValue(kv, UserMetadataKey)
-	info.IsAdmin, _ = s.getBoolValue(kv, UserIsAdminKey)
-	info.IsPresenter, _ = s.getBoolValue(kv, UserIsPresenterKey)
-	info.JoinedAt, _ = s.getUint64Value(kv, UserJoinedAt)
-	info.ReconnectedAt, _ = s.getUint64Value(kv, UserReconnectedAt)
-	info.DisconnectedAt, _ = s.getUint64Value(kv, UserDisconnectedAt)
+	info.UserId, _ = s.getStringValue(kv, s.formatUserKey(userId, UserIdKey))
+	info.UserSid, _ = s.getStringValue(kv, s.formatUserKey(userId, UserSidKey))
+	info.Name, _ = s.getStringValue(kv, s.formatUserKey(userId, UserNameKey))
+	info.RoomId, _ = s.getStringValue(kv, s.formatUserKey(userId, UserRoomIdKey))
+	info.Metadata, _ = s.getStringValue(kv, s.formatUserKey(userId, UserMetadataKey))
+	info.IsAdmin, _ = s.getBoolValue(kv, s.formatUserKey(userId, UserIsAdminKey))
+	info.IsPresenter, _ = s.getBoolValue(kv, s.formatUserKey(userId, UserIsPresenterKey))
+	info.JoinedAt, _ = s.getUint64Value(kv, s.formatUserKey(userId, UserJoinedAt))
+	info.ReconnectedAt, _ = s.getUint64Value(kv, s.formatUserKey(userId, UserReconnectedAt))
+	info.DisconnectedAt, _ = s.getUint64Value(kv, s.formatUserKey(userId, UserDisconnectedAt))
 
-	// So, for some reason, not found in cache. So, we will start watching
-	s.cs.AddUserInfoWatcher(kv, bucket, roomId, userId)
-
+	// The watcher is now on the consolidated bucket, started during room creation.
 	return info, nil
 }
 
-// GetRoomAllUsersFromStatusBucket retrieves all users and their statuses in a specific room.
-// Returns nil if the room is not found.
+// GetRoomAllUsersFromStatusBucket is now DEPRECATED in its old form.
+// This function will now list all keys and filter for user statuses.
 func (s *NatsService) GetRoomAllUsersFromStatusBucket(roomId string) (map[string]jetstream.KeyValueEntry, error) {
-	kv, err := s.getKV(fmt.Sprintf(RoomUsersBucket, roomId))
+	kv, err := s.getKV(s.formatConsolidatedRoomBucket(roomId))
 	if err != nil || kv == nil {
 		return nil, err
 	}
@@ -74,9 +71,17 @@ func (s *NatsService) GetRoomAllUsersFromStatusBucket(roomId string) (map[string
 	}
 
 	users := make(map[string]jetstream.KeyValueEntry)
-	for k := range kl.Keys() {
-		if entry, err := kv.Get(s.ctx, k); err == nil && entry != nil {
-			users[k] = entry
+	for key := range kl.Keys() {
+		if strings.HasPrefix(key, UserKeyUserIdPrefix) && strings.HasSuffix(key, UserKeyFieldPrefix+UserStatusKey) {
+			if entry, err := kv.Get(s.ctx, key); err == nil && entry != nil {
+				// Use robust parsing based on the "user-USERID_<userId>-FIELD_<field>" schema.
+				trimmed := strings.TrimPrefix(key, UserKeyUserIdPrefix)
+				parts := strings.SplitN(trimmed, UserKeyFieldPrefix, 2)
+				if len(parts) == 2 {
+					userId := parts[0]
+					users[userId] = entry
+				}
+			}
 		}
 	}
 	return users, nil
@@ -165,11 +170,11 @@ func (s *NatsService) GetOnlineUsersListAsJson(roomId string) ([]byte, error) {
 // GetUserKeyValue retrieves a specific key-value entry for a user in a specific room.
 // Returns nil if the user or room is not found.
 func (s *NatsService) GetUserKeyValue(roomId, userId, key string) (jetstream.KeyValueEntry, error) {
-	kv, err := s.getKV(fmt.Sprintf(UserInfoBucket, roomId, userId))
+	kv, err := s.getKV(s.formatConsolidatedRoomBucket(roomId))
 	if err != nil || kv == nil {
 		return nil, err
 	}
-	return kv.Get(s.ctx, key)
+	return kv.Get(s.ctx, s.formatUserKey(userId, key))
 }
 
 // GetUserMetadataStruct retrieves the metadata for a user in a specific room as a structured object.

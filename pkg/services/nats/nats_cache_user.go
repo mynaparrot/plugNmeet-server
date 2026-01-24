@@ -5,185 +5,27 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/nats-io/nats.go/jetstream"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 )
 
-// AddRoomUserStatusWatcher will start watching user status in a specific room.
-// remember each room has only one RoomUsersBucket bucket
-// in this bucket userId is key and status is value
-func (ncs *NatsCacheService) AddRoomUserStatusWatcher(kv jetstream.KeyValue, bucket, roomId string) {
-	log := ncs.logger.WithFields(logrus.Fields{
-		"bucket": bucket,
-		"room":   roomId,
-	})
-
-	ncs.roomUsersStatusLock.Lock()
-	_, ok := ncs.roomUsersStatusStore[roomId]
-	if ok {
-		//already watching this room
-		ncs.roomUsersStatusLock.Unlock()
-		return
-	}
-	ncs.roomUsersStatusStore[roomId] = make(map[string]CachedRoomUserStatusEntry)
-	ncs.roomUsersStatusLock.Unlock()
-
-	opts := []jetstream.WatchOpt{jetstream.IncludeHistory()}
-	watcher, err := kv.WatchAll(ncs.serviceCtx, opts...)
-	if err != nil {
-		log.WithError(err).Errorln("Error starting NATS KV watcher")
-		// fallback to clean cache as we've set it above
-		ncs.cleanRoomUserStatusCache(roomId)
-		return
-	}
-	log.Infof("NATS KV watcher for room user status started")
-
-	go func() {
-		defer func() {
-			log.Infof("NATS KV watcher for room user status stopped")
-			_ = watcher.Stop()
-			ncs.cleanRoomUserStatusCache(roomId)
-		}()
-
-		for {
-			select {
-			case <-ncs.serviceCtx.Done():
-				return
-			case entry, ok := <-watcher.Updates():
-				if !ok {
-					// channel closed may be bucket deleted
-					return
-				}
-				// here each user id is a separate key and status is the value
-				if entry != nil {
-					ncs.roomUsersStatusLock.Lock()
-					// force push updated data
-					ncs.roomUsersStatusStore[roomId][entry.Key()] = CachedRoomUserStatusEntry{
-						Status:   string(entry.Value()),
-						Revision: entry.Revision(),
-					}
-					ncs.roomUsersStatusLock.Unlock()
-				}
-			}
-		}
-	}()
-}
-
-func (ncs *NatsCacheService) GetCachedRoomUserStatus(roomId, userId string) (string, uint64) {
-	ncs.roomUsersStatusLock.RLock()
-	defer ncs.roomUsersStatusLock.RUnlock()
-	if rm, found := ncs.roomUsersStatusStore[roomId]; found {
-		if entry, ok := rm[userId]; ok {
-			return entry.Status, entry.Revision
-		}
-	}
-	return "", 0
-}
-
-func (ncs *NatsCacheService) GetUsersIdFromRoomStatusBucket(roomId, filterStatus string) []string {
-	ncs.roomUsersStatusLock.RLock()
-	defer ncs.roomUsersStatusLock.RUnlock()
-
-	var usersIds []string
-	if rm, found := ncs.roomUsersStatusStore[roomId]; found {
-		for userId, val := range rm {
-			if filterStatus != "" && val.Status == filterStatus {
-				usersIds = append(usersIds, userId)
-			} else if filterStatus == "" {
-				// if no filter, return all users
-				usersIds = append(usersIds, userId)
-			}
-		}
-	}
-	return usersIds
-}
-
-// remember each room has only one RoomUsersBucket bucket
-// in this bucket userId is key and status is value
-func (ncs *NatsCacheService) cleanRoomUserStatusCache(roomId string) {
-	ncs.roomUsersStatusLock.Lock()
-	defer ncs.roomUsersStatusLock.Unlock()
-	delete(ncs.roomUsersStatusStore, roomId)
-}
-
-// AddUserInfoWatcher will start watching user info
-// each user has its own bucket, so watch should be for each userId
-func (ncs *NatsCacheService) AddUserInfoWatcher(kv jetstream.KeyValue, bucket, roomId, userId string) {
-	log := ncs.logger.WithFields(logrus.Fields{
-		"bucket": bucket,
-		"room":   roomId,
-		"user":   userId,
-	})
-
-	ncs.roomUsersInfoLock.Lock()
-	rm, ok := ncs.roomUsersInfoStore[roomId]
-	if !ok {
-		ncs.roomUsersInfoStore[roomId] = make(map[string]CachedUserInfoEntry)
-		rm = ncs.roomUsersInfoStore[roomId]
-	}
-	_, ok = rm[userId]
-	if ok {
-		// already watching user info for this userId
-		ncs.roomUsersInfoLock.Unlock()
-		return
-	}
-	ncs.roomUsersInfoStore[roomId][userId] = CachedUserInfoEntry{
-		UserInfo: new(plugnmeet.NatsKvUserInfo),
-	}
-	ncs.roomUsersInfoLock.Unlock()
-
-	opts := []jetstream.WatchOpt{jetstream.IncludeHistory()}
-	watcher, err := kv.WatchAll(ncs.serviceCtx, opts...)
-	if err != nil {
-		log.WithError(err).Errorln("Error starting NATS KV watcher")
-		// fallback to clean cache as we've set it above
-		ncs.cleanUserInfoCache(roomId, userId)
-		return
-	}
-	log.Infof("NATS KV watcher for user started")
-
-	go func() {
-		defer func() {
-			log.Infof("NATS KV watcher for user info stopped")
-			_ = watcher.Stop()
-			ncs.cleanUserInfoCache(roomId, userId)
-		}()
-
-		for {
-			select {
-			case <-ncs.serviceCtx.Done():
-				return
-			case entry, ok := <-watcher.Updates():
-				if !ok {
-					// channel closed may be bucket deleted
-					return
-				}
-				if entry != nil && len(entry.Value()) > 0 {
-					ncs.updateUserInfoCache(entry, roomId, userId)
-				}
-			}
-		}
-	}()
-}
-
-func (ncs *NatsCacheService) updateUserInfoCache(entry jetstream.KeyValueEntry, roomId, userId string) {
+// updateUserInfoCache is called by the smart watcher dispatcher to update the unified user info cache.
+func (ncs *NatsCacheService) updateUserInfoCache(entry jetstream.KeyValueEntry, roomId, userId, field string) {
 	ncs.roomUsersInfoLock.Lock()
 	defer ncs.roomUsersInfoLock.Unlock()
 
 	room, roomOk := ncs.roomUsersInfoStore[roomId]
 	if !roomOk {
-		// Room is no longer tracked, so we can ignore this update.
-		return
+		room = make(map[string]CachedUserInfoEntry)
+		ncs.roomUsersInfoStore[roomId] = room
 	}
 
 	user, userOk := room[userId]
 	if !userOk {
-		// User is no longer tracked, so we can ignore this update.
-		return
+		user = CachedUserInfoEntry{UserInfo: new(plugnmeet.NatsKvUserInfo)}
 	}
 
 	val := string(entry.Value())
-	switch entry.Key() {
+	switch field {
 	case UserIdKey:
 		user.UserInfo.UserId = val
 	case UserSidKey:
@@ -206,17 +48,50 @@ func (ncs *NatsCacheService) updateUserInfoCache(entry jetstream.KeyValueEntry, 
 		user.UserInfo.DisconnectedAt = ncs.convertTextToUint64(val)
 	case UserLastPingAt:
 		user.LastPingAt = ncs.convertTextToUint64(val)
+	case UserStatusKey:
+		user.Status = val
 	}
-	// force push updated data
 	ncs.roomUsersInfoStore[roomId][userId] = user
 }
 
+// GetCachedRoomUserStatus reads the user status from the unified cache.
+func (ncs *NatsCacheService) GetCachedRoomUserStatus(roomId, userId string) string {
+	ncs.roomUsersInfoLock.RLock()
+	defer ncs.roomUsersInfoLock.RUnlock()
+	if rm, found := ncs.roomUsersInfoStore[roomId]; found {
+		if entry, ok := rm[userId]; ok {
+			// Note: Revision is no longer tracked for individual status, so we return 0.
+			// This is acceptable as the watcher guarantees we have the latest state.
+			return entry.Status
+		}
+	}
+	return ""
+}
+
+// GetUsersIdFromRoomStatusBucket reads user IDs from the unified cache, filtering by status.
+func (ncs *NatsCacheService) GetUsersIdFromRoomStatusBucket(roomId, filterStatus string) []string {
+	ncs.roomUsersInfoLock.RLock()
+	defer ncs.roomUsersInfoLock.RUnlock()
+
+	var usersIds []string
+	if rm, found := ncs.roomUsersInfoStore[roomId]; found {
+		for userId, val := range rm {
+			if filterStatus != "" && val.Status == filterStatus {
+				usersIds = append(usersIds, userId)
+			} else if filterStatus == "" {
+				usersIds = append(usersIds, userId)
+			}
+		}
+	}
+	return usersIds
+}
+
+// GetUserInfo is a simple reader for the cache.
 func (ncs *NatsCacheService) GetUserInfo(roomId, userId string) *plugnmeet.NatsKvUserInfo {
 	ncs.roomUsersInfoLock.RLock()
 	defer ncs.roomUsersInfoLock.RUnlock()
 	if rm, found := ncs.roomUsersInfoStore[roomId]; found {
 		if entry, ok := rm[userId]; ok && entry.UserInfo != nil {
-			// Return a copy to prevent modification of cached object if it's a pointer
 			infoCopy := proto.Clone(entry.UserInfo).(*plugnmeet.NatsKvUserInfo)
 			return infoCopy
 		}
@@ -224,6 +99,7 @@ func (ncs *NatsCacheService) GetUserInfo(roomId, userId string) *plugnmeet.NatsK
 	return nil
 }
 
+// GetUserLastPingAt is a simple reader for the cache.
 func (ncs *NatsCacheService) GetUserLastPingAt(roomId, userId string) int64 {
 	ncs.roomUsersInfoLock.RLock()
 	defer ncs.roomUsersInfoLock.RUnlock()
@@ -233,10 +109,4 @@ func (ncs *NatsCacheService) GetUserLastPingAt(roomId, userId string) int64 {
 		}
 	}
 	return 0
-}
-
-func (ncs *NatsCacheService) cleanUserInfoCache(roomId, userId string) {
-	ncs.roomUsersInfoLock.Lock()
-	defer ncs.roomUsersInfoLock.Unlock()
-	delete(ncs.roomUsersInfoStore[roomId], userId)
 }

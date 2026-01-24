@@ -1,33 +1,31 @@
 package natsservice
 
 import (
-	"fmt"
-
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 )
 
-// GetRoomInfo retrieves the room information for the given roomId
+// GetRoomInfo retrieves the room information for the given roomId from the consolidated bucket
 func (s *NatsService) GetRoomInfo(roomId string) (*plugnmeet.NatsKvRoomInfo, error) {
 	// try to get cached room info first
 	if info := s.cs.GetCachedRoomInfo(roomId); info != nil {
 		return info, nil
 	}
 
-	bucket := fmt.Sprintf(RoomInfoBucket, roomId)
+	bucket := s.formatConsolidatedRoomBucket(roomId)
 	kv, err := s.getKV(bucket)
 	if err != nil || kv == nil {
 		return nil, err
 	}
 
 	info := new(plugnmeet.NatsKvRoomInfo)
-	info.DbTableId, _ = s.getUint64Value(kv, RoomDbTableIdKey)
-	info.RoomId, _ = s.getStringValue(kv, RoomIdKey)
-	info.RoomSid, _ = s.getStringValue(kv, RoomSidKey)
-	info.Status, _ = s.getStringValue(kv, RoomStatusKey)
-	info.EmptyTimeout, _ = s.getUint64Value(kv, RoomEmptyTimeoutKey)
-	info.MaxParticipants, _ = s.getUint64Value(kv, RoomMaxParticipants)
-	info.CreatedAt, _ = s.getUint64Value(kv, RoomCreatedKey)
-	info.Metadata, _ = s.getStringValue(kv, RoomMetadataKey)
+	info.DbTableId, _ = s.getUint64Value(kv, s.formatRoomKey(RoomDbTableIdKey))
+	info.RoomId, _ = s.getStringValue(kv, s.formatRoomKey(RoomIdKey))
+	info.RoomSid, _ = s.getStringValue(kv, s.formatRoomKey(RoomSidKey))
+	info.Status, _ = s.getStringValue(kv, s.formatRoomKey(RoomStatusKey))
+	info.EmptyTimeout, _ = s.getUint64Value(kv, s.formatRoomKey(RoomEmptyTimeoutKey))
+	info.MaxParticipants, _ = s.getUint64Value(kv, s.formatRoomKey(RoomMaxParticipants))
+	info.CreatedAt, _ = s.getUint64Value(kv, s.formatRoomKey(RoomCreatedKey))
+	info.Metadata, _ = s.getStringValue(kv, s.formatRoomKey(RoomMetadataKey))
 
 	// So, for some reason, if the room info is not found in cache,
 	// then may be room wasn't created in this server.
