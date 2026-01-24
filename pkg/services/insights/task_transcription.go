@@ -96,8 +96,9 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 				if err != nil {
 					return
 				}
-				if err = t.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_TRANSCRIPTION_OUTPUT_TEXT, roomId, marshal, nil); err != nil {
-					log.WithError(err).Errorln("error broadcasting transcription result")
+				// Use the real-time pub/sub publisher for high-performance, loss-tolerant events.
+				if err = t.natsService.BroadcastSystemPubSubEventToRoom(plugnmeet.NatsMsgServerToClientEvents_TRANSCRIPTION_OUTPUT_TEXT, roomId, marshal); err != nil {
+					log.WithError(err).Errorln("error publishing real-time transcription result")
 				}
 
 				// If we have a final result, publish it to the dedicated synthesis SynthesisNatsChannel.
