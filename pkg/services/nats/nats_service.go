@@ -24,13 +24,12 @@ const (
 	// RoomInfoKeyPrefix format: info_<field>
 	RoomInfoKeyPrefix = "info_"
 
-	// UserKeyUserIdPrefix format: user-USERID_
-	UserKeyUserIdPrefix = "user-USERID_"
-	// UserKeyFieldPrefix format: -FIELD_
+	// UserKeyPrefix format: user_<userId>-FIELD_<field>
+	UserKeyPrefix = "user_"
+	// UserKeyFieldPrefix is the separator between the userId and the field.
 	UserKeyFieldPrefix = "-FIELD_"
-
-	WebhookKeyPrefix = "webhook_"
-	FileKeyPrefix    = "file_"
+	// FileKeyPrefix format: file_<fileId>
+	FileKeyPrefix = "file_"
 )
 
 var protoJsonOpts = protojson.MarshalOptions{
@@ -73,9 +72,9 @@ func (s *NatsService) formatRoomKey(field string) string {
 }
 
 // formatUserKey generates a key for a specific user's field.
-// The format will be `user-USERID_<userId>-FIELD_<field>`.
+// The format will be `user_<userId>-FIELD_<field>`.
 func (s *NatsService) formatUserKey(userId, field string) string {
-	return UserKeyUserIdPrefix + userId + UserKeyFieldPrefix + field
+	return UserKeyPrefix + userId + UserKeyFieldPrefix + field
 }
 
 // formatFileKey generates the key for a specific file's metadata.

@@ -117,8 +117,8 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 		log.WithError(err).Errorln()
 		return "", err
 	}
-	if strings.HasPrefix(g.UserInfo.UserId, natsservice.UserKeyUserIdPrefix) {
-		err = fmt.Errorf("user_id cannot start with the reserved pattern '%s'", natsservice.UserKeyUserIdPrefix)
+	if strings.HasPrefix(g.UserInfo.UserId, natsservice.UserKeyPrefix) {
+		err = fmt.Errorf("user_id cannot start with the reserved pattern '%s'", natsservice.UserKeyPrefix)
 		log.WithError(err).Errorln()
 		return "", err
 	}

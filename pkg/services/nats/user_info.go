@@ -57,8 +57,7 @@ func (s *NatsService) GetUserInfo(roomId, userId string) (*plugnmeet.NatsKvUserI
 	return info, nil
 }
 
-// GetRoomAllUsersFromStatusBucket is now DEPRECATED in its old form.
-// This function will now list all keys and filter for user statuses.
+// GetRoomAllUsersFromStatusBucket will list all keys and filter for user statuses.
 func (s *NatsService) GetRoomAllUsersFromStatusBucket(roomId string) (map[string]jetstream.KeyValueEntry, error) {
 	kv, err := s.getKV(s.formatConsolidatedRoomBucket(roomId))
 	if err != nil || kv == nil {
@@ -72,10 +71,10 @@ func (s *NatsService) GetRoomAllUsersFromStatusBucket(roomId string) (map[string
 
 	users := make(map[string]jetstream.KeyValueEntry)
 	for key := range kl.Keys() {
-		if strings.HasPrefix(key, UserKeyUserIdPrefix) && strings.HasSuffix(key, UserKeyFieldPrefix+UserStatusKey) {
+		if strings.HasPrefix(key, UserKeyPrefix) && strings.HasSuffix(key, UserKeyFieldPrefix+UserStatusKey) {
 			if entry, err := kv.Get(s.ctx, key); err == nil && entry != nil {
-				// Use robust parsing based on the "user-USERID_<userId>-FIELD_<field>" schema.
-				trimmed := strings.TrimPrefix(key, UserKeyUserIdPrefix)
+				// parsing based on the "user_<userId>-FIELD_<field>" schema.
+				trimmed := strings.TrimPrefix(key, UserKeyPrefix)
 				parts := strings.SplitN(trimmed, UserKeyFieldPrefix, 2)
 				if len(parts) == 2 {
 					userId := parts[0]

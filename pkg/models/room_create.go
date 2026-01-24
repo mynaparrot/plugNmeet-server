@@ -29,8 +29,8 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 		log.WithError(err).Errorln()
 		return nil, err
 	}
-	if strings.HasPrefix(r.RoomId, natsservice.UserKeyUserIdPrefix) {
-		err := fmt.Errorf("roomId cannot start with the reserved pattern '%s'", natsservice.UserKeyUserIdPrefix)
+	if strings.HasPrefix(r.RoomId, natsservice.UserKeyPrefix) {
+		err := fmt.Errorf("roomId cannot start with the reserved pattern '%s'", natsservice.UserKeyPrefix)
 		log.WithError(err).Errorln()
 		return nil, err
 	}

@@ -77,7 +77,9 @@ func (ac *AuthController) HandleVerifyToken(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
-	if status == natsservice.UserStatusOnline {
+	if status == "" {
+		return utils.SendCommonProtobufResponse(c, false, "client information not found")
+	} else if status == natsservice.UserStatusOnline {
 		return utils.SendCommonProtobufResponse(c, false, "notifications.room-disconnected-duplicate-entry")
 	}
 

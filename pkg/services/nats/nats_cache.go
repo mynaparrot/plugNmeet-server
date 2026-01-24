@@ -141,9 +141,9 @@ func (ncs *NatsCacheService) dispatchCacheUpdate(entry jetstream.KeyValueEntry, 
 	switch {
 	case strings.HasPrefix(key, RoomInfoKeyPrefix):
 		ncs.updateRoomInfoCache(entry, roomId)
-	case strings.HasPrefix(key, UserKeyUserIdPrefix):
-		// parsing based on the "user-USERID_<userId>-FIELD_<field>" schema.
-		trimmed := strings.TrimPrefix(key, UserKeyUserIdPrefix)
+	case strings.HasPrefix(key, UserKeyPrefix):
+		// parsing based on the "user_<userId>-FIELD_<field>" schema.
+		trimmed := strings.TrimPrefix(key, UserKeyPrefix)
 		parts := strings.SplitN(trimmed, UserKeyFieldPrefix, 2)
 
 		if len(parts) == 2 {

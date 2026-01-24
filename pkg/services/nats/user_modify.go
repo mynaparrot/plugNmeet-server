@@ -176,9 +176,9 @@ func (s *NatsService) deleteAllUserConsumers(roomId string) error {
 
 	deletedUsers := make(map[string]bool)
 	for key := range keys.Keys() {
-		if strings.HasPrefix(key, UserKeyUserIdPrefix) {
-			// Use robust parsing based on the "user-USERID_<userId>-FIELD_<field>" schema.
-			trimmed := strings.TrimPrefix(key, UserKeyUserIdPrefix)
+		if strings.HasPrefix(key, UserKeyPrefix) {
+			// parsing based on the "user_<userId>-FIELD_<field>" schema.
+			trimmed := strings.TrimPrefix(key, UserKeyPrefix)
 			parts := strings.SplitN(trimmed, UserKeyFieldPrefix, 2)
 
 			if len(parts) == 2 {

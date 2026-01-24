@@ -148,5 +148,4 @@ func (s *NatsService) OnAfterSessionEndCleanup(roomId string) {
 	_ = s.deleteAllUserConsumers(roomId)
 	_ = s.DeleteRoom(roomId)
 	_ = s.DeleteRoomNatsStream(roomId)
-	_ = s.DeleteAllRoomFiles(roomId)
 }
