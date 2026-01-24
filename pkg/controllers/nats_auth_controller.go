@@ -185,9 +185,11 @@ func (s *NatsAuthController) setPermissionForClient(data *plugnmeet.PlugNmeetTok
 		Sub: jwt.Permission{
 			Allow: jwt.StringList{
 				"_INBOX.>", // otherwise break request-reply patterns
-				// allow to publish in whiteboard channel
+				// allow to subscribe in SystemPublic pub/sub channel
+				fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.SystemPublic, roomId),
+				// allow to subscribe in whiteboard channel
 				fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.Whiteboard, roomId),
-				// allow to publish in DataChannel channel
+				// allow to subscribe in DataChannel channel
 				fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.DataChannel, roomId),
 			},
 		},

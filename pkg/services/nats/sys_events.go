@@ -10,13 +10,13 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func (s *NatsService) BroadcastSystemEventToRoom(event plugnmeet.NatsMsgServerToClientEvents, roomId string, data interface{}, toUserId *string) error {
+// prepareNatsServerToClientMsg prepares a plugnmeet.NatsMsgServerToClient message for broadcasting.
+func (s *NatsService) prepareNatsServerToClientMsg(event plugnmeet.NatsMsgServerToClientEvents, data interface{}) ([]byte, error) {
 	var msg string
 	var err error
 
 	switch v := data.(type) {
-	case int:
-	case float64:
+	case int, float64:
 		msg = fmt.Sprintf("%v", v)
 	case []byte:
 		msg = string(v)
@@ -25,10 +25,10 @@ func (s *NatsService) BroadcastSystemEventToRoom(event plugnmeet.NatsMsgServerTo
 	case proto.Message:
 		msg, err = s.MarshalToProtoJson(v)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	default:
-		return fmt.Errorf("invalid data type")
+		return nil, fmt.Errorf("invalid data type for NATS message")
 	}
 
 	payload := plugnmeet.NatsMsgServerToClient{
@@ -36,7 +36,12 @@ func (s *NatsService) BroadcastSystemEventToRoom(event plugnmeet.NatsMsgServerTo
 		Event: event,
 		Msg:   msg,
 	}
-	message, err := proto.Marshal(&payload)
+	return proto.Marshal(&payload)
+}
+
+// BroadcastSystemEventToRoom sends a message using JetStream for reliable, guaranteed delivery.
+func (s *NatsService) BroadcastSystemEventToRoom(event plugnmeet.NatsMsgServerToClientEvents, roomId string, data interface{}, toUserId *string) error {
+	message, err := s.prepareNatsServerToClientMsg(event, data)
 	if err != nil {
 		return err
 	}
@@ -47,11 +52,20 @@ func (s *NatsService) BroadcastSystemEventToRoom(event plugnmeet.NatsMsgServerTo
 	}
 
 	_, err = s.js.Publish(s.ctx, sub, message)
+	return err
+}
+
+// BroadcastSystemPubSubEventToRoom sends a public message to everyone in the room
+// using core NATS for high-performance, loss-tolerant events.
+func (s *NatsService) BroadcastSystemPubSubEventToRoom(event plugnmeet.NatsMsgServerToClientEvents, roomId string, data interface{}) error {
+	message, err := s.prepareNatsServerToClientMsg(event, data)
 	if err != nil {
 		return err
 	}
 
-	return nil
+	// For public, real-time events, use the core NATS publisher with the specified pattern.
+	sub := fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.SystemPublic, roomId)
+	return s.nc.Publish(sub, message)
 }
 
 func (s *NatsService) BroadcastSystemEventToEveryoneExceptUserId(event plugnmeet.NatsMsgServerToClientEvents, roomId string, data interface{}, exceptUserId string) error {
