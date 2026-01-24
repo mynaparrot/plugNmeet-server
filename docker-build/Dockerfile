@@ -6,16 +6,16 @@ RUN echo "Building for $TARGETPLATFORM"
 
 WORKDIR /go/src/app
 
-COPY main.go main.go
-COPY go.mod go.mod
-COPY go.sum go.sum
+COPY ../main.go main.go
+COPY ../go.mod go.mod
+COPY ../go.sum go.sum
 # download if above files changed
 RUN go mod download
 
 # Copy the go source
-COPY helpers/ helpers/
-COPY pkg/ pkg/
-COPY version/ version/
+COPY ../helpers helpers/
+COPY ../pkg pkg/
+COPY ../version version/
 
 # Define SPEECHSDK_ROOT for the builder stage
 ENV SPEECHSDK_ROOT=/opt/speechsdk
@@ -60,7 +60,7 @@ COPY --from=builder /go/src/app/plugnmeet-server /usr/bin/plugnmeet-server
 COPY --from=builder /opt/speechsdk /opt/speechsdk
 
 # Copy the entrypoint script
-COPY docker-entrypoint.sh /usr/local/bin/
+COPY docker-build/docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Run the entrypoint script, which sets up the environment and runs the binary

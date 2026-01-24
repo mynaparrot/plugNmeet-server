@@ -73,7 +73,7 @@ services:
   plugnmeet-api:
     build:
       context: .
-      dockerfile: Dockerfile.dev
+      dockerfile: docker-build/Dockerfile.dev
     ports:
       - "8080:8080/tcp"
     volumes:
