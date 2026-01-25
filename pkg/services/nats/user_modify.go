@@ -15,22 +15,21 @@ import (
 
 // Constants for bucket naming and user metadata keys
 const (
-	RoomUsersBlockList = Prefix + "usersBlockList-%s"
-
 	UserOnlineMaxPingDiff = time.Minute * 2
 
-	UserIdKey          = "id"
-	UserSidKey         = "sid"
-	UserNameKey        = "name"
-	UserRoomIdKey      = "room_id"
-	UserIsAdminKey     = "is_admin"
-	UserIsPresenterKey = "is_presenter"
-	UserMetadataKey    = "metadata"
-	UserJoinedAt       = "joined_at"
-	UserReconnectedAt  = "reconnected_at"
-	UserDisconnectedAt = "disconnected_at"
-	UserLastPingAt     = "last_ping_at"
-	UserStatusKey      = "status" // Note: This is different from RoomStatusKey
+	UserIdKey            = "id"
+	UserSidKey           = "sid"
+	UserNameKey          = "name"
+	UserRoomIdKey        = "room_id"
+	UserIsAdminKey       = "is_admin"
+	UserIsPresenterKey   = "is_presenter"
+	UserMetadataKey      = "metadata"
+	UserJoinedAt         = "joined_at"
+	UserReconnectedAt    = "reconnected_at"
+	UserDisconnectedAt   = "disconnected_at"
+	UserLastPingAt       = "last_ping_at"
+	UserStatusKey        = "status" // Note: This is different from RoomStatusKey
+	UserIsBlacklistedKey = "is_blacklisted"
 
 	UserStatusAdded        = "added"
 	UserStatusOnline       = "online"
@@ -55,15 +54,16 @@ func (s *NatsService) AddUser(roomId, userId, name string, isAdmin, isPresenter 
 
 	// Prepare user data
 	data := map[string]string{
-		UserIdKey:          userId,
-		UserSidKey:         uuid.NewString(),
-		UserNameKey:        name,
-		UserRoomIdKey:      roomId,
-		UserIsAdminKey:     fmt.Sprintf("%v", isAdmin),
-		UserIsPresenterKey: fmt.Sprintf("%v", isPresenter),
-		UserMetadataKey:    mt,
-		UserLastPingAt:     "0",
-		UserStatusKey:      UserStatusAdded,
+		UserIdKey:            userId,
+		UserSidKey:           uuid.NewString(),
+		UserNameKey:          name,
+		UserRoomIdKey:        roomId,
+		UserIsAdminKey:       fmt.Sprintf("%v", isAdmin),
+		UserIsPresenterKey:   fmt.Sprintf("%v", isPresenter),
+		UserMetadataKey:      mt,
+		UserLastPingAt:       "0",
+		UserStatusKey:        UserStatusAdded,
+		UserIsBlacklistedKey: "false", // Set default value on creation
 	}
 
 	// Store user data in the key-value store using the user-specific prefix
@@ -213,19 +213,23 @@ func (s *NatsService) UpdateUserKeyValue(roomId, userId, key, val string) error 
 	return nil
 }
 
-// AddUserToBlockList adds a user to the block list for a room
-func (s *NatsService) AddUserToBlockList(roomId, userId string) (uint64, error) {
-	// Create or update the room users block list bucket
-	blockListKV, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
-		Bucket:   fmt.Sprintf(RoomUsersBlockList, roomId),
-		Replicas: s.app.NatsInfo.NumReplicas,
-	})
+// AddUserToBlockList sets the is_blacklisted flag for a user to true.
+func (s *NatsService) AddUserToBlockList(roomId, userId string) error {
+	// Get the consolidated room bucket
+	kv, err := s.js.KeyValue(s.ctx, s.formatConsolidatedRoomBucket(roomId))
 	if err != nil {
-		return 0, fmt.Errorf("failed to create block list bucket: %w", err)
+		if errors.Is(err, jetstream.ErrBucketNotFound) {
+			return fmt.Errorf("no consolidated room bucket found with roomId: %s", roomId)
+		}
+		return err
 	}
 
-	// Add the user to the block list with the current timestamp
-	return blockListKV.PutString(s.ctx, userId, fmt.Sprintf("%d", time.Now().UnixMilli()))
+	// Directly set the blacklisted key to true. This will create the key if it doesn't exist.
+	_, err = kv.PutString(s.ctx, s.formatUserKey(userId, UserIsBlacklistedKey), "true")
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *NatsService) AddUserManuallyAndBroadcast(roomId, userId, name string, isAdmin, broadcast bool) (*plugnmeet.NatsKvUserInfo, error) {
@@ -263,9 +267,4 @@ func (s *NatsService) AddUserManuallyAndBroadcast(roomId, userId, name string, i
 		return nil, err
 	}
 	return userInfo, nil
-}
-
-// DeleteRoomUsersBlockList deletes the block list for a room
-func (s *NatsService) DeleteRoomUsersBlockList(roomId string) {
-	_ = s.js.DeleteKeyValue(s.ctx, fmt.Sprintf(RoomUsersBlockList, roomId))
 }

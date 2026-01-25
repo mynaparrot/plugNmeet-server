@@ -121,9 +121,6 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 		log.WithError(err).Error("DB error updating status")
 	}
 
-	// Clear any user blocklists associated with the room from NATS.
-	m.natsService.DeleteRoomUsersBlockList(roomID)
-
 	// Send a stop signal to any active recorders for this room.
 	if err = m.recordingModel.DispatchRecorderTask(&plugnmeet.RecordingReq{Task: plugnmeet.RecordingTasks_STOP, Sid: roomSID, RoomId: roomID}); err != nil {
 		log.WithError(err).Error("Error sending stop to recorder")
@@ -157,11 +154,12 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 	// End all the agent tasks for this room.
 	m.insightsModel.OnAfterRoomEnded(dbTableId, roomID, roomSID)
 
-	// Perform the final NATS cleanup, deleting room-specific streams and KV stores.
-	m.natsService.OnAfterSessionEndCleanup(roomID)
-
 	// clean any SIP DispatchRule
 	m.lk.DeleteSIPDispatchRule(roomID, log)
+
+	// NOTE: ==> THIS WILL BE THE LAST <==
+	// Perform the final NATS cleanup, deleting room-specific streams, and KV stores.
+	m.natsService.OnAfterSessionEndCleanup(roomID)
 
 	log.Info("Room has been cleaned properly")
 

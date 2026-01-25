@@ -4,12 +4,13 @@ import (
 	"fmt"
 
 	"github.com/nats-io/nats.go/jetstream"
+	"github.com/sirupsen/logrus"
 )
 
 const DurableNameTpl = "%s_%s"
 
-// CreateRoomNatsStreams will create a single stream for all rooms.
-func (s *NatsService) CreateRoomNatsStreams() error {
+// CreateRoomNatsStream will create a single stream for all rooms.
+func (s *NatsService) CreateRoomNatsStream(logger *logrus.Entry) error {
 	_, err := s.js.CreateOrUpdateStream(s.ctx, jetstream.StreamConfig{
 		Name:     s.app.NatsInfo.RoomStreamName,
 		Replicas: s.app.NatsInfo.NumReplicas,
@@ -21,6 +22,7 @@ func (s *NatsService) CreateRoomNatsStreams() error {
 	if err != nil {
 		return err
 	}
+	logger.Infof("successfully created room stream: %s", s.app.NatsInfo.RoomStreamName)
 
 	return nil
 }

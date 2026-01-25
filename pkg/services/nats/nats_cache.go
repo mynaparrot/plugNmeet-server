@@ -23,9 +23,10 @@ type CachedRoomEntry struct {
 }
 
 type CachedUserInfoEntry struct {
-	UserInfo   *plugnmeet.NatsKvUserInfo
-	Status     string
-	LastPingAt uint64
+	UserInfo      *plugnmeet.NatsKvUserInfo
+	Status        string
+	LastPingAt    uint64
+	IsBlacklisted bool
 }
 
 type NatsCacheService struct {

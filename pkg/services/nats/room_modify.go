@@ -146,6 +146,6 @@ func (s *NatsService) UpdateRoomStatus(roomId string, status string) error {
 func (s *NatsService) OnAfterSessionEndCleanup(roomId string) {
 	// silently delete everything without log
 	_ = s.deleteAllUserConsumers(roomId)
-	_ = s.DeleteRoom(roomId)
 	_ = s.DeleteRoomNatsStream(roomId)
+	_ = s.DeleteRoom(roomId)
 }

@@ -40,6 +40,8 @@ func (ncs *NatsCacheService) updateUserInfoCache(entry jetstream.KeyValueEntry, 
 		user.UserInfo.IsAdmin, _ = strconv.ParseBool(val)
 	case UserIsPresenterKey:
 		user.UserInfo.IsPresenter, _ = strconv.ParseBool(val)
+	case UserIsBlacklistedKey:
+		user.IsBlacklisted, _ = strconv.ParseBool(val)
 	case UserJoinedAt:
 		user.UserInfo.JoinedAt = ncs.convertTextToUint64(val)
 	case UserReconnectedAt:
@@ -97,6 +99,19 @@ func (ncs *NatsCacheService) GetUserInfo(roomId, userId string) *plugnmeet.NatsK
 		}
 	}
 	return nil
+}
+
+// IsUserBlacklistedFromCache is a simple reader for the cache.
+// It returns the status, and a boolean indicating if the value was found in the cache.
+func (ncs *NatsCacheService) IsUserBlacklistedFromCache(roomId, userId string) (isBlocked bool, foundInCache bool) {
+	ncs.roomUsersInfoLock.RLock()
+	defer ncs.roomUsersInfoLock.RUnlock()
+	if rm, found := ncs.roomUsersInfoStore[roomId]; found {
+		if entry, ok := rm[userId]; ok {
+			return entry.IsBlacklisted, true
+		}
+	}
+	return false, false
 }
 
 // GetUserLastPingAt is a simple reader for the cache.

@@ -2,7 +2,6 @@ package natsservice
 
 import (
 	"encoding/json"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -239,12 +238,25 @@ func (s *NatsService) IsUserPresenter(roomId, userId string) bool {
 }
 
 // IsUserExistInBlockList checks if a user is in the block list for a specific room.
-// Returns false if the user or room is not found.
+// It checks the cache first for performance.
 func (s *NatsService) IsUserExistInBlockList(roomId, userId string) bool {
-	kv, err := s.getKV(fmt.Sprintf(RoomUsersBlockList, roomId))
+	// Check cache first
+	if isBlocked, found := s.cs.IsUserBlacklistedFromCache(roomId, userId); found {
+		return isBlocked
+	}
+
+	// Fallback to NATS if not in cache
+	kv, err := s.getKV(s.formatConsolidatedRoomBucket(roomId))
 	if err != nil || kv == nil {
 		return false
 	}
-	entry, err := kv.Get(s.ctx, userId)
-	return err == nil && entry != nil
+
+	// Check for the existence and value of the is_blacklisted key.
+	entry, err := kv.Get(s.ctx, s.formatUserKey(userId, UserIsBlacklistedKey))
+	if err != nil || entry == nil {
+		return false
+	}
+
+	isBlocked, _ := strconv.ParseBool(string(entry.Value()))
+	return isBlocked
 }
