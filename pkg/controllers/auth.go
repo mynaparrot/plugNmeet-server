@@ -90,19 +90,23 @@ func (ac *AuthController) HandleVerifyToken(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "notifications.you-are-blocked")
 	}
 
-	rr, roomDbInfo, rInfo, meta := ac.RoomModel.IsRoomActive(c.UserContext(), &plugnmeet.IsRoomActiveReq{
+	rr, rInfo, meta := ac.RoomModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: roomId.(string),
 	})
 
 	if !rr.GetIsActive() {
-		return utils.SendCommonProtobufResponse(c, false, rr.Msg)
-	}
-	if rInfo == nil || meta == nil {
-		return utils.SendCommonProtobufResponse(c, false, "room not found")
+		return utils.SendCommonProtobufResponse(c, false, "notifications.room-not-active")
 	}
 
-	if rInfo.MaxParticipants > 0 && roomDbInfo.JoinedParticipants >= int64(rInfo.MaxParticipants) {
-		return utils.SendCommonProtobufResponse(c, false, "notifications.max-num-participates-exceeded")
+	// rInfo and meta are guaranteed to be non-nil if IsActive is true.
+	if rInfo.MaxParticipants > 0 {
+		onlineUsers, err := ac.NatsService.GetOnlineUsersId(roomId.(string))
+		if err != nil {
+			return utils.SendCommonProtobufResponse(c, false, err.Error())
+		}
+		if int64(len(onlineUsers)) >= int64(rInfo.MaxParticipants) {
+			return utils.SendCommonProtobufResponse(c, false, "notifications.max-num-participates-exceeded")
+		}
 	}
 
 	enabledSelfInsertEncryptionKey := false

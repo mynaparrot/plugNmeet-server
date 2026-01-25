@@ -15,15 +15,17 @@ import (
 type UserController struct {
 	AppConfig   *config.AppConfig
 	UserModel   *models.UserModel
+	RoomModel   *models.RoomModel
 	ds          *dbservice.DatabaseService
 	NatsService *natsservice.NatsService
 }
 
 // NewUserController creates a new UserController.
-func NewUserController(appConfig *config.AppConfig, ds *dbservice.DatabaseService, natsService *natsservice.NatsService, userModel *models.UserModel) *UserController {
+func NewUserController(appConfig *config.AppConfig, ds *dbservice.DatabaseService, natsService *natsservice.NatsService, userModel *models.UserModel, roomModel *models.RoomModel) *UserController {
 	return &UserController{
 		AppConfig:   appConfig,
 		UserModel:   userModel,
+		RoomModel:   roomModel,
 		ds:          ds,
 		NatsService: natsService,
 	}
@@ -46,9 +48,13 @@ func (uc *UserController) HandleGenerateJoinToken(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, "this user is blocked to join this session")
 	}
 
-	ri, _ := uc.ds.GetRoomInfoByRoomId(req.RoomId, 1)
-	if ri == nil || ri.ID == 0 {
-		return utils.SendCommonProtoJsonResponse(c, false, "room is not active. create room first")
+	// Use the single point of truth to check if the room is active.
+	rr, _, _ := uc.RoomModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{
+		RoomId: req.RoomId,
+	})
+
+	if !rr.GetIsActive() {
+		return utils.SendCommonProtoJsonResponse(c, false, "room is not active")
 	}
 
 	token, err := uc.UserModel.GetPNMJoinToken(c.UserContext(), req)

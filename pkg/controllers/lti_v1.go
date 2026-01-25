@@ -97,7 +97,7 @@ func (lc *LtiV1Controller) HandleLTIV1VerifyHeaderToken(c *fiber.Ctx) error {
 func (lc *LtiV1Controller) HandleLTIV1IsRoomActive(c *fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 
-	res, _, _, _ := lc.RoomModel.IsRoomActive(c.UserContext(), &plugnmeet.IsRoomActiveReq{
+	res, _, _ := lc.RoomModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: roomId.(string),
 	})
 

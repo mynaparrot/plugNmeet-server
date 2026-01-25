@@ -48,7 +48,7 @@ func (rc *RoomController) HandleIsRoomActive(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	res, _, _, _ := rc.RoomModel.IsRoomActive(c.UserContext(), req)
+	res, _, _ := rc.RoomModel.IsRoomActive(req)
 	return utils.SendProtoJsonResponse(c, res)
 }
 

@@ -294,7 +294,7 @@ func (bc *BBBController) HandleBBBIsMeetingRunning(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
 
-	res, _, _, _ := bc.RoomModel.IsRoomActive(c.UserContext(), &plugnmeet.IsRoomActiveReq{
+	res, _, _ := bc.RoomModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: q.MeetingID,
 	})
 

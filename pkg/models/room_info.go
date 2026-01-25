@@ -5,54 +5,39 @@ import (
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 )
 
-func (m *RoomModel) IsRoomActive(ctx context.Context, r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoomActiveRes, *dbmodels.RoomInfo, *plugnmeet.NatsKvRoomInfo, *plugnmeet.RoomMetadata) {
-	log := m.logger.WithFields(logrus.Fields{"roomId": r.RoomId, "method": "IsRoomActive"})
-	// check first
-	_ = waitUntilRoomCreationCompletes(ctx, m.rs, r.GetRoomId(), log)
-
+// IsRoomActive checks if a room is active by using NATS as the primary source of truth.
+// This is a high-performance, cache-aware function.
+func (m *RoomModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoomActiveRes, *plugnmeet.NatsKvRoomInfo, *plugnmeet.RoomMetadata) {
 	res := &plugnmeet.IsRoomActiveRes{
-		Status: true,
-		Msg:    "room is not active",
+		Status:   true,
+		IsActive: false,
+		Msg:      "room is not active",
 	}
 
-	roomDbInfo, err := m.ds.GetRoomInfoByRoomId(r.RoomId, 1)
-	if err != nil {
-		res.Status = false
-		res.Msg = err.Error()
-		return res, nil, nil, nil
-	}
-	if roomDbInfo == nil || roomDbInfo.ID == 0 {
-		return res, nil, nil, nil
-	}
-
-	// let's make sure room actually active
+	// NATS is now the single source of truth for this check.
 	rInfo, meta, err := m.natsService.GetRoomInfoWithMetadata(r.RoomId)
 	if err != nil {
 		res.Status = false
 		res.Msg = err.Error()
-		return res, nil, nil, nil
+		return res, nil, nil
 	}
 
 	if rInfo == nil || meta == nil {
-		// Room isn't active. Change status
-		_, _ = m.ds.UpdateRoomStatus(&dbmodels.RoomInfo{
-			RoomId:    r.RoomId,
-			IsRunning: 0,
-		})
-		return res, nil, nil, nil
+		// Room isn't active in NATS.
+		return res, nil, nil
 	}
 
 	if rInfo.Status == natsservice.RoomStatusCreated || rInfo.Status == natsservice.RoomStatusActive {
 		res.IsActive = true
 		res.Msg = "room is active"
 	}
+	// If status is "ended" or anything else, it will correctly return IsActive: false and "room is not active".
 
-	return res, roomDbInfo, rInfo, meta
+	return res, rInfo, meta
 }
 
 func (m *RoomModel) GetActiveRoomInfo(ctx context.Context, r *plugnmeet.GetActiveRoomInfoReq) (bool, string, *plugnmeet.ActiveRoomWithParticipant) {

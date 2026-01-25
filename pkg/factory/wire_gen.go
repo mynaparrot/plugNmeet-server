@@ -54,7 +54,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	pollsController := controllers.NewPollsController(pollModel, redisService)
 	recordingController := controllers.NewRecordingController(databaseService, recordingModel, logger)
 	roomController := controllers.NewRoomController(roomModel)
-	userController := controllers.NewUserController(appConfig, databaseService, natsService, userModel)
+	userController := controllers.NewUserController(appConfig, databaseService, natsService, userModel, roomModel)
 	natsModel := models.NewNatsModel(appConfig, databaseService, redisService, natsService, livekitService, analyticsModel, authModel, userModel, logger)
 	webhookModel := models.NewWebhookModel(ctx, appConfig, databaseService, redisService, natsService, livekitService, roomModel, analyticsModel, breakoutRoomModel, natsModel, webhookNotifier, logger)
 	webhookController := controllers.NewWebhookController(authModel, webhookModel)
