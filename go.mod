@@ -24,7 +24,7 @@ require (
 	github.com/nats-io/nats.go v1.48.0
 	github.com/nats-io/nkeys v0.4.14
 	github.com/pion/webrtc/v4 v4.1.7
-	github.com/redis/go-redis/v9 v9.17.2
+	github.com/redis/go-redis/v9 v9.17.3
 	github.com/sirupsen/logrus v1.9.4
 	golang.org/x/sync v0.19.0
 	google.golang.org/genai v1.43.0
