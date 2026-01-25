@@ -207,6 +207,7 @@ type NatsInfo struct {
 	AuthCalloutIssuerPrivate string           `yaml:"auth_callout_issuer_private"`
 	AuthCalloutXkeyPrivate   *string          `yaml:"auth_callout_xkey_private"`
 	NumReplicas              int              `yaml:"num_replicas"`
+	RoomStreamName           string           `yaml:"room_stream_name"`
 	Subjects                 NatsSubjects     `yaml:"subjects"`
 	Recorder                 NatsInfoRecorder `yaml:"recorder"`
 }
@@ -234,6 +235,9 @@ func New(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 		appCnf.Client.TokenValidity = &validity
 	}
 	appCnf.ctx = ctx
+	if appCnf.NatsInfo.RoomStreamName == "" {
+		appCnf.NatsInfo.RoomStreamName = "pnm-room-stream"
+	}
 
 	// set default values
 	if appCnf.AnalyticsSettings != nil {

@@ -5,8 +5,10 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
+	"errors"
 	"strings"
 
+	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
@@ -78,7 +80,7 @@ func (ac *AuthController) HandleVerifyToken(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 	if status == "" {
-		return utils.SendCommonProtobufResponse(c, false, "client information not found")
+		return utils.SendCommonProtobufResponse(c, false, "notifications.user-info-not-found")
 	} else if status == natsservice.UserStatusOnline {
 		return utils.SendCommonProtobufResponse(c, false, "notifications.room-disconnected-duplicate-entry")
 	}
@@ -113,12 +115,13 @@ func (ac *AuthController) HandleVerifyToken(c *fiber.Ctx) error {
 	uId := requestedUserId.(string)
 	natsSubjs := ac.AppConfig.NatsInfo.Subjects
 	res := &plugnmeet.VerifyTokenRes{
-		Status:        true,
-		Msg:           "token is valid",
-		NatsWsUrls:    ac.AppConfig.NatsInfo.NatsWSUrls,
-		ServerVersion: &v,
-		RoomId:        &rId,
-		UserId:        &uId,
+		Status:         true,
+		Msg:            "token is valid",
+		NatsWsUrls:     ac.AppConfig.NatsInfo.NatsWSUrls,
+		ServerVersion:  &v,
+		RoomId:         &rId,
+		UserId:         &uId,
+		RoomStreamName: &ac.AppConfig.NatsInfo.RoomStreamName,
 		NatsSubjects: &plugnmeet.NatsSubjects{
 			SystemApiWorker: natsSubjs.SystemApiWorker,
 			SystemJsWorker:  natsSubjs.SystemJsWorker,
@@ -146,13 +149,17 @@ func (ac *AuthController) HandleVerifyHeaderToken(c *fiber.Ctx) error {
 
 	if authToken == "" {
 		_ = c.SendStatus(errStatus)
-		return utils.SendCommonProtoJsonResponse(c, false, "Authorization header is missing")
+		return utils.SendCommonProtoJsonResponse(c, false, "notifications.auth-header-missing")
 	}
 
 	claims, err := ac.AuthModel.VerifyPlugNmeetAccessToken(authToken, 0)
 	if err != nil {
 		_ = c.SendStatus(errStatus)
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+		errMsg := "notifications.invalid-token"
+		if errors.Is(err, jwt.ErrExpired) {
+			errMsg = "notifications.token-expired"
+		}
+		return utils.SendCommonProtoJsonResponse(c, false, errMsg)
 	}
 
 	c.Locals("isAdmin", claims.IsAdmin)

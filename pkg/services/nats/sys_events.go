@@ -55,7 +55,7 @@ func (s *NatsService) BroadcastSystemEventToRoom(event plugnmeet.NatsMsgServerTo
 	}
 
 	// Explicitly publish to our stream to ensure delivery.
-	_, err = s.js.Publish(s.ctx, sub, message, jetstream.WithExpectStream(PnmRoomStream))
+	_, err = s.js.Publish(s.ctx, sub, message, jetstream.WithExpectStream(s.app.NatsInfo.RoomStreamName))
 	return err
 }
 
