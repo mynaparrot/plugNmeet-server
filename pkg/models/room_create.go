@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,6 +22,19 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 		"method":        "CreateRoom",
 	})
 	log.Infoln("create room request")
+
+	// Validate the roomId to ensure it doesn't contain our internal patterns.
+	if strings.Contains(r.RoomId, natsservice.UserKeyFieldPrefix) {
+		err := fmt.Errorf("roomId cannot contain the reserved pattern '%s'", natsservice.UserKeyFieldPrefix)
+		log.WithError(err).Errorln()
+		return nil, err
+	}
+	if strings.HasPrefix(r.RoomId, natsservice.UserKeyPrefix) {
+		err := fmt.Errorf("roomId cannot start with the reserved pattern '%s'", natsservice.UserKeyPrefix)
+		log.WithError(err).Errorln()
+		return nil, err
+	}
+
 	// we'll lock the same room creation until the room is created
 	lockValue, err := acquireRoomCreationLockWithRetry(m.ctx, m.rs, r.GetRoomId(), log)
 	if err != nil {
@@ -105,14 +119,6 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 	}
 	log.Info("room added to nats")
 
-	// create streams
-	err = m.natsService.CreateRoomNatsStreams(r.RoomId)
-	if err != nil {
-		log.WithError(err).Error("failed to create nats streams")
-		return nil, err
-	}
-	log.Info("nats streams created")
-
 	rInfo, err := m.natsService.GetRoomInfo(r.RoomId)
 	if err != nil || rInfo == nil {
 		return nil, fmt.Errorf("room not found in KV")
@@ -165,11 +171,7 @@ func (m *RoomModel) handleExistingRoom(r *plugnmeet.CreateRoomReq, roomDbInfo *d
 	}
 
 	// The room is active and matches the DB record.
-	log.Info("found matching active room in NATS, ensuring streams are active and returning info")
-	if err := m.natsService.CreateRoomNatsStreams(r.RoomId); err != nil {
-		log.WithError(err).Error("failed to ensure NATS streams are active")
-		return nil, err
-	}
+	log.Info("found matching active room in NATS, updating status")
 	if err := m.natsService.UpdateRoomStatus(r.RoomId, natsservice.RoomStatusActive); err != nil {
 		log.WithError(err).Error("failed to update room status to active")
 		return nil, err

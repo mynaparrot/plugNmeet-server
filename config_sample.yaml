@@ -135,6 +135,7 @@ nats_info:
   auth_callout_issuer_private: "SAAMTMBUANSRW3XDXZBIBF4JYRRUMWGV2GZT5MQ54VNWNRPN2Y4J46NQSA"
   auth_callout_xkey_private: "SXAMBYY64TKXZCLFQGWDATGPIPURA4SIV3GDCSGG7A74USK6XDO6WQTIUU"
   num_replicas: 1 # Acceptable values: 1, 3, or 5
+  room_stream_name: "pnm-room-stream"
   subjects:
     system_api_worker: "sysApiWorker"
     system_js_worker: "sysJsWorker"

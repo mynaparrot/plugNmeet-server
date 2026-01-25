@@ -17,6 +17,19 @@ import (
 const (
 	Prefix     = "pnm-"
 	DefaultTTL = time.Hour * 24
+
+	// ConsolidatedRoomBucketPrefix is the prefix for the new single bucket for all room-related data.
+	ConsolidatedRoomBucketPrefix = Prefix + "room-"
+
+	// RoomInfoKeyPrefix format: info_<field>
+	RoomInfoKeyPrefix = "info_"
+
+	// UserKeyPrefix format: user_<userId>-FIELD_<field>
+	UserKeyPrefix = "user_"
+	// UserKeyFieldPrefix is the separator between the userId and the field.
+	UserKeyFieldPrefix = "-FIELD_"
+	// FileKeyPrefix format: file_<fileId>
+	FileKeyPrefix = "file_"
 )
 
 var protoJsonOpts = protojson.MarshalOptions{
@@ -44,6 +57,30 @@ func New(ctx context.Context, app *config.AppConfig, logger *logrus.Logger) *Nat
 		cs:     GetNatsCacheService(app, log.Logger),
 		logger: log,
 	}
+}
+
+// formatConsolidatedRoomBucket generates the bucket name for a consolidated room.
+// The format will be `pnm-room-<roomId>`.
+func (s *NatsService) formatConsolidatedRoomBucket(roomId string) string {
+	return ConsolidatedRoomBucketPrefix + roomId
+}
+
+// formatRoomKey generates a key for a room-level info field.
+// The format will be `info_<field>`.
+func (s *NatsService) formatRoomKey(field string) string {
+	return RoomInfoKeyPrefix + field
+}
+
+// formatUserKey generates a key for a specific user's field.
+// The format will be `user_<userId>-FIELD_<field>`.
+func (s *NatsService) formatUserKey(userId, field string) string {
+	return UserKeyPrefix + userId + UserKeyFieldPrefix + field
+}
+
+// formatFileKey generates the key for a specific file's metadata.
+// The format will be `file_<fileId>`.
+func (s *NatsService) formatFileKey(fileId string) string {
+	return FileKeyPrefix + fileId
 }
 
 // MarshalToProtoJson will convert data into proper format

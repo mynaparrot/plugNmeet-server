@@ -11,9 +11,6 @@ import (
 
 // Constants for room info bucket and keys
 const (
-	RoomInfoBucketPrefix = Prefix + "roomInfo-"
-	RoomInfoBucket       = RoomInfoBucketPrefix + "%s"
-
 	RoomDbTableIdKey    = "id"
 	RoomIdKey           = "room_id"
 	RoomSidKey          = "room_sid"
@@ -31,7 +28,7 @@ const (
 // AddRoom creates a new room entry in the NATS JetStream Key-Value store
 func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeout, maxParticipants *uint32, metadata *plugnmeet.RoomMetadata) error {
 	// Create or update the key-value bucket for the room
-	bucket := fmt.Sprintf(RoomInfoBucket, roomId)
+	bucket := s.formatConsolidatedRoomBucket(roomId)
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
 		Replicas: s.app.NatsInfo.NumReplicas,
 		Bucket:   bucket,
@@ -59,14 +56,14 @@ func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeo
 
 	// Prepare room data
 	data := map[string]string{
-		RoomDbTableIdKey:    fmt.Sprintf("%d", tableId),
-		RoomIdKey:           roomId,
-		RoomSidKey:          roomSid,
-		RoomEmptyTimeoutKey: fmt.Sprintf("%d", *emptyTimeout),
-		RoomMaxParticipants: fmt.Sprintf("%d", *maxParticipants),
-		RoomStatusKey:       RoomStatusCreated,
-		RoomCreatedKey:      fmt.Sprintf("%d", time.Now().UTC().Unix()),
-		RoomMetadataKey:     mt,
+		s.formatRoomKey(RoomDbTableIdKey):    fmt.Sprintf("%d", tableId),
+		s.formatRoomKey(RoomIdKey):           roomId,
+		s.formatRoomKey(RoomSidKey):          roomSid,
+		s.formatRoomKey(RoomEmptyTimeoutKey): fmt.Sprintf("%d", *emptyTimeout),
+		s.formatRoomKey(RoomMaxParticipants): fmt.Sprintf("%d", *maxParticipants),
+		s.formatRoomKey(RoomStatusKey):       RoomStatusCreated,
+		s.formatRoomKey(RoomCreatedKey):      fmt.Sprintf("%d", time.Now().UTC().Unix()),
+		s.formatRoomKey(RoomMetadataKey):     mt,
 	}
 
 	// Store each key-value pair
@@ -100,8 +97,7 @@ func (s *NatsService) updateRoomMetadata(roomId string, metadata interface{}) (s
 	}
 
 	// Retrieve the room's KV bucket
-	bucket := fmt.Sprintf(RoomInfoBucket, roomId)
-	kv, err := s.js.KeyValue(s.ctx, bucket)
+	kv, err := s.js.KeyValue(s.ctx, s.formatConsolidatedRoomBucket(roomId))
 	if errors.Is(err, jetstream.ErrBucketNotFound) {
 		return "", fmt.Errorf("no room found with roomId: %s", roomId)
 	} else if err != nil {
@@ -114,7 +110,7 @@ func (s *NatsService) updateRoomMetadata(roomId string, metadata interface{}) (s
 		return "", fmt.Errorf("failed to marshal metadata: %w", err)
 	}
 
-	if _, err := kv.PutString(s.ctx, RoomMetadataKey, ml); err != nil {
+	if _, err := kv.PutString(s.ctx, s.formatRoomKey(RoomMetadataKey), ml); err != nil {
 		return "", fmt.Errorf("failed to update metadata: %w", err)
 	}
 
@@ -123,7 +119,7 @@ func (s *NatsService) updateRoomMetadata(roomId string, metadata interface{}) (s
 
 // DeleteRoom removes the room's KV bucket
 func (s *NatsService) DeleteRoom(roomId string) error {
-	err := s.js.DeleteKeyValue(s.ctx, fmt.Sprintf(RoomInfoBucket, roomId))
+	err := s.js.DeleteKeyValue(s.ctx, s.formatConsolidatedRoomBucket(roomId))
 	if errors.Is(err, jetstream.ErrBucketNotFound) {
 		return nil // Room already deleted
 	}
@@ -132,14 +128,14 @@ func (s *NatsService) DeleteRoom(roomId string) error {
 
 // UpdateRoomStatus changes the status of a room
 func (s *NatsService) UpdateRoomStatus(roomId string, status string) error {
-	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf(RoomInfoBucket, roomId))
+	kv, err := s.js.KeyValue(s.ctx, s.formatConsolidatedRoomBucket(roomId))
 	if errors.Is(err, jetstream.ErrBucketNotFound) {
 		return fmt.Errorf("no room found with roomId: %s", roomId)
 	} else if err != nil {
 		return err
 	}
 
-	if _, err := kv.PutString(s.ctx, RoomStatusKey, status); err != nil {
+	if _, err := kv.PutString(s.ctx, s.formatRoomKey(RoomStatusKey), status); err != nil {
 		return fmt.Errorf("failed to update room status: %w", err)
 	}
 
@@ -149,8 +145,7 @@ func (s *NatsService) UpdateRoomStatus(roomId string, status string) error {
 // OnAfterSessionEndCleanup performs cleanup after a session ends
 func (s *NatsService) OnAfterSessionEndCleanup(roomId string) {
 	// silently delete everything without log
+	_ = s.deleteAllUserConsumers(roomId)
 	_ = s.DeleteRoom(roomId)
-	_ = s.DeleteAllRoomUsersWithConsumer(roomId)
 	_ = s.DeleteRoomNatsStream(roomId)
-	_ = s.DeleteAllRoomFiles(roomId)
 }

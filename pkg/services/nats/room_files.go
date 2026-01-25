@@ -3,28 +3,18 @@ package natsservice
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/nats-io/nats.go/jetstream"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-// Constants for room files bucket and keys
-const (
-	RoomFilesBucketPrefix = Prefix + "roomFiles-"
-	RoomFilesBucket       = RoomFilesBucketPrefix + "%s"
-)
-
-// AddRoomFile adds or updates a file's metadata in the room's file bucket.
-// The fileId will be used as the key.
+// AddRoomFile adds or updates a file's metadata in the consolidated room bucket.
 func (s *NatsService) AddRoomFile(roomId string, meta *plugnmeet.RoomUploadedFileMetadata) error {
-	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
-		Replicas: s.app.NatsInfo.NumReplicas,
-		Bucket:   fmt.Sprintf(RoomFilesBucket, roomId),
-		TTL:      DefaultTTL,
-	})
+	kv, err := s.js.KeyValue(s.ctx, s.formatConsolidatedRoomBucket(roomId))
 	if err != nil {
-		return err
+		return fmt.Errorf("could not get consolidated room bucket: %w", err)
 	}
 
 	metaBytes, err := protojson.Marshal(meta)
@@ -32,16 +22,16 @@ func (s *NatsService) AddRoomFile(roomId string, meta *plugnmeet.RoomUploadedFil
 		return fmt.Errorf("failed to marshal file metadata: %w", err)
 	}
 
-	_, err = kv.Put(s.ctx, meta.FileId, metaBytes)
+	_, err = kv.Put(s.ctx, s.formatFileKey(meta.FileId), metaBytes)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// DeleteRoomFile removes a file's metadata from the room's file bucket.
+// DeleteRoomFile removes a file's metadata from the consolidated room bucket.
 func (s *NatsService) DeleteRoomFile(roomId, fileId string) error {
-	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf(RoomFilesBucket, roomId))
+	kv, err := s.js.KeyValue(s.ctx, s.formatConsolidatedRoomBucket(roomId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
 		return nil
@@ -49,12 +39,12 @@ func (s *NatsService) DeleteRoomFile(roomId, fileId string) error {
 		return err
 	}
 
-	return kv.Purge(s.ctx, fileId)
+	return kv.Purge(s.ctx, s.formatFileKey(fileId))
 }
 
-// GetRoomFile retrieves a specific file's metadata.
+// GetRoomFile retrieves a specific file's metadata from the consolidated room bucket.
 func (s *NatsService) GetRoomFile(roomId, fileId string) (*plugnmeet.RoomUploadedFileMetadata, error) {
-	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf(RoomFilesBucket, roomId))
+	kv, err := s.js.KeyValue(s.ctx, s.formatConsolidatedRoomBucket(roomId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
 		return nil, nil
@@ -62,7 +52,7 @@ func (s *NatsService) GetRoomFile(roomId, fileId string) (*plugnmeet.RoomUploade
 		return nil, err
 	}
 
-	entry, err := kv.Get(s.ctx, fileId)
+	entry, err := kv.Get(s.ctx, s.formatFileKey(fileId))
 	switch {
 	case errors.Is(err, jetstream.ErrKeyNotFound):
 		return nil, nil
@@ -79,9 +69,9 @@ func (s *NatsService) GetRoomFile(roomId, fileId string) (*plugnmeet.RoomUploade
 	return meta, nil
 }
 
-// GetAllRoomFiles retrieves all file metadata for a given room.
+// GetAllRoomFiles retrieves all file metadata for a given room from the consolidated bucket.
 func (s *NatsService) GetAllRoomFiles(roomId string) (map[string]*plugnmeet.RoomUploadedFileMetadata, error) {
-	kv, err := s.js.KeyValue(s.ctx, fmt.Sprintf(RoomFilesBucket, roomId))
+	kv, err := s.js.KeyValue(s.ctx, s.formatConsolidatedRoomBucket(roomId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
 		return nil, nil
@@ -95,20 +85,17 @@ func (s *NatsService) GetAllRoomFiles(roomId string) (map[string]*plugnmeet.Room
 	}
 
 	files := make(map[string]*plugnmeet.RoomUploadedFileMetadata)
-	for k := range keys.Keys() {
-		if entry, err := kv.Get(s.ctx, k); err == nil && entry != nil {
-			meta := new(plugnmeet.RoomUploadedFileMetadata)
-			err = protojson.Unmarshal(entry.Value(), meta)
-			if err == nil {
-				files[k] = meta
+	for key := range keys.Keys() {
+		if strings.HasPrefix(key, FileKeyPrefix) {
+			if entry, err := kv.Get(s.ctx, key); err == nil && entry != nil {
+				meta := new(plugnmeet.RoomUploadedFileMetadata)
+				err = protojson.Unmarshal(entry.Value(), meta)
+				if err == nil {
+					files[meta.FileId] = meta
+				}
 			}
 		}
 	}
 
 	return files, nil
-}
-
-// DeleteAllRoomFiles purges the entire file bucket for a room, typically on session end.
-func (s *NatsService) DeleteAllRoomFiles(roomId string) error {
-	return s.js.DeleteKeyValue(s.ctx, fmt.Sprintf(RoomFilesBucket, roomId))
 }

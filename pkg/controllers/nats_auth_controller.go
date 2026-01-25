@@ -147,49 +147,37 @@ func (s *NatsAuthController) setPermissionForClient(data *plugnmeet.PlugNmeetTok
 		return fmt.Errorf("user info not found for userId: %s, roomId: %s", userId, roomId)
 	}
 
-	allowPub := jwt.StringList{
-		"$JS.API.INFO",
-		fmt.Sprintf("$JS.API.STREAM.INFO.%s", roomId),
-		// allow sending messages to the system
-		fmt.Sprintf("%s.%s.%s", s.app.NatsInfo.Subjects.SystemJsWorker, roomId, userId),
-	}
-
-	chatPermission, err := s.natsService.CreateChatConsumer(roomId, userId)
+	stream, durableName, err := s.natsService.CreateUserConsumer(roomId, userId)
 	if err != nil {
 		return err
 	}
-	allowPub.Add(chatPermission...)
-
-	sysPublicPermission, err := s.natsService.CreateSystemPublicConsumer(roomId, userId)
-	if err != nil {
-		return err
-	}
-	allowPub.Add(sysPublicPermission...)
-
-	sysPrivatePermission, err := s.natsService.CreateSystemPrivateConsumer(roomId, userId)
-	if err != nil {
-		return err
-	}
-	allowPub.Add(sysPrivatePermission...)
-
-	// to allow to publish in whiteboard channel in core pub/sub
-	allowPub.Add(fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.Whiteboard, roomId))
-	// to allow to publish in DataChannel channel in core pub/sub
-	allowPub.Add(fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.DataChannel, roomId))
 
 	// Assign Permissions
 	claims.Permissions = jwt.Permissions{
 		Pub: jwt.Permission{
-			Allow: allowPub,
+			Allow: jwt.StringList{
+				"$JS.API.INFO",
+				// permission for consumer (JetStream)
+				fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.%s", stream, durableName),
+				fmt.Sprintf("$JS.API.CONSUMER.MSG.NEXT.%s.%s", stream, durableName),
+				fmt.Sprintf("$JS.ACK.%s.%s.>", stream, durableName),
+
+				// permission to publish messages to the system (JetStream)
+				fmt.Sprintf("%s.%s.%s", s.app.NatsInfo.Subjects.SystemJsWorker, roomId, userId),
+				// permission to publish in core pub/sub
+				fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.Chat, roomId),
+				fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.Whiteboard, roomId),
+				fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.DataChannel, roomId),
+			},
 		},
 		Sub: jwt.Permission{
 			Allow: jwt.StringList{
 				"_INBOX.>", // otherwise break request-reply patterns
-				// allow to subscribe in SystemPublic pub/sub channel
+				// allow to subscribe in pub/sub channel system public which is different from JetStream
 				fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.SystemPublic, roomId),
-				// allow to subscribe in whiteboard channel
+				// other pub/sub channels
+				fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.Chat, roomId),
 				fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.Whiteboard, roomId),
-				// allow to subscribe in DataChannel channel
 				fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.DataChannel, roomId),
 			},
 		},
