@@ -74,6 +74,14 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 	})
 	log.Info("Starting room cleanup")
 
+	if roomStatus != natsservice.RoomStatusEnded {
+		// update status immediately
+		err := m.natsService.UpdateRoomStatus(roomID, natsservice.RoomStatusEnded)
+		if err != nil {
+			log.WithError(err).Error("error updating room status")
+		}
+	}
+
 	// Acquire a distributed lock to prevent race conditions with room creation.
 	cleanupLockTTL := config.WaitBeforeTriggerOnAfterRoomEnded + (time.Second * 10)
 	lockAcquired, lockVal, errLock := m.rs.LockRoomCreation(m.ctx, roomID, cleanupLockTTL)
@@ -102,14 +110,9 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 	// so that all the users got disconnect properly
 	time.Sleep(config.WaitBeforeTriggerOnAfterRoomEnded)
 
-	// If the room wasn't ended via the API, ensure its status is updated in NATS
-	// and that the session is terminated in LiveKit.
 	if roomStatus != natsservice.RoomStatusEnded {
-		err := m.natsService.UpdateRoomStatus(roomID, natsservice.RoomStatusEnded)
-		if err != nil {
-			log.WithError(err).Error("error updating room status")
-		}
-		_, err = m.lk.EndRoom(roomID)
+		// ensure the session is terminated in LiveKit
+		_, err := m.lk.EndRoom(roomID)
 		if err != nil {
 			log.WithError(err).Error("error ending room in livekit")
 		}
