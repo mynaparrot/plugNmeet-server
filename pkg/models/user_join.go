@@ -173,8 +173,7 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 	}
 
 	log.Infoln("successfully generated pnm join token")
-	am := NewAuthModel(m.app, m.natsService, m.logger.Logger)
-	return am.GeneratePNMJoinToken(c)
+	return m.am.GeneratePNMJoinToken(c)
 }
 
 // waitForUserToBeOffline polls until the user's status is no longer "online".

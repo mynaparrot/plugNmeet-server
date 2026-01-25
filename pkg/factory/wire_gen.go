@@ -35,7 +35,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	analyticsController := controllers.NewAnalyticsController(analyticsModel, artifactModel)
 	authModel := models.NewAuthModel(appConfig, natsService, logger)
 	livekitService := livekitservice.New(ctx, appConfig, logger)
-	userModel := models.NewUserModel(appConfig, databaseService, redisService, livekitService, natsService, analyticsModel, logger)
+	userModel := models.NewUserModel(appConfig, databaseService, redisService, livekitService, natsService, analyticsModel, authModel, logger)
 	recordingModel := models.NewRecordingModel(appConfig, databaseService, redisService, natsService, analyticsModel, userModel, webhookNotifier, logger)
 	fileModel := models.NewFileModel(ctx, appConfig, databaseService, natsService, logger)
 	etherpadModel := models.NewEtherpadModel(ctx, appConfig, databaseService, redisService, natsService, analyticsModel, logger)

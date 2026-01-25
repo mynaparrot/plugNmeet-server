@@ -19,10 +19,11 @@ type UserModel struct {
 	lk             *livekitservice.LivekitService
 	natsService    *natsservice.NatsService
 	analyticsModel *AnalyticsModel
+	am             *AuthModel
 	logger         *logrus.Entry
 }
 
-func NewUserModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService, natsService *natsservice.NatsService, analyticsModel *AnalyticsModel, logger *logrus.Logger) *UserModel {
+func NewUserModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService, natsService *natsservice.NatsService, analyticsModel *AnalyticsModel, am *AuthModel, logger *logrus.Logger) *UserModel {
 	return &UserModel{
 		app:            app,
 		ds:             ds,
@@ -30,6 +31,7 @@ func NewUserModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redi
 		lk:             lk,
 		natsService:    natsService,
 		analyticsModel: analyticsModel,
+		am:             am,
 		logger:         logger.WithField("model", "user"),
 	}
 }
