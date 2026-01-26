@@ -58,6 +58,20 @@ func (ncs *NatsCacheService) GetCachedRoomInfo(roomID string) *plugnmeet.NatsKvR
 	return nil
 }
 
+// GetCachedRoomMetadata retrieves only the metadata string from the cache.
+// It returns the metadata and a boolean indicating if it was found.
+func (ncs *NatsCacheService) GetCachedRoomMetadata(roomID string) (string, bool) {
+	ncs.roomLock.RLock()
+	defer ncs.roomLock.RUnlock()
+	if cachedEntry, found := ncs.roomsInfoStore[roomID]; found && cachedEntry.RoomInfo != nil {
+		if cachedEntry.RoomInfo.Status == RoomStatusEnded {
+			return "", false // Treat ended rooms as not found
+		}
+		return cachedEntry.RoomInfo.Metadata, true
+	}
+	return "", false
+}
+
 func (ncs *NatsCacheService) cleanRoomCache(roomID string) {
 	ncs.roomLock.Lock()
 	defer ncs.roomLock.Unlock()

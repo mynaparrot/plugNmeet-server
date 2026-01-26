@@ -1,7 +1,10 @@
 package natsservice
 
 import (
+	"errors"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/nats-io/nats.go/jetstream"
 )
 
 // GetRoomInfo retrieves the room information for the given roomId from the consolidated bucket
@@ -27,7 +30,7 @@ func (s *NatsService) GetRoomInfo(roomId string) (*plugnmeet.NatsKvRoomInfo, err
 	info.CreatedAt, _ = s.getUint64Value(kv, s.formatRoomKey(RoomCreatedKey))
 	info.Metadata, _ = s.getStringValue(kv, s.formatRoomKey(RoomMetadataKey))
 
-	// So, for some reason, if the room info is not found in cache,
+	// So, for some reason, if the room info is not found in the cache,
 	// then may be room wasn't created in this server.
 	// So, we will start watching if status not ended
 	if info.Status != RoomStatusEnded {
@@ -52,16 +55,38 @@ func (s *NatsService) GetRoomInfoWithMetadata(roomId string) (*plugnmeet.NatsKvR
 	return info, metadata, nil
 }
 
-// GetRoomMetadataStruct retrieves the room metadata as a structured object for the given roomId
+// GetRoomMetadataStruct retrieves the room metadata as a structured object for the given roomId.
+// It is highly optimized to check the cache first and then fetch only the required key.
 func (s *NatsService) GetRoomMetadataStruct(roomId string) (*plugnmeet.RoomMetadata, error) {
-	info, err := s.GetRoomInfo(roomId)
+	// Use the dedicated cache method to get only the metadata.
+	if metadata, found := s.cs.GetCachedRoomMetadata(roomId); found {
+		if len(metadata) > 0 {
+			return s.UnmarshalRoomMetadata(metadata)
+		}
+	}
+
+	// If not in cache, directly fetch only the metadata key from NATS KV.
+	bucket := s.formatConsolidatedRoomBucket(roomId)
+	kv, err := s.getKV(bucket)
 	if err != nil {
 		return nil, err
 	}
-
-	if info == nil || len(info.Metadata) == 0 {
+	if kv == nil {
+		// Bucket not found, so no metadata
 		return nil, nil
 	}
 
-	return s.UnmarshalRoomMetadata(info.Metadata)
+	entry, err := kv.Get(s.ctx, s.formatRoomKey(RoomMetadataKey))
+	if err != nil {
+		if errors.Is(err, jetstream.ErrKeyNotFound) {
+			return nil, nil // Metadata key not found
+		}
+		return nil, err
+	}
+
+	if entry == nil || len(entry.Value()) == 0 {
+		return nil, nil
+	}
+
+	return s.UnmarshalRoomMetadata(string(entry.Value()))
 }

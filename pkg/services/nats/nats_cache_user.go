@@ -70,8 +70,8 @@ func (ncs *NatsCacheService) GetCachedRoomUserStatus(roomId, userId string) stri
 	return ""
 }
 
-// GetUsersIdFromRoomStatusBucket reads user IDs from the unified cache, filtering by status.
-func (ncs *NatsCacheService) GetUsersIdFromRoomStatusBucket(roomId, filterStatus string) []string {
+// GetRoomUserIds reads user IDs from the unified cache, filtering by status.
+func (ncs *NatsCacheService) GetRoomUserIds(roomId, filterStatus string) []string {
 	ncs.roomUsersInfoLock.RLock()
 	defer ncs.roomUsersInfoLock.RUnlock()
 
@@ -99,6 +99,19 @@ func (ncs *NatsCacheService) GetUserInfo(roomId, userId string) *plugnmeet.NatsK
 		}
 	}
 	return nil
+}
+
+// GetCachedUserMetadata retrieves only the user's metadata string from the cache.
+// It returns the metadata and a boolean indicating if it was found.
+func (ncs *NatsCacheService) GetCachedUserMetadata(roomId, userId string) (string, bool) {
+	ncs.roomUsersInfoLock.RLock()
+	defer ncs.roomUsersInfoLock.RUnlock()
+	if rm, found := ncs.roomUsersInfoStore[roomId]; found {
+		if entry, ok := rm[userId]; ok && entry.UserInfo != nil {
+			return entry.UserInfo.Metadata, true
+		}
+	}
+	return "", false
 }
 
 // IsUserBlacklistedFromCache is a simple reader for the cache.

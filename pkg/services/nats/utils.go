@@ -3,6 +3,7 @@ package natsservice
 import (
 	"errors"
 	"strconv"
+	"strings"
 
 	"github.com/nats-io/nats.go/jetstream"
 )
@@ -64,4 +65,19 @@ func (s *NatsService) getInt64Value(kv jetstream.KeyValue, key string) (int64, e
 		return 0, nil
 	}
 	return strconv.ParseInt(val, 10, 64)
+}
+
+// ParseUserKey parses a user-specific NATS KV key into its userId and field components.
+// It returns the userId, the field, and a boolean indicating if parsing was successful.
+func ParseUserKey(key string) (userId, field string, ok bool) {
+	if !strings.HasPrefix(key, UserKeyPrefix) {
+		return "", "", false
+	}
+	trimmed := strings.TrimPrefix(key, UserKeyPrefix)
+	parts := strings.SplitN(trimmed, UserKeyFieldPrefix, 2)
+
+	if len(parts) == 2 {
+		return parts[0], parts[1], true
+	}
+	return "", "", false
 }

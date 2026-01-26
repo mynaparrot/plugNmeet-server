@@ -2,8 +2,8 @@ package natsservice
 
 import (
 	"encoding/json"
+	"errors"
 	"strconv"
-	"strings"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/nats-io/nats.go/jetstream"
@@ -56,8 +56,8 @@ func (s *NatsService) GetUserInfo(roomId, userId string) (*plugnmeet.NatsKvUserI
 	return info, nil
 }
 
-// GetRoomAllUsersFromStatusBucket will list all keys and filter for user statuses.
-func (s *NatsService) GetRoomAllUsersFromStatusBucket(roomId string) (map[string]jetstream.KeyValueEntry, error) {
+// GetRoomUserStatusEntries will list all keys and filter for user statuses.
+func (s *NatsService) GetRoomUserStatusEntries(roomId string) (map[string]jetstream.KeyValueEntry, error) {
 	kv, err := s.getKV(s.formatConsolidatedRoomBucket(roomId))
 	if err != nil || kv == nil {
 		return nil, err
@@ -70,15 +70,11 @@ func (s *NatsService) GetRoomAllUsersFromStatusBucket(roomId string) (map[string
 
 	users := make(map[string]jetstream.KeyValueEntry)
 	for key := range kl.Keys() {
-		if strings.HasPrefix(key, UserKeyPrefix) && strings.HasSuffix(key, UserKeyFieldPrefix+UserStatusKey) {
+		// Use the new helper function to parse the user key
+		userId, field, ok := ParseUserKey(key)
+		if ok && field == UserStatusKey {
 			if entry, err := kv.Get(s.ctx, key); err == nil && entry != nil {
-				// parsing based on the "user_<userId>-FIELD_<field>" schema.
-				trimmed := strings.TrimPrefix(key, UserKeyPrefix)
-				parts := strings.SplitN(trimmed, UserKeyFieldPrefix, 2)
-				if len(parts) == 2 {
-					userId := parts[0]
-					users[userId] = entry
-				}
+				users[userId] = entry
 			}
 		}
 	}
@@ -88,12 +84,12 @@ func (s *NatsService) GetRoomAllUsersFromStatusBucket(roomId string) (map[string
 // GetOnlineUsersId retrieves the IDs of users who are currently online in a specific room.
 // Returns nil if the room is not found or no users are online.
 func (s *NatsService) GetOnlineUsersId(roomId string) ([]string, error) {
-	if userIds := s.cs.GetUsersIdFromRoomStatusBucket(roomId, UserStatusOnline); len(userIds) > 0 {
+	if userIds := s.cs.GetRoomUserIds(roomId, UserStatusOnline); len(userIds) > 0 {
 		return userIds, nil
 	}
 
 	// fallback to nats
-	users, err := s.GetRoomAllUsersFromStatusBucket(roomId)
+	users, err := s.GetRoomUserStatusEntries(roomId) // Use new name
 	if err != nil || users == nil {
 		return nil, err
 	}
@@ -107,14 +103,15 @@ func (s *NatsService) GetOnlineUsersId(roomId string) ([]string, error) {
 	return userIds, nil
 }
 
-func (s *NatsService) GetUsersIdFromRoomStatusBucket(roomId string) []string {
+// GetRoomUserIds retrieves all user IDs for a given room.
+func (s *NatsService) GetRoomUserIds(roomId string) []string {
 	var userIds []string
-	if userIds = s.cs.GetUsersIdFromRoomStatusBucket(roomId, ""); len(userIds) > 0 {
+	if userIds = s.cs.GetRoomUserIds(roomId, ""); len(userIds) > 0 {
 		return userIds
 	}
 
 	// fallback to nats
-	users, err := s.GetRoomAllUsersFromStatusBucket(roomId)
+	users, err := s.GetRoomUserStatusEntries(roomId)
 	if err != nil || users == nil {
 		return userIds
 	}
@@ -178,15 +175,33 @@ func (s *NatsService) GetUserKeyValue(roomId, userId, key string) (jetstream.Key
 // GetUserMetadataStruct retrieves the metadata for a user in a specific room as a structured object.
 // Returns nil if the user or room is not found.
 func (s *NatsService) GetUserMetadataStruct(roomId, userId string) (*plugnmeet.UserMetadata, error) {
-	info, err := s.GetUserInfo(roomId, userId)
-	if err != nil {
+	// Use the dedicated cache method to get only the metadata.
+	if metadata, found := s.cs.GetCachedUserMetadata(roomId, userId); found {
+		if len(metadata) > 0 {
+			return s.UnmarshalUserMetadata(metadata)
+		}
+		return nil, nil // Metadata is empty in cache
+	}
+
+	// If not in cache, directly fetch only the metadata key from NATS KV.
+	kv, err := s.getKV(s.formatConsolidatedRoomBucket(roomId))
+	if err != nil || kv == nil {
 		return nil, err
 	}
-	if info == nil || len(info.Metadata) == 0 {
+
+	entry, err := kv.Get(s.ctx, s.formatUserKey(userId, UserMetadataKey))
+	if err != nil {
+		if errors.Is(err, jetstream.ErrKeyNotFound) {
+			return nil, nil // Metadata key not found
+		}
+		return nil, err
+	}
+
+	if entry == nil || len(entry.Value()) == 0 {
 		return nil, nil
 	}
 
-	return s.UnmarshalUserMetadata(info.Metadata)
+	return s.UnmarshalUserMetadata(string(entry.Value()))
 }
 
 // GetUserWithMetadata retrieves detailed information and metadata about a user in a specific room.

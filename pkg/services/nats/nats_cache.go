@@ -143,14 +143,15 @@ func (ncs *NatsCacheService) dispatchCacheUpdate(entry jetstream.KeyValueEntry, 
 	case strings.HasPrefix(key, RoomInfoKeyPrefix):
 		ncs.updateRoomInfoCache(entry, roomId)
 	case strings.HasPrefix(key, UserKeyPrefix):
-		// parsing based on the "user_<userId>-FIELD_<field>" schema.
-		trimmed := strings.TrimPrefix(key, UserKeyPrefix)
-		parts := strings.SplitN(trimmed, UserKeyFieldPrefix, 2)
-
-		if len(parts) == 2 {
-			userId := parts[0]
-			field := parts[1]
+		// Use the new helper function to parse the user key
+		userId, field, ok := ParseUserKey(key)
+		if ok {
 			ncs.updateUserInfoCache(entry, roomId, userId, field)
+		} else {
+			ncs.logger.WithFields(logrus.Fields{
+				"key":    key,
+				"roomId": roomId,
+			}).Warn("failed to parse user key in dispatchCacheUpdate")
 		}
 	}
 }
