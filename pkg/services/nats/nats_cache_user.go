@@ -56,8 +56,8 @@ func (ncs *NatsCacheService) updateUserInfoCache(entry jetstream.KeyValueEntry, 
 	ncs.roomUsersInfoStore[roomId][userId] = user
 }
 
-// GetCachedRoomUserStatus reads the user status from the unified cache.
-func (ncs *NatsCacheService) GetCachedRoomUserStatus(roomId, userId string) string {
+// getCachedRoomUserStatus reads the user status from the unified cache.
+func (ncs *NatsCacheService) getCachedRoomUserStatus(roomId, userId string) string {
 	ncs.roomUsersInfoLock.RLock()
 	defer ncs.roomUsersInfoLock.RUnlock()
 	if rm, found := ncs.roomUsersInfoStore[roomId]; found {
@@ -70,8 +70,8 @@ func (ncs *NatsCacheService) GetCachedRoomUserStatus(roomId, userId string) stri
 	return ""
 }
 
-// GetRoomUserIds reads user IDs from the unified cache, filtering by status.
-func (ncs *NatsCacheService) GetRoomUserIds(roomId, filterStatus string) []string {
+// getRoomUserIds reads user IDs from the unified cache, filtering by status.
+func (ncs *NatsCacheService) getRoomUserIds(roomId, filterStatus string) []string {
 	ncs.roomUsersInfoLock.RLock()
 	defer ncs.roomUsersInfoLock.RUnlock()
 
@@ -88,8 +88,8 @@ func (ncs *NatsCacheService) GetRoomUserIds(roomId, filterStatus string) []strin
 	return usersIds
 }
 
-// GetUserInfo is a simple reader for the cache.
-func (ncs *NatsCacheService) GetUserInfo(roomId, userId string) *plugnmeet.NatsKvUserInfo {
+// getUserInfo is a simple reader for the cache.
+func (ncs *NatsCacheService) getUserInfo(roomId, userId string) *plugnmeet.NatsKvUserInfo {
 	ncs.roomUsersInfoLock.RLock()
 	defer ncs.roomUsersInfoLock.RUnlock()
 	if rm, found := ncs.roomUsersInfoStore[roomId]; found {
@@ -101,9 +101,9 @@ func (ncs *NatsCacheService) GetUserInfo(roomId, userId string) *plugnmeet.NatsK
 	return nil
 }
 
-// GetCachedUserMetadata retrieves only the user's metadata string from the cache.
+// getCachedUserMetadata retrieves only the user's metadata string from the cache.
 // It returns the metadata and a boolean indicating if it was found.
-func (ncs *NatsCacheService) GetCachedUserMetadata(roomId, userId string) (string, bool) {
+func (ncs *NatsCacheService) getCachedUserMetadata(roomId, userId string) (string, bool) {
 	ncs.roomUsersInfoLock.RLock()
 	defer ncs.roomUsersInfoLock.RUnlock()
 	if rm, found := ncs.roomUsersInfoStore[roomId]; found {
@@ -114,9 +114,9 @@ func (ncs *NatsCacheService) GetCachedUserMetadata(roomId, userId string) (strin
 	return "", false
 }
 
-// IsUserBlacklistedFromCache is a simple reader for the cache.
+// isUserBlacklistedFromCache is a simple reader for the cache.
 // It returns the status, and a boolean indicating if the value was found in the cache.
-func (ncs *NatsCacheService) IsUserBlacklistedFromCache(roomId, userId string) (isBlocked bool, foundInCache bool) {
+func (ncs *NatsCacheService) isUserBlacklistedFromCache(roomId, userId string) (isBlocked bool, foundInCache bool) {
 	ncs.roomUsersInfoLock.RLock()
 	defer ncs.roomUsersInfoLock.RUnlock()
 	if rm, found := ncs.roomUsersInfoStore[roomId]; found {
@@ -127,8 +127,8 @@ func (ncs *NatsCacheService) IsUserBlacklistedFromCache(roomId, userId string) (
 	return false, false
 }
 
-// GetUserLastPingAt is a simple reader for the cache.
-func (ncs *NatsCacheService) GetUserLastPingAt(roomId, userId string) int64 {
+// getUserLastPingAt is a simple reader for the cache.
+func (ncs *NatsCacheService) getUserLastPingAt(roomId, userId string) int64 {
 	ncs.roomUsersInfoLock.RLock()
 	defer ncs.roomUsersInfoLock.RUnlock()
 	if rm, found := ncs.roomUsersInfoStore[roomId]; found {

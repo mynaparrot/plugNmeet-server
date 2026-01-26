@@ -45,7 +45,7 @@ func (ncs *NatsCacheService) updateRoomInfoCache(entry jetstream.KeyValueEntry, 
 	ncs.roomsInfoStore[roomId] = cacheEntry
 }
 
-func (ncs *NatsCacheService) GetCachedRoomInfo(roomID string) *plugnmeet.NatsKvRoomInfo {
+func (ncs *NatsCacheService) getCachedRoomInfo(roomID string) *plugnmeet.NatsKvRoomInfo {
 	ncs.roomLock.RLock()
 	defer ncs.roomLock.RUnlock()
 	if cachedEntry, found := ncs.roomsInfoStore[roomID]; found && cachedEntry.RoomInfo != nil {
@@ -58,9 +58,9 @@ func (ncs *NatsCacheService) GetCachedRoomInfo(roomID string) *plugnmeet.NatsKvR
 	return nil
 }
 
-// GetCachedRoomMetadata retrieves only the metadata string from the cache.
+// getCachedRoomMetadata retrieves only the metadata string from the cache.
 // It returns the metadata and a boolean indicating if it was found.
-func (ncs *NatsCacheService) GetCachedRoomMetadata(roomID string) (string, bool) {
+func (ncs *NatsCacheService) getCachedRoomMetadata(roomID string) (string, bool) {
 	ncs.roomLock.RLock()
 	defer ncs.roomLock.RUnlock()
 	if cachedEntry, found := ncs.roomsInfoStore[roomID]; found && cachedEntry.RoomInfo != nil {

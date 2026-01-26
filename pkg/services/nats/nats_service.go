@@ -48,13 +48,14 @@ type NatsService struct {
 
 func New(ctx context.Context, app *config.AppConfig, logger *logrus.Logger) *NatsService {
 	log := logger.WithField("service", "nats")
+	cs := newNatsCacheService(ctx, log)
 
 	return &NatsService{
 		ctx:    ctx,
 		app:    app,
 		nc:     app.NatsConn,
 		js:     app.JetStream,
-		cs:     GetNatsCacheService(app, log.Logger),
+		cs:     cs,
 		logger: log,
 	}
 }

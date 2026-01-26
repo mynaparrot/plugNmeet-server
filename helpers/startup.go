@@ -6,7 +6,6 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/factory"
-	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"gopkg.in/yaml.v3"
 )
 
@@ -52,9 +51,6 @@ func PrepareServer(ctx context.Context, appCnf *config.AppConfig) error {
 	if err != nil {
 		return err
 	}
-
-	// initialize nats Cache Service
-	natsservice.InitNatsCacheService(appCnf, appCnf.Logger)
 
 	return nil
 }

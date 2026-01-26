@@ -73,7 +73,7 @@ func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeo
 		}
 	}
 	// add room to watcher
-	s.cs.AddRoomWatcher(kv, bucket, roomId)
+	s.cs.addRoomWatcher(kv, bucket, roomId)
 	return nil
 }
 

@@ -7,14 +7,8 @@ import (
 	"sync"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/sirupsen/logrus"
-)
-
-var (
-	defaultNatsCacheService *NatsCacheService
-	initCacheOnce           sync.Once
 )
 
 type CachedRoomEntry struct {
@@ -42,36 +36,15 @@ type NatsCacheService struct {
 	roomUsersInfoStore map[string]map[string]CachedUserInfoEntry
 }
 
-func InitNatsCacheService(app *config.AppConfig, log *logrus.Logger) {
-	initCacheOnce.Do(func() {
-		if app.JetStream == nil {
-			log.Fatal("NATS JetStream not provided to InitNatsCacheService")
-		}
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defaultNatsCacheService = &NatsCacheService{
-			serviceCtx:         ctx,
-			serviceCancel:      cancel,
-			roomsInfoStore:     make(map[string]CachedRoomEntry),
-			roomUsersInfoStore: make(map[string]map[string]CachedUserInfoEntry),
-			logger:             log.WithField("sub-service", "nats-cache"),
-		}
-	})
-}
-
-// GetNatsCacheService returns the singleton instance.
-func GetNatsCacheService(app *config.AppConfig, logger *logrus.Logger) *NatsCacheService {
-	if defaultNatsCacheService == nil {
-		InitNatsCacheService(app, logger)
+func newNatsCacheService(ctx context.Context, log *logrus.Entry) *NatsCacheService {
+	ctx, cancel := context.WithCancel(ctx)
+	return &NatsCacheService{
+		serviceCtx:         ctx,
+		serviceCancel:      cancel,
+		roomsInfoStore:     make(map[string]CachedRoomEntry),
+		roomUsersInfoStore: make(map[string]map[string]CachedUserInfoEntry),
+		logger:             log.WithField("sub-service", "nats-cache"),
 	}
-	return defaultNatsCacheService
-}
-
-// Shutdown gracefully stops all watchers.
-func (ncs *NatsCacheService) Shutdown() {
-	ncs.logger.Info("Shutting down NATS Cache Service...")
-	ncs.serviceCancel() // Signals all watchers started with ncs.serviceCtx to stop
-	ncs.logger.Info("NATS Cache Service shutdown complete.")
 }
 
 func (ncs *NatsCacheService) convertTextToUint64(text string) uint64 {
@@ -79,8 +52,8 @@ func (ncs *NatsCacheService) convertTextToUint64(text string) uint64 {
 	return value
 }
 
-// AddRoomWatcher will add a single "smart" watcher for the given consolidated room bucket.
-func (ncs *NatsCacheService) AddRoomWatcher(kv jetstream.KeyValue, bucket, roomId string) {
+// addRoomWatcher will add a single "smart" watcher for the given consolidated room bucket.
+func (ncs *NatsCacheService) addRoomWatcher(kv jetstream.KeyValue, bucket, roomId string) {
 	log := ncs.logger.WithFields(logrus.Fields{
 		"bucket": bucket,
 		"room":   roomId,

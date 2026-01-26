@@ -10,7 +10,7 @@ import (
 // GetRoomInfo retrieves the room information for the given roomId from the consolidated bucket
 func (s *NatsService) GetRoomInfo(roomId string) (*plugnmeet.NatsKvRoomInfo, error) {
 	// try to get cached room info first
-	if info := s.cs.GetCachedRoomInfo(roomId); info != nil {
+	if info := s.cs.getCachedRoomInfo(roomId); info != nil {
 		return info, nil
 	}
 
@@ -34,7 +34,7 @@ func (s *NatsService) GetRoomInfo(roomId string) (*plugnmeet.NatsKvRoomInfo, err
 	// then may be room wasn't created in this server.
 	// So, we will start watching if status not ended
 	if info.Status != RoomStatusEnded {
-		s.cs.AddRoomWatcher(kv, bucket, roomId)
+		s.cs.addRoomWatcher(kv, bucket, roomId)
 	}
 
 	return info, nil
@@ -59,7 +59,7 @@ func (s *NatsService) GetRoomInfoWithMetadata(roomId string) (*plugnmeet.NatsKvR
 // It is highly optimized to check the cache first and then fetch only the required key.
 func (s *NatsService) GetRoomMetadataStruct(roomId string) (*plugnmeet.RoomMetadata, error) {
 	// Use the dedicated cache method to get only the metadata.
-	if metadata, found := s.cs.GetCachedRoomMetadata(roomId); found {
+	if metadata, found := s.cs.getCachedRoomMetadata(roomId); found {
 		if len(metadata) > 0 {
 			return s.UnmarshalRoomMetadata(metadata)
 		}

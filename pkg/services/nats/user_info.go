@@ -13,7 +13,7 @@ import (
 // Returns an empty string if the user or room is not found.
 func (s *NatsService) GetRoomUserStatus(roomId, userId string) (string, error) {
 	var status string
-	if status = s.cs.GetCachedRoomUserStatus(roomId, userId); status != "" {
+	if status = s.cs.getCachedRoomUserStatus(roomId, userId); status != "" {
 		return status, nil
 	}
 
@@ -30,7 +30,7 @@ func (s *NatsService) GetRoomUserStatus(roomId, userId string) (string, error) {
 // GetUserInfo retrieves detailed information about a user in a specific room.
 // Returns nil if the user or room is not found.
 func (s *NatsService) GetUserInfo(roomId, userId string) (*plugnmeet.NatsKvUserInfo, error) {
-	if info := s.cs.GetUserInfo(roomId, userId); info != nil {
+	if info := s.cs.getUserInfo(roomId, userId); info != nil {
 		return info, nil
 	}
 
@@ -84,7 +84,7 @@ func (s *NatsService) GetRoomUserStatusEntries(roomId string) (map[string]jetstr
 // GetOnlineUsersId retrieves the IDs of users who are currently online in a specific room.
 // Returns nil if the room is not found or no users are online.
 func (s *NatsService) GetOnlineUsersId(roomId string) ([]string, error) {
-	if userIds := s.cs.GetRoomUserIds(roomId, UserStatusOnline); len(userIds) > 0 {
+	if userIds := s.cs.getRoomUserIds(roomId, UserStatusOnline); len(userIds) > 0 {
 		return userIds, nil
 	}
 
@@ -106,7 +106,7 @@ func (s *NatsService) GetOnlineUsersId(roomId string) ([]string, error) {
 // GetRoomUserIds retrieves all user IDs for a given room.
 func (s *NatsService) GetRoomUserIds(roomId string) []string {
 	var userIds []string
-	if userIds = s.cs.GetRoomUserIds(roomId, ""); len(userIds) > 0 {
+	if userIds = s.cs.getRoomUserIds(roomId, ""); len(userIds) > 0 {
 		return userIds
 	}
 
@@ -176,7 +176,7 @@ func (s *NatsService) GetUserKeyValue(roomId, userId, key string) (jetstream.Key
 // Returns nil if the user or room is not found.
 func (s *NatsService) GetUserMetadataStruct(roomId, userId string) (*plugnmeet.UserMetadata, error) {
 	// Use the dedicated cache method to get only the metadata.
-	if metadata, found := s.cs.GetCachedUserMetadata(roomId, userId); found {
+	if metadata, found := s.cs.getCachedUserMetadata(roomId, userId); found {
 		if len(metadata) > 0 {
 			return s.UnmarshalUserMetadata(metadata)
 		}
@@ -221,7 +221,7 @@ func (s *NatsService) GetUserWithMetadata(roomId, userId string) (*plugnmeet.Nat
 // GetUserLastPing retrieves the last ping timestamp for a user in a specific room.
 // Returns 0 if the user or room is not found or the timestamp cannot be parsed.
 func (s *NatsService) GetUserLastPing(roomId, userId string) int64 {
-	if val := s.cs.GetUserLastPingAt(roomId, userId); val > 0 {
+	if val := s.cs.getUserLastPingAt(roomId, userId); val > 0 {
 		return val
 	}
 
@@ -239,7 +239,7 @@ func (s *NatsService) GetUserLastPing(roomId, userId string) int64 {
 // Returns false if the user or room is not found.
 func (s *NatsService) IsUserPresenter(roomId, userId string) bool {
 	// check cache first
-	userInfo := s.cs.GetUserInfo(roomId, userId)
+	userInfo := s.cs.getUserInfo(roomId, userId)
 	if userInfo != nil {
 		return userInfo.GetIsPresenter()
 	}
@@ -256,7 +256,7 @@ func (s *NatsService) IsUserPresenter(roomId, userId string) bool {
 // It checks the cache first for performance.
 func (s *NatsService) IsUserExistInBlockList(roomId, userId string) bool {
 	// Check cache first
-	if isBlocked, found := s.cs.IsUserBlacklistedFromCache(roomId, userId); found {
+	if isBlocked, found := s.cs.isUserBlacklistedFromCache(roomId, userId); found {
 		return isBlocked
 	}
 

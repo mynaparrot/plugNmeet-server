@@ -2,7 +2,6 @@ package helpers
 
 import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 )
 
@@ -19,8 +18,6 @@ func HandleCloseConnections(appCnf *config.AppConfig) {
 	// close redis
 	_ = appCnf.RDS.Close()
 
-	// close nats
-	natsservice.GetNatsCacheService(appCnf, appCnf.Logger).Shutdown()
 	_ = appCnf.NatsConn.Drain()
 	appCnf.NatsConn.Close()
 
