@@ -121,6 +121,7 @@ func (m *WebhookModel) getRoomInfoFromNatsOrRedis(roomId string, log *logrus.Ent
 		if rInfo == nil {
 			return nil, errors.New("room not found in NATS or Redis")
 		}
+		rInfo.Status = natsservice.RoomStatusEnded
 	}
 	return rInfo, nil
 }
