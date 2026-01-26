@@ -89,13 +89,23 @@ func (c *transcribeClient) CreateTranscription(mainCtx context.Context, roomId, 
 		})
 	}
 
+	// safeSend prevents a panic when sending to a closed channel by using recover.
+	safeSend := func(event *insights.TranscriptionEvent) {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Warnln("could not send to resultsChan, likely closed:", r)
+			}
+		}()
+		resultsChan <- event
+	}
+
 	recognizer.SessionStarted(func(e speech.SessionEventArgs) {
 		log.Infoln("azure transcription started")
-		resultsChan <- &insights.TranscriptionEvent{Type: insights.EventTypeSessionStarted}
+		safeSend(&insights.TranscriptionEvent{Type: insights.EventTypeSessionStarted})
 	})
 	recognizer.SessionStopped(func(e speech.SessionEventArgs) {
 		log.Infoln("azure transcription stopped")
-		resultsChan <- &insights.TranscriptionEvent{Type: insights.EventTypeSessionStopped}
+		safeSend(&insights.TranscriptionEvent{Type: insights.EventTypeSessionStopped})
 		safeClose()
 	})
 
@@ -112,10 +122,10 @@ func (c *transcribeClient) CreateTranscription(mainCtx context.Context, roomId, 
 		for lang, text := range e.Result.GetTranslations() {
 			result.Translations[GetLocaleFromCode(lang)] = text
 		}
-		resultsChan <- &insights.TranscriptionEvent{
+		safeSend(&insights.TranscriptionEvent{
 			Type:   insights.EventTypePartialResult,
 			Result: result,
-		}
+		})
 	})
 
 	recognizer.Recognized(func(e speech.TranslationRecognitionEventArgs) {
@@ -131,18 +141,18 @@ func (c *transcribeClient) CreateTranscription(mainCtx context.Context, roomId, 
 		for lang, text := range e.Result.GetTranslations() {
 			result.Translations[GetLocaleFromCode(lang)] = text
 		}
-		resultsChan <- &insights.TranscriptionEvent{
+		safeSend(&insights.TranscriptionEvent{
 			Type:   insights.EventTypeFinalResult,
 			Result: result,
-		}
+		})
 	})
 
 	recognizer.Canceled(func(e speech.TranslationRecognitionCanceledEventArgs) {
 		log.Infof("Azure transcription with translation canceled: %v\n", e.ErrorDetails)
-		resultsChan <- &insights.TranscriptionEvent{
+		safeSend(&insights.TranscriptionEvent{
 			Type:  insights.EventTypeError,
 			Error: e.ErrorDetails,
-		}
+		})
 		safeClose()
 	})
 
