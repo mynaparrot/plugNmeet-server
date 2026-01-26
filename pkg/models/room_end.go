@@ -50,17 +50,17 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 		return true, "room ended (NATS info was missing, cleanup initiated)"
 	}
 
-	// Step 5: Temporarily cache the live room data in Redis.
+	// Temporarily cache the live room data in Redis.
 	// This serves as a fallback in case the 'room_finished' webhook from LiveKit is delayed.
 	m.rs.HoldTemporaryRoomData(info)
 
-	// Step 6: Broadcast a 'SESSION_ENDED' event to all clients in the room to notify them.
+	// Broadcast a 'SESSION_ENDED' event to all clients in the room to notify them.
 	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SESSION_ENDED, roomID, "notifications.room-disconnected-room-ended", nil)
 	if err != nil {
 		log.WithError(err).Error("error sending session ended notification message")
 	}
 
-	// Step 7: Trigger the main asynchronous cleanup process in a separate goroutine.
+	// Trigger the main asynchronous cleanup process in a separate goroutine.
 	go m.OnAfterRoomEnded(info.DbTableId, info.RoomId, info.RoomSid, info.Metadata, info.Status)
 	return true, "success"
 }

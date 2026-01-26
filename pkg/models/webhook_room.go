@@ -98,17 +98,11 @@ func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 	})
 	log.Infoln("handling room_finished webhook")
 
-	rInfo, err := m.natsService.GetRoomInfo(event.Room.Name)
-	if err != nil || rInfo == nil {
-		if err != nil {
-			log.WithError(err).Errorln("failed to get room info from NATS due to an error, falling back to redis")
-		}
-		// fallback to redis to retrieve room info
-		rInfo = m.rs.GetTemporaryRoomData(event.Room.Name)
-		if rInfo == nil {
-			log.Warnln("room not found in Nats or Redis, skipping room_finished tasks")
-			return
-		}
+	// Use the new helper function to get room info
+	rInfo, err := m.getRoomInfoFromNatsOrRedis(event.Room.Name, log)
+	if err != nil {
+		log.WithError(err).Errorln("failed to get room info, skipping room_finished tasks")
+		return
 	}
 
 	event.Room.Metadata = rInfo.Metadata
@@ -128,7 +122,7 @@ func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 		// change status to ended
 		err = m.natsService.UpdateRoomStatus(rInfo.RoomId, natsservice.RoomStatusEnded)
 		if err != nil {
-			log.WithError(err).Errorln("failed to update room status to ended")
+			log.WithError(err).Errorln("failed to update room status")
 		}
 		// end the room in the proper plugNmeet way
 		m.rm.EndRoom(m.ctx, &plugnmeet.RoomEndReq{RoomId: rInfo.RoomId})

@@ -78,13 +78,10 @@ func (m *WebhookModel) trackUnpublished(event *livekit.WebhookEvent) {
 	})
 	log.Infoln("handling track_unpublished webhook")
 
-	rInfo, err := m.natsService.GetRoomInfo(event.Room.Name)
+	// Use the new helper function to get room info
+	rInfo, err := m.getRoomInfoFromNatsOrRedis(event.Room.Name, log)
 	if err != nil {
-		log.WithError(err).Errorln("failed to get room info from NATS")
-		return
-	}
-	if rInfo == nil {
-		log.Warnln("room not found in NATS, skipping track_unpublished tasks")
+		log.WithError(err).Errorln("failed to get room info, skipping track_unpublished tasks")
 		return
 	}
 

@@ -2,9 +2,11 @@ package models
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/livekit/protocol/livekit"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
@@ -101,4 +103,24 @@ func (m *WebhookModel) sendCustomTypeWebhook(event *livekit.WebhookEvent, eventN
 
 func (m *WebhookModel) isRequireManualTrigger(userId string) bool {
 	return strings.HasPrefix(userId, config.IngressUserIdPrefix) || strings.HasPrefix(userId, config.TTSAgentUserIdPrefix) || strings.HasPrefix(userId, config.SipUserIdPrefix)
+}
+
+// getRoomInfoFromNatsOrRedis attempts to retrieve room info from NATS,
+// falling back to Redis if NATS fails or returns nil.
+func (m *WebhookModel) getRoomInfoFromNatsOrRedis(roomId string, log *logrus.Entry) (*plugnmeet.NatsKvRoomInfo, error) {
+	rInfo, err := m.natsService.GetRoomInfo(roomId)
+	if err != nil || rInfo == nil {
+		if err != nil {
+			log.WithError(err).Warnln("failed to get room info from NATS, falling back to redis")
+		} else {
+			log.Warnln("room not found in NATS, falling back to redis")
+		}
+
+		// Fallback to redis to retrieve room info
+		rInfo = m.rs.GetTemporaryRoomData(roomId)
+		if rInfo == nil {
+			return nil, errors.New("room not found in NATS or Redis")
+		}
+	}
+	return rInfo, nil
 }
