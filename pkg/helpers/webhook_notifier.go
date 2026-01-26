@@ -16,6 +16,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// roomNotifier holds a dedicated worker and the cached webhook URLs for a single room.
+type roomNotifier struct {
+	worker *webhook.Notifier
+	urls   []string
+}
+
 type WebhookNotifier struct {
 	ctx                  context.Context
 	ds                   *dbservice.DatabaseService
@@ -25,8 +31,8 @@ type WebhookNotifier struct {
 	isEnabled            bool
 	enabledForPerMeeting bool
 	defaultUrl           string
-	// notifiers will hold a queue for each room, local to this server instance
-	notifiers map[string]*webhook.Notifier
+	// notifiers will hold our new wrapper for each room
+	notifiers map[string]*roomNotifier
 	// mu will protect access to the notifiers map
 	mu     sync.Mutex
 	logger *logrus.Entry
@@ -46,7 +52,7 @@ func newWebhookNotifier(ctx context.Context, app *config.AppConfig, ds *dbservic
 		isEnabled:            app.Client.WebhookConf.Enable,
 		enabledForPerMeeting: app.Client.WebhookConf.EnableForPerMeeting,
 		defaultUrl:           app.Client.WebhookConf.Url,
-		notifiers:            make(map[string]*webhook.Notifier),
+		notifiers:            make(map[string]*roomNotifier),
 		logger:               logger.WithField("helper", "webhookNotifier"),
 	}
 
@@ -73,25 +79,46 @@ func (w *WebhookNotifier) subscribeToCleanup() {
 	}
 }
 
-// getOrCreateNotifier returns a dedicated notifier for a given room.
-// If one doesn't exist, it creates and stores it.
-func (w *WebhookNotifier) getOrCreateNotifier(roomId string) *webhook.Notifier {
+// getOrCreateNotifier gets a notifier for a room, creating it just-in-time if it doesn't exist on this server instance.
+func (w *WebhookNotifier) getOrCreateNotifier(roomId string) *roomNotifier {
 	w.mu.Lock()
-	defer w.mu.Unlock()
+	notifier, ok := w.notifiers[roomId]
+	w.mu.Unlock()
 
-	if notifier, ok := w.notifiers[roomId]; ok {
+	if ok {
 		return notifier
 	}
 
-	// Create a new notifier for this room
-	notifier := webhook.NewNotifier(w.ctx, config.DefaultWebhookQueueSize, w.logger.Logger)
-	w.notifiers[roomId] = notifier
-	w.logger.WithFields(logrus.Fields{
-		"room_id": roomId,
-		"method":  "getOrCreateNotifier",
-	}).Info("created new webhook queue for room")
+	// Notifier does not exist on this server instance. Create it.
+	d, err := w.getData(roomId)
+	if err != nil || d == nil || len(d.Urls) == 0 {
+		// Log the error but don't create a notifier if there are no URLs.
+		if err != nil {
+			w.logger.WithField("room_id", roomId).WithError(err).Error("failed to get webhook data for notifier creation")
+		}
+		return nil
+	}
 
-	return notifier
+	// Create the new wrapper with the fetched URLs and the worker.
+	newNotifier := &roomNotifier{
+		worker: webhook.NewNotifier(w.ctx, config.DefaultWebhookQueueSize, w.logger.Logger),
+		urls:   d.Urls,
+	}
+
+	// Lock again to safely add to the map.
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	// Double-check in case another goroutine created it in the meantime.
+	if existingNotifier, exists := w.notifiers[roomId]; exists {
+		// Another goroutine won the race. Discard our new one and use the existing one.
+		newNotifier.worker.Kill()
+		return existingNotifier
+	}
+
+	w.notifiers[roomId] = newNotifier
+	w.logger.WithField("room_id", roomId).Info("created new just-in-time webhook notifier for room")
+	return newNotifier
 }
 
 // cleanupNotifier stops the worker and removes the notifier for a room from the local map.
@@ -100,7 +127,7 @@ func (w *WebhookNotifier) cleanupNotifier(roomId string) {
 	defer w.mu.Unlock()
 
 	if notifier, ok := w.notifiers[roomId]; ok {
-		notifier.Kill() // This will call Kill() on the worker.
+		notifier.worker.Kill() // This will call Kill() on the worker.
 		delete(w.notifiers, roomId)
 		w.logger.WithFields(logrus.Fields{
 			"room_id": roomId,
@@ -197,38 +224,32 @@ func (w *WebhookNotifier) SendWebhookEvent(event *plugnmeet.CommonNotifyEvent) e
 	}
 	roomId := event.Room.GetRoomId()
 
-	d, err := w.getData(roomId)
-	if err != nil {
-		return err
+	// Handle state changes for room_started and room_finished
+	if event.GetEvent() == "room_started" || event.GetEvent() == "room_finished" {
+		d, err := w.getData(roomId)
+		if err != nil {
+			return err
+		}
+		if d != nil {
+			if event.GetEvent() == "room_started" && d.PerformDeleting {
+				d.PerformDeleting = false
+				_ = w.saveData(roomId, d)
+			} else if event.GetEvent() == "room_finished" && !d.PerformDeleting {
+				d.PerformDeleting = true
+				_ = w.saveData(roomId, d)
+			}
+		}
 	}
-	if d == nil {
+
+	// Use the clean, separated getOrCreateNotifier function.
+	notifier := w.getOrCreateNotifier(roomId)
+	if notifier == nil {
+		// This is expected condition if no URLs are configured.
 		return nil
 	}
 
-	// it may happen that the room was created again before we delete the queue
-	// in DeleteWebhook
-	// if we delete then no further events will sendPostRequest even the room is active,
-	// so here we'll reset the deleted status
-	if event.GetEvent() == "room_started" && d.PerformDeleting {
-		d.PerformDeleting = false
-		err := w.saveData(roomId, d)
-		if err != nil {
-			// we'll just log
-			w.logger.WithError(err).Errorln("failed to save webhook data")
-		}
-	} else if event.GetEvent() == "room_finished" && !d.PerformDeleting {
-		// if we got room_finished then we'll set for deleting
-		d.PerformDeleting = true
-		err := w.saveData(roomId, d)
-		if err != nil {
-			// we'll just log
-			w.logger.WithError(err).Errorln("failed to save webhook data")
-		}
-	}
-
-	// Use the dedicated notifier for this room
-	notifier := w.getOrCreateNotifier(roomId)
-	notifier.AddInNotifyQueue(event, w.app.Client.ApiKey, w.app.Client.Secret, d.Urls)
+	// Send the event to the queue using the static app config and the cached URLs.
+	notifier.worker.AddInNotifyQueue(event, w.app.Client.ApiKey, w.app.Client.Secret, notifier.urls)
 	return nil
 }
 
