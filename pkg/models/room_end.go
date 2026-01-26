@@ -20,14 +20,14 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 		"method":  "EndRoom",
 	})
 
-	// Step 1: Wait until any ongoing room creation process is complete to avoid race conditions.
+	// Wait until any ongoing room creation process is complete to avoid race conditions.
 	if errWait := waitUntilRoomCreationCompletes(ctx, m.rs, roomID, m.logger); errWait != nil {
 		log.WithError(errWait).Error("Cannot end room as it's locked")
 		return false, fmt.Sprintf("Failed to end room: %s", errWait.Error())
 	}
 	log.Info("Proceeding to end room")
 
-	// Step 2: Fetch room information from the database.
+	// Fetch room information from the database.
 	roomDbInfo, err := m.ds.GetRoomInfoByRoomId(roomID, 1)
 	if err != nil {
 		return false, err.Error()
@@ -36,12 +36,12 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 		return false, "room not found in DB or not active"
 	}
 
-	// Step 3: Fetch the live room state from the NATS key-value store.
+	// Fetch the live room state from the NATS key-value store.
 	info, err := m.natsService.GetRoomInfo(roomID)
 	if err != nil {
 		log.WithError(err).Warn("NATS GetRoomInfo failed during EndRoom. Proceeding with DB cleanup.")
 	}
-	// Step 4: Handle cases where the room exists in the DB but not in NATS.
+	// Handle cases where the room exists in the DB but not in NATS.
 	if info == nil {
 		if roomDbInfo.IsRunning == 1 {
 			log.Warn("Room active in DB but not in NATS during EndRoom. Marking as ended and cleaning up.")
@@ -75,8 +75,8 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 	log.Info("Starting room cleanup")
 
 	if roomStatus != natsservice.RoomStatusEnded {
-		// update status immediately
-		err := m.natsService.UpdateRoomStatus(roomID, natsservice.RoomStatusEnded)
+		// update status immediately to prevent user to join
+		err := m.natsService.UpdateRoomStatus(roomID, natsservice.RoomStatusTriggeredEnd)
 		if err != nil {
 			log.WithError(err).Error("error updating room status")
 		}
@@ -111,8 +111,12 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 	time.Sleep(config.WaitBeforeTriggerOnAfterRoomEnded)
 
 	if roomStatus != natsservice.RoomStatusEnded {
+		err := m.natsService.UpdateRoomStatus(roomID, natsservice.RoomStatusEnded)
+		if err != nil {
+			log.WithError(err).Error("error updating room status")
+		}
 		// ensure the session is terminated in LiveKit
-		_, err := m.lk.EndRoom(roomID)
+		_, err = m.lk.EndRoom(roomID)
 		if err != nil {
 			log.WithError(err).Error("error ending room in livekit")
 		}

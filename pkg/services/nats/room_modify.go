@@ -20,9 +20,10 @@ const (
 	RoomMetadataKey     = "metadata"
 	RoomCreatedKey      = "created_at"
 
-	RoomStatusCreated = "created"
-	RoomStatusActive  = "active"
-	RoomStatusEnded   = "ended"
+	RoomStatusCreated      = "created"
+	RoomStatusActive       = "active"
+	RoomStatusTriggeredEnd = "triggered_end"
+	RoomStatusEnded        = "ended"
 )
 
 // AddRoom creates a new room entry in the NATS JetStream Key-Value store
