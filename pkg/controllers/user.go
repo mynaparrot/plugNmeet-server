@@ -118,13 +118,8 @@ func (uc *UserController) HandleMuteUnMuteTrack(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	err := uc.UserModel.CommonValidation(c)
-	if err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
-	}
-
 	req := new(plugnmeet.MuteUnMuteTrackReq)
-	err = proto.Unmarshal(c.Body(), req)
+	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -159,13 +154,8 @@ func (uc *UserController) HandleRemoveParticipant(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	err := uc.UserModel.CommonValidation(c)
-	if err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
-	}
-
 	req := new(plugnmeet.RemoveParticipantReq)
-	err = proto.Unmarshal(c.Body(), req)
+	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}

@@ -63,84 +63,6 @@ func (ac *AuthController) HandleAuthHeaderCheck(c *fiber.Ctx) error {
 	return c.Next()
 }
 
-// HandleVerifyToken verifies a user's token before they join a room.
-func (ac *AuthController) HandleVerifyToken(c *fiber.Ctx) error {
-	roomId := c.Locals("roomId")
-	requestedUserId := c.Locals("requestedUserId")
-
-	req := new(plugnmeet.VerifyTokenReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
-	}
-
-	// check for duplicate join
-	status, err := ac.NatsService.GetRoomUserStatus(roomId.(string), requestedUserId.(string))
-	if err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
-	}
-	if status == "" {
-		return utils.SendCommonProtobufResponse(c, false, "notifications.user-info-not-found")
-	} else if status == natsservice.UserStatusOnline {
-		return utils.SendCommonProtobufResponse(c, false, "notifications.room-disconnected-duplicate-entry")
-	}
-
-	exist := ac.NatsService.IsUserExistInBlockList(roomId.(string), requestedUserId.(string))
-	if exist {
-		return utils.SendCommonProtobufResponse(c, false, "notifications.you-are-blocked")
-	}
-
-	rr, rInfo, meta := ac.RoomModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{
-		RoomId: roomId.(string),
-	})
-
-	if !rr.GetIsActive() {
-		return utils.SendCommonProtobufResponse(c, false, "notifications.room-not-active")
-	}
-
-	// rInfo and meta are guaranteed to be non-nil if IsActive is true.
-	if rInfo.MaxParticipants > 0 {
-		onlineUsers, err := ac.NatsService.GetOnlineUsersId(roomId.(string))
-		if err != nil {
-			return utils.SendCommonProtobufResponse(c, false, err.Error())
-		}
-		if int64(len(onlineUsers)) >= int64(rInfo.MaxParticipants) {
-			return utils.SendCommonProtobufResponse(c, false, "notifications.max-num-participates-exceeded")
-		}
-	}
-
-	enabledSelfInsertEncryptionKey := false
-	if meta.RoomFeatures.EndToEndEncryptionFeatures.IsEnabled {
-		enabledSelfInsertEncryptionKey = meta.RoomFeatures.EndToEndEncryptionFeatures.EnabledSelfInsertEncryptionKey
-	}
-
-	v := version.Version
-	rId := roomId.(string)
-	uId := requestedUserId.(string)
-	natsSubjs := ac.AppConfig.NatsInfo.Subjects
-	res := &plugnmeet.VerifyTokenRes{
-		Status:         true,
-		Msg:            "token is valid",
-		NatsWsUrls:     ac.AppConfig.NatsInfo.NatsWSUrls,
-		ServerVersion:  &v,
-		RoomId:         &rId,
-		UserId:         &uId,
-		RoomStreamName: &ac.AppConfig.NatsInfo.RoomStreamName,
-		NatsSubjects: &plugnmeet.NatsSubjects{
-			SystemApiWorker: natsSubjs.SystemApiWorker,
-			SystemJsWorker:  natsSubjs.SystemJsWorker,
-			SystemPublic:    natsSubjs.SystemPublic,
-			SystemPrivate:   natsSubjs.SystemPrivate,
-			Chat:            natsSubjs.Chat,
-			Whiteboard:      natsSubjs.Whiteboard,
-			DataChannel:     natsSubjs.DataChannel,
-		},
-		EnabledSelfInsertEncryptionKey: &enabledSelfInsertEncryptionKey,
-	}
-
-	return utils.SendProtobufResponse(c, res)
-}
-
 // HandleVerifyHeaderToken is a middleware to verify the Authorization header token.
 func (ac *AuthController) HandleVerifyHeaderToken(c *fiber.Ctx) error {
 	authToken := c.Get("Authorization")
@@ -171,4 +93,80 @@ func (ac *AuthController) HandleVerifyHeaderToken(c *fiber.Ctx) error {
 	c.Locals("requestedUserId", claims.UserId)
 
 	return c.Next()
+}
+
+// HandleVerifyToken verifies a user's token before they join a room.
+func (ac *AuthController) HandleVerifyToken(c *fiber.Ctx) error {
+	roomId := c.Locals("roomId").(string)
+	requestedUserId := c.Locals("requestedUserId").(string)
+
+	req := new(plugnmeet.VerifyTokenReq)
+	err := proto.Unmarshal(c.Body(), req)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	// check for duplicate join
+	status, err := ac.NatsService.GetRoomUserStatus(roomId, requestedUserId)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+	if status == "" {
+		return utils.SendCommonProtobufResponse(c, false, "notifications.user-info-not-found")
+	} else if status == natsservice.UserStatusOnline {
+		return utils.SendCommonProtobufResponse(c, false, "notifications.room-disconnected-duplicate-entry")
+	}
+
+	exist := ac.NatsService.IsUserExistInBlockList(roomId, requestedUserId)
+	if exist {
+		return utils.SendCommonProtobufResponse(c, false, "notifications.you-are-blocked")
+	}
+
+	rr, rInfo, meta := ac.RoomModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{
+		RoomId: roomId,
+	})
+
+	if !rr.GetIsActive() {
+		return utils.SendCommonProtobufResponse(c, false, "notifications.room-not-active")
+	}
+
+	// rInfo and meta are guaranteed to be non-nil if IsActive is true.
+	if rInfo.MaxParticipants > 0 {
+		onlineUsers, err := ac.NatsService.GetOnlineUsersId(roomId)
+		if err != nil {
+			return utils.SendCommonProtobufResponse(c, false, err.Error())
+		}
+		if int64(len(onlineUsers)) >= int64(rInfo.MaxParticipants) {
+			return utils.SendCommonProtobufResponse(c, false, "notifications.max-num-participates-exceeded")
+		}
+	}
+
+	enabledSelfInsertEncryptionKey := false
+	if meta.RoomFeatures.EndToEndEncryptionFeatures.IsEnabled {
+		enabledSelfInsertEncryptionKey = meta.RoomFeatures.EndToEndEncryptionFeatures.EnabledSelfInsertEncryptionKey
+	}
+
+	v := version.Version
+	natsSubjs := ac.AppConfig.NatsInfo.Subjects
+	res := &plugnmeet.VerifyTokenRes{
+		Status:         true,
+		Msg:            "token is valid",
+		NatsWsUrls:     ac.AppConfig.NatsInfo.NatsWSUrls,
+		ServerVersion:  &v,
+		RoomId:         &roomId,
+		UserId:         &requestedUserId,
+		RoomStreamName: &ac.AppConfig.NatsInfo.RoomStreamName,
+		NatsSubjects: &plugnmeet.NatsSubjects{
+			SystemApiWorker: natsSubjs.SystemApiWorker,
+			SystemJsWorker:  natsSubjs.SystemJsWorker,
+			SystemPublic:    natsSubjs.SystemPublic,
+			SystemPrivate:   natsSubjs.SystemPrivate,
+			Chat:            natsSubjs.Chat,
+			Whiteboard:      natsSubjs.Whiteboard,
+			DataChannel:     natsSubjs.DataChannel,
+		},
+		EnabledSelfInsertEncryptionKey: &enabledSelfInsertEncryptionKey,
+	}
+
+	return utils.SendProtobufResponse(c, res)
 }

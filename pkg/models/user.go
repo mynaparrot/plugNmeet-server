@@ -1,9 +1,6 @@
 package models
 
 import (
-	"errors"
-
-	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
@@ -34,17 +31,4 @@ func NewUserModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redi
 		am:             am,
 		logger:         logger.WithField("model", "user"),
 	}
-}
-
-func (m *UserModel) CommonValidation(c *fiber.Ctx) error {
-	isAdmin := c.Locals("isAdmin")
-	roomId := c.Locals("roomId")
-	if isAdmin != true {
-		return errors.New(config.OnlyAdminCanRequest)
-	}
-	if roomId == "" {
-		return errors.New(config.NoRoomIdInToken)
-	}
-
-	return nil
 }
