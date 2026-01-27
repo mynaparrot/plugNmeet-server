@@ -52,12 +52,18 @@ func (m *NatsModel) HandleInitialData(roomId, userId string) {
 	}
 }
 
-func (m *NatsModel) HandleSendUsersList(roomId, userId string) {
+func (m *NatsModel) HandleSendUsersList(roomId, userId string, event *plugnmeet.NatsMsgServerToClientEvents) {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId": roomId,
 		"userId": userId,
 		"method": "HandleSendUsersList",
 	})
+
+	// Default to the original event if none is provided, for backward compatibility.
+	if event == nil {
+		e := plugnmeet.NatsMsgServerToClientEvents_RES_JOINED_USERS_LIST
+		event = &e
+	}
 
 	users, err := m.natsService.GetOnlineUsersListAsJson(roomId)
 	if err != nil {
@@ -66,9 +72,9 @@ func (m *NatsModel) HandleSendUsersList(roomId, userId string) {
 	}
 
 	if users != nil {
-		err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_RES_JOINED_USERS_LIST, roomId, users, &userId)
+		err = m.natsService.BroadcastSystemEventToRoom(*event, roomId, users, &userId)
 		if err != nil {
-			log.WithError(err).Warnln("error sending RES_JOINED_USERS_LIST event")
+			log.WithError(err).Warnf("error sending event %s", event.String())
 		}
 	}
 }

@@ -44,7 +44,7 @@ func (m *NatsModel) HandleFromClientToServerReq(roomId, userId string, req *plug
 	case plugnmeet.NatsMsgClientToServerEvents_REQ_INITIAL_DATA:
 		m.HandleInitialData(roomId, userId)
 	case plugnmeet.NatsMsgClientToServerEvents_REQ_JOINED_USERS_LIST:
-		m.HandleSendUsersList(roomId, userId)
+		m.HandleSendUsersList(roomId, userId, nil)
 	case plugnmeet.NatsMsgClientToServerEvents_REQ_MEDIA_SERVER_DATA:
 		m.HandleMediaServerInfo(roomId, userId, true)
 	case plugnmeet.NatsMsgClientToServerEvents_PING:
@@ -63,5 +63,8 @@ func (m *NatsModel) HandleFromClientToServerReq(roomId, userId string, req *plug
 			return
 		}
 		m.analyticsModel.HandleEvent(ad)
+	case plugnmeet.NatsMsgClientToServerEvents_REQ_ONLINE_USERS_LIST:
+		event := plugnmeet.NatsMsgServerToClientEvents_RESP_ONLINE_USERS_LIST
+		m.HandleSendUsersList(roomId, userId, &event)
 	}
 }
