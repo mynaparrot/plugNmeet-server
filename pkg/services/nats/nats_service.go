@@ -48,16 +48,18 @@ type NatsService struct {
 
 func New(ctx context.Context, app *config.AppConfig, logger *logrus.Logger) *NatsService {
 	log := logger.WithField("service", "nats")
-	cs := newNatsCacheService(ctx, log)
-
-	return &NatsService{
+	s := &NatsService{
 		ctx:    ctx,
 		app:    app,
 		nc:     app.NatsConn,
 		js:     app.JetStream,
-		cs:     cs,
+		cs:     newNatsCacheService(ctx, log),
 		logger: log,
 	}
+	s.ensureEtherpadBucket()
+	s.createRoomNatsStream()
+
+	return s
 }
 
 // formatConsolidatedRoomBucket generates the bucket name for a consolidated room.

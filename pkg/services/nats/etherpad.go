@@ -27,21 +27,21 @@ func formatEtherpadTokenKey(nodeId string) string {
 }
 
 // ensureEtherpadBucket creates the consolidated etherpad bucket if it doesn't exist.
-func (s *NatsService) ensureEtherpadBucket() (jetstream.KeyValue, error) {
-	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
+func (s *NatsService) ensureEtherpadBucket() {
+	_, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
 		Replicas:       s.app.NatsInfo.NumReplicas,
 		Bucket:         EtherpadBucket,
 		LimitMarkerTTL: time.Second,
 	})
 	if err != nil {
-		return nil, err
+		s.logger.WithError(err).Fatalf("failed to create %s bucket", EtherpadBucket)
 	}
-	return kv, nil
+	s.logger.Infof("successfully created %s bucket", EtherpadBucket)
 }
 
 // AddRoomInEtherpad records that a room is active on a specific etherpad node.
 func (s *NatsService) AddRoomInEtherpad(nodeId, roomId string) error {
-	kv, err := s.ensureEtherpadBucket()
+	kv, err := s.js.KeyValue(s.ctx, EtherpadBucket)
 	if err != nil {
 		return fmt.Errorf("failed to get etherpad bucket: %w", err)
 	}
@@ -102,7 +102,7 @@ func (s *NatsService) RemoveRoomFromEtherpad(nodeId, roomId string) error {
 
 // AddEtherpadToken stores a temporary access token with a specific TTL on the key.
 func (s *NatsService) AddEtherpadToken(nodeId, token string, expiration time.Duration) error {
-	kv, err := s.ensureEtherpadBucket()
+	kv, err := s.js.KeyValue(s.ctx, EtherpadBucket)
 	if err != nil {
 		return fmt.Errorf("failed to get etherpad bucket: %w", err)
 	}
