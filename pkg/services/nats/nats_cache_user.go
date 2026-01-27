@@ -10,13 +10,16 @@ import (
 
 // updateUserInfoCache is called by the smart watcher dispatcher to update the unified user info cache.
 func (ncs *NatsCacheService) updateUserInfoCache(entry jetstream.KeyValueEntry, roomId, userId, field string) {
-	ncs.roomUsersInfoLock.Lock()
-	defer ncs.roomUsersInfoLock.Unlock()
+	ncs.roomLock.Lock()
+	defer ncs.roomLock.Unlock()
 
 	room, roomOk := ncs.roomUsersInfoStore[roomId]
 	if !roomOk {
-		room = make(map[string]CachedUserInfoEntry)
-		ncs.roomUsersInfoStore[roomId] = room
+		// This can happen if the room was cleaned up just after the event was dispatched.
+		// We should not create it manually as UserInfo map belongs to a room
+		// and should only be created when we'll create room map e.g. in addRoomWatcher
+		// It's safe to just return.
+		return
 	}
 
 	user, userOk := room[userId]
@@ -58,12 +61,10 @@ func (ncs *NatsCacheService) updateUserInfoCache(entry jetstream.KeyValueEntry, 
 
 // getCachedRoomUserStatus reads the user status from the unified cache.
 func (ncs *NatsCacheService) getCachedRoomUserStatus(roomId, userId string) string {
-	ncs.roomUsersInfoLock.RLock()
-	defer ncs.roomUsersInfoLock.RUnlock()
+	ncs.roomLock.RLock()
+	defer ncs.roomLock.RUnlock()
 	if rm, found := ncs.roomUsersInfoStore[roomId]; found {
 		if entry, ok := rm[userId]; ok {
-			// Note: Revision is no longer tracked for individual status, so we return 0.
-			// This is acceptable as the watcher guarantees we have the latest state.
 			return entry.Status
 		}
 	}
@@ -72,8 +73,8 @@ func (ncs *NatsCacheService) getCachedRoomUserStatus(roomId, userId string) stri
 
 // getRoomUserIds reads user IDs from the unified cache, filtering by status.
 func (ncs *NatsCacheService) getRoomUserIds(roomId, filterStatus string) []string {
-	ncs.roomUsersInfoLock.RLock()
-	defer ncs.roomUsersInfoLock.RUnlock()
+	ncs.roomLock.RLock()
+	defer ncs.roomLock.RUnlock()
 
 	var usersIds []string
 	if rm, found := ncs.roomUsersInfoStore[roomId]; found {
@@ -90,8 +91,8 @@ func (ncs *NatsCacheService) getRoomUserIds(roomId, filterStatus string) []strin
 
 // getUserInfo is a simple reader for the cache.
 func (ncs *NatsCacheService) getUserInfo(roomId, userId string) *plugnmeet.NatsKvUserInfo {
-	ncs.roomUsersInfoLock.RLock()
-	defer ncs.roomUsersInfoLock.RUnlock()
+	ncs.roomLock.RLock()
+	defer ncs.roomLock.RUnlock()
 	if rm, found := ncs.roomUsersInfoStore[roomId]; found {
 		if entry, ok := rm[userId]; ok && entry.UserInfo != nil {
 			infoCopy := proto.Clone(entry.UserInfo).(*plugnmeet.NatsKvUserInfo)
@@ -104,8 +105,8 @@ func (ncs *NatsCacheService) getUserInfo(roomId, userId string) *plugnmeet.NatsK
 // getCachedUserMetadata retrieves only the user's metadata string from the cache.
 // It returns the metadata and a boolean indicating if it was found.
 func (ncs *NatsCacheService) getCachedUserMetadata(roomId, userId string) (string, bool) {
-	ncs.roomUsersInfoLock.RLock()
-	defer ncs.roomUsersInfoLock.RUnlock()
+	ncs.roomLock.RLock()
+	defer ncs.roomLock.RUnlock()
 	if rm, found := ncs.roomUsersInfoStore[roomId]; found {
 		if entry, ok := rm[userId]; ok && entry.UserInfo != nil {
 			return entry.UserInfo.Metadata, true
@@ -117,8 +118,8 @@ func (ncs *NatsCacheService) getCachedUserMetadata(roomId, userId string) (strin
 // isUserBlacklistedFromCache is a simple reader for the cache.
 // It returns the status, and a boolean indicating if the value was found in the cache.
 func (ncs *NatsCacheService) isUserBlacklistedFromCache(roomId, userId string) (isBlocked bool, foundInCache bool) {
-	ncs.roomUsersInfoLock.RLock()
-	defer ncs.roomUsersInfoLock.RUnlock()
+	ncs.roomLock.RLock()
+	defer ncs.roomLock.RUnlock()
 	if rm, found := ncs.roomUsersInfoStore[roomId]; found {
 		if entry, ok := rm[userId]; ok {
 			return entry.IsBlacklisted, true
@@ -129,8 +130,8 @@ func (ncs *NatsCacheService) isUserBlacklistedFromCache(roomId, userId string) (
 
 // getUserLastPingAt is a simple reader for the cache.
 func (ncs *NatsCacheService) getUserLastPingAt(roomId, userId string) int64 {
-	ncs.roomUsersInfoLock.RLock()
-	defer ncs.roomUsersInfoLock.RUnlock()
+	ncs.roomLock.RLock()
+	defer ncs.roomLock.RUnlock()
 	if rm, found := ncs.roomUsersInfoStore[roomId]; found {
 		if entry, ok := rm[userId]; ok {
 			return int64(entry.LastPingAt)

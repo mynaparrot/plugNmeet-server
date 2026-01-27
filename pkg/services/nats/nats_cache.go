@@ -29,10 +29,9 @@ type NatsCacheService struct {
 	serviceCancel context.CancelFunc
 	logger        *logrus.Entry
 
-	roomLock       sync.RWMutex
-	roomsInfoStore map[string]CachedRoomEntry
-
-	roomUsersInfoLock  sync.RWMutex
+	// Single lock to protect all room-related cache maps
+	roomLock           sync.RWMutex
+	roomsInfoStore     map[string]CachedRoomEntry
 	roomUsersInfoStore map[string]map[string]CachedUserInfoEntry
 }
 
@@ -61,11 +60,11 @@ func (ncs *NatsCacheService) addRoomWatcher(kv jetstream.KeyValue, bucket, roomI
 
 	ncs.roomLock.Lock()
 	if _, ok := ncs.roomsInfoStore[roomId]; ok {
-		ncs.roomLock.Unlock()
-		return // Already watching
+		ncs.roomLock.Unlock() // Release lock before returning
+		return                // Already watching
 	}
 
-	// Initialize all cache stores for this room at once.
+	// Initialize both cache stores for this room at once under the same lock.
 	stopChan := make(chan struct{})
 	ncs.roomsInfoStore[roomId] = CachedRoomEntry{
 		RoomInfo: new(plugnmeet.NatsKvRoomInfo),
@@ -78,7 +77,9 @@ func (ncs *NatsCacheService) addRoomWatcher(kv jetstream.KeyValue, bucket, roomI
 	watcher, err := kv.WatchAll(ncs.serviceCtx, opts...)
 	if err != nil {
 		log.WithError(err).Errorln("Error starting NATS KV smart watcher")
-		ncs.cleanRoomCache(roomId) // Clean up all related caches
+		// If watcher fails, clean up the entries we just created.
+		// cleanRoomCache handles its own locking.
+		ncs.cleanRoomCache(roomId)
 		return
 	}
 	log.Infof("NATS KV smart watcher for room started")

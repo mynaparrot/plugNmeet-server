@@ -87,7 +87,5 @@ func (ncs *NatsCacheService) cleanRoomCacheUnsafe(roomID string) {
 	delete(ncs.roomsInfoStore, roomID)
 
 	// Also clean the unified user info cache for this room.
-	ncs.roomUsersInfoLock.Lock()
 	delete(ncs.roomUsersInfoStore, roomID)
-	ncs.roomUsersInfoLock.Unlock()
 }
