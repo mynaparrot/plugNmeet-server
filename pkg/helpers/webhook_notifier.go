@@ -10,7 +10,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/webhook"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
-	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
@@ -27,7 +26,6 @@ type WebhookNotifier struct {
 	ds                   *dbservice.DatabaseService
 	rs                   *redisservice.RedisService
 	app                  *config.AppConfig
-	natsService          *natsservice.NatsService
 	isEnabled            bool
 	enabledForPerMeeting bool
 	defaultUrl           string
@@ -43,12 +41,12 @@ type webhookRedisFields struct {
 	PerformDeleting bool     `json:"perform_deleting"`
 }
 
-func newWebhookNotifier(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, natsService *natsservice.NatsService, logger *logrus.Logger) *WebhookNotifier {
+func NewWebhookNotifier(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, logger *logrus.Logger) *WebhookNotifier {
 	w := &WebhookNotifier{
 		ctx:                  ctx,
 		app:                  app,
 		ds:                   ds,
-		natsService:          natsService,
+		rs:                   rs,
 		isEnabled:            app.Client.WebhookConf.Enable,
 		enabledForPerMeeting: app.Client.WebhookConf.EnableForPerMeeting,
 		defaultUrl:           app.Client.WebhookConf.Url,
@@ -64,7 +62,7 @@ func newWebhookNotifier(ctx context.Context, app *config.AppConfig, ds *dbservic
 
 // subscribeToCleanup listens for cleanup messages broadcast to all servers.
 func (w *WebhookNotifier) subscribeToCleanup() {
-	_, err := w.app.NatsConn.Subscribe(natsservice.WebhookCleanupSubject, func(m *nats.Msg) {
+	_, err := w.app.NatsConn.Subscribe(redisservice.WebhookCleanupSubject, func(m *nats.Msg) {
 		roomId := string(m.Data) // Make a copy of the data
 		w.logger.WithFields(logrus.Fields{
 			"room_id": roomId,
@@ -207,7 +205,7 @@ func (w *WebhookNotifier) DeleteWebhook(roomId string) error {
 
 	// Broadcast a cleanup message to all servers in the cluster.
 	// Only the server running the worker for this room will act on it.
-	err = w.app.NatsConn.Publish(natsservice.WebhookCleanupSubject, []byte(roomId))
+	err = w.app.NatsConn.Publish(redisservice.WebhookCleanupSubject, []byte(roomId))
 	if err != nil {
 		w.logger.WithFields(logrus.Fields{
 			"room_id": roomId,
@@ -215,7 +213,7 @@ func (w *WebhookNotifier) DeleteWebhook(roomId string) error {
 		}).WithError(err).Error("failed to publish webhook cleanup")
 	}
 
-	return w.natsService.DeleteWebhookData(roomId)
+	return w.rs.DeleteWebhookData(roomId)
 }
 
 func (w *WebhookNotifier) SendWebhookEvent(event *plugnmeet.CommonNotifyEvent) error {
@@ -293,7 +291,7 @@ func (w *WebhookNotifier) saveData(roomId string, d *webhookRedisFields) error {
 	}
 
 	// we'll simply override any existing value & put new
-	err = w.natsService.AddWebhookData(roomId, marshal)
+	err = w.rs.AddWebhookData(roomId, marshal)
 	if err != nil {
 		return err
 	}
@@ -302,7 +300,7 @@ func (w *WebhookNotifier) saveData(roomId string, d *webhookRedisFields) error {
 }
 
 func (w *WebhookNotifier) getData(roomId string) (*webhookRedisFields, error) {
-	data, err := w.natsService.GetWebhookData(roomId)
+	data, err := w.rs.GetWebhookData(roomId)
 	if err != nil {
 		return nil, err
 	}
@@ -318,15 +316,4 @@ func (w *WebhookNotifier) getData(roomId string) (*webhookRedisFields, error) {
 	}
 
 	return d, nil
-}
-
-var webhookNotifier *WebhookNotifier
-
-func GetWebhookNotifier(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, natsService *natsservice.NatsService, logger *logrus.Logger) *WebhookNotifier {
-	if webhookNotifier != nil {
-		return webhookNotifier
-	}
-	webhookNotifier = newWebhookNotifier(ctx, app, ds, natsService, logger)
-
-	return webhookNotifier
 }

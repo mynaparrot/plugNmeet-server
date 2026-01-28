@@ -29,7 +29,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	client := appConfig.RDS
 	redisService := redisservice.New(ctx, client, logger)
 	natsService := natsservice.New(ctx, appConfig, logger)
-	webhookNotifier := helpers.GetWebhookNotifier(ctx, appConfig, databaseService, natsService, logger)
+	webhookNotifier := helpers.NewWebhookNotifier(ctx, appConfig, databaseService, redisService, logger)
 	analyticsModel := models.NewAnalyticsModel(ctx, appConfig, databaseService, redisService, natsService, webhookNotifier, logger)
 	artifactModel := provideArtifactModel(ctx, appConfig, databaseService, redisService, natsService, webhookNotifier, analyticsModel)
 	analyticsController := controllers.NewAnalyticsController(analyticsModel, artifactModel)
@@ -98,7 +98,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 var serviceSet = wire.NewSet(dbservice.New, redisservice.New, natsservice.New, livekitservice.New)
 
 // build the dependency set for helpers
-var helperSet = wire.NewSet(helpers.GetWebhookNotifier)
+var helperSet = wire.NewSet(helpers.NewWebhookNotifier)
 
 func provideBreakoutRoomModel(rm *models.RoomModel) *models.BreakoutRoomModel {
 

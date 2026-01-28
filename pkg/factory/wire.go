@@ -27,7 +27,7 @@ var serviceSet = wire.NewSet(
 
 // build the dependency set for helpers
 var helperSet = wire.NewSet(
-	helpers.GetWebhookNotifier,
+	helpers.NewWebhookNotifier,
 )
 
 func provideBreakoutRoomModel(rm *models.RoomModel) *models.BreakoutRoomModel {
