@@ -37,7 +37,6 @@ func (s *NatsService) GetAllActiveRecorders() []*utils.RecorderInfo {
 	// Group keys by recorderId
 	recorderKeys := make(map[string]map[string]string)
 	for key := range keys.Keys() {
-		// Use the new utils function
 		recorderId, field, ok := utils.ParseRecorderKey(key)
 		if !ok {
 			continue
@@ -94,7 +93,6 @@ func (s *NatsService) GetRecorderInfo(recorderId string) (*utils.RecorderInfo, e
 	progressField := fmt.Sprintf("%d", plugnmeet.RecorderInfoKeys_RECORDER_INFO_CURRENT_PROGRESS)
 	lastPingField := fmt.Sprintf("%d", plugnmeet.RecorderInfoKeys_RECORDER_INFO_LAST_PING)
 
-	// Use the new utils function
 	maxLimitKey := utils.FormatRecorderKey(recorderId, maxLimitField)
 	progressKey := utils.FormatRecorderKey(recorderId, progressField)
 	pingKey := utils.FormatRecorderKey(recorderId, lastPingField)
