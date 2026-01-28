@@ -93,7 +93,7 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 	}
 
 	if data.GetName() == config.RecorderUserAuthName {
-		s.setPermissionForRecorder(data, claims)
+		s.setPermissionForRecorder(claims)
 		return claims, nil
 	}
 
@@ -105,15 +105,13 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 	return claims, nil
 }
 
-func (s *NatsAuthController) setPermissionForRecorder(data *plugnmeet.PlugNmeetTokenClaims, claims *jwt.UserClaims) {
+func (s *NatsAuthController) setPermissionForRecorder(claims *jwt.UserClaims) {
 	pubAllow := jwt.StringList{
 		"$JS.API.INFO",
 		"_INBOX.>", // otherwise won't be able to send respond msg
-		fmt.Sprintf("$JS.API.STREAM.INFO.KV_%s-%s", s.app.NatsInfo.Recorder.RecorderInfoKv, data.GetUserId()),
-		fmt.Sprintf("$JS.API.STREAM.UPDATE.KV_%s-%s", s.app.NatsInfo.Recorder.RecorderInfoKv, data.GetUserId()),
-		fmt.Sprintf("$JS.API.STREAM.CREATE.KV_%s-%s", s.app.NatsInfo.Recorder.RecorderInfoKv, data.GetUserId()),
-		fmt.Sprintf("$KV.%s-%s.>", s.app.NatsInfo.Recorder.RecorderInfoKv, data.GetUserId()),
-		fmt.Sprintf("$JS.API.DIRECT.GET.KV_%s-%s.>", s.app.NatsInfo.Recorder.RecorderInfoKv, data.GetUserId()),
+		fmt.Sprintf("$JS.API.STREAM.INFO.KV_%s", s.app.NatsInfo.Recorder.RecorderInfoKv),
+		fmt.Sprintf("$KV.%s.>", s.app.NatsInfo.Recorder.RecorderInfoKv),
+		fmt.Sprintf("$JS.API.DIRECT.GET.KV_%s.>", s.app.NatsInfo.Recorder.RecorderInfoKv),
 		// Allow publishing the job to the stream
 		s.app.NatsInfo.Recorder.TranscodingJobs,
 		// Allow fetching the next message from the consumer & send ack

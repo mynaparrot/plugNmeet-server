@@ -57,6 +57,7 @@ func New(ctx context.Context, app *config.AppConfig, logger *logrus.Logger) *Nat
 		logger: log,
 	}
 	s.createRoomNatsStream()
+	s.createRecorderKV()
 
 	return s
 }
