@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
@@ -38,7 +39,6 @@ const (
 	// nats connection event queue
 	natsConnectionEventQueueGroup = prefix + "conn-event-queue"
 	websocketClientType           = "websocket"
-	transcoderConsumerDurable     = "transcoderWorker"
 )
 
 type natsJob struct {
@@ -119,7 +119,7 @@ func (c *NatsController) BootUp(ctx context.Context, wg *sync.WaitGroup) {
 	}
 
 	_, err = transcoderStream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
-		Durable:   transcoderConsumerDurable,
+		Durable:   utils.TranscoderConsumerDurable,
 		AckPolicy: jetstream.AckExplicitPolicy,
 	})
 	if err != nil {

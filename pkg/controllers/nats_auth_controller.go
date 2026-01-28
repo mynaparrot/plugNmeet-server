@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
@@ -115,9 +116,9 @@ func (s *NatsAuthController) setPermissionForRecorder(claims *jwt.UserClaims) {
 		// Allow publishing the job to the stream
 		s.app.NatsInfo.Recorder.TranscodingJobs,
 		// Allow fetching the next message from the consumer & send ack
-		fmt.Sprintf("$JS.API.CONSUMER.MSG.NEXT.%s.%s", s.app.NatsInfo.Recorder.TranscodingJobs, transcoderConsumerDurable),
-		fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.%s", s.app.NatsInfo.Recorder.TranscodingJobs, transcoderConsumerDurable),
-		fmt.Sprintf("$JS.ACK.%s.%s.>", s.app.NatsInfo.Recorder.TranscodingJobs, transcoderConsumerDurable),
+		fmt.Sprintf("$JS.API.CONSUMER.MSG.NEXT.%s.%s", s.app.NatsInfo.Recorder.TranscodingJobs, utils.TranscoderConsumerDurable),
+		fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.%s", s.app.NatsInfo.Recorder.TranscodingJobs, utils.TranscoderConsumerDurable),
+		fmt.Sprintf("$JS.ACK.%s.%s.>", s.app.NatsInfo.Recorder.TranscodingJobs, utils.TranscoderConsumerDurable),
 	}
 
 	claims.Permissions = jwt.Permissions{
