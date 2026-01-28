@@ -43,16 +43,16 @@ func (m *BreakoutRoomModel) GetMyBreakoutRooms(roomId, userId string) (*plugnmee
 }
 
 func (m *BreakoutRoomModel) fetchBreakoutRoom(roomId, breakoutRoomId string) (*plugnmeet.BreakoutRoom, error) {
-	result, err := m.natsService.GetBreakoutRoom(roomId, breakoutRoomId)
+	result, err := m.rs.GetBreakoutRoom(roomId, breakoutRoomId)
 	if err != nil {
 		return nil, err
 	}
-	if result == nil {
+	if result == "" {
 		return nil, errors.New("not info found")
 	}
 
 	room := new(plugnmeet.BreakoutRoom)
-	err = protojson.Unmarshal(result, room)
+	err = protojson.Unmarshal([]byte(result), room)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func (m *BreakoutRoomModel) fetchBreakoutRoom(roomId, breakoutRoomId string) (*p
 }
 
 func (m *BreakoutRoomModel) fetchBreakoutRooms(roomId string) ([]*plugnmeet.BreakoutRoom, error) {
-	rooms, err := m.natsService.GetAllBreakoutRoomsByParentRoomId(roomId)
+	rooms, err := m.rs.GetAllBreakoutRoomsByParentRoomId(roomId)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (m *BreakoutRoomModel) fetchBreakoutRooms(roomId string) ([]*plugnmeet.Brea
 	var breakoutRooms []*plugnmeet.BreakoutRoom
 	for i, r := range rooms {
 		room := new(plugnmeet.BreakoutRoom)
-		err := protojson.Unmarshal(r, room)
+		err := protojson.Unmarshal([]byte(r), room)
 		if err != nil {
 			continue
 		}

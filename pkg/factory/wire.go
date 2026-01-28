@@ -30,9 +30,9 @@ var helperSet = wire.NewSet(
 	helpers.GetWebhookNotifier,
 )
 
-func provideBreakoutRoomModel(rm *models.RoomModel, natsService *natsservice.NatsService) *models.BreakoutRoomModel {
+func provideBreakoutRoomModel(rm *models.RoomModel) *models.BreakoutRoomModel {
 	// we need to create BreakoutRoomModel first
-	bm := models.NewBreakoutRoomModel(rm, natsService)
+	bm := models.NewBreakoutRoomModel(rm)
 	// then set it to RoomModel to solve circular dependency
 	rm.SetBreakoutRoomModel(bm)
 	return bm

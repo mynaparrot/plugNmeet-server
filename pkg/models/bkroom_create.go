@@ -91,7 +91,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRooms
 			continue
 		}
 
-		err = m.natsService.InsertOrUpdateBreakoutRoom(r.RoomId, bRoom.RoomId, marshal)
+		err = m.rs.InsertOrUpdateBreakoutRoom(r.RoomId, bRoom.RoomId, marshal)
 		if err != nil {
 			roomLog.WithError(err).Error("failed to insert breakout room in nats")
 			e[bRoom.RoomId] = true
@@ -163,7 +163,7 @@ func (m *BreakoutRoomModel) PostTaskAfterRoomStartWebhook(roomId string, metadat
 		return err
 	}
 
-	err = m.natsService.InsertOrUpdateBreakoutRoom(metadata.ParentRoomId, roomId, marshal)
+	err = m.rs.InsertOrUpdateBreakoutRoom(metadata.ParentRoomId, roomId, marshal)
 	if err != nil {
 		log.WithError(err).Error("failed to update breakout room info in nats")
 		return err

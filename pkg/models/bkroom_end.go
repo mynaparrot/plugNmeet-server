@@ -17,12 +17,12 @@ func (m *BreakoutRoomModel) EndBreakoutRoom(ctx context.Context, r *plugnmeet.En
 	})
 	log.Infoln("request to end a single breakout room")
 
-	rm, err := m.natsService.GetBreakoutRoom(r.RoomId, r.BreakoutRoomId)
+	rm, err := m.rs.GetBreakoutRoom(r.RoomId, r.BreakoutRoomId)
 	if err != nil {
 		log.WithError(err).Error("failed to get breakout room from nats")
 		return err
 	}
-	if rm == nil {
+	if rm == "" {
 		err = errors.New("breakout room not found")
 		log.WithError(err).Warn()
 		return err
@@ -38,7 +38,7 @@ func (m *BreakoutRoomModel) EndAllBreakoutRoomsByParentRoomId(ctx context.Contex
 	})
 	log.Infoln("request to end all breakout rooms")
 
-	ids, err := m.natsService.GetBreakoutRoomIdsByParentRoomId(parentRoomId)
+	ids, err := m.rs.GetBreakoutRoomIdsByParentRoomId(parentRoomId)
 	if err != nil {
 		log.WithError(err).Error("failed to get breakout room ids from nats")
 		return err
@@ -64,7 +64,7 @@ func (m *BreakoutRoomModel) proceedToEndBkRoom(ctx context.Context, bkRoomId, pa
 		roomLog.WithField("endRoomMsg", msg).Error("failed to end breakout room via room model")
 	}
 
-	err := m.natsService.DeleteBreakoutRoom(parentRoomId, bkRoomId)
+	err := m.rs.DeleteBreakoutRoom(parentRoomId, bkRoomId)
 	if err != nil {
 		roomLog.WithError(err).Error("failed to delete breakout room from nats")
 	}
@@ -74,10 +74,10 @@ func (m *BreakoutRoomModel) proceedToEndBkRoom(ctx context.Context, bkRoomId, pa
 
 func (m *BreakoutRoomModel) onAfterBkRoomEnded(parentRoomId, bkRoomId string, log *logrus.Entry) {
 	log.Info("performing post-end tasks for breakout room")
-	if c, err := m.natsService.CountBreakoutRooms(parentRoomId); err == nil && c == 0 {
+	if c, err := m.rs.CountBreakoutRooms(parentRoomId); err == nil && c == 0 {
 		log.Info("last breakout room ended, cleaning up parent room metadata")
 		// no room left so, delete breakoutRoomKey key for this room
-		m.natsService.DeleteAllBreakoutRoomsByParentRoomId(parentRoomId)
+		m.rs.DeleteAllBreakoutRoomsByParentRoomId(parentRoomId)
 		_ = m.updateParentRoomMetadata(parentRoomId, log)
 	}
 	// notify to the room for updating list
@@ -132,7 +132,7 @@ func (m *BreakoutRoomModel) PostTaskAfterRoomEndWebhook(ctx context.Context, roo
 
 	if meta.IsBreakoutRoom {
 		log.Info("breakout room ended, cleaning up its records")
-		_ = m.natsService.DeleteBreakoutRoom(meta.ParentRoomId, roomId)
+		_ = m.rs.DeleteBreakoutRoom(meta.ParentRoomId, roomId)
 		m.onAfterBkRoomEnded(meta.ParentRoomId, roomId, log)
 	} else {
 		log.Info("parent room ended, ending all associated breakout rooms")

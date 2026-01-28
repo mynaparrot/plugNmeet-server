@@ -38,7 +38,7 @@ func (m *BreakoutRoomModel) IncreaseBreakoutRoomDuration(r *plugnmeet.IncreaseBr
 		return err
 	}
 
-	err = m.natsService.InsertOrUpdateBreakoutRoom(r.RoomId, r.BreakoutRoomId, marshal)
+	err = m.rs.InsertOrUpdateBreakoutRoom(r.RoomId, r.BreakoutRoomId, marshal)
 	if err != nil {
 		log.WithError(err).Error("failed to update breakout room in nats")
 		return err

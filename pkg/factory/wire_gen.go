@@ -45,7 +45,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	authController := controllers.NewAuthController(appConfig, natsService, authModel, roomModel)
 	bbbApiWrapperModel := models.NewBBBApiWrapperModel(appConfig, databaseService, redisService, recordingModel, logger)
 	bbbController := controllers.NewBBBController(appConfig, roomModel, userModel, bbbApiWrapperModel, recordingModel, natsService)
-	breakoutRoomModel := provideBreakoutRoomModel(roomModel, natsService)
+	breakoutRoomModel := provideBreakoutRoomModel(roomModel)
 	breakoutRoomController := controllers.NewBreakoutRoomController(breakoutRoomModel)
 	etherpadController := controllers.NewEtherpadController(appConfig, etherpadModel, roomModel, databaseService)
 	fileController := controllers.NewFileController(appConfig, fileModel, logger)
@@ -100,9 +100,9 @@ var serviceSet = wire.NewSet(dbservice.New, redisservice.New, natsservice.New, l
 // build the dependency set for helpers
 var helperSet = wire.NewSet(helpers.GetWebhookNotifier)
 
-func provideBreakoutRoomModel(rm *models.RoomModel, natsService *natsservice.NatsService) *models.BreakoutRoomModel {
+func provideBreakoutRoomModel(rm *models.RoomModel) *models.BreakoutRoomModel {
 
-	bm := models.NewBreakoutRoomModel(rm, natsService)
+	bm := models.NewBreakoutRoomModel(rm)
 
 	rm.SetBreakoutRoomModel(bm)
 	return bm
