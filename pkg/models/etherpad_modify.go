@@ -167,7 +167,7 @@ func (m *EtherpadModel) postToEtherpad(host *config.EtherpadInfo, method string,
 }
 
 func (m *EtherpadModel) getAccessToken(host *config.EtherpadInfo, log *logrus.Entry) (string, error) {
-	token, _ := m.natsService.GetEtherpadToken(host.Id)
+	token, _ := m.rs.GetEtherpadToken(host.Id)
 	if token != "" {
 		log.Debug("using cached etherpad access token")
 		return token, nil
@@ -224,7 +224,7 @@ func (m *EtherpadModel) getAccessToken(host *config.EtherpadInfo, log *logrus.En
 	}
 
 	// we'll store the value with expiry of 30-minute max
-	err = m.natsService.AddEtherpadToken(host.Id, vals.AccessToken, time.Minute*30)
+	err = m.rs.AddEtherpadToken(host.Id, vals.AccessToken, time.Minute*30)
 	if err != nil {
 		log.WithError(err).Warn("failed to cache etherpad access token")
 	}

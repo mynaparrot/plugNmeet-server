@@ -11,7 +11,6 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
 )
@@ -81,8 +80,8 @@ func formatVTTTimestamp(d time.Duration) string {
 
 // createSpeechTranscriptionFileArtifact creates a downloadable VTT artifact file
 func (m *ArtifactModel) createSpeechTranscriptionFileArtifact(roomId, roomSid string, roomTableId uint64, log *logrus.Entry) (artifactId *string, err error) {
-	// 1. Get all transcription chunks from NATS KV.
-	chunks, err := m.natsService.GetTranscriptionChunks(roomId)
+	// 1. Get all transcription chunks.
+	chunks, err := m.rs.GetTranscriptionHistory(roomId)
 	if err != nil {
 		return nil, err
 	}
@@ -90,15 +89,25 @@ func (m *ArtifactModel) createSpeechTranscriptionFileArtifact(roomId, roomSid st
 		return nil, nil // No chunks stored.
 	}
 
-	// 2. Clean up the NATS bucket.
-	m.natsService.DeleteTranscriptionBucket(roomId)
+	// 2. Clean up the history.
+	m.rs.DeleteTranscriptionHistory(roomId)
 
 	// 3. Sort keys chronologically.
 	keys := make([]string, 0, len(chunks))
 	for k := range chunks {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	sort.Slice(keys, func(i, j int) bool {
+		// Convert string keys to int64 for proper numerical comparison.
+		ts1, err1 := strconv.ParseInt(keys[i], 10, 64)
+		ts2, err2 := strconv.ParseInt(keys[j], 10, 64)
+		// If there's a parsing error, treat the key as "less" to avoid panics,
+		// though in practice, these keys should always be valid timestamps.
+		if err1 != nil || err2 != nil {
+			return keys[i] < keys[j]
+		}
+		return ts1 < ts2
+	})
 
 	// 4. Format the chunks into a VTT file.
 	var fileContent strings.Builder
@@ -109,8 +118,8 @@ func (m *ArtifactModel) createSpeechTranscriptionFileArtifact(roomId, roomSid st
 	var previousEndTime time.Duration
 
 	for i, key := range keys {
-		var chunk natsservice.TranscriptionChunk
-		if err := json.Unmarshal(chunks[key], &chunk); err != nil {
+		var chunk redisservice.TranscriptionChunk
+		if err := json.Unmarshal([]byte(chunks[key]), &chunk); err != nil {
 			continue // Skip corrupted data
 		}
 

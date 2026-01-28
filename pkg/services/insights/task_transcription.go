@@ -107,7 +107,7 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 						log.WithError(err).Errorln("error publishing to synthesis SynthesisNatsChannel")
 					}
 					if event.Result.AllowedTranscriptionStorage {
-						if err = t.natsService.AddTranscriptionChunk(roomId, userId, event.Result.FromUserName, event.Result.Lang, event.Result.Text); err != nil {
+						if err = t.redisService.AddTranscriptionToHistory(roomId, userId, event.Result.FromUserName, event.Result.Lang, event.Result.Text); err != nil {
 							log.WithError(err).Errorln("error adding transcription chunk")
 						}
 					}

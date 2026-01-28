@@ -2,6 +2,7 @@ package redisservice
 
 import (
 	"context"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
@@ -9,6 +10,7 @@ import (
 
 const (
 	Prefix          = "pnm:"
+	DefaultTTL      = time.Hour * 24
 	TotalUsageField = "total_usage"
 )
 

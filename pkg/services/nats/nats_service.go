@@ -56,7 +56,6 @@ func New(ctx context.Context, app *config.AppConfig, logger *logrus.Logger) *Nat
 		cs:     newNatsCacheService(ctx, log),
 		logger: log,
 	}
-	s.ensureEtherpadBucket()
 	s.createRoomNatsStream()
 
 	return s

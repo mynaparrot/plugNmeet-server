@@ -40,7 +40,7 @@ func (m *EtherpadModel) CleanPad(roomId, nodeId, padId string) error {
 	}
 
 	// add roomId to redis for this node
-	if err = m.natsService.RemoveRoomFromEtherpad(nodeId, roomId); err != nil {
+	if err = m.rs.RemoveEtherpadRoom(nodeId, roomId); err != nil {
 		log.WithError(err).Error("failed to remove room from etherpad nats store")
 	}
 
