@@ -5,7 +5,6 @@ import (
 
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 )
@@ -129,7 +128,7 @@ func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 	}
 
 	// now we'll perform a few service related tasks
-	time.Sleep(config.WaitBeforeTriggerOnAfterRoomEnded)
+	time.Sleep(time.Second)
 
 	// at the end we'll handle event notification
 	// send it first

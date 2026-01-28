@@ -112,8 +112,6 @@ func (m *WebhookModel) getRoomInfoFromNatsOrRedis(roomId string, log *logrus.Ent
 	if err != nil || rInfo == nil {
 		if err != nil {
 			log.WithError(err).Warnln("failed to get room info from NATS, falling back to redis")
-		} else {
-			log.Warnln("room not found in NATS, falling back to redis")
 		}
 
 		// Fallback to redis to retrieve room info
