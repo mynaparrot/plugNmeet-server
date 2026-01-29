@@ -36,7 +36,7 @@ func (m *RecordingModel) DispatchRecorderTask(req *plugnmeet.RecordingReq) error
 		log.Info("roomTableId is 0, fetching room info by sid")
 		rmInfo, _ := m.ds.GetRoomInfoBySid(req.Sid, nil)
 		if rmInfo == nil || rmInfo.IsRecording == 0 {
-			log.Warn("room not found by sid or is not in recording state, skipping")
+			log.Infoln("room not found by sid or is not in recording state, skipping")
 			return nil
 		}
 		req.RoomTableId = int64(rmInfo.ID)

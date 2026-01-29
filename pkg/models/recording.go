@@ -41,19 +41,15 @@ func (m *RecordingModel) ProcessRecorderEvent(r *plugnmeet.RecorderToPlugNmeet, 
 	switch r.Task {
 	case plugnmeet.RecordingTasks_START_RECORDING:
 		m.recordingStarted(r)
-		go m.sendToWebhookNotifier(r)
 
 	case plugnmeet.RecordingTasks_END_RECORDING:
 		m.recordingEnded(r)
-		go m.sendToWebhookNotifier(r)
 
 	case plugnmeet.RecordingTasks_START_RTMP:
 		m.rtmpStarted(r)
-		go m.sendToWebhookNotifier(r)
 
 	case plugnmeet.RecordingTasks_END_RTMP:
 		m.rtmpEnded(r)
-		go m.sendToWebhookNotifier(r)
 
 	case plugnmeet.RecordingTasks_RECORDING_PROCEEDED:
 		creation, err := m.addRecordingInfoToDB(r, roomInfo)
@@ -62,8 +58,9 @@ func (m *RecordingModel) ProcessRecorderEvent(r *plugnmeet.RecorderToPlugNmeet, 
 		}
 		// keep record of this file
 		m.addRecordingInfoFile(r, creation, roomInfo)
-		go m.sendToWebhookNotifier(r)
 	}
+
+	m.sendToWebhookNotifier(r)
 }
 
 func (m *RecordingModel) sendToWebhookNotifier(r *plugnmeet.RecorderToPlugNmeet) {
@@ -117,6 +114,9 @@ func (m *RecordingModel) sendToWebhookNotifier(r *plugnmeet.RecorderToPlugNmeet)
 		data.EventName = plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_RTMP_STATUS
 		val = plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()
 	}
-	data.HsetValue = &val
-	m.analyticsModel.HandleEvent(data)
+
+	if val != "" {
+		data.HsetValue = &val
+		m.analyticsModel.HandleEvent(data)
+	}
 }
