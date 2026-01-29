@@ -23,6 +23,9 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 		"roomSid":   sid,
 		"operation": "ExportAnalytics",
 	})
+
+	defer m.webhookNotifier.DeleteWebhook(roomId, log)
+
 	if m.app.AnalyticsSettings == nil || !m.app.AnalyticsSettings.Enabled {
 		log.Debug("analytics is disabled, skipping export")
 		return
@@ -96,7 +99,7 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 			log.WithError(err).Error("failed to create analytics artifact")
 		} else {
 			// notify
-			go m.sendToWebhookNotifier(room.RoomId, room.Sid, "analytics_proceeded", artifact.ArtifactId)
+			m.sendToWebhookNotifier(room.RoomId, room.Sid, "analytics_proceeded", artifact.ArtifactId)
 		}
 	} else {
 		log.Debug("analytics feature was not enabled for this room, file not saved to DB")

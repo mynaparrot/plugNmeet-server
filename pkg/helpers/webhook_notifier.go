@@ -3,7 +3,6 @@ package helpers
 import (
 	"context"
 	"sync"
-	"time"
 
 	"github.com/goccy/go-json"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -184,36 +183,37 @@ func (w *WebhookNotifier) RegisterWebhook(roomId, sid string) {
 	log.Info("successfully registered webhook")
 }
 
-func (w *WebhookNotifier) DeleteWebhook(roomId string) error {
-	// we'll wait long time before delete WebhookQueued
-	// to make sure that we've completed everything else
-	time.Sleep(config.MaxDurationWaitBeforeCleanRoomWebhook)
+// DeleteWebhook will clean up webhook data from redis as well local state
+// this should call when analytics export process completed
+func (w *WebhookNotifier) DeleteWebhook(roomId string, log *logrus.Entry) {
+	log = log.WithField("method", "DeleteWebhook")
 
 	d, err := w.getData(roomId)
 	if err != nil {
-		return err
+		log.WithError(err).Error("failed to get webhook data")
+		return
 	}
 	if d == nil {
 		// this meeting does not have any webhook url
-		return nil
+		return
 	}
 
 	if !d.PerformDeleting {
 		// this mean may be new session has been started for the same room
-		return nil
+		return
 	}
 
 	// Broadcast a cleanup message to all servers in the cluster.
 	// Only the server running the worker for this room will act on it.
 	err = w.app.NatsConn.Publish(redisservice.WebhookCleanupSubject, []byte(roomId))
 	if err != nil {
-		w.logger.WithFields(logrus.Fields{
-			"room_id": roomId,
-			"method":  "DeleteWebhook",
-		}).WithError(err).Error("failed to publish webhook cleanup")
+		log.WithError(err).Error("failed to publish webhook cleanup")
 	}
 
-	return w.rs.DeleteWebhookData(roomId)
+	err = w.rs.DeleteWebhookData(roomId)
+	if err != nil {
+		log.WithError(err).Error("failed to delete webhook data from redis")
+	}
 }
 
 func (w *WebhookNotifier) SendWebhookEvent(event *plugnmeet.CommonNotifyEvent) error {

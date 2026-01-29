@@ -14,8 +14,8 @@ const (
 
 	// all the time.Sleep() values
 	WaitBeforeTriggerOnAfterRoomEnded      = 10 * time.Second
+	WaitBeforeAnalyticsStartProcessing     = 50 * time.Second
 	WaitBeforeBreakoutRoomOnAfterRoomStart = 2 * time.Second
-	WaitBeforeAnalyticsStartProcessing     = 40 * time.Second
 	MaxDurationWaitBeforeCleanRoomWebhook  = 1 * time.Minute
 
 	DefaultWebhookQueueSize = 200

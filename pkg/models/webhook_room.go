@@ -131,13 +131,8 @@ func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 	time.Sleep(time.Second)
 
 	// at the end we'll handle event notification
-	// send it first
 	m.sendToWebhookNotifier(event)
 
-	// now clean up webhook for this room
-	err = m.webhookNotifier.DeleteWebhook(rInfo.RoomId)
-	if err != nil {
-		log.WithError(err).Errorln("failed to delete webhook registration")
-	}
 	log.Info("successfully processed room_finished webhook")
+	// webhook data will be clean after analytics export method call e.g. PrepareToExportAnalytics
 }
