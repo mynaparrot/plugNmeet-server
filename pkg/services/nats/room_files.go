@@ -42,8 +42,15 @@ func (s *NatsService) DeleteRoomFile(roomId, fileId string) error {
 	return kv.Purge(s.ctx, s.formatFileKey(fileId))
 }
 
-// GetRoomFile retrieves a specific file's metadata from the consolidated room bucket.
+// GetRoomFile retrieves a specific file's metadata.
+// It first checks the local cache, and falls back to a direct NATS KV lookup on a cache miss.
 func (s *NatsService) GetRoomFile(roomId, fileId string) (*plugnmeet.RoomUploadedFileMetadata, error) {
+	// Try to get from cache first for high performance.
+	if file, ok := s.cs.getCachedRoomFile(roomId, fileId); ok && file != nil {
+		return file, nil
+	}
+
+	// Fallback: If not in cache, fetch directly from NATS KV.
 	kv, err := s.js.KeyValue(s.ctx, s.formatConsolidatedRoomBucket(roomId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):
@@ -69,8 +76,15 @@ func (s *NatsService) GetRoomFile(roomId, fileId string) (*plugnmeet.RoomUploade
 	return meta, nil
 }
 
-// GetAllRoomFiles retrieves all file metadata for a given room from the consolidated bucket.
+// GetAllRoomFiles retrieves all file metadata for a given room.
+// It first checks the local cache, and falls back to a direct NATS KV lookup on a cache miss.
 func (s *NatsService) GetAllRoomFiles(roomId string) (map[string]*plugnmeet.RoomUploadedFileMetadata, error) {
+	// Try to get from cache first for high performance.
+	if files, ok := s.cs.getAllCachedRoomFiles(roomId); ok && len(files) > 0 {
+		return files, nil
+	}
+
+	// Fallback: If not in cache, fetch directly from NATS KV.
 	kv, err := s.js.KeyValue(s.ctx, s.formatConsolidatedRoomBucket(roomId))
 	switch {
 	case errors.Is(err, jetstream.ErrBucketNotFound):

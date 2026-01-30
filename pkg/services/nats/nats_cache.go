@@ -33,6 +33,7 @@ type NatsCacheService struct {
 	roomLock           sync.RWMutex
 	roomsInfoStore     map[string]CachedRoomEntry
 	roomUsersInfoStore map[string]map[string]CachedUserInfoEntry
+	roomFilesStore     map[string]map[string]*plugnmeet.RoomUploadedFileMetadata
 }
 
 func newNatsCacheService(ctx context.Context, log *logrus.Entry) *NatsCacheService {
@@ -42,6 +43,7 @@ func newNatsCacheService(ctx context.Context, log *logrus.Entry) *NatsCacheServi
 		serviceCancel:      cancel,
 		roomsInfoStore:     make(map[string]CachedRoomEntry),
 		roomUsersInfoStore: make(map[string]map[string]CachedUserInfoEntry),
+		roomFilesStore:     make(map[string]map[string]*plugnmeet.RoomUploadedFileMetadata),
 		logger:             log.WithField("sub-service", "nats-cache"),
 	}
 }
@@ -58,20 +60,22 @@ func (ncs *NatsCacheService) addRoomWatcher(kv jetstream.KeyValue, bucket, roomI
 		"room":   roomId,
 	})
 
+	// Acquire lock, do minimal work, release lock.
 	ncs.roomLock.Lock()
 	if _, ok := ncs.roomsInfoStore[roomId]; ok {
 		ncs.roomLock.Unlock() // Release lock before returning
-		return                // Already watching
+		return
 	}
 
-	// Initialize both cache stores for this room at once under the same lock.
+	// Initialize all cache stores for this room at once under the same lock.
 	stopChan := make(chan struct{})
 	ncs.roomsInfoStore[roomId] = CachedRoomEntry{
 		RoomInfo: new(plugnmeet.NatsKvRoomInfo),
 		stop:     stopChan,
 	}
 	ncs.roomUsersInfoStore[roomId] = make(map[string]CachedUserInfoEntry)
-	ncs.roomLock.Unlock()
+	ncs.roomFilesStore[roomId] = make(map[string]*plugnmeet.RoomUploadedFileMetadata)
+	ncs.roomLock.Unlock() // RELEASE LOCK HERE, before network operation
 
 	opts := []jetstream.WatchOpt{jetstream.IncludeHistory()}
 	watcher, err := kv.WatchAll(ncs.serviceCtx, opts...)
@@ -127,5 +131,8 @@ func (ncs *NatsCacheService) dispatchCacheUpdate(entry jetstream.KeyValueEntry, 
 				"roomId": roomId,
 			}).Warn("failed to parse user key in dispatchCacheUpdate")
 		}
+	case strings.HasPrefix(key, FileKeyPrefix):
+		fileId := strings.TrimPrefix(key, FileKeyPrefix)
+		ncs.updateRoomFilesCache(entry, roomId, fileId)
 	}
 }
