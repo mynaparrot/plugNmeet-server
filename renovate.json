@@ -4,5 +4,5 @@
     "config:base"
   ],
   "description": "Schedule to run only on Sunday at midnight to reduce noise during the week.",
-  "schedule": ["0 0 * * 0"]
+  "schedule": ["before 3am on sunday"]
 }
