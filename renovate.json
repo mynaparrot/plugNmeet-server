@@ -1,8 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:base"
-  ],
+  "extends": ["config:recommended"],
   "description": "Schedule to run only on Sunday at midnight to reduce noise during the week.",
   "schedule": ["before 3am on sunday"]
 }
