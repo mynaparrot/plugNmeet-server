@@ -23,7 +23,7 @@ func (ncs *NatsCacheService) updateRecorderCache(entry jetstream.KeyValueEntry) 
 	if entry.Operation() == jetstream.KeyValuePurge {
 		// Only log and delete if the entry actually still exists in our cache.
 		if _, exists := ncs.recordersStore[recorderId]; exists {
-			ncs.logger.Infof("recorder %s went offline, removing from local cache.", recorderId)
+			ncs.logger.Infof("recorder %s went offline, removing from local cache", recorderId)
 			delete(ncs.recordersStore, recorderId)
 		}
 		return
@@ -32,6 +32,7 @@ func (ncs *NatsCacheService) updateRecorderCache(entry jetstream.KeyValueEntry) 
 	// Get or create the recorder info in the cache
 	recorder, exists := ncs.recordersStore[recorderId]
 	if !exists {
+		ncs.logger.Infof("adding recorder %s to local cache", recorderId)
 		recorder = &utils.RecorderInfo{RecorderId: recorderId}
 		ncs.recordersStore[recorderId] = recorder
 	}
