@@ -52,6 +52,10 @@ func (s *NatsService) GetUserInfo(roomId, userId string) (*plugnmeet.NatsKvUserI
 	info.ReconnectedAt, _ = s.getUint64Value(kv, s.formatUserKey(userId, UserReconnectedAt))
 	info.DisconnectedAt, _ = s.getUint64Value(kv, s.formatUserKey(userId, UserDisconnectedAt))
 
+	// so, the room may not be started to watching yet, trigger here
+	// don't call watching directly from here, just call GetRoomInfo
+	_, _ = s.GetRoomInfo(roomId)
+
 	// The watcher is now on the consolidated bucket, started during room creation.
 	return info, nil
 }
