@@ -165,7 +165,10 @@ upload_file_settings:
 recorder_info:
   # This path must match the recorder's copy_to_dir > main_path setting.
   recording_files_path: "./recording_files"
+  # How long generated token will valid to download the file
   token_validity: 30m
+  # How long to wait before considering a recorder inactive. default: 8 seconds
+  ping_timeout: 8s
   # If true, deleted recordings will be moved to a backup directory instead of being immediately removed.
   # But it will be removed from the database only.
   # This allows recovery in case of accidental deletion.

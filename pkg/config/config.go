@@ -100,8 +100,11 @@ type UploadFileSettings struct {
 }
 
 type RecorderInfo struct {
-	RecordingFilesPath         string        `yaml:"recording_files_path"`
-	TokenValidity              time.Duration `yaml:"token_validity"`
+	RecordingFilesPath string `yaml:"recording_files_path"`
+	//How long generated token will valid to download the file
+	TokenValidity time.Duration `yaml:"token_validity"`
+	// How long to wait before considering a recorder inactive. default: 8 seconds
+	PingTimeout                time.Duration `yaml:"ping_timeout"`
 	EnableDelRecordingBackup   bool          `yaml:"enable_del_recording_backup"`
 	DelRecordingBackupPath     string        `yaml:"del_recording_backup_path"`
 	DelRecordingBackupDuration time.Duration `yaml:"del_recording_backup_duration"`
@@ -257,6 +260,9 @@ func New(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 	if strings.HasPrefix(appCnf.RecorderInfo.RecordingFilesPath, "./") {
 		appCnf.RecorderInfo.RecordingFilesPath = filepath.Join(appCnf.RootWorkingDir, appCnf.RecorderInfo.RecordingFilesPath)
 		appCnf.RecorderInfo.DelRecordingBackupPath = filepath.Join(appCnf.RootWorkingDir, appCnf.RecorderInfo.DelRecordingBackupPath)
+	}
+	if appCnf.RecorderInfo.PingTimeout == 0 {
+		appCnf.RecorderInfo.PingTimeout = time.Second * 8
 	}
 
 	// setup everything for artifacts

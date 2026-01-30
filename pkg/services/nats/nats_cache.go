@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/sirupsen/logrus"
 )
@@ -34,6 +35,10 @@ type NatsCacheService struct {
 	roomsInfoStore     map[string]CachedRoomEntry
 	roomUsersInfoStore map[string]map[string]CachedUserInfoEntry
 	roomFilesStore     map[string]map[string]*plugnmeet.RoomUploadedFileMetadata
+
+	// Lock for the global recorder store
+	recorderLock   sync.RWMutex
+	recordersStore map[string]*utils.RecorderInfo
 }
 
 func newNatsCacheService(ctx context.Context, log *logrus.Entry) *NatsCacheService {
@@ -44,6 +49,7 @@ func newNatsCacheService(ctx context.Context, log *logrus.Entry) *NatsCacheServi
 		roomsInfoStore:     make(map[string]CachedRoomEntry),
 		roomUsersInfoStore: make(map[string]map[string]CachedUserInfoEntry),
 		roomFilesStore:     make(map[string]map[string]*plugnmeet.RoomUploadedFileMetadata),
+		recordersStore:     make(map[string]*utils.RecorderInfo),
 		logger:             log.WithField("sub-service", "nats-cache"),
 	}
 }
@@ -135,4 +141,38 @@ func (ncs *NatsCacheService) dispatchCacheUpdate(entry jetstream.KeyValueEntry, 
 		fileId := strings.TrimPrefix(key, FileKeyPrefix)
 		ncs.updateRoomFilesCache(entry, roomId, fileId)
 	}
+}
+
+// watchRecorderKV will add a "smart" watcher for the global recorder info bucket.
+func (ncs *NatsCacheService) watchRecorderKV(kv jetstream.KeyValue, log *logrus.Entry) {
+	log = log.WithField("sub-service", "recorder-cache-watcher")
+
+	opts := []jetstream.WatchOpt{jetstream.IncludeHistory()}
+	watcher, err := kv.WatchAll(ncs.serviceCtx, opts...)
+	if err != nil {
+		log.WithError(err).Errorln("Error starting NATS KV recorder watcher")
+		return
+	}
+	log.Infof("NATS KV recorder watcher started for bucket: %s", kv.Bucket())
+
+	go func() {
+		defer func() {
+			log.Infof("NATS KV recorder watcher stopped")
+			_ = watcher.Stop()
+		}()
+
+		for {
+			select {
+			case <-ncs.serviceCtx.Done():
+				return
+			case entry, ok := <-watcher.Updates():
+				if !ok {
+					return // Channel closed
+				}
+				if entry != nil {
+					ncs.updateRecorderCache(entry)
+				}
+			}
+		}
+	}()
 }
