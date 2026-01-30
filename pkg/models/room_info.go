@@ -18,7 +18,7 @@ func (m *RoomModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoo
 		Msg:      "room is not active",
 	}
 
-	// NATS is now the single source of truth for this check.
+	// NATS is the single source of truth for this check.
 	rInfo, meta, err := m.natsService.GetRoomInfoWithMetadata(r.RoomId)
 	if err != nil {
 		res.Status = false
