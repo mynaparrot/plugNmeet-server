@@ -64,7 +64,7 @@ func (ncs *NatsCacheService) getCachedRoomMetadata(roomID string) (string, bool)
 	ncs.roomLock.RLock()
 	defer ncs.roomLock.RUnlock()
 	if cachedEntry, found := ncs.roomsInfoStore[roomID]; found && cachedEntry.RoomInfo != nil {
-		if cachedEntry.RoomInfo.Status == RoomStatusEnded {
+		if cachedEntry.RoomInfo.DbTableId == 0 || cachedEntry.RoomInfo.Status == RoomStatusEnded {
 			return "", false // Treat ended rooms as not found
 		}
 		return cachedEntry.RoomInfo.Metadata, true

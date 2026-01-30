@@ -108,7 +108,7 @@ func (ncs *NatsCacheService) getCachedUserMetadata(roomId, userId string) (strin
 	ncs.roomLock.RLock()
 	defer ncs.roomLock.RUnlock()
 	if rm, found := ncs.roomUsersInfoStore[roomId]; found {
-		if entry, ok := rm[userId]; ok && entry.UserInfo != nil {
+		if entry, ok := rm[userId]; ok && entry.UserInfo != nil && entry.UserInfo.Metadata != "" {
 			return entry.UserInfo.Metadata, true
 		}
 	}
