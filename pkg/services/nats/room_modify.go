@@ -27,7 +27,7 @@ const (
 )
 
 // AddRoom creates a new room entry in the NATS JetStream Key-Value store
-func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeout, maxParticipants *uint32, metadata *plugnmeet.RoomMetadata) error {
+func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeout, maxParticipants *uint32, metadata *plugnmeet.RoomMetadata) (string, error) {
 	// Create or update the key-value bucket for the room
 	bucket := s.formatConsolidatedRoomBucket(roomId)
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
@@ -36,7 +36,7 @@ func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeo
 		TTL:      DefaultTTL,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create or update KV bucket: %w", err)
+		return "", fmt.Errorf("failed to create or update KV bucket: %w", err)
 	}
 
 	// Set default values if not provided
@@ -52,7 +52,7 @@ func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeo
 	// Marshal metadata to string
 	mt, err := s.MarshalRoomMetadata(metadata)
 	if err != nil {
-		return fmt.Errorf("failed to marshal metadata: %w", err)
+		return "", fmt.Errorf("failed to marshal metadata: %w", err)
 	}
 
 	// Prepare room data
@@ -70,12 +70,12 @@ func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeo
 	// Store each key-value pair
 	for k, v := range data {
 		if _, err := kv.PutString(s.ctx, k, v); err != nil {
-			return fmt.Errorf("failed to store room data for key %s: %w", k, err)
+			return "", fmt.Errorf("failed to store room data for key %s: %w", k, err)
 		}
 	}
 	// add room to watcher
 	s.cs.addRoomWatcher(kv, bucket, roomId)
-	return nil
+	return mt, nil
 }
 
 // updateRoomMetadata updates the metadata of an existing room

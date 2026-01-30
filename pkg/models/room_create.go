@@ -112,17 +112,12 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 	}
 
 	// now create room bucket
-	err = m.natsService.AddRoom(roomDbInfo.ID, r.RoomId, sid, r.EmptyTimeout, r.MaxParticipants, r.Metadata)
+	mt, err := m.natsService.AddRoom(roomDbInfo.ID, r.RoomId, sid, r.EmptyTimeout, r.MaxParticipants, r.Metadata)
 	if err != nil {
 		log.WithError(err).Error("failed to add room to nats")
 		return nil, err
 	}
 	log.Info("room added to nats")
-
-	rInfo, err := m.natsService.GetRoomInfo(r.RoomId)
-	if err != nil || rInfo == nil {
-		return nil, fmt.Errorf("room not found in KV")
-	}
 
 	// preload whiteboard file if needed
 	if !r.Metadata.IsBreakoutRoom {
@@ -130,13 +125,13 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 	}
 
 	ari := &plugnmeet.ActiveRoomInfo{
-		RoomId:       rInfo.RoomId,
-		Sid:          rInfo.RoomSid,
+		RoomId:       r.RoomId,
+		Sid:          sid,
 		RoomTitle:    roomDbInfo.RoomTitle,
 		IsRunning:    1,
 		CreationTime: roomDbInfo.CreationTime,
 		WebhookUrl:   roomDbInfo.WebhookUrl,
-		Metadata:     rInfo.Metadata,
+		Metadata:     mt,
 	}
 
 	// create and send room_created webhook

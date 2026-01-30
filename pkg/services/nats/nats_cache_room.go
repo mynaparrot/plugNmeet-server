@@ -49,7 +49,7 @@ func (ncs *NatsCacheService) getCachedRoomInfo(roomID string) *plugnmeet.NatsKvR
 	ncs.roomLock.RLock()
 	defer ncs.roomLock.RUnlock()
 	if cachedEntry, found := ncs.roomsInfoStore[roomID]; found && cachedEntry.RoomInfo != nil {
-		if cachedEntry.RoomInfo.Status == RoomStatusEnded {
+		if cachedEntry.RoomInfo.DbTableId == 0 || cachedEntry.RoomInfo.Status == RoomStatusEnded {
 			return nil
 		}
 		infoCopy := proto.Clone(cachedEntry.RoomInfo).(*plugnmeet.NatsKvRoomInfo)
