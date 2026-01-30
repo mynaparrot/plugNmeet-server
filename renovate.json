@@ -3,5 +3,6 @@
   "extends": [
     "config:base"
   ],
-  "schedule": ["every weekend"]
+  "description": "Schedule to run only on Sunday at midnight to reduce noise during the week.",
+  "schedule": ["0 0 * * 0"]
 }
