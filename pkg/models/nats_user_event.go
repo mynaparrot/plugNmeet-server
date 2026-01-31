@@ -9,6 +9,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func (m *NatsModel) HandleInitialData(roomId, userId string) {
@@ -159,5 +160,29 @@ func (m *NatsModel) HandleClientPing(roomId, userId string) {
 	err := m.natsService.UpdateUserKeyValue(roomId, userId, natsservice.UserLastPingAt, fmt.Sprintf("%d", time.Now().UnixMilli()))
 	if err != nil {
 		m.logger.Errorln(fmt.Sprintf("error updating user last ping for %s; roomId: %s; msg: %s", userId, roomId, err.Error()))
+	}
+}
+
+// HandleToDeliveryPrivateData will work as a medium to deliver private messages
+// it will extract the header from message and deliver binary data to the user through private channel
+func (m *NatsModel) HandleToDeliveryPrivateData(roomId, userId string, req *plugnmeet.NatsMsgClientToServer) {
+	header := new(plugnmeet.PrivateDataDelivery)
+	err := protojson.Unmarshal([]byte(req.Msg), header)
+	if err != nil {
+		m.logger.WithError(err).Errorln("error unmarshalling private data header")
+		return
+	}
+
+	err = m.natsService.BroadcastSystemEventToRoomWithBinMsg(plugnmeet.NatsMsgServerToClientEvents_DELIVERY_PRIVATE_DATA, roomId, req.Msg, req.BinMsg, &header.ToUserId)
+	if err != nil {
+		m.logger.WithError(err).Errorf("error sending delivery private data to user %s", header.ToUserId)
+	}
+
+	// like chat messages need to send back to sender as well
+	if header.EchoToSender {
+		err = m.natsService.BroadcastSystemEventToRoomWithBinMsg(plugnmeet.NatsMsgServerToClientEvents_DELIVERY_PRIVATE_DATA, roomId, req.Msg, req.BinMsg, &userId)
+		if err != nil {
+			m.logger.WithError(err).Errorf("error sending delivery private data to sender user %s", userId)
+		}
 	}
 }

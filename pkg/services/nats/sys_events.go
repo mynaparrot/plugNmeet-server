@@ -72,6 +72,29 @@ func (s *NatsService) BroadcastSystemPubSubEventToRoom(event plugnmeet.NatsMsgSe
 	return s.nc.Publish(sub, message)
 }
 
+func (s *NatsService) BroadcastSystemEventToRoomWithBinMsg(event plugnmeet.NatsMsgServerToClientEvents, roomId, msg string, binMsg []byte, toUserId *string) error {
+	payload := plugnmeet.NatsMsgServerToClient{
+		Id:     uuid.NewString(),
+		Event:  event,
+		Msg:    msg,
+		BinMsg: binMsg,
+	}
+	message, err := proto.Marshal(&payload)
+	if err != nil {
+		return err
+	}
+	// Default to the public system subject for the room.
+	sub := fmt.Sprintf("%s.%s.system", s.app.NatsInfo.Subjects.SystemPublic, roomId)
+	if toUserId != nil {
+		// If a user ID is provided, target the private system subject for that user.
+		sub = fmt.Sprintf("%s.%s.%s.system", s.app.NatsInfo.Subjects.SystemPrivate, roomId, *toUserId)
+	}
+
+	// Explicitly publish to our stream to ensure delivery.
+	_, err = s.js.Publish(s.ctx, sub, message, jetstream.WithExpectStream(s.app.NatsInfo.RoomStreamName))
+	return err
+}
+
 func (s *NatsService) BroadcastSystemEventToEveryoneExceptUserId(event plugnmeet.NatsMsgServerToClientEvents, roomId string, data interface{}, exceptUserId string) error {
 	ids, err := s.GetOnlineUsersId(roomId)
 	if err != nil {
