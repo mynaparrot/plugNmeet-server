@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.1.2](https://github.com/mynaparrot/plugNmeet-server/compare/v2.1.1...v2.1.2) (2026-01-31)
+
+
+### Bug Fixes
+
+* deliver private messages routed by server through private channel ([e638788](https://github.com/mynaparrot/plugNmeet-server/commit/e6387888f3257169dfa770e658a4108ad2e9bd35))
+* fallback watching with `GetUserInfo` as well ([98c3006](https://github.com/mynaparrot/plugNmeet-server/commit/98c300637bb6a70e22a89b95528989b1b5f9b8b2))
+* more verification before getting from cache ([3782da1](https://github.com/mynaparrot/plugNmeet-server/commit/3782da13f97ef30503aca9b38bc30b45c6c3f7a0))
+
 ## [2.1.1](https://github.com/mynaparrot/plugNmeet-server/compare/v2.1.0...v2.1.1) (2026-01-30)
 
 
