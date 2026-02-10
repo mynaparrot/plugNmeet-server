@@ -157,9 +157,16 @@ func (m *NatsModel) HandleClientPing(roomId, userId string) {
 	// OnAfterUserJoined will check the current status and act if the user was not online.
 	m.OnAfterUserJoined(roomId, userId)
 
-	err := m.natsService.UpdateUserKeyValue(roomId, userId, natsservice.UserLastPingAt, fmt.Sprintf("%d", time.Now().UnixMilli()))
+	lastPing := fmt.Sprintf("%d", time.Now().UnixMilli())
+	err := m.natsService.UpdateUserKeyValue(roomId, userId, natsservice.UserLastPingAt, lastPing)
 	if err != nil {
 		m.logger.Errorln(fmt.Sprintf("error updating user last ping for %s; roomId: %s; msg: %s", userId, roomId, err.Error()))
+	}
+
+	// send pong back to the user time to make sure that both are connected
+	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_PONG, roomId, lastPing, &userId)
+	if err != nil {
+		m.logger.WithError(err).Warnln("failed to send PONG to user")
 	}
 }
 
