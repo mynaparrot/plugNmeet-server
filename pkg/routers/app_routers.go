@@ -63,7 +63,7 @@ func New(appConfig *config.AppConfig, ctrl *factory.ApplicationControllers) *fib
 
 	app.Use(rr.New())
 	app.Use(cors.New(cors.Config{
-		AllowMethods: "POST,GET,OPTIONS",
+		AllowMethods: "POST,GET,OPTIONS,HEAD",
 	}))
 	app.Static("/assets", appConfig.Client.Path+"/assets")
 	app.Static("/favicon.ico", appConfig.Client.Path+"/assets/imgs/favicon.ico")
