@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.1.3](https://github.com/mynaparrot/plugNmeet-server/compare/v2.1.2...v2.1.3) (2026-02-11)
+
+
+### Bug Fixes
+
+* added `HEAD` as `AllowMethods` ([52169a0](https://github.com/mynaparrot/plugNmeet-server/commit/52169a0d49607098f98176ddc23388b3360228a7))
+* **deps:** update module github.com/gabriel-vasile/mimetype to v1.4.13 ([cdfeae1](https://github.com/mynaparrot/plugNmeet-server/commit/cdfeae1c14a3b75674e9a18906e154bd05b091f4))
+* **deps:** update module github.com/gabriel-vasile/mimetype to v1.4.13 ([b5102dc](https://github.com/mynaparrot/plugNmeet-server/commit/b5102dcbec60e39b9abd5385785eeb0ca3ce69b7))
+* **deps:** update module github.com/gofiber/fiber/v2 to v2.52.11 [security] ([1916cca](https://github.com/mynaparrot/plugNmeet-server/commit/1916cca89a9d835b0e327b9403a1402f7a13398a))
+* **deps:** update module github.com/gofiber/fiber/v2 to v2.52.11 [security] ([cb3b3b3](https://github.com/mynaparrot/plugNmeet-server/commit/cb3b3b36f30cd00e064e17e36e92ab5847d1ef88))
+* **deps:** update module github.com/livekit/server-sdk-go/v2 to v2.13.3 ([e81330b](https://github.com/mynaparrot/plugNmeet-server/commit/e81330b366b5c310b16480a9a7494a1f5030b9b8))
+* **deps:** update module github.com/livekit/server-sdk-go/v2 to v2.13.3 ([b2432a6](https://github.com/mynaparrot/plugNmeet-server/commit/b2432a681a374edac0fd6399d87652ee7b52456b))
+* **feature:** implemented PONG from server to client to detect backend server's responsiveness ([c0cb832](https://github.com/mynaparrot/plugNmeet-server/commit/c0cb83227d563eb8f24f79288231bbf4575e15de))
+
 ## [2.1.2](https://github.com/mynaparrot/plugNmeet-server/compare/v2.1.1...v2.1.2) (2026-01-31)
 
 
