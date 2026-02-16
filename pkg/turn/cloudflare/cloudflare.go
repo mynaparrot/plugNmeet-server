@@ -65,12 +65,19 @@ func (p *CloudflareProvider) GetTURNServerCredentials(ctx context.Context, c *co
 		ttl = configTTL
 	}
 
+	// Use the roomId as the custom identifier
+	customIdentifier := roomId
+	if len(customIdentifier) > 64 {
+		// cloudflare will throw 400 error if longer so, we'll truncate
+		customIdentifier = customIdentifier[:64]
+	}
+
 	payloadStruct := struct {
 		TTL              int    `json:"ttl"`
 		CustomIdentifier string `json:"customIdentifier,omitempty"`
 	}{
 		TTL:              ttl,
-		CustomIdentifier: fmt.Sprintf("%s", roomId),
+		CustomIdentifier: customIdentifier,
 	}
 	payload, err := json.Marshal(payloadStruct)
 	if err != nil {
