@@ -70,7 +70,7 @@ func (p *CloudflareProvider) GetTURNServerCredentials(ctx context.Context, c *co
 		CustomIdentifier string `json:"customIdentifier,omitempty"`
 	}{
 		TTL:              ttl,
-		CustomIdentifier: fmt.Sprintf("%s:%s", roomId, userId),
+		CustomIdentifier: fmt.Sprintf("%s", roomId),
 	}
 	payload, err := json.Marshal(payloadStruct)
 	if err != nil {
