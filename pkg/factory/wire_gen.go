@@ -17,6 +17,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/mynaparrot/plugnmeet-server/pkg/services/turn"
 )
 
 // Injectors from wire.go:
@@ -55,7 +56,11 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	recordingController := controllers.NewRecordingController(databaseService, recordingModel, logger)
 	roomController := controllers.NewRoomController(roomModel)
 	userController := controllers.NewUserController(appConfig, databaseService, natsService, userModel, roomModel)
-	natsModel := models.NewNatsModel(appConfig, databaseService, redisService, natsService, livekitService, analyticsModel, authModel, userModel, logger)
+	turnService, err := turnservice.New(appConfig)
+	if err != nil {
+		return nil, err
+	}
+	natsModel := models.NewNatsModel(appConfig, databaseService, redisService, natsService, livekitService, turnService, analyticsModel, authModel, userModel, logger)
 	webhookModel := models.NewWebhookModel(ctx, appConfig, databaseService, redisService, natsService, livekitService, roomModel, analyticsModel, breakoutRoomModel, natsModel, webhookNotifier, logger)
 	webhookController := controllers.NewWebhookController(authModel, webhookModel)
 	natsController := controllers.NewNatsController(appConfig, natsService, authModel, natsModel, logger)
@@ -95,7 +100,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 // wire.go:
 
 // build the dependency set for services
-var serviceSet = wire.NewSet(dbservice.New, redisservice.New, natsservice.New, livekitservice.New)
+var serviceSet = wire.NewSet(dbservice.New, redisservice.New, natsservice.New, livekitservice.New, turnservice.New)
 
 // build the dependency set for helpers
 var helperSet = wire.NewSet(helpers.NewWebhookNotifier)

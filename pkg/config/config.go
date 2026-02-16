@@ -47,6 +47,7 @@ type AppConfig struct {
 	ArtifactsSettings            *ArtifactsSettings           `yaml:"artifacts_settings"`
 	NatsInfo                     NatsInfo                     `yaml:"nats_info"`
 	Insights                     *InsightsConfig              `yaml:"insights"`
+	TurnServer                   *TurnConfig                  `yaml:"turn_server"`
 }
 
 type ClientInfo struct {

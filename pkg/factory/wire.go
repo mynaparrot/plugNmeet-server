@@ -15,6 +15,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/mynaparrot/plugnmeet-server/pkg/services/turn"
 )
 
 // build the dependency set for services
@@ -23,6 +24,7 @@ var serviceSet = wire.NewSet(
 	redisservice.New,
 	natsservice.New,
 	livekitservice.New,
+	turnservice.New,
 )
 
 // build the dependency set for helpers

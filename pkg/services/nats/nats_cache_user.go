@@ -55,6 +55,8 @@ func (ncs *NatsCacheService) updateUserInfoCache(entry jetstream.KeyValueEntry, 
 		user.LastPingAt = ncs.convertTextToUint64(val)
 	case UserStatusKey:
 		user.Status = val
+	case UserTurnCredentialsKey:
+		user.TurnCredentials = val
 	}
 	ncs.roomUsersInfoStore[roomId][userId] = user
 }
@@ -126,6 +128,18 @@ func (ncs *NatsCacheService) isUserBlacklistedFromCache(roomId, userId string) (
 		}
 	}
 	return false, false
+}
+
+// getCachedUserTurnCredentials retrieves only the user's turn credentials string from the cache.
+func (ncs *NatsCacheService) getCachedUserTurnCredentials(roomId, userId string) (string, bool) {
+	ncs.roomLock.RLock()
+	defer ncs.roomLock.RUnlock()
+	if rm, found := ncs.roomUsersInfoStore[roomId]; found {
+		if entry, ok := rm[userId]; ok && entry.TurnCredentials != "" {
+			return entry.TurnCredentials, true
+		}
+	}
+	return "", false
 }
 
 // getUserLastPingAt is a simple reader for the cache.

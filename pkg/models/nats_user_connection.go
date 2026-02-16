@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
+	"github.com/mynaparrot/plugnmeet-server/pkg/turn"
 	"github.com/sirupsen/logrus"
 )
 
@@ -96,6 +98,9 @@ func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, userInfo *p
 	log = log.WithField("subMethod", "handleDelayedOfflineTasks")
 	log.Info("starting delayed offline tasks")
 
+	// get TurnCredentials to use it later otherwise it may cleaned up if room ended
+	turnCreds, _ := m.natsService.GetUserTurnCredentials(roomId, userId)
+
 	// Stage 1: Wait for the reconnection grace period.
 	time.Sleep(5 * time.Second)
 
@@ -135,7 +140,23 @@ func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, userInfo *p
 
 	// Final cleanup: Delete the user's NATS consumer.
 	m.natsService.DeleteConsumer(roomId, userId)
+
+	if turnCreds != nil {
+		// Try to revoke TURN credentials as the very last step.
+		m.revokeTurnCredentials(turnCreds, log)
+	}
+
 	log.Info("user offline tasks completed")
+}
+
+func (m *NatsModel) revokeTurnCredentials(creds *turn.Credentials, log *logrus.Entry) {
+	ctx, cancel := context.WithTimeout(m.app.GetApplicationCtx(), 5*time.Second)
+	defer cancel()
+	if err := m.turn.RevokeCredentials(ctx, creds); err != nil {
+		log.WithError(err).Warn("failed to revoke turn credentials")
+	} else {
+		log.Info("successfully revoked turn credentials")
+	}
 }
 
 func (m *NatsModel) updateUserLeftAnalytics(roomId, userId string) {
