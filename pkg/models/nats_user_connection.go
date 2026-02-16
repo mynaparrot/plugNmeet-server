@@ -154,8 +154,9 @@ func (m *NatsModel) revokeTurnCredentials(creds *turn.Credentials, log *logrus.E
 	defer cancel()
 	if err := m.turn.RevokeCredentials(ctx, creds); err != nil {
 		log.WithError(err).Warn("failed to revoke turn credentials")
+	} else {
+		log.Info("successfully revoked turn credentials")
 	}
-	log.Info("successfully revoked turn credentials")
 }
 
 func (m *NatsModel) updateUserLeftAnalytics(roomId, userId string) {
