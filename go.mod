@@ -3,7 +3,7 @@ module github.com/mynaparrot/plugnmeet-server
 go 1.25.5
 
 require (
-	buf.build/go/protovalidate v1.1.1
+	buf.build/go/protovalidate v1.1.2
 	github.com/Microsoft/cognitive-services-speech-sdk-go v1.43.0
 	github.com/ansrivas/fiberprometheus/v2 v2.15.0
 	github.com/cavaliergopher/grab/v3 v3.0.1
