@@ -7,6 +7,7 @@ import (
 	livekitservice "github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	turnservice "github.com/mynaparrot/plugnmeet-server/pkg/services/turn"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -16,6 +17,7 @@ type NatsModel struct {
 	ds             *dbservice.DatabaseService
 	rs             *redisservice.RedisService
 	lk             *livekitservice.LivekitService
+	turn           *turnservice.TurnService
 	authModel      *AuthModel
 	natsService    *natsservice.NatsService
 	userModel      *UserModel
@@ -23,12 +25,13 @@ type NatsModel struct {
 	logger         *logrus.Entry
 }
 
-func NewNatsModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, lk *livekitservice.LivekitService, analyticsModel *AnalyticsModel, authModel *AuthModel, userModel *UserModel, logger *logrus.Logger) *NatsModel {
+func NewNatsModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, lk *livekitservice.LivekitService, turn *turnservice.TurnService, analyticsModel *AnalyticsModel, authModel *AuthModel, userModel *UserModel, logger *logrus.Logger) *NatsModel {
 	return &NatsModel{
 		app:            app,
 		ds:             ds,
 		rs:             rs,
 		lk:             lk,
+		turn:           turn,
 		natsService:    natsService,
 		authModel:      authModel,
 		userModel:      userModel,

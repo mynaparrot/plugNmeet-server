@@ -297,3 +297,19 @@ insights:
         gemini-2.0-flash:
           input_price_per_million_tokens: 0.35
           output_price_per_million_tokens: 0.70
+
+# Custom TURN Server (Optional)
+#turn_server:
+#  # Set to true to use a custom TURN provider instead of LiveKit's default.
+#  enabled: false
+#  # If true, forces all clients to use the TURN server for media.
+#  force_turn: false
+#  # The provider to use from the 'providers' map below.
+#  provider: "coturn_custom"
+#
+#  providers:
+#    coturn_custom:
+#      options:
+#        shared_secret: "YOUR_COTURN_SHARED_SECRET"
+#        uris:
+#          - "turn:turn.your-domain.com:3478?transport=udp"
