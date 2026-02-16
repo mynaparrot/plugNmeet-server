@@ -12,8 +12,9 @@ import (
 
 // TurnService is the main entry point for interacting with the TURN framework.
 type TurnService struct {
-	config   *config.TurnConfig
-	provider turn.Provider
+	config    *config.TurnConfig
+	provider  turn.Provider
+	forceTurn bool
 }
 
 func New(conf *config.AppConfig) (*TurnService, error) {
@@ -26,7 +27,8 @@ func New(conf *config.AppConfig) (*TurnService, error) {
 	}
 
 	ts := &TurnService{
-		config: conf.TurnServer,
+		config:    conf.TurnServer,
+		forceTurn: conf.TurnServer.ForceTurn,
 	}
 
 	// This factory logic selects the correct provider.
@@ -44,7 +46,7 @@ func New(conf *config.AppConfig) (*TurnService, error) {
 
 // GetCredentials returns TURN credentials from the configured provider.
 // It returns nil if the service is disabled.
-func (s *TurnService) GetCredentials(ctx context.Context) (*turn.Credentials, error) {
+func (s *TurnService) GetCredentials(ctx context.Context, roomId, userId string) (*turn.Credentials, error) {
 	if s.config == nil || !s.config.Enabled || s.provider == nil {
 		// If the feature is disabled, we simply return nothing.
 		// This is not an error condition.
@@ -56,5 +58,25 @@ func (s *TurnService) GetCredentials(ctx context.Context) (*turn.Credentials, er
 		return nil, err
 	}
 
-	return s.provider.GetTURNServerCredentials(ctx, providerConf)
+	credentials, err := s.provider.GetTURNServerCredentials(ctx, providerConf, roomId, userId)
+	if err != nil {
+		return nil, err
+	}
+	credentials.ForceTurn = s.config.ForceTurn
+	return credentials, nil
+}
+
+// RevokeCredentials revokes TURN credentials using the configured provider.
+func (s *TurnService) RevokeCredentials(ctx context.Context, creds *turn.Credentials) error {
+	if s.config == nil || !s.config.Enabled || s.provider == nil {
+		// If the feature is disabled, we simply return nothing.
+		return nil
+	}
+
+	providerConf, err := s.config.GetProvider()
+	if err != nil {
+		return err
+	}
+
+	return s.provider.RevokeTURNServerCredentials(ctx, providerConf, creds)
 }

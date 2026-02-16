@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -119,6 +120,30 @@ func (m *NatsModel) HandleMediaServerInfo(roomId, userId string, broadcast bool)
 	data := &plugnmeet.MediaServerConnInfo{
 		Url:   lkHost,
 		Token: token,
+	}
+
+	// get turn credentials
+	ctx, cancel := context.WithTimeout(m.app.GetApplicationCtx(), 5*time.Second)
+	defer cancel()
+	turnCred, err := m.turn.GetCredentials(ctx, roomId, userId)
+	if err != nil {
+		log.WithError(err).Errorln("failed to get turn credentials")
+		// we can ignore this error and continue
+	}
+
+	if turnCred != nil {
+		data.TurnCredentials = &plugnmeet.TurnCredentials{
+			Username:  turnCred.Username,
+			Password:  turnCred.Password,
+			Uris:      turnCred.URIs,
+			ForceTurn: turnCred.ForceTurn,
+		}
+		// store in nats so we can revoke it later
+		if val, err := protojson.Marshal(data.TurnCredentials); err == nil {
+			if err := m.natsService.UpdateUserKeyValue(roomId, userId, natsservice.UserTurnCredentialsKey, string(val)); err != nil {
+				log.WithError(err).Warnln("failed to store turn credentials")
+			}
+		}
 	}
 
 	if broadcast {

@@ -6,7 +6,9 @@ import (
 	"strconv"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/turn"
 	"github.com/nats-io/nats.go/jetstream"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // GetRoomUserStatus retrieves the status of a user in a specific room.
@@ -278,4 +280,41 @@ func (s *NatsService) IsUserExistInBlockList(roomId, userId string) bool {
 
 	isBlocked, _ := strconv.ParseBool(string(entry.Value()))
 	return isBlocked
+}
+
+// GetUserTurnCredentials is a public method to access the user's turn credentials.
+// It will try the cache first, then fallback to a direct NATS KV lookup.
+// It returns the unmarshalled credentials ready for use.
+func (s *NatsService) GetUserTurnCredentials(roomId, userId string) (*turn.Credentials, bool) {
+	var rawCreds string
+	var found bool
+
+	// First, try the cache
+	if rawCreds, found = s.cs.getCachedUserTurnCredentials(roomId, userId); !found {
+		// If not in cache, fallback to NATS KV store
+		if entry, err := s.GetUserKeyValue(roomId, userId, UserTurnCredentialsKey); err == nil && entry != nil {
+			rawCreds = string(entry.Value())
+		}
+	}
+
+	if rawCreds == "" {
+		return nil, false
+	}
+
+	// Unmarshal into the protobuf type first
+	protoCreds := new(plugnmeet.TurnCredentials)
+	if err := protojson.Unmarshal([]byte(rawCreds), protoCreds); err != nil {
+		s.logger.WithError(err).Warn("failed to unmarshal turn credentials from nats")
+		return nil, false
+	}
+
+	// Convert to the service-level type
+	creds := &turn.Credentials{
+		Username:  protoCreds.Username,
+		Password:  protoCreds.Password,
+		URIs:      protoCreds.Uris,
+		ForceTurn: protoCreds.ForceTurn,
+	}
+
+	return creds, true
 }

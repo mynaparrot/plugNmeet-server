@@ -2,6 +2,10 @@ module github.com/mynaparrot/plugnmeet-server
 
 go 1.25.5
 
+replace (
+	github.com/mynaparrot/plugnmeet-protocol => ../protocol
+)
+
 require (
 	buf.build/go/protovalidate v1.1.1
 	github.com/Microsoft/cognitive-services-speech-sdk-go v1.43.0

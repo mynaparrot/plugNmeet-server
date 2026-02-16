@@ -13,8 +13,7 @@ type TurnConfig struct {
 
 // TurnProvider holds the configuration for a single provider.
 type TurnProvider struct {
-	Credentials CredentialsConfig      `yaml:"credentials"`
-	Options     map[string]interface{} `yaml:"options"`
+	Options map[string]interface{} `yaml:"options"`
 }
 
 // GetProvider returns the configuration for the currently active provider.

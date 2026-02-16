@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -135,7 +136,21 @@ func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, userInfo *p
 
 	// Final cleanup: Delete the user's NATS consumer.
 	m.natsService.DeleteConsumer(roomId, userId)
+
+	// Try to revoke TURN credentials as the very last step.
+	m.revokeTurnCredentials(roomId, userId, log)
+
 	log.Info("user offline tasks completed")
+}
+
+func (m *NatsModel) revokeTurnCredentials(roomId, userId string, log *logrus.Entry) {
+	if creds, found := m.natsService.GetUserTurnCredentials(roomId, userId); found {
+		ctx, cancel := context.WithTimeout(m.app.GetApplicationCtx(), 5*time.Second)
+		defer cancel()
+		if err := m.turn.RevokeCredentials(ctx, creds); err != nil {
+			log.WithError(err).Warn("failed to revoke turn credentials")
+		}
+	}
 }
 
 func (m *NatsModel) updateUserLeftAnalytics(roomId, userId string) {

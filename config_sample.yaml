@@ -305,10 +305,10 @@ insights:
 #  # If true, forces all clients to use the TURN server for media.
 #  force_turn: false
 #  # The provider to use from the 'providers' map below.
-#  provider: "coturn_custom"
+#  provider: "coturn"
 #
 #  providers:
-#    coturn_custom:
+#    coturn:
 #      options:
 #        shared_secret: "YOUR_COTURN_SHARED_SECRET"
 #        uris:

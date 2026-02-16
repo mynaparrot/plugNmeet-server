@@ -8,14 +8,15 @@ import (
 
 // Credentials holds the response from a TURN provider.
 type Credentials struct {
-	Username string   `json:"username"`
-	Password string   `json:"password"`
-	URIs     []string `json:"uris"`
-	TTL      int      `json:"ttl"`
+	Username  string   `json:"username"`
+	Password  string   `json:"password"`
+	URIs      []string `json:"uris"`
+	TTL       int      `json:"ttl"`
+	ForceTurn bool     `json:"force_turn"`
 }
 
 // Provider is the master interface for all TURN service integrations.
 type Provider interface {
-	IsEnabled() bool
-	GetTURNServerCredentials(ctx context.Context, c *config.TurnProvider) (*Credentials, error)
+	GetTURNServerCredentials(ctx context.Context, c *config.TurnProvider, roomId, userId string) (*Credentials, error)
+	RevokeTURNServerCredentials(ctx context.Context, c *config.TurnProvider, creds *Credentials) error
 }

@@ -17,19 +17,20 @@ import (
 const (
 	UserOnlineMaxPingDiff = time.Minute * 2
 
-	UserIdKey            = "id"
-	UserSidKey           = "sid"
-	UserNameKey          = "name"
-	UserRoomIdKey        = "room_id"
-	UserIsAdminKey       = "is_admin"
-	UserIsPresenterKey   = "is_presenter"
-	UserMetadataKey      = "metadata"
-	UserJoinedAt         = "joined_at"
-	UserReconnectedAt    = "reconnected_at"
-	UserDisconnectedAt   = "disconnected_at"
-	UserLastPingAt       = "last_ping_at"
-	UserStatusKey        = "status" // Note: This is different from RoomStatusKey
-	UserIsBlacklistedKey = "is_blacklisted"
+	UserIdKey              = "id"
+	UserSidKey             = "sid"
+	UserNameKey            = "name"
+	UserRoomIdKey          = "room_id"
+	UserIsAdminKey         = "is_admin"
+	UserIsPresenterKey     = "is_presenter"
+	UserMetadataKey        = "metadata"
+	UserJoinedAt           = "joined_at"
+	UserReconnectedAt      = "reconnected_at"
+	UserDisconnectedAt     = "disconnected_at"
+	UserLastPingAt         = "last_ping_at"
+	UserStatusKey          = "status" // Note: This is different from RoomStatusKey
+	UserIsBlacklistedKey   = "is_blacklisted"
+	UserTurnCredentialsKey = "turn_credentials"
 
 	UserStatusAdded        = "added"
 	UserStatusOnline       = "online"
@@ -54,16 +55,17 @@ func (s *NatsService) AddUser(roomId, userId, name string, isAdmin, isPresenter 
 
 	// Prepare user data
 	data := map[string]string{
-		UserIdKey:            userId,
-		UserSidKey:           uuid.NewString(),
-		UserNameKey:          name,
-		UserRoomIdKey:        roomId,
-		UserIsAdminKey:       fmt.Sprintf("%v", isAdmin),
-		UserIsPresenterKey:   fmt.Sprintf("%v", isPresenter),
-		UserMetadataKey:      mt,
-		UserLastPingAt:       "0",
-		UserStatusKey:        UserStatusAdded,
-		UserIsBlacklistedKey: "false", // Set default value on creation
+		UserIdKey:              userId,
+		UserSidKey:             uuid.NewString(),
+		UserNameKey:            name,
+		UserRoomIdKey:          roomId,
+		UserIsAdminKey:         fmt.Sprintf("%v", isAdmin),
+		UserIsPresenterKey:     fmt.Sprintf("%v", isPresenter),
+		UserMetadataKey:        mt,
+		UserLastPingAt:         "0",
+		UserStatusKey:          UserStatusAdded,
+		UserIsBlacklistedKey:   "false",
+		UserTurnCredentialsKey: "",
 	}
 
 	// Store user data in the key-value store using the user-specific prefix
