@@ -304,6 +304,9 @@ insights:
 #  enabled: false
 #  # If true, forces all clients to use the TURN server for media.
 #  force_turn: false
+#  # If true, client will fallback to TURN if direct connection is poor.
+#  # (This has no effect if force_turn is true).
+#  fallback_turn: false
 #  # The provider to use from the 'providers' map below.
 #  provider: "coturn"
 #

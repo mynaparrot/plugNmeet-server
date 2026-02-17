@@ -5,10 +5,11 @@ import "fmt"
 // TurnConfig is the main config block for the TURN feature.
 type TurnConfig struct {
 	// by default false, in that case livekit will handle it
-	Enabled   bool                    `yaml:"enabled"`
-	Provider  string                  `yaml:"provider"`
-	ForceTurn bool                    `yaml:"force_turn"`
-	Providers map[string]TurnProvider `yaml:"providers"`
+	Enabled      bool                    `yaml:"enabled"`
+	Provider     string                  `yaml:"provider"`
+	ForceTurn    bool                    `yaml:"force_turn"`
+	FallbackTurn bool                    `yaml:"fallback_turn"`
+	Providers    map[string]TurnProvider `yaml:"providers"`
 }
 
 // TurnProvider holds the configuration for a single provider.

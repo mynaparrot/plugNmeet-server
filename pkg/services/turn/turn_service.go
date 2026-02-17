@@ -12,9 +12,8 @@ import (
 
 // TurnService is the main entry point for interacting with the TURN framework.
 type TurnService struct {
-	config    *config.TurnConfig
-	provider  turn.Provider
-	forceTurn bool
+	config   *config.TurnConfig
+	provider turn.Provider
 }
 
 func New(conf *config.AppConfig) (*TurnService, error) {
@@ -27,8 +26,8 @@ func New(conf *config.AppConfig) (*TurnService, error) {
 	}
 
 	ts := &TurnService{
-		config:    conf.TurnServer,
-		forceTurn: conf.TurnServer.ForceTurn,
+		config: conf.TurnServer,
+		// forceTurn is deprecated, we'll use the value from credentials
 	}
 
 	// This factory logic selects the correct provider.
@@ -62,7 +61,13 @@ func (s *TurnService) GetCredentials(ctx context.Context, roomId, userId string)
 	if err != nil {
 		return nil, err
 	}
+
 	credentials.ForceTurn = s.config.ForceTurn
+	// Only enable fallback if force_turn is false
+	if !s.config.ForceTurn && s.config.FallbackTurn {
+		credentials.FallbackTurn = true
+	}
+
 	return credentials, nil
 }
 

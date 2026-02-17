@@ -8,11 +8,12 @@ import (
 
 // Credentials holds the response from a TURN provider.
 type Credentials struct {
-	Username  string   `json:"username"`
-	Password  string   `json:"password"`
-	URIs      []string `json:"uris"`
-	TTL       int      `json:"ttl"`
-	ForceTurn bool     `json:"force_turn"`
+	Username     string   `json:"username"`
+	Password     string   `json:"password"`
+	URIs         []string `json:"uris"`
+	TTL          int      `json:"ttl"`
+	ForceTurn    bool     `json:"force_turn"`
+	FallbackTurn bool     `json:"fallback_turn"`
 }
 
 // Provider is the master interface for all TURN service integrations.

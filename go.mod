@@ -4,8 +4,8 @@ go 1.25.5
 
 require (
 	buf.build/go/protovalidate v1.1.2
-	github.com/Microsoft/cognitive-services-speech-sdk-go v1.43.0
-	github.com/ansrivas/fiberprometheus/v2 v2.15.0
+	github.com/Microsoft/cognitive-services-speech-sdk-go v1.48.0
+	github.com/ansrivas/fiberprometheus/v2 v2.16.0
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/gabriel-vasile/mimetype v1.4.13
 	github.com/go-jose/go-jose/v4 v4.1.3
@@ -19,15 +19,15 @@ require (
 	github.com/livekit/media-sdk v0.0.0-20251106223430-dd8f5e0de2cf
 	github.com/livekit/protocol v1.44.1-0.20260120134243-0914cc74653e
 	github.com/livekit/server-sdk-go/v2 v2.13.3
-	github.com/mynaparrot/plugnmeet-protocol v1.2.2-0.20260216125814-4b83d563f92b
+	github.com/mynaparrot/plugnmeet-protocol v1.2.2-0.20260217143830-bb85b2c06a7c
 	github.com/nats-io/jwt/v2 v2.8.0
 	github.com/nats-io/nats.go v1.48.0
 	github.com/nats-io/nkeys v0.4.15
 	github.com/pion/webrtc/v4 v4.2.3
-	github.com/redis/go-redis/v9 v9.17.3
+	github.com/redis/go-redis/v9 v9.18.0
 	github.com/sirupsen/logrus v1.9.4
 	golang.org/x/sync v0.19.0
-	google.golang.org/genai v1.43.0
+	google.golang.org/genai v1.46.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/mysql v1.6.0
@@ -116,9 +116,9 @@ require (
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.63.0 // indirect
-	go.opentelemetry.io/otel v1.39.0 // indirect
-	go.opentelemetry.io/otel/metric v1.39.0 // indirect
-	go.opentelemetry.io/otel/trace v1.39.0 // indirect
+	go.opentelemetry.io/otel v1.40.0 // indirect
+	go.opentelemetry.io/otel/metric v1.40.0 // indirect
+	go.opentelemetry.io/otel/trace v1.40.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.1 // indirect
