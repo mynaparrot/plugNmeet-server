@@ -133,11 +133,12 @@ func (m *NatsModel) HandleMediaServerInfo(roomId, userId string, broadcast bool)
 
 	if turnCred != nil {
 		data.TurnCredentials = &plugnmeet.TurnCredentials{
-			Username:     turnCred.Username,
-			Password:     turnCred.Password,
-			Uris:         turnCred.URIs,
-			ForceTurn:    turnCred.ForceTurn,
-			FallbackTurn: turnCred.FallbackTurn,
+			Username:              turnCred.Username,
+			Password:              turnCred.Password,
+			Uris:                  turnCred.URIs,
+			ForceTurn:             turnCred.ForceTurn,
+			FallbackTurn:          turnCred.FallbackTurn,
+			FallbackTimerDuration: turnCred.FallbackTimerDuration,
 		}
 		// store in nats so we can revoke it later
 		if val, err := protojson.Marshal(data.TurnCredentials); err == nil {

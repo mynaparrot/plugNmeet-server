@@ -3,6 +3,7 @@ package turnservice
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/turn"
@@ -66,6 +67,13 @@ func (s *TurnService) GetCredentials(ctx context.Context, roomId, userId string)
 	// Only enable fallback if force_turn is false
 	if !s.config.ForceTurn && s.config.FallbackTurn {
 		credentials.FallbackTurn = true
+
+		// Add the duration logic here
+		duration := s.config.FallbackTimerDuration
+		if duration <= 0 {
+			duration = time.Second * 60 // default 60s
+		}
+		credentials.FallbackTimerDuration = duration.Milliseconds()
 	}
 
 	return credentials, nil
