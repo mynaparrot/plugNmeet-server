@@ -308,7 +308,7 @@ insights:
 #  # (This has no effect if force_turn is true).
 #  fallback_turn: false
 #  # The duration to wait with a poor connection before triggering the fallback.
-#  # Examples: "30s", "1m". Default: "60s". Set to "0s" to disable.
+#  # Examples: "30s", "1m". Default: "60s"
 #  fallback_timer_duration: "60s"
 #  # The provider to use from the 'providers' map below.
 #  provider: "coturn"
