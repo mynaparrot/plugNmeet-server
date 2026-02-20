@@ -51,18 +51,19 @@ type AppConfig struct {
 }
 
 type ClientInfo struct {
-	Port           int            `yaml:"port"`
-	Debug          bool           `yaml:"debug"`
-	Path           string         `yaml:"path"`
-	AssetHost      *string        `yaml:"asset_host"`
-	ApiKey         string         `yaml:"api_key"`
-	Secret         string         `yaml:"secret"`
-	TokenValidity  *time.Duration `yaml:"token_validity"`
-	WebhookConf    WebhookConf    `yaml:"webhook_conf"`
-	PrometheusConf PrometheusConf `yaml:"prometheus"`
-	ProxyHeader    string         `yaml:"proxy_header"`
-	CopyrightConf  *CopyrightConf `yaml:"copyright_conf"`
-	BBBJoinHost    *string        `yaml:"bbb_join_host"`
+	Port               int                 `yaml:"port"`
+	Debug              bool                `yaml:"debug"`
+	Path               string              `yaml:"path"`
+	AssetHost          *string             `yaml:"asset_host"`
+	ApiKey             string              `yaml:"api_key"`
+	Secret             string              `yaml:"secret"`
+	TokenValidity      *time.Duration      `yaml:"token_validity"`
+	WebhookConf        WebhookConf         `yaml:"webhook_conf"`
+	PrometheusConf     PrometheusConf      `yaml:"prometheus"`
+	ProxyHeader        string              `yaml:"proxy_header"`
+	CopyrightConf      *CopyrightConf      `yaml:"copyright_conf"`
+	BBBJoinHost        *string             `yaml:"bbb_join_host"`
+	AutoClientDownload *AutoClientDownload `yaml:"auto_client_download"`
 }
 
 type WebhookConf struct {
@@ -300,6 +301,13 @@ func New(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 		}
 		if appCnf.LivekitSipInfo.TrunkName == "" {
 			appCnf.LivekitSipInfo.TrunkName = "pnm-inbound-trunk"
+		}
+	}
+
+	// handle client download
+	if appCnf.Client.AutoClientDownload != nil {
+		if err := appCnf.Client.AutoClientDownload.Handle(appCnf); err != nil {
+			return nil, err
 		}
 	}
 

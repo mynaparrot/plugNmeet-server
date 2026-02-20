@@ -41,6 +41,20 @@ client:
     text: 'Powered by <a href="https://www.plugnmeet.org" target="_blank">plugNmeet</a>'
   # Specify host information for accurate BBB join URLs when behind a load balancer.
   bbb_join_host: "http://localhost:3000"
+#  auto_client_download:
+#    # Set to true to enable automatic client download at server startup.
+#    # This is highly recommended for containerized deployments (Docker, k8s).
+#    enabled: false
+#    # The public-facing URL of your plugNmeet server.
+#    # This is REQUIRED if enabled=true, as it will be injected into the client's
+#    # configuration file during the download process.
+#    server_url: "" # e.g., "https://plugnmeet.example.com"
+#    # To use a custom build, provide the full, direct URL to the client.zip file.
+#    # If this is set, 'from_release' will be ignored.
+#    from_custom_url: "" # e.g., "https://my-cdn.com/builds/client.zip"
+#    # (Optional) To use a specific official release, specify the version tag.
+#    # If left empty or omitted, it will default to "latest".
+#    from_release: "" # e.g., "v2.1.4"
 
 room_default_settings:
   max_duration: 0 # Duration in minutes. 0 means unlimited.
