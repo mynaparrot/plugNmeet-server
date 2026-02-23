@@ -3,7 +3,7 @@ module github.com/mynaparrot/plugnmeet-server
 go 1.25.5
 
 require (
-	buf.build/go/protovalidate v1.1.2
+	buf.build/go/protovalidate v1.1.3
 	github.com/Microsoft/cognitive-services-speech-sdk-go v1.48.0
 	github.com/ansrivas/fiberprometheus/v2 v2.16.0
 	github.com/cavaliergopher/grab/v3 v3.0.1
@@ -64,7 +64,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gofiber/template v1.8.3 // indirect
 	github.com/gofiber/utils v1.2.0 // indirect
-	github.com/google/cel-go v0.26.1 // indirect
+	github.com/google/cel-go v0.27.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.7 // indirect
