@@ -12,19 +12,23 @@ import (
 
 func NewNatsConnection(appCnf *config.AppConfig) error {
 	info := appCnf.NatsInfo
-	var opt nats.Option
 	var err error
+	opts := []nats.Option{
+		nats.Name("plugnmeet-server"),
+	}
 
 	if info.Nkey != nil {
-		opt, err = utils.NkeyOptionFromSeedText(*info.Nkey)
+		opt, err := utils.NkeyOptionFromSeedText(*info.Nkey)
 		if err != nil {
 			return err
 		}
+		opts = append(opts, opt)
 	} else {
-		opt = nats.UserInfo(info.User, info.Password)
+		opt := nats.UserInfo(info.User, info.Password)
+		opts = append(opts, opt)
 	}
 
-	nc, err := nats.Connect(strings.Join(info.NatsUrls, ","), opt)
+	nc, err := nats.Connect(strings.Join(info.NatsUrls, ","), opts...)
 	if err != nil {
 		return err
 	}
