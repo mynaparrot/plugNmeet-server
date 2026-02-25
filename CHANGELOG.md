@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.1.4](https://github.com/mynaparrot/plugNmeet-server/compare/v2.1.3...v2.1.4) (2026-02-25)
+
+
+### Bug Fixes
+
+* configurable option to `fallback_turn` when connection bad ([e05b55e](https://github.com/mynaparrot/plugNmeet-server/commit/e05b55e1a1b02952c12de9065486264186c09a87))
+* **deps:** update module buf.build/go/protovalidate to v1.1.2 ([79b81ad](https://github.com/mynaparrot/plugNmeet-server/commit/79b81ad221320efb25e2495d095c051ff483562c))
+* **deps:** update module buf.build/go/protovalidate to v1.1.2 ([04a2ec7](https://github.com/mynaparrot/plugNmeet-server/commit/04a2ec7a132ac75f09f78e155805bee2ff5cab9f))
+* **deps:** update module buf.build/go/protovalidate to v1.1.3 ([541ac68](https://github.com/mynaparrot/plugNmeet-server/commit/541ac684b0f23b38afecfc6e2a707e3aa82071fa))
+* **deps:** update module buf.build/go/protovalidate to v1.1.3 ([82a259a](https://github.com/mynaparrot/plugNmeet-server/commit/82a259ab1fbf9c07b26a206aa8f7b6885bb286ca))
+* **deps:** update module github.com/gofiber/fiber/v2 to v2.52.12 [security] ([736860a](https://github.com/mynaparrot/plugNmeet-server/commit/736860af443ef30e304e44d54af89bc3d1cb6304))
+* **deps:** update module github.com/gofiber/fiber/v2 to v2.52.12 [security] ([d39747d](https://github.com/mynaparrot/plugNmeet-server/commit/d39747db851549642d663a417b6d8248d609a8f2))
+* **deps:** update module github.com/microsoft/cognitive-services-speech-sdk-go to v1.48.2 ([cf84a12](https://github.com/mynaparrot/plugNmeet-server/commit/cf84a12a9b0d0dc27718c6fb1f0cb361819ee3e5))
+* **deps:** update module github.com/microsoft/cognitive-services-speech-sdk-go to v1.48.2 ([3e41609](https://github.com/mynaparrot/plugNmeet-server/commit/3e41609ec0b17bba2d4721ba1293bff6d2ee93b2))
+* ensure max 64 characters ([dace4f2](https://github.com/mynaparrot/plugNmeet-server/commit/dace4f2b371470d9ab2a51c3c11901e18ecdb530))
+* **feat:** option to auto download client ([22449f1](https://github.com/mynaparrot/plugNmeet-server/commit/22449f159f6e98c157644a507e34785c2c93fbb5))
+* **feat:** option to configure custom turn servers ([1fc45a7](https://github.com/mynaparrot/plugNmeet-server/commit/1fc45a75ebe19c669b78f398a5ba399f7801ef22))
+* **feat:** option to configure custom turn servers ([1cd9b65](https://github.com/mynaparrot/plugNmeet-server/commit/1cd9b6592aa99760d643a82bc912f2f8ecd5a19e))
+* nats connection tag name ([5cb471b](https://github.com/mynaparrot/plugNmeet-server/commit/5cb471b97ca119c9a7b4866b8784048cf8ab4f65))
+* option to set `fallbackTimerDuration` in server config ([a58048a](https://github.com/mynaparrot/plugNmeet-server/commit/a58048a109b7de04c68f06343c54c9dada482eb9))
+* the value of `customIdentifier` can't be too long ([55990a6](https://github.com/mynaparrot/plugNmeet-server/commit/55990a6addec2a8318e6edd3f54dcd947a048cf1))
+
 ## [2.1.3](https://github.com/mynaparrot/plugNmeet-server/compare/v2.1.2...v2.1.3) (2026-02-11)
 
 
