@@ -11,8 +11,9 @@ const DurableNameTpl = "%s_%s"
 // createRoomNatsStream will create a single stream for all rooms.
 func (s *NatsService) createRoomNatsStream() {
 	_, err := s.js.CreateOrUpdateStream(s.ctx, jetstream.StreamConfig{
-		Name:     s.app.NatsInfo.RoomStreamName,
-		Replicas: s.app.NatsInfo.NumReplicas,
+		Name:      s.app.NatsInfo.RoomStreamName,
+		Replicas:  s.app.NatsInfo.NumReplicas,
+		Retention: jetstream.InterestPolicy,
 		Subjects: []string{
 			fmt.Sprintf("%s.>", s.app.NatsInfo.Subjects.SystemPublic),
 			fmt.Sprintf("%s.>", s.app.NatsInfo.Subjects.SystemPrivate),
