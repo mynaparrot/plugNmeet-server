@@ -5,7 +5,7 @@ go 1.25.5
 require (
 	buf.build/go/protovalidate v1.1.3
 	github.com/Microsoft/cognitive-services-speech-sdk-go v1.48.2
-	github.com/ansrivas/fiberprometheus/v2 v2.16.0
+	github.com/ansrivas/fiberprometheus/v2 v2.17.0
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/gabriel-vasile/mimetype v1.4.13
 	github.com/go-jose/go-jose/v4 v4.1.3
@@ -21,13 +21,13 @@ require (
 	github.com/livekit/server-sdk-go/v2 v2.13.3
 	github.com/mynaparrot/plugnmeet-protocol v1.2.2-0.20260217221638-cc76b616ad56
 	github.com/nats-io/jwt/v2 v2.8.0
-	github.com/nats-io/nats.go v1.48.0
+	github.com/nats-io/nats.go v1.49.0
 	github.com/nats-io/nkeys v0.4.15
 	github.com/pion/webrtc/v4 v4.2.3
 	github.com/redis/go-redis/v9 v9.18.0
 	github.com/sirupsen/logrus v1.9.4
 	golang.org/x/sync v0.19.0
-	google.golang.org/genai v1.46.0
+	google.golang.org/genai v1.48.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/mysql v1.6.0
@@ -108,7 +108,6 @@ require (
 	github.com/prometheus/common v0.67.4 // indirect
 	github.com/prometheus/procfs v0.19.2 // indirect
 	github.com/puzpuzpuz/xsync/v3 v3.5.1 // indirect
-	github.com/stoewer/go-strcase v1.3.1 // indirect
 	github.com/twitchtv/twirp v8.1.3+incompatible // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.69.0 // indirect
