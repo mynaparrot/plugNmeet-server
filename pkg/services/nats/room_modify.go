@@ -30,10 +30,15 @@ const (
 func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeout, maxParticipants *uint32, metadata *plugnmeet.RoomMetadata) (string, error) {
 	// Create or update the key-value bucket for the room
 	bucket := s.formatConsolidatedRoomBucket(roomId)
+	roomTitle := metadata.GetRoomTitle()
+	if len(roomTitle) > 15 {
+		roomTitle = roomTitle[:15]
+	}
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
-		Replicas: s.app.NatsInfo.NumReplicas,
-		Bucket:   bucket,
-		TTL:      DefaultTTL,
+		Replicas:    s.app.NatsInfo.NumReplicas,
+		Bucket:      bucket,
+		TTL:         DefaultTTL,
+		Description: roomTitle,
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to create or update KV bucket: %w", err)
