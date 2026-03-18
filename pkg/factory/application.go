@@ -67,5 +67,6 @@ func (a *Application) Boot() {
 
 func (a *Application) Shutdown() {
 	a.Controllers.InsightsController.Shutdown()
+	a.Controllers.WebhookController.Shutdown()
 	a.janitorModel.Shutdown()
 }
