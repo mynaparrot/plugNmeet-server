@@ -128,7 +128,7 @@ func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 	}
 
 	// now we'll perform a few service related tasks
-	time.Sleep(time.Second)
+	// time.Sleep(time.Second)
 
 	// at the end we'll handle event notification
 	m.sendToWebhookNotifier(event)

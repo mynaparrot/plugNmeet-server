@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/gammazero/workerpool"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -24,8 +25,6 @@ import (
 const (
 	// DefaultNumWorkers Number of concurrent workers for processing NATS messages.
 	DefaultNumWorkers = 50
-	// DefaultJobQueueSize Size of the job queue. A larger buffer can handle larger bursts of messages.
-	DefaultJobQueueSize = 1000
 	// nats auth service endpoint subject
 	natsAuthServiceEndpointSubject = "$SYS.REQ.USER.AUTH"
 	// nats connection event subject format
@@ -41,10 +40,6 @@ const (
 	websocketClientType           = "websocket"
 )
 
-type natsJob struct {
-	handler func()
-}
-
 type NatsController struct {
 	app           *config.AppConfig
 	natsService   *natsservice.NatsService
@@ -52,7 +47,7 @@ type NatsController struct {
 	curveKeyPair  nkeys.KeyPair
 	authModel     *models.AuthModel
 	natsModel     *models.NatsModel
-	jobChan       chan natsJob
+	wp            *workerpool.WorkerPool
 	logger        *logrus.Entry
 }
 
@@ -68,7 +63,7 @@ func NewNatsController(app *config.AppConfig, natsService *natsservice.NatsServi
 		issuerKeyPair: issuerKeyPair,
 		authModel:     authModel,
 		natsModel:     natsModel,
-		jobChan:       make(chan natsJob, DefaultJobQueueSize),
+		wp:            workerpool.New(DefaultNumWorkers),
 		logger:        logger.WithField("controller", "nats"),
 	}
 
@@ -83,11 +78,6 @@ func NewNatsController(app *config.AppConfig, natsService *natsservice.NatsServi
 }
 
 func (c *NatsController) BootUp(ctx context.Context, wg *sync.WaitGroup) {
-	// Start the worker pool
-	for i := 0; i < DefaultNumWorkers; i++ {
-		go c.worker()
-	}
-
 	// system receiver as worker
 	stream, err := c.app.JetStream.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
 		Name:      fmt.Sprintf("%s", c.app.NatsInfo.Subjects.SystemJsWorker),
@@ -155,12 +145,7 @@ func (c *NatsController) BootUp(ctx context.Context, wg *sync.WaitGroup) {
 
 	sysWorkerCon.Stop()
 	_ = con.Unsubscribe()
-}
-
-func (c *NatsController) worker() {
-	for job := range c.jobChan {
-		job.handler()
-	}
+	c.wp.Stop()
 }
 
 // SubscribeToUsersConnEvents will be used to subscribe with users' connection events
@@ -178,9 +163,9 @@ func (c *NatsController) subscribeToUsersConnEvents() (*nats.Subscription, error
 		data := make([]byte, len(msg.Data))
 		copy(data, msg.Data)
 
-		c.jobChan <- natsJob{handler: func() {
+		c.wp.Submit(func() {
 			c.handleUserConnectionEvent(data, isConnect)
-		}}
+		})
 	})
 }
 
@@ -240,7 +225,7 @@ func (c *NatsController) subscribeToSystemWorker(ctx context.Context, stream jet
 		data := make([]byte, len(msg.Data()))
 		copy(data, msg.Data())
 
-		c.jobChan <- natsJob{handler: func() {
+		c.wp.Submit(func() {
 			req := new(plugnmeet.NatsMsgClientToServer)
 			if err := proto.Unmarshal(data, req); err == nil {
 				p := strings.Split(sub, ".")
@@ -248,7 +233,7 @@ func (c *NatsController) subscribeToSystemWorker(ctx context.Context, stream jet
 					c.natsModel.HandleFromClientToServerReq(p[1], p[2], req)
 				}
 			}
-		}}
+		})
 	}, jetstream.ConsumeErrHandler(func(consumeCtx jetstream.ConsumeContext, err error) {
 		if ctx.Err() == nil {
 			c.logger.WithError(err).Warn("jetstream consume error")
