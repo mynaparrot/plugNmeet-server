@@ -1,6 +1,7 @@
 package dbservice
 
 import (
+	"errors"
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
@@ -101,6 +102,9 @@ func (s *DatabaseService) UpdateNumParticipants(sId string, num int64) (int64, e
 
 // IncrementOrDecrementNumParticipants will increment or decrement the number of Participants
 func (s *DatabaseService) IncrementOrDecrementNumParticipants(sId, operator string) (int64, error) {
+	if operator != "+" && operator != "-" {
+		return 0, errors.New("invalid operator for IncrementOrDecrementNumParticipants")
+	}
 	update := map[string]interface{}{
 		"joined_participants": gorm.Expr("GREATEST(CAST(joined_participants AS SIGNED)" + operator + " 1, 0)"),
 	}
