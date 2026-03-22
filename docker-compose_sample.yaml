@@ -1,6 +1,6 @@
 services:
   redis:
-    image: redis:8.4
+    image: redis:8.6
     ports:
       - "6379:6379/tcp"
   db:
