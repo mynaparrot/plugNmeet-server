@@ -18,8 +18,8 @@ require (
 	github.com/google/wire v0.7.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/media-sdk v0.0.0-20251106223430-dd8f5e0de2cf
-	github.com/livekit/protocol v1.44.1-0.20260223055551-e05f7b7a6146
-	github.com/livekit/server-sdk-go/v2 v2.16.0
+	github.com/livekit/protocol v1.45.1
+	github.com/livekit/server-sdk-go/v2 v2.16.1
 	github.com/mynaparrot/plugnmeet-protocol v1.2.2-0.20260320100209-552a041b6298
 	github.com/nats-io/jwt/v2 v2.8.1
 	github.com/nats-io/nats.go v1.49.0
