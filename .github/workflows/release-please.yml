@@ -51,7 +51,7 @@ jobs:
 
       - name: Build and push
         if: ${{ steps.release.outputs.release_created }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./docker-build/Dockerfile
