@@ -2,11 +2,14 @@ package controllers
 
 import (
 	"fmt"
+	"net/url"
+	"strings"
 
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 )
 
@@ -29,14 +32,16 @@ const (
 
 // LtiV1Controller holds dependencies for LTI v1 related handlers.
 type LtiV1Controller struct {
+	app            *config.AppConfig
 	LtiV1Model     *models.LtiV1Model
 	RoomModel      *models.RoomModel
 	RecordingModel *models.RecordingModel
 }
 
 // NewLtiV1Controller creates a new LtiV1Controller.
-func NewLtiV1Controller(lm *models.LtiV1Model, rm *models.RoomModel, recm *models.RecordingModel) *LtiV1Controller {
+func NewLtiV1Controller(app *config.AppConfig, lm *models.LtiV1Model, rm *models.RoomModel, recm *models.RecordingModel) *LtiV1Controller {
 	return &LtiV1Controller{
+		app:            app,
 		LtiV1Model:     lm,
 		RoomModel:      rm,
 		RecordingModel: recm,
@@ -50,11 +55,28 @@ func (lc *LtiV1Controller) HandleLTIV1Landing(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).SendString("empty body")
 	}
 
+	hostName := c.Hostname()
 	proto := "https"
 	if c.Protocol() == "http" {
 		proto = "http"
 	}
-	signingURL := fmt.Sprintf("%s://%s%s", proto, c.Hostname(), c.Path())
+	// fiber format: [host]:[port]
+	parts := strings.Split(hostName, ":")
+
+	// we can use BBBJoinHost to build correct info
+	if lc.app.Client.BBBJoinHost != nil && *lc.app.Client.BBBJoinHost != "" {
+		if u, err := url.Parse(*lc.app.Client.BBBJoinHost); err == nil {
+			hostName = u.Hostname()
+			proto = u.Scheme
+
+			if len(parts) == 2 {
+				// we'll use port from the request
+				hostName = fmt.Sprintf("%s:%s", hostName, parts[1])
+			}
+		}
+	}
+
+	signingURL := fmt.Sprintf("%s://%s%s", proto, hostName, c.Path())
 
 	return lc.LtiV1Model.LTIV1Landing(c, string(b), signingURL)
 }

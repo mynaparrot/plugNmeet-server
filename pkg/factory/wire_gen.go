@@ -51,7 +51,7 @@ func NewAppFactory(ctx context.Context, appConfig *config.AppConfig) (*Applicati
 	etherpadController := controllers.NewEtherpadController(appConfig, etherpadModel, roomModel, databaseService)
 	fileController := controllers.NewFileController(appConfig, fileModel, logger)
 	ltiV1Model := models.NewLtiV1Model(appConfig, roomModel, userModel)
-	ltiV1Controller := controllers.NewLtiV1Controller(ltiV1Model, roomModel, recordingModel)
+	ltiV1Controller := controllers.NewLtiV1Controller(appConfig, ltiV1Model, roomModel, recordingModel)
 	pollsController := controllers.NewPollsController(pollModel, redisService)
 	recordingController := controllers.NewRecordingController(databaseService, recordingModel, logger)
 	roomController := controllers.NewRoomController(roomModel)
