@@ -91,10 +91,16 @@ func (c *NatsController) BootUp(ctx context.Context, wg *sync.WaitGroup) {
 		c.logger.WithError(err).Fatal("error creating system worker stream")
 	}
 
-	// now subscribe
+	// now subscribe via JetStream for guaranteed messages (e.g., PINGs)
 	sysWorkerCon, err := c.subscribeToSystemWorker(ctx, stream)
 	if err != nil {
 		c.logger.WithError(err).Fatal("error subscribing to system worker")
+	}
+
+	// Subscribe to the same subject via core NATS for lightweight pub/sub messages
+	sysWorkerCoreSub, err := c.subscribeToSystemWorkerCore()
+	if err != nil {
+		c.logger.WithError(err).Fatal("error subscribing to system worker via core NATS")
 	}
 
 	// create recorder transcoder worker
@@ -144,6 +150,7 @@ func (c *NatsController) BootUp(ctx context.Context, wg *sync.WaitGroup) {
 	<-ctx.Done()
 
 	sysWorkerCon.Stop()
+	_ = sysWorkerCoreSub.Unsubscribe()
 	_ = con.Unsubscribe()
 	c.wp.Stop()
 }
@@ -210,6 +217,38 @@ func (c *NatsController) handleUserConnectionEvent(data []byte, isConnect bool) 
 	}
 }
 
+// subscribeToSystemWorkerCore subscribes to the system worker subject via core NATS pub/sub.
+// This is intended for lightweight, fire-and-forget messages (e.g., analytics) that don't require JetStream's guarantees.
+// It runs in parallel with the JetStream consumer.
+func (c *NatsController) subscribeToSystemWorkerCore() (*nats.Subscription, error) {
+	subject := fmt.Sprintf("%s.*.*", c.app.NatsInfo.Subjects.SystemJsWorker)
+	// Use a queue group to load-balance across multiple server instances.
+	// The name is derived from the JetStream consumer for consistency.
+	queue := fmt.Sprintf("%s%s-core", prefix, c.app.NatsInfo.Subjects.SystemJsWorker)
+
+	return c.app.NatsConn.QueueSubscribe(subject, queue, func(msg *nats.Msg) {
+		// Copy data to avoid race conditions as the message buffer is reused.
+		sub := msg.Subject
+		data := make([]byte, len(msg.Data))
+		copy(data, msg.Data)
+
+		c.wp.Submit(func() {
+			req := new(plugnmeet.NatsMsgClientToServer)
+			if err := proto.Unmarshal(data, req); err == nil {
+				p := strings.Split(sub, ".")
+				if len(p) == 3 {
+					// The handler is the same as the JetStream one.
+					// The natsModel will differentiate the message by its event type.
+					c.natsModel.HandleFromClientToServerReq(p[1], p[2], req)
+				}
+			}
+		})
+	})
+}
+
+// subscribeToSystemWorker subscribes to the system worker subject via JetStream.
+// This is used for messages that require guaranteed delivery, such as PINGs, token renewals, and private messages.
+// It runs in parallel with the core NATS pub/sub subscriber.
 func (c *NatsController) subscribeToSystemWorker(ctx context.Context, stream jetstream.Stream) (jetstream.ConsumeContext, error) {
 	cons, err := stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
 		Durable: fmt.Sprintf("%s%s", prefix, c.app.NatsInfo.Subjects.SystemJsWorker),
