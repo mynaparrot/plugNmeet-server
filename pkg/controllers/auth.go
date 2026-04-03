@@ -39,17 +39,22 @@ func NewAuthController(config *config.AppConfig, natsService *natsservice.NatsSe
 
 // HandleAuthHeaderCheck is a middleware to check API-KEY & HASH-SIGNATURE.
 func (ac *AuthController) HandleAuthHeaderCheck(c *fiber.Ctx) error {
-	apiKey := c.Get("API-KEY", "")
-	signature := c.Get("HASH-SIGNATURE", "")
+	apiKey := c.Get("API-KEY")
+	signature := c.Get("HASH-SIGNATURE")
 	body := c.Body()
 
+	if apiKey == "" {
+		c.Status(fiber.StatusUnauthorized)
+		return utils.SendCommonProtoJsonResponse(c, false, "Missing API-KEY header.")
+	}
 	if apiKey != ac.AppConfig.Client.ApiKey {
 		c.Status(fiber.StatusUnauthorized)
-		return utils.SendCommonProtoJsonResponse(c, false, "invalid API key")
+		return utils.SendCommonProtoJsonResponse(c, false, "Invalid API key provided.")
 	}
+
 	if signature == "" {
 		c.Status(fiber.StatusUnauthorized)
-		return utils.SendCommonProtoJsonResponse(c, false, "hash signature value required")
+		return utils.SendCommonProtoJsonResponse(c, false, "Missing HASH-SIGNATURE header.")
 	}
 
 	mac := hmac.New(sha256.New, []byte(ac.AppConfig.Client.Secret))
@@ -57,7 +62,7 @@ func (ac *AuthController) HandleAuthHeaderCheck(c *fiber.Ctx) error {
 	expectedSignature := hex.EncodeToString(mac.Sum(nil))
 	if subtle.ConstantTimeCompare([]byte(expectedSignature), []byte(signature)) != 1 {
 		c.Status(fiber.StatusUnauthorized)
-		return utils.SendCommonProtoJsonResponse(c, false, "can't verify provided information")
+		return utils.SendCommonProtoJsonResponse(c, false, "Failed to verify provided authentication details.")
 	}
 
 	return c.Next()
