@@ -54,6 +54,16 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId string) {
 			HsetValue: &now,
 		})
 		log.Info("successfully processed user joined event")
+
+		roomInfo, err := m.natsService.GetRoomInfo(roomId)
+		if err != nil {
+			log.WithError(err).Error("failed to get room info")
+		}
+		if roomInfo != nil {
+			if _, err := m.ds.IncrementOrDecrementNumParticipants(roomInfo.GetRoomSid(), "+"); err != nil {
+				log.WithError(err).Error("failed to increment num participants")
+			}
+		}
 	} else if err != nil {
 		log.WithError(err).Warn("could not get user info after join")
 	}
@@ -75,8 +85,8 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) {
 		log.WithError(err).WithField("status", natsservice.UserStatusDisconnected).Warn("failed to update user status")
 	}
 
-	// update analytics for the user leaving.
-	m.updateUserLeftAnalytics(roomId, userId)
+	// update analytics & db for the user leaving.
+	m.updateUserLeftAnalytics(roomId, userId, log)
 
 	// Try to get user info for a richer disconnect message.
 	userInfo, err := m.natsService.GetUserInfo(roomId, userId)
@@ -159,7 +169,7 @@ func (m *NatsModel) revokeTurnCredentials(creds *turn.Credentials, log *logrus.E
 	}
 }
 
-func (m *NatsModel) updateUserLeftAnalytics(roomId, userId string) {
+func (m *NatsModel) updateUserLeftAnalytics(roomId, userId string, log *logrus.Entry) {
 	now := fmt.Sprintf("%d", time.Now().UnixMilli())
 	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
@@ -168,4 +178,14 @@ func (m *NatsModel) updateUserLeftAnalytics(roomId, userId string) {
 		UserId:    &userId,
 		HsetValue: &now,
 	})
+
+	roomInfo, err := m.natsService.GetRoomInfo(roomId)
+	if err != nil {
+		log.WithError(err).Error("failed to get room info")
+	}
+	if roomInfo != nil {
+		if _, err := m.ds.IncrementOrDecrementNumParticipants(roomInfo.GetRoomSid(), "-"); err != nil {
+			log.WithError(err).Error("failed to increment num participants")
+		}
+	}
 }

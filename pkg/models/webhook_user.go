@@ -38,11 +38,6 @@ func (m *WebhookModel) participantJoined(event *livekit.WebhookEvent) {
 	event.Room.MaxParticipants = uint32(rInfo.MaxParticipants)
 	event.Room.EmptyTimeout = uint32(rInfo.EmptyTimeout)
 
-	_, err = m.ds.IncrementOrDecrementNumParticipants(rInfo.RoomSid, "+")
-	if err != nil {
-		log.WithError(err).Errorln("error incrementing num participants")
-	}
-
 	if m.isRequireManualTrigger(event.Participant.Identity) {
 		if strings.HasPrefix(event.Participant.Identity, config.SipUserIdPrefix) {
 			// for special case SIP
@@ -94,11 +89,6 @@ func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 	event.Room.Metadata = rInfo.Metadata
 	event.Room.MaxParticipants = uint32(rInfo.MaxParticipants)
 	event.Room.EmptyTimeout = uint32(rInfo.EmptyTimeout)
-
-	_, err = m.ds.IncrementOrDecrementNumParticipants(rInfo.RoomSid, "-")
-	if err != nil {
-		log.WithError(err).Errorln("error decrementing num participants")
-	}
 
 	if m.isRequireManualTrigger(event.Participant.Identity) {
 		if strings.HasPrefix(event.Participant.Identity, config.SipUserIdPrefix) {
