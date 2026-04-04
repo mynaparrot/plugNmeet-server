@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.1.5](https://github.com/mynaparrot/plugNmeet-server/compare/v2.1.4...v2.1.5) (2026-04-04)
+
+
+### Bug Fixes
+
+* bug fix and improved LTI ([42d25cc](https://github.com/mynaparrot/plugNmeet-server/commit/42d25cc1e7d3404d9ea899871f4d34056aeddf44))
+* bump deps ([d0809a1](https://github.com/mynaparrot/plugNmeet-server/commit/d0809a1e2016fde2a1d0ff74de654c6cbd052788))
+* bump deps ([9626944](https://github.com/mynaparrot/plugNmeet-server/commit/9626944c38e80884565dd534040bf050df264963))
+* db counter should update when user conncted/disconncted ([b09d589](https://github.com/mynaparrot/plugNmeet-server/commit/b09d589d04dd4c111042f45365a5884ddde1edbe))
+* **deps:** update module github.com/go-jose/go-jose/v4 to v4.1.4 [security] ([0db6d9b](https://github.com/mynaparrot/plugNmeet-server/commit/0db6d9b9f7683d2213e29b4b0939d36257549a2b))
+* **deps:** update module github.com/go-jose/go-jose/v4 to v4.1.4 [security] ([24ccdb4](https://github.com/mynaparrot/plugNmeet-server/commit/24ccdb4638f322b52c5145b5fd310285f86bd226))
+* **deps:** update module github.com/goccy/go-json to v0.10.6 ([a44ef26](https://github.com/mynaparrot/plugNmeet-server/commit/a44ef262ffb844f1b641822682a37bda136fb5be))
+* **deps:** update module github.com/goccy/go-json to v0.10.6 ([f7baa2b](https://github.com/mynaparrot/plugNmeet-server/commit/f7baa2b4d8f0959af3c6b3a50e3773f4bc3f11a4))
+* just for safety although strickly controlled by caller ([2e7569f](https://github.com/mynaparrot/plugNmeet-server/commit/2e7569fc79e560c3de0f4e8ed3a48b6b679968f9))
+* **LTI:** build URL correct way ([4e012f3](https://github.com/mynaparrot/plugNmeet-server/commit/4e012f34ab0ff0f206180805528758ee2e3689c6))
+* migrate manual worker pool to `gammazero/workerpool` ([6f5d5ad](https://github.com/mynaparrot/plugNmeet-server/commit/6f5d5add048b4071ba723daf19473f6dda35c7e8))
+* **nats:** Implemented new system pub/sub core channel and moved `sendAnalyticsData` to use it. ([75e41a2](https://github.com/mynaparrot/plugNmeet-server/commit/75e41a22215d36df5e34fef44764d8657bb1b726))
+* update messages ([1a7a64c](https://github.com/mynaparrot/plugNmeet-server/commit/1a7a64cea50e4e75b6356650de9ef2602068a8db))
+* use latest image ([ce714ec](https://github.com/mynaparrot/plugNmeet-server/commit/ce714ec79258431123312ddad99d072e67b20d15))
+* use title to identify ([98b12bd](https://github.com/mynaparrot/plugNmeet-server/commit/98b12bd4791ef6d16c71617ec6b9b961e36b192e))
+
 ## [2.1.4](https://github.com/mynaparrot/plugNmeet-server/compare/v2.1.3...v2.1.4) (2026-03-02)
 
 
