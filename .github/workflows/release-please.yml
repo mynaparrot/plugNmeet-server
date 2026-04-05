@@ -23,7 +23,7 @@ jobs:
       - name: Docker meta
         if: ${{ steps.release.outputs.release_created }}
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/plugnmeet-server
           tags: |
