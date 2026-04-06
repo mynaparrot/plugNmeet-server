@@ -20,7 +20,7 @@ require (
 	github.com/livekit/media-sdk v0.0.0-20251106223430-dd8f5e0de2cf
 	github.com/livekit/protocol v1.45.1
 	github.com/livekit/server-sdk-go/v2 v2.16.1
-	github.com/mynaparrot/plugnmeet-protocol v1.2.2-0.20260328091936-21903c6a5e05
+	github.com/mynaparrot/plugnmeet-protocol v1.2.2-0.20260406140131-e4cdbb15b0fc
 	github.com/nats-io/jwt/v2 v2.8.1
 	github.com/nats-io/nats.go v1.50.0
 	github.com/nats-io/nkeys v0.4.15
@@ -44,7 +44,7 @@ require (
 	cloud.google.com/go/auth v0.18.2 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	filippo.io/edwards25519 v1.2.0 // indirect
-	github.com/DeRuina/timberjack v1.4.0 // indirect
+	github.com/DeRuina/timberjack v1.4.1 // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/at-wat/ebml-go v0.17.2 // indirect

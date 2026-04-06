@@ -98,7 +98,7 @@ func (w *WebhookNotifier) getOrCreateNotifier(roomId string) *roomNotifier {
 
 	// Create the new wrapper with the fetched URLs and the worker.
 	newNotifier := &roomNotifier{
-		worker: webhook.NewNotifier(w.ctx, config.DefaultWebhookQueueSize, w.logger.Logger),
+		worker: webhook.NewNotifier(w.ctx, 1, 2, w.logger),
 		urls:   d.Urls,
 	}
 
@@ -279,7 +279,7 @@ func (w *WebhookNotifier) ForceToPutInQueue(event *plugnmeet.CommonNotifyEvent) 
 		return
 	}
 
-	notifier := webhook.NewNotifier(w.ctx, config.DefaultWebhookQueueSize, w.logger.Logger)
+	notifier := webhook.NewNotifier(w.ctx, 1, 2, w.logger)
 	defer notifier.StopGracefully()
 	notifier.AddInNotifyQueue(event, w.app.Client.ApiKey, w.app.Client.Secret, urls)
 }
