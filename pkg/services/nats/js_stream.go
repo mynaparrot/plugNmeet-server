@@ -25,7 +25,9 @@ func (s *NatsService) createRoomNatsStream() {
 	s.logger.Infof("successfully created room stream: %s", s.app.NatsInfo.RoomStreamName)
 }
 
-func (s *NatsService) DeleteRoomNatsStream(roomId string) error {
+// PurgeRoomMessagesFromStream purges all message subjects for a specific room from the main stream.
+// It does NOT delete the stream itself.
+func (s *NatsService) PurgeRoomMessagesFromStream(roomId string) error {
 	// Purge all subjects for the specific room.
 	stream, err := s.js.Stream(s.ctx, s.app.NatsInfo.RoomStreamName)
 	if err != nil {

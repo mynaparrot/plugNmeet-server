@@ -148,10 +148,12 @@ func (s *NatsService) UpdateRoomStatus(roomId string, status string) error {
 	return nil
 }
 
-// OnAfterSessionEndCleanup performs cleanup after a session ends
+// OnAfterSessionEndCleanup is the final, authoritative cleanup process for a room in NATS.
+// It ensures all consumers are deleted, all messages are purged, and the room's KV bucket is removed.
+// This function acts as a safety net to prevent orphaned NATS resources.
 func (s *NatsService) OnAfterSessionEndCleanup(roomId string) {
 	// silently delete everything without log
 	_ = s.deleteAllUserConsumers(roomId)
-	_ = s.DeleteRoomNatsStream(roomId)
+	_ = s.PurgeRoomMessagesFromStream(roomId)
 	_ = s.DeleteRoom(roomId)
 }

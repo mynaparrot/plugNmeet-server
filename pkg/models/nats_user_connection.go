@@ -119,7 +119,10 @@ func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, userInfo *p
 	}
 
 	// User is still disconnected, so mark as offline.
-	_ = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusOffline)
+	// We only log an error if the room hasn't ended, as the user's KV will be deleted soon anyway.
+	if err := m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusOffline); err != nil && !roomEnded {
+		log.WithError(err).Warn("failed to update user status to offline")
+	}
 
 	// Broadcast the final offline status.
 	if userInfo != nil {
@@ -130,7 +133,7 @@ func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, userInfo *p
 		}
 	} else {
 		// Fallback if userInfo was not available initially.
-		_ = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_OFFLINE, roomId, &plugnmeet.NatsKvUserInfo{UserId: userId}, userId)
+		_ = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_OFFLINE, roomId, &plugnmeet.NatsKvUserInfo{UserId: userId, RoomId: roomId}, userId)
 	}
 
 	// If the room ended during Stage 1, skip Stage 2 and go straight to cleanup.
@@ -147,7 +150,8 @@ func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, userInfo *p
 	// also try to silently remove this user from livekit as well
 	_, _ = m.lk.RemoveParticipant(roomId, userId)
 
-	// Final cleanup: Delete the user's NATS consumer.
+	// Final cleanup for a user leaving an active room.
+	// Note: this is redundant if the room has ended, as OnAfterSessionEndCleanup will sweep all consumers.
 	m.natsService.DeleteConsumer(roomId, userId)
 
 	if turnCreds != nil {

@@ -44,12 +44,13 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 		}
 		if roomDbInfo.IsRunning == 1 {
 			log.Warn("Room active in DB but not in NATS during EndRoom. Marking as ended and cleaning up.")
-			go m.OnAfterRoomEnded(roomDbInfo.ID, roomDbInfo.RoomId, roomDbInfo.Sid, "", "") // Metadata might be empty
+			go m.OnAfterRoomEnded(roomDbInfo.ID, roomDbInfo.RoomId, roomDbInfo.Sid, "", "", uint64(roomDbInfo.CreationTime)) // Metadata might be empty
 		}
 		return true, "room ended (NATS info was missing, cleanup initiated)"
 	}
 
 	// Temporarily cache the live room data in Redis.
+	// This serves as a fallback in case the 'room_finished' webhook from LiveKit is delayed.
 	m.rs.HoldTemporaryRoomData(info)
 
 	// Broadcast a 'SESSION_ENDED' event to all clients in the room.
@@ -58,11 +59,11 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 	}
 
 	// Trigger the main asynchronous cleanup process.
-	go m.OnAfterRoomEnded(info.DbTableId, info.RoomId, info.RoomSid, info.Metadata, info.Status)
+	go m.OnAfterRoomEnded(info.DbTableId, info.RoomId, info.RoomSid, info.Metadata, info.Status, info.CreatedAt)
 	return true, "success"
 }
 
-func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata, roomStatus string) {
+func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata, roomStatus string, createdAt uint64) {
 	log := m.logger.WithFields(logrus.Fields{
 		"room_id":     roomID,
 		"room_sid":    roomSID,
@@ -106,7 +107,7 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 	m.waitForAllUsersToDisconnect(roomID)
 
 	// send session_ended webhook before ending room in livekit
-	m.sendSessionEndedWebhook(roomID, roomSID)
+	m.sendSessionEndedWebhook(roomID, roomSID, metadata, createdAt)
 
 	if roomStatus != natsservice.RoomStatusEnded {
 		err := m.natsService.UpdateRoomStatus(roomID, natsservice.RoomStatusEnded)
@@ -163,7 +164,7 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 	m.lk.DeleteSIPDispatchRule(roomID, log)
 
 	// NOTE: ==> THIS WILL BE THE LAST <==
-	// Perform the final NATS cleanup, deleting room-specific streams, and KV stores.
+	// Final NATS cleanup: deletes all consumers, messages, and the KV store for this room.
 	m.natsService.OnAfterSessionEndCleanup(roomID)
 
 	log.Info("Room has been cleaned properly")
@@ -211,14 +212,16 @@ func (m *RoomModel) waitForAllUsersToDisconnect(roomID string) {
 }
 
 // sendSessionEndedWebhook to send webhook
-func (m *RoomModel) sendSessionEndedWebhook(roomId, roomSid string) {
+func (m *RoomModel) sendSessionEndedWebhook(roomId, roomSid, metadata string, createdAt uint64) {
 	if m.webhookNotifier != nil {
 		e := "session_ended"
 		msg := &plugnmeet.CommonNotifyEvent{
 			Event: &e,
 			Room: &plugnmeet.NotifyEventRoom{
-				RoomId: &roomId,
-				Sid:    &roomSid,
+				RoomId:       &roomId,
+				Sid:          &roomSid,
+				Metadata:     &metadata,
+				CreationTime: &createdAt,
 			},
 		}
 
