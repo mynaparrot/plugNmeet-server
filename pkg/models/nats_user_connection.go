@@ -103,20 +103,17 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId string) {
 	go m.handleDelayedOfflineTasks(roomId, userId, userInfo, log)
 }
 
-// handleDelayedOfflineTasks manages the grace period for user reconnection and subsequent cleanup.
+// handleDelayedOfflineTasks manages the grace period for user reconnection and subsequent cleanup using periodic checks.
 func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, userInfo *plugnmeet.NatsKvUserInfo, log *logrus.Entry) {
 	log = log.WithField("subMethod", "handleDelayedOfflineTasks")
-	log.Info("starting delayed offline tasks")
+	log.Info("starting delayed offline tasks with periodic checks")
 
 	// get TurnCredentials to use it later otherwise it may cleaned up if room ended
 	turnCreds, _ := m.natsService.GetUserTurnCredentials(roomId, userId)
 
-	// Stage 1: Wait for the reconnection grace period.
-	time.Sleep(5 * time.Second)
-
-	status, err := m.natsService.GetRoomUserStatus(roomId, userId)
-	if err == nil && status == natsservice.UserStatusOnline {
-		// User reconnected, do nothing.
+	// Stage 1: Wait for the reconnection grace period (5s), checking every second.
+	reconnected, roomEnded := m.waitForReconnect(roomId, userId, 5*time.Second, 1*time.Second, log)
+	if reconnected {
 		log.Info("user reconnected within grace period, aborting offline tasks")
 		return
 	}
@@ -126,7 +123,7 @@ func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, userInfo *p
 
 	// Broadcast the final offline status.
 	if userInfo != nil {
-		if err = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_OFFLINE, roomId, userInfo, userId); err != nil {
+		if err := m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_OFFLINE, roomId, userInfo, userId); err != nil {
 			if !errors.Is(err, config.NoOnlineUserFound) {
 				log.WithError(err).Warn("failed to broadcast USER_OFFLINE event")
 			}
@@ -136,15 +133,17 @@ func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, userInfo *p
 		_ = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_OFFLINE, roomId, &plugnmeet.NatsKvUserInfo{UserId: userId}, userId)
 	}
 
-	// Stage 2: Wait a bit longer before cleaning up resources.
-	time.Sleep(30 * time.Second)
-
-	status, err = m.natsService.GetRoomUserStatus(roomId, userId)
-	if err == nil && status == natsservice.UserStatusOnline {
-		// User reconnected, do not delete consumer.
-		log.Info("user reconnected before final cleanup, consumer will not be deleted")
-		return
+	// If the room ended during Stage 1, skip Stage 2 and go straight to cleanup.
+	if roomEnded {
+		log.Info("room ended during grace period, skipping second wait and proceeding to final cleanup")
+	} else {
+		// Stage 2: Wait a bit longer (30s) before cleaning up, checking for changes every 5 seconds.
+		if reconnected, _ = m.waitForReconnect(roomId, userId, 30*time.Second, 5*time.Second, log); reconnected {
+			log.Info("user reconnected before final cleanup, consumer will not be deleted")
+			return
+		}
 	}
+
 	// also try to silently remove this user from livekit as well
 	_, _ = m.lk.RemoveParticipant(roomId, userId)
 
@@ -157,6 +156,39 @@ func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, userInfo *p
 	}
 
 	log.Info("user offline tasks completed")
+}
+
+// waitForReconnect periodically checks for user reconnection or if the room has ended.
+// Returns (reconnected bool, roomEnded bool).
+func (m *NatsModel) waitForReconnect(roomId, userId string, totalWait, interval time.Duration, log *logrus.Entry) (reconnected bool, roomEnded bool) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	timeout := time.After(totalWait)
+
+	for {
+		select {
+		case <-timeout:
+			// Wait period is over. User did not reconnect, and we didn't detect the room ending.
+			return false, false
+		case <-ticker.C:
+			// 1. Check if user reconnected (highest priority)
+			status, err := m.natsService.GetRoomUserStatus(roomId, userId)
+			if err == nil && status == natsservice.UserStatusOnline {
+				return true, false // User reconnected.
+			}
+
+			// 2. Check if room has ended.
+			roomInfo, _ := m.natsService.GetRoomInfo(roomId) // Ignore error, nil info is a valid signal.
+			if roomInfo == nil {
+				log.Info("room info not found, assuming it has ended.")
+				return false, true // Room has ended.
+			}
+			if roomInfo.Status == natsservice.RoomStatusEnded || roomInfo.Status == natsservice.RoomStatusTriggeredEnd {
+				log.Info("room has ended, proceeding to next cleanup step")
+				return false, true // Room has ended.
+			}
+		}
+	}
 }
 
 func (m *NatsModel) revokeTurnCredentials(creds *turn.Credentials, log *logrus.Entry) {
