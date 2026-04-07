@@ -24,10 +24,9 @@ func (s *RedisService) HoldTemporaryRoomData(info *plugnmeet.NatsKvRoomInfo) {
 		log.WithError(err).Errorln("marshalling failed")
 		return
 	}
-	key := fmt.Sprintf(temporaryRoomData, info.RoomId)
 
-	err = s.rc.SetNX(s.ctx, key, marshal, time.Minute*1).Err()
-	if err != nil {
+	key := fmt.Sprintf(temporaryRoomData, info.RoomId)
+	if err = s.rc.SetNX(s.ctx, key, marshal, time.Minute*1).Err(); err != nil {
 		log.WithError(err).Errorln("SetNX failed")
 	}
 }

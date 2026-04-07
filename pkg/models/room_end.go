@@ -27,22 +27,21 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 	}
 	log.Info("Proceeding to end room")
 
-	// Fetch room information from the database.
-	roomDbInfo, err := m.ds.GetRoomInfoByRoomId(roomID, 1)
-	if err != nil {
-		return false, err.Error()
-	}
-	if roomDbInfo == nil || roomDbInfo.ID == 0 {
-		return false, "room not found in DB or not active"
-	}
-
-	// Fetch the live room state from the NATS key-value store.
+	// Fetch the live room state from the NATS key-value store first.
 	info, err := m.natsService.GetRoomInfo(roomID)
 	if err != nil {
-		log.WithError(err).Warn("NATS GetRoomInfo failed during EndRoom. Proceeding with DB cleanup.")
+		log.WithError(err).Warn("NATS GetRoomInfo failed during EndRoom. Falling back to DB check.")
 	}
-	// Handle cases where the room exists in the DB but not in NATS.
+
 	if info == nil {
+		// If NATS fails or room not in NATS, check the database.
+		roomDbInfo, dbErr := m.ds.GetRoomInfoByRoomId(roomID, 1) // Using 1 for active
+		if dbErr != nil {
+			return false, dbErr.Error()
+		}
+		if roomDbInfo == nil || roomDbInfo.ID == 0 {
+			return false, "room not found in DB or not active"
+		}
 		if roomDbInfo.IsRunning == 1 {
 			log.Warn("Room active in DB but not in NATS during EndRoom. Marking as ended and cleaning up.")
 			go m.OnAfterRoomEnded(roomDbInfo.ID, roomDbInfo.RoomId, roomDbInfo.Sid, "", "") // Metadata might be empty
@@ -51,16 +50,14 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 	}
 
 	// Temporarily cache the live room data in Redis.
-	// This serves as a fallback in case the 'room_finished' webhook from LiveKit is delayed.
 	m.rs.HoldTemporaryRoomData(info)
 
-	// Broadcast a 'SESSION_ENDED' event to all clients in the room to notify them.
-	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SESSION_ENDED, roomID, "notifications.room-disconnected-room-ended", nil)
-	if err != nil {
+	// Broadcast a 'SESSION_ENDED' event to all clients in the room.
+	if err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SESSION_ENDED, roomID, "notifications.room-disconnected-room-ended", nil); err != nil {
 		log.WithError(err).Error("error sending session ended notification message")
 	}
 
-	// Trigger the main asynchronous cleanup process in a separate goroutine.
+	// Trigger the main asynchronous cleanup process.
 	go m.OnAfterRoomEnded(info.DbTableId, info.RoomId, info.RoomSid, info.Metadata, info.Status)
 	return true, "success"
 }
@@ -76,8 +73,7 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 
 	if roomStatus != natsservice.RoomStatusEnded {
 		// update status immediately to prevent user to join
-		err := m.natsService.UpdateRoomStatus(roomID, natsservice.RoomStatusTriggeredEnd)
-		if err != nil {
+		if err := m.natsService.UpdateRoomStatus(roomID, natsservice.RoomStatusTriggeredEnd); err != nil {
 			log.WithError(err).Error("error updating room status")
 		}
 	}
@@ -106,9 +102,11 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 		}
 	}()
 
-	// to avoid race condition better wait few seconds
-	// so that all the users got disconnect properly
-	time.Sleep(config.WaitBeforeTriggerOnAfterRoomEnded)
+	// Wait for all users to disconnect before proceeding.
+	m.waitForAllUsersToDisconnect(roomID)
+
+	// send session_ended webhook before ending room in livekit
+	m.sendSessionEndedWebhook(roomID, roomSID)
 
 	if roomStatus != natsservice.RoomStatusEnded {
 		err := m.natsService.UpdateRoomStatus(roomID, natsservice.RoomStatusEnded)
@@ -176,4 +174,56 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 		// PrepareToExportAnalytics has it's own room creation locking logic
 		m.analyticsModel.PrepareToExportAnalytics(roomID, roomSID, metadata)
 	})
+}
+
+// waitForAllUsersToDisconnect waits for all users in a room to disconnect.
+// It checks periodically and times out after a configured duration.
+func (m *RoomModel) waitForAllUsersToDisconnect(roomID string) {
+	log := m.logger.WithField("room_id", roomID)
+	totalWait := config.WaitBeforeTriggerOnAfterRoomEnded
+	interval := 1 * time.Second // Check every second
+
+	timeout := time.After(totalWait)
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	log.Infof("Waiting up to %s for all users to disconnect.", totalWait)
+
+	for {
+		select {
+		case <-timeout:
+			log.Warn("Timed out waiting for all users to disconnect. Proceeding with cleanup.")
+			return
+		case <-ticker.C:
+			onlineUsers, err := m.natsService.GetOnlineUsersId(roomID)
+			if err != nil {
+				log.WithError(err).Warn("Failed to get online user list while waiting for disconnect. Proceeding with cleanup.")
+				return // Exit if we can't check users
+			}
+
+			if onlineUsers == nil || len(onlineUsers) == 0 {
+				log.Info("All users have disconnected. Proceeding with cleanup.")
+				return // All users are gone, exit loop
+			}
+			log.Infof("Waiting for %d user(s) to disconnect...", len(onlineUsers))
+		}
+	}
+}
+
+// sendSessionEndedWebhook to send webhook
+func (m *RoomModel) sendSessionEndedWebhook(roomId, roomSid string) {
+	if m.webhookNotifier != nil {
+		e := "session_ended"
+		msg := &plugnmeet.CommonNotifyEvent{
+			Event: &e,
+			Room: &plugnmeet.NotifyEventRoom{
+				RoomId: &roomId,
+				Sid:    &roomSid,
+			},
+		}
+
+		if err := m.webhookNotifier.SendWebhookEvent(msg); err != nil {
+			m.logger.WithError(err).Errorln("error sending session ended webhook")
+		}
+	}
 }

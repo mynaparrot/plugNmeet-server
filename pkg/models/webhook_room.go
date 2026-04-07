@@ -109,26 +109,18 @@ func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 	event.Room.MaxParticipants = uint32(rInfo.MaxParticipants)
 	event.Room.EmptyTimeout = uint32(rInfo.EmptyTimeout)
 
-	// we are introducing a new event name here
-	// because for our case we still have remaining tasks
-	m.sendCustomTypeWebhook(event, "session_ended")
-
 	if rInfo.Status != natsservice.RoomStatusEnded {
 		// This means the room was ended directly by LiveKit (e.g., empty timeout),
 		// not through the plugNmeet API. We need to trigger our cleanup flow.
 		log.Warnln("room was not ended via API, triggering plugNmeet EndRoom flow")
 
 		// change status to ended
-		err = m.natsService.UpdateRoomStatus(rInfo.RoomId, natsservice.RoomStatusEnded)
-		if err != nil {
+		if err = m.natsService.UpdateRoomStatus(rInfo.RoomId, natsservice.RoomStatusEnded); err != nil {
 			log.WithError(err).Errorln("failed to update room status")
 		}
 		// end the room in the proper plugNmeet way
 		m.rm.EndRoom(m.ctx, &plugnmeet.RoomEndReq{RoomId: rInfo.RoomId})
 	}
-
-	// now we'll perform a few service related tasks
-	// time.Sleep(time.Second)
 
 	// at the end we'll handle event notification
 	m.sendToWebhookNotifier(event)
