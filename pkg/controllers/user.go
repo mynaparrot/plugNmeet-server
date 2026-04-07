@@ -136,7 +136,7 @@ func (uc *UserController) HandleMuteUnMuteTrack(c *fiber.Ctx) error {
 	}
 
 	req.RequestedUserId = requestedUserId.(string)
-	err = uc.UserModel.MuteUnMuteTrack(req)
+	err = uc.UserModel.MuteUnMuteTrack(c.UserContext(), req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}

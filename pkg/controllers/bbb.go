@@ -156,7 +156,7 @@ func (bc *BBBController) HandleBBBCreate(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", err.Error()))
 	}
 
-	room, err := bc.RoomModel.CreateRoom(pnmReq)
+	room, err := bc.RoomModel.CreateRoom(c.UserContext(), pnmReq)
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 	}
@@ -340,8 +340,7 @@ func (bc *BBBController) HandleBBBGetMeetingInfo(c *fiber.Ctx) error {
 
 // HandleBBBGetMeetings handles BBB getMeetings requests.
 func (bc *BBBController) HandleBBBGetMeetings(c *fiber.Ctx) error {
-	_, _, rooms := bc.RoomModel.GetActiveRoomsInfo()
-
+	_, _, rooms := bc.RoomModel.GetActiveRoomsInfo(c.UserContext())
 	if rooms == nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("SUCCESS", "noMeetings", "no meetings were found on this server"))
 	}

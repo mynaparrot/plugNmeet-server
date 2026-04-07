@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -13,7 +14,7 @@ import (
 
 const BreakoutRoomFormat = "%s-%s"
 
-func (m *BreakoutRoomModel) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRoomsReq) error {
+func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plugnmeet.CreateBreakoutRoomsReq) error {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId":   r.RoomId,
 		"method":   "CreateBreakoutRooms",
@@ -73,7 +74,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(r *plugnmeet.CreateBreakoutRooms
 		bRoom.RoomId = bRoomId
 		meta.RoomTitle = room.Title
 		bRoom.Metadata = meta
-		_, err := m.rm.CreateRoom(bRoom)
+		_, err := m.rm.CreateRoom(userCtx, bRoom)
 
 		if err != nil {
 			roomLog.WithError(err).Error("failed to create breakout room")

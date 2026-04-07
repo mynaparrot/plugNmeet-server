@@ -1,6 +1,7 @@
 package dbservice
 
 import (
+	"context"
 	"errors"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
@@ -60,13 +61,13 @@ func (s *DatabaseService) GetRoomInfoByTableId(tableId uint64) (*dbmodels.RoomIn
 	return info, nil
 }
 
-func (s *DatabaseService) GetActiveRoomsInfo() ([]dbmodels.RoomInfo, error) {
+func (s *DatabaseService) GetActiveRoomsInfo(ctx context.Context) ([]dbmodels.RoomInfo, error) {
 	var rooms []dbmodels.RoomInfo
 	cond := &dbmodels.RoomInfo{
 		IsRunning: 1,
 	}
 
-	result := s.db.Where(cond).Find(&rooms)
+	result := s.db.WithContext(ctx).Where(cond).Find(&rooms)
 	switch {
 	case errors.Is(result.Error, gorm.ErrRecordNotFound):
 		return nil, nil
@@ -77,14 +78,14 @@ func (s *DatabaseService) GetActiveRoomsInfo() ([]dbmodels.RoomInfo, error) {
 	return rooms, nil
 }
 
-func (s *DatabaseService) GetPastRooms(roomIds []string, offset, limit uint64, direction *string) ([]dbmodels.RoomInfo, int64, error) {
+func (s *DatabaseService) GetPastRooms(ctx context.Context, roomIds []string, offset, limit uint64, direction *string) ([]dbmodels.RoomInfo, int64, error) {
 	var roomsInfo []dbmodels.RoomInfo
 	var total int64
 	cond := &dbmodels.RoomInfo{
 		IsRunning: 0,
 	}
 
-	d := s.db.Model(&dbmodels.RoomInfo{}).Where(cond)
+	d := s.db.WithContext(ctx).Model(&dbmodels.RoomInfo{}).Where(cond)
 	if len(roomIds) > 0 {
 		d.Where("roomId IN ?", roomIds)
 	}

@@ -26,7 +26,7 @@ func (m *JanitorModel) checkRoomWithDuration() {
 func (m *JanitorModel) activeRoomChecker() {
 	log := m.logger.WithField("task", "activeRoomChecker")
 
-	activeRooms, err := m.ds.GetActiveRoomsInfo()
+	activeRooms, err := m.ds.GetActiveRoomsInfo(m.ctx)
 	if err != nil {
 		return
 	}

@@ -15,13 +15,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoomInfo, error) {
+func (m *RoomModel) CreateRoom(userCtx context.Context, r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoomInfo, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"room_id":       r.GetRoomId(),
 		"breakout_room": r.GetMetadata().GetIsBreakoutRoom(),
 		"method":        "CreateRoom",
 	})
-	log.Infoln("create room request")
+	started := time.Now()
+	log.Infoln("Room creation request received")
 
 	// Validate the roomId to ensure it doesn't contain our internal patterns.
 	if strings.Contains(r.RoomId, natsservice.UserKeyFieldPrefix) {
@@ -36,14 +37,14 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 	}
 
 	// we'll lock the same room creation until the room is created
-	lockValue, err := acquireRoomCreationLockWithRetry(m.ctx, m.rs, r.GetRoomId(), log)
+	lockValue, err := acquireRoomCreationLockWithRetry(userCtx, m.rs, r.GetRoomId(), log)
 	if err != nil {
 		return nil, err // Error already logged by helper
 	}
 
 	// Defer unlock using the obtained lockValue for safety.
 	defer func() {
-		unlockCtx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		unlockCtx, cancel := context.WithTimeout(userCtx, 5*time.Second)
 		defer cancel()
 		if unlockErr := m.rs.UnlockRoomCreation(unlockCtx, r.GetRoomId(), lockValue); unlockErr != nil {
 			// UnlockRoomCreation in RedisService should log details
@@ -92,7 +93,7 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 		"room_sid":    sid,
 		"webhook_url": roomDbInfo.WebhookUrl,
 	})
-	log.Info("room info saved to db")
+	log.Info("Room info added to DB")
 
 	if !r.Metadata.IsBreakoutRoom {
 		sipDialInFeatures := r.Metadata.RoomFeatures.SipDialInFeatures
@@ -114,10 +115,10 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 	// now create room bucket
 	mt, err := m.natsService.AddRoom(roomDbInfo.ID, r.RoomId, sid, r.EmptyTimeout, r.MaxParticipants, r.Metadata)
 	if err != nil {
-		log.WithError(err).Error("failed to add room to nats")
+		log.WithError(err).Error("Failed to add room to NATS")
 		return nil, err
 	}
-	log.Info("room added to nats")
+	log.Info("Room info added to NATS")
 
 	// preload whiteboard file if needed
 	if !r.Metadata.IsBreakoutRoom {
@@ -137,14 +138,14 @@ func (m *RoomModel) CreateRoom(r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoo
 	// create and send room_created webhook
 	go m.sendRoomCreatedWebhook(ari, r.EmptyTimeout, r.MaxParticipants)
 
-	log.Info("successfully created new room")
+	log.Infof("Successfully finished room creation after %s", time.Since(started))
 	return ari, nil
 }
 
 // handleExistingRoom to handle logic if room already exists
 func (m *RoomModel) handleExistingRoom(r *plugnmeet.CreateRoomReq, roomDbInfo *dbmodels.RoomInfo, log *logrus.Entry) (*plugnmeet.ActiveRoomInfo, error) {
 	log = log.WithField("subMethod", "handleExistingRoom")
-	log.Info("checking NATS for live room info")
+	log.Info("Checking NATS for live room info")
 
 	rInfo, err := m.natsService.GetRoomInfo(r.RoomId)
 	if err != nil {
@@ -301,7 +302,7 @@ func (m *RoomModel) prepareWhiteboardPreloadFile(meta *plugnmeet.RoomMetadata, r
 		"subMethod":        "prepareWhiteboardPreloadFile",
 	})
 
-	log.Info("preparing preloaded whiteboard file")
+	log.Info("Preparing preloaded whiteboard file")
 
 	res, err := m.fileModel.DownloadAndProcessPreUploadWBfile(roomId, roomSid, preloadFile, log)
 	if err != nil {
@@ -325,7 +326,7 @@ func (m *RoomModel) prepareWhiteboardPreloadFile(meta *plugnmeet.RoomMetadata, r
 		log.WithError(updateErr).Error("failed to update room metadata after whiteboard processing error")
 	}
 
-	log.Info("preloaded whiteboard file processed successfully")
+	log.Info("Preloaded whiteboard file processed successfully")
 }
 
 // sendRoomCreatedWebhook to send webhook

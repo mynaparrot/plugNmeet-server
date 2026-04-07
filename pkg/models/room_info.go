@@ -81,7 +81,7 @@ func (m *RoomModel) GetActiveRoomInfo(ctx context.Context, r *plugnmeet.GetActiv
 		Metadata:           rrr.Metadata,
 	}
 
-	if participants, err := m.lk.LoadParticipants(roomDbInfo.RoomId); err == nil && participants != nil && len(participants) > 0 {
+	if participants, err := m.lk.LoadParticipants(ctx, roomDbInfo.RoomId); err == nil && participants != nil && len(participants) > 0 {
 		for _, participant := range participants {
 			entry, err := m.natsService.GetUserKeyValue(roomDbInfo.RoomId, participant.Identity, natsservice.UserMetadataKey)
 			if err != nil || entry == nil {
@@ -95,8 +95,8 @@ func (m *RoomModel) GetActiveRoomInfo(ctx context.Context, r *plugnmeet.GetActiv
 	return true, "success", res
 }
 
-func (m *RoomModel) GetActiveRoomsInfo() (bool, string, []*plugnmeet.ActiveRoomWithParticipant) {
-	roomsInfo, err := m.ds.GetActiveRoomsInfo()
+func (m *RoomModel) GetActiveRoomsInfo(userCtx context.Context) (bool, string, []*plugnmeet.ActiveRoomWithParticipant) {
+	roomsInfo, err := m.ds.GetActiveRoomsInfo(userCtx)
 	if err != nil {
 		return false, err.Error(), nil
 	}
@@ -128,7 +128,7 @@ func (m *RoomModel) GetActiveRoomsInfo() (bool, string, []*plugnmeet.ActiveRoomW
 		}
 		i.RoomInfo.Metadata = rri.Metadata
 
-		if participants, err := m.lk.LoadParticipants(r.RoomId); err == nil && participants != nil && len(participants) > 0 {
+		if participants, err := m.lk.LoadParticipants(userCtx, r.RoomId); err == nil && participants != nil && len(participants) > 0 {
 			for _, participant := range participants {
 				entry, err := m.natsService.GetUserKeyValue(r.RoomId, participant.Identity, natsservice.UserMetadataKey)
 				if err != nil || entry == nil {
@@ -145,7 +145,7 @@ func (m *RoomModel) GetActiveRoomsInfo() (bool, string, []*plugnmeet.ActiveRoomW
 	return true, "success", res
 }
 
-func (m *RoomModel) FetchPastRooms(r *plugnmeet.FetchPastRoomsReq) (*plugnmeet.FetchPastRoomsResult, error) {
+func (m *RoomModel) FetchPastRooms(userCtx context.Context, r *plugnmeet.FetchPastRoomsReq) (*plugnmeet.FetchPastRoomsResult, error) {
 	if r.Limit <= 0 {
 		r.Limit = 20
 	}
@@ -156,7 +156,7 @@ func (m *RoomModel) FetchPastRooms(r *plugnmeet.FetchPastRoomsReq) (*plugnmeet.F
 	if r.OrderBy == "" {
 		r.OrderBy = "DESC"
 	}
-	rooms, total, err := m.ds.GetPastRooms(r.RoomIds, uint64(r.From), uint64(r.Limit), &r.OrderBy)
+	rooms, total, err := m.ds.GetPastRooms(userCtx, r.RoomIds, uint64(r.From), uint64(r.Limit), &r.OrderBy)
 	if err != nil {
 		return nil, err
 	}

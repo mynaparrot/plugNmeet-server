@@ -51,15 +51,15 @@ func (m *UserModel) UpdateUserLockSettings(r *plugnmeet.UpdateUserLockSettingsRe
 	if r.UserId == "all" {
 		// If "all", handle the batch update for the entire room.
 		return m.handleUpdateAllUsersLockSettings(r, log)
-	} else {
-		// For a single user, perform the update and broadcast immediately.
-		log.Info("request to update single user lock settings")
-		err := m.updateAndBroadcastUserLock(r.RoomId, r.UserId, r.Service, r.Direction)
-		if err != nil {
-			log.WithError(err).Errorln("failed to update user lock settings")
-		}
-		return err
 	}
+
+	// For a single user, perform the update and broadcast immediately.
+	log.Info("request to update single user lock settings")
+	err := m.updateAndBroadcastUserLock(r.RoomId, r.UserId, r.Service, r.Direction)
+	if err != nil {
+		log.WithError(err).Errorln("failed to update user lock settings")
+	}
+	return err
 }
 
 // handleUpdateAllUsersLockSettings orchestrates the update for all users in a room.

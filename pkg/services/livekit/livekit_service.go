@@ -49,17 +49,17 @@ func (s *LivekitService) EndRoom(roomId string) (string, error) {
 }
 
 // MuteUnMuteTrack can be used to mute/unmute track. This will send request to livekit
-func (s *LivekitService) MuteUnMuteTrack(roomId string, userId string, trackSid string, muted bool) (*livekit.MuteRoomTrackResponse, error) {
+func (s *LivekitService) MuteUnMuteTrack(ctx context.Context, roomId string, userId string, trackSid string, muted bool) (*livekit.MuteRoomTrackResponse, error) {
 	data := livekit.MuteRoomTrackRequest{
 		Room:     roomId,
 		Identity: userId,
 		TrackSid: trackSid,
 		Muted:    muted,
 	}
-	ctx, cancel := context.WithTimeout(s.ctx, time.Second*10)
+	apiCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
 
-	res, err := s.lkc.MutePublishedTrack(ctx, &data)
+	res, err := s.lkc.MutePublishedTrack(apiCtx, &data)
 	if err != nil {
 		return nil, err
 	}
@@ -68,14 +68,14 @@ func (s *LivekitService) MuteUnMuteTrack(roomId string, userId string, trackSid 
 }
 
 // LoadParticipants will load all the participant info from livekit
-func (s *LivekitService) LoadParticipants(roomId string) ([]*livekit.ParticipantInfo, error) {
+func (s *LivekitService) LoadParticipants(ctx context.Context, roomId string) ([]*livekit.ParticipantInfo, error) {
 	req := livekit.ListParticipantsRequest{
 		Room: roomId,
 	}
-	ctx, cancel := context.WithTimeout(s.ctx, time.Second*15)
+	apiCtx, cancel := context.WithTimeout(ctx, time.Second*15)
 	defer cancel()
 
-	res, err := s.lkc.ListParticipants(ctx, &req)
+	res, err := s.lkc.ListParticipants(apiCtx, &req)
 	if err != nil {
 		return nil, err
 	}

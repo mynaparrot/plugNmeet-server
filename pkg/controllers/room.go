@@ -27,7 +27,7 @@ func (rc *RoomController) HandleRoomCreate(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	room, err := rc.RoomModel.CreateRoom(req)
+	room, err := rc.RoomModel.CreateRoom(c.UserContext(), req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
@@ -72,7 +72,7 @@ func (rc *RoomController) HandleGetActiveRoomInfo(c *fiber.Ctx) error {
 
 // HandleGetActiveRoomsInfo gets information about all active rooms.
 func (rc *RoomController) HandleGetActiveRoomsInfo(c *fiber.Ctx) error {
-	status, msg, res := rc.RoomModel.GetActiveRoomsInfo()
+	status, msg, res := rc.RoomModel.GetActiveRoomsInfo(c.UserContext())
 
 	r := &plugnmeet.GetActiveRoomsInfoRes{
 		Status: status,
@@ -102,8 +102,7 @@ func (rc *RoomController) HandleFetchPastRooms(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}
 
-	result, err := rc.RoomModel.FetchPastRooms(req)
-
+	result, err := rc.RoomModel.FetchPastRooms(c.UserContext(), req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
 	}

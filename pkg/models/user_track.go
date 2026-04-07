@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/livekit/protocol/livekit"
@@ -13,7 +14,7 @@ import (
 // if track_sid wasn't send then it will find the microphone track & mute it
 // for unmute you'll require enabling "enable_remote_unmute: true" in livekit
 // under room settings. For privacy reason we aren't using it.
-func (m *UserModel) MuteUnMuteTrack(r *plugnmeet.MuteUnMuteTrackReq) error {
+func (m *UserModel) MuteUnMuteTrack(ctx context.Context, r *plugnmeet.MuteUnMuteTrackReq) error {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId":          r.RoomId,
 		"userId":          r.UserId,
@@ -25,7 +26,7 @@ func (m *UserModel) MuteUnMuteTrack(r *plugnmeet.MuteUnMuteTrackReq) error {
 	log.Infoln("request to mute/unmute track")
 
 	if r.UserId == "all" {
-		return m.muteUnmuteAllMic(r, log)
+		return m.muteUnmuteAllMic(ctx, r, log)
 	}
 
 	p, err := m.lk.LoadParticipantInfo(r.RoomId, r.UserId)
@@ -58,7 +59,7 @@ func (m *UserModel) MuteUnMuteTrack(r *plugnmeet.MuteUnMuteTrackReq) error {
 		return err
 	}
 
-	_, err = m.lk.MuteUnMuteTrack(r.RoomId, r.UserId, trackSid, r.Muted)
+	_, err = m.lk.MuteUnMuteTrack(ctx, r.RoomId, r.UserId, trackSid, r.Muted)
 	if err != nil {
 		log.WithError(err).Errorln("failed to mute/unmute track in livekit")
 		return err
@@ -68,9 +69,9 @@ func (m *UserModel) MuteUnMuteTrack(r *plugnmeet.MuteUnMuteTrackReq) error {
 	return nil
 }
 
-func (m *UserModel) muteUnmuteAllMic(r *plugnmeet.MuteUnMuteTrackReq, log *logrus.Entry) error {
+func (m *UserModel) muteUnmuteAllMic(ctx context.Context, r *plugnmeet.MuteUnMuteTrackReq, log *logrus.Entry) error {
 	log.Infoln("request to mute/unmute all microphones")
-	participants, err := m.lk.LoadParticipants(r.RoomId)
+	participants, err := m.lk.LoadParticipants(ctx, r.RoomId)
 	if err != nil {
 		return err
 	}
@@ -84,7 +85,7 @@ func (m *UserModel) muteUnmuteAllMic(r *plugnmeet.MuteUnMuteTrackReq, log *logru
 		if p.State == livekit.ParticipantInfo_ACTIVE && p.Identity != r.RequestedUserId {
 			for _, t := range p.Tracks {
 				if t.Source == livekit.TrackSource_MICROPHONE {
-					if _, err := m.lk.MuteUnMuteTrack(r.RoomId, p.Identity, t.Sid, r.Muted); err != nil {
+					if _, err := m.lk.MuteUnMuteTrack(ctx, r.RoomId, p.Identity, t.Sid, r.Muted); err != nil {
 						log.WithFields(logrus.Fields{
 							"targetUserId":   p.Identity,
 							"targetTrackSid": t.Sid,
