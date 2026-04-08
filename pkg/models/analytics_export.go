@@ -27,7 +27,7 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 	defer m.webhookNotifier.DeleteWebhook(roomId, log)
 
 	if m.app.AnalyticsSettings == nil || !m.app.AnalyticsSettings.Enabled {
-		log.Debug("analytics is disabled, skipping export")
+		log.Debug("Analytics is disabled, skipping export")
 		return
 	}
 
@@ -35,7 +35,7 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 	// if still there was some data stored in redis,
 	// we will have to think different way to clean those
 	if meta == "" || sid == "" {
-		log.Warn("metadata or sid is empty, skipping analytics export")
+		log.Warn("Metadata or sid is empty, skipping analytics export")
 		return
 	}
 
@@ -124,9 +124,9 @@ func (m *AnalyticsModel) exportAnalyticsToJSON(room *dbmodels.RoomInfo, metadata
 		return nil, err
 	}
 	if len(allKeys) == 0 {
-		log.Info("no analytics keys found, file will contain only basic room info")
+		log.Info("No analytics keys found, file will contain only basic room info")
 	} else {
-		log.Infof("found %d total analytics keys to process", len(allKeys))
+		log.Infof("Found %d total analytics keys to process", len(allKeys))
 	}
 
 	// Process room-level events
@@ -138,7 +138,7 @@ func (m *AnalyticsModel) exportAnalyticsToJSON(room *dbmodels.RoomInfo, metadata
 			roomKeysProcessed++
 		}
 	}
-	log.Infof("processed %d room-level analytics keys", roomKeysProcessed)
+	log.Infof("Processed %d room-level analytics keys", roomKeysProcessed)
 
 	var usersInfo []*plugnmeet.AnalyticsUserInfo
 
@@ -174,7 +174,7 @@ func (m *AnalyticsModel) exportAnalyticsToJSON(room *dbmodels.RoomInfo, metadata
 			}
 		}
 
-		log.WithField("user_id", i).Infof("processed %d analytics keys for user", userKeysProcessed)
+		log.WithField("user_id", i).Infof("Processed %d analytics keys for user", userKeysProcessed)
 		usersInfo = append(usersInfo, userInfo)
 	}
 
@@ -193,7 +193,7 @@ func (m *AnalyticsModel) exportAnalyticsToJSON(room *dbmodels.RoomInfo, metadata
 		}
 		marshal, err = op.Marshal(result)
 		if err != nil {
-			log.WithError(err).Error("failed to marshal analytics result")
+			log.WithError(err).Error("Failed to marshal analytics result")
 			return nil, err
 		}
 	}
@@ -204,7 +204,7 @@ func (m *AnalyticsModel) exportAnalyticsToJSON(room *dbmodels.RoomInfo, metadata
 	allKeys = append(allKeys, usersKey)
 
 	if err = m.rs.AnalyticsDeleteKeys(allKeys); err != nil {
-		log.WithError(err).Error("failed to delete analytics keys from redis")
+		log.WithError(err).Error("Failed to delete analytics keys from redis")
 	}
 
 	return marshal, err

@@ -55,7 +55,7 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 
 	// Broadcast a 'SESSION_ENDED' event to all clients in the room.
 	if err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SESSION_ENDED, roomID, "notifications.room-disconnected-room-ended", nil); err != nil {
-		log.WithError(err).Error("error sending session ended notification message")
+		log.WithError(err).Error("Error sending session ended notification message")
 	}
 
 	// Trigger the main asynchronous cleanup process.
@@ -68,7 +68,7 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 		"room_id":     roomID,
 		"room_sid":    roomSID,
 		"room_status": roomStatus,
-		"operation":   "OnAfterRoomEnded",
+		"method":      "OnAfterRoomEnded",
 	})
 	log.Info("Starting room cleanup")
 
@@ -84,13 +84,13 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 	lockAcquired, lockVal, errLock := m.rs.LockRoomCreation(m.ctx, roomID, cleanupLockTTL)
 
 	if errLock != nil {
-		log.WithError(errLock).Error("redis error acquiring room creation. Cleanup might be incomplete.")
+		log.WithError(errLock).Error("Redis error acquiring room creation. Cleanup might be incomplete.")
 		return // Can't proceed without a clear lock status.
 	} else if !lockAcquired {
-		log.Warn("could not acquire room creation lock. Cleanup might be incomplete.")
+		log.Warn("Could not acquire room creation lock. Cleanup might be incomplete.")
 		return // Another process is likely handling this room.
 	}
-	log.WithField("lockVal", lockVal).Info("room creation lock acquired")
+	log.WithField("lockVal", lockVal).Info("Room creation lock acquired")
 
 	// Defer the lock release to ensure it's always unlocked, even if a panic occurs.
 	defer func() {
@@ -99,7 +99,7 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 		if err := m.rs.UnlockRoomCreation(unlockCtx, roomID, lockVal); err != nil {
 			log.WithField("lockVal", lockVal).WithError(err).Error("Error releasing cleanup lock")
 		} else {
-			log.WithField("lockVal", lockVal).Info("room creation lock released")
+			log.WithField("lockVal", lockVal).Info("Room creation lock released")
 		}
 	}()
 
@@ -110,37 +110,37 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 	m.sendSessionEndedWebhook(roomID, roomSID, metadata, createdAt)
 
 	if roomStatus != natsservice.RoomStatusEnded {
-		err := m.natsService.UpdateRoomStatus(roomID, natsservice.RoomStatusEnded)
-		if err != nil {
-			log.WithError(err).Error("error updating room status")
+		if err := m.natsService.UpdateRoomStatus(roomID, natsservice.RoomStatusEnded); err != nil {
+			log.WithError(err).Error("Error updating room status")
 		}
 		// ensure the session is terminated in LiveKit
-		_, err = m.lk.EndRoom(roomID)
-		if err != nil {
-			log.WithError(err).Error("error ending room in livekit")
+		if _, err := m.lk.EndRoom(roomID); err != nil {
+			log.WithError(err).Error("Error ending room in livekit")
 		}
 	}
 
 	// Mark the room as not running in the database.
-	_, err := m.ds.UpdateRoomStatus(&dbmodels.RoomInfo{RoomId: roomID, IsRunning: 0})
-	if err != nil {
+	if _, err := m.ds.UpdateRoomStatus(&dbmodels.RoomInfo{RoomId: roomID, IsRunning: 0}); err != nil {
 		log.WithError(err).Error("DB error updating status")
 	}
 
 	// Send a stop signal to any active recorders for this room.
-	if err = m.recordingModel.DispatchRecorderTask(&plugnmeet.RecordingReq{Task: plugnmeet.RecordingTasks_STOP, Sid: roomSID, RoomId: roomID}); err != nil {
-		log.WithError(err).Error("Error sending stop to recorder")
-	}
+	_ = m.recordingModel.DispatchRecorderTask(&plugnmeet.RecordingReq{
+		Task:        plugnmeet.RecordingTasks_STOP,
+		Sid:         roomSID,
+		RoomId:      roomID,
+		RoomTableId: int64(dbTableId),
+	})
 
 	// If not configured to keep files, delete all uploaded files for this session.
 	if !m.app.UploadFileSettings.KeepForever {
-		if err = m.fileModel.DeleteRoomUploadedDir(roomSID); err != nil {
+		if err := m.fileModel.DeleteRoomUploadedDir(roomSID); err != nil {
 			log.WithError(err).Error("Error deleting uploads")
 		}
 	}
 
 	// Remove the room from the duration checker if it was being monitored.
-	if err = m.DeleteRoomWithDuration(roomID); err != nil {
+	if err := m.DeleteRoomWithDuration(roomID); err != nil {
 		log.WithError(err).Error("Error deleting room duration")
 	}
 
@@ -148,12 +148,12 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 	_ = m.etherpadModel.CleanAfterRoomEnd(roomID, metadata)
 
 	// Clean up any polls created during the session.
-	if err = m.pollModel.CleanUpPolls(roomID); err != nil {
+	if err := m.pollModel.CleanUpPolls(roomID); err != nil {
 		log.WithError(err).Error("Error cleaning polls")
 	}
 
 	// Perform post-end tasks for breakout rooms, if any.
-	if err = m.breakoutModel.PostTaskAfterRoomEndWebhook(m.ctx, roomID, metadata); err != nil {
+	if err := m.breakoutModel.PostTaskAfterRoomEndWebhook(m.ctx, roomID, metadata); err != nil {
 		log.WithError(err).Error("Error in breakout room post-end task")
 	}
 

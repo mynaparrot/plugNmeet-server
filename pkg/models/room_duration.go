@@ -62,15 +62,13 @@ func (m *RoomModel) AddRoomWithDurationInfo(roomId string, r *RoomDurationInfo) 
 
 func (m *RoomModel) DeleteRoomWithDuration(roomId string) error {
 	log := m.logger.WithField("roomId", roomId)
-	log.Info("deleting room with duration")
 
-	err := m.rs.DeleteRoomWithDuration(roomId)
-	if err != nil {
+	if err := m.rs.DeleteRoomWithDuration(roomId); err != nil {
 		log.WithError(err).Error("failed to delete room with duration from redis")
 		return err
 	}
 
-	log.Info("successfully deleted room with duration")
+	log.Info("Successfully deleted room with duration")
 	return nil
 }
 

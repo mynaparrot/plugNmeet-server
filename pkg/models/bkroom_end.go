@@ -36,7 +36,7 @@ func (m *BreakoutRoomModel) EndAllBreakoutRoomsByParentRoomId(ctx context.Contex
 		"parentRoomId": parentRoomId,
 		"method":       "EndAllBreakoutRoomsByParentRoomId",
 	})
-	log.Infoln("request to end all breakout rooms")
+	log.Infoln("Request to end all breakout rooms")
 
 	ids, err := m.rs.GetBreakoutRoomIdsByParentRoomId(parentRoomId)
 	if err != nil {
@@ -45,7 +45,7 @@ func (m *BreakoutRoomModel) EndAllBreakoutRoomsByParentRoomId(ctx context.Contex
 	}
 
 	if ids == nil || len(ids) == 0 {
-		log.Info("no active breakout rooms found to end")
+		log.Info("No active breakout rooms found to end")
 		return m.updateParentRoomMetadata(parentRoomId, log)
 	}
 
@@ -131,14 +131,13 @@ func (m *BreakoutRoomModel) PostTaskAfterRoomEndWebhook(ctx context.Context, roo
 	}
 
 	if meta.IsBreakoutRoom {
-		log.Info("breakout room ended, cleaning up its records")
+		log.Info("Breakout room ended, cleaning up its records")
 		_ = m.rs.DeleteBreakoutRoom(meta.ParentRoomId, roomId)
 		m.onAfterBkRoomEnded(meta.ParentRoomId, roomId, log)
 	} else {
-		log.Info("parent room ended, ending all associated breakout rooms")
-		err = m.EndAllBreakoutRoomsByParentRoomId(ctx, roomId)
-		if err != nil {
-			log.WithError(err).Error("failed to end all breakout rooms")
+		log.Info("Parent room ended, ending all associated breakout rooms")
+		if err = m.EndAllBreakoutRoomsByParentRoomId(ctx, roomId); err != nil {
+			log.WithError(err).Error("Failed to end all breakout rooms")
 			return err
 		}
 	}

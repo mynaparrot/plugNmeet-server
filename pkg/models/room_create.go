@@ -26,12 +26,12 @@ func (m *RoomModel) CreateRoom(userCtx context.Context, r *plugnmeet.CreateRoomR
 
 	// Validate the roomId to ensure it doesn't contain our internal patterns.
 	if strings.Contains(r.RoomId, natsservice.UserKeyFieldPrefix) {
-		err := fmt.Errorf("roomId cannot contain the reserved pattern '%s'", natsservice.UserKeyFieldPrefix)
+		err := fmt.Errorf("RoomId cannot contain the reserved pattern '%s'", natsservice.UserKeyFieldPrefix)
 		log.WithError(err).Errorln()
 		return nil, err
 	}
 	if strings.HasPrefix(r.RoomId, natsservice.UserKeyPrefix) {
-		err := fmt.Errorf("roomId cannot start with the reserved pattern '%s'", natsservice.UserKeyPrefix)
+		err := fmt.Errorf("RoomId cannot start with the reserved pattern '%s'", natsservice.UserKeyPrefix)
 		log.WithError(err).Errorln()
 		return nil, err
 	}
@@ -48,33 +48,33 @@ func (m *RoomModel) CreateRoom(userCtx context.Context, r *plugnmeet.CreateRoomR
 		defer cancel()
 		if unlockErr := m.rs.UnlockRoomCreation(unlockCtx, r.GetRoomId(), lockValue); unlockErr != nil {
 			// UnlockRoomCreation in RedisService should log details
-			log.WithError(unlockErr).Error("error trying to clean up room creation lock")
+			log.WithError(unlockErr).Error("Error trying to clean up room creation lock")
 		} else {
-			log.Info("room creation lock released")
+			log.Info("Room creation lock released")
 		}
 	}()
 
 	// check if room already exists in db or not
 	roomDbInfo, err := m.ds.GetRoomInfoByRoomId(r.RoomId, 1)
 	if err != nil {
-		log.WithError(err).Error("could not get room info from db")
+		log.WithError(err).Error("Could not get room info from db")
 		return nil, err
 	}
 
 	// handle existing room logic
 	if roomDbInfo != nil && roomDbInfo.Sid != "" {
-		log.Info("found existing active room in db, attempting to handle it")
+		log.Info("Found existing active room in db, attempting to handle it")
 		ari, err := m.handleExistingRoom(r, roomDbInfo, log)
 		if err != nil {
-			log.WithError(err).Error("failed to handle existing room")
+			log.WithError(err).Error("Failed to handle existing room")
 			return nil, err
 		}
 		if ari != nil {
-			log.Info("successfully handled existing room, returning info")
+			log.Info("Successfully handled existing room, returning info")
 			return ari, nil
 		}
 		// otherwise, we'll keep going
-		log.Info("existing room record was stale or mismatched, proceeding to create a new session")
+		log.Info("Existing room record was stale or mismatched, proceeding to create a new session")
 	}
 
 	// initialize room defaults
@@ -84,16 +84,14 @@ func (m *RoomModel) CreateRoom(userCtx context.Context, r *plugnmeet.CreateRoomR
 	roomDbInfo, sid := m.prepareRoomDbInfo(r, roomDbInfo)
 
 	// save info to db
-	_, err = m.ds.InsertOrUpdateRoomInfo(roomDbInfo)
-	if err != nil {
-		log.WithError(err).Error("failed to insert or update room in db")
+	if _, err := m.ds.InsertOrUpdateRoomInfo(roomDbInfo); err != nil {
+		log.WithError(err).Error("Failed to insert or update room in db")
 		return nil, err
 	}
 	log = log.WithFields(logrus.Fields{
-		"room_sid":    sid,
-		"webhook_url": roomDbInfo.WebhookUrl,
+		"room_sid": sid,
 	})
-	log.Info("Room info added to DB")
+	log.WithField("webhook_url", roomDbInfo.WebhookUrl).Info("Room info added to DB")
 
 	if !r.Metadata.IsBreakoutRoom {
 		sipDialInFeatures := r.Metadata.RoomFeatures.SipDialInFeatures
@@ -118,7 +116,7 @@ func (m *RoomModel) CreateRoom(userCtx context.Context, r *plugnmeet.CreateRoomR
 		log.WithError(err).Error("Failed to add room to NATS")
 		return nil, err
 	}
-	log.Info("Room info added to NATS")
+	log.WithField("table_id", roomDbInfo.ID).Info("Room info added to NATS")
 
 	// preload whiteboard file if needed
 	if !r.Metadata.IsBreakoutRoom {
@@ -154,7 +152,7 @@ func (m *RoomModel) handleExistingRoom(r *plugnmeet.CreateRoomReq, roomDbInfo *d
 	}
 
 	if rInfo == nil {
-		log.Info("no active room found in NATS, proceeding to create a new session")
+		log.Info("No active room found in NATS, proceeding to create a new session")
 		return nil, nil
 	}
 
@@ -167,9 +165,9 @@ func (m *RoomModel) handleExistingRoom(r *plugnmeet.CreateRoomReq, roomDbInfo *d
 	}
 
 	// The room is active and matches the DB record.
-	log.Info("found matching active room in NATS, updating status")
+	log.Info("Found matching active room in NATS, updating status")
 	if err := m.natsService.UpdateRoomStatus(r.RoomId, natsservice.RoomStatusActive); err != nil {
-		log.WithError(err).Error("failed to update room status to active")
+		log.WithError(err).Error("Failed to update room status to active")
 		return nil, err
 	}
 
@@ -347,9 +345,8 @@ func (m *RoomModel) sendRoomCreatedWebhook(info *plugnmeet.ActiveRoomInfo, empty
 			},
 		}
 
-		err := m.webhookNotifier.SendWebhookEvent(msg)
-		if err != nil {
-			m.logger.WithError(err).Errorln("error sending room created webhook")
+		if err := m.webhookNotifier.SendWebhookEvent(msg); err != nil {
+			m.logger.WithError(err).Error("Error sending room created webhook")
 		}
 	}
 }

@@ -129,7 +129,7 @@ func (s *LivekitService) DeleteSIPDispatchRule(roomId string, log *logrus.Entry)
 
 	for _, item := range rules.GetItems() {
 		if item.Name == roomId {
-			log.Infof("sip dispatch rule found with id: %s, deleting it", item.SipDispatchRuleId)
+			log.Infof("Sip dispatch rule found with id: %s, deleting it", item.SipDispatchRuleId)
 			_, err := sipClient.DeleteSIPDispatchRule(s.ctx, &livekit.DeleteSIPDispatchRuleRequest{SipDispatchRuleId: item.SipDispatchRuleId})
 			if err != nil {
 				log.WithError(err).Error("error deleting sip dispatch rule")

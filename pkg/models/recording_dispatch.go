@@ -22,7 +22,7 @@ func (m *RecordingModel) DispatchRecorderTask(req *plugnmeet.RecordingReq) error
 		"task":   req.Task.String(),
 		"method": "DispatchRecorderTask",
 	})
-	log.Infoln("request to send message to recorder")
+	log.Infoln("Request to send message to recorder")
 
 	recordId := time.Now().UnixMilli()
 
@@ -56,49 +56,47 @@ func (m *RecordingModel) DispatchRecorderTask(req *plugnmeet.RecordingReq) error
 
 	switch req.Task {
 	case plugnmeet.RecordingTasks_START_RECORDING:
-		err := m.addTokenAndRecorder(context.Background(), req, toSend, config.RecorderBot, log)
-		if err != nil {
+		if err := m.addTokenAndRecorder(context.Background(), req, toSend, config.RecorderBot, log); err != nil {
 			log.WithError(err).Error("failed to add token for recording bot")
 			return err
 		}
 	case plugnmeet.RecordingTasks_START_RTMP:
 		toSend.RtmpUrl = req.RtmpUrl
-		err := m.addTokenAndRecorder(context.Background(), req, toSend, config.RtmpBot, log)
-		if err != nil {
-			log.WithError(err).Error("failed to add token for rtmp bot")
+		if err := m.addTokenAndRecorder(context.Background(), req, toSend, config.RtmpBot, log); err != nil {
+			log.WithError(err).Error("Failed to add token for rtmp bot")
 			return err
 		}
 	}
 
 	payload, err := proto.Marshal(toSend)
 	if err != nil {
-		log.WithError(err).Error("failed to marshal message for recorder")
+		log.WithError(err).Error("Failed to marshal message for recorder")
 		return err
 	}
 
-	log.Info("sending request to NATS recorder channel")
+	log.Info("Sending request to NATS recorder channel")
 	msg, err := m.app.NatsConn.RequestMsg(&nats.Msg{
 		Subject: m.app.NatsInfo.Recorder.RecorderChannel,
 		Data:    payload,
 	}, time.Second*3)
 
 	if err != nil {
-		log.WithError(err).Error("failed to get response from NATS recorder channel")
+		log.WithError(err).Error("Failed to get response from NATS recorder channel")
 		return err
 	}
 
 	res := new(plugnmeet.CommonResponse)
 	if err = proto.Unmarshal(msg.Data, res); err != nil {
-		log.WithError(err).Error("failed to unmarshal response from recorder")
+		log.WithError(err).Error("Failed to unmarshal response from recorder")
 		return err
 	}
 	if !res.Status {
 		err = errors.New(res.GetMsg())
-		log.WithError(err).Error("recorder returned a non-successful response")
+		log.WithError(err).Error("Recorder returned a non-successful response")
 		return err
 	}
 
-	log.Info("successfully sent message to recorder and got a success response")
+	log.Info("Successfully sent message to recorder and got a success response")
 	return nil
 }
 

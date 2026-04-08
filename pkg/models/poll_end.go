@@ -42,7 +42,7 @@ func (m *PollModel) CleanUpPolls(roomId string) error {
 		"roomId": roomId,
 		"method": "CleanUpPolls",
 	})
-	log.Infoln("cleaning up polls for room")
+	log.Infoln("Cleaning up polls for room")
 
 	// Directly fetch poll IDs instead of the full poll objects.
 	pIds, err := m.rs.GetPollIdsByRoomId(roomId)
@@ -52,7 +52,7 @@ func (m *PollModel) CleanUpPolls(roomId string) error {
 	}
 
 	if len(pIds) == 0 {
-		log.Info("no polls to clean up")
+		log.Info("No polls to clean up")
 		return nil // No polls to clean up.
 	}
 
@@ -62,6 +62,6 @@ func (m *PollModel) CleanUpPolls(roomId string) error {
 		return err
 	}
 
-	log.Info("successfully cleaned up polls")
+	log.Info("Successfully cleaned up polls")
 	return nil
 }
