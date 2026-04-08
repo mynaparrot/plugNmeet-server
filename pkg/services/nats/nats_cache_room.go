@@ -1,47 +1,51 @@
 package natsservice
 
 import (
-	"strings"
-
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/nats-io/nats.go/jetstream"
 	"google.golang.org/protobuf/proto"
 )
 
-func (ncs *NatsCacheService) updateRoomInfoCache(entry jetstream.KeyValueEntry, roomId string) {
+// setRoomInfoCache is the single entry point for updating the room info cache.
+// It can be called either by the NATS watcher or manually.
+func (ncs *NatsCacheService) setRoomInfoCache(roomId, field, value string, revision uint64) {
 	ncs.roomLock.Lock()
 	defer ncs.roomLock.Unlock()
 
 	cacheEntry, ok := ncs.roomsInfoStore[roomId]
 	if !ok {
+		// This can happen if the room was cleaned up just after the event was dispatched.
 		return
 	}
 
-	val := string(entry.Value())
-	field := strings.TrimPrefix(entry.Key(), RoomInfoKeyPrefix)
+	// If the incoming revision is older than what we have, ignore it.
+	if revision > 0 && cacheEntry.LastRevision >= revision {
+		return
+	}
 
 	switch field {
 	case RoomDbTableIdKey:
-		cacheEntry.RoomInfo.DbTableId = ncs.convertTextToUint64(val)
+		cacheEntry.RoomInfo.DbTableId = ncs.convertTextToUint64(value)
 	case RoomIdKey:
-		cacheEntry.RoomInfo.RoomId = val
+		cacheEntry.RoomInfo.RoomId = value
 	case RoomSidKey:
-		cacheEntry.RoomInfo.RoomSid = val
+		cacheEntry.RoomInfo.RoomSid = value
 	case RoomStatusKey:
-		cacheEntry.RoomInfo.Status = val
-		if val == RoomStatusEnded {
+		cacheEntry.RoomInfo.Status = value
+		if value == RoomStatusEnded {
 			ncs.cleanRoomCacheUnsafe(roomId)
-			return
+			return // Important to return here as the cache entry is gone
 		}
 	case RoomEmptyTimeoutKey:
-		cacheEntry.RoomInfo.EmptyTimeout = ncs.convertTextToUint64(val)
+		cacheEntry.RoomInfo.EmptyTimeout = ncs.convertTextToUint64(value)
 	case RoomMaxParticipants:
-		cacheEntry.RoomInfo.MaxParticipants = ncs.convertTextToUint64(val)
+		cacheEntry.RoomInfo.MaxParticipants = ncs.convertTextToUint64(value)
 	case RoomCreatedKey:
-		cacheEntry.RoomInfo.CreatedAt = ncs.convertTextToUint64(val)
+		cacheEntry.RoomInfo.CreatedAt = ncs.convertTextToUint64(value)
 	case RoomMetadataKey:
-		cacheEntry.RoomInfo.Metadata = val
+		cacheEntry.RoomInfo.Metadata = value
 	}
+
+	cacheEntry.LastRevision = revision
 	ncs.roomsInfoStore[roomId] = cacheEntry
 }
 

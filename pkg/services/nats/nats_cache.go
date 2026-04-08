@@ -13,8 +13,9 @@ import (
 )
 
 type CachedRoomEntry struct {
-	RoomInfo *plugnmeet.NatsKvRoomInfo
-	stop     chan struct{}
+	RoomInfo     *plugnmeet.NatsKvRoomInfo
+	LastRevision uint64
+	stop         chan struct{}
 }
 
 type CachedUserInfoEntry struct {
@@ -23,6 +24,7 @@ type CachedUserInfoEntry struct {
 	LastPingAt      uint64
 	IsBlacklisted   bool
 	TurnCredentials string
+	LastRevision    uint64
 }
 
 type NatsCacheService struct {
@@ -126,12 +128,13 @@ func (ncs *NatsCacheService) dispatchCacheUpdate(entry jetstream.KeyValueEntry, 
 	key := entry.Key()
 	switch {
 	case strings.HasPrefix(key, RoomInfoKeyPrefix):
-		ncs.updateRoomInfoCache(entry, roomId)
+		field := strings.TrimPrefix(entry.Key(), RoomInfoKeyPrefix)
+		ncs.setRoomInfoCache(roomId, field, string(entry.Value()), entry.Revision())
 	case strings.HasPrefix(key, UserKeyPrefix):
 		// Use the new helper function to parse the user key
 		userId, field, ok := ParseUserKey(key)
 		if ok {
-			ncs.updateUserInfoCache(entry, roomId, userId, field)
+			ncs.setUserInfoCache(roomId, userId, field, string(entry.Value()), entry.Revision())
 		} else {
 			ncs.logger.WithFields(logrus.Fields{
 				"key":    key,

@@ -44,6 +44,9 @@ func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeo
 		return "", fmt.Errorf("failed to create or update KV bucket: %w", err)
 	}
 
+	// CRITICAL: Add room to watcher here to initialize cache maps BEFORE updating them.
+	s.cs.addRoomWatcher(kv, bucket, roomId)
+
 	// Set default values if not provided
 	if emptyTimeout == nil {
 		defaultTimeout := uint32(1800) // 30 minutes
@@ -60,26 +63,28 @@ func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeo
 		return "", fmt.Errorf("failed to marshal metadata: %w", err)
 	}
 
-	// Prepare room data
+	// Prepare room data using short field names as keys
 	data := map[string]string{
-		s.formatRoomKey(RoomDbTableIdKey):    fmt.Sprintf("%d", tableId),
-		s.formatRoomKey(RoomIdKey):           roomId,
-		s.formatRoomKey(RoomSidKey):          roomSid,
-		s.formatRoomKey(RoomEmptyTimeoutKey): fmt.Sprintf("%d", *emptyTimeout),
-		s.formatRoomKey(RoomMaxParticipants): fmt.Sprintf("%d", *maxParticipants),
-		s.formatRoomKey(RoomStatusKey):       RoomStatusCreated,
-		s.formatRoomKey(RoomCreatedKey):      fmt.Sprintf("%d", time.Now().UTC().Unix()),
-		s.formatRoomKey(RoomMetadataKey):     mt,
+		RoomDbTableIdKey:    fmt.Sprintf("%d", tableId),
+		RoomIdKey:           roomId,
+		RoomSidKey:          roomSid,
+		RoomEmptyTimeoutKey: fmt.Sprintf("%d", *emptyTimeout),
+		RoomMaxParticipants: fmt.Sprintf("%d", *maxParticipants),
+		RoomStatusKey:       RoomStatusCreated,
+		RoomCreatedKey:      fmt.Sprintf("%d", time.Now().UTC().Unix()),
+		RoomMetadataKey:     mt,
 	}
 
-	// Store each key-value pair
-	for k, v := range data {
-		if _, err := kv.PutString(s.ctx, k, v); err != nil {
-			return "", fmt.Errorf("failed to store room data for key %s: %w", k, err)
+	// Store each key-value pair and update cache manually
+	for field, v := range data {
+		key := s.formatRoomKey(field)
+		rev, err := kv.PutString(s.ctx, key, v)
+		if err != nil {
+			return "", fmt.Errorf("failed to store room data for key %s: %w", field, err)
 		}
+		s.cs.setRoomInfoCache(roomId, field, v, rev)
 	}
-	// add room to watcher
-	s.cs.addRoomWatcher(kv, bucket, roomId)
+
 	return mt, nil
 }
 
@@ -116,9 +121,11 @@ func (s *NatsService) updateRoomMetadata(roomId string, metadata interface{}) (s
 		return "", fmt.Errorf("failed to marshal metadata: %w", err)
 	}
 
-	if _, err := kv.PutString(s.ctx, s.formatRoomKey(RoomMetadataKey), ml); err != nil {
+	rev, err := kv.PutString(s.ctx, s.formatRoomKey(RoomMetadataKey), ml)
+	if err != nil {
 		return "", fmt.Errorf("failed to update metadata: %w", err)
 	}
+	s.cs.setRoomInfoCache(roomId, RoomMetadataKey, ml, rev)
 
 	return ml, nil
 }
@@ -141,9 +148,13 @@ func (s *NatsService) UpdateRoomStatus(roomId string, status string) error {
 		return err
 	}
 
-	if _, err := kv.PutString(s.ctx, s.formatRoomKey(RoomStatusKey), status); err != nil {
+	rev, err := kv.PutString(s.ctx, s.formatRoomKey(RoomStatusKey), status)
+	if err != nil {
 		return fmt.Errorf("failed to update room status: %w", err)
 	}
+
+	// Manually update the cache to avoid watch latency
+	s.cs.setRoomInfoCache(roomId, RoomStatusKey, status, rev)
 
 	return nil
 }

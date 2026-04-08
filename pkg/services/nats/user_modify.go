@@ -69,10 +69,13 @@ func (s *NatsService) AddUser(roomId, userId, name string, isAdmin, isPresenter 
 	}
 
 	// Store user data in the key-value store using the user-specific prefix
-	for k, v := range data {
-		if _, err := kv.PutString(s.ctx, s.formatUserKey(userId, k), v); err != nil {
-			return fmt.Errorf("failed to add user data to consolidated bucket for key %s: %w", k, err)
+	for field, v := range data {
+		key := s.formatUserKey(userId, field)
+		rev, err := kv.PutString(s.ctx, key, v)
+		if err != nil {
+			return fmt.Errorf("failed to add user data to consolidated bucket for key %s: %w", field, err)
 		}
+		s.cs.setUserInfoCache(roomId, userId, field, v, rev)
 	}
 
 	// The watcher for user info is the same as the room watcher now.
@@ -91,9 +94,12 @@ func (s *NatsService) UpdateUserStatus(roomId, userId string, status string) err
 	}
 
 	// Update user status in the room bucket
-	if _, err := kv.PutString(s.ctx, s.formatUserKey(userId, UserStatusKey), status); err != nil {
+	rev, err := kv.PutString(s.ctx, s.formatUserKey(userId, UserStatusKey), status)
+	if err != nil {
 		return fmt.Errorf("failed to update user status: %w", err)
 	}
+	// Manually update the cache to avoid watch latency
+	s.cs.setUserInfoCache(roomId, userId, UserStatusKey, status, rev)
 
 	// Update user info based on status
 	now := fmt.Sprintf("%d", time.Now().UnixMilli())
@@ -102,18 +108,27 @@ func (s *NatsService) UpdateUserStatus(roomId, userId string, status string) err
 		// Check if user has joined before
 		joined, _ := kv.Get(s.ctx, s.formatUserKey(userId, UserJoinedAt))
 		if joined != nil && len(joined.Value()) > 0 {
-			if _, err := kv.PutString(s.ctx, s.formatUserKey(userId, UserReconnectedAt), now); err != nil {
+			rev, err := kv.PutString(s.ctx, s.formatUserKey(userId, UserReconnectedAt), now)
+			if err != nil {
 				return fmt.Errorf("failed to update reconnected time: %w", err)
 			}
+			// Manually update the cache
+			s.cs.setUserInfoCache(roomId, userId, UserReconnectedAt, now, rev)
 		} else {
-			if _, err := kv.PutString(s.ctx, s.formatUserKey(userId, UserJoinedAt), now); err != nil {
+			rev, err := kv.PutString(s.ctx, s.formatUserKey(userId, UserJoinedAt), now)
+			if err != nil {
 				return fmt.Errorf("failed to update joined time: %w", err)
 			}
+			// Manually update the cache
+			s.cs.setUserInfoCache(roomId, userId, UserJoinedAt, now, rev)
 		}
 	case UserStatusDisconnected, UserStatusOffline:
-		if _, err := kv.PutString(s.ctx, s.formatUserKey(userId, UserDisconnectedAt), now); err != nil {
+		rev, err := kv.PutString(s.ctx, s.formatUserKey(userId, UserDisconnectedAt), now)
+		if err != nil {
 			return fmt.Errorf("failed to update disconnected time: %w", err)
 		}
+		// Manually update the cache
+		s.cs.setUserInfoCache(roomId, userId, UserDisconnectedAt, now, rev)
 	}
 
 	return nil
@@ -208,9 +223,11 @@ func (s *NatsService) UpdateUserKeyValue(roomId, userId, key, val string) error 
 	}
 
 	// Update the key-value pair in the user info bucket
-	if _, err := userKV.PutString(s.ctx, s.formatUserKey(userId, key), val); err != nil {
+	rev, err := userKV.PutString(s.ctx, s.formatUserKey(userId, key), val)
+	if err != nil {
 		return fmt.Errorf("failed to update key-value pair: %w", err)
 	}
+	s.cs.setUserInfoCache(roomId, userId, key, val, rev)
 
 	return nil
 }
@@ -227,10 +244,11 @@ func (s *NatsService) AddUserToBlockList(roomId, userId string) error {
 	}
 
 	// Directly set the blacklisted key to true. This will create the key if it doesn't exist.
-	_, err = kv.PutString(s.ctx, s.formatUserKey(userId, UserIsBlacklistedKey), "true")
+	rev, err := kv.PutString(s.ctx, s.formatUserKey(userId, UserIsBlacklistedKey), "true")
 	if err != nil {
 		return err
 	}
+	s.cs.setUserInfoCache(roomId, userId, UserIsBlacklistedKey, "true", rev)
 	return nil
 }
 

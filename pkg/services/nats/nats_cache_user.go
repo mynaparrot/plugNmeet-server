@@ -4,12 +4,12 @@ import (
 	"strconv"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/nats-io/nats.go/jetstream"
 	"google.golang.org/protobuf/proto"
 )
 
-// updateUserInfoCache is called by the smart watcher dispatcher to update the unified user info cache.
-func (ncs *NatsCacheService) updateUserInfoCache(entry jetstream.KeyValueEntry, roomId, userId, field string) {
+// setUserInfoCache is the single entry point for updating the user info cache.
+// It can be called either by the NATS watcher or manually.
+func (ncs *NatsCacheService) setUserInfoCache(roomId, userId, field, value string, revision uint64) {
 	ncs.roomLock.Lock()
 	defer ncs.roomLock.Unlock()
 
@@ -27,37 +27,43 @@ func (ncs *NatsCacheService) updateUserInfoCache(entry jetstream.KeyValueEntry, 
 		user = CachedUserInfoEntry{UserInfo: new(plugnmeet.NatsKvUserInfo)}
 	}
 
-	val := string(entry.Value())
+	// If the incoming revision is older than what we have, ignore it.
+	if revision > 0 && user.LastRevision >= revision {
+		return
+	}
+
 	switch field {
 	case UserIdKey:
-		user.UserInfo.UserId = val
+		user.UserInfo.UserId = value
 	case UserSidKey:
-		user.UserInfo.UserSid = val
+		user.UserInfo.UserSid = value
 	case UserNameKey:
-		user.UserInfo.Name = val
+		user.UserInfo.Name = value
 	case UserRoomIdKey:
-		user.UserInfo.RoomId = val
+		user.UserInfo.RoomId = value
 	case UserMetadataKey:
-		user.UserInfo.Metadata = val
+		user.UserInfo.Metadata = value
 	case UserIsAdminKey:
-		user.UserInfo.IsAdmin, _ = strconv.ParseBool(val)
+		user.UserInfo.IsAdmin, _ = strconv.ParseBool(value)
 	case UserIsPresenterKey:
-		user.UserInfo.IsPresenter, _ = strconv.ParseBool(val)
+		user.UserInfo.IsPresenter, _ = strconv.ParseBool(value)
 	case UserIsBlacklistedKey:
-		user.IsBlacklisted, _ = strconv.ParseBool(val)
+		user.IsBlacklisted, _ = strconv.ParseBool(value)
 	case UserJoinedAt:
-		user.UserInfo.JoinedAt = ncs.convertTextToUint64(val)
+		user.UserInfo.JoinedAt = ncs.convertTextToUint64(value)
 	case UserReconnectedAt:
-		user.UserInfo.ReconnectedAt = ncs.convertTextToUint64(val)
+		user.UserInfo.ReconnectedAt = ncs.convertTextToUint64(value)
 	case UserDisconnectedAt:
-		user.UserInfo.DisconnectedAt = ncs.convertTextToUint64(val)
+		user.UserInfo.DisconnectedAt = ncs.convertTextToUint64(value)
 	case UserLastPingAt:
-		user.LastPingAt = ncs.convertTextToUint64(val)
+		user.LastPingAt = ncs.convertTextToUint64(value)
 	case UserStatusKey:
-		user.Status = val
+		user.Status = value
 	case UserTurnCredentialsKey:
-		user.TurnCredentials = val
+		user.TurnCredentials = value
 	}
+
+	user.LastRevision = revision
 	ncs.roomUsersInfoStore[roomId][userId] = user
 }
 

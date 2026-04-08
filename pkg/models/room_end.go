@@ -200,7 +200,7 @@ func (m *RoomModel) onAfterRoomEnded(p *onAfterRoomEndedParams) {
 	// clean any SIP DispatchRule
 	m.lk.DeleteSIPDispatchRule(p.roomId, log)
 
-	// NOTE: ==> THIS WILL BE THE LAST <==
+	// CRITICAL: ==> THIS WILL BE THE LAST <==
 	// Final NATS cleanup: deletes all consumers, messages, and the KV store for this room.
 	m.natsService.OnAfterSessionEndCleanup(p.roomId)
 
