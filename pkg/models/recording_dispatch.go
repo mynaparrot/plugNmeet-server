@@ -81,7 +81,10 @@ func (m *RecordingModel) DispatchRecorderTask(req *plugnmeet.RecordingReq) error
 	}, time.Second*3)
 
 	if err != nil {
-		log.WithError(err).Error("Failed to get response from NATS recorder channel")
+		// is normal for plugnmeet.RecordingTasks_STOP not to receive any response from recorder if not task is running
+		if req.Task != plugnmeet.RecordingTasks_STOP {
+			log.WithError(err).Error("Failed to get response from NATS recorder channel")
+		}
 		return err
 	}
 
