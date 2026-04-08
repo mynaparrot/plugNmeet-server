@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -12,7 +11,18 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// EndRoom now accepts context and userIDForLog
+type onAfterRoomEndedParams struct {
+	dbTableId  uint64
+	roomId     string
+	roomSid    string
+	metadata   string
+	roomStatus string
+	createdAt  uint64
+	started    time.Time
+	lockVal    string
+}
+
+// EndRoom will mark a room as ended and trigger all the post-end processes.
 func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool, string) {
 	roomID := r.GetRoomId()
 	log := m.logger.WithFields(logrus.Fields{
@@ -23,10 +33,24 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 
 	// Wait until any ongoing room creation process is complete to avoid race conditions.
 	if errWait := waitUntilRoomCreationCompletes(ctx, m.rs, roomID, m.logger); errWait != nil {
-		log.WithError(errWait).Error("Cannot end room as it's locked")
-		return false, fmt.Sprintf("Failed to end room: %s", errWait.Error())
+		log.WithError(errWait).Error("Cannot end room as it's locked during creation")
+		return false, "failed to end room, it may be starting"
 	}
-	log.Info("Proceeding to end room")
+
+	// Acquire a distributed lock to prevent multiple end-room processes from running simultaneously.
+	roomEndLockTTL := config.WaitBeforeTriggerOnAfterRoomEnded + (time.Second * 10)
+	lockAcquired, lockVal, errLock := m.rs.LockRoomCreation(m.ctx, roomID, roomEndLockTTL)
+
+	if errLock != nil {
+		log.WithError(errLock).Error("Redis error acquiring room-end lock")
+		return false, "failed to end room"
+	}
+	if !lockAcquired {
+		log.Warn("Could not acquire room-end lock. Another end-room process is likely already running.")
+		return true, "success"
+	}
+
+	log.WithField("lockVal", lockVal).Info("Room-end lock acquired")
 
 	// Fetch the live room state from the NATS key-value store first.
 	info, err := m.natsService.GetRoomInfo(roomID)
@@ -38,16 +62,30 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 		// If NATS fails or room not in NATS, check the database.
 		roomDbInfo, dbErr := m.ds.GetRoomInfoByRoomId(roomID, 1) // Using 1 for active
 		if dbErr != nil {
-			return false, dbErr.Error()
+			// an error occurred, we must release the lock.
+			_ = m.rs.UnlockRoomCreation(ctx, roomID, lockVal)
+			return false, "failed to end room"
 		}
 		if roomDbInfo == nil || roomDbInfo.ID == 0 {
-			return false, "room not found in DB or not active"
+			_ = m.rs.UnlockRoomCreation(ctx, roomID, lockVal)
+			return false, "room not found or not active"
 		}
 		if roomDbInfo.IsRunning == 1 {
 			log.Warn("Room active in DB but not in NATS during EndRoom. Marking as ended and cleaning up.")
-			go m.OnAfterRoomEnded(roomDbInfo.ID, roomDbInfo.RoomId, roomDbInfo.Sid, "", "", uint64(roomDbInfo.CreationTime), started) // Metadata might be empty
+			go m.onAfterRoomEnded(&onAfterRoomEndedParams{
+				dbTableId: roomDbInfo.ID,
+				roomId:    roomDbInfo.RoomId,
+				roomSid:   roomDbInfo.Sid,
+				createdAt: uint64(roomDbInfo.CreationTime),
+				started:   started,
+				lockVal:   lockVal,
+			})
+		} else {
+			// The room was found in DB but is not active, so no action is needed. Release the lock.
+			log.Warn("Room found in DB but already marked as not running. Releasing lock.")
+			_ = m.rs.UnlockRoomCreation(ctx, roomID, lockVal)
 		}
-		return true, "room ended (NATS info was missing, cleanup initiated)"
+		return true, "success"
 	}
 
 	// Temporarily cache the live room data in Redis.
@@ -59,122 +97,120 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 		log.WithError(err).Error("Error sending session ended notification message")
 	}
 
-	// Trigger the main asynchronous cleanup process.
-	go m.OnAfterRoomEnded(info.DbTableId, info.RoomId, info.RoomSid, info.Metadata, info.Status, info.CreatedAt, started)
+	// Trigger the main asynchronous room-end process.
+	go m.onAfterRoomEnded(&onAfterRoomEndedParams{
+		dbTableId:  info.DbTableId,
+		roomId:     info.RoomId,
+		roomSid:    info.RoomSid,
+		metadata:   info.Metadata,
+		roomStatus: info.Status,
+		createdAt:  info.CreatedAt,
+		started:    started,
+		lockVal:    lockVal,
+	})
 	return true, "success"
 }
 
-func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata, roomStatus string, createdAt uint64, started time.Time) {
+// onAfterRoomEnded performs all the necessary tasks after a room has ended.
+// This includes updating statuses, stopping recorders, cleaning up data, and triggering webhooks.
+func (m *RoomModel) onAfterRoomEnded(p *onAfterRoomEndedParams) {
 	log := m.logger.WithFields(logrus.Fields{
-		"room_id":     roomID,
-		"room_sid":    roomSID,
-		"room_status": roomStatus,
-		"method":      "OnAfterRoomEnded",
+		"room_id":     p.roomId,
+		"room_sid":    p.roomSid,
+		"room_status": p.roomStatus,
+		"method":      "onAfterRoomEnded",
 	})
-	log.Info("Starting room cleanup")
-
-	if roomStatus != natsservice.RoomStatusEnded {
-		// update status immediately to prevent user to join
-		if err := m.natsService.UpdateRoomStatus(roomID, natsservice.RoomStatusTriggeredEnd); err != nil {
-			log.WithError(err).Error("error updating room status")
-		}
-	}
-
-	// Acquire a distributed lock to prevent race conditions with room creation.
-	cleanupLockTTL := config.WaitBeforeTriggerOnAfterRoomEnded + (time.Second * 10)
-	lockAcquired, lockVal, errLock := m.rs.LockRoomCreation(m.ctx, roomID, cleanupLockTTL)
-
-	if errLock != nil {
-		log.WithError(errLock).Error("Redis error acquiring room creation. Cleanup might be incomplete.")
-		return // Can't proceed without a clear lock status.
-	} else if !lockAcquired {
-		log.Warn("Could not acquire room creation lock. Cleanup might be incomplete.")
-		return // Another process is likely handling this room.
-	}
-	log.WithField("lockVal", lockVal).Info("Room creation lock acquired")
+	log.Info("Starting room cleanup process")
 
 	// Defer the lock release to ensure it's always unlocked, even if a panic occurs.
 	defer func() {
 		unlockCtx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
 		defer cancel()
-		if err := m.rs.UnlockRoomCreation(unlockCtx, roomID, lockVal); err != nil {
-			log.WithField("lockVal", lockVal).WithError(err).Error("Error releasing cleanup lock")
+		if err := m.rs.UnlockRoomCreation(unlockCtx, p.roomId, p.lockVal); err != nil {
+			log.WithField("lockVal", p.lockVal).WithError(err).Error("Error releasing room-end lock")
 		} else {
-			log.WithField("lockVal", lockVal).Infof("Room creation lock released after %s", time.Since(started))
+			log.WithField("lockVal", p.lockVal).Infof("Room-end lock released after %s", time.Since(p.started))
 		}
 	}()
 
+	if p.roomStatus != natsservice.RoomStatusEnded {
+		// update status immediately to prevent user to join
+		if err := m.natsService.UpdateRoomStatus(p.roomId, natsservice.RoomStatusTriggeredEnd); err != nil {
+			log.WithError(err).Error("error updating room status")
+		}
+	}
+
 	// Wait for all users to disconnect before proceeding.
-	m.waitForAllUsersToDisconnect(roomID)
+	m.waitForAllUsersToDisconnect(p.roomId)
 
 	// send session_ended webhook before ending room in livekit
-	m.sendSessionEndedWebhook(roomID, roomSID, metadata, createdAt)
+	m.sendSessionEndedWebhook(p.roomId, p.roomSid, p.metadata, p.createdAt)
 
-	if roomStatus != natsservice.RoomStatusEnded {
-		if err := m.natsService.UpdateRoomStatus(roomID, natsservice.RoomStatusEnded); err != nil {
+	if p.roomStatus != natsservice.RoomStatusEnded {
+		if err := m.natsService.UpdateRoomStatus(p.roomId, natsservice.RoomStatusEnded); err != nil {
 			log.WithError(err).Error("Error updating room status")
 		}
 		// ensure the session is terminated in LiveKit
-		if _, err := m.lk.EndRoom(roomID); err != nil {
+		if _, err := m.lk.EndRoom(p.roomId); err != nil {
 			log.WithError(err).Error("Error ending room in livekit")
 		}
 	}
 
 	// Mark the room as not running in the database.
-	if _, err := m.ds.UpdateRoomStatus(&dbmodels.RoomInfo{RoomId: roomID, IsRunning: 0}); err != nil {
+	if _, err := m.ds.UpdateRoomStatus(&dbmodels.RoomInfo{RoomId: p.roomId, IsRunning: 0}); err != nil {
 		log.WithError(err).Error("DB error updating status")
 	}
 
 	// Send a stop signal to any active recorders for this room.
 	_ = m.recordingModel.DispatchRecorderTask(&plugnmeet.RecordingReq{
 		Task:        plugnmeet.RecordingTasks_STOP,
-		Sid:         roomSID,
-		RoomId:      roomID,
-		RoomTableId: int64(dbTableId),
+		Sid:         p.roomSid,
+		RoomId:      p.roomId,
+		RoomTableId: int64(p.dbTableId),
 	})
 
 	// If not configured to keep files, delete all uploaded files for this session.
 	if !m.app.UploadFileSettings.KeepForever {
-		if err := m.fileModel.DeleteRoomUploadedDir(roomSID); err != nil {
+		if err := m.fileModel.DeleteRoomUploadedDir(p.roomSid); err != nil {
 			log.WithError(err).Error("Error deleting uploads")
 		}
 	}
 
 	// Remove the room from the duration checker if it was being monitored.
-	if err := m.DeleteRoomWithDuration(roomID); err != nil {
+	if err := m.DeleteRoomWithDuration(p.roomId); err != nil {
 		log.WithError(err).Error("Error deleting room duration")
 	}
 
 	// Clean up any associated Etherpad (shared notepad) pads.
-	_ = m.etherpadModel.CleanAfterRoomEnd(roomID, metadata)
+	_ = m.etherpadModel.CleanAfterRoomEnd(p.roomId, p.metadata)
 
 	// Clean up any polls created during the session.
-	if err := m.pollModel.CleanUpPolls(roomID); err != nil {
+	if err := m.pollModel.CleanUpPolls(p.roomId); err != nil {
 		log.WithError(err).Error("Error cleaning polls")
 	}
 
 	// Perform post-end tasks for breakout rooms, if any.
-	if err := m.breakoutModel.PostTaskAfterRoomEndWebhook(m.ctx, roomID, metadata); err != nil {
+	if err := m.breakoutModel.PostTaskAfterRoomEndWebhook(m.ctx, p.roomId, p.metadata); err != nil {
 		log.WithError(err).Error("Error in breakout room post-end task")
 	}
 
 	// End all the agent tasks for this room.
-	m.insightsModel.OnAfterRoomEnded(dbTableId, roomID, roomSID)
+	m.insightsModel.OnAfterRoomEnded(p.dbTableId, p.roomId, p.roomSid)
 
 	// clean any SIP DispatchRule
-	m.lk.DeleteSIPDispatchRule(roomID, log)
+	m.lk.DeleteSIPDispatchRule(p.roomId, log)
 
 	// NOTE: ==> THIS WILL BE THE LAST <==
 	// Final NATS cleanup: deletes all consumers, messages, and the KV store for this room.
-	m.natsService.OnAfterSessionEndCleanup(roomID)
+	m.natsService.OnAfterSessionEndCleanup(p.roomId)
 
-	log.Infof("Room has been cleaned properly after %s", time.Since(started))
+	log.Infof("Room has been ended properly after %s", time.Since(p.started))
 
 	// Schedule the analytics export to run after a delay.
-	// This is done asynchronously to allow the current cleanup lock to be released.
+	// This is done asynchronously to allow the current room-end lock to be released.
 	time.AfterFunc(config.WaitBeforeAnalyticsStartProcessing, func() {
 		// PrepareToExportAnalytics has it's own room creation locking logic
-		m.analyticsModel.PrepareToExportAnalytics(roomID, roomSID, metadata)
+		m.analyticsModel.PrepareToExportAnalytics(p.roomId, p.roomSid, p.metadata)
 	})
 }
 
@@ -194,17 +230,17 @@ func (m *RoomModel) waitForAllUsersToDisconnect(roomID string) {
 	for {
 		select {
 		case <-timeout:
-			log.Warn("Timed out waiting for all users to disconnect. Proceeding with cleanup.")
+			log.Warn("Timed out waiting for all users to disconnect. Proceeding with room-end process.")
 			return
 		case <-ticker.C:
 			onlineUsers, err := m.natsService.GetOnlineUsersId(roomID)
 			if err != nil {
-				log.WithError(err).Warn("Failed to get online user list while waiting for disconnect. Proceeding with cleanup.")
+				log.WithError(err).Warn("Failed to get online user list while waiting for disconnect. Proceeding with room-end process.")
 				return // Exit if we can't check users
 			}
 
 			if onlineUsers == nil || len(onlineUsers) == 0 {
-				log.Info("All users have disconnected. Proceeding with cleanup.")
+				log.Info("All users have disconnected. Proceeding with room-end process.")
 				return // All users are gone, exit loop
 			}
 			log.Infof("Waiting for %d user(s) to disconnect...", len(onlineUsers))
