@@ -32,6 +32,8 @@ const (
 	backoffJitter          = 0.2
 )
 
+var timeoutErr = errors.New("timeout reached")
+
 type RoomModel struct {
 	ctx             context.Context
 	app             *config.AppConfig
@@ -82,39 +84,32 @@ func (m *RoomModel) SetBreakoutRoomModel(bm *BreakoutRoomModel) {
 	m.breakoutModel = bm
 }
 
-func acquireRoomCreationLockWithRetry(ctx context.Context, rs *redisservice.RedisService, roomID string, log *logrus.Entry) (string, error) {
-	maxWaitTime := defaultRoomCreationMaxWaitTime
-	lockTTL := defaultRoomCreationLockTTL
+// performWithBackoff is a helper that executes a function with an exponential backoff retry strategy.
+func performWithBackoff(ctx context.Context, maxWaitTime time.Duration, log *logrus.Entry, action func() (bool, error)) error {
 	currentInterval := backoffInitialInterval
-
 	loopStartTime := time.Now()
-	log.Info("attempting to acquire room creation lock")
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.WithError(ctx.Err()).Warn("Context cancelled while waiting for room creation lock")
-			return "", fmt.Errorf("lock acquisition cancelled for room '%s': %w", roomID, ctx.Err())
+			log.WithError(ctx.Err()).Warn("Context cancelled during backoff")
+			return ctx.Err()
 		default:
 		}
 
-		acquired, lockValue, errLock := rs.LockRoomCreation(ctx, roomID, lockTTL)
-		if errLock != nil {
-			log.WithError(errLock).Error("Redis error while attempting to acquire room creation lock")
-			return "", fmt.Errorf("redis communication error for room '%s' lock: %w", roomID, errLock)
+		done, err := action()
+		if err != nil {
+			log.WithError(err).Error("Error during backoff action")
+			return err
 		}
 
-		if acquired {
-			log.WithFields(logrus.Fields{
-				"lockValue": lockValue,
-				"duration":  time.Since(loopStartTime),
-			}).Info("successfully acquired room creation lock")
-			return lockValue, nil
+		if done {
+			return nil
 		}
 
 		if time.Since(loopStartTime) >= maxWaitTime {
-			log.WithField("maxWaitTime", maxWaitTime).Warn("Timeout while waiting for room creation lock")
-			return "", errors.New("timeout waiting to acquire lock for room " + roomID + ", operation is currently locked")
+			log.WithField("maxWaitTime", maxWaitTime).Warn("Timeout during backoff")
+			return timeoutErr
 		}
 
 		// Calculate next interval with jitter
@@ -124,12 +119,12 @@ func acquireRoomCreationLockWithRetry(ctx context.Context, rs *redisservice.Redi
 		log.WithFields(logrus.Fields{
 			"waitDuration": waitDuration,
 			"elapsed":      time.Since(loopStartTime),
-		}).Debug("Room creation lock not acquired. Waiting.")
+		}).Debug("Action not complete. Waiting.")
 		select {
 		case <-time.After(waitDuration):
 		case <-ctx.Done():
-			log.WithError(ctx.Err()).Warn("Context cancelled while polling for room creation lock")
-			return "", fmt.Errorf("lock acquisition polling cancelled for room '%s': %w", roomID, ctx.Err())
+			log.WithError(ctx.Err()).Warn("Context cancelled while waiting for next backoff attempt")
+			return ctx.Err()
 		}
 		currentInterval = time.Duration(float64(currentInterval) * backoffMultiplier)
 		if currentInterval > backoffMaxInterval {
@@ -138,52 +133,58 @@ func acquireRoomCreationLockWithRetry(ctx context.Context, rs *redisservice.Redi
 	}
 }
 
+func acquireRoomCreationLockWithRetry(ctx context.Context, rs *redisservice.RedisService, roomID string, log *logrus.Entry) (string, error) {
+	maxWaitTime := defaultRoomCreationMaxWaitTime
+	lockTTL := defaultRoomCreationLockTTL
+	var lockValue string
+
+	log.Info("Attempting to acquire room creation lock")
+
+	action := func() (bool, error) {
+		acquired, val, err := rs.LockRoomCreation(ctx, roomID, lockTTL)
+		if err != nil {
+			return false, fmt.Errorf("redis communication error for room '%s' lock: %w", roomID, err)
+		}
+		if acquired {
+			lockValue = val
+			return true, nil
+		}
+		return false, nil
+	}
+
+	err := performWithBackoff(ctx, maxWaitTime, log, action)
+	if err != nil {
+		if errors.Is(err, timeoutErr) {
+			return "", errors.New("timeout waiting to acquire lock for room " + roomID + ", operation is currently locked")
+		}
+		return "", fmt.Errorf("lock acquisition cancelled for room '%s': %w", roomID, err)
+	}
+
+	log.WithFields(logrus.Fields{
+		"lockValue": lockValue,
+	}).Info("Successfully acquired room creation lock")
+	return lockValue, nil
+}
+
 // waitUntilRoomCreationCompletes waits until the room creation lock for the given roomID is released.
 func waitUntilRoomCreationCompletes(ctx context.Context, rs *redisservice.RedisService, roomID string, log *logrus.Entry) error {
 	maxWaitTime := defaultWaitForRoomCreationMaxWaitTime
-	currentInterval := backoffInitialInterval
-	loopStartTime := time.Now()
 
-	for {
-		select {
-		case <-ctx.Done():
-			log.WithError(ctx.Err()).Warn("Context cancelled while waiting for room creation to complete")
-			return fmt.Errorf("waiting for room creation to complete cancelled for room '%s': %w", roomID, ctx.Err())
-		default:
+	action := func() (bool, error) {
+		isLocked, err := rs.IsRoomCreationLock(ctx, roomID)
+		if err != nil {
+			return false, fmt.Errorf("redis communication error while checking room '%s' creation lock: %w", roomID, err)
 		}
+		return !isLocked, nil
+	}
 
-		isLocked, errCheck := rs.IsRoomCreationLock(ctx, roomID)
-		if errCheck != nil {
-			log.WithError(errCheck).Error("Redis error while checking room creation lock")
-			return fmt.Errorf("redis communication error while checking room '%s' creation lock: %w", roomID, errCheck)
-		}
-
-		if !isLocked {
-			return nil
-		}
-
-		if time.Since(loopStartTime) >= maxWaitTime {
-			log.WithField("maxWaitTime", maxWaitTime).Warn("Timeout while waiting for room creation to complete")
+	err := performWithBackoff(ctx, maxWaitTime, log, action)
+	if err != nil {
+		if errors.Is(err, timeoutErr) {
 			return fmt.Errorf("timeout waiting for room creation of room '%s' to complete", roomID)
 		}
-
-		// Calculate next interval with jitter
-		jitter := time.Duration(rand.Float64() * backoffJitter * float64(currentInterval))
-		waitDuration := currentInterval + jitter
-
-		log.WithFields(logrus.Fields{
-			"waitDuration": waitDuration,
-			"elapsed":      time.Since(loopStartTime),
-		}).Debug("Room creation is still in progress. Waiting.")
-		select {
-		case <-time.After(waitDuration):
-		case <-ctx.Done():
-			log.WithError(ctx.Err()).Warn("Context cancelled while polling for room creation to complete")
-			return fmt.Errorf("polling for room creation to complete cancelled for room '%s': %w", roomID, ctx.Err())
-		}
-		currentInterval = time.Duration(float64(currentInterval) * backoffMultiplier)
-		if currentInterval > backoffMaxInterval {
-			currentInterval = backoffMaxInterval
-		}
+		return fmt.Errorf("waiting for room creation to complete cancelled for room '%s': %w", roomID, err)
 	}
+
+	return nil
 }
