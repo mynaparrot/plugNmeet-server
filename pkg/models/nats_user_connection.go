@@ -165,6 +165,34 @@ func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, userInfo *p
 // waitForReconnect periodically checks for user reconnection or if the room has ended.
 // Returns (reconnected bool, roomEnded bool).
 func (m *NatsModel) waitForReconnect(roomId, userId string, totalWait, interval time.Duration, log *logrus.Entry) (reconnected bool, roomEnded bool) {
+	// It checks for user reconnection or if the room has ended.
+	checkStatus := func() (bool, bool) {
+		// 1. Check if user reconnected (highest priority)
+		status, err := m.natsService.GetRoomUserStatus(roomId, userId)
+		if err == nil && status == natsservice.UserStatusOnline {
+			return true, false // User reconnected.
+		}
+
+		// 2. Check if room has ended.
+		roomInfo, _ := m.natsService.GetRoomInfo(roomId) // Ignore error, nil info is a valid signal.
+		if roomInfo == nil {
+			log.Info("room info not found, assuming it has ended.")
+			return false, true // Room has ended.
+		}
+		if roomInfo.Status == natsservice.RoomStatusEnded || roomInfo.Status == natsservice.RoomStatusTriggeredEnd {
+			log.Info("room has ended, proceeding to next cleanup step")
+			return false, true // Room has ended.
+		}
+
+		return false, false // Neither condition met.
+	}
+
+	// Perform an immediate check before starting the ticker.
+	if reconnected, roomEnded = checkStatus(); reconnected || roomEnded {
+		return
+	}
+
+	// If not immediately resolved, start the ticker.
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	timeout := time.After(totalWait)
@@ -172,24 +200,11 @@ func (m *NatsModel) waitForReconnect(roomId, userId string, totalWait, interval 
 	for {
 		select {
 		case <-timeout:
-			// Wait period is over. User did not reconnect, and we didn't detect the room ending.
+			// Wait period is over.
 			return false, false
 		case <-ticker.C:
-			// 1. Check if user reconnected (highest priority)
-			status, err := m.natsService.GetRoomUserStatus(roomId, userId)
-			if err == nil && status == natsservice.UserStatusOnline {
-				return true, false // User reconnected.
-			}
-
-			// 2. Check if room has ended.
-			roomInfo, _ := m.natsService.GetRoomInfo(roomId) // Ignore error, nil info is a valid signal.
-			if roomInfo == nil {
-				log.Info("room info not found, assuming it has ended.")
-				return false, true // Room has ended.
-			}
-			if roomInfo.Status == natsservice.RoomStatusEnded || roomInfo.Status == natsservice.RoomStatusTriggeredEnd {
-				log.Info("room has ended, proceeding to next cleanup step")
-				return false, true // Room has ended.
+			if reconnected, roomEnded = checkStatus(); reconnected || roomEnded {
+				return
 			}
 		}
 	}
