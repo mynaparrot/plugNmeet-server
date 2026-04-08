@@ -19,6 +19,7 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 		"room_id": roomID,
 		"method":  "EndRoom",
 	})
+	started := time.Now()
 
 	// Wait until any ongoing room creation process is complete to avoid race conditions.
 	if errWait := waitUntilRoomCreationCompletes(ctx, m.rs, roomID, m.logger); errWait != nil {
@@ -44,7 +45,7 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 		}
 		if roomDbInfo.IsRunning == 1 {
 			log.Warn("Room active in DB but not in NATS during EndRoom. Marking as ended and cleaning up.")
-			go m.OnAfterRoomEnded(roomDbInfo.ID, roomDbInfo.RoomId, roomDbInfo.Sid, "", "", uint64(roomDbInfo.CreationTime)) // Metadata might be empty
+			go m.OnAfterRoomEnded(roomDbInfo.ID, roomDbInfo.RoomId, roomDbInfo.Sid, "", "", uint64(roomDbInfo.CreationTime), started) // Metadata might be empty
 		}
 		return true, "room ended (NATS info was missing, cleanup initiated)"
 	}
@@ -59,11 +60,11 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 	}
 
 	// Trigger the main asynchronous cleanup process.
-	go m.OnAfterRoomEnded(info.DbTableId, info.RoomId, info.RoomSid, info.Metadata, info.Status, info.CreatedAt)
+	go m.OnAfterRoomEnded(info.DbTableId, info.RoomId, info.RoomSid, info.Metadata, info.Status, info.CreatedAt, started)
 	return true, "success"
 }
 
-func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata, roomStatus string, createdAt uint64) {
+func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata, roomStatus string, createdAt uint64, started time.Time) {
 	log := m.logger.WithFields(logrus.Fields{
 		"room_id":     roomID,
 		"room_sid":    roomSID,
@@ -99,7 +100,7 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 		if err := m.rs.UnlockRoomCreation(unlockCtx, roomID, lockVal); err != nil {
 			log.WithField("lockVal", lockVal).WithError(err).Error("Error releasing cleanup lock")
 		} else {
-			log.WithField("lockVal", lockVal).Info("Room creation lock released")
+			log.WithField("lockVal", lockVal).Infof("Room creation lock released after %s", time.Since(started))
 		}
 	}()
 
@@ -167,7 +168,7 @@ func (m *RoomModel) OnAfterRoomEnded(dbTableId uint64, roomID, roomSID, metadata
 	// Final NATS cleanup: deletes all consumers, messages, and the KV store for this room.
 	m.natsService.OnAfterSessionEndCleanup(roomID)
 
-	log.Info("Room has been cleaned properly")
+	log.Infof("Room has been cleaned properly after %s", time.Since(started))
 
 	// Schedule the analytics export to run after a delay.
 	// This is done asynchronously to allow the current cleanup lock to be released.

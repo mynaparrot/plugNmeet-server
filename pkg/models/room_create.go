@@ -50,7 +50,7 @@ func (m *RoomModel) CreateRoom(userCtx context.Context, r *plugnmeet.CreateRoomR
 			// UnlockRoomCreation in RedisService should log details
 			log.WithError(unlockErr).Error("Error trying to clean up room creation lock")
 		} else {
-			log.Info("Room creation lock released")
+			log.Infof("Room creation lock released after %s", time.Since(started))
 		}
 	}()
 
