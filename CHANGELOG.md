@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.1.6](https://github.com/mynaparrot/plugNmeet-server/compare/v2.1.5...v2.1.6) (2026-04-09)
+
+
+### Bug Fixes
+
+* acquire lock as soon as request arrive ([6bbae57](https://github.com/mynaparrot/plugNmeet-server/commit/6bbae5766391babaa0a4b64c5c020fc8ac9dbff7))
+* added comments and renamed methods ([b8298f6](https://github.com/mynaparrot/plugNmeet-server/commit/b8298f66f19f9663e914a1535e90268b53d746b0))
+* added missing context ([933fd13](https://github.com/mynaparrot/plugNmeet-server/commit/933fd13247ec61922821ae26699d2fe8c294d402))
+* added/clean logs ([d6366ec](https://github.com/mynaparrot/plugNmeet-server/commit/d6366ec67ac849d10d79958c02014226dec14e77))
+* check status immediately after calling ([8fc8521](https://github.com/mynaparrot/plugNmeet-server/commit/8fc8521ba2038467705180a5c3fe229c067d0402))
+* clean up code ([e1df472](https://github.com/mynaparrot/plugNmeet-server/commit/e1df472feb57fd295ad655920475715f9e1fe49c))
+* confusing log was displaying ([6f420ce](https://github.com/mynaparrot/plugNmeet-server/commit/6f420cee9c6176ae3be14696780100ce9e01dac9))
+* **critical:** duplicate event was sending because of using same subject for both JS and Core pub/sub ([83c0535](https://github.com/mynaparrot/plugNmeet-server/commit/83c053590bf3946e4ea76dae86a8a594d4486c8a))
+* **deps:** update module google.golang.org/genai to v1.53.0 ([c94f417](https://github.com/mynaparrot/plugNmeet-server/commit/c94f41793ffc7502a3ee3553920c7b90f908acbf))
+* **deps:** update module google.golang.org/genai to v1.53.0 ([ba3d28e](https://github.com/mynaparrot/plugNmeet-server/commit/ba3d28e7e95705876a528f6ee417da26d5891159))
+* handle user disconnection more efficiently ([87f8a27](https://github.com/mynaparrot/plugNmeet-server/commit/87f8a2718b203d58018ef1f30009dca71b7ebd45))
+* log duration took ([3c670b0](https://github.com/mynaparrot/plugNmeet-server/commit/3c670b01085a6bff1e0fcbe6890faefe55d16b38))
+* reworked on `OnAfterRoomEnded` to handle session termination more efficiently ([7285ca3](https://github.com/mynaparrot/plugNmeet-server/commit/7285ca3c323040e624acfec15f5349f71f73797a))
+* update local cache during update to prevent nats `watch` latency problem ([a540966](https://github.com/mynaparrot/plugNmeet-server/commit/a540966edb1f60ede5b4c0fdeba825271502bea1))
+* update proto ([a33ff7b](https://github.com/mynaparrot/plugNmeet-server/commit/a33ff7bd6b9c2a13c99a24bbdd04eec4672c1093))
+
 ## [2.1.5](https://github.com/mynaparrot/plugNmeet-server/compare/v2.1.4...v2.1.5) (2026-04-04)
 
 
