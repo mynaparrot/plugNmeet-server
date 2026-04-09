@@ -17,7 +17,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/google/wire v0.7.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/media-sdk v0.0.0-20251106223430-dd8f5e0de2cf
+	github.com/livekit/media-sdk v0.0.0-20260409112027-28f10249a925
 	github.com/livekit/protocol v1.45.1
 	github.com/livekit/server-sdk-go/v2 v2.16.1
 	github.com/mynaparrot/plugnmeet-protocol v1.2.2-0.20260409110802-d201b3fecf6e
