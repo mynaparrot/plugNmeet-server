@@ -20,7 +20,7 @@ require (
 	github.com/livekit/media-sdk v0.0.0-20251106223430-dd8f5e0de2cf
 	github.com/livekit/protocol v1.45.1
 	github.com/livekit/server-sdk-go/v2 v2.16.1
-	github.com/mynaparrot/plugnmeet-protocol v1.2.2-0.20260406140131-e4cdbb15b0fc
+	github.com/mynaparrot/plugnmeet-protocol v1.2.2-0.20260409110802-d201b3fecf6e
 	github.com/nats-io/jwt/v2 v2.8.1
 	github.com/nats-io/nats.go v1.50.0
 	github.com/nats-io/nkeys v0.4.15
@@ -28,7 +28,7 @@ require (
 	github.com/redis/go-redis/v9 v9.18.0
 	github.com/sirupsen/logrus v1.9.4
 	golang.org/x/sync v0.20.0
-	google.golang.org/genai v1.52.0
+	google.golang.org/genai v1.52.1
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/mysql v1.6.0

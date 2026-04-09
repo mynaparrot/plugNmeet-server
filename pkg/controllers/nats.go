@@ -209,22 +209,20 @@ func (c *NatsController) handleUserConnectionEvent(data []byte, isConnect bool) 
 		}
 		if claims.GetName() != config.RecorderUserAuthName {
 			if isConnect {
-				c.natsModel.OnAfterUserJoined(claims.GetRoomId(), claims.GetUserId())
+				c.natsModel.OnAfterUserJoined(claims.GetRoomId(), claims.GetUserId(), "handleUserConnectionEvent")
 			} else {
-				c.natsModel.OnAfterUserDisconnected(claims.GetRoomId(), claims.GetUserId())
+				c.natsModel.OnAfterUserDisconnected(claims.GetRoomId(), claims.GetUserId(), "handleUserConnectionEvent")
 			}
 		}
 	}
 }
 
-// subscribeToSystemWorkerCore subscribes to the system worker subject via core NATS pub/sub.
+// subscribeToSystemWorkerCore subscribes to the SystemCoreWorker subject via core NATS pub/sub.
 // This is intended for lightweight, fire-and-forget messages (e.g., analytics) that don't require JetStream's guarantees.
-// It runs in parallel with the JetStream consumer.
 func (c *NatsController) subscribeToSystemWorkerCore() (*nats.Subscription, error) {
-	subject := fmt.Sprintf("%s.*.*", c.app.NatsInfo.Subjects.SystemJsWorker)
+	subject := fmt.Sprintf("%s.*.*", c.app.NatsInfo.Subjects.SystemCoreWorker)
 	// Use a queue group to load-balance across multiple server instances.
-	// The name is derived from the JetStream consumer for consistency.
-	queue := fmt.Sprintf("%s%s-core", prefix, c.app.NatsInfo.Subjects.SystemJsWorker)
+	queue := fmt.Sprintf("%s%s", prefix, c.app.NatsInfo.Subjects.SystemCoreWorker)
 
 	return c.app.NatsConn.QueueSubscribe(subject, queue, func(msg *nats.Msg) {
 		// Copy data to avoid race conditions as the message buffer is reused.

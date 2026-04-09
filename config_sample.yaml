@@ -152,7 +152,8 @@ nats_info:
   room_stream_name: "pnm-room-stream"
   subjects:
     system_api_worker: "sysApiWorker"
-    system_js_worker: "sysJsWorker"
+    system_js_worker: "sysJsWorker" # for JetStream
+    system_core_worker: "sysCoreWorker" # for Core pub/sub
     system_public: "sysPublic"
     system_private: "sysPrivate"
     chat: "chat"

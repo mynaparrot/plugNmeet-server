@@ -182,7 +182,7 @@ func (m *NatsModel) HandleClientPing(roomId, userId string) {
 	//  because the server may receive this join status a bit lately
 	// as user has sent ping request, this indicates the user is online
 	// OnAfterUserJoined will check the current status and act if the user was not online.
-	m.OnAfterUserJoined(roomId, userId)
+	m.OnAfterUserJoined(roomId, userId, "HandleClientPing")
 
 	lastPing := fmt.Sprintf("%d", time.Now().UnixMilli())
 	err := m.natsService.UpdateUserKeyValue(roomId, userId, natsservice.UserLastPingAt, lastPing)

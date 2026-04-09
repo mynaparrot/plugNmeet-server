@@ -57,7 +57,7 @@ func (m *WebhookModel) participantJoined(event *livekit.WebhookEvent) {
 		// if user was internal agent user then we'll have to do it manually
 		// because that user will not use plugNmeet client interface
 		log.Infof("internal agent participant joined, triggering OnAfterUserJoined manually")
-		m.nm.OnAfterUserJoined(event.Room.Name, event.Participant.Identity)
+		m.nm.OnAfterUserJoined(event.Room.Name, event.Participant.Identity, "participantJoined")
 	}
 
 	// webhook notification
@@ -100,7 +100,7 @@ func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 		// if user was internal agent user then we'll have to do it manually
 		// because that user did not use plugNmeet client interface
 		log.Info("internal agent participant joined left, triggering OnAfterUserDisconnected manually")
-		m.nm.OnAfterUserDisconnected(event.Room.Name, event.Participant.Identity)
+		m.nm.OnAfterUserDisconnected(event.Room.Name, event.Participant.Identity, "participantLeft")
 	}
 	// webhook notification
 	m.sendToWebhookNotifier(event)
@@ -140,6 +140,6 @@ func (m *WebhookModel) ensureUserIsOffline(event *livekit.WebhookEvent, log *log
 		// user should be offline because it's disconnected from media server
 		// but may be for some reason it wasn't triggered by Nats correctly
 		log.Warnln("user status remain online, triggering OnAfterUserDisconnected manually")
-		m.nm.OnAfterUserDisconnected(event.Room.Name, event.Participant.Identity)
+		m.nm.OnAfterUserDisconnected(event.Room.Name, event.Participant.Identity, "ensureUserIsOffline")
 	}
 }

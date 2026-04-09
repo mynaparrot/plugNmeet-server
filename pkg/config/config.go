@@ -218,13 +218,14 @@ type NatsInfo struct {
 }
 
 type NatsSubjects struct {
-	SystemApiWorker string `yaml:"system_api_worker"`
-	SystemJsWorker  string `yaml:"system_js_worker"`
-	SystemPublic    string `yaml:"system_public"`
-	SystemPrivate   string `yaml:"system_private"`
-	Chat            string `yaml:"chat"`
-	Whiteboard      string `yaml:"whiteboard"`
-	DataChannel     string `yaml:"data_channel"`
+	SystemApiWorker  string `yaml:"system_api_worker"`
+	SystemJsWorker   string `yaml:"system_js_worker"`   // jetstream worker
+	SystemCoreWorker string `yaml:"system_core_worker"` // core pub/sub worker
+	SystemPublic     string `yaml:"system_public"`
+	SystemPrivate    string `yaml:"system_private"`
+	Chat             string `yaml:"chat"`
+	Whiteboard       string `yaml:"whiteboard"`
+	DataChannel      string `yaml:"data_channel"`
 }
 
 type NatsInfoRecorder struct {
@@ -242,6 +243,9 @@ func New(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 	appCnf.ctx = ctx
 	if appCnf.NatsInfo.RoomStreamName == "" {
 		appCnf.NatsInfo.RoomStreamName = "pnm-room-stream"
+	}
+	if appCnf.NatsInfo.Subjects.SystemCoreWorker == "" {
+		appCnf.NatsInfo.Subjects.SystemCoreWorker = "sysCoreWorker"
 	}
 
 	// set default values

@@ -163,6 +163,8 @@ func (s *NatsAuthController) setPermissionForClient(data *plugnmeet.PlugNmeetTok
 
 				// permission to publish messages to the system (JetStream)
 				fmt.Sprintf("%s.%s.%s", s.app.NatsInfo.Subjects.SystemJsWorker, roomId, userId),
+				// permission to publish messages to the system (core pub/sub)
+				fmt.Sprintf("%s.%s.%s", s.app.NatsInfo.Subjects.SystemCoreWorker, roomId, userId),
 				// permission to publish in core pub/sub
 				fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.Chat, roomId),
 				fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.Whiteboard, roomId),

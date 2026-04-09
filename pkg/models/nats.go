@@ -9,6 +9,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	turnservice "github.com/mynaparrot/plugnmeet-server/pkg/services/turn"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/singleflight"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -23,6 +24,7 @@ type NatsModel struct {
 	userModel      *UserModel
 	analyticsModel *AnalyticsModel
 	logger         *logrus.Entry
+	sfGroup        *singleflight.Group
 }
 
 func NewNatsModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, lk *livekitservice.LivekitService, turn *turnservice.TurnService, analyticsModel *AnalyticsModel, authModel *AuthModel, userModel *UserModel, logger *logrus.Logger) *NatsModel {
@@ -37,6 +39,7 @@ func NewNatsModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redi
 		userModel:      userModel,
 		analyticsModel: analyticsModel,
 		logger:         logger.WithField("model", "nats"),
+		sfGroup:        new(singleflight.Group),
 	}
 }
 
