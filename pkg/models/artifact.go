@@ -135,9 +135,8 @@ func (m *ArtifactModel) CreateAllRoomUsageArtifacts(roomId, roomSid string, room
 
 func (m *ArtifactModel) sendWebhookNotification(eventName ArtifactEventName, roomSid string, artifact *dbmodels.RoomArtifact, metadata *plugnmeet.RoomArtifactMetadata, forceSend bool) {
 	if m.webhookNotifier != nil {
-		e := string(eventName)
 		msg := &plugnmeet.CommonNotifyEvent{
-			Event: &e,
+			Event: new(string(eventName)),
 			Room: &plugnmeet.NotifyEventRoom{
 				Sid:    &roomSid,
 				RoomId: &artifact.RoomId,
@@ -199,6 +198,5 @@ func (m *ArtifactModel) createAndSaveArtifact(roomId, roomSid string, roomTableI
 
 func roundAndPointer(val float64, precision int) *float64 {
 	multiplier := math.Pow10(precision)
-	rounded := math.Round(val*multiplier) / multiplier
-	return &rounded
+	return new(math.Round(val*multiplier) / multiplier)
 }

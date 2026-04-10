@@ -1,6 +1,6 @@
 module github.com/mynaparrot/plugnmeet-server
 
-go 1.25.7
+go 1.26
 
 require (
 	buf.build/go/protovalidate v1.1.3

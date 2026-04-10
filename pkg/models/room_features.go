@@ -8,7 +8,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/proto"
 )
 
 func (m *RoomModel) ChangeVisibility(r *plugnmeet.ChangeVisibilityRes) (bool, string) {
@@ -140,11 +139,11 @@ func (m *RoomModel) CreateIngress(r *plugnmeet.CreateIngressReq) (*livekit.Ingre
 	log.Info("adding ingress participant to NATS user bucket")
 	mt := plugnmeet.UserMetadata{
 		IsAdmin:         true,
-		RecordWebcam:    proto.Bool(true),
+		RecordWebcam:    new(true),
 		WaitForApproval: false,
 		LockSettings: &plugnmeet.LockSettings{
-			LockWebcam:     proto.Bool(false),
-			LockMicrophone: proto.Bool(false),
+			LockWebcam:     new(false),
+			LockMicrophone: new(false),
 		},
 	}
 	err = m.natsService.AddUser(r.RoomId, req.ParticipantIdentity, r.ParticipantName, true, false, &mt)

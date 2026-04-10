@@ -12,7 +12,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/proto"
 )
 
 var validUserIDRegex = regexp.MustCompile("^[a-zA-Z0-9-_]+$")
@@ -69,8 +68,7 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 	// Step 5: If no external user ID is provided, use the internal user ID as the default.
 	if g.UserInfo.UserMetadata.ExUserId == nil || *g.UserInfo.UserMetadata.ExUserId == "" {
 		// if empty, then we'll use the default user id
-		exId := strings.Clone(g.UserInfo.UserId)
-		g.UserInfo.UserMetadata.ExUserId = &exId
+		g.UserInfo.UserMetadata.ExUserId = new(strings.Clone(g.UserInfo.UserId))
 	}
 
 	// Step 6: Handle user ID generation and duplicate user checks.
@@ -153,7 +151,7 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 	}
 
 	if g.UserInfo.UserMetadata.RecordWebcam == nil {
-		g.UserInfo.UserMetadata.RecordWebcam = proto.Bool(true)
+		g.UserInfo.UserMetadata.RecordWebcam = new(true)
 	}
 
 	// Step 9: Add the user's information to the NATS key-value store for the room.

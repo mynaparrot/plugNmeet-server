@@ -251,9 +251,8 @@ func (m *RoomModel) waitForAllUsersToDisconnect(roomID string) {
 // sendSessionEndedWebhook to send webhook
 func (m *RoomModel) sendSessionEndedWebhook(roomId, roomSid, metadata string, createdAt uint64) {
 	if m.webhookNotifier != nil {
-		e := "session_ended"
 		msg := &plugnmeet.CommonNotifyEvent{
-			Event: &e,
+			Event: new("session_ended"),
 			Room: &plugnmeet.NotifyEventRoom{
 				RoomId:       &roomId,
 				Sid:          &roomSid,

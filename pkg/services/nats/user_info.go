@@ -73,6 +73,7 @@ func (s *NatsService) GetRoomUserStatusEntries(roomId string) (map[string]jetstr
 	if err != nil {
 		return nil, err
 	}
+	defer kl.Stop()
 
 	users := make(map[string]jetstream.KeyValueEntry)
 	for key := range kl.Keys() {
@@ -95,7 +96,7 @@ func (s *NatsService) GetOnlineUsersId(roomId string) ([]string, error) {
 	}
 
 	// fallback to nats
-	users, err := s.GetRoomUserStatusEntries(roomId) // Use new name
+	users, err := s.GetRoomUserStatusEntries(roomId)
 	if err != nil || users == nil {
 		return nil, err
 	}

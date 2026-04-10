@@ -98,8 +98,7 @@ func (s *NatsService) MarshalToProtoJson(m proto.Message) (string, error) {
 
 // MarshalRoomMetadata will convert metadata struct to proper json format
 func (s *NatsService) MarshalRoomMetadata(meta *plugnmeet.RoomMetadata) (string, error) {
-	mId := uuid.NewString()
-	meta.MetadataId = &mId
+	meta.MetadataId = new(uuid.NewString())
 
 	marshal, err := s.MarshalToProtoJson(meta)
 	if err != nil {
@@ -122,8 +121,7 @@ func (s *NatsService) UnmarshalRoomMetadata(metadata string) (*plugnmeet.RoomMet
 
 // MarshalUserMetadata will create proper json string of user's metadata
 func (s *NatsService) MarshalUserMetadata(meta *plugnmeet.UserMetadata) (string, error) {
-	mId := uuid.NewString()
-	meta.MetadataId = &mId
+	meta.MetadataId = new(uuid.NewString())
 
 	marshal, err := s.MarshalToProtoJson(meta)
 	if err != nil {

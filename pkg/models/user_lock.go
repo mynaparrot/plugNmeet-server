@@ -6,7 +6,6 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/proto"
 )
 
 // AssignLockSettingsToUser will assign lock to a non-admin user.
@@ -147,7 +146,7 @@ var lockSettingMap = map[string]func(l *plugnmeet.LockSettings, val *bool){
 // assignNewLockSetting use map to find and update
 func (m *UserModel) assignNewLockSetting(service string, direction string, l *plugnmeet.LockSettings) {
 	if setter, ok := lockSettingMap[service]; ok {
-		lock := proto.Bool(false)
+		lock := new(false)
 		if direction == "lock" {
 			*lock = true
 		}

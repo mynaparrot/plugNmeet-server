@@ -67,8 +67,7 @@ func (m *NatsModel) HandleSendUsersList(roomId, userId string, event *plugnmeet.
 
 	// Default to the original event if none is provided, for backward compatibility.
 	if event == nil {
-		e := plugnmeet.NatsMsgServerToClientEvents_RES_JOINED_USERS_LIST
-		event = &e
+		event = new(plugnmeet.NatsMsgServerToClientEvents_RES_JOINED_USERS_LIST)
 	}
 
 	users, err := m.natsService.GetOnlineUsersListAsJson(roomId)

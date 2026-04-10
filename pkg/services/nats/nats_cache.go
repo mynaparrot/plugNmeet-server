@@ -116,15 +116,15 @@ func (ncs *NatsCacheService) addRoomWatcher(kv jetstream.KeyValue, bucket, roomI
 					return // Channel closed
 				}
 				if entry != nil {
-					ncs.dispatchCacheUpdate(entry, roomId)
+					ncs.dispatchRoomCacheUpdate(entry, roomId)
 				}
 			}
 		}
 	}()
 }
 
-// dispatchCacheUpdate inspects the key and routes the update to the correct cache handler.
-func (ncs *NatsCacheService) dispatchCacheUpdate(entry jetstream.KeyValueEntry, roomId string) {
+// dispatchRoomCacheUpdate inspects the key and routes the update to the correct cache handler.
+func (ncs *NatsCacheService) dispatchRoomCacheUpdate(entry jetstream.KeyValueEntry, roomId string) {
 	key := entry.Key()
 	switch {
 	case strings.HasPrefix(key, RoomInfoKeyPrefix):

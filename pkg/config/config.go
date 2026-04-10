@@ -237,8 +237,7 @@ type NatsInfoRecorder struct {
 func New(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 	// default validation of token is 10 minutes
 	if appCnf.Client.TokenValidity == nil || *appCnf.Client.TokenValidity < 0 {
-		validity := time.Minute * 10
-		appCnf.Client.TokenValidity = &validity
+		appCnf.Client.TokenValidity = new(time.Minute * 10)
 	}
 	appCnf.ctx = ctx
 	if appCnf.NatsInfo.RoomStreamName == "" {
@@ -252,8 +251,7 @@ func New(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 	if appCnf.AnalyticsSettings != nil {
 		//TODO: deprecated, will remove in future
 		if appCnf.AnalyticsSettings.FilesStorePath == nil {
-			p := "./analytics"
-			appCnf.AnalyticsSettings.FilesStorePath = &p
+			appCnf.AnalyticsSettings.FilesStorePath = new("./analytics")
 		}
 	}
 
@@ -334,12 +332,10 @@ func handleArtifactsSettings(appCnf *AppConfig) error {
 	}
 	if appCnf.ArtifactsSettings.StoragePath == nil {
 		// Set the default path if it's not specified
-		p := "./artifacts"
-		appCnf.ArtifactsSettings.StoragePath = &p
+		appCnf.ArtifactsSettings.StoragePath = new("./artifacts")
 	}
 	if appCnf.ArtifactsSettings.TokenValidity == nil {
-		d := time.Minute * 10
-		appCnf.ArtifactsSettings.TokenValidity = &d
+		appCnf.ArtifactsSettings.TokenValidity = new(time.Minute * 10)
 	}
 
 	p := *appCnf.ArtifactsSettings.StoragePath

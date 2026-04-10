@@ -192,10 +192,9 @@ func (m *AnalyticsModel) FetchAnalytics(r *plugnmeet.FetchAnalyticsReq) (*plugnm
 	}
 
 	// 1. Fetch from the new artifacts system
-	artifactType := plugnmeet.RoomArtifactType_MEETING_ANALYTICS
 	artifacts, err := m.artifactModel.FetchArtifacts(&plugnmeet.FetchArtifactsReq{
 		RoomIds: r.RoomIds,
-		Type:    &artifactType,
+		Type:    new(plugnmeet.RoomArtifactType_MEETING_ANALYTICS),
 		Limit:   uint64(r.Limit),
 		From:    uint64(r.From),
 		OrderBy: r.OrderBy,

@@ -103,8 +103,7 @@ func (ncs *NatsCacheService) getUserInfo(roomId, userId string) *plugnmeet.NatsK
 	defer ncs.roomLock.RUnlock()
 	if rm, found := ncs.roomUsersInfoStore[roomId]; found {
 		if entry, ok := rm[userId]; ok && entry.UserInfo != nil && entry.UserInfo.UserId != "" {
-			infoCopy := proto.Clone(entry.UserInfo).(*plugnmeet.NatsKvUserInfo)
-			return infoCopy
+			return proto.CloneOf(entry.UserInfo)
 		}
 	}
 	return nil

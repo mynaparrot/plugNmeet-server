@@ -94,12 +94,11 @@ func (m *EtherpadModel) addPadToRoomMetadata(roomId string, selectedHost *config
 	}
 
 	// send analytics
-	val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()
 	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
 		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_ETHERPAD_STATUS,
 		RoomId:    roomId,
-		HsetValue: &val,
+		HsetValue: new(plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()),
 	})
 
 	if err == nil {

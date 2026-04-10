@@ -167,8 +167,7 @@ func (m *ArtifactModel) MigrateAnalyticsToArtifacts() {
 			// Clean up the copied file if DB insert fails.
 			_ = os.Remove(absolutePath)
 
-			var mysqlErr *mysql.MySQLError
-			if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 { // 1062 is the error number for duplicate entry
+			if mysqlErr, ok := errors.AsType[*mysql.MySQLError](err); ok && mysqlErr.Number == 1062 { // 1062 is the error number for duplicate entry
 				log.Warnf("artifact for file_id %s already exists, skipping.", analytic.FileID)
 				skippedCount++
 			} else {

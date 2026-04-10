@@ -120,13 +120,12 @@ func (m *FileModel) ConvertAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 
 // addFileToNatsStore stores the metadata of a converted file into the dedicated NATS KV bucket.
 func (m *FileModel) addFileToNatsStore(roomId string, fileInfo *ConvertWhiteboardFileRes) error {
-	pages := int32(fileInfo.TotalPages)
 	meta := plugnmeet.RoomUploadedFileMetadata{
 		FileId:     fileInfo.FileId,
 		FileName:   fileInfo.FileName,
 		FilePath:   fileInfo.FilePath,
 		FileType:   plugnmeet.RoomUploadedFileType_WHITEBOARD_CONVERTED_FILE,
-		TotalPages: &pages,
+		TotalPages: new(int32(fileInfo.TotalPages)),
 	}
 	return m.natsService.AddRoomFile(roomId, &meta)
 }

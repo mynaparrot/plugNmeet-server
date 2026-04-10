@@ -97,6 +97,7 @@ func (s *NatsService) GetAllRoomFiles(roomId string) (map[string]*plugnmeet.Room
 	if err != nil {
 		return nil, err
 	}
+	defer keys.Stop()
 
 	files := make(map[string]*plugnmeet.RoomUploadedFileMetadata)
 	for key := range keys.Keys() {

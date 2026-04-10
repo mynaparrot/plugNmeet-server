@@ -151,8 +151,7 @@ func (rc *RecordingController) HandleRecorderTasks(c *fiber.Ctx) error {
 	}
 
 	// now need to check if meeting is running or not
-	isRunning := 1
-	room, err := rc.ds.GetRoomInfoBySid(req.Sid, &isRunning)
+	room, err := rc.ds.GetRoomInfoBySid(req.Sid, new(1))
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}

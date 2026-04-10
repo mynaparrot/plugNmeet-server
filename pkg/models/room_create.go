@@ -331,14 +331,12 @@ func (m *RoomModel) prepareWhiteboardPreloadFile(meta *plugnmeet.RoomMetadata, r
 func (m *RoomModel) sendRoomCreatedWebhook(info *plugnmeet.ActiveRoomInfo, emptyTimeout, maxParticipants *uint32) {
 	if m.webhookNotifier != nil {
 		m.webhookNotifier.RegisterWebhook(info.RoomId, info.Sid)
-		e := "room_created"
-		cr := uint64(info.CreationTime)
 		msg := &plugnmeet.CommonNotifyEvent{
-			Event: &e,
+			Event: new("room_created"),
 			Room: &plugnmeet.NotifyEventRoom{
 				RoomId:          &info.RoomId,
 				Sid:             &info.Sid,
-				CreationTime:    &cr,
+				CreationTime:    new(uint64(info.CreationTime)),
 				Metadata:        &info.Metadata,
 				EmptyTimeout:    emptyTimeout,
 				MaxParticipants: maxParticipants,

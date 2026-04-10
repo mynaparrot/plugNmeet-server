@@ -72,8 +72,7 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 		return // The lock will be released by the deferred function.
 	}
 
-	isRunning := 0
-	room, err := m.ds.GetRoomInfoBySid(sid, &isRunning)
+	room, err := m.ds.GetRoomInfoBySid(sid, new(0))
 	if err != nil {
 		log.WithError(err).Error("failed to get room info from db")
 	}

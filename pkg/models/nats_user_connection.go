@@ -46,7 +46,6 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId, calledFrom string) {
 				log.WithError(err).Error("Failed to broadcast USER_JOINED event")
 			}
 
-			now := fmt.Sprintf("%d", time.Now().UnixMilli())
 			m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 				EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
 				EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_JOINED,
@@ -54,7 +53,7 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId, calledFrom string) {
 				UserId:    &userId,
 				UserName:  &userInfo.Name,
 				ExtraData: &userInfo.Metadata,
-				HsetValue: &now,
+				HsetValue: new(fmt.Sprintf("%d", time.Now().UnixMilli())),
 			})
 			log.Info("Successfully processed user joined event")
 
@@ -240,13 +239,12 @@ func (m *NatsModel) revokeTurnCredentials(creds *turn.Credentials, log *logrus.E
 }
 
 func (m *NatsModel) updateUserLeftAnalytics(roomId, userId string, log *logrus.Entry) {
-	now := fmt.Sprintf("%d", time.Now().UnixMilli())
 	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
 		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_LEFT,
 		RoomId:    roomId,
 		UserId:    &userId,
-		HsetValue: &now,
+		HsetValue: new(fmt.Sprintf("%d", time.Now().UnixMilli())),
 	})
 
 	roomInfo, err := m.natsService.GetRoomInfo(roomId)

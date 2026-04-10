@@ -70,8 +70,7 @@ func (m *NatsModel) HandleFromClientToServerReq(roomId, userId string, req *plug
 		}
 		m.analyticsModel.HandleEvent(ad)
 	case plugnmeet.NatsMsgClientToServerEvents_REQ_ONLINE_USERS_LIST:
-		event := plugnmeet.NatsMsgServerToClientEvents_RESP_ONLINE_USERS_LIST
-		m.HandleSendUsersList(roomId, userId, &event)
+		m.HandleSendUsersList(roomId, userId, new(plugnmeet.NatsMsgServerToClientEvents_RESP_ONLINE_USERS_LIST))
 	case plugnmeet.NatsMsgClientToServerEvents_REQ_PRIVATE_DATA_DELIVERY:
 		m.HandleToDeliveryPrivateData(roomId, userId, req)
 	}

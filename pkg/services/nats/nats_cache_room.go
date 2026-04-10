@@ -56,8 +56,7 @@ func (ncs *NatsCacheService) getCachedRoomInfo(roomID string) *plugnmeet.NatsKvR
 		if cachedEntry.RoomInfo.DbTableId == 0 || cachedEntry.RoomInfo.Status == RoomStatusEnded {
 			return nil
 		}
-		infoCopy := proto.Clone(cachedEntry.RoomInfo).(*plugnmeet.NatsKvRoomInfo)
-		return infoCopy
+		return proto.CloneOf(cachedEntry.RoomInfo)
 	}
 	return nil
 }

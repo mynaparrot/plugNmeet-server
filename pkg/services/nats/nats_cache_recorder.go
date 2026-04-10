@@ -67,8 +67,7 @@ func (ncs *NatsCacheService) getAllCachedActiveRecorders(pingTimeout time.Durati
 		// Use time.After() for a clear and safe comparison.
 		if pingTime.After(cutoffTime) {
 			// Create a copy to avoid race conditions if the caller modifies it
-			infoCopy := *r
-			recorders = append(recorders, &infoCopy)
+			recorders = append(recorders, new(*r))
 		}
 	}
 
@@ -82,8 +81,7 @@ func (ncs *NatsCacheService) getCachedRecorderInfo(recorderId string) (*utils.Re
 
 	if recorder, ok := ncs.recordersStore[recorderId]; ok {
 		// Create a copy to avoid race conditions
-		infoCopy := *recorder
-		return &infoCopy, true
+		return new(*recorder), true
 	}
 
 	return nil, false

@@ -47,12 +47,11 @@ func (m *PollModel) CreatePoll(r *plugnmeet.CreatePollReq) (string, error) {
 	if err != nil {
 		log.WithError(err).Errorln("failed to marshal analytics data")
 	}
-	val := string(marshal)
 	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
 		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_POLL_ADDED,
 		RoomId:    r.RoomId,
-		HsetValue: &val,
+		HsetValue: new(string(marshal)),
 	})
 
 	log.Info("successfully created poll")
@@ -109,13 +108,12 @@ func (m *PollModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq) error
 	if err != nil {
 		log.WithError(err).Errorln("failed to marshal analytics data")
 	}
-	val := string(marshal)
 	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
 		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_VOTED_POLL,
 		RoomId:    r.RoomId,
 		UserId:    &r.UserId,
-		HsetValue: &val,
+		HsetValue: new(string(marshal)),
 	})
 
 	log.Info("successfully submitted poll response")

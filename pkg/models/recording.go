@@ -64,11 +64,10 @@ func (m *RecordingModel) ProcessRecorderEvent(r *plugnmeet.RecorderToPlugNmeet, 
 }
 
 func (m *RecordingModel) sendToWebhookNotifier(r *plugnmeet.RecorderToPlugNmeet) {
-	tk := r.Task.String()
 	n := m.webhookNotifier
 	if n != nil {
 		msg := &plugnmeet.CommonNotifyEvent{
-			Event: &tk,
+			Event: new(r.Task.String()),
 			Room: &plugnmeet.NotifyEventRoom{
 				Sid:    &r.RoomSid,
 				RoomId: &r.RoomId,

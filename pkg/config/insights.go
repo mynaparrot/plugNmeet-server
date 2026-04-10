@@ -81,8 +81,7 @@ func (c *InsightsConfig) GetProviderAccountForService(serviceType insights.Servi
 	// 3. Find the specific account within the list by its ID.
 	for _, acc := range providerAccounts {
 		if acc.ID == serviceConfig.ID {
-			found := acc
-			return &found, &serviceConfig, nil
+			return new(acc), &serviceConfig, nil
 		}
 	}
 

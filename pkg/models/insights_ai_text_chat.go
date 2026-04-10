@@ -127,11 +127,10 @@ func (s *InsightsModel) buildHistoryWithUserPrompt(ctx context.Context, roomId, 
 	}
 
 	// 3. Append new user prompt
-	streamId := uuid.NewString()
 	userMsg := &plugnmeet.InsightsAITextChatContent{
 		Role:     plugnmeet.InsightsAITextChatRole_INSIGHTS_AI_TEXT_CHAT_ROLE_USER,
 		Text:     prompt,
-		StreamId: &streamId,
+		StreamId: new(uuid.NewString()),
 	}
 	history = append(history, userMsg)
 

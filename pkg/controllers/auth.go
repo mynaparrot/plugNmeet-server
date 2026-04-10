@@ -151,13 +151,12 @@ func (ac *AuthController) HandleVerifyToken(c *fiber.Ctx) error {
 		enabledSelfInsertEncryptionKey = meta.RoomFeatures.EndToEndEncryptionFeatures.EnabledSelfInsertEncryptionKey
 	}
 
-	v := version.Version
 	natsSubjs := ac.AppConfig.NatsInfo.Subjects
 	res := &plugnmeet.VerifyTokenRes{
 		Status:         true,
 		Msg:            "token is valid",
 		NatsWsUrls:     ac.AppConfig.NatsInfo.NatsWSUrls,
-		ServerVersion:  &v,
+		ServerVersion:  new(version.Version),
 		RoomId:         &roomId,
 		UserId:         &requestedUserId,
 		RoomStreamName: &ac.AppConfig.NatsInfo.RoomStreamName,

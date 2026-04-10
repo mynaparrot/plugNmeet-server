@@ -92,8 +92,7 @@ func (uc *UserController) HandleUpdateUserLockSetting(c *fiber.Ctx) error {
 	}
 
 	// now need to check if meeting is running or not
-	isRunning := 1
-	room, _ := uc.ds.GetRoomInfoBySid(req.RoomSid, &isRunning)
+	room, _ := uc.ds.GetRoomInfoBySid(req.RoomSid, new(1))
 
 	if room == nil || room.ID == 0 {
 		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
@@ -129,8 +128,7 @@ func (uc *UserController) HandleMuteUnMuteTrack(c *fiber.Ctx) error {
 	}
 
 	// now need to check if meeting is running or not
-	isRunning := 1
-	room, _ := uc.ds.GetRoomInfoBySid(req.Sid, &isRunning)
+	room, _ := uc.ds.GetRoomInfoBySid(req.Sid, new(1))
 	if room == nil || room.ID == 0 {
 		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
 	}
@@ -168,8 +166,7 @@ func (uc *UserController) HandleRemoveParticipant(c *fiber.Ctx) error {
 	}
 
 	// now need to check if meeting is running or not
-	isRunning := 1
-	room, _ := uc.ds.GetRoomInfoBySid(req.Sid, &isRunning)
+	room, _ := uc.ds.GetRoomInfoBySid(req.Sid, new(1))
 	if room == nil || room.ID == 0 {
 		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
 	}

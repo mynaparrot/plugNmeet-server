@@ -10,7 +10,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/nats-io/nats.go/jetstream"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/proto"
 )
 
 // Constants for bucket naming and user metadata keys
@@ -190,6 +189,7 @@ func (s *NatsService) deleteAllUserConsumers(roomId string) error {
 	if err != nil {
 		return fmt.Errorf("failed to list keys for consumer deletion: %w", err)
 	}
+	defer keys.Stop()
 
 	deletedUsers := make(map[string]bool)
 	for key := range keys.Keys() {
@@ -255,11 +255,11 @@ func (s *NatsService) AddUserToBlockList(roomId, userId string) error {
 func (s *NatsService) AddUserManuallyAndBroadcast(roomId, userId, name string, isAdmin, broadcast bool) (*plugnmeet.NatsKvUserInfo, error) {
 	mt := plugnmeet.UserMetadata{
 		IsAdmin:         isAdmin,
-		RecordWebcam:    proto.Bool(false),
+		RecordWebcam:    new(false),
 		WaitForApproval: false,
 		LockSettings: &plugnmeet.LockSettings{
-			LockWebcam:     proto.Bool(false),
-			LockMicrophone: proto.Bool(false),
+			LockWebcam:     new(false),
+			LockMicrophone: new(false),
 		},
 	}
 	err := s.AddUser(roomId, userId, name, isAdmin, false, &mt)

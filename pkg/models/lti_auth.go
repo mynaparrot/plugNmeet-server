@@ -41,8 +41,6 @@ func (m *LtiV1Model) VerifyAuth(requests, signingURL string) (*url.Values, error
 	if err != nil {
 		return nil, err
 	}
-	params := p.Params()
-
 	if sign != providedSignature {
 		m.logger.WithFields(logrus.Fields{
 			"calculated": sign,
@@ -51,7 +49,7 @@ func (m *LtiV1Model) VerifyAuth(requests, signingURL string) (*url.Values, error
 		return nil, errors.New(config.VerificationFailed)
 	}
 
-	return &params, nil
+	return new(p.Params()), nil
 }
 
 func (m *LtiV1Model) genHashId(id string) string {
