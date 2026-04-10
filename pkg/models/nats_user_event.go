@@ -138,6 +138,7 @@ func (m *NatsModel) HandleMediaServerInfo(roomId, userId string, broadcast bool)
 			ForceTurn:             turnCred.ForceTurn,
 			FallbackTurn:          turnCred.FallbackTurn,
 			FallbackTimerDuration: turnCred.FallbackTimerDuration,
+			FallbackOnFlapping:    turnCred.FallbackOnFlapping,
 		}
 		// store in nats so we can revoke it later
 		if val, err := protojson.Marshal(data.TurnCredentials); err == nil {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/turn"
 	"github.com/mynaparrot/plugnmeet-server/pkg/turn/cloudflare"
@@ -74,6 +75,23 @@ func (s *TurnService) GetCredentials(ctx context.Context, roomId, userId string)
 			duration = time.Second * 60 // default 60s
 		}
 		credentials.FallbackTimerDuration = duration.Milliseconds()
+	}
+
+	if s.config.FallbackOnFlapping != nil && s.config.FallbackOnFlapping.Enabled {
+		// Set default values if not provided in config
+		maxPoorConnCount := s.config.FallbackOnFlapping.MaxPoorConnCount
+		if maxPoorConnCount == 0 {
+			maxPoorConnCount = 3
+		}
+		checkDurationInSec := s.config.FallbackOnFlapping.CheckDurationInSec
+		if checkDurationInSec == 0 {
+			checkDurationInSec = 120
+		}
+		credentials.FallbackOnFlapping = &plugnmeet.FallbackOnFlapping{
+			Enabled:            s.config.FallbackOnFlapping.Enabled,
+			MaxPoorConnCount:   maxPoorConnCount,
+			CheckDurationInSec: checkDurationInSec,
+		}
 	}
 
 	return credentials, nil

@@ -3,6 +3,7 @@ package turn
 import (
 	"context"
 
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
@@ -15,6 +16,7 @@ type Credentials struct {
 	ForceTurn             bool     `json:"force_turn"`
 	FallbackTurn          bool     `json:"fallback_turn"`
 	FallbackTimerDuration int64    `json:"fallback_timer_duration"`
+	FallbackOnFlapping    *plugnmeet.FallbackOnFlapping
 }
 
 // Provider is the master interface for all TURN service integrations.

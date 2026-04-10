@@ -13,7 +13,14 @@ type TurnConfig struct {
 	ForceTurn             bool                    `yaml:"force_turn"`
 	FallbackTurn          bool                    `yaml:"fallback_turn"`
 	FallbackTimerDuration time.Duration           `yaml:"fallback_timer_duration"`
+	FallbackOnFlapping    *FallbackOnFlapping     `yaml:"fallback_on_flapping"`
 	Providers             map[string]TurnProvider `yaml:"providers"`
+}
+
+type FallbackOnFlapping struct {
+	Enabled            bool  `yaml:"enabled"`
+	MaxPoorConnCount   int32 `yaml:"max_poor_conn_count"`
+	CheckDurationInSec int32 `yaml:"check_duration_in_sec"`
 }
 
 // TurnProvider holds the configuration for a single provider.

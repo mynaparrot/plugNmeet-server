@@ -325,6 +325,13 @@ insights:
 #  # The duration to wait with a poor connection before triggering the fallback.
 #  # Examples: "30s", "1m". Default: "60s"
 #  fallback_timer_duration: "60s"
+#  # Fallback on flapping connection
+#  fallback_on_flapping:
+#    enabled: false
+#    # max number of times connection can be poor
+#    max_poor_conn_count: 3
+#    # duration in seconds to check for poor connections
+#    check_duration_in_sec: 120
 #  # The provider to use from the 'providers' map below.
 #  provider: "coturn"
 #
