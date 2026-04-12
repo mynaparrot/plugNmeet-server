@@ -4,7 +4,7 @@ go 1.26
 
 require (
 	buf.build/go/protovalidate v1.1.3
-	github.com/Microsoft/cognitive-services-speech-sdk-go v1.48.2
+	github.com/Microsoft/cognitive-services-speech-sdk-go v1.49.0
 	github.com/ansrivas/fiberprometheus/v2 v2.17.0
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/gabriel-vasile/mimetype v1.4.13
