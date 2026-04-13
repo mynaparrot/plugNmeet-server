@@ -47,6 +47,10 @@ func (ncs *NatsCacheService) updateRecorderCache(entry jetstream.KeyValueEntry) 
 		recorder.CurrentProgress, _ = strconv.ParseInt(val, 10, 64)
 	case plugnmeet.RecorderInfoKeys_RECORDER_INFO_LAST_PING:
 		recorder.LastPing, _ = strconv.ParseInt(val, 10, 64)
+	case plugnmeet.RecorderInfoKeys_RECORDER_INFO_TOTAL_CORES:
+		recorder.TotalCores, _ = strconv.ParseInt(val, 10, 64)
+	case plugnmeet.RecorderInfoKeys_RECORDER_INFO_CPU_SCORE:
+		recorder.CpuScore, _ = strconv.ParseFloat(val, 64)
 	}
 }
 

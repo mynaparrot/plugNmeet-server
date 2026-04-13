@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
@@ -149,6 +150,40 @@ func (m *RecordingModel) addTokenAndRecorder(ctx context.Context, req *plugnmeet
 	return nil
 }
 
+// calculateRecorderScore calculates a load score for a recorder. A lower score is better.
+func calculateRecorderScore(r *utils.RecorderInfo) float64 {
+	progressWeight := 0.6 // 60% weight for session progress
+	cpuWeight := 0.4      // 40% weight for CPU load
+
+	// 1. Calculate progress score (0-1)
+	var progressScore float64
+	if r.MaxLimit > 0 {
+		progressScore = float64(r.CurrentProgress) / float64(r.MaxLimit)
+	}
+	// If MaxLimit is 0, progressScore remains 0, which is fine (no capacity defined).
+
+	// 2. Get CPU score (0-1, already normalized by recorder)
+	cpuScore := r.CpuScore
+
+	// 3. Combine scores based on weights
+	combinedScore := progressWeight*progressScore + cpuWeight*cpuScore
+
+	// 4. Factor in total cores. A recorder with more cores can handle more load.
+	// We penalize recorders with fewer cores by making their score higher.
+	// Using a base of 2 cores to avoid over-penalizing single-core machines.
+	if r.TotalCores > 0 {
+		// Example: 2 cores -> factor 1.0; 4 cores -> factor 0.5; 1 core -> factor 2.0
+		coreFactor := 2.0 / float64(r.TotalCores)
+		combinedScore = combinedScore * coreFactor
+	} else {
+		// If TotalCores is not reported (older recorder), assume a base factor,
+		// e.g., treat it as a 1-core machine for scoring purposes.
+		combinedScore = combinedScore * 2.0 // Equivalent to 1 core (2.0 / 1.0)
+	}
+
+	return combinedScore
+}
+
 func (m *RecordingModel) selectRecorder(log *logrus.Entry) string {
 	log = log.WithField("method", "selectRecorder")
 	log.Info("Selecting a recorder")
@@ -159,24 +194,23 @@ func (m *RecordingModel) selectRecorder(log *logrus.Entry) string {
 		log.Warn("No active recorders found")
 		return ""
 	}
-	// let's sort it based on active processes & max limit.
-	sort.Slice(recorders, func(i int, j int) bool {
-		var iA, jA float64
-		if recorders[i].MaxLimit > 0 {
-			iA = float64(recorders[i].CurrentProgress) / float64(recorders[i].MaxLimit)
-		}
-		if recorders[j].MaxLimit > 0 {
-			jA = float64(recorders[j].CurrentProgress) / float64(recorders[j].MaxLimit)
-		}
-		return iA < jA
+
+	// Sort recorders based on our new scoring logic. Lower score is better.
+	sort.Slice(recorders, func(i, j int) bool {
+		scoreI := calculateRecorderScore(recorders[i])
+		scoreJ := calculateRecorderScore(recorders[j])
+		return scoreI < scoreJ
 	})
 
-	// we'll return the first one
+	// The best recorder is the first one in the sorted list.
 	selected := recorders[0]
 	log.WithFields(logrus.Fields{
 		"selectedRecorderId": selected.RecorderId,
 		"currentProgress":    selected.CurrentProgress,
 		"maxLimit":           selected.MaxLimit,
+		"cpuScore":           selected.CpuScore,
+		"totalCores":         selected.TotalCores,
+		"finalScore":         calculateRecorderScore(selected),
 	}).Info("Successfully selected a recorder")
 	return selected.RecorderId
 }
