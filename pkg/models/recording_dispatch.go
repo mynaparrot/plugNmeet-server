@@ -15,6 +15,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const recorderResponseTimeout = 3 * time.Second
+
 func (m *RecordingModel) DispatchRecorderTask(req *plugnmeet.RecordingReq) error {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId": req.RoomId,
@@ -78,12 +80,14 @@ func (m *RecordingModel) DispatchRecorderTask(req *plugnmeet.RecordingReq) error
 	msg, err := m.app.NatsConn.RequestMsg(&nats.Msg{
 		Subject: m.app.NatsInfo.Recorder.RecorderChannel,
 		Data:    payload,
-	}, time.Second*3)
+	}, recorderResponseTimeout)
 
 	if err != nil {
-		// is normal for plugnmeet.RecordingTasks_STOP not to receive any response from recorder if not task is running
-		if req.Task != plugnmeet.RecordingTasks_STOP {
-			log.WithError(err).Error("Failed to get response from NATS recorder channel")
+		// is normal for plugnmeet.RecordingTasks_STOP not to receive any response from recorder if no task is running
+		if req.Task == plugnmeet.RecordingTasks_STOP {
+			log.Infof("Timed out waiting for a response from the NATS recorder channel after %s, which is expected when no task is active", recorderResponseTimeout)
+		} else {
+			log.WithError(err).Errorf("Timed out waiting for a response from the NATS recorder channel after %s", recorderResponseTimeout)
 		}
 		return err
 	}
@@ -147,12 +151,12 @@ func (m *RecordingModel) addTokenAndRecorder(ctx context.Context, req *plugnmeet
 
 func (m *RecordingModel) selectRecorder(log *logrus.Entry) string {
 	log = log.WithField("method", "selectRecorder")
-	log.Info("selecting a recorder")
+	log.Info("Selecting a recorder")
 
 	recorders := m.natsService.GetAllActiveRecorders()
 
 	if len(recorders) < 1 {
-		log.Warn("no active recorders found")
+		log.Warn("No active recorders found")
 		return ""
 	}
 	// let's sort it based on active processes & max limit.
@@ -173,6 +177,6 @@ func (m *RecordingModel) selectRecorder(log *logrus.Entry) string {
 		"selectedRecorderId": selected.RecorderId,
 		"currentProgress":    selected.CurrentProgress,
 		"maxLimit":           selected.MaxLimit,
-	}).Info("selected recorder")
+	}).Info("Successfully selected a recorder")
 	return selected.RecorderId
 }

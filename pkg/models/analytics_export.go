@@ -31,9 +31,8 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 		return
 	}
 
-	// if no metadata then it is hard to make next logics
-	// if still there was some data stored in redis,
-	// we will have to think different way to clean those
+	// If metadata is missing, it becomes difficult to proceed with the next logic.
+	// If any stale data still exists in Redis, it will be cleaned up by the TTL.
 	if meta == "" || sid == "" {
 		log.Warn("Metadata or sid is empty, skipping analytics export")
 		return
@@ -64,8 +63,8 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 		}
 	}()
 
-	// we'll check if the room is still active or not.
-	// this may happen when we closed the room & re-created it instantly
+	// Ensure the room is still active. This situation can occur when a room is closed and re-created instantly.
+	// We must stop here, as the process would delete all records, since data is keyed by roomId instead of SID.
 	exist, err := m.natsService.GetRoomInfo(roomId)
 	if err == nil && exist != nil && exist.RoomSid != sid {
 		log.Info("room was likely re-created, skipping analytics export for the previous session")
