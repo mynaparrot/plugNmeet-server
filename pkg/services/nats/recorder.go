@@ -9,8 +9,9 @@ import (
 func (s *NatsService) createRecorderKVAndWatch() {
 	bucket := s.app.NatsInfo.Recorder.RecorderInfoKv
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
-		Replicas: s.app.NatsInfo.NumReplicas,
-		Bucket:   bucket,
+		Bucket:      bucket,
+		Description: "plugNmeet recorder info",
+		Replicas:    s.app.NatsInfo.NumReplicas,
 	})
 	if err != nil {
 		s.logger.WithError(err).Fatalf("could not create recorder info bucket %s", bucket)

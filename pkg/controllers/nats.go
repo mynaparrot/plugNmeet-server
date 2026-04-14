@@ -80,9 +80,10 @@ func NewNatsController(app *config.AppConfig, natsService *natsservice.NatsServi
 func (c *NatsController) BootUp(ctx context.Context, wg *sync.WaitGroup) {
 	// system receiver as worker
 	stream, err := c.app.JetStream.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
-		Name:      fmt.Sprintf("%s", c.app.NatsInfo.Subjects.SystemJsWorker),
-		Replicas:  c.app.NatsInfo.NumReplicas,
-		Retention: jetstream.WorkQueuePolicy, // to become a worker
+		Name:        fmt.Sprintf("%s", c.app.NatsInfo.Subjects.SystemJsWorker),
+		Description: "plugNmeet system worker",
+		Replicas:    c.app.NatsInfo.NumReplicas,
+		Retention:   jetstream.WorkQueuePolicy, // to become a worker
 		Subjects: []string{
 			fmt.Sprintf("%s.*.*", c.app.NatsInfo.Subjects.SystemJsWorker),
 		},
@@ -105,10 +106,11 @@ func (c *NatsController) BootUp(ctx context.Context, wg *sync.WaitGroup) {
 
 	// create recorder transcoder worker
 	transcoderStream, err := c.app.JetStream.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
-		Name:      c.app.NatsInfo.Recorder.TranscodingJobs,
-		Replicas:  c.app.NatsInfo.NumReplicas,
-		Retention: jetstream.WorkQueuePolicy,
-		Subjects:  []string{c.app.NatsInfo.Recorder.TranscodingJobs},
+		Name:        c.app.NatsInfo.Recorder.TranscodingJobs,
+		Description: "plugNmeet recorder transcoding jobs",
+		Replicas:    c.app.NatsInfo.NumReplicas,
+		Retention:   jetstream.WorkQueuePolicy,
+		Subjects:    []string{c.app.NatsInfo.Recorder.TranscodingJobs},
 	})
 	if err != nil {
 		c.logger.WithError(err).Fatal("error creating recorder transcoder stream")
