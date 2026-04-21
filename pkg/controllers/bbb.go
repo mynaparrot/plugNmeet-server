@@ -317,7 +317,7 @@ func (bc *BBBController) HandleBBBGetMeetingInfo(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
 
-	status, msg, res := bc.RoomModel.GetActiveRoomInfo(c.UserContext(), &plugnmeet.GetActiveRoomInfoReq{
+	status, msg, _, res := bc.RoomModel.GetActiveRoomInfo(c.UserContext(), &plugnmeet.GetActiveRoomInfoReq{
 		RoomId: bbbapiwrapper.CheckMeetingIdToMatchFormat(q.MeetingID),
 	})
 
@@ -340,7 +340,7 @@ func (bc *BBBController) HandleBBBGetMeetingInfo(c *fiber.Ctx) error {
 
 // HandleBBBGetMeetings handles BBB getMeetings requests.
 func (bc *BBBController) HandleBBBGetMeetings(c *fiber.Ctx) error {
-	_, _, rooms := bc.RoomModel.GetActiveRoomsInfo(c.UserContext())
+	_, _, _, rooms := bc.RoomModel.GetActiveRoomsInfo(c.UserContext())
 	if rooms == nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("SUCCESS", "noMeetings", "no meetings were found on this server"))
 	}
@@ -371,7 +371,7 @@ func (bc *BBBController) HandleBBBEndMeetings(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
 
-	status, msg := bc.RoomModel.EndRoom(c.UserContext(), &plugnmeet.RoomEndReq{
+	status, msg, _ := bc.RoomModel.EndRoom(c.UserContext(), &plugnmeet.RoomEndReq{
 		RoomId: bbbapiwrapper.CheckMeetingIdToMatchFormat(q.MeetingID),
 	})
 

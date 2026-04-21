@@ -167,7 +167,7 @@ func (lc *LtiV1Controller) HandleLTIV1EndRoom(c *fiber.Ctx) error {
 	if !ok {
 		return sendErrorResponse(c, fiber.StatusBadRequest, errRoomIdMissing)
 	}
-	status, msg := lc.RoomModel.EndRoom(c.UserContext(), &plugnmeet.RoomEndReq{
+	status, msg, _ := lc.RoomModel.EndRoom(c.UserContext(), &plugnmeet.RoomEndReq{
 		RoomId: roomId,
 	})
 

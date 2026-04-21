@@ -16,3 +16,4 @@ const (
 )
 
 var NoOnlineUserFound = errors.New("no online user found")
+var NotFoundErr = errors.New("not found")

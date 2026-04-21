@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"gorm.io/gorm"
 )
@@ -87,7 +88,7 @@ func (s *DatabaseService) GetRoomArtifactDetails(artifactID string) (*dbmodels.R
 		return nil, nil, err
 	}
 	if artifact == nil {
-		return nil, nil, fmt.Errorf("artifact not found with ID: %s", artifactID)
+		return nil, nil, config.NotFoundErr
 	}
 
 	roomInfo, err := s.GetRoomInfoByTableId(artifact.RoomTableID)

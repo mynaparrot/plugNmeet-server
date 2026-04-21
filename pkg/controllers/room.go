@@ -24,18 +24,19 @@ func NewRoomController(m *models.RoomModel) *RoomController {
 func (rc *RoomController) HandleRoomCreate(c *fiber.Ctx) error {
 	req := new(plugnmeet.CreateRoomReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	room, err := rc.RoomModel.CreateRoom(c.UserContext(), req)
 	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 
 	r := &plugnmeet.CreateRoomRes{
-		Status:   true,
-		Msg:      "success",
-		RoomInfo: room,
+		Status:     true,
+		Msg:        "success",
+		StatusCode: plugnmeet.StatusCode_SUCCESS,
+		RoomInfo:   room,
 	}
 
 	return utils.SendProtoJsonResponse(c, r)
@@ -45,7 +46,7 @@ func (rc *RoomController) HandleRoomCreate(c *fiber.Ctx) error {
 func (rc *RoomController) HandleIsRoomActive(c *fiber.Ctx) error {
 	req := new(plugnmeet.IsRoomActiveReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	res, _, _ := rc.RoomModel.IsRoomActive(req)
@@ -56,15 +57,15 @@ func (rc *RoomController) HandleIsRoomActive(c *fiber.Ctx) error {
 func (rc *RoomController) HandleGetActiveRoomInfo(c *fiber.Ctx) error {
 	req := new(plugnmeet.GetActiveRoomInfoReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
-	status, msg, res := rc.RoomModel.GetActiveRoomInfo(c.UserContext(), req)
-
+	status, msg, statusCode, res := rc.RoomModel.GetActiveRoomInfo(c.UserContext(), req)
 	r := &plugnmeet.GetActiveRoomInfoRes{
-		Status: status,
-		Msg:    msg,
-		Room:   res,
+		Status:     status,
+		Msg:        msg,
+		StatusCode: statusCode,
+		Room:       res,
 	}
 
 	return utils.SendProtoJsonResponse(c, r)
@@ -72,12 +73,13 @@ func (rc *RoomController) HandleGetActiveRoomInfo(c *fiber.Ctx) error {
 
 // HandleGetActiveRoomsInfo gets information about all active rooms.
 func (rc *RoomController) HandleGetActiveRoomsInfo(c *fiber.Ctx) error {
-	status, msg, res := rc.RoomModel.GetActiveRoomsInfo(c.UserContext())
+	status, msg, statusCode, res := rc.RoomModel.GetActiveRoomsInfo(c.UserContext())
 
 	r := &plugnmeet.GetActiveRoomsInfoRes{
-		Status: status,
-		Msg:    msg,
-		Rooms:  res,
+		Status:     status,
+		Msg:        msg,
+		StatusCode: statusCode,
+		Rooms:      res,
 	}
 
 	return utils.SendProtoJsonResponse(c, r)
@@ -87,33 +89,33 @@ func (rc *RoomController) HandleGetActiveRoomsInfo(c *fiber.Ctx) error {
 func (rc *RoomController) HandleEndRoom(c *fiber.Ctx) error {
 	req := new(plugnmeet.RoomEndReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
-	status, msg := rc.RoomModel.EndRoom(c.UserContext(), req)
-
-	return utils.SendCommonProtoJsonResponse(c, status, msg)
+	status, msg, statusCode := rc.RoomModel.EndRoom(c.UserContext(), req)
+	return utils.SendCommonProtoJsonResponse(c, status, msg, statusCode)
 }
 
 // HandleFetchPastRooms handles fetching past rooms.
 func (rc *RoomController) HandleFetchPastRooms(c *fiber.Ctx) error {
 	req := new(plugnmeet.FetchPastRoomsReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	result, err := rc.RoomModel.FetchPastRooms(c.UserContext(), req)
 	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 	if result.GetTotalRooms() == 0 {
-		return utils.SendCommonProtoJsonResponse(c, false, "no info found")
+		return utils.SendCommonProtoJsonResponse(c, false, "no info found", plugnmeet.StatusCode_NOT_FOUND)
 	}
 
 	r := &plugnmeet.FetchPastRoomsRes{
-		Status: true,
-		Msg:    "success",
-		Result: result,
+		Status:     true,
+		Msg:        "success",
+		StatusCode: plugnmeet.StatusCode_SUCCESS,
+		Result:     result,
 	}
 	return utils.SendProtoJsonResponse(c, r)
 }
@@ -137,7 +139,7 @@ func (rc *RoomController) HandleEndRoomForAPI(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "requested roomId & token roomId mismatched")
 	}
 
-	status, msg := rc.RoomModel.EndRoom(c.UserContext(), req)
+	status, msg, _ := rc.RoomModel.EndRoom(c.UserContext(), req)
 	return utils.SendCommonProtobufResponse(c, status, msg)
 }
 

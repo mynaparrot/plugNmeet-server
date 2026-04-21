@@ -15,7 +15,7 @@ func (m *JanitorModel) checkRoomWithDuration() {
 		now := uint64(time.Now().Unix())
 		valid := r.StartedAt + (r.Duration * 60)
 		if now > valid {
-			_, _ = m.rm.EndRoom(context.Background(), &plugnmeet.RoomEndReq{
+			_, _, _ = m.rm.EndRoom(context.Background(), &plugnmeet.RoomEndReq{
 				RoomId: i,
 			})
 		}

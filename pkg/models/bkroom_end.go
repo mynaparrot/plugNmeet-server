@@ -59,7 +59,7 @@ func (m *BreakoutRoomModel) proceedToEndBkRoom(ctx context.Context, bkRoomId, pa
 	roomLog := log.WithField("breakoutRoomId", bkRoomId)
 	roomLog.Info("proceeding to end breakout room")
 
-	ok, msg := m.rm.EndRoom(ctx, &plugnmeet.RoomEndReq{RoomId: bkRoomId})
+	ok, msg, _ := m.rm.EndRoom(ctx, &plugnmeet.RoomEndReq{RoomId: bkRoomId})
 	if !ok {
 		roomLog.WithField("endRoomMsg", msg).Error("failed to end breakout room via room model")
 	}

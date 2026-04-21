@@ -35,17 +35,17 @@ func NewUserController(appConfig *config.AppConfig, ds *dbservice.DatabaseServic
 func (uc *UserController) HandleGenerateJoinToken(c *fiber.Ctx) error {
 	req := new(plugnmeet.GenerateTokenReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	if req.UserInfo == nil {
-		return utils.SendCommonProtoJsonResponse(c, false, "UserInfo required")
+		return utils.SendCommonProtoJsonResponse(c, false, "UserInfo required", plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	// don't generate token if user is blocked
 	exist := uc.NatsService.IsUserExistInBlockList(req.RoomId, req.UserInfo.UserId)
 	if exist {
-		return utils.SendCommonProtoJsonResponse(c, false, "this user is blocked to join this session")
+		return utils.SendCommonProtoJsonResponse(c, false, "this user is blocked to join this session", plugnmeet.StatusCode_USER_BLOCKED)
 	}
 
 	// Use the single point of truth to check if the room is active.
@@ -54,18 +54,19 @@ func (uc *UserController) HandleGenerateJoinToken(c *fiber.Ctx) error {
 	})
 
 	if !rr.GetIsActive() {
-		return utils.SendCommonProtoJsonResponse(c, false, "room is not active")
+		return utils.SendCommonProtoJsonResponse(c, false, "room is not active", plugnmeet.StatusCode_ROOM_NOT_FOUND)
 	}
 
 	token, err := uc.UserModel.GetPNMJoinToken(c.UserContext(), req)
 	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 
 	r := &plugnmeet.GenerateTokenRes{
-		Status: true,
-		Msg:    "success",
-		Token:  &token,
+		Status:     true,
+		Msg:        "success",
+		StatusCode: plugnmeet.StatusCode_SUCCESS,
+		Token:      &token,
 	}
 
 	return utils.SendProtoJsonResponse(c, r)

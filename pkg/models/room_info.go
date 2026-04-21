@@ -13,9 +13,10 @@ import (
 // This is a high-performance, cache-aware function.
 func (m *RoomModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoomActiveRes, *plugnmeet.NatsKvRoomInfo, *plugnmeet.RoomMetadata) {
 	res := &plugnmeet.IsRoomActiveRes{
-		Status:   true,
-		IsActive: false,
-		Msg:      "room is not active",
+		Status:     true,
+		IsActive:   false,
+		Msg:        "room is not active",
+		StatusCode: plugnmeet.StatusCode_ROOM_NOT_FOUND,
 	}
 
 	// NATS is the single source of truth for this check.
@@ -23,6 +24,7 @@ func (m *RoomModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoo
 	if err != nil {
 		res.Status = false
 		res.Msg = err.Error()
+		res.StatusCode = plugnmeet.StatusCode_INTERNAL_SERVER_ERROR
 		return res, nil, nil
 	}
 
@@ -34,25 +36,26 @@ func (m *RoomModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoo
 	if rInfo.Status == natsservice.RoomStatusCreated || rInfo.Status == natsservice.RoomStatusActive {
 		res.IsActive = true
 		res.Msg = "room is active"
+		res.StatusCode = plugnmeet.StatusCode_SUCCESS
 	}
 	// If status is "ended" or anything else, it will correctly return IsActive: false and "room is not active".
 
 	return res, rInfo, meta
 }
 
-func (m *RoomModel) GetActiveRoomInfo(ctx context.Context, r *plugnmeet.GetActiveRoomInfoReq) (bool, string, *plugnmeet.ActiveRoomWithParticipant) {
+func (m *RoomModel) GetActiveRoomInfo(ctx context.Context, r *plugnmeet.GetActiveRoomInfoReq) (bool, string, plugnmeet.StatusCode, *plugnmeet.ActiveRoomWithParticipant) {
 	log := m.logger.WithFields(logrus.Fields{"roomId": r.RoomId, "method": "GetActiveRoomInfo"})
 	// check first
 	_ = waitUntilRoomCreationCompletes(ctx, m.rs, r.GetRoomId(), log)
 
 	roomDbInfo, _ := m.ds.GetRoomInfoByRoomId(r.RoomId, 1)
 	if roomDbInfo == nil || roomDbInfo.ID == 0 {
-		return false, "no room found", nil
+		return false, "no room found", plugnmeet.StatusCode_ROOM_NOT_FOUND, nil
 	}
 
 	rrr, err := m.natsService.GetRoomInfo(r.RoomId)
 	if err != nil {
-		return false, err.Error(), nil
+		return false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil
 	}
 	if rrr == nil || (rrr.Status != natsservice.RoomStatusCreated && rrr.Status != natsservice.RoomStatusActive) {
 		// The room is not in NATS or its status is not active, so we'll mark it as ended in the DB.
@@ -60,9 +63,9 @@ func (m *RoomModel) GetActiveRoomInfo(ctx context.Context, r *plugnmeet.GetActiv
 		roomDbInfo.IsRunning = 0
 		_, err := m.ds.UpdateRoomStatus(roomDbInfo)
 		if err != nil {
-			return false, err.Error(), nil
+			return false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil
 		}
-		return false, "room is not active", nil
+		return false, "room is not active", plugnmeet.StatusCode_ROOM_NOT_FOUND, nil
 	}
 
 	res := new(plugnmeet.ActiveRoomWithParticipant)
@@ -92,16 +95,16 @@ func (m *RoomModel) GetActiveRoomInfo(ctx context.Context, r *plugnmeet.GetActiv
 		}
 	}
 
-	return true, "success", res
+	return true, "success", plugnmeet.StatusCode_SUCCESS, res
 }
 
-func (m *RoomModel) GetActiveRoomsInfo(userCtx context.Context) (bool, string, []*plugnmeet.ActiveRoomWithParticipant) {
+func (m *RoomModel) GetActiveRoomsInfo(userCtx context.Context) (bool, string, plugnmeet.StatusCode, []*plugnmeet.ActiveRoomWithParticipant) {
 	roomsInfo, err := m.ds.GetActiveRoomsInfo(userCtx)
 	if err != nil {
-		return false, err.Error(), nil
+		return false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil
 	}
 	if roomsInfo == nil || len(roomsInfo) == 0 {
-		return false, "no active room found", nil
+		return false, "no active room found", plugnmeet.StatusCode_ROOM_NOT_FOUND, nil
 	}
 	res := make([]*plugnmeet.ActiveRoomWithParticipant, 0, len(roomsInfo))
 
@@ -142,7 +145,7 @@ func (m *RoomModel) GetActiveRoomsInfo(userCtx context.Context) (bool, string, [
 		res = append(res, i)
 	}
 
-	return true, "success", res
+	return true, "success", plugnmeet.StatusCode_SUCCESS, res
 }
 
 func (m *RoomModel) FetchPastRooms(userCtx context.Context, r *plugnmeet.FetchPastRoomsReq) (*plugnmeet.FetchPastRoomsResult, error) {

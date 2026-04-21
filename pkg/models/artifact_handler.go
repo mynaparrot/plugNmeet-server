@@ -11,6 +11,7 @@ import (
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -67,8 +68,9 @@ func (m *ArtifactModel) GetArtifactInfoByArtifactId(artifactId string) (*plugnme
 	}
 
 	res := &plugnmeet.ArtifactInfoRes{
-		Status: true,
-		Msg:    "success",
+		Status:     true,
+		Msg:        "success",
+		StatusCode: plugnmeet.StatusCode_SUCCESS,
 		ArtifactInfo: &plugnmeet.ArtifactInfo{
 			ArtifactId: dbArtifact.ArtifactId,
 			RoomId:     dbArtifact.RoomId,
@@ -118,7 +120,7 @@ func (m *ArtifactModel) GetArtifactDownloadToken(req *plugnmeet.GetArtifactDownl
 		return "", err
 	}
 	if artifact == nil {
-		return "", fmt.Errorf("artifact not found with ID: %s", req.ArtifactId)
+		return "", config.NotFoundErr
 	}
 
 	if !m.isDownloadable(plugnmeet.RoomArtifactType(artifact.Type)) {
@@ -175,7 +177,7 @@ func (m *ArtifactModel) DeleteArtifact(req *plugnmeet.DeleteArtifactReq) error {
 		return err
 	}
 	if artifact == nil {
-		return fmt.Errorf("artifact not found with ID: %s", req.ArtifactId)
+		return config.NotFoundErr
 	}
 
 	// Check if the artifact type is deletable.

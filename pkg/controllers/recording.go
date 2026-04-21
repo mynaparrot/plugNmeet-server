@@ -1,9 +1,12 @@
 package controllers
 
 import (
+	"errors"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	dbservice "github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	"github.com/sirupsen/logrus"
@@ -30,21 +33,22 @@ func NewRecordingController(ds *dbservice.DatabaseService, recordingModel *model
 func (rc *RecordingController) HandleFetchRecordings(c *fiber.Ctx) error {
 	req := new(plugnmeet.FetchRecordingsReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	result, err := rc.recordingModel.FetchRecordings(req)
 	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 	if result.GetTotalRecordings() == 0 {
-		return utils.SendCommonProtoJsonResponse(c, false, "no recordings found")
+		return utils.SendCommonProtoJsonResponse(c, false, "no recordings found", plugnmeet.StatusCode_NOT_FOUND)
 	}
 
 	r := &plugnmeet.FetchRecordingsRes{
-		Status: true,
-		Msg:    "success",
-		Result: result,
+		Status:     true,
+		Msg:        "success",
+		StatusCode: plugnmeet.StatusCode_SUCCESS,
+		Result:     result,
 	}
 	return utils.SendProtoJsonResponse(c, r)
 }
@@ -53,12 +57,15 @@ func (rc *RecordingController) HandleFetchRecordings(c *fiber.Ctx) error {
 func (rc *RecordingController) HandleRecordingInfo(c *fiber.Ctx) error {
 	req := new(plugnmeet.RecordingInfoReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	result, err := rc.recordingModel.RecordingInfo(req)
 	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+		if errors.Is(err, config.NotFoundErr) {
+			return utils.SendCommonProtoJsonResponse(c, false, "recording not found", plugnmeet.StatusCode_NOT_FOUND)
+		}
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 
 	return utils.SendProtoJsonResponse(c, result)
@@ -68,48 +75,58 @@ func (rc *RecordingController) HandleRecordingInfo(c *fiber.Ctx) error {
 func (rc *RecordingController) HandleUpdateRecordingMetadata(c *fiber.Ctx) error {
 	req := new(plugnmeet.UpdateRecordingMetadataReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	err := rc.recordingModel.UpdateRecordingMetadata(req)
 	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+		if errors.Is(err, config.NotFoundErr) {
+			return utils.SendCommonProtoJsonResponse(c, false, "recording not found", plugnmeet.StatusCode_NOT_FOUND)
+		}
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 
-	return utils.SendCommonProtoJsonResponse(c, true, "success")
+	return utils.SendCommonProtoJsonResponse(c, true, "success", plugnmeet.StatusCode_SUCCESS)
 }
 
 // HandleDeleteRecording handles deleting a recording.
 func (rc *RecordingController) HandleDeleteRecording(c *fiber.Ctx) error {
 	req := new(plugnmeet.DeleteRecordingReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	err := rc.recordingModel.DeleteRecording(req)
 	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+		if errors.Is(err, config.NotFoundErr) {
+			return utils.SendCommonProtoJsonResponse(c, false, "recording not found", plugnmeet.StatusCode_NOT_FOUND)
+		}
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 
-	return utils.SendCommonProtoJsonResponse(c, true, "success")
+	return utils.SendCommonProtoJsonResponse(c, true, "success", plugnmeet.StatusCode_SUCCESS)
 }
 
 // HandleGetDownloadToken handles generating a download token for a recording.
 func (rc *RecordingController) HandleGetDownloadToken(c *fiber.Ctx) error {
 	req := new(plugnmeet.GetDownloadTokenReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	token, err := rc.recordingModel.GetDownloadToken(req)
 	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error())
+		if errors.Is(err, config.NotFoundErr) {
+			return utils.SendCommonProtoJsonResponse(c, false, "recording not found", plugnmeet.StatusCode_NOT_FOUND)
+		}
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 
 	r := &plugnmeet.GetDownloadTokenRes{
-		Status: true,
-		Msg:    "success",
-		Token:  &token,
+		Status:     true,
+		Msg:        "success",
+		StatusCode: plugnmeet.StatusCode_SUCCESS,
+		Token:      &token,
 	}
 	return utils.SendProtoJsonResponse(c, r)
 }

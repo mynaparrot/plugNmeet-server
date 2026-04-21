@@ -1,10 +1,10 @@
 package models
 
 import (
-	"fmt"
 	"strconv"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -63,7 +63,7 @@ func (m *RecordingModel) FetchRecording(recordId string) (*plugnmeet.RecordingIn
 		return nil, err
 	}
 	if v == nil {
-		return nil, fmt.Errorf("no info found")
+		return nil, config.NotFoundErr
 	}
 	size, _ := strconv.ParseFloat(v.Size, 32)
 	recording := &plugnmeet.RecordingInfo{
@@ -113,6 +113,7 @@ func (m *RecordingModel) RecordingInfo(req *plugnmeet.RecordingInfoReq) (*plugnm
 	return &plugnmeet.RecordingInfoRes{
 		Status:        true,
 		Msg:           "success",
+		StatusCode:    plugnmeet.StatusCode_SUCCESS,
 		RecordingInfo: recording,
 		RoomInfo:      pastRoomInfo,
 	}, nil

@@ -45,16 +45,16 @@ func (ac *AuthController) HandleAuthHeaderCheck(c *fiber.Ctx) error {
 
 	if apiKey == "" {
 		c.Status(fiber.StatusUnauthorized)
-		return utils.SendCommonProtoJsonResponse(c, false, "Missing API-KEY header.")
+		return utils.SendCommonProtoJsonResponse(c, false, "Missing API-KEY header.", plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER)
 	}
 	if apiKey != ac.AppConfig.Client.ApiKey {
 		c.Status(fiber.StatusUnauthorized)
-		return utils.SendCommonProtoJsonResponse(c, false, "Invalid API key provided.")
+		return utils.SendCommonProtoJsonResponse(c, false, "Invalid API key provided.", plugnmeet.StatusCode_INVALID_API_KEY)
 	}
 
 	if signature == "" {
 		c.Status(fiber.StatusUnauthorized)
-		return utils.SendCommonProtoJsonResponse(c, false, "Missing HASH-SIGNATURE header.")
+		return utils.SendCommonProtoJsonResponse(c, false, "Missing HASH-SIGNATURE header.", plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER)
 	}
 
 	mac := hmac.New(sha256.New, []byte(ac.AppConfig.Client.Secret))
@@ -62,7 +62,7 @@ func (ac *AuthController) HandleAuthHeaderCheck(c *fiber.Ctx) error {
 	expectedSignature := hex.EncodeToString(mac.Sum(nil))
 	if subtle.ConstantTimeCompare([]byte(expectedSignature), []byte(signature)) != 1 {
 		c.Status(fiber.StatusUnauthorized)
-		return utils.SendCommonProtoJsonResponse(c, false, "Failed to verify provided authentication details.")
+		return utils.SendCommonProtoJsonResponse(c, false, "Failed to verify provided authentication details.", plugnmeet.StatusCode_INVALID_TOKEN_OR_SIGNATURE)
 	}
 
 	return c.Next()
@@ -80,7 +80,7 @@ func (ac *AuthController) HandleVerifyHeaderToken(c *fiber.Ctx) error {
 
 	if authToken == "" {
 		_ = c.SendStatus(errStatus)
-		return utils.SendCommonProtoJsonResponse(c, false, "notifications.auth-header-missing")
+		return utils.SendCommonProtoJsonResponse(c, false, "notifications.auth-header-missing", plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER)
 	}
 
 	claims, err := ac.AuthModel.VerifyPlugNmeetAccessToken(authToken, 0)
@@ -90,7 +90,7 @@ func (ac *AuthController) HandleVerifyHeaderToken(c *fiber.Ctx) error {
 		if errors.Is(err, jwt.ErrExpired) {
 			errMsg = "notifications.token-expired"
 		}
-		return utils.SendCommonProtoJsonResponse(c, false, errMsg)
+		return utils.SendCommonProtoJsonResponse(c, false, errMsg, plugnmeet.StatusCode_INVALID_TOKEN_OR_SIGNATURE)
 	}
 
 	c.Locals("isAdmin", claims.IsAdmin)
