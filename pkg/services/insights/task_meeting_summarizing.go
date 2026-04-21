@@ -80,7 +80,7 @@ func (t *MeetingSummarizingTask) RunAudioStream(participantCtx context.Context, 
 		}
 		t.writer = writer
 
-		newMixer, err := mixer.NewMixer(writer, rtp.DefFrameDur, nil, 1, mixer.DefaultInputBufferFrames)
+		newMixer, err := mixer.NewMixer(writer, rtp.DefFrameDur, 1, mixer.WithInputBufferFrames(mixer.DefaultInputBufferFrames))
 		if err != nil {
 			initErr = fmt.Errorf("failed to create newMixer: %w", err)
 			log.Error(initErr)
