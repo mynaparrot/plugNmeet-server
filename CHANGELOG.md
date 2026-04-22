@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.1.7](https://github.com/mynaparrot/plugNmeet-server/compare/v2.1.6...v2.1.7) (2026-04-21)
+
+
+### Bug Fixes
+
+* added description for easy understanding ([b67219f](https://github.com/mynaparrot/plugNmeet-server/commit/b67219fb00a4ab1cea7ec76cadda5832b68224eb))
+* added status code in auth related response ([c5a9f5f](https://github.com/mynaparrot/plugNmeet-server/commit/c5a9f5f8278b179a6696c7fb48d3beb5ecc0928d))
+* adjusted with new options ([97bd547](https://github.com/mynaparrot/plugNmeet-server/commit/97bd547b42f9283a467630f98bd9e169f68424ff))
+* bump to go `1.26` ([30e02b7](https://github.com/mynaparrot/plugNmeet-server/commit/30e02b7dab973fce72b434044db37684d16aedc4))
+* clear logs ([a8fee75](https://github.com/mynaparrot/plugNmeet-server/commit/a8fee75617b9a1ea3deb43fe2d9bcb7af23becfe))
+* consider CPU usage during selecting recorder ([cc9870a](https://github.com/mynaparrot/plugNmeet-server/commit/cc9870aaaece04a72c23fda608c8304f2848543f))
+* **deps:** update module github.com/microsoft/cognitive-services-speech-sdk-go to v1.49.0 ([90ae974](https://github.com/mynaparrot/plugNmeet-server/commit/90ae97444412289207664b505ac24b0e58d555d9))
+* **deps:** update module github.com/microsoft/cognitive-services-speech-sdk-go to v1.49.0 ([56566d8](https://github.com/mynaparrot/plugNmeet-server/commit/56566d86955cc986cb7e351e3228c497ba117258))
+* **feat:** new option `fallback_on_flapping` for turn server ([033cb4a](https://github.com/mynaparrot/plugNmeet-server/commit/033cb4ab4e5ba5e74c62b0f9d89f57c9e31c2918))
+
 ## [2.1.6](https://github.com/mynaparrot/plugNmeet-server/compare/v2.1.5...v2.1.6) (2026-04-09)
 
 
