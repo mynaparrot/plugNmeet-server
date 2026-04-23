@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -19,7 +18,7 @@ import (
 // It validates the file, saves it, and triggers conversion and broadcasting.
 // This should be run in a separate goroutine due to its potentially long execution time.
 func (m *FileModel) DownloadAndProcessPreUploadWBfile(roomId, roomSid, fileUrl string, log *logrus.Entry) (*ConvertWhiteboardFileRes, error) {
-	log.WithFields(logrus.Fields{
+	log = log.WithFields(logrus.Fields{
 		"sub-method": "DownloadAndProcessPreUploadWBfile",
 	})
 	if err := m.validateRemoteFile(fileUrl); err != nil {
@@ -49,7 +48,27 @@ func (m *FileModel) DownloadAndProcessPreUploadWBfile(roomId, roomSid, fileUrl s
 	resp := client.Do(req.WithContext(ctx))
 	<-resp.Done // Wait for the download to complete or be canceled.
 
+	// Check for download errors (e.g., timeout, connection issues)
+	if err := resp.Err(); err != nil {
+		log.WithError(err).Errorln("failed to download file")
+		return nil, fmt.Errorf("failed to download file: %w", err)
+	}
+
 	defer os.Remove(resp.Filename)
+
+	// Verify actual file size as the server might not have sent Content-Length header
+	stat, err := os.Stat(resp.Filename)
+	if err != nil {
+		log.WithError(err).Errorln("failed to stat downloaded file")
+		return nil, fmt.Errorf("failed to stat downloaded file: %w", err)
+	}
+	if stat.Size() > config.MaxPreloadedWhiteboardFileSize {
+		log.WithFields(logrus.Fields{
+			"size":     stat.Size(),
+			"max_size": config.MaxPreloadedWhiteboardFileSize,
+		}).Errorln("downloaded file is too large")
+		return nil, fmt.Errorf("downloaded file is too large: allowed %d bytes, got %d", config.MaxPreloadedWhiteboardFileSize, stat.Size())
+	}
 
 	// Validate downloaded file type
 	mType, err := mimetype.DetectFile(resp.Filename)
@@ -84,10 +103,8 @@ func (m *FileModel) validateRemoteFile(fileUrl string) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.ContentLength < 1 {
-		return errors.New("invalid file: empty content")
-	}
-	if resp.ContentLength > config.MaxPreloadedWhiteboardFileSize {
+	// Only check ContentLength if it is provided (> 0)
+	if resp.ContentLength > 0 && resp.ContentLength > config.MaxPreloadedWhiteboardFileSize {
 		return fmt.Errorf("file too large: allowed %d bytes, got %d", config.MaxPreloadedWhiteboardFileSize, resp.ContentLength)
 	}
 
