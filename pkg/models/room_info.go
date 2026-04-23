@@ -104,7 +104,7 @@ func (m *RoomModel) GetActiveRoomsInfo(userCtx context.Context) (bool, string, p
 		return false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil
 	}
 	if roomsInfo == nil || len(roomsInfo) == 0 {
-		return false, "no active room found", plugnmeet.StatusCode_ROOM_NOT_FOUND, nil
+		return false, "no active room found", plugnmeet.StatusCode_NOT_FOUND, nil
 	}
 	res := make([]*plugnmeet.ActiveRoomWithParticipant, 0, len(roomsInfo))
 
