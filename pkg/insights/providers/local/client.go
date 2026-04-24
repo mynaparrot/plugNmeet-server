@@ -18,17 +18,19 @@ import (
 
 // LocalProvider implements insights.Provider using local faster-whisper + NLLB translation.
 type LocalProvider struct {
-	account *config.ProviderAccount
-	service *config.ServiceConfig
-	logger  *logrus.Entry
+	account    *config.ProviderAccount
+	service    *config.ServiceConfig
+	logger     *logrus.Entry
+	httpClient *http.Client
 }
 
 // NewProvider creates a new LocalProvider.
 func NewProvider(providerAccount *config.ProviderAccount, serviceConfig *config.ServiceConfig, log *logrus.Entry) (insights.Provider, error) {
 	return &LocalProvider{
-		account: providerAccount,
-		service: serviceConfig,
-		logger:  log.WithField("service", "local"),
+		account:    providerAccount,
+		service:    serviceConfig,
+		logger:     log.WithField("service", "local"),
+		httpClient: &http.Client{Timeout: 15 * time.Second},
 	}, nil
 }
 
@@ -83,15 +85,16 @@ func (p *LocalProvider) TranslateText(ctx context.Context, text, sourceLang stri
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := p.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("translation request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
+		// Bound the error body read to keep a misbehaving companion
+		// from exhausting memory on a very large response.
+		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
 		return nil, fmt.Errorf("translation request failed with status %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 

@@ -22,6 +22,17 @@ type whisperMsg struct {
 	Error string `json:"error,omitempty"`
 }
 
+// audioBufPool reuses PCM-encoding scratch buffers. WriteSample is called
+// at audio-frame rate (tens of Hz per active speaker), so avoiding per-call
+// allocation materially reduces GC pressure on busy servers. Initial cap is
+// sized for typical LiveKit opus frame expansions.
+var audioBufPool = sync.Pool{
+	New: func() interface{} {
+		b := make([]byte, 0, 4096)
+		return &b
+	},
+}
+
 type localTranscribeStream struct {
 	conn    *websocket.Conn
 	cancel  context.CancelFunc
@@ -84,12 +95,26 @@ func (s *localTranscribeStream) readLoop(ctx context.Context, resultsChan chan *
 	})
 	defer safeClose()
 
-	resultsChan <- &insights.TranscriptionEvent{Type: insights.EventTypeSessionStarted}
+	// emit sends an event or aborts if the context is done. Returning false
+	// tells the caller to unwind — the consumer is gone and further sends
+	// would block forever on a full channel.
+	emit := func(ev *insights.TranscriptionEvent) bool {
+		select {
+		case resultsChan <- ev:
+			return true
+		case <-ctx.Done():
+			return false
+		}
+	}
+
+	if !emit(&insights.TranscriptionEvent{Type: insights.EventTypeSessionStarted}) {
+		return
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
-			resultsChan <- &insights.TranscriptionEvent{Type: insights.EventTypeSessionStopped}
+			emit(&insights.TranscriptionEvent{Type: insights.EventTypeSessionStopped})
 			return
 		default:
 		}
@@ -98,12 +123,14 @@ func (s *localTranscribeStream) readLoop(ctx context.Context, resultsChan chan *
 		if err != nil {
 			if !websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
 				s.log.WithError(err).Warn("whisper WebSocket read error")
-				resultsChan <- &insights.TranscriptionEvent{
+				if !emit(&insights.TranscriptionEvent{
 					Type:  insights.EventTypeError,
 					Error: err.Error(),
+				}) {
+					return
 				}
 			}
-			resultsChan <- &insights.TranscriptionEvent{Type: insights.EventTypeSessionStopped}
+			emit(&insights.TranscriptionEvent{Type: insights.EventTypeSessionStopped})
 			return
 		}
 
@@ -115,7 +142,7 @@ func (s *localTranscribeStream) readLoop(ctx context.Context, resultsChan chan *
 
 		switch msg.Type {
 		case "partial":
-			resultsChan <- &insights.TranscriptionEvent{
+			if !emit(&insights.TranscriptionEvent{
 				Type: insights.EventTypePartialResult,
 				Result: &plugnmeet.InsightsTranscriptionResult{
 					FromUserId:                  s.userId,
@@ -126,9 +153,11 @@ func (s *localTranscribeStream) readLoop(ctx context.Context, resultsChan chan *
 					AllowedTranscriptionStorage: s.opts.AllowedTranscriptionStorage,
 					Translations:                make(map[string]string),
 				},
+			}) {
+				return
 			}
 		case "final":
-			resultsChan <- &insights.TranscriptionEvent{
+			if !emit(&insights.TranscriptionEvent{
 				Type: insights.EventTypeFinalResult,
 				Result: &plugnmeet.InsightsTranscriptionResult{
 					FromUserId:                  s.userId,
@@ -139,14 +168,18 @@ func (s *localTranscribeStream) readLoop(ctx context.Context, resultsChan chan *
 					AllowedTranscriptionStorage: s.opts.AllowedTranscriptionStorage,
 					Translations:                make(map[string]string),
 				},
+			}) {
+				return
 			}
 		case "translation":
 			// Server can optionally send pre-translated results embedded in the message.
 			// Handled separately if the whisper service does its own translation.
 		case "error":
-			resultsChan <- &insights.TranscriptionEvent{
+			if !emit(&insights.TranscriptionEvent{
 				Type:  insights.EventTypeError,
 				Error: msg.Error,
+			}) {
+				return
 			}
 		}
 	}
@@ -160,12 +193,22 @@ func (s *localTranscribeStream) WriteSample(sample media.PCM16Sample) error {
 		return fmt.Errorf("stream is closed")
 	}
 
-	buf := make([]byte, len(sample)*2)
+	need := len(sample) * 2
+	bufPtr := audioBufPool.Get().(*[]byte)
+	defer audioBufPool.Put(bufPtr)
+
+	if cap(*bufPtr) < need {
+		*bufPtr = make([]byte, need)
+	} else {
+		*bufPtr = (*bufPtr)[:need]
+	}
 	for i, v := range sample {
-		binary.LittleEndian.PutUint16(buf[i*2:], uint16(v))
+		binary.LittleEndian.PutUint16((*bufPtr)[i*2:], uint16(v))
 	}
 
-	return s.conn.WriteMessage(websocket.BinaryMessage, buf)
+	// gorilla/websocket WriteMessage copies/consumes the buffer synchronously,
+	// so returning it to the pool via defer is safe.
+	return s.conn.WriteMessage(websocket.BinaryMessage, *bufPtr)
 }
 
 // Close signals the stream end, sends a WebSocket close frame, and cancels the context.
