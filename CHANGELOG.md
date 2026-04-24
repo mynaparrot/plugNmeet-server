@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.1.8](https://github.com/mynaparrot/plugNmeet-server/compare/v2.1.7...v2.1.8) (2026-04-24)
+
+
+### Bug Fixes
+
+* added new `max_preloaded_wb_file_size` config option ([a1fb850](https://github.com/mynaparrot/plugNmeet-server/commit/a1fb850820889d370d8360134751c57e3a4527d5))
+* don't check `ContentLength` if server didn't set it, need to check after download ([e0888fb](https://github.com/mynaparrot/plugNmeet-server/commit/e0888fba22876138cd8d773eeba2ead135c7ac4f))
+* invalid status code was added ([604a44c](https://github.com/mynaparrot/plugNmeet-server/commit/604a44c44bd71b4dd21012ca88c3ddd4836cc79d))
+
 ## [2.1.7](https://github.com/mynaparrot/plugNmeet-server/compare/v2.1.6...v2.1.7) (2026-04-21)
 
 
