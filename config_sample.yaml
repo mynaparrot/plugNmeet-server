@@ -256,6 +256,18 @@ insights:
         credentials:
           api_key: "YOUR_GEMINI_API_KEY_HERE"
 
+    # Self-hosted transcription & translation. Talks to a companion
+    # service over WebSocket (PCM16). Reference implementation:
+    # https://github.com/xynstr/plugnmeet-local-insights
+    # Useful for GDPR-sensitive or air-gapped deployments. Setup guide:
+    # docs/providers/local.md
+    #local:
+    #  - id: "local-01"
+    #    credentials: { api_key: "", region: "" }
+    #    options:
+    #      whisper_url:   "ws://whisper-local:8002/ws/transcribe"
+    #      translate_url: "http://whisper-local:8002/translate"
+
   # 2. Define the services that USE the providers.
   # The key ("transcription", "translation", "ai_text_chat", "meeting_summarizing") is the service name.
   services:
