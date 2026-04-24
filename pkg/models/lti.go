@@ -77,7 +77,7 @@ func (m *LtiV1Model) LTIV1Landing(c *fiber.Ctx, requests, signingURL string) err
 	}
 
 	if userId == "" {
-		return fmt.Errorf(config.UserIdOrEmailRequired)
+		return config.UserIdOrEmailRequired
 	}
 
 	name := params.Get("lis_person_name_full")

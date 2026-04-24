@@ -2,18 +2,9 @@ package config
 
 import "errors"
 
-const (
-	RequestedRoomNotExist            = "requested room does not exist"
-	OnlyAdminCanRequest              = "only admin can send this request"
-	NoRoomIdInToken                  = "no roomId in token"
-	UserNotActive                    = "user isn't active now"
-	CanNotDemotePresenter            = "can't demote current presenter"
-	CanNotChangeAlternativePresenter = "can't change alternative presenter"
-	CanNotPromoteToPresenter         = "can't promote to presenter"
-	InvalidConsumerKey               = "invalid consumer_key"
-	VerificationFailed               = "verification failed"
-	UserIdOrEmailRequired            = "either value of user_id or lis_person_contact_email_primary  required"
-)
-
+var UserNotActive = errors.New("user isn't active now")
+var InvalidConsumerKey = errors.New("invalid consumer_key")
+var VerificationFailed = errors.New("verification failed")
+var UserIdOrEmailRequired = errors.New("either value of user_id or lis_person_contact_email_primary  required")
 var NoOnlineUserFound = errors.New("no online user found")
 var NotFoundErr = errors.New("not found")

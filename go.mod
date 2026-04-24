@@ -3,8 +3,8 @@ module github.com/mynaparrot/plugnmeet-server
 go 1.26
 
 require (
-	buf.build/go/protovalidate v1.1.3
-	github.com/Microsoft/cognitive-services-speech-sdk-go v1.49.0
+	buf.build/go/protovalidate v1.2.0
+	github.com/Microsoft/cognitive-services-speech-sdk-go v1.49.1
 	github.com/ansrivas/fiberprometheus/v2 v2.17.0
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/gabriel-vasile/mimetype v1.4.13
@@ -20,7 +20,7 @@ require (
 	github.com/livekit/media-sdk v0.0.0-20260401192012-ea94ab340a57
 	github.com/livekit/protocol v1.45.2-0.20260403151849-8a360e8d0221
 	github.com/livekit/server-sdk-go/v2 v2.16.2
-	github.com/mynaparrot/plugnmeet-protocol v1.2.2-0.20260421142947-0b31d7d28d2d
+	github.com/mynaparrot/plugnmeet-protocol v1.2.2-0.20260424064137-a448c18e8ea2
 	github.com/nats-io/jwt/v2 v2.8.1
 	github.com/nats-io/nats.go v1.51.0
 	github.com/nats-io/nkeys v0.4.15
@@ -37,7 +37,7 @@ require (
 )
 
 require (
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.11-20260209202127-80ab13bee0bf.1 // indirect
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.11-20260415201107-50325440f8f2.1 // indirect
 	buf.build/go/protoyaml v0.6.0 // indirect
 	cel.dev/expr v0.25.1 // indirect
 	cloud.google.com/go v0.123.0 // indirect
@@ -64,7 +64,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gofiber/template v1.8.3 // indirect
 	github.com/gofiber/utils v1.2.0 // indirect
-	github.com/google/cel-go v0.27.0 // indirect
+	github.com/google/cel-go v0.28.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.14 // indirect

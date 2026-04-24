@@ -1,8 +1,6 @@
 package models
 
 import (
-	"errors"
-
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
@@ -25,7 +23,7 @@ func (m *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 	}
 
 	if status != natsservice.UserStatusOnline {
-		err = errors.New(config.UserNotActive)
+		err = config.UserNotActive
 		log.WithError(err).Warnln("user not online")
 		return err
 	}

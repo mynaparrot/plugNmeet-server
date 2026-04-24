@@ -237,7 +237,7 @@ type NatsInfoRecorder struct {
 func New(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 	// default validation of token is 10 minutes
 	if appCnf.Client.TokenValidity == nil || *appCnf.Client.TokenValidity < 0 {
-		appCnf.Client.TokenValidity = new(time.Minute * 10)
+		appCnf.Client.TokenValidity = new(10 * time.Minute)
 	}
 	appCnf.ctx = ctx
 	if appCnf.NatsInfo.RoomStreamName == "" {
@@ -255,6 +255,20 @@ func New(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 		}
 	}
 
+	if appCnf.RoomDefaultSettings == nil {
+		appCnf.RoomDefaultSettings = &utils.RoomDefaultSettings{}
+	}
+	if appCnf.RoomDefaultSettings.MaxPreloadedWhiteboardFileSize == nil {
+		appCnf.RoomDefaultSettings.MaxPreloadedWhiteboardFileSize = new("5mb")
+	}
+
+	bytes, err := utils.ParseFileSizeToBytes(*appCnf.RoomDefaultSettings.MaxPreloadedWhiteboardFileSize)
+	if err != nil {
+		logrus.WithError(err).Errorf("failed to parse max_preloaded_whiteboard_file_size, using default 5MB")
+		bytes = 5 * 1024 * 1024
+	}
+	appCnf.RoomDefaultSettings.MaxPreloadedWhiteboardFileSizeByte = &bytes
+
 	if strings.HasPrefix(appCnf.LogSettings.LogFile, "./") {
 		appCnf.LogSettings.LogFile = filepath.Join(appCnf.RootWorkingDir, appCnf.LogSettings.LogFile)
 	}
@@ -270,7 +284,7 @@ func New(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 	}
 
 	// setup everything for artifacts
-	err := handleArtifactsSettings(appCnf)
+	err = handleArtifactsSettings(appCnf)
 	if err != nil {
 		return nil, err
 	}
@@ -285,8 +299,7 @@ func New(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 			appCnf.RecorderInfo.DelRecordingBackupPath = path.Join(appCnf.RecorderInfo.RecordingFilesPath, "del_backup")
 		}
 
-		err := os.MkdirAll(appCnf.RecorderInfo.DelRecordingBackupPath, 0755)
-		if err != nil {
+		if err := os.MkdirAll(appCnf.RecorderInfo.DelRecordingBackupPath, 0755); err != nil {
 			return nil, fmt.Errorf("failed to create recording backup directory %s: %w", appCnf.RecorderInfo.DelRecordingBackupPath, err)
 		}
 	}
@@ -335,7 +348,7 @@ func handleArtifactsSettings(appCnf *AppConfig) error {
 		appCnf.ArtifactsSettings.StoragePath = new("./artifacts")
 	}
 	if appCnf.ArtifactsSettings.TokenValidity == nil {
-		appCnf.ArtifactsSettings.TokenValidity = new(time.Minute * 10)
+		appCnf.ArtifactsSettings.TokenValidity = new(10 * time.Minute)
 	}
 
 	p := *appCnf.ArtifactsSettings.StoragePath

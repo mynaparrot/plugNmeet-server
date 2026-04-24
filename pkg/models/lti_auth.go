@@ -3,7 +3,6 @@ package models
 import (
 	"crypto/sha1"
 	"encoding/hex"
-	"errors"
 	"net/url"
 	"strings"
 	"time"
@@ -34,7 +33,7 @@ func (m *LtiV1Model) VerifyAuth(requests, signingURL string) (*url.Values, error
 	}
 
 	if p.Get("oauth_consumer_key") != p.ConsumerKey {
-		return nil, errors.New(config.InvalidConsumerKey)
+		return nil, config.InvalidConsumerKey
 	}
 
 	sign, err := p.Sign()
@@ -46,7 +45,7 @@ func (m *LtiV1Model) VerifyAuth(requests, signingURL string) (*url.Values, error
 			"calculated": sign,
 			"provided":   providedSignature,
 		}).WithError(err).Errorln("signature verification failed")
-		return nil, errors.New(config.VerificationFailed)
+		return nil, config.VerificationFailed
 	}
 
 	return new(p.Params()), nil

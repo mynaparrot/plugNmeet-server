@@ -57,10 +57,14 @@ client:
 #    from_release: "" # e.g., "v2.1.4"
 
 room_default_settings:
-  max_duration: 0 # Duration in minutes. 0 means unlimited.
-  max_participants: 0 # 0 means unlimited.
+  # Duration in minutes. 0 = unlimited.
+  max_duration: 0
+  # Maximum number of participants. 0 = unlimited.
+  max_participants: 0
   # Limit the number of breakout rooms. Default is 6, maximum is 16.
   max_num_breakout_rooms: 6
+  # Maximum preloaded file size for whiteboard in kb,mb. Default is 5mb.
+  max_preloaded_wb_file_size: 5mb
 
 log_settings:
   log_file: "./log/plugNmeet.log"

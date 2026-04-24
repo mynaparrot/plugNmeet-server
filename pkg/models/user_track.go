@@ -36,7 +36,7 @@ func (m *UserModel) MuteUnMuteTrack(ctx context.Context, r *plugnmeet.MuteUnMute
 	}
 
 	if p == nil || p.State != livekit.ParticipantInfo_ACTIVE {
-		err = fmt.Errorf(config.UserNotActive)
+		err = config.UserNotActive
 		log.WithError(err).Warnln("participant not active")
 		return err
 	}
