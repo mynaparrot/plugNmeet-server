@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.9](https://github.com/mynaparrot/plugNmeet-server/compare/v2.1.8...v2.1.9) (2026-04-26)
+
+
+### Bug Fixes
+
+* lock to prevent duplicate task while another is processing ([e89604a](https://github.com/mynaparrot/plugNmeet-server/commit/e89604a8ba5c852c6a66500e72e9ff305f1e8251))
+
 ## [2.1.8](https://github.com/mynaparrot/plugNmeet-server/compare/v2.1.7...v2.1.8) (2026-04-24)
 
 
