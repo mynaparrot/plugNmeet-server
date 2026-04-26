@@ -14,6 +14,7 @@ import (
 const (
 	RoomCreationLockKey = Prefix + "roomCreationLock-%s"
 	janitorLockKey      = Prefix + "janitorLeaderLock"
+	RecorderTaskLockKey = Prefix + "recorderTaskLock-%s-%s" // roomID, taskType
 )
 
 // unlockScript is a Lua script for atomic check-and-delete.

@@ -11,6 +11,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
@@ -25,6 +26,29 @@ func (m *RecordingModel) DispatchRecorderTask(req *plugnmeet.RecordingReq) error
 		"task":   req.Task.String(),
 		"method": "DispatchRecorderTask",
 	})
+
+	if req.Task == plugnmeet.RecordingTasks_START_RECORDING || req.Task == plugnmeet.RecordingTasks_START_RTMP {
+		// we'll use a lock to ensure that we're not sending multiple requests for the same task
+		// we'll use a TTL of 30 seconds, which is more than enough for the recorder to respond
+		lockKey := fmt.Sprintf(redisservice.RecorderTaskLockKey, req.RoomId, req.Task.String())
+		lock := m.rs.NewLock(lockKey, 30*time.Second)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
+		defer cancel()
+
+		acquired, err := lock.TryLock(ctx)
+		if err != nil {
+			log.WithError(err).Error("failed to acquire recorder task lock")
+			return err
+		}
+		if !acquired {
+			err := errors.New("another request is already in progress")
+			log.WithError(err).Warn("recorder task lock already acquired")
+			return err
+		}
+		defer lock.Unlock(ctx)
+	}
+
 	log.Infoln("Request to send message to recorder")
 
 	recordId := time.Now().UnixMilli()
