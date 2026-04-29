@@ -22,12 +22,9 @@ import (
 // audio in memory and POSTing fixed-duration WAV chunks to the OpenAI
 // transcription endpoint. Each upload yields a single final_result event.
 //
-// This trades partials and per-word latency for portability: the same code
-// path works against OpenAI cloud and any OpenAI-compatible self-hosted
-// transcription server (e.g. faster-whisper behind LocalAI, whisper.cpp's
-// HTTP server, vLLM with whisper). Real-time partials would require the
-// OpenAI Realtime websocket API, which is not yet covered by openai-go and
-// is not supported by most self-hosted backends.
+// This trades partials for portability: the same code path works against any
+// OpenAI-compatible HTTP backend (faster-whisper-server, whisper.cpp, vLLM,
+// LocalAI). For partial deltas use mode: "realtime" (realtimeStream).
 type chunkedStream struct {
 	client       openaisdk.Client
 	model        string

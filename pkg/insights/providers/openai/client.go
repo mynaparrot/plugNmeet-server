@@ -24,6 +24,9 @@ const (
 	defaultChatModel          = "gpt-4o-mini"
 	defaultChunkSeconds       = 5.0
 	transcriptionSampleRate   = 16000
+
+	modeChunked  = "chunked"
+	modeRealtime = "realtime"
 )
 
 // Provider implements insights.Provider for OpenAI and OpenAI-compatible APIs.
@@ -59,9 +62,9 @@ func NewProvider(providerAccount *config.ProviderAccount, serviceConfig *config.
 	}, nil
 }
 
-// CreateTranscription opens a chunked transcription stream that periodically
-// uploads buffered PCM16 audio to /v1/audio/transcriptions and emits a
-// final_result event per chunk.
+// CreateTranscription opens a transcription stream. mode: "chunked" (default)
+// uploads WAV chunks to /v1/audio/transcriptions; mode: "realtime" streams
+// PCM16 over WebSocket and surfaces partials.
 func (p *Provider) CreateTranscription(ctx context.Context, roomId, userId string, options []byte) (insights.TranscriptionStream, error) {
 	opts := &insights.TranscriptionOptions{}
 	if len(options) > 0 {
@@ -71,9 +74,13 @@ func (p *Provider) CreateTranscription(ctx context.Context, roomId, userId strin
 	}
 
 	model := p.serviceModel(defaultTranscriptionModel)
-	chunkSec := p.chunkSeconds()
 
-	return newChunkedStream(ctx, p.client, model, chunkSec, roomId, userId, opts, p.logger)
+	switch p.transcribeMode() {
+	case modeRealtime:
+		return newRealtimeStream(ctx, p.account, model, roomId, userId, opts, p.logger)
+	default:
+		return newChunkedStream(ctx, p.client, model, p.chunkSeconds(), roomId, userId, opts, p.logger)
+	}
 }
 
 // TranslateText performs translation via Chat Completions with a JSON-schema
@@ -146,6 +153,18 @@ func (p *Provider) serviceModel(fallback string) string {
 		}
 	}
 	return fallback
+}
+
+func (p *Provider) transcribeMode() string {
+	if p.account == nil {
+		return modeChunked
+	}
+	switch m, _ := p.account.Options["mode"].(string); m {
+	case modeRealtime:
+		return modeRealtime
+	default:
+		return modeChunked
+	}
 }
 
 // chunkSeconds reads chunk_seconds from the provider account options. YAML

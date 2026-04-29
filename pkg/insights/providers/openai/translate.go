@@ -82,19 +82,12 @@ func translateViaChatCompletions(parentCtx context.Context, client openaisdk.Cli
 	}
 
 	raw := resp.Choices[0].Message.Content
-	parsed := map[string]string{}
-	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
-		// Some local backends ignore Strict mode and wrap output in markdown
-		// fences or prose. Try one tolerant unwrap before giving up.
-		if cleaned := stripJSONNoise(raw); cleaned != raw {
-			if err2 := json.Unmarshal([]byte(cleaned), &parsed); err2 == nil {
-				goto OK
-			}
-		}
+	parsed, err := parseTranslationJSON(raw)
+	if err != nil {
 		log.WithError(err).WithField("raw", truncate(raw, 256)).Warn("openai translation: failed to parse JSON response")
 		return nil, fmt.Errorf("failed to parse translation JSON: %w", err)
 	}
-OK:
+
 	translations := make(map[string]string, len(targetLangs))
 	for _, l := range targetLangs {
 		translations[l] = parsed[l]
@@ -122,6 +115,22 @@ func buildTranslationSchema(targetLangs []string) map[string]any {
 		"additionalProperties": false,
 		"properties":           properties,
 		"required":             required,
+	}
+}
+
+// parseTranslationJSON unmarshals the response, retrying once with markdown
+// fences stripped for backends that ignore Strict mode.
+func parseTranslationJSON(raw string) (map[string]string, error) {
+	parsed := map[string]string{}
+	if err := json.Unmarshal([]byte(raw), &parsed); err == nil {
+		return parsed, nil
+	} else if cleaned := stripJSONNoise(raw); cleaned != raw {
+		if err2 := json.Unmarshal([]byte(cleaned), &parsed); err2 == nil {
+			return parsed, nil
+		}
+		return nil, err
+	} else {
+		return nil, err
 	}
 }
 
