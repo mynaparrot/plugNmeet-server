@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.1.9](https://github.com/mynaparrot/plugNmeet-server/compare/v2.1.8...v2.1.9) (2026-05-07)
+
+
+### Bug Fixes
+
+* bump actions ([3b067ee](https://github.com/mynaparrot/plugNmeet-server/commit/3b067ee7fbf92cbccf633dc9282a8a651936033a))
+* bump deps ([7948141](https://github.com/mynaparrot/plugNmeet-server/commit/7948141d1d8fc90ac53910622b489753b396358b))
+* bump proto ([da564ba](https://github.com/mynaparrot/plugNmeet-server/commit/da564ba44edc66e61f0545627fe0a8b0d78ca041))
+* lock to prevent duplicate task while another is processing ([e89604a](https://github.com/mynaparrot/plugNmeet-server/commit/e89604a8ba5c852c6a66500e72e9ff305f1e8251))
+
 ## [2.1.8](https://github.com/mynaparrot/plugNmeet-server/compare/v2.1.7...v2.1.8) (2026-04-24)
 
 
