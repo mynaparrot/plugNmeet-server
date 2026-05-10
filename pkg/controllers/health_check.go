@@ -3,7 +3,7 @@ package controllers
 import (
 	"context"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
@@ -15,7 +15,7 @@ func NewHealthCheckController(app *config.AppConfig) *HealthCheckController {
 	return &HealthCheckController{app: app}
 }
 
-func (h *HealthCheckController) HandleHealthCheck(c *fiber.Ctx) error {
+func (h *HealthCheckController) HandleHealthCheck(c fiber.Ctx) error {
 	db, err := h.app.DB.DB()
 	if err != nil {
 		return c.Status(fiber.StatusServiceUnavailable).SendString("DB connection error")

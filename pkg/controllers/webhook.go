@@ -2,7 +2,7 @@ package controllers
 
 import (
 	"github.com/gammazero/workerpool"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 )
@@ -34,7 +34,7 @@ func (wc *WebhookController) Shutdown() {
 }
 
 // HandleWebhook processes incoming webhook events from LiveKit.
-func (wc *WebhookController) HandleWebhook(c *fiber.Ctx) error {
+func (wc *WebhookController) HandleWebhook(c fiber.Ctx) error {
 	// Read raw request body
 	data := c.Body()
 

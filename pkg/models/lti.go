@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -63,7 +63,7 @@ func NewLtiV1Model(app *config.AppConfig, rm *RoomModel, um *UserModel) *LtiV1Mo
 	}
 }
 
-func (m *LtiV1Model) LTIV1Landing(c *fiber.Ctx, requests, signingURL string) error {
+func (m *LtiV1Model) LTIV1Landing(c fiber.Ctx, requests, signingURL string) error {
 	params, err := m.VerifyAuth(requests, signingURL)
 	if err != nil {
 		return err

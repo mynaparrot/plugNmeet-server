@@ -1,7 +1,7 @@
 package controllers
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
@@ -21,13 +21,13 @@ func NewRoomController(m *models.RoomModel) *RoomController {
 }
 
 // HandleRoomCreate handles creating a new room.
-func (rc *RoomController) HandleRoomCreate(c *fiber.Ctx) error {
+func (rc *RoomController) HandleRoomCreate(c fiber.Ctx) error {
 	req := new(plugnmeet.CreateRoomReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
-	room, err := rc.RoomModel.CreateRoom(c.UserContext(), req)
+	room, err := rc.RoomModel.CreateRoom(c, req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
@@ -43,7 +43,7 @@ func (rc *RoomController) HandleRoomCreate(c *fiber.Ctx) error {
 }
 
 // HandleIsRoomActive checks if a room is active.
-func (rc *RoomController) HandleIsRoomActive(c *fiber.Ctx) error {
+func (rc *RoomController) HandleIsRoomActive(c fiber.Ctx) error {
 	req := new(plugnmeet.IsRoomActiveReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
@@ -54,13 +54,13 @@ func (rc *RoomController) HandleIsRoomActive(c *fiber.Ctx) error {
 }
 
 // HandleGetActiveRoomInfo gets information about an active room.
-func (rc *RoomController) HandleGetActiveRoomInfo(c *fiber.Ctx) error {
+func (rc *RoomController) HandleGetActiveRoomInfo(c fiber.Ctx) error {
 	req := new(plugnmeet.GetActiveRoomInfoReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
-	status, msg, statusCode, res := rc.RoomModel.GetActiveRoomInfo(c.UserContext(), req)
+	status, msg, statusCode, res := rc.RoomModel.GetActiveRoomInfo(c, req)
 	r := &plugnmeet.GetActiveRoomInfoRes{
 		Status:     status,
 		Msg:        msg,
@@ -72,8 +72,8 @@ func (rc *RoomController) HandleGetActiveRoomInfo(c *fiber.Ctx) error {
 }
 
 // HandleGetActiveRoomsInfo gets information about all active rooms.
-func (rc *RoomController) HandleGetActiveRoomsInfo(c *fiber.Ctx) error {
-	status, msg, statusCode, res := rc.RoomModel.GetActiveRoomsInfo(c.UserContext())
+func (rc *RoomController) HandleGetActiveRoomsInfo(c fiber.Ctx) error {
+	status, msg, statusCode, res := rc.RoomModel.GetActiveRoomsInfo(c)
 
 	r := &plugnmeet.GetActiveRoomsInfoRes{
 		Status:     status,
@@ -86,24 +86,24 @@ func (rc *RoomController) HandleGetActiveRoomsInfo(c *fiber.Ctx) error {
 }
 
 // HandleEndRoom handles ending a room.
-func (rc *RoomController) HandleEndRoom(c *fiber.Ctx) error {
+func (rc *RoomController) HandleEndRoom(c fiber.Ctx) error {
 	req := new(plugnmeet.RoomEndReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
-	status, msg, statusCode := rc.RoomModel.EndRoom(c.UserContext(), req)
+	status, msg, statusCode := rc.RoomModel.EndRoom(c, req)
 	return utils.SendCommonProtoJsonResponse(c, status, msg, statusCode)
 }
 
 // HandleFetchPastRooms handles fetching past rooms.
-func (rc *RoomController) HandleFetchPastRooms(c *fiber.Ctx) error {
+func (rc *RoomController) HandleFetchPastRooms(c fiber.Ctx) error {
 	req := new(plugnmeet.FetchPastRoomsReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
-	result, err := rc.RoomModel.FetchPastRooms(c.UserContext(), req)
+	result, err := rc.RoomModel.FetchPastRooms(c, req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
@@ -121,7 +121,7 @@ func (rc *RoomController) HandleFetchPastRooms(c *fiber.Ctx) error {
 }
 
 // HandleEndRoomForAPI handles ending a room via API call.
-func (rc *RoomController) HandleEndRoomForAPI(c *fiber.Ctx) error {
+func (rc *RoomController) HandleEndRoomForAPI(c fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 
@@ -139,12 +139,12 @@ func (rc *RoomController) HandleEndRoomForAPI(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "requested roomId & token roomId mismatched")
 	}
 
-	status, msg, _ := rc.RoomModel.EndRoom(c.UserContext(), req)
+	status, msg, _ := rc.RoomModel.EndRoom(c, req)
 	return utils.SendCommonProtobufResponse(c, status, msg)
 }
 
 // HandleChangeVisibilityForAPI handles changing room visibility via API call.
-func (rc *RoomController) HandleChangeVisibilityForAPI(c *fiber.Ctx) error {
+func (rc *RoomController) HandleChangeVisibilityForAPI(c fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 
@@ -166,7 +166,7 @@ func (rc *RoomController) HandleChangeVisibilityForAPI(c *fiber.Ctx) error {
 	return utils.SendCommonProtobufResponse(c, status, msg)
 }
 
-func (rc *RoomController) HandleEnableRoomSipDialIn(c *fiber.Ctx) error {
+func (rc *RoomController) HandleEnableRoomSipDialIn(c fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 
@@ -188,7 +188,7 @@ func (rc *RoomController) HandleEnableRoomSipDialIn(c *fiber.Ctx) error {
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
-func (rc *RoomController) HandleCreateIngress(c *fiber.Ctx) error {
+func (rc *RoomController) HandleCreateIngress(c fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	isAdmin := c.Locals("isAdmin")
 
@@ -219,7 +219,7 @@ func (rc *RoomController) HandleCreateIngress(c *fiber.Ctx) error {
 }
 
 // HandleExternalDisplayLink handles sharing an external display link.
-func (rc *RoomController) HandleExternalDisplayLink(c *fiber.Ctx) error {
+func (rc *RoomController) HandleExternalDisplayLink(c fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
@@ -250,7 +250,7 @@ func (rc *RoomController) HandleExternalDisplayLink(c *fiber.Ctx) error {
 }
 
 // HandleExternalMediaPlayer handles external media player actions.
-func (rc *RoomController) HandleExternalMediaPlayer(c *fiber.Ctx) error {
+func (rc *RoomController) HandleExternalMediaPlayer(c fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
@@ -281,7 +281,7 @@ func (rc *RoomController) HandleExternalMediaPlayer(c *fiber.Ctx) error {
 }
 
 // HandleApproveUsers handles approving users from the waiting room.
-func (rc *RoomController) HandleApproveUsers(c *fiber.Ctx) error {
+func (rc *RoomController) HandleApproveUsers(c fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	isAdmin := c.Locals("isAdmin")
 
@@ -305,7 +305,7 @@ func (rc *RoomController) HandleApproveUsers(c *fiber.Ctx) error {
 }
 
 // HandleUpdateWaitingRoomMessage handles updating the waiting room message.
-func (rc *RoomController) HandleUpdateWaitingRoomMessage(c *fiber.Ctx) error {
+func (rc *RoomController) HandleUpdateWaitingRoomMessage(c fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	isAdmin := c.Locals("isAdmin")
 

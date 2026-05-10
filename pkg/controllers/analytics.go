@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"buf.build/go/protovalidate"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -53,7 +53,7 @@ func validateRequest(msg proto.Message) error {
 
 // HandleFetchAnalytics fetches analytics data.
 // Deprecated: only for backward compatibility
-func (ac *AnalyticsController) HandleFetchAnalytics(c *fiber.Ctx) error {
+func (ac *AnalyticsController) HandleFetchAnalytics(c fiber.Ctx) error {
 	req := new(plugnmeet.FetchAnalyticsReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
@@ -77,7 +77,7 @@ func (ac *AnalyticsController) HandleFetchAnalytics(c *fiber.Ctx) error {
 
 // HandleDeleteAnalytics deletes analytics data.
 // Deprecated: only for backward compatibility
-func (ac *AnalyticsController) HandleDeleteAnalytics(c *fiber.Ctx) error {
+func (ac *AnalyticsController) HandleDeleteAnalytics(c fiber.Ctx) error {
 	req := new(plugnmeet.DeleteAnalyticsReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
@@ -99,7 +99,7 @@ func (ac *AnalyticsController) HandleDeleteAnalytics(c *fiber.Ctx) error {
 
 // HandleGetAnalyticsDownloadToken generates a download token for analytics.
 // Deprecated: only for backward compatibility
-func (ac *AnalyticsController) HandleGetAnalyticsDownloadToken(c *fiber.Ctx) error {
+func (ac *AnalyticsController) HandleGetAnalyticsDownloadToken(c fiber.Ctx) error {
 	req := new(plugnmeet.GetAnalyticsDownloadTokenReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
@@ -126,7 +126,7 @@ func (ac *AnalyticsController) HandleGetAnalyticsDownloadToken(c *fiber.Ctx) err
 
 // HandleDownloadAnalytics handles the download of an analytics file.
 // Deprecated: only for backward compatibility
-func (ac *AnalyticsController) HandleDownloadAnalytics(c *fiber.Ctx) error {
+func (ac *AnalyticsController) HandleDownloadAnalytics(c fiber.Ctx) error {
 	token := c.Params("token")
 	if len(token) == 0 {
 		return c.Status(fiber.StatusUnauthorized).SendString("token required or invalid url")
@@ -138,5 +138,7 @@ func (ac *AnalyticsController) HandleDownloadAnalytics(c *fiber.Ctx) error {
 	}
 
 	c.Attachment(fileName)
-	return c.SendFile(filePath, false)
+	return c.SendFile(filePath, fiber.SendFile{
+		Compress: false,
+	})
 }

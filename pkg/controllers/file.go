@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/gabriel-vasile/mimetype"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -35,13 +35,13 @@ func NewFileController(config *config.AppConfig, fm *models.FileModel, logger *l
 
 // HandleFileUpload method can only be use if you are using resumable.js as your frontend.
 // Library link: https://github.com/23/resumable.js
-func (fc *FileController) HandleFileUpload(c *fiber.Ctx) error {
+func (fc *FileController) HandleFileUpload(c fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
 
 	// this will be used to verify regarding file origin only
 	req := new(models.ResumableUploadReq)
-	err := c.QueryParser(req)
+	err := c.Bind().Query(req)
 	if err != nil {
 		return commonFileErrorResponse(c, err.Error(), fiber.StatusBadRequest)
 	}
@@ -70,7 +70,7 @@ func (fc *FileController) HandleFileUpload(c *fiber.Ctx) error {
 }
 
 // HandleUploadedFileMerge handles merging chunks of a resumable upload.
-func (fc *FileController) HandleUploadedFileMerge(c *fiber.Ctx) error {
+func (fc *FileController) HandleUploadedFileMerge(c fiber.Ctx) error {
 	req := new(plugnmeet.UploadedFileMergeReq)
 	ctnType := c.Get("Content-Type")
 	var err error
@@ -107,7 +107,7 @@ func (fc *FileController) HandleUploadedFileMerge(c *fiber.Ctx) error {
 }
 
 // HandleUploadBase64EncodedData handles uploading base64 encoded data.
-func (fc *FileController) HandleUploadBase64EncodedData(c *fiber.Ctx) error {
+func (fc *FileController) HandleUploadBase64EncodedData(c fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 
 	req := new(plugnmeet.UploadBase64EncodedDataReq)
@@ -126,7 +126,7 @@ func (fc *FileController) HandleUploadBase64EncodedData(c *fiber.Ctx) error {
 }
 
 // HandleDownloadUploadedFile handles downloading an uploaded file.
-func (fc *FileController) HandleDownloadUploadedFile(c *fiber.Ctx) error {
+func (fc *FileController) HandleDownloadUploadedFile(c fiber.Ctx) error {
 	sid := c.Params("sid")
 	otherParts := c.Params("*")
 	otherParts, _ = url.QueryUnescape(otherParts)
@@ -146,9 +146,9 @@ func (fc *FileController) HandleDownloadUploadedFile(c *fiber.Ctx) error {
 }
 
 // HandleConvertWhiteboardFile handles converting a file for the whiteboard.
-func (fc *FileController) HandleConvertWhiteboardFile(c *fiber.Ctx) error {
+func (fc *FileController) HandleConvertWhiteboardFile(c fiber.Ctx) error {
 	req := new(models.ConvertWhiteboardFileReq)
-	err := c.BodyParser(req)
+	err := c.Bind().Body(req)
 	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
@@ -182,7 +182,7 @@ func (fc *FileController) HandleConvertWhiteboardFile(c *fiber.Ctx) error {
 	return c.JSON(res)
 }
 
-func (fc *FileController) HandleGetRoomFilesByType(c *fiber.Ctx) error {
+func (fc *FileController) HandleGetRoomFilesByType(c fiber.Ctx) error {
 	req := new(plugnmeet.GetRoomUploadedFilesReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
@@ -199,7 +199,7 @@ func (fc *FileController) HandleGetRoomFilesByType(c *fiber.Ctx) error {
 
 // HandleGetClientFiles gets the client CSS and JS files.
 // this also depends on config's readClientFiles method
-func (fc *FileController) HandleGetClientFiles(c *fiber.Ctx) error {
+func (fc *FileController) HandleGetClientFiles(c fiber.Ctx) error {
 	var cssFiles, jsFiles []string
 
 	if fc.AppConfig.Client.Debug {
@@ -229,7 +229,7 @@ func (fc *FileController) HandleGetClientFiles(c *fiber.Ctx) error {
 	})
 }
 
-func commonFileErrorResponse(c *fiber.Ctx, msg string, status int) error {
+func commonFileErrorResponse(c fiber.Ctx, msg string, status int) error {
 	if status > 0 {
 		_ = c.SendStatus(status)
 	}

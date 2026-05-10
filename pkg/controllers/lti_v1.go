@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/goccy/go-json"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -49,7 +49,7 @@ func NewLtiV1Controller(app *config.AppConfig, lm *models.LtiV1Model, rm *models
 }
 
 // HandleLTIV1Landing handles the initial LTI v1 landing request.
-func (lc *LtiV1Controller) HandleLTIV1Landing(c *fiber.Ctx) error {
+func (lc *LtiV1Controller) HandleLTIV1Landing(c fiber.Ctx) error {
 	b := c.Body()
 	if len(b) == 0 {
 		return c.Status(fiber.StatusUnauthorized).SendString("empty body")
@@ -82,12 +82,12 @@ func (lc *LtiV1Controller) HandleLTIV1Landing(c *fiber.Ctx) error {
 }
 
 // HandleLTIV1GETREQUEST handles GET requests to LTI endpoints, which are not allowed.
-func (lc *LtiV1Controller) HandleLTIV1GETREQUEST(c *fiber.Ctx) error {
+func (lc *LtiV1Controller) HandleLTIV1GETREQUEST(c fiber.Ctx) error {
 	return sendErrorResponse(c, fiber.StatusMethodNotAllowed, errPleaseUsePostRequest)
 }
 
 // HandleLTIV1VerifyHeaderToken is a middleware to verify the LTI Authorization header token.
-func (lc *LtiV1Controller) HandleLTIV1VerifyHeaderToken(c *fiber.Ctx) error {
+func (lc *LtiV1Controller) HandleLTIV1VerifyHeaderToken(c fiber.Ctx) error {
 	authToken := c.Get("Authorization")
 	if authToken == "" {
 		return sendErrorResponse(c, fiber.StatusUnauthorized, errAuthorizationHeaderMissing)
@@ -115,7 +115,7 @@ func (lc *LtiV1Controller) HandleLTIV1VerifyHeaderToken(c *fiber.Ctx) error {
 }
 
 // HandleLTIV1IsRoomActive checks if the LTI room is active.
-func (lc *LtiV1Controller) HandleLTIV1IsRoomActive(c *fiber.Ctx) error {
+func (lc *LtiV1Controller) HandleLTIV1IsRoomActive(c fiber.Ctx) error {
 	roomId, ok := c.Locals(ctxKeyRoomID).(string)
 	if !ok {
 		return sendErrorResponse(c, fiber.StatusBadRequest, errRoomIdMissing)
@@ -129,7 +129,7 @@ func (lc *LtiV1Controller) HandleLTIV1IsRoomActive(c *fiber.Ctx) error {
 }
 
 // HandleLTIV1JoinRoom handles joining an LTI room.
-func (lc *LtiV1Controller) HandleLTIV1JoinRoom(c *fiber.Ctx) error {
+func (lc *LtiV1Controller) HandleLTIV1JoinRoom(c fiber.Ctx) error {
 	claim := &plugnmeet.LtiClaims{
 		UserId:    c.Locals(ctxKeyUserID).(string),
 		Name:      c.Locals(ctxKeyName).(string),
@@ -145,7 +145,7 @@ func (lc *LtiV1Controller) HandleLTIV1JoinRoom(c *fiber.Ctx) error {
 		}
 	}
 
-	token, err := lc.LtiV1Model.LTIV1JoinRoom(c.UserContext(), claim)
+	token, err := lc.LtiV1Model.LTIV1JoinRoom(c, claim)
 	if err != nil {
 		return sendErrorResponse(c, fiber.StatusInternalServerError, err.Error())
 	}
@@ -158,7 +158,7 @@ func (lc *LtiV1Controller) HandleLTIV1JoinRoom(c *fiber.Ctx) error {
 }
 
 // HandleLTIV1EndRoom handles ending an LTI room session.
-func (lc *LtiV1Controller) HandleLTIV1EndRoom(c *fiber.Ctx) error {
+func (lc *LtiV1Controller) HandleLTIV1EndRoom(c fiber.Ctx) error {
 	if isAdmin, ok := c.Locals(ctxKeyIsAdmin).(bool); !ok || !isAdmin {
 		return sendErrorResponse(c, fiber.StatusForbidden, errOnlyAdminCanPerform)
 	}
@@ -167,7 +167,7 @@ func (lc *LtiV1Controller) HandleLTIV1EndRoom(c *fiber.Ctx) error {
 	if !ok {
 		return sendErrorResponse(c, fiber.StatusBadRequest, errRoomIdMissing)
 	}
-	status, msg, _ := lc.RoomModel.EndRoom(c.UserContext(), &plugnmeet.RoomEndReq{
+	status, msg, _ := lc.RoomModel.EndRoom(c, &plugnmeet.RoomEndReq{
 		RoomId: roomId,
 	})
 
@@ -178,9 +178,9 @@ func (lc *LtiV1Controller) HandleLTIV1EndRoom(c *fiber.Ctx) error {
 }
 
 // HandleLTIV1FetchRecordings fetches recordings for an LTI room.
-func (lc *LtiV1Controller) HandleLTIV1FetchRecordings(c *fiber.Ctx) error {
+func (lc *LtiV1Controller) HandleLTIV1FetchRecordings(c fiber.Ctx) error {
 	req := new(plugnmeet.FetchRecordingsReq)
-	if err := c.BodyParser(req); err != nil {
+	if err := c.Bind().Body(req); err != nil {
 		return sendErrorResponse(c, fiber.StatusBadRequest, err.Error())
 	}
 
@@ -202,9 +202,9 @@ func (lc *LtiV1Controller) HandleLTIV1FetchRecordings(c *fiber.Ctx) error {
 }
 
 // HandleLTIV1GetRecordingDownloadToken gets a download token for a recording.
-func (lc *LtiV1Controller) HandleLTIV1GetRecordingDownloadToken(c *fiber.Ctx) error {
+func (lc *LtiV1Controller) HandleLTIV1GetRecordingDownloadToken(c fiber.Ctx) error {
 	req := new(plugnmeet.GetDownloadTokenReq)
-	if err := c.BodyParser(req); err != nil {
+	if err := c.Bind().Body(req); err != nil {
 		return sendErrorResponse(c, fiber.StatusBadRequest, err.Error())
 	}
 
@@ -221,13 +221,13 @@ func (lc *LtiV1Controller) HandleLTIV1GetRecordingDownloadToken(c *fiber.Ctx) er
 }
 
 // HandleLTIV1DeleteRecordings deletes a recording for an LTI room.
-func (lc *LtiV1Controller) HandleLTIV1DeleteRecordings(c *fiber.Ctx) error {
+func (lc *LtiV1Controller) HandleLTIV1DeleteRecordings(c fiber.Ctx) error {
 	if isAdmin, ok := c.Locals(ctxKeyIsAdmin).(bool); !ok || !isAdmin {
 		return sendErrorResponse(c, fiber.StatusForbidden, errOnlyAdminCanPerform)
 	}
 
 	req := new(plugnmeet.DeleteRecordingReq)
-	if err := c.BodyParser(req); err != nil {
+	if err := c.Bind().Body(req); err != nil {
 		return sendErrorResponse(c, fiber.StatusBadRequest, err.Error())
 	}
 
@@ -241,7 +241,7 @@ func (lc *LtiV1Controller) HandleLTIV1DeleteRecordings(c *fiber.Ctx) error {
 	})
 }
 
-func sendErrorResponse(c *fiber.Ctx, code int, msg string) error {
+func sendErrorResponse(c fiber.Ctx, code int, msg string) error {
 	return c.Status(code).JSON(fiber.Map{
 		"status": false,
 		"msg":    msg,

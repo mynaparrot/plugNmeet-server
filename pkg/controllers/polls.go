@@ -3,7 +3,7 @@ package controllers
 import (
 	"strconv"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
@@ -26,7 +26,7 @@ func NewPollsController(pm *models.PollModel, rs *redisservice.RedisService) *Po
 }
 
 // HandleActivatePolls handles activating or deactivating polls.
-func (pc *PollsController) HandleActivatePolls(c *fiber.Ctx) error {
+func (pc *PollsController) HandleActivatePolls(c fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	isAdmin := c.Locals("isAdmin")
 
@@ -53,7 +53,7 @@ func (pc *PollsController) HandleActivatePolls(c *fiber.Ctx) error {
 }
 
 // HandleCreatePoll handles creating a new poll.
-func (pc *PollsController) HandleCreatePoll(c *fiber.Ctx) error {
+func (pc *PollsController) HandleCreatePoll(c fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	isAdmin := c.Locals("isAdmin")
 	requestedUserId := c.Locals("requestedUserId")
@@ -87,7 +87,7 @@ func (pc *PollsController) HandleCreatePoll(c *fiber.Ctx) error {
 }
 
 // HandleListPolls lists all polls for a room.
-func (pc *PollsController) HandleListPolls(c *fiber.Ctx) error {
+func (pc *PollsController) HandleListPolls(c fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	res := new(plugnmeet.PollResponse)
 	res.Status = false
@@ -105,7 +105,7 @@ func (pc *PollsController) HandleListPolls(c *fiber.Ctx) error {
 }
 
 // HandleCountPollTotalResponses counts the total responses for a poll.
-func (pc *PollsController) HandleCountPollTotalResponses(c *fiber.Ctx) error {
+func (pc *PollsController) HandleCountPollTotalResponses(c fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	pollId := c.Params("pollId")
 	res := new(plugnmeet.PollResponse)
@@ -136,7 +136,7 @@ func (pc *PollsController) HandleCountPollTotalResponses(c *fiber.Ctx) error {
 }
 
 // HandleUserSelectedOption checks which option a user selected.
-func (pc *PollsController) HandleUserSelectedOption(c *fiber.Ctx) error {
+func (pc *PollsController) HandleUserSelectedOption(c fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	pollId := c.Params("pollId")
 	userId := c.Params("userId")
@@ -158,7 +158,7 @@ func (pc *PollsController) HandleUserSelectedOption(c *fiber.Ctx) error {
 }
 
 // HandleUserSubmitResponse handles a user's poll submission.
-func (pc *PollsController) HandleUserSubmitResponse(c *fiber.Ctx) error {
+func (pc *PollsController) HandleUserSubmitResponse(c fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	res := new(plugnmeet.PollResponse)
 	res.Status = false
@@ -184,7 +184,7 @@ func (pc *PollsController) HandleUserSubmitResponse(c *fiber.Ctx) error {
 }
 
 // HandleClosePoll handles closing a poll.
-func (pc *PollsController) HandleClosePoll(c *fiber.Ctx) error {
+func (pc *PollsController) HandleClosePoll(c fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	isAdmin := c.Locals("isAdmin")
 	requestedUserId := c.Locals("requestedUserId")
@@ -219,7 +219,7 @@ func (pc *PollsController) HandleClosePoll(c *fiber.Ctx) error {
 }
 
 // HandleGetPollResponsesDetails gets detailed responses for a poll.
-func (pc *PollsController) HandleGetPollResponsesDetails(c *fiber.Ctx) error {
+func (pc *PollsController) HandleGetPollResponsesDetails(c fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	pollId := c.Params("pollId")
 	isAdmin := c.Locals("isAdmin")
@@ -250,7 +250,7 @@ func (pc *PollsController) HandleGetPollResponsesDetails(c *fiber.Ctx) error {
 }
 
 // HandleGetResponsesResult gets the aggregated results of a poll.
-func (pc *PollsController) HandleGetResponsesResult(c *fiber.Ctx) error {
+func (pc *PollsController) HandleGetResponsesResult(c fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	pollId := c.Params("pollId")
 	res := new(plugnmeet.PollResponse)
@@ -270,7 +270,7 @@ func (pc *PollsController) HandleGetResponsesResult(c *fiber.Ctx) error {
 }
 
 // HandleGetPollsStats gets statistics for all polls in a room.
-func (pc *PollsController) HandleGetPollsStats(c *fiber.Ctx) error {
+func (pc *PollsController) HandleGetPollsStats(c fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	res := new(plugnmeet.PollResponse)
 	res.Status = false
@@ -287,7 +287,7 @@ func (pc *PollsController) HandleGetPollsStats(c *fiber.Ctx) error {
 	return sendPollResponse(c, res)
 }
 
-func sendPollResponse(c *fiber.Ctx, res *plugnmeet.PollResponse) error {
+func sendPollResponse(c fiber.Ctx, res *plugnmeet.PollResponse) error {
 	marshal, err := proto.Marshal(res)
 	if err != nil {
 		return err
