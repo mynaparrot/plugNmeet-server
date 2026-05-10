@@ -75,7 +75,9 @@ func New(appConfig *config.AppConfig, ctrl *factory.ApplicationControllers) *fib
 	// serving static files from assets dir
 	assets := path.Join(appConfig.Client.Path, "assets")
 	app.Use("/assets", static.New(assets))
-	app.Use("/favicon.ico", static.New(path.Join(assets, "imgs", "favicon.ico")))
+	app.Get("/favicon.ico", func(c fiber.Ctx) error {
+		return c.SendFile(path.Join(assets, "imgs", "favicon.ico"))
+	})
 
 	// --- Route Registration ---
 	r := &router{
