@@ -8,6 +8,7 @@ import (
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/adaptor"
+	"github.com/gofiber/fiber/v3/middleware/basicauth"
 	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/gofiber/fiber/v3/middleware/favicon"
 	"github.com/gofiber/fiber/v3/middleware/logger"
@@ -44,13 +45,22 @@ func New(appConfig *config.AppConfig, ctrl *factory.ApplicationControllers) *fib
 		AppName:     "plugNmeet version: " + version.Version + " runtime: " + runtime.Version(),
 	}
 
-	if appConfig.Client.ProxyHeader != "" {
-		cnf.ProxyHeader = appConfig.Client.ProxyHeader
+	if appConfig.Client.ProxyConf != nil && appConfig.Client.ProxyConf.Enabled {
+		cnf.ProxyHeader = appConfig.Client.ProxyConf.ProxyHeader
+		cnf.TrustProxy = true
+		cnf.TrustProxyConfig.Proxies = appConfig.Client.ProxyConf.TrustedProxyIps
 	}
 
 	// --- App Initialization & Middleware ---
 	app := fiber.New(cnf)
 	app.Use(rr.New())
+
+	// serving static files from assets dir
+	assets := path.Join(appConfig.Client.Path, "assets")
+	app.Use("/assets", static.New(assets))
+	app.Use(favicon.New(favicon.Config{
+		File: path.Join(assets, "imgs", "favicon.ico"),
+	}))
 
 	app.Use(logger.New(logger.Config{
 		Done: func(c fiber.Ctx, logString []byte) {
@@ -61,23 +71,24 @@ func New(appConfig *config.AppConfig, ctrl *factory.ApplicationControllers) *fib
 		Stream:      io.Discard,
 	}))
 
-	if appConfig.Client.PrometheusConf.Enable {
-		p := appConfig.Client.PrometheusConf.MetricsPath
+	prometheusConf := appConfig.Client.PrometheusConf
+	if prometheusConf.Enable {
+		p := prometheusConf.MetricsPath
 		if p == "" {
 			p = "/metrics"
+		}
+		if prometheusConf.Username != "" && prometheusConf.Password != "" {
+			app.Use(p, basicauth.New(basicauth.Config{
+				Authorizer: func(user, pass string, c fiber.Ctx) bool {
+					return user == prometheusConf.Username && pass == prometheusConf.Password
+				},
+			}))
 		}
 		app.Get(p, adaptor.HTTPHandler(promhttp.Handler()))
 	}
 
 	app.Use(cors.New(cors.Config{
 		AllowMethods: []string{"POST", "GET", "OPTIONS", "HEAD"},
-	}))
-
-	// serving static files from assets dir
-	assets := path.Join(appConfig.Client.Path, "assets")
-	app.Use("/assets", static.New(assets))
-	app.Use(favicon.New(favicon.Config{
-		File: path.Join(assets, "imgs", "favicon.ico"),
 	}))
 
 	// --- Route Registration ---

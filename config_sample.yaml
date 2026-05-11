@@ -31,7 +31,16 @@ client:
   prometheus:
     enable: false
     metrics_path: "/metrics"
-  proxy_header: "" ## Set to X-Forwarded-For if needed.
+    username: ""
+    password: ""
+  # proxy_conf is used to get the real client IP when behind a reverse proxy.
+  proxy_conf:
+    # Set to true to enable proxy support.
+    enabled: false
+    # Header field for the real client IP. Common values: "X-Forwarded-For", "X-Real-IP".
+    proxy_header: "X-Forwarded-For"
+    # A list of trusted proxy IP addresses or CIDR ranges.
+    trusted_proxy_ips: [ "127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "::1/128" ]
   copyright_conf:
     # If true, copyright info can be modified via API.
     allow_override: false

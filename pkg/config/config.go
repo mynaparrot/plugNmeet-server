@@ -60,7 +60,7 @@ type ClientInfo struct {
 	TokenValidity      *time.Duration      `yaml:"token_validity"`
 	WebhookConf        WebhookConf         `yaml:"webhook_conf"`
 	PrometheusConf     PrometheusConf      `yaml:"prometheus"`
-	ProxyHeader        string              `yaml:"proxy_header"`
+	ProxyConf          *ProxyConf          `yaml:"proxy_conf"`
 	CopyrightConf      *CopyrightConf      `yaml:"copyright_conf"`
 	BBBJoinHost        *string             `yaml:"bbb_join_host"`
 	AutoClientDownload *AutoClientDownload `yaml:"auto_client_download"`
@@ -75,6 +75,14 @@ type WebhookConf struct {
 type PrometheusConf struct {
 	Enable      bool   `yaml:"enable"`
 	MetricsPath string `yaml:"metrics_path"`
+	Username    string `yaml:"username"`
+	Password    string `yaml:"password"`
+}
+
+type ProxyConf struct {
+	Enabled         bool     `yaml:"enabled"`
+	ProxyHeader     string   `yaml:"proxy_header"`
+	TrustedProxyIps []string `yaml:"trusted_proxy_ips"`
 }
 
 type LivekitInfo struct {
