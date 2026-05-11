@@ -353,17 +353,16 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 		if a.payload.RoomE2EEKey == nil || *a.payload.RoomE2EEKey == "" {
 			a.logger.Errorln("received an encrypted track but no key was provided, so not continuing")
 			return
-		} else {
-			key, err := lksdk.DeriveKeyFromString(*a.payload.RoomE2EEKey)
-			if err != nil {
-				a.logger.WithError(err).Error("failed to derive key")
-				return
-			}
-			decryptor, err = lkmedia.NewGCMDecryptor(key, a.Room.SifTrailer())
-			if err != nil {
-				a.logger.WithError(err).Error("failed to create decryptor")
-				return
-			}
+		}
+		key, err := lksdk.DeriveKeyFromString(*a.payload.RoomE2EEKey)
+		if err != nil {
+			a.logger.WithError(err).Error("failed to derive key")
+			return
+		}
+		decryptor, err = lkmedia.NewGCMDecryptor(key, a.Room.SifTrailer())
+		if err != nil {
+			a.logger.WithError(err).Error("failed to create decryptor")
+			return
 		}
 	}
 

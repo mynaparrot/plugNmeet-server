@@ -250,12 +250,16 @@ func (m *RoomModel) setRoomDefaults(r *plugnmeet.CreateRoomReq) {
 		r.Metadata.RoomFeatures.SipDialInFeatures.IsAllow = false
 		r.Metadata.RoomFeatures.IngressFeatures.IsAllow = false
 
-		insightsFeatures := r.Metadata.RoomFeatures.InsightsFeatures
-		if insightsFeatures.TranscriptionFeatures != nil {
-			insightsFeatures.TranscriptionFeatures.IsAllow = false
-		}
-		if insightsFeatures.AiFeatures != nil && insightsFeatures.AiFeatures.MeetingSummarizationFeatures != nil {
-			insightsFeatures.AiFeatures.MeetingSummarizationFeatures.IsAllow = false
+		if r.Metadata.RoomFeatures.EndToEndEncryptionFeatures.GetEnabledSelfInsertEncryptionKey() {
+			r.Metadata.RoomFeatures.AllowRtmp = false
+
+			insightsFeatures := r.Metadata.RoomFeatures.InsightsFeatures
+			if insightsFeatures.TranscriptionFeatures != nil {
+				insightsFeatures.TranscriptionFeatures.IsAllow = false
+			}
+			if insightsFeatures.AiFeatures != nil && insightsFeatures.AiFeatures.MeetingSummarizationFeatures != nil {
+				insightsFeatures.AiFeatures.MeetingSummarizationFeatures.IsAllow = false
+			}
 		}
 	}
 }
