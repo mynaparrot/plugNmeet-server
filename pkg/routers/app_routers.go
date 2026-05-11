@@ -2,18 +2,21 @@ package routers
 
 import (
 	"io"
+	"path"
 	"runtime"
 
-	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/goccy/go-json"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/logger"
-	rr "github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/gofiber/template/html/v2"
+	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/adaptor"
+	"github.com/gofiber/fiber/v3/middleware/cors"
+	"github.com/gofiber/fiber/v3/middleware/logger"
+	"github.com/gofiber/fiber/v3/middleware/recover"
+	"github.com/gofiber/fiber/v3/middleware/static"
+	"github.com/gofiber/template/html/v3"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/factory"
 	"github.com/mynaparrot/plugnmeet-server/version"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // router is a struct to hold the dependencies for setting up routes,
@@ -48,25 +51,33 @@ func New(appConfig *config.AppConfig, ctrl *factory.ApplicationControllers) *fib
 	app := fiber.New(cnf)
 
 	app.Use(logger.New(logger.Config{
-		Done: func(c *fiber.Ctx, logString []byte) {
+		Done: func(c fiber.Ctx, logString []byte) {
 			appConfig.Logger.Debugln(string(logString))
 		},
-		Format: "${status} | ${latency} | ${ip} | ${method} | ${path} | ${error}",
-		Output: io.Discard,
+		Format:      "| ${status} | ${latency} | ${ip} | ${method} | ${path} | ${error}",
+		ForceColors: true,
+		Stream:      io.Discard,
 	}))
 
 	if appConfig.Client.PrometheusConf.Enable {
-		prometheus := fiberprometheus.New("plugNmeet")
-		prometheus.RegisterAt(app, appConfig.Client.PrometheusConf.MetricsPath)
-		app.Use(prometheus.Middleware)
+		p := appConfig.Client.PrometheusConf.MetricsPath
+		if p == "" {
+			p = "/metrics"
+		}
+		app.Get(p, adaptor.HTTPHandler(promhttp.Handler()))
 	}
 
-	app.Use(rr.New())
+	app.Use(recover.New())
 	app.Use(cors.New(cors.Config{
-		AllowMethods: "POST,GET,OPTIONS,HEAD",
+		AllowMethods: []string{"POST", "GET", "OPTIONS", "HEAD"},
 	}))
-	app.Static("/assets", appConfig.Client.Path+"/assets")
-	app.Static("/favicon.ico", appConfig.Client.Path+"/assets/imgs/favicon.ico")
+
+	// serving static files from assets dir
+	assets := path.Join(appConfig.Client.Path, "assets")
+	app.Use("/assets", static.New(assets))
+	app.Get("/favicon.ico", func(c fiber.Ctx) error {
+		return c.SendFile(path.Join(assets, "imgs", "favicon.ico"))
+	})
 
 	// --- Route Registration ---
 	r := &router{
@@ -82,7 +93,7 @@ func New(appConfig *config.AppConfig, ctrl *factory.ApplicationControllers) *fib
 
 	// --- Final Catch-All 404 Handler ---
 	// This MUST be the last middleware to be registered.
-	app.Use(func(c *fiber.Ctx) error {
+	app.Use(func(c fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).SendString("not found")
 	})
 
@@ -90,10 +101,10 @@ func New(appConfig *config.AppConfig, ctrl *factory.ApplicationControllers) *fib
 }
 
 func (r *router) registerBaseRoutes() {
-	r.app.Get("/", func(c *fiber.Ctx) error {
+	r.app.Get("/", func(c fiber.Ctx) error {
 		return c.Render("index", nil)
 	})
-	r.app.Get("/login*", func(c *fiber.Ctx) error {
+	r.app.Get("/login*", func(c fiber.Ctx) error {
 		return c.Render("login", nil)
 	})
 	r.app.Post("/webhook", r.ctrl.WebhookController.HandleWebhook)

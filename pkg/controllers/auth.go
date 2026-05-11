@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/go-jose/go-jose/v4/jwt"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -38,7 +38,7 @@ func NewAuthController(config *config.AppConfig, natsService *natsservice.NatsSe
 }
 
 // HandleAuthHeaderCheck is a middleware to check API-KEY & HASH-SIGNATURE.
-func (ac *AuthController) HandleAuthHeaderCheck(c *fiber.Ctx) error {
+func (ac *AuthController) HandleAuthHeaderCheck(c fiber.Ctx) error {
 	apiKey := c.Get("API-KEY")
 	signature := c.Get("HASH-SIGNATURE")
 	body := c.Body()
@@ -69,7 +69,7 @@ func (ac *AuthController) HandleAuthHeaderCheck(c *fiber.Ctx) error {
 }
 
 // HandleVerifyHeaderToken is a middleware to verify the Authorization header token.
-func (ac *AuthController) HandleVerifyHeaderToken(c *fiber.Ctx) error {
+func (ac *AuthController) HandleVerifyHeaderToken(c fiber.Ctx) error {
 	authToken := c.Get("Authorization")
 
 	errStatus := fiber.StatusUnauthorized
@@ -101,7 +101,7 @@ func (ac *AuthController) HandleVerifyHeaderToken(c *fiber.Ctx) error {
 }
 
 // HandleVerifyToken verifies a user's token before they join a room.
-func (ac *AuthController) HandleVerifyToken(c *fiber.Ctx) error {
+func (ac *AuthController) HandleVerifyToken(c fiber.Ctx) error {
 	roomId := c.Locals("roomId").(string)
 	requestedUserId := c.Locals("requestedUserId").(string)
 

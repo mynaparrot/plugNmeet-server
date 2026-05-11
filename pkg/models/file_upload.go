@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/gabriel-vasile/mimetype"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/sirupsen/logrus"
@@ -28,13 +28,13 @@ type ResumableUploadReq struct {
 
 // ResumableFileUpload method can only be use if you are using resumable.js as your frontend.
 // Library link: https://github.com/23/resumable.js
-func (m *FileModel) ResumableFileUpload(c *fiber.Ctx) (*plugnmeet.UploadedFileRes, *fiber.Error) {
+func (m *FileModel) ResumableFileUpload(c fiber.Ctx) (*plugnmeet.UploadedFileRes, *fiber.Error) {
 	req := new(ResumableUploadReq)
 	res := &plugnmeet.UploadedFileRes{
 		Status: true,
 	}
 
-	if err := c.QueryParser(req); err != nil {
+	if err := c.Bind().Query(req); err != nil {
 		m.logger.WithError(err).Errorln("failed to parse query parameters")
 		return nil, fiber.NewError(fiber.StatusBadRequest, "Failed to parse query parameters")
 	}

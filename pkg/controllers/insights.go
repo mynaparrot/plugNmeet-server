@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -86,7 +86,7 @@ func (i *InsightsController) Shutdown() {
 	i.insightsModel.Shutdown()
 }
 
-func (i *InsightsController) HandleTranscriptionConfigure(c *fiber.Ctx) error {
+func (i *InsightsController) HandleTranscriptionConfigure(c fiber.Ctx) error {
 	if i.app.Insights == nil || !i.app.Insights.Enabled {
 		return utils.SendCommonProtobufResponse(c, false, "insights feature wasn't configured")
 	}
@@ -111,7 +111,7 @@ func (i *InsightsController) HandleTranscriptionConfigure(c *fiber.Ctx) error {
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
-func (i *InsightsController) HandleTranscriptionUserSession(c *fiber.Ctx) error {
+func (i *InsightsController) HandleTranscriptionUserSession(c fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
 
@@ -129,7 +129,7 @@ func (i *InsightsController) HandleTranscriptionUserSession(c *fiber.Ctx) error 
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
-func (i *InsightsController) HandleEndTranscription(c *fiber.Ctx) error {
+func (i *InsightsController) HandleEndTranscription(c fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 
@@ -145,7 +145,7 @@ func (i *InsightsController) HandleEndTranscription(c *fiber.Ctx) error {
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
-func (i *InsightsController) HandleGetTranscriptionUserTaskStatus(c *fiber.Ctx) error {
+func (i *InsightsController) HandleGetTranscriptionUserTaskStatus(c fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
 
@@ -158,7 +158,7 @@ func (i *InsightsController) HandleGetTranscriptionUserTaskStatus(c *fiber.Ctx) 
 	return c.Send(res)
 }
 
-func (i *InsightsController) HandleGetSupportedLangs(c *fiber.Ctx) error {
+func (i *InsightsController) HandleGetSupportedLangs(c fiber.Ctx) error {
 	req := new(plugnmeet.InsightsGetSupportedLanguagesReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
@@ -170,7 +170,7 @@ func (i *InsightsController) HandleGetSupportedLangs(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	langs, err := i.insightsModel.GetSupportedLanguagesForService(c.UserContext(), serviceType)
+	langs, err := i.insightsModel.GetSupportedLanguagesForService(c, serviceType)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -184,7 +184,7 @@ func (i *InsightsController) HandleGetSupportedLangs(c *fiber.Ctx) error {
 	return utils.SendProtobufResponse(c, res)
 }
 
-func (i *InsightsController) HandleChatTranslationConfigure(c *fiber.Ctx) error {
+func (i *InsightsController) HandleChatTranslationConfigure(c fiber.Ctx) error {
 	if i.app.Insights == nil || !i.app.Insights.Enabled {
 		return utils.SendCommonProtobufResponse(c, false, "insights feature wasn't configured")
 	}
@@ -209,7 +209,7 @@ func (i *InsightsController) HandleChatTranslationConfigure(c *fiber.Ctx) error 
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
-func (i *InsightsController) HandleExecuteChatTranslation(c *fiber.Ctx) error {
+func (i *InsightsController) HandleExecuteChatTranslation(c fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
 
@@ -219,7 +219,7 @@ func (i *InsightsController) HandleExecuteChatTranslation(c *fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	result, err := i.insightsModel.ExecuteChatTranslation(c.UserContext(), req, roomId.(string), requestedUserId.(string))
+	result, err := i.insightsModel.ExecuteChatTranslation(c, req, roomId.(string), requestedUserId.(string))
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -227,7 +227,7 @@ func (i *InsightsController) HandleExecuteChatTranslation(c *fiber.Ctx) error {
 	return utils.SendProtobufResponse(c, result)
 }
 
-func (i *InsightsController) HandleEndChatTranslation(c *fiber.Ctx) error {
+func (i *InsightsController) HandleEndChatTranslation(c fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 
@@ -242,7 +242,7 @@ func (i *InsightsController) HandleEndChatTranslation(c *fiber.Ctx) error {
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
-func (i *InsightsController) HandleAITextChatConfigure(c *fiber.Ctx) error {
+func (i *InsightsController) HandleAITextChatConfigure(c fiber.Ctx) error {
 	if i.app.Insights == nil || !i.app.Insights.Enabled {
 		return utils.SendCommonProtobufResponse(c, false, "insights feature wasn't configured")
 	}
@@ -267,7 +267,7 @@ func (i *InsightsController) HandleAITextChatConfigure(c *fiber.Ctx) error {
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
-func (i *InsightsController) HandleExecuteAITextChat(c *fiber.Ctx) error {
+func (i *InsightsController) HandleExecuteAITextChat(c fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
 
@@ -285,7 +285,7 @@ func (i *InsightsController) HandleExecuteAITextChat(c *fiber.Ctx) error {
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
-func (i *InsightsController) HandleEndAITextChat(c *fiber.Ctx) error {
+func (i *InsightsController) HandleEndAITextChat(c fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 
@@ -300,7 +300,7 @@ func (i *InsightsController) HandleEndAITextChat(c *fiber.Ctx) error {
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
-func (i *InsightsController) HandleAIMeetingSummarizationConfig(c *fiber.Ctx) error {
+func (i *InsightsController) HandleAIMeetingSummarizationConfig(c fiber.Ctx) error {
 	if i.app.Insights == nil || !i.app.Insights.Enabled {
 		return utils.SendCommonProtobufResponse(c, false, "insights feature wasn't configured")
 	}
@@ -325,7 +325,7 @@ func (i *InsightsController) HandleAIMeetingSummarizationConfig(c *fiber.Ctx) er
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
-func (i *InsightsController) HandleEndAIMeetingSummarization(c *fiber.Ctx) error {
+func (i *InsightsController) HandleEndAIMeetingSummarization(c fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 

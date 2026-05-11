@@ -1,7 +1,7 @@
 package controllers
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -29,7 +29,7 @@ func NewEtherpadController(config *config.AppConfig, em *models.EtherpadModel, r
 }
 
 // HandleCreateEtherpad handles the creation of an etherpad session.
-func (ec *EtherpadController) HandleCreateEtherpad(c *fiber.Ctx) error {
+func (ec *EtherpadController) HandleCreateEtherpad(c fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
@@ -62,7 +62,7 @@ func (ec *EtherpadController) HandleCreateEtherpad(c *fiber.Ctx) error {
 }
 
 // HandleCleanPad handles cleaning an etherpad pad.
-func (ec *EtherpadController) HandleCleanPad(c *fiber.Ctx) error {
+func (ec *EtherpadController) HandleCleanPad(c fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	if !isAdmin.(bool) {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
@@ -83,7 +83,7 @@ func (ec *EtherpadController) HandleCleanPad(c *fiber.Ctx) error {
 }
 
 // HandleChangeEtherpadStatus handles changing the public status of an etherpad.
-func (ec *EtherpadController) HandleChangeEtherpadStatus(c *fiber.Ctx) error {
+func (ec *EtherpadController) HandleChangeEtherpadStatus(c fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	if !isAdmin.(bool) {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")

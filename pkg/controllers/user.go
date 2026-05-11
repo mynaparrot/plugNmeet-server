@@ -1,7 +1,7 @@
 package controllers
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -32,7 +32,7 @@ func NewUserController(appConfig *config.AppConfig, ds *dbservice.DatabaseServic
 }
 
 // HandleGenerateJoinToken handles generating a join token for a user.
-func (uc *UserController) HandleGenerateJoinToken(c *fiber.Ctx) error {
+func (uc *UserController) HandleGenerateJoinToken(c fiber.Ctx) error {
 	req := new(plugnmeet.GenerateTokenReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
@@ -57,7 +57,7 @@ func (uc *UserController) HandleGenerateJoinToken(c *fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, "room is not active", plugnmeet.StatusCode_ROOM_NOT_FOUND)
 	}
 
-	token, err := uc.UserModel.GetPNMJoinToken(c.UserContext(), req)
+	token, err := uc.UserModel.GetPNMJoinToken(c, req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
@@ -73,7 +73,7 @@ func (uc *UserController) HandleGenerateJoinToken(c *fiber.Ctx) error {
 }
 
 // HandleUpdateUserLockSetting handles updating a user's lock settings.
-func (uc *UserController) HandleUpdateUserLockSetting(c *fiber.Ctx) error {
+func (uc *UserController) HandleUpdateUserLockSetting(c fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	isAdmin := c.Locals("isAdmin")
 	requestedUserId := c.Locals("requestedUserId")
@@ -109,7 +109,7 @@ func (uc *UserController) HandleUpdateUserLockSetting(c *fiber.Ctx) error {
 }
 
 // HandleMuteUnMuteTrack handles muting or unmuting a user's track.
-func (uc *UserController) HandleMuteUnMuteTrack(c *fiber.Ctx) error {
+func (uc *UserController) HandleMuteUnMuteTrack(c fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	isAdmin := c.Locals("isAdmin")
 	requestedUserId := c.Locals("requestedUserId")
@@ -135,7 +135,7 @@ func (uc *UserController) HandleMuteUnMuteTrack(c *fiber.Ctx) error {
 	}
 
 	req.RequestedUserId = requestedUserId.(string)
-	err = uc.UserModel.MuteUnMuteTrack(c.UserContext(), req)
+	err = uc.UserModel.MuteUnMuteTrack(c, req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -144,7 +144,7 @@ func (uc *UserController) HandleMuteUnMuteTrack(c *fiber.Ctx) error {
 }
 
 // HandleRemoveParticipant handles removing a participant from a room.
-func (uc *UserController) HandleRemoveParticipant(c *fiber.Ctx) error {
+func (uc *UserController) HandleRemoveParticipant(c fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")
 	isAdmin := c.Locals("isAdmin")
@@ -181,7 +181,7 @@ func (uc *UserController) HandleRemoveParticipant(c *fiber.Ctx) error {
 }
 
 // HandleSwitchPresenter handles switching the presenter in a room.
-func (uc *UserController) HandleSwitchPresenter(c *fiber.Ctx) error {
+func (uc *UserController) HandleSwitchPresenter(c fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 	requestedUserId := c.Locals("requestedUserId")

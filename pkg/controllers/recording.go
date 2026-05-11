@@ -3,7 +3,7 @@ package controllers
 import (
 	"errors"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -30,7 +30,7 @@ func NewRecordingController(ds *dbservice.DatabaseService, recordingModel *model
 }
 
 // HandleFetchRecordings handles fetching recordings.
-func (rc *RecordingController) HandleFetchRecordings(c *fiber.Ctx) error {
+func (rc *RecordingController) HandleFetchRecordings(c fiber.Ctx) error {
 	req := new(plugnmeet.FetchRecordingsReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
@@ -54,7 +54,7 @@ func (rc *RecordingController) HandleFetchRecordings(c *fiber.Ctx) error {
 }
 
 // HandleRecordingInfo handles fetching information for a single recording.
-func (rc *RecordingController) HandleRecordingInfo(c *fiber.Ctx) error {
+func (rc *RecordingController) HandleRecordingInfo(c fiber.Ctx) error {
 	req := new(plugnmeet.RecordingInfoReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
@@ -72,7 +72,7 @@ func (rc *RecordingController) HandleRecordingInfo(c *fiber.Ctx) error {
 }
 
 // HandleUpdateRecordingMetadata handles update metadata information for a single recording.
-func (rc *RecordingController) HandleUpdateRecordingMetadata(c *fiber.Ctx) error {
+func (rc *RecordingController) HandleUpdateRecordingMetadata(c fiber.Ctx) error {
 	req := new(plugnmeet.UpdateRecordingMetadataReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
@@ -90,7 +90,7 @@ func (rc *RecordingController) HandleUpdateRecordingMetadata(c *fiber.Ctx) error
 }
 
 // HandleDeleteRecording handles deleting a recording.
-func (rc *RecordingController) HandleDeleteRecording(c *fiber.Ctx) error {
+func (rc *RecordingController) HandleDeleteRecording(c fiber.Ctx) error {
 	req := new(plugnmeet.DeleteRecordingReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
@@ -108,7 +108,7 @@ func (rc *RecordingController) HandleDeleteRecording(c *fiber.Ctx) error {
 }
 
 // HandleGetDownloadToken handles generating a download token for a recording.
-func (rc *RecordingController) HandleGetDownloadToken(c *fiber.Ctx) error {
+func (rc *RecordingController) HandleGetDownloadToken(c fiber.Ctx) error {
 	req := new(plugnmeet.GetDownloadTokenReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
@@ -132,7 +132,7 @@ func (rc *RecordingController) HandleGetDownloadToken(c *fiber.Ctx) error {
 }
 
 // HandleDownloadRecording handles downloading a recording file.
-func (rc *RecordingController) HandleDownloadRecording(c *fiber.Ctx) error {
+func (rc *RecordingController) HandleDownloadRecording(c fiber.Ctx) error {
 	token := c.Params("token")
 
 	if len(token) == 0 {
@@ -145,11 +145,13 @@ func (rc *RecordingController) HandleDownloadRecording(c *fiber.Ctx) error {
 	}
 
 	c.Attachment(file)
-	return c.SendFile(file, false)
+	return c.SendFile(file, fiber.SendFile{
+		Compress: false,
+	})
 }
 
 // HandleRecorderTasks handles start/stop recording & RTMP requests.
-func (rc *RecordingController) HandleRecorderTasks(c *fiber.Ctx) error {
+func (rc *RecordingController) HandleRecorderTasks(c fiber.Ctx) error {
 	isAdmin := c.Locals("isAdmin")
 	roomId := c.Locals("roomId")
 
@@ -215,7 +217,7 @@ func (rc *RecordingController) HandleRecorderTasks(c *fiber.Ctx) error {
 }
 
 // HandleRecorderEvents handles events coming from the recorder.
-func (rc *RecordingController) HandleRecorderEvents(c *fiber.Ctx) error {
+func (rc *RecordingController) HandleRecorderEvents(c fiber.Ctx) error {
 	req := new(plugnmeet.RecorderToPlugNmeet)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {

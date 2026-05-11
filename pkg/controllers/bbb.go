@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/goccy/go-json"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/bbbapiwrapper"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -41,7 +41,7 @@ func NewBBBController(config *config.AppConfig, roomModel *models.RoomModel, use
 }
 
 // HandleVerifyApiRequest is a middleware to verify BBB API requests.
-func (bc *BBBController) HandleVerifyApiRequest(c *fiber.Ctx) error {
+func (bc *BBBController) HandleVerifyApiRequest(c fiber.Ctx) error {
 	apiKey := c.Params("apiKey")
 	if apiKey == "" || apiKey != bc.AppConfig.Client.ApiKey {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "apiKeyError", "invalid api key"))
@@ -113,13 +113,13 @@ func (bc *BBBController) HandleVerifyApiRequest(c *fiber.Ctx) error {
 }
 
 // HandleBBBCreate handles BBB create meeting requests.
-func (bc *BBBController) HandleBBBCreate(c *fiber.Ctx) error {
+func (bc *BBBController) HandleBBBCreate(c fiber.Ctx) error {
 	q := new(bbbapiwrapper.CreateMeetingReq)
 	var err error
 	if c.Method() == "POST" && c.Get("Content-Type") == "application/x-www-form-urlencoded" {
-		err = c.BodyParser(q)
+		err = c.Bind().Body(q)
 	} else {
-		err = c.QueryParser(q)
+		err = c.Bind().Query(q)
 	}
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
@@ -156,7 +156,7 @@ func (bc *BBBController) HandleBBBCreate(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", err.Error()))
 	}
 
-	room, err := bc.RoomModel.CreateRoom(c.UserContext(), pnmReq)
+	room, err := bc.RoomModel.CreateRoom(c, pnmReq)
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 	}
@@ -178,13 +178,13 @@ func (bc *BBBController) HandleBBBCreate(c *fiber.Ctx) error {
 }
 
 // HandleBBBJoin handles BBB join meeting requests.
-func (bc *BBBController) HandleBBBJoin(c *fiber.Ctx) error {
+func (bc *BBBController) HandleBBBJoin(c fiber.Ctx) error {
 	q := new(bbbapiwrapper.JoinMeetingReq)
 	var err error
 	if c.Method() == "POST" && c.Get("Content-Type") == "application/x-www-form-urlencoded" {
-		err = c.BodyParser(q)
+		err = c.Bind().Body(q)
 	} else {
-		err = c.QueryParser(q)
+		err = c.Bind().Query(q)
 	}
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
@@ -245,7 +245,7 @@ func (bc *BBBController) HandleBBBJoin(c *fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", "this user is blocked to join this session"))
 	}
 
-	token, err := bc.UserModel.GetPNMJoinToken(c.UserContext(), req)
+	token, err := bc.UserModel.GetPNMJoinToken(c, req)
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 	}
@@ -278,17 +278,17 @@ func (bc *BBBController) HandleBBBJoin(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.Redirect(ul)
+	return c.Redirect().To(ul)
 }
 
 // HandleBBBIsMeetingRunning handles BBB isMeetingRunning requests.
-func (bc *BBBController) HandleBBBIsMeetingRunning(c *fiber.Ctx) error {
+func (bc *BBBController) HandleBBBIsMeetingRunning(c fiber.Ctx) error {
 	q := new(bbbapiwrapper.MeetingReq)
 	var err error
 	if c.Method() == "POST" && c.Get("Content-Type") == "application/x-www-form-urlencoded" {
-		err = c.BodyParser(q)
+		err = c.Bind().Body(q)
 	} else {
-		err = c.QueryParser(q)
+		err = c.Bind().Query(q)
 	}
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
@@ -305,19 +305,19 @@ func (bc *BBBController) HandleBBBIsMeetingRunning(c *fiber.Ctx) error {
 }
 
 // HandleBBBGetMeetingInfo handles BBB getMeetingInfo requests.
-func (bc *BBBController) HandleBBBGetMeetingInfo(c *fiber.Ctx) error {
+func (bc *BBBController) HandleBBBGetMeetingInfo(c fiber.Ctx) error {
 	q := new(bbbapiwrapper.MeetingReq)
 	var err error
 	if c.Method() == "POST" && c.Get("Content-Type") == "application/x-www-form-urlencoded" {
-		err = c.BodyParser(q)
+		err = c.Bind().Body(q)
 	} else {
-		err = c.QueryParser(q)
+		err = c.Bind().Query(q)
 	}
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
 
-	status, msg, _, res := bc.RoomModel.GetActiveRoomInfo(c.UserContext(), &plugnmeet.GetActiveRoomInfoReq{
+	status, msg, _, res := bc.RoomModel.GetActiveRoomInfo(c, &plugnmeet.GetActiveRoomInfoReq{
 		RoomId: bbbapiwrapper.CheckMeetingIdToMatchFormat(q.MeetingID),
 	})
 
@@ -339,8 +339,8 @@ func (bc *BBBController) HandleBBBGetMeetingInfo(c *fiber.Ctx) error {
 }
 
 // HandleBBBGetMeetings handles BBB getMeetings requests.
-func (bc *BBBController) HandleBBBGetMeetings(c *fiber.Ctx) error {
-	_, _, _, rooms := bc.RoomModel.GetActiveRoomsInfo(c.UserContext())
+func (bc *BBBController) HandleBBBGetMeetings(c fiber.Ctx) error {
+	_, _, _, rooms := bc.RoomModel.GetActiveRoomsInfo(c)
 	if rooms == nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("SUCCESS", "noMeetings", "no meetings were found on this server"))
 	}
@@ -359,19 +359,19 @@ func (bc *BBBController) HandleBBBGetMeetings(c *fiber.Ctx) error {
 }
 
 // HandleBBBEndMeetings handles BBB endMeeting requests.
-func (bc *BBBController) HandleBBBEndMeetings(c *fiber.Ctx) error {
+func (bc *BBBController) HandleBBBEndMeetings(c fiber.Ctx) error {
 	q := new(bbbapiwrapper.MeetingReq)
 	var err error
 	if c.Method() == "POST" && c.Get("Content-Type") == "application/x-www-form-urlencoded" {
-		err = c.BodyParser(q)
+		err = c.Bind().Body(q)
 	} else {
-		err = c.QueryParser(q)
+		err = c.Bind().Query(q)
 	}
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
 
-	status, msg, _ := bc.RoomModel.EndRoom(c.UserContext(), &plugnmeet.RoomEndReq{
+	status, msg, _ := bc.RoomModel.EndRoom(c, &plugnmeet.RoomEndReq{
 		RoomId: bbbapiwrapper.CheckMeetingIdToMatchFormat(q.MeetingID),
 	})
 
@@ -382,13 +382,13 @@ func (bc *BBBController) HandleBBBEndMeetings(c *fiber.Ctx) error {
 }
 
 // HandleBBBGetRecordings handles BBB getRecordings requests.
-func (bc *BBBController) HandleBBBGetRecordings(c *fiber.Ctx) error {
+func (bc *BBBController) HandleBBBGetRecordings(c fiber.Ctx) error {
 	q := new(bbbapiwrapper.GetRecordingsReq)
 	var err error
 	if c.Method() == "POST" && c.Get("Content-Type") == "application/x-www-form-urlencoded" {
-		err = c.BodyParser(q)
+		err = c.Bind().Body(q)
 	} else {
-		err = c.QueryParser(q)
+		err = c.Bind().Query(q)
 	}
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
@@ -412,13 +412,13 @@ func (bc *BBBController) HandleBBBGetRecordings(c *fiber.Ctx) error {
 }
 
 // HandleBBBDeleteRecordings handles BBB deleteRecordings requests.
-func (bc *BBBController) HandleBBBDeleteRecordings(c *fiber.Ctx) error {
+func (bc *BBBController) HandleBBBDeleteRecordings(c fiber.Ctx) error {
 	q := new(bbbapiwrapper.DeleteRecordingsReq)
 	var err error
 	if c.Method() == "POST" && c.Get("Content-Type") == "application/x-www-form-urlencoded" {
-		err = c.BodyParser(q)
+		err = c.Bind().Body(q)
 	} else {
-		err = c.QueryParser(q)
+		err = c.Bind().Query(q)
 	}
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
@@ -439,7 +439,7 @@ func (bc *BBBController) HandleBBBDeleteRecordings(c *fiber.Ctx) error {
 }
 
 // HandleBBBPublishRecordings TO-DO: in the future
-func (bc *BBBController) HandleBBBPublishRecordings(c *fiber.Ctx) error {
+func (bc *BBBController) HandleBBBPublishRecordings(c fiber.Ctx) error {
 	return c.XML(bbbapiwrapper.PublishRecordingsRes{
 		ReturnCode: "SUCCESS",
 		Published:  true,
@@ -447,7 +447,7 @@ func (bc *BBBController) HandleBBBPublishRecordings(c *fiber.Ctx) error {
 }
 
 // HandleBBBUpdateRecordings TO-DO: in the future
-func (bc *BBBController) HandleBBBUpdateRecordings(c *fiber.Ctx) error {
+func (bc *BBBController) HandleBBBUpdateRecordings(c fiber.Ctx) error {
 	return c.XML(bbbapiwrapper.UpdateRecordingsRes{
 		ReturnCode: "SUCCESS",
 		Updated:    true,

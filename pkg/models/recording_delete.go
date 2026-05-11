@@ -36,11 +36,6 @@ func (m *RecordingModel) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error 
 		if _, ok := errors.AsType[*fs.PathError](err); ok {
 			log.WithError(err).Warnln("recording file does not exist, will proceed to delete DB record")
 			fileExist = false
-		} else {
-			ms := strings.SplitN(err.Error(), "/", -1)
-			err = fmt.Errorf(ms[len(ms)-1])
-			log.WithError(err).Errorln("failed to stat recording file")
-			return err
 		}
 	}
 

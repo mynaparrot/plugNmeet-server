@@ -3,7 +3,7 @@ package controllers
 import (
 	"errors"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -23,7 +23,7 @@ func NewArtifactController(am *models.ArtifactModel) *ArtifactController {
 }
 
 // HandleFetchArtifacts fetches a paginated list of artifacts.
-func (ac *ArtifactController) HandleFetchArtifacts(c *fiber.Ctx) error {
+func (ac *ArtifactController) HandleFetchArtifacts(c fiber.Ctx) error {
 	req := new(plugnmeet.FetchArtifactsReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
@@ -47,7 +47,7 @@ func (ac *ArtifactController) HandleFetchArtifacts(c *fiber.Ctx) error {
 }
 
 // HandleGetArtifactDownloadToken generates a download token for a downloadable artifact.
-func (ac *ArtifactController) HandleGetArtifactDownloadToken(c *fiber.Ctx) error {
+func (ac *ArtifactController) HandleGetArtifactDownloadToken(c fiber.Ctx) error {
 	req := new(plugnmeet.GetArtifactDownloadTokenReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
@@ -71,7 +71,7 @@ func (ac *ArtifactController) HandleGetArtifactDownloadToken(c *fiber.Ctx) error
 }
 
 // HandleDownloadArtifact handles the download of an artifact file using a JWT.
-func (ac *ArtifactController) HandleDownloadArtifact(c *fiber.Ctx) error {
+func (ac *ArtifactController) HandleDownloadArtifact(c fiber.Ctx) error {
 	token := c.Params("token")
 	if len(token) == 0 {
 		return c.Status(fiber.StatusUnauthorized).SendString("token required or invalid url")
@@ -84,10 +84,12 @@ func (ac *ArtifactController) HandleDownloadArtifact(c *fiber.Ctx) error {
 	}
 
 	c.Attachment(fileName)
-	return c.SendFile(filePath, false)
+	return c.SendFile(filePath, fiber.SendFile{
+		Compress: false,
+	})
 }
 
-func (ac *ArtifactController) HandleGetArtifactInfo(c *fiber.Ctx) error {
+func (ac *ArtifactController) HandleGetArtifactInfo(c fiber.Ctx) error {
 	req := new(plugnmeet.ArtifactInfoReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
@@ -104,7 +106,7 @@ func (ac *ArtifactController) HandleGetArtifactInfo(c *fiber.Ctx) error {
 }
 
 // HandleDeleteArtifact deletes an artifact.
-func (ac *ArtifactController) HandleDeleteArtifact(c *fiber.Ctx) error {
+func (ac *ArtifactController) HandleDeleteArtifact(c fiber.Ctx) error {
 	req := new(plugnmeet.DeleteArtifactReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
