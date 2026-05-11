@@ -9,6 +9,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/adaptor"
 	"github.com/gofiber/fiber/v3/middleware/cors"
+	"github.com/gofiber/fiber/v3/middleware/favicon"
 	"github.com/gofiber/fiber/v3/middleware/logger"
 	"github.com/gofiber/fiber/v3/middleware/recover"
 	"github.com/gofiber/fiber/v3/middleware/static"
@@ -50,6 +51,18 @@ func New(appConfig *config.AppConfig, ctrl *factory.ApplicationControllers) *fib
 	// --- App Initialization & Middleware ---
 	app := fiber.New(cnf)
 
+	app.Use(recover.New())
+	app.Use(cors.New(cors.Config{
+		AllowMethods: []string{"POST", "GET", "OPTIONS", "HEAD"},
+	}))
+
+	// serving static files from assets dir
+	assets := path.Join(appConfig.Client.Path, "assets")
+	app.Use("/assets", static.New(assets))
+	app.Use(favicon.New(favicon.Config{
+		File: path.Join(assets, "imgs", "favicon.ico"),
+	}))
+
 	app.Use(logger.New(logger.Config{
 		Done: func(c fiber.Ctx, logString []byte) {
 			appConfig.Logger.Debugln(string(logString))
@@ -66,18 +79,6 @@ func New(appConfig *config.AppConfig, ctrl *factory.ApplicationControllers) *fib
 		}
 		app.Get(p, adaptor.HTTPHandler(promhttp.Handler()))
 	}
-
-	app.Use(recover.New())
-	app.Use(cors.New(cors.Config{
-		AllowMethods: []string{"POST", "GET", "OPTIONS", "HEAD"},
-	}))
-
-	// serving static files from assets dir
-	assets := path.Join(appConfig.Client.Path, "assets")
-	app.Use("/assets", static.New(assets))
-	app.Get("/favicon.ico", func(c fiber.Ctx) error {
-		return c.SendFile(path.Join(assets, "imgs", "favicon.ico"))
-	})
 
 	// --- Route Registration ---
 	r := &router{
