@@ -48,7 +48,7 @@ FROM debian:stable-slim
 
 RUN export DEBIAN_FRONTEND=noninteractive; \
     apt update && \
-    apt install --no-install-recommends -y wget ca-certificates libreoffice mupdf-tools \
+    apt install --no-install-recommends -y wget curl ca-certificates libreoffice mupdf-tools \
     libasound2 libssl3 libopus0 libsoxr0 libopusfile0 && \
     apt clean && \
     rm -rf /var/lib/apt/lists/*
