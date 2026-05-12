@@ -84,7 +84,7 @@ func New(appConfig *config.AppConfig, ctrl *factory.ApplicationControllers) *fib
 				},
 			}))
 		}
-		app.Get(p, adaptor.HTTPHandler(promhttp.Handler()))
+		app.Use(p, adaptor.HTTPHandler(promhttp.Handler()))
 	}
 
 	app.Use(cors.New(cors.Config{
@@ -113,18 +113,18 @@ func New(appConfig *config.AppConfig, ctrl *factory.ApplicationControllers) *fib
 }
 
 func (r *router) registerBaseRoutes() {
-	r.app.Get("/", func(c fiber.Ctx) error {
+	r.app.Add([]string{"GET", "HEAD"}, "/", func(c fiber.Ctx) error {
 		return c.Render("index", nil)
 	})
-	r.app.Get("/login*", func(c fiber.Ctx) error {
+	r.app.Add([]string{"GET", "HEAD"}, "/login*", func(c fiber.Ctx) error {
 		return c.Render("login", nil)
 	})
 	r.app.Post("/webhook", r.ctrl.WebhookController.HandleWebhook)
-	r.app.Get("/download/uploadedFile/:sid/*", r.ctrl.FileController.HandleDownloadUploadedFile)
-	r.app.Get("/download/recording/:token", r.ctrl.RecordingController.HandleDownloadRecording)
-	r.app.Get("/download/analytics/:token", r.ctrl.AnalyticsController.HandleDownloadAnalytics)
-	r.app.Get("/download/artifact/:token", r.ctrl.ArtifactController.HandleDownloadArtifact)
-	r.app.Get("/healthCheck", r.ctrl.HealthCheckController.HandleHealthCheck)
+	r.app.Add([]string{"GET", "HEAD"}, "/download/uploadedFile/:sid/*", r.ctrl.FileController.HandleDownloadUploadedFile)
+	r.app.Add([]string{"GET", "HEAD"}, "/download/recording/:token", r.ctrl.RecordingController.HandleDownloadRecording)
+	r.app.Add([]string{"GET", "HEAD"}, "/download/analytics/:token", r.ctrl.AnalyticsController.HandleDownloadAnalytics)
+	r.app.Add([]string{"GET", "HEAD"}, "/download/artifact/:token", r.ctrl.ArtifactController.HandleDownloadArtifact)
+	r.app.Use("/healthCheck", r.ctrl.HealthCheckController.HandleHealthCheck)
 }
 
 func (r *router) registerLtiRoutes() {
