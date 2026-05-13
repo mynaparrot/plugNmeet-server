@@ -57,7 +57,7 @@ func (uc *UserController) HandleGenerateJoinToken(c fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, "room is not active", plugnmeet.StatusCode_ROOM_NOT_FOUND)
 	}
 
-	token, err := uc.UserModel.GetPNMJoinToken(c, req)
+	token, err := uc.UserModel.GetPNMJoinToken(c.RequestCtx(), req)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
@@ -83,8 +83,7 @@ func (uc *UserController) HandleUpdateUserLockSetting(c fiber.Ctx) error {
 	}
 
 	req := new(plugnmeet.UpdateUserLockSettingsReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
@@ -100,8 +99,7 @@ func (uc *UserController) HandleUpdateUserLockSetting(c fiber.Ctx) error {
 	}
 
 	req.RequestedUserId = requestedUserId.(string)
-	err = uc.UserModel.UpdateUserLockSettings(req)
-	if err != nil {
+	if err := uc.UserModel.UpdateUserLockSettings(req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
@@ -135,8 +133,7 @@ func (uc *UserController) HandleMuteUnMuteTrack(c fiber.Ctx) error {
 	}
 
 	req.RequestedUserId = requestedUserId.(string)
-	err = uc.UserModel.MuteUnMuteTrack(c, req)
-	if err != nil {
+	if err = uc.UserModel.MuteUnMuteTrack(c.RequestCtx(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
@@ -172,8 +169,7 @@ func (uc *UserController) HandleRemoveParticipant(c fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
 	}
 
-	err = uc.UserModel.RemoveParticipant(req)
-	if err != nil {
+	if err = uc.UserModel.RemoveParticipant(req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
@@ -191,15 +187,13 @@ func (uc *UserController) HandleSwitchPresenter(c fiber.Ctx) error {
 	}
 
 	req := new(plugnmeet.SwitchPresenterReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
 	req.RoomId = roomId.(string)
 	req.RequestedUserId = requestedUserId.(string)
-	err = uc.UserModel.SwitchPresenter(req)
-	if err != nil {
+	if err := uc.UserModel.SwitchPresenter(req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 

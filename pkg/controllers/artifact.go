@@ -112,8 +112,7 @@ func (ac *ArtifactController) HandleDeleteArtifact(c fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
-	err := ac.ArtifactModel.DeleteArtifact(req)
-	if err != nil {
+	if err := ac.ArtifactModel.DeleteArtifact(req); err != nil {
 		if errors.Is(err, config.NotFoundErr) {
 			return utils.SendCommonProtoJsonResponse(c, false, "artifact not found", plugnmeet.StatusCode_NOT_FOUND)
 		}

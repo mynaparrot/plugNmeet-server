@@ -156,7 +156,7 @@ func (bc *BBBController) HandleBBBCreate(c fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", err.Error()))
 	}
 
-	room, err := bc.RoomModel.CreateRoom(c, pnmReq)
+	room, err := bc.RoomModel.CreateRoom(c.RequestCtx(), pnmReq)
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 	}
@@ -245,7 +245,7 @@ func (bc *BBBController) HandleBBBJoin(c fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", "this user is blocked to join this session"))
 	}
 
-	token, err := bc.UserModel.GetPNMJoinToken(c, req)
+	token, err := bc.UserModel.GetPNMJoinToken(c.RequestCtx(), req)
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 	}
@@ -317,7 +317,7 @@ func (bc *BBBController) HandleBBBGetMeetingInfo(c fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
 
-	status, msg, _, res := bc.RoomModel.GetActiveRoomInfo(c, &plugnmeet.GetActiveRoomInfoReq{
+	status, msg, _, res := bc.RoomModel.GetActiveRoomInfo(c.RequestCtx(), &plugnmeet.GetActiveRoomInfoReq{
 		RoomId: bbbapiwrapper.CheckMeetingIdToMatchFormat(q.MeetingID),
 	})
 
@@ -340,7 +340,7 @@ func (bc *BBBController) HandleBBBGetMeetingInfo(c fiber.Ctx) error {
 
 // HandleBBBGetMeetings handles BBB getMeetings requests.
 func (bc *BBBController) HandleBBBGetMeetings(c fiber.Ctx) error {
-	_, _, _, rooms := bc.RoomModel.GetActiveRoomsInfo(c)
+	_, _, _, rooms := bc.RoomModel.GetActiveRoomsInfo(c.RequestCtx())
 	if rooms == nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("SUCCESS", "noMeetings", "no meetings were found on this server"))
 	}
@@ -371,7 +371,7 @@ func (bc *BBBController) HandleBBBEndMeetings(c fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
 	}
 
-	status, msg, _ := bc.RoomModel.EndRoom(c, &plugnmeet.RoomEndReq{
+	status, msg, _ := bc.RoomModel.EndRoom(c.RequestCtx(), &plugnmeet.RoomEndReq{
 		RoomId: bbbapiwrapper.CheckMeetingIdToMatchFormat(q.MeetingID),
 	})
 

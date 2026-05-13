@@ -1,8 +1,6 @@
 package controllers
 
 import (
-	"context"
-
 	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
@@ -20,13 +18,11 @@ func (h *HealthCheckController) HandleHealthCheck(c fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusServiceUnavailable).SendString("DB connection error")
 	}
-	err = db.PingContext(c.Context())
-	if err != nil {
+	if err := db.PingContext(c.RequestCtx()); err != nil {
 		return c.Status(fiber.StatusServiceUnavailable).SendString("DB connection error")
 	}
 
-	_, err = h.app.RDS.Ping(context.Background()).Result()
-	if err != nil {
+	if _, err := h.app.RDS.Ping(c.RequestCtx()).Result(); err != nil {
 		return c.Status(fiber.StatusServiceUnavailable).SendString("Redis connection error")
 	}
 

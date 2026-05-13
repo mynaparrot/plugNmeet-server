@@ -41,8 +41,7 @@ func (fc *FileController) HandleFileUpload(c fiber.Ctx) error {
 
 	// this will be used to verify regarding file origin only
 	req := new(models.ResumableUploadReq)
-	err := c.Bind().Query(req)
-	if err != nil {
+	if err := c.Bind().Query(req); err != nil {
 		return commonFileErrorResponse(c, err.Error(), fiber.StatusBadRequest)
 	}
 
@@ -64,9 +63,9 @@ func (fc *FileController) HandleFileUpload(c fiber.Ctx) error {
 	if res.FilePath == "part_uploaded" {
 		_ = c.SendStatus(fiber.StatusOK)
 		return c.SendString(res.FilePath)
-	} else {
-		return c.SendString(res.Msg)
 	}
+
+	return c.SendString(res.Msg)
 }
 
 // HandleUploadedFileMerge handles merging chunks of a resumable upload.
@@ -111,8 +110,7 @@ func (fc *FileController) HandleUploadBase64EncodedData(c fiber.Ctx) error {
 	roomId := c.Locals("roomId")
 
 	req := new(plugnmeet.UploadBase64EncodedDataReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 

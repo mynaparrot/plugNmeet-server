@@ -145,7 +145,7 @@ func (lc *LtiV1Controller) HandleLTIV1JoinRoom(c fiber.Ctx) error {
 		}
 	}
 
-	token, err := lc.LtiV1Model.LTIV1JoinRoom(c, claim)
+	token, err := lc.LtiV1Model.LTIV1JoinRoom(c.RequestCtx(), claim)
 	if err != nil {
 		return sendErrorResponse(c, fiber.StatusInternalServerError, err.Error())
 	}
@@ -167,7 +167,7 @@ func (lc *LtiV1Controller) HandleLTIV1EndRoom(c fiber.Ctx) error {
 	if !ok {
 		return sendErrorResponse(c, fiber.StatusBadRequest, errRoomIdMissing)
 	}
-	status, msg, _ := lc.RoomModel.EndRoom(c, &plugnmeet.RoomEndReq{
+	status, msg, _ := lc.RoomModel.EndRoom(c.RequestCtx(), &plugnmeet.RoomEndReq{
 		RoomId: roomId,
 	})
 

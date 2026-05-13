@@ -69,13 +69,11 @@ func (ec *EtherpadController) HandleCleanPad(c fiber.Ctx) error {
 	}
 
 	req := new(plugnmeet.CleanEtherpadReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	err = ec.EtherpadModel.CleanPad(req.RoomId, req.NodeId, req.PadId)
-	if err != nil {
+	if err := ec.EtherpadModel.CleanPad(req.RoomId, req.NodeId, req.PadId); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
@@ -90,13 +88,11 @@ func (ec *EtherpadController) HandleChangeEtherpadStatus(c fiber.Ctx) error {
 	}
 
 	req := new(plugnmeet.ChangeEtherpadStatusReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	err = ec.EtherpadModel.ChangeEtherpadStatus(req)
-	if err != nil {
+	if err := ec.EtherpadModel.ChangeEtherpadStatus(req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 

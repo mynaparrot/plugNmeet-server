@@ -106,8 +106,7 @@ func (ac *AuthController) HandleVerifyToken(c fiber.Ctx) error {
 	requestedUserId := c.Locals("requestedUserId").(string)
 
 	req := new(plugnmeet.VerifyTokenReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 

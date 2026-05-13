@@ -33,8 +33,7 @@ func (brc *BreakoutRoomController) HandleCreateBreakoutRooms(c fiber.Ctx) error 
 	}
 
 	req := new(plugnmeet.CreateBreakoutRoomsReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		res.Msg = err.Error()
 		return sendBreakoutRoomResponse(c, res)
 	}
@@ -42,8 +41,7 @@ func (brc *BreakoutRoomController) HandleCreateBreakoutRooms(c fiber.Ctx) error 
 	req.RoomId = roomId.(string)
 	req.RequestedUserId = requestedUserId.(string)
 
-	err = brc.BreakoutRoomModel.CreateBreakoutRooms(c, req)
-	if err != nil {
+	if err := brc.BreakoutRoomModel.CreateBreakoutRooms(c.RequestCtx(), req); err != nil {
 		res.Msg = err.Error()
 		return sendBreakoutRoomResponse(c, res)
 	}
@@ -70,7 +68,7 @@ func (brc *BreakoutRoomController) HandleJoinBreakoutRoom(c fiber.Ctx) error {
 
 	req.RoomId = roomId.(string)
 	req.IsAdmin = isAdmin.(bool)
-	token, err := brc.BreakoutRoomModel.JoinBreakoutRoom(c, req)
+	token, err := brc.BreakoutRoomModel.JoinBreakoutRoom(c.RequestCtx(), req)
 	if err != nil {
 		res.Msg = err.Error()
 		return sendBreakoutRoomResponse(c, res)
@@ -158,8 +156,7 @@ func (brc *BreakoutRoomController) HandleSendBreakoutRoomMsg(c fiber.Ctx) error 
 	}
 
 	req.RoomId = roomId.(string)
-	err = brc.BreakoutRoomModel.SendBreakoutRoomMsg(req)
-	if err != nil {
+	if err := brc.BreakoutRoomModel.SendBreakoutRoomMsg(req); err != nil {
 		res.Msg = err.Error()
 		return sendBreakoutRoomResponse(c, res)
 	}
@@ -176,15 +173,13 @@ func (brc *BreakoutRoomController) HandleEndBreakoutRoom(c fiber.Ctx) error {
 	res.Status = false
 
 	req := new(plugnmeet.EndBreakoutRoomReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		res.Msg = err.Error()
 		return sendBreakoutRoomResponse(c, res)
 	}
 
 	req.RoomId = roomId.(string)
-	err = brc.BreakoutRoomModel.EndBreakoutRoom(c, req)
-	if err != nil {
+	if err := brc.BreakoutRoomModel.EndBreakoutRoom(c.RequestCtx(), req); err != nil {
 		res.Msg = err.Error()
 		return sendBreakoutRoomResponse(c, res)
 	}
@@ -206,8 +201,7 @@ func (brc *BreakoutRoomController) HandleEndBreakoutRooms(c fiber.Ctx) error {
 		return sendBreakoutRoomResponse(c, res)
 	}
 
-	err := brc.BreakoutRoomModel.EndAllBreakoutRoomsByParentRoomId(c, roomId.(string))
-	if err != nil {
+	if err := brc.BreakoutRoomModel.EndAllBreakoutRoomsByParentRoomId(c.RequestCtx(), roomId.(string)); err != nil {
 		res.Msg = err.Error()
 		return sendBreakoutRoomResponse(c, res)
 	}

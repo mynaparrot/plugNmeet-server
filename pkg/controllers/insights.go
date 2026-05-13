@@ -98,13 +98,11 @@ func (i *InsightsController) HandleTranscriptionConfigure(c fiber.Ctx) error {
 	}
 
 	req := new(plugnmeet.InsightsTranscriptionConfigReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	err = i.insightsModel.TranscriptionConfigure(req, roomId.(string))
-	if err != nil {
+	if err := i.insightsModel.TranscriptionConfigure(req, roomId.(string)); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
@@ -116,13 +114,11 @@ func (i *InsightsController) HandleTranscriptionUserSession(c fiber.Ctx) error {
 	requestedUserId := c.Locals("requestedUserId")
 
 	req := new(plugnmeet.InsightsTranscriptionUserSessionReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	err = i.insightsModel.TranscriptionUserSession(req, roomId.(string), requestedUserId.(string))
-	if err != nil {
+	if err := i.insightsModel.TranscriptionUserSession(req, roomId.(string), requestedUserId.(string)); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
@@ -170,7 +166,7 @@ func (i *InsightsController) HandleGetSupportedLangs(c fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	langs, err := i.insightsModel.GetSupportedLanguagesForService(c, serviceType)
+	langs, err := i.insightsModel.GetSupportedLanguagesForService(c.RequestCtx(), serviceType)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -219,7 +215,7 @@ func (i *InsightsController) HandleExecuteChatTranslation(c fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	result, err := i.insightsModel.ExecuteChatTranslation(c, req, roomId.(string), requestedUserId.(string))
+	result, err := i.insightsModel.ExecuteChatTranslation(c.RequestCtx(), req, roomId.(string), requestedUserId.(string))
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -333,8 +329,7 @@ func (i *InsightsController) HandleEndAIMeetingSummarization(c fiber.Ctx) error 
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	err := i.insightsModel.EndEndAIMeetingSummarization(roomId.(string))
-	if err != nil {
+	if err := i.insightsModel.EndEndAIMeetingSummarization(roomId.(string)); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 	return utils.SendCommonProtobufResponse(c, true, "success")
