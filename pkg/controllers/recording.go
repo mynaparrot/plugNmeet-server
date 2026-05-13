@@ -152,10 +152,10 @@ func (rc *RecordingController) HandleDownloadRecording(c fiber.Ctx) error {
 
 // HandleRecorderTasks handles start/stop recording & RTMP requests.
 func (rc *RecordingController) HandleRecorderTasks(c fiber.Ctx) error {
-	isAdmin := c.Locals("isAdmin")
-	roomId := c.Locals("roomId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	roomId := fiber.Locals[string](c, "roomId")
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can start recording")
 	}
 

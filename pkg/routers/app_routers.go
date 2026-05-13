@@ -192,34 +192,6 @@ func (r *router) registerBBBRoutes() {
 	bbb.All("/publishRecordings", r.ctrl.BBBController.HandleBBBPublishRecordings)
 }
 
-func (r *router) registerInsightsRegisterAPIRoutes(api fiber.Router) {
-	insights := api.Group("/insights")
-	insights.Post("/supportedLangs", r.ctrl.InsightsController.HandleGetSupportedLangs)
-
-	transcription := insights.Group("/transcription")
-	transcription.Post("/configure", r.ctrl.InsightsController.HandleTranscriptionConfigure)
-	transcription.Post("/end", r.ctrl.InsightsController.HandleEndTranscription)
-	transcription.Post("/userSession", r.ctrl.InsightsController.HandleTranscriptionUserSession)
-	transcription.Post("/userStatus", r.ctrl.InsightsController.HandleGetTranscriptionUserTaskStatus)
-
-	translation := insights.Group("/translation")
-	chatTranslation := translation.Group("/chat")
-	chatTranslation.Post("/configure", r.ctrl.InsightsController.HandleChatTranslationConfigure)
-	chatTranslation.Post("/end", r.ctrl.InsightsController.HandleEndChatTranslation)
-	chatTranslation.Post("/execute", r.ctrl.InsightsController.HandleExecuteChatTranslation)
-
-	ai := insights.Group("/ai")
-
-	aiTextChat := ai.Group("/textChat")
-	aiTextChat.Post("/configure", r.ctrl.InsightsController.HandleAITextChatConfigure)
-	aiTextChat.Post("/execute", r.ctrl.InsightsController.HandleExecuteAITextChat)
-	aiTextChat.Post("/end", r.ctrl.InsightsController.HandleEndAITextChat)
-
-	aiMeetingSummarization := ai.Group("/meetingSummarization")
-	aiMeetingSummarization.Post("/configure", r.ctrl.InsightsController.HandleAIMeetingSummarizationConfig)
-	aiMeetingSummarization.Post("/end", r.ctrl.InsightsController.HandleEndAIMeetingSummarization)
-}
-
 func (r *router) registerAPIRoutes() {
 	api := r.app.Group("/api", r.ctrl.AuthController.HandleVerifyHeaderToken)
 	api.Post("/verifyToken", r.ctrl.AuthController.HandleVerifyToken)
@@ -288,4 +260,32 @@ func (r *router) registerAPIRoutes() {
 	// mostly for whiteboard images
 	api.Post("/uploadBase64EncodedData", r.ctrl.FileController.HandleUploadBase64EncodedData)
 	api.All("/getRoomFilesByType", r.ctrl.FileController.HandleGetRoomFilesByType)
+}
+
+func (r *router) registerInsightsRegisterAPIRoutes(api fiber.Router) {
+	insights := api.Group("/insights")
+	insights.Post("/supportedLangs", r.ctrl.InsightsController.HandleGetSupportedLangs)
+
+	transcription := insights.Group("/transcription")
+	transcription.Post("/configure", r.ctrl.InsightsController.HandleTranscriptionConfigure)
+	transcription.Post("/end", r.ctrl.InsightsController.HandleEndTranscription)
+	transcription.Post("/userSession", r.ctrl.InsightsController.HandleTranscriptionUserSession)
+	transcription.Post("/userStatus", r.ctrl.InsightsController.HandleGetTranscriptionUserTaskStatus)
+
+	translation := insights.Group("/translation")
+	chatTranslation := translation.Group("/chat")
+	chatTranslation.Post("/configure", r.ctrl.InsightsController.HandleChatTranslationConfigure)
+	chatTranslation.Post("/end", r.ctrl.InsightsController.HandleEndChatTranslation)
+	chatTranslation.Post("/execute", r.ctrl.InsightsController.HandleExecuteChatTranslation)
+
+	ai := insights.Group("/ai")
+
+	aiTextChat := ai.Group("/textChat")
+	aiTextChat.Post("/configure", r.ctrl.InsightsController.HandleAITextChatConfigure)
+	aiTextChat.Post("/execute", r.ctrl.InsightsController.HandleExecuteAITextChat)
+	aiTextChat.Post("/end", r.ctrl.InsightsController.HandleEndAITextChat)
+
+	aiMeetingSummarization := ai.Group("/meetingSummarization")
+	aiMeetingSummarization.Post("/configure", r.ctrl.InsightsController.HandleAIMeetingSummarizationConfig)
+	aiMeetingSummarization.Post("/end", r.ctrl.InsightsController.HandleEndAIMeetingSummarization)
 }

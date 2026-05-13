@@ -122,10 +122,10 @@ func (rc *RoomController) HandleFetchPastRooms(c fiber.Ctx) error {
 
 // HandleEndRoomForAPI handles ending a room via API call.
 func (rc *RoomController) HandleEndRoomForAPI(c fiber.Ctx) error {
-	isAdmin := c.Locals("isAdmin")
-	roomId := c.Locals("roomId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	roomId := fiber.Locals[string](c, "roomId")
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
@@ -145,10 +145,10 @@ func (rc *RoomController) HandleEndRoomForAPI(c fiber.Ctx) error {
 
 // HandleChangeVisibilityForAPI handles changing room visibility via API call.
 func (rc *RoomController) HandleChangeVisibilityForAPI(c fiber.Ctx) error {
-	isAdmin := c.Locals("isAdmin")
-	roomId := c.Locals("roomId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	roomId := fiber.Locals[string](c, "roomId")
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
@@ -167,10 +167,10 @@ func (rc *RoomController) HandleChangeVisibilityForAPI(c fiber.Ctx) error {
 }
 
 func (rc *RoomController) HandleEnableRoomSipDialIn(c fiber.Ctx) error {
-	isAdmin := c.Locals("isAdmin")
-	roomId := c.Locals("roomId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	roomId := fiber.Locals[string](c, "roomId")
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
@@ -179,7 +179,7 @@ func (rc *RoomController) HandleEnableRoomSipDialIn(c fiber.Ctx) error {
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
-	req.RoomId = roomId.(string)
+	req.RoomId = roomId
 
 	err = rc.RoomModel.EnableRoomSipDialIn(req)
 	if err != nil {
@@ -189,10 +189,10 @@ func (rc *RoomController) HandleEnableRoomSipDialIn(c fiber.Ctx) error {
 }
 
 func (rc *RoomController) HandleCreateIngress(c fiber.Ctx) error {
-	roomId := c.Locals("roomId")
-	isAdmin := c.Locals("isAdmin")
+	roomId := fiber.Locals[string](c, "roomId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
@@ -202,7 +202,7 @@ func (rc *RoomController) HandleCreateIngress(c fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	req.RoomId = roomId.(string)
+	req.RoomId = roomId
 	f, err := rc.RoomModel.CreateIngress(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -220,15 +220,15 @@ func (rc *RoomController) HandleCreateIngress(c fiber.Ctx) error {
 
 // HandleExternalDisplayLink handles sharing an external display link.
 func (rc *RoomController) HandleExternalDisplayLink(c fiber.Ctx) error {
-	isAdmin := c.Locals("isAdmin")
-	roomId := c.Locals("roomId")
-	requestedUserId := c.Locals("requestedUserId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	roomId := fiber.Locals[string](c, "roomId")
+	requestedUserId := fiber.Locals[string](c, "requestedUserId")
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	rid := roomId.(string)
+	rid := roomId
 	if rid == "" {
 		return utils.SendCommonProtobufResponse(c, false, "roomId required")
 	}
@@ -240,7 +240,7 @@ func (rc *RoomController) HandleExternalDisplayLink(c fiber.Ctx) error {
 	}
 
 	req.RoomId = rid
-	req.UserId = requestedUserId.(string)
+	req.UserId = requestedUserId
 	err = rc.RoomModel.HandleExternalDisplayTask(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -251,15 +251,15 @@ func (rc *RoomController) HandleExternalDisplayLink(c fiber.Ctx) error {
 
 // HandleExternalMediaPlayer handles external media player actions.
 func (rc *RoomController) HandleExternalMediaPlayer(c fiber.Ctx) error {
-	isAdmin := c.Locals("isAdmin")
-	roomId := c.Locals("roomId")
-	requestedUserId := c.Locals("requestedUserId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	roomId := fiber.Locals[string](c, "roomId")
+	requestedUserId := fiber.Locals[string](c, "requestedUserId")
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	rid := roomId.(string)
+	rid := roomId
 	if rid == "" {
 		return utils.SendCommonProtobufResponse(c, false, "roomId required")
 	}
@@ -271,7 +271,7 @@ func (rc *RoomController) HandleExternalMediaPlayer(c fiber.Ctx) error {
 	}
 
 	req.RoomId = rid
-	req.UserId = requestedUserId.(string)
+	req.UserId = requestedUserId
 	err = rc.RoomModel.HandleExternalMediaTask(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -282,10 +282,10 @@ func (rc *RoomController) HandleExternalMediaPlayer(c fiber.Ctx) error {
 
 // HandleApproveUsers handles approving users from the waiting room.
 func (rc *RoomController) HandleApproveUsers(c fiber.Ctx) error {
-	roomId := c.Locals("roomId")
-	isAdmin := c.Locals("isAdmin")
+	roomId := fiber.Locals[string](c, "roomId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
@@ -295,7 +295,7 @@ func (rc *RoomController) HandleApproveUsers(c fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	req.RoomId = roomId.(string)
+	req.RoomId = roomId
 	err = rc.RoomModel.ApproveWaitingUsers(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -306,10 +306,10 @@ func (rc *RoomController) HandleApproveUsers(c fiber.Ctx) error {
 
 // HandleUpdateWaitingRoomMessage handles updating the waiting room message.
 func (rc *RoomController) HandleUpdateWaitingRoomMessage(c fiber.Ctx) error {
-	roomId := c.Locals("roomId")
-	isAdmin := c.Locals("isAdmin")
+	roomId := fiber.Locals[string](c, "roomId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
@@ -319,7 +319,7 @@ func (rc *RoomController) HandleUpdateWaitingRoomMessage(c fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	req.RoomId = roomId.(string)
+	req.RoomId = roomId
 	err = rc.RoomModel.UpdateWaitingRoomMessage(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())

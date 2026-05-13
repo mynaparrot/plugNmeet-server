@@ -74,11 +74,11 @@ func (uc *UserController) HandleGenerateJoinToken(c fiber.Ctx) error {
 
 // HandleUpdateUserLockSetting handles updating a user's lock settings.
 func (uc *UserController) HandleUpdateUserLockSetting(c fiber.Ctx) error {
-	roomId := c.Locals("roomId")
-	isAdmin := c.Locals("isAdmin")
-	requestedUserId := c.Locals("requestedUserId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	roomId := fiber.Locals[string](c, "roomId")
+	requestedUserId := fiber.Locals[string](c, "requestedUserId")
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
@@ -98,7 +98,7 @@ func (uc *UserController) HandleUpdateUserLockSetting(c fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
 	}
 
-	req.RequestedUserId = requestedUserId.(string)
+	req.RequestedUserId = requestedUserId
 	if err := uc.UserModel.UpdateUserLockSettings(req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -108,11 +108,11 @@ func (uc *UserController) HandleUpdateUserLockSetting(c fiber.Ctx) error {
 
 // HandleMuteUnMuteTrack handles muting or unmuting a user's track.
 func (uc *UserController) HandleMuteUnMuteTrack(c fiber.Ctx) error {
-	roomId := c.Locals("roomId")
-	isAdmin := c.Locals("isAdmin")
-	requestedUserId := c.Locals("requestedUserId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	roomId := fiber.Locals[string](c, "roomId")
+	requestedUserId := fiber.Locals[string](c, "requestedUserId")
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
@@ -132,7 +132,7 @@ func (uc *UserController) HandleMuteUnMuteTrack(c fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
 	}
 
-	req.RequestedUserId = requestedUserId.(string)
+	req.RequestedUserId = requestedUserId
 	if err = uc.UserModel.MuteUnMuteTrack(c.RequestCtx(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -142,11 +142,11 @@ func (uc *UserController) HandleMuteUnMuteTrack(c fiber.Ctx) error {
 
 // HandleRemoveParticipant handles removing a participant from a room.
 func (uc *UserController) HandleRemoveParticipant(c fiber.Ctx) error {
-	roomId := c.Locals("roomId")
-	requestedUserId := c.Locals("requestedUserId")
-	isAdmin := c.Locals("isAdmin")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	roomId := fiber.Locals[string](c, "roomId")
+	requestedUserId := fiber.Locals[string](c, "requestedUserId")
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
@@ -178,11 +178,11 @@ func (uc *UserController) HandleRemoveParticipant(c fiber.Ctx) error {
 
 // HandleSwitchPresenter handles switching the presenter in a room.
 func (uc *UserController) HandleSwitchPresenter(c fiber.Ctx) error {
-	isAdmin := c.Locals("isAdmin")
-	roomId := c.Locals("roomId")
-	requestedUserId := c.Locals("requestedUserId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	roomId := fiber.Locals[string](c, "roomId")
+	requestedUserId := fiber.Locals[string](c, "requestedUserId")
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
@@ -191,8 +191,8 @@ func (uc *UserController) HandleSwitchPresenter(c fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	req.RoomId = roomId.(string)
-	req.RequestedUserId = requestedUserId.(string)
+	req.RoomId = roomId
+	req.RequestedUserId = requestedUserId
 	if err := uc.UserModel.SwitchPresenter(req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}

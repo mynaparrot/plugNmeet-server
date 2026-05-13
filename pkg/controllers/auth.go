@@ -102,8 +102,8 @@ func (ac *AuthController) HandleVerifyHeaderToken(c fiber.Ctx) error {
 
 // HandleVerifyToken verifies a user's token before they join a room.
 func (ac *AuthController) HandleVerifyToken(c fiber.Ctx) error {
-	roomId := c.Locals("roomId").(string)
-	requestedUserId := c.Locals("requestedUserId").(string)
+	roomId := fiber.Locals[string](c, "roomId")
+	requestedUserId := fiber.Locals[string](c, "requestedUserId")
 
 	req := new(plugnmeet.VerifyTokenReq)
 	if err := proto.Unmarshal(c.Body(), req); err != nil {

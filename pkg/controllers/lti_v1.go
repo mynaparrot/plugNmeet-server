@@ -116,8 +116,8 @@ func (lc *LtiV1Controller) HandleLTIV1VerifyHeaderToken(c fiber.Ctx) error {
 
 // HandleLTIV1IsRoomActive checks if the LTI room is active.
 func (lc *LtiV1Controller) HandleLTIV1IsRoomActive(c fiber.Ctx) error {
-	roomId, ok := c.Locals(ctxKeyRoomID).(string)
-	if !ok {
+	roomId := fiber.Locals[string](c, ctxKeyRoomID)
+	if roomId == "" {
 		return sendErrorResponse(c, fiber.StatusBadRequest, errRoomIdMissing)
 	}
 
@@ -131,11 +131,11 @@ func (lc *LtiV1Controller) HandleLTIV1IsRoomActive(c fiber.Ctx) error {
 // HandleLTIV1JoinRoom handles joining an LTI room.
 func (lc *LtiV1Controller) HandleLTIV1JoinRoom(c fiber.Ctx) error {
 	claim := &plugnmeet.LtiClaims{
-		UserId:    c.Locals(ctxKeyUserID).(string),
-		Name:      c.Locals(ctxKeyName).(string),
-		IsAdmin:   c.Locals(ctxKeyIsAdmin).(bool),
-		RoomId:    c.Locals(ctxKeyRoomID).(string),
-		RoomTitle: c.Locals(ctxKeyRoomTitle).(string),
+		UserId:    fiber.Locals[string](c, ctxKeyUserID),
+		Name:      fiber.Locals[string](c, ctxKeyName),
+		IsAdmin:   fiber.Locals[bool](c, ctxKeyIsAdmin),
+		RoomId:    fiber.Locals[string](c, ctxKeyRoomID),
+		RoomTitle: fiber.Locals[string](c, ctxKeyRoomTitle),
 	}
 
 	if customParams, ok := c.Locals(ctxKeyCustomParams).([]byte); ok && len(customParams) > 0 {

@@ -30,11 +30,11 @@ func NewEtherpadController(config *config.AppConfig, em *models.EtherpadModel, r
 
 // HandleCreateEtherpad handles the creation of an etherpad session.
 func (ec *EtherpadController) HandleCreateEtherpad(c fiber.Ctx) error {
-	isAdmin := c.Locals("isAdmin")
-	roomId := c.Locals("roomId")
-	requestedUserId := c.Locals("requestedUserId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	roomId := fiber.Locals[string](c, "roomId")
+	requestedUserId := fiber.Locals[string](c, "requestedUserId")
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
@@ -42,7 +42,7 @@ func (ec *EtherpadController) HandleCreateEtherpad(c fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "feature disabled")
 	}
 
-	rid := roomId.(string)
+	rid := roomId
 	if rid == "" {
 		return utils.SendCommonProtobufResponse(c, false, "roomId required")
 	}
@@ -53,7 +53,7 @@ func (ec *EtherpadController) HandleCreateEtherpad(c fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "room isn't active")
 	}
 
-	result, err := ec.EtherpadModel.CreateSession(rid, requestedUserId.(string))
+	result, err := ec.EtherpadModel.CreateSession(rid, requestedUserId)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -63,8 +63,8 @@ func (ec *EtherpadController) HandleCreateEtherpad(c fiber.Ctx) error {
 
 // HandleCleanPad handles cleaning an etherpad pad.
 func (ec *EtherpadController) HandleCleanPad(c fiber.Ctx) error {
-	isAdmin := c.Locals("isAdmin")
-	if !isAdmin.(bool) {
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
@@ -82,8 +82,8 @@ func (ec *EtherpadController) HandleCleanPad(c fiber.Ctx) error {
 
 // HandleChangeEtherpadStatus handles changing the public status of an etherpad.
 func (ec *EtherpadController) HandleChangeEtherpadStatus(c fiber.Ctx) error {
-	isAdmin := c.Locals("isAdmin")
-	if !isAdmin.(bool) {
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 

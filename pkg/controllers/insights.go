@@ -90,10 +90,10 @@ func (i *InsightsController) HandleTranscriptionConfigure(c fiber.Ctx) error {
 	if i.app.Insights == nil || !i.app.Insights.Enabled {
 		return utils.SendCommonProtobufResponse(c, false, "insights feature wasn't configured")
 	}
-	isAdmin := c.Locals("isAdmin")
-	roomId := c.Locals("roomId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	roomId := fiber.Locals[string](c, "roomId")
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
@@ -102,7 +102,7 @@ func (i *InsightsController) HandleTranscriptionConfigure(c fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	if err := i.insightsModel.TranscriptionConfigure(req, roomId.(string)); err != nil {
+	if err := i.insightsModel.TranscriptionConfigure(req, roomId); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
@@ -110,15 +110,15 @@ func (i *InsightsController) HandleTranscriptionConfigure(c fiber.Ctx) error {
 }
 
 func (i *InsightsController) HandleTranscriptionUserSession(c fiber.Ctx) error {
-	roomId := c.Locals("roomId")
-	requestedUserId := c.Locals("requestedUserId")
+	roomId := fiber.Locals[string](c, "roomId")
+	requestedUserId := fiber.Locals[string](c, "requestedUserId")
 
 	req := new(plugnmeet.InsightsTranscriptionUserSessionReq)
 	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	if err := i.insightsModel.TranscriptionUserSession(req, roomId.(string), requestedUserId.(string)); err != nil {
+	if err := i.insightsModel.TranscriptionUserSession(req, roomId, requestedUserId); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
@@ -126,14 +126,14 @@ func (i *InsightsController) HandleTranscriptionUserSession(c fiber.Ctx) error {
 }
 
 func (i *InsightsController) HandleEndTranscription(c fiber.Ctx) error {
-	isAdmin := c.Locals("isAdmin")
-	roomId := c.Locals("roomId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	roomId := fiber.Locals[string](c, "roomId")
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	err := i.insightsModel.EndTranscription(roomId.(string))
+	err := i.insightsModel.EndTranscription(roomId)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -142,10 +142,10 @@ func (i *InsightsController) HandleEndTranscription(c fiber.Ctx) error {
 }
 
 func (i *InsightsController) HandleGetTranscriptionUserTaskStatus(c fiber.Ctx) error {
-	roomId := c.Locals("roomId")
-	requestedUserId := c.Locals("requestedUserId")
+	roomId := fiber.Locals[string](c, "roomId")
+	requestedUserId := fiber.Locals[string](c, "requestedUserId")
 
-	res, err := i.insightsModel.GetUserTaskStatus(insights.ServiceTypeTranscription, roomId.(string), requestedUserId.(string), time.Second*5)
+	res, err := i.insightsModel.GetUserTaskStatus(insights.ServiceTypeTranscription, roomId, requestedUserId, time.Second*5)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -184,21 +184,19 @@ func (i *InsightsController) HandleChatTranslationConfigure(c fiber.Ctx) error {
 	if i.app.Insights == nil || !i.app.Insights.Enabled {
 		return utils.SendCommonProtobufResponse(c, false, "insights feature wasn't configured")
 	}
-	isAdmin := c.Locals("isAdmin")
-	roomId := c.Locals("roomId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	roomId := fiber.Locals[string](c, "roomId")
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
 	req := new(plugnmeet.InsightsChatTranslationConfigReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	err = i.insightsModel.ChatTranslationConfigure(req, roomId.(string))
-	if err != nil {
+	if err := i.insightsModel.ChatTranslationConfigure(req, roomId); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
@@ -206,16 +204,15 @@ func (i *InsightsController) HandleChatTranslationConfigure(c fiber.Ctx) error {
 }
 
 func (i *InsightsController) HandleExecuteChatTranslation(c fiber.Ctx) error {
-	roomId := c.Locals("roomId")
-	requestedUserId := c.Locals("requestedUserId")
+	roomId := fiber.Locals[string](c, "roomId")
+	requestedUserId := fiber.Locals[string](c, "requestedUserId")
 
 	req := new(plugnmeet.InsightsTranslateTextReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	result, err := i.insightsModel.ExecuteChatTranslation(c.RequestCtx(), req, roomId.(string), requestedUserId.(string))
+	result, err := i.insightsModel.ExecuteChatTranslation(c.RequestCtx(), req, roomId, requestedUserId)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -224,15 +221,14 @@ func (i *InsightsController) HandleExecuteChatTranslation(c fiber.Ctx) error {
 }
 
 func (i *InsightsController) HandleEndChatTranslation(c fiber.Ctx) error {
-	isAdmin := c.Locals("isAdmin")
-	roomId := c.Locals("roomId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	roomId := fiber.Locals[string](c, "roomId")
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	err := i.insightsModel.ChatEndTranslation(roomId.(string))
-	if err != nil {
+	if err := i.insightsModel.ChatEndTranslation(roomId); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 	return utils.SendCommonProtobufResponse(c, true, "success")
@@ -242,21 +238,19 @@ func (i *InsightsController) HandleAITextChatConfigure(c fiber.Ctx) error {
 	if i.app.Insights == nil || !i.app.Insights.Enabled {
 		return utils.SendCommonProtobufResponse(c, false, "insights feature wasn't configured")
 	}
-	isAdmin := c.Locals("isAdmin")
-	roomId := c.Locals("roomId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	roomId := fiber.Locals[string](c, "roomId")
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
 	req := new(plugnmeet.InsightsAITextChatConfigReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	err = i.insightsModel.AITextChatConfigure(req, roomId.(string))
-	if err != nil {
+	if err := i.insightsModel.AITextChatConfigure(req, roomId); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
@@ -264,17 +258,15 @@ func (i *InsightsController) HandleAITextChatConfigure(c fiber.Ctx) error {
 }
 
 func (i *InsightsController) HandleExecuteAITextChat(c fiber.Ctx) error {
-	roomId := c.Locals("roomId")
-	requestedUserId := c.Locals("requestedUserId")
+	roomId := fiber.Locals[string](c, "roomId")
+	requestedUserId := fiber.Locals[string](c, "requestedUserId")
 
 	req := new(plugnmeet.InsightsAITextChatContent)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	err = i.insightsModel.ExecuteAITextChat(req, roomId.(string), requestedUserId.(string))
-	if err != nil {
+	if err := i.insightsModel.ExecuteAITextChat(req, roomId, requestedUserId); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
@@ -282,15 +274,14 @@ func (i *InsightsController) HandleExecuteAITextChat(c fiber.Ctx) error {
 }
 
 func (i *InsightsController) HandleEndAITextChat(c fiber.Ctx) error {
-	isAdmin := c.Locals("isAdmin")
-	roomId := c.Locals("roomId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	roomId := fiber.Locals[string](c, "roomId")
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	err := i.insightsModel.EndAITextChat(roomId.(string))
-	if err != nil {
+	if err := i.insightsModel.EndAITextChat(roomId); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 	return utils.SendCommonProtobufResponse(c, true, "success")
@@ -300,21 +291,19 @@ func (i *InsightsController) HandleAIMeetingSummarizationConfig(c fiber.Ctx) err
 	if i.app.Insights == nil || !i.app.Insights.Enabled {
 		return utils.SendCommonProtobufResponse(c, false, "insights feature wasn't configured")
 	}
-	isAdmin := c.Locals("isAdmin")
-	roomId := c.Locals("roomId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	roomId := fiber.Locals[string](c, "roomId")
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
 	req := new(plugnmeet.InsightsAIMeetingSummarizationConfigReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	err = i.insightsModel.AIMeetingSummarizationConfig(req, roomId.(string))
-	if err != nil {
+	if err := i.insightsModel.AIMeetingSummarizationConfig(req, roomId); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
@@ -322,14 +311,14 @@ func (i *InsightsController) HandleAIMeetingSummarizationConfig(c fiber.Ctx) err
 }
 
 func (i *InsightsController) HandleEndAIMeetingSummarization(c fiber.Ctx) error {
-	isAdmin := c.Locals("isAdmin")
-	roomId := c.Locals("roomId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	roomId := fiber.Locals[string](c, "roomId")
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	if err := i.insightsModel.EndEndAIMeetingSummarization(roomId.(string)); err != nil {
+	if err := i.insightsModel.EndEndAIMeetingSummarization(roomId); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 	return utils.SendCommonProtobufResponse(c, true, "success")

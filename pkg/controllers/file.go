@@ -36,8 +36,8 @@ func NewFileController(config *config.AppConfig, fm *models.FileModel, logger *l
 // HandleFileUpload method can only be use if you are using resumable.js as your frontend.
 // Library link: https://github.com/23/resumable.js
 func (fc *FileController) HandleFileUpload(c fiber.Ctx) error {
-	roomId := c.Locals("roomId")
-	requestedUserId := c.Locals("requestedUserId")
+	roomId := fiber.Locals[string](c, "roomId")
+	requestedUserId := fiber.Locals[string](c, "requestedUserId")
 
 	// this will be used to verify regarding file origin only
 	req := new(models.ResumableUploadReq)
@@ -107,14 +107,14 @@ func (fc *FileController) HandleUploadedFileMerge(c fiber.Ctx) error {
 
 // HandleUploadBase64EncodedData handles uploading base64 encoded data.
 func (fc *FileController) HandleUploadBase64EncodedData(c fiber.Ctx) error {
-	roomId := c.Locals("roomId")
+	roomId := fiber.Locals[string](c, "roomId")
 
 	req := new(plugnmeet.UploadBase64EncodedDataReq)
 	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	req.RoomId = roomId.(string)
+	req.RoomId = roomId
 	res, err := fc.FileModel.UploadBase64EncodedData(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())

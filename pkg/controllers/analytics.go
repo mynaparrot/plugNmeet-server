@@ -17,20 +17,6 @@ var unmarshalOpts = protojson.UnmarshalOptions{
 	DiscardUnknown: true,
 }
 
-// AnalyticsController holds the dependencies for analytics-related handlers.
-type AnalyticsController struct {
-	AnalyticsModel *models.AnalyticsModel
-	artifactModel  *models.ArtifactModel
-}
-
-// NewAnalyticsController creates a new AnalyticsController.
-func NewAnalyticsController(am *models.AnalyticsModel, artifactModel *models.ArtifactModel) *AnalyticsController {
-	return &AnalyticsController{
-		AnalyticsModel: am,
-		artifactModel:  artifactModel,
-	}
-}
-
 func parseAndValidateRequest(data []byte, msg proto.Message) error {
 	err := unmarshalOpts.Unmarshal(data, msg)
 	if err != nil {
@@ -49,6 +35,20 @@ func validateRequest(msg proto.Message) error {
 		return err
 	}
 	return nil
+}
+
+// AnalyticsController holds the dependencies for analytics-related handlers.
+type AnalyticsController struct {
+	AnalyticsModel *models.AnalyticsModel
+	artifactModel  *models.ArtifactModel
+}
+
+// NewAnalyticsController creates a new AnalyticsController.
+func NewAnalyticsController(am *models.AnalyticsModel, artifactModel *models.ArtifactModel) *AnalyticsController {
+	return &AnalyticsController{
+		AnalyticsModel: am,
+		artifactModel:  artifactModel,
+	}
 }
 
 // HandleFetchAnalytics fetches analytics data.

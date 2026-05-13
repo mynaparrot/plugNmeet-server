@@ -27,14 +27,14 @@ func NewPollsController(pm *models.PollModel, rs *redisservice.RedisService) *Po
 
 // HandleActivatePolls handles activating or deactivating polls.
 func (pc *PollsController) HandleActivatePolls(c fiber.Ctx) error {
-	roomId := c.Locals("roomId")
-	isAdmin := c.Locals("isAdmin")
+	roomId := fiber.Locals[string](c, "roomId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	rid := roomId.(string)
+	rid := roomId
 	if rid == "" {
 		return utils.SendCommonProtobufResponse(c, false, "roomId required")
 	}
@@ -44,7 +44,7 @@ func (pc *PollsController) HandleActivatePolls(c fiber.Ctx) error {
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
-	req.RoomId = roomId.(string)
+	req.RoomId = roomId
 	err = pc.PollModel.ManageActivation(req)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
@@ -54,26 +54,25 @@ func (pc *PollsController) HandleActivatePolls(c fiber.Ctx) error {
 
 // HandleCreatePoll handles creating a new poll.
 func (pc *PollsController) HandleCreatePoll(c fiber.Ctx) error {
-	roomId := c.Locals("roomId")
-	isAdmin := c.Locals("isAdmin")
-	requestedUserId := c.Locals("requestedUserId")
+	roomId := fiber.Locals[string](c, "roomId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	requestedUserId := fiber.Locals[string](c, "requestedUserId")
 	res := new(plugnmeet.PollResponse)
 	res.Status = false
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		res.Msg = "only admin can perform this task"
 		return sendPollResponse(c, res)
 	}
 
 	req := new(plugnmeet.CreatePollReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		res.Msg = err.Error()
 		return sendPollResponse(c, res)
 	}
 
-	req.RoomId = roomId.(string)
-	req.UserId = requestedUserId.(string)
+	req.RoomId = roomId
+	req.UserId = requestedUserId
 	pollId, err := pc.PollModel.CreatePoll(req)
 	if err != nil {
 		res.Msg = err.Error()
@@ -88,11 +87,11 @@ func (pc *PollsController) HandleCreatePoll(c fiber.Ctx) error {
 
 // HandleListPolls lists all polls for a room.
 func (pc *PollsController) HandleListPolls(c fiber.Ctx) error {
-	roomId := c.Locals("roomId")
+	roomId := fiber.Locals[string](c, "roomId")
 	res := new(plugnmeet.PollResponse)
 	res.Status = false
 
-	polls, err := pc.PollModel.ListPolls(roomId.(string))
+	polls, err := pc.PollModel.ListPolls(roomId)
 	if err != nil {
 		res.Msg = err.Error()
 		return sendPollResponse(c, res)
@@ -106,7 +105,7 @@ func (pc *PollsController) HandleListPolls(c fiber.Ctx) error {
 
 // HandleCountPollTotalResponses counts the total responses for a poll.
 func (pc *PollsController) HandleCountPollTotalResponses(c fiber.Ctx) error {
-	roomId := c.Locals("roomId")
+	roomId := fiber.Locals[string](c, "roomId")
 	pollId := c.Params("pollId")
 	res := new(plugnmeet.PollResponse)
 	res.Status = false
@@ -116,7 +115,7 @@ func (pc *PollsController) HandleCountPollTotalResponses(c fiber.Ctx) error {
 		return sendPollResponse(c, res)
 	}
 
-	responses, err := pc.RedisService.GetPollTotalResponses(roomId.(string), pollId)
+	responses, err := pc.RedisService.GetPollTotalResponses(roomId, pollId)
 	if err != nil {
 		res.Msg = err.Error()
 		return sendPollResponse(c, res)
@@ -137,7 +136,7 @@ func (pc *PollsController) HandleCountPollTotalResponses(c fiber.Ctx) error {
 
 // HandleUserSelectedOption checks which option a user selected.
 func (pc *PollsController) HandleUserSelectedOption(c fiber.Ctx) error {
-	roomId := c.Locals("roomId")
+	roomId := fiber.Locals[string](c, "roomId")
 	pollId := c.Params("pollId")
 	userId := c.Params("userId")
 	res := new(plugnmeet.PollResponse)
@@ -148,7 +147,7 @@ func (pc *PollsController) HandleUserSelectedOption(c fiber.Ctx) error {
 		return sendPollResponse(c, res)
 	}
 
-	voted, _ := pc.PollModel.UserSelectedOption(roomId.(string), pollId, userId)
+	voted, _ := pc.PollModel.UserSelectedOption(roomId, pollId, userId)
 
 	res.Status = true
 	res.Msg = "success"
@@ -159,7 +158,7 @@ func (pc *PollsController) HandleUserSelectedOption(c fiber.Ctx) error {
 
 // HandleUserSubmitResponse handles a user's poll submission.
 func (pc *PollsController) HandleUserSubmitResponse(c fiber.Ctx) error {
-	roomId := c.Locals("roomId")
+	roomId := fiber.Locals[string](c, "roomId")
 	res := new(plugnmeet.PollResponse)
 	res.Status = false
 
@@ -170,7 +169,7 @@ func (pc *PollsController) HandleUserSubmitResponse(c fiber.Ctx) error {
 		return sendPollResponse(c, res)
 	}
 
-	req.RoomId = roomId.(string)
+	req.RoomId = roomId
 	err = pc.PollModel.UserSubmitResponse(req)
 	if err != nil {
 		res.Msg = err.Error()
@@ -185,13 +184,13 @@ func (pc *PollsController) HandleUserSubmitResponse(c fiber.Ctx) error {
 
 // HandleClosePoll handles closing a poll.
 func (pc *PollsController) HandleClosePoll(c fiber.Ctx) error {
-	roomId := c.Locals("roomId")
-	isAdmin := c.Locals("isAdmin")
-	requestedUserId := c.Locals("requestedUserId")
+	roomId := fiber.Locals[string](c, "roomId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	requestedUserId := fiber.Locals[string](c, "requestedUserId")
 	res := new(plugnmeet.PollResponse)
 	res.Status = false
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		res.Msg = "only admin can perform this task"
 		return sendPollResponse(c, res)
 	}
@@ -204,8 +203,8 @@ func (pc *PollsController) HandleClosePoll(c fiber.Ctx) error {
 		return sendPollResponse(c, res)
 	}
 
-	req.RoomId = roomId.(string)
-	req.UserId = requestedUserId.(string)
+	req.RoomId = roomId
+	req.UserId = requestedUserId
 	err = pc.PollModel.ClosePoll(req)
 	if err != nil {
 		res.Msg = err.Error()
@@ -220,13 +219,13 @@ func (pc *PollsController) HandleClosePoll(c fiber.Ctx) error {
 
 // HandleGetPollResponsesDetails gets detailed responses for a poll.
 func (pc *PollsController) HandleGetPollResponsesDetails(c fiber.Ctx) error {
-	roomId := c.Locals("roomId")
+	roomId := fiber.Locals[string](c, "roomId")
 	pollId := c.Params("pollId")
-	isAdmin := c.Locals("isAdmin")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
 	res := new(plugnmeet.PollResponse)
 	res.Status = false
 
-	if !isAdmin.(bool) {
+	if !isAdmin {
 		res.Msg = "only admin can perform this task"
 		return sendPollResponse(c, res)
 	}
@@ -236,7 +235,7 @@ func (pc *PollsController) HandleGetPollResponsesDetails(c fiber.Ctx) error {
 		return sendPollResponse(c, res)
 	}
 
-	responses, err := pc.PollModel.GetPollResponsesDetails(roomId.(string), pollId)
+	responses, err := pc.PollModel.GetPollResponsesDetails(roomId, pollId)
 	if err != nil {
 		res.Msg = err.Error()
 		return sendPollResponse(c, res)
@@ -251,12 +250,12 @@ func (pc *PollsController) HandleGetPollResponsesDetails(c fiber.Ctx) error {
 
 // HandleGetResponsesResult gets the aggregated results of a poll.
 func (pc *PollsController) HandleGetResponsesResult(c fiber.Ctx) error {
-	roomId := c.Locals("roomId")
+	roomId := fiber.Locals[string](c, "roomId")
 	pollId := c.Params("pollId")
 	res := new(plugnmeet.PollResponse)
 	res.Status = false
 
-	result, err := pc.PollModel.GetResponsesResult(roomId.(string), pollId)
+	result, err := pc.PollModel.GetResponsesResult(roomId, pollId)
 	if err != nil {
 		res.Msg = err.Error()
 		return sendPollResponse(c, res)
@@ -271,11 +270,11 @@ func (pc *PollsController) HandleGetResponsesResult(c fiber.Ctx) error {
 
 // HandleGetPollsStats gets statistics for all polls in a room.
 func (pc *PollsController) HandleGetPollsStats(c fiber.Ctx) error {
-	roomId := c.Locals("roomId")
+	roomId := fiber.Locals[string](c, "roomId")
 	res := new(plugnmeet.PollResponse)
 	res.Status = false
 
-	stats, err := pc.PollModel.GetPollsStats(roomId.(string))
+	stats, err := pc.PollModel.GetPollsStats(roomId)
 	if err != nil {
 		res.Msg = err.Error()
 		return sendPollResponse(c, res)
