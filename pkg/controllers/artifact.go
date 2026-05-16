@@ -31,10 +31,10 @@ func (ac *ArtifactController) HandleFetchArtifacts(c fiber.Ctx) error {
 
 	result, err := ac.ArtifactModel.FetchArtifacts(req)
 	if err != nil {
+		if errors.Is(err, config.NotFoundErr) {
+			return utils.SendCommonProtoJsonResponse(c, false, "no artifact found", plugnmeet.StatusCode_NOT_FOUND)
+		}
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
-	}
-	if result.GetTotalArtifacts() == 0 {
-		return utils.SendCommonProtoJsonResponse(c, false, "no artifacts found", plugnmeet.StatusCode_NOT_FOUND)
 	}
 
 	r := &plugnmeet.FetchArtifactsRes{

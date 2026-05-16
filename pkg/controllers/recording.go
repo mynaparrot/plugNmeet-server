@@ -38,10 +38,10 @@ func (rc *RecordingController) HandleFetchRecordings(c fiber.Ctx) error {
 
 	result, err := rc.recordingModel.FetchRecordings(req)
 	if err != nil {
+		if errors.Is(err, config.NotFoundErr) {
+			return utils.SendCommonProtoJsonResponse(c, false, "no recording found", plugnmeet.StatusCode_NOT_FOUND)
+		}
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
-	}
-	if result.GetTotalRecordings() == 0 {
-		return utils.SendCommonProtoJsonResponse(c, false, "no recordings found", plugnmeet.StatusCode_NOT_FOUND)
 	}
 
 	r := &plugnmeet.FetchRecordingsRes{

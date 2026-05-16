@@ -2,7 +2,6 @@ package dbservice
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -24,7 +23,7 @@ func (s *DatabaseService) GetArtifacts(roomIds []string, roomSid *string, artifa
 			return nil, 0, err
 		}
 		if roomInfo == nil {
-			return nil, 0, fmt.Errorf("room not found with sid: %s", *roomSid)
+			return nil, 0, config.NotFoundErr
 		}
 		tx.Where("room_table_id = ?", roomInfo.ID)
 	} else if len(roomIds) > 0 {

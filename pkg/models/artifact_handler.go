@@ -30,6 +30,9 @@ func (m *ArtifactModel) FetchArtifacts(req *plugnmeet.FetchArtifactsReq) (*plugn
 	if err != nil {
 		return nil, err
 	}
+	if total == 0 {
+		return nil, config.NotFoundErr
+	}
 
 	result := &plugnmeet.FetchArtifactsResult{
 		TotalArtifacts: total,

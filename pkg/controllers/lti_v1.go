@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -191,6 +192,9 @@ func (lc *LtiV1Controller) HandleLTIV1FetchRecordings(c fiber.Ctx) error {
 	req.RoomIds = []string{roomId}
 	result, err := lc.RecordingModel.FetchRecordings(req)
 	if err != nil {
+		if errors.Is(err, config.NotFoundErr) {
+			return sendErrorResponse(c, fiber.StatusNotFound, "no recording found")
+		}
 		return sendErrorResponse(c, fiber.StatusInternalServerError, err.Error())
 	}
 
@@ -210,6 +214,9 @@ func (lc *LtiV1Controller) HandleLTIV1GetRecordingDownloadToken(c fiber.Ctx) err
 
 	token, err := lc.RecordingModel.GetDownloadToken(req)
 	if err != nil {
+		if errors.Is(err, config.NotFoundErr) {
+			return sendErrorResponse(c, fiber.StatusNotFound, "recording not found")
+		}
 		return sendErrorResponse(c, fiber.StatusInternalServerError, err.Error())
 	}
 
@@ -232,6 +239,9 @@ func (lc *LtiV1Controller) HandleLTIV1DeleteRecordings(c fiber.Ctx) error {
 	}
 
 	if err := lc.RecordingModel.DeleteRecording(req); err != nil {
+		if errors.Is(err, config.NotFoundErr) {
+			return sendErrorResponse(c, fiber.StatusNotFound, "recording not found")
+		}
 		return sendErrorResponse(c, fiber.StatusInternalServerError, err.Error())
 	}
 

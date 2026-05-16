@@ -23,6 +23,9 @@ func (m *RecordingModel) FetchRecordings(r *plugnmeet.FetchRecordingsReq) (*plug
 	if err != nil {
 		return nil, err
 	}
+	if total == 0 {
+		return nil, config.NotFoundErr
+	}
 	recordings := make([]*plugnmeet.RecordingInfo, 0, len(data))
 
 	for _, v := range data {

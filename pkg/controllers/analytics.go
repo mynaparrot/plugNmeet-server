@@ -61,10 +61,10 @@ func (ac *AnalyticsController) HandleFetchAnalytics(c fiber.Ctx) error {
 
 	result, err := ac.AnalyticsModel.FetchAnalytics(req)
 	if err != nil {
+		if errors.Is(err, config.NotFoundErr) {
+			return utils.SendCommonProtoJsonResponse(c, false, "no artifact found", plugnmeet.StatusCode_NOT_FOUND)
+		}
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
-	}
-	if result.GetTotalAnalytics() == 0 {
-		return utils.SendCommonProtoJsonResponse(c, false, "no analytics found", plugnmeet.StatusCode_NOT_FOUND)
 	}
 
 	r := &plugnmeet.FetchAnalyticsRes{
