@@ -1,9 +1,12 @@
 package controllers
 
 import (
+	"errors"
+
 	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -105,6 +108,9 @@ func (rc *RoomController) HandleFetchPastRooms(c fiber.Ctx) error {
 
 	result, err := rc.RoomModel.FetchPastRooms(c.RequestCtx(), req)
 	if err != nil {
+		if errors.Is(err, config.NotFoundErr) {
+			return utils.SendCommonProtoJsonResponse(c, false, "no room found", plugnmeet.StatusCode_NOT_FOUND)
+		}
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 	if result.GetTotalRooms() == 0 {
@@ -118,6 +124,26 @@ func (rc *RoomController) HandleFetchPastRooms(c fiber.Ctx) error {
 		Result:     result,
 	}
 	return utils.SendProtoJsonResponse(c, r)
+}
+
+// HandleBroadcastToRoom handles broadcasting message/notificaiton to a room.
+func (rc *RoomController) HandleBroadcastToRoom(c fiber.Ctx) error {
+	req := new(plugnmeet.BroadcastToRoomReq)
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
+	}
+
+	res, _, _ := rc.RoomModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{RoomId: req.RoomId})
+	if !res.GetIsActive() {
+		return utils.SendCommonProtoJsonResponse(c, false, res.GetMsg(), res.GetStatusCode())
+	}
+
+	statusCode, err := rc.RoomModel.BroadcastToRoom(req)
+	if err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), statusCode)
+	}
+
+	return utils.SendCommonProtoJsonResponse(c, true, "success", plugnmeet.StatusCode_SUCCESS)
 }
 
 // HandleEndRoomForAPI handles ending a room via API call.

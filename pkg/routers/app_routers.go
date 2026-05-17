@@ -152,6 +152,7 @@ func (r *router) registerAuthRoutes() {
 	room.Post("/getActiveRoomsInfo", r.ctrl.RoomController.HandleGetActiveRoomsInfo)
 	room.Post("/endRoom", r.ctrl.RoomController.HandleEndRoom)
 	room.Post("/fetchPastRooms", r.ctrl.RoomController.HandleFetchPastRooms)
+	room.Post("/broadcastToRoom", r.ctrl.RoomController.HandleBroadcastToRoom)
 
 	recording := auth.Group("/recording")
 	recording.Post("/fetch", r.ctrl.RecordingController.HandleFetchRecordings)
