@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -172,4 +173,71 @@ func (m *RoomModel) CreateIngress(r *plugnmeet.CreateIngressReq) (*livekit.Ingre
 
 	log.Info("successfully created ingress")
 	return f, err
+}
+
+func (m *RoomModel) BroadcastToRoom(r *plugnmeet.BroadcastToRoomReq) (plugnmeet.StatusCode, error) {
+	log := m.logger.WithFields(logrus.Fields{
+		"method":  "BroadcastToRoom",
+		"room_id": r.RoomId,
+	})
+	toUsersIds := make(map[string]bool)
+
+	if r.OnlyToAdmins {
+		users, err := m.natsService.GetOnlineUsersList(r.RoomId)
+		if err != nil {
+			return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, err
+		}
+
+		if users == nil {
+			return plugnmeet.StatusCode_USER_NOT_FOUND, fmt.Errorf("no online user found")
+		}
+
+		for _, u := range users {
+			if u.IsAdmin {
+				toUsersIds[u.UserId] = true
+			}
+		}
+		if len(toUsersIds) == 0 {
+			return plugnmeet.StatusCode_USER_NOT_FOUND, fmt.Errorf("no online admin user found")
+		}
+	}
+
+	var event plugnmeet.NatsMsgServerToClientEvents
+	var data interface{}
+
+	switch v := r.Payload.(type) {
+	case *plugnmeet.BroadcastToRoomReq_NotificationMsg:
+		event = plugnmeet.NatsMsgServerToClientEvents_SYSTEM_NOTIFICATION
+		data = &plugnmeet.NatsSystemNotification{
+			Id:        uuid.NewString(),
+			Type:      v.NotificationMsg.Type,
+			Msg:       v.NotificationMsg.Text,
+			SentAt:    time.Now().UnixMilli(),
+			WithSound: v.NotificationMsg.WithSound,
+		}
+		if v.NotificationMsg.ToUserId != nil && *v.NotificationMsg.ToUserId != "" {
+			toUsersIds[*v.NotificationMsg.ToUserId] = true
+		}
+	case *plugnmeet.BroadcastToRoomReq_ChatMsg:
+		event = plugnmeet.NatsMsgServerToClientEvents_SYSTEM_CHAT_MSG
+		data = v.ChatMsg.Message
+		if v.ChatMsg.ToUserId != nil && *v.ChatMsg.ToUserId != "" {
+			toUsersIds[*v.ChatMsg.ToUserId] = true
+		}
+	}
+
+	if len(toUsersIds) > 0 {
+		for u := range toUsersIds {
+			if err := m.natsService.BroadcastSystemEventToRoom(event, r.RoomId, data, &u); err != nil {
+				log.WithError(err).Errorf("Failed to broadcast message to %s", u)
+			}
+		}
+	} else {
+		// to everyone
+		if err := m.natsService.BroadcastSystemEventToRoom(event, r.RoomId, data, nil); err != nil {
+			log.WithError(err).Error("Failed to broadcast message to the room")
+		}
+	}
+
+	return plugnmeet.StatusCode_SUCCESS, nil
 }

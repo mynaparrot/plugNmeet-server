@@ -4,7 +4,7 @@ go 1.26
 
 require (
 	buf.build/go/protovalidate v1.2.0
-	github.com/Microsoft/cognitive-services-speech-sdk-go v1.49.1
+	github.com/Microsoft/cognitive-services-speech-sdk-go v1.50.0
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/gabriel-vasile/mimetype v1.4.13
 	github.com/gammazero/workerpool v1.2.1
@@ -19,7 +19,7 @@ require (
 	github.com/livekit/media-sdk v0.0.0-20260424094251-1e21ae1138de
 	github.com/livekit/protocol v1.45.8
 	github.com/livekit/server-sdk-go/v2 v2.16.3
-	github.com/mynaparrot/plugnmeet-protocol v1.2.2-0.20260510165746-408ba81a10f4
+	github.com/mynaparrot/plugnmeet-protocol v1.2.2-0.20260517215845-e3b1d636d838
 	github.com/nats-io/jwt/v2 v2.8.1
 	github.com/nats-io/nats.go v1.52.0
 	github.com/nats-io/nkeys v0.4.15
@@ -28,7 +28,7 @@ require (
 	github.com/redis/go-redis/v9 v9.19.0
 	github.com/sirupsen/logrus v1.9.4
 	golang.org/x/sync v0.20.0
-	google.golang.org/genai v1.56.0
+	google.golang.org/genai v1.57.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/mysql v1.6.0

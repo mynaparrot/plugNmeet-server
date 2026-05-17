@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 )
@@ -16,7 +17,7 @@ func (m *RoomModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoo
 		Status:     true,
 		IsActive:   false,
 		Msg:        "room is not active",
-		StatusCode: plugnmeet.StatusCode_ROOM_NOT_FOUND,
+		StatusCode: plugnmeet.StatusCode_ROOM_NOT_ACTIVE,
 	}
 
 	// NATS is the single source of truth for this check.
@@ -50,7 +51,7 @@ func (m *RoomModel) GetActiveRoomInfo(ctx context.Context, r *plugnmeet.GetActiv
 
 	roomDbInfo, _ := m.ds.GetRoomInfoByRoomId(r.RoomId, 1)
 	if roomDbInfo == nil || roomDbInfo.ID == 0 {
-		return false, "no room found", plugnmeet.StatusCode_ROOM_NOT_FOUND, nil
+		return false, "room not found in active state", plugnmeet.StatusCode_ROOM_NOT_FOUND, nil
 	}
 
 	rrr, err := m.natsService.GetRoomInfo(r.RoomId)
@@ -65,7 +66,7 @@ func (m *RoomModel) GetActiveRoomInfo(ctx context.Context, r *plugnmeet.GetActiv
 		if err != nil {
 			return false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil
 		}
-		return false, "room is not active", plugnmeet.StatusCode_ROOM_NOT_FOUND, nil
+		return false, "room is not active", plugnmeet.StatusCode_ROOM_NOT_ACTIVE, nil
 	}
 
 	res := new(plugnmeet.ActiveRoomWithParticipant)
@@ -163,6 +164,10 @@ func (m *RoomModel) FetchPastRooms(userCtx context.Context, r *plugnmeet.FetchPa
 	if err != nil {
 		return nil, err
 	}
+	if total == 0 {
+		return nil, config.NotFoundErr
+	}
+
 	list := make([]*plugnmeet.PastRoomInfo, 0, len(rooms))
 
 	for _, rr := range rooms {
