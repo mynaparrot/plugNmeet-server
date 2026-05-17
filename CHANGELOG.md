@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.2.0](https://github.com/mynaparrot/plugNmeet-server/compare/v2.1.9...v2.2.0) (2026-05-17)
+
+
+### Features
+
+* added more details proxy config based on fiber v3 + prometheus basic auth ([a864a9d](https://github.com/mynaparrot/plugNmeet-server/commit/a864a9d7ed3ff00adbe6819a7b5b879b51953221))
+* added new API `BroadcastToRoom` ([203e950](https://github.com/mynaparrot/plugNmeet-server/commit/203e95009149ff596363dfae634ad9a5232390e4))
+* added new API `BroadcastToRoom` ([b925d24](https://github.com/mynaparrot/plugNmeet-server/commit/b925d24e842c6504ebdc55909828d7fdb0231595))
+
+
+### Bug Fixes
+
+* disable features when `SelfInsertEncryptionKey` enabled ([6633cb2](https://github.com/mynaparrot/plugNmeet-server/commit/6633cb24ece714549d79f2c69e4cb0ed6a23dd52))
+* install curl ([18f176c](https://github.com/mynaparrot/plugNmeet-server/commit/18f176cd0d91329fc20323c66fce87077722c63b))
+* invalid status code was returning ([7409152](https://github.com/mynaparrot/plugNmeet-server/commit/7409152a53cd58a5e2856c339ebc09f2350bd07a))
+* replaced by `fiber.Locals` ([bc178e6](https://github.com/mynaparrot/plugNmeet-server/commit/bc178e63bbd5c2a93f5a915ac37ec46680cf1d4d))
+* replaced with `c.RequestCtx()` ([cff65fb](https://github.com/mynaparrot/plugNmeet-server/commit/cff65fb74202b0a91de6c42f492ddc46be7f6466))
+* router for v3 where need to specify both `GET` and `HEAD` ([b74f2e7](https://github.com/mynaparrot/plugNmeet-server/commit/b74f2e7be5536c6bd1ef05e95c1c0791e6d677e6))
+* upgrade gofiber v3 ([b5f2a3e](https://github.com/mynaparrot/plugNmeet-server/commit/b5f2a3e42bbf3614895ad945962250ad9bc03f8f))
+* upgrade to gofiber v3 ([90e176c](https://github.com/mynaparrot/plugNmeet-server/commit/90e176c12d7c2b2a761bac7a875a97629d82c5a0))
+* use `favicon` middleware ([1bc3eaa](https://github.com/mynaparrot/plugNmeet-server/commit/1bc3eaa87a20ec96a60671947f991d0be3d87c4a))
+
 ## [2.1.9](https://github.com/mynaparrot/plugNmeet-server/compare/v2.1.8...v2.1.9) (2026-05-07)
 
 
