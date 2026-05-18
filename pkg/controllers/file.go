@@ -128,10 +128,11 @@ func (fc *FileController) HandleUploadBase64EncodedData(c fiber.Ctx) error {
 // HandleUploadWhiteboardFile will upload file from Auth API.
 // Uploading from client we use resumable.js library not this endpoint.
 func (fc *FileController) HandleUploadWhiteboardFile(c fiber.Ctx) error {
-	roomId := c.FormValue("room_id")
+	roomId := c.Get("Room-Id")
 	if roomId == "" {
-		return commonFileErrorResponse(c, "missing required field room_id", fiber.StatusBadRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return commonFileErrorResponse(c, "missing required header Room-Id", fiber.StatusBadRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
+
 	res, rf, _ := fc.RoomModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{RoomId: roomId})
 	if !res.GetIsActive() {
 		return commonFileErrorResponse(c, res.GetMsg(), fiber.StatusBadRequest, res.GetStatusCode())

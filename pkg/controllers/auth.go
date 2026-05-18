@@ -41,7 +41,6 @@ func NewAuthController(config *config.AppConfig, natsService *natsservice.NatsSe
 func (ac *AuthController) HandleAuthHeaderCheck(c fiber.Ctx) error {
 	apiKey := c.Get("API-KEY")
 	signature := c.Get("HASH-SIGNATURE")
-	body := c.Body()
 
 	if apiKey == "" {
 		c.Status(fiber.StatusUnauthorized)
@@ -58,10 +57,18 @@ func (ac *AuthController) HandleAuthHeaderCheck(c fiber.Ctx) error {
 	}
 
 	mac := hmac.New(sha256.New, []byte(ac.AppConfig.Client.Secret))
-	// For multipart/form-data, we can't rely on the body for the signature as it will be different each time.
-	// In this case, we'll generate a signature based on an empty body.
-	if !strings.Contains(c.Get("Content-type"), "multipart/form-data") {
-		mac.Write(body)
+	if strings.Contains(c.Get("Content-type"), "multipart/form-data") {
+		// For multipart/form-data, we sign the Room-Id header to ensure its integrity.
+		roomId := c.Get("Room-Id")
+		if roomId == "" {
+			// The client MUST send Room-Id for the signature contract to be met.
+			c.Status(fiber.StatusUnauthorized)
+			return utils.SendCommonProtoJsonResponse(c, false, "Missing Room-Id header for multipart request.", plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER)
+		}
+		mac.Write([]byte(roomId))
+	} else {
+		// For all other requests, we sign the raw body.
+		mac.Write(c.Body())
 	}
 
 	expectedSignature := hex.EncodeToString(mac.Sum(nil))
