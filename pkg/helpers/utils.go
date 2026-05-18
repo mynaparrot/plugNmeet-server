@@ -4,7 +4,11 @@ import (
 	"crypto/rand"
 	"math"
 	"math/big"
+	"path/filepath"
+	"regexp"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 func ToFixed(num float32, precision int) float32 {
@@ -47,4 +51,49 @@ func GenerateSipPin(length int) string {
 		builder.WriteRune(rune('0' + d))
 	}
 	return builder.String()
+}
+
+var (
+	// Match anything that is NOT a Unicode letter, number, dash, dot, or underscore.
+	// \p{L} matches any kind of letter from any language.
+	// \p{N} matches any kind of numeric character in any script.
+	illegalNameChars = regexp.MustCompile(`[^\p{L}\p{N}\.\-\_]`)
+
+	// Match multiple consecutive underscores to clean up the resulting string.
+	multipleUnderscores = regexp.MustCompile(`_+`)
+)
+
+// MakeSafeFilename sanitizes a string to be used as a safe filename, preserving Unicode.
+func MakeSafeFilename(name string) string {
+	// 1. Prevent path traversal by extracting only the base file name
+	// (e.g., "../../secret.txt" becomes "secret.txt")
+	name = filepath.Base(filepath.Clean(name))
+
+	// 2. Replace illegal characters (like spaces, slashes, quotes) with an underscore
+	safeName := illegalNameChars.ReplaceAllString(name, "_")
+
+	// 3. Clean up multiple consecutive underscores for better readability
+	safeName = multipleUnderscores.ReplaceAllString(safeName, "_")
+
+	// 4. Trim leading/trailing dots, spaces, or underscores (Windows dislikes trailing dots)
+	safeName = strings.Trim(safeName, " ._")
+
+	// 5. Provide a fallback if the resulting string is empty
+	if safeName == "" {
+		return uuid.New().String()
+	}
+
+	// 6. Enforce a max length of 255 bytes (standard limit for ext4, NTFS, APFS)
+	// We truncate by runes rather than bytes to prevent slicing a multibyte Unicode character in half.
+	const maxBytes = 255
+	if len(safeName) > maxBytes {
+		runes := []rune(safeName)
+		// Iteratively drop the last rune until the byte length is within the limit
+		for len(string(runes)) > maxBytes {
+			runes = runes[:len(runes)-1]
+		}
+		safeName = string(runes)
+	}
+
+	return safeName
 }

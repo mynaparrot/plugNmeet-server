@@ -334,6 +334,20 @@ func New(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 		}
 	}
 
+	// setting up upload files setting
+	if appCnf.UploadFileSettings.MaxSize <= 0 {
+		appCnf.UploadFileSettings.MaxSize = 50
+	}
+	if appCnf.UploadFileSettings.MaxSizeWhiteboardFile <= 0 {
+		appCnf.UploadFileSettings.MaxSizeWhiteboardFile = 30
+	}
+	if len(appCnf.UploadFileSettings.AllowedTypes) == 0 {
+		appCnf.UploadFileSettings.AllowedTypes = []string{"jpg", "png", "jpeg", "svg", "pdf", "docx", "txt", "xlsx", "pptx", "zip", "mp4", "webm", "mp3"}
+	}
+	if appCnf.UploadFileSettings.MaxSizeWhiteboardFile > appCnf.UploadFileSettings.MaxSize {
+		return nil, fmt.Errorf("max_size_whiteboard_file value should not be more than max_size")
+	}
+
 	// read client files and cache it
 	err = readClientFiles(appCnf)
 	if err != nil {

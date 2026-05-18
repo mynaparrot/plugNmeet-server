@@ -43,6 +43,7 @@ func New(appConfig *config.AppConfig, ctrl *factory.ApplicationControllers) *fib
 		JSONDecoder: json.Unmarshal,
 		Views:       templateEngine,
 		AppName:     "plugNmeet version: " + version.Version + " runtime: " + runtime.Version(),
+		BodyLimit:   int(appConfig.UploadFileSettings.MaxSize * 1024 * 1024),
 	}
 
 	if appConfig.Client.ProxyConf != nil && appConfig.Client.ProxyConf.Enabled {
@@ -153,6 +154,7 @@ func (r *router) registerAuthRoutes() {
 	room.Post("/endRoom", r.ctrl.RoomController.HandleEndRoom)
 	room.Post("/fetchPastRooms", r.ctrl.RoomController.HandleFetchPastRooms)
 	room.Post("/broadcastToRoom", r.ctrl.RoomController.HandleBroadcastToRoom)
+	room.Post("/uploadWhiteboardFile", r.ctrl.FileController.HandleUploadWhiteboardFile)
 
 	recording := auth.Group("/recording")
 	recording.Post("/fetch", r.ctrl.RecordingController.HandleFetchRecordings)

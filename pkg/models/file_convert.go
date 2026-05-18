@@ -35,7 +35,7 @@ type ConvertWhiteboardFileRes struct {
 }
 
 // ConvertAndBroadcastWhiteboardFile will convert & broadcast files for whiteboard.
-func (m *FileModel) ConvertAndBroadcastWhiteboardFile(roomId, roomSid, filePath string) (*ConvertWhiteboardFileRes, error) {
+func (m *FileModel) ConvertAndBroadcastWhiteboardFile(roomId, roomSid, filePath string, requestedUserId *string) (*ConvertWhiteboardFileRes, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId":   roomId,
 		"roomSid":  roomSid,
@@ -112,6 +112,21 @@ func (m *FileModel) ConvertAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 	if err := m.addFileToNatsStore(roomId, res); err != nil {
 		log.WithError(err).Error("failed to store converted file metadata in NATS")
 		// Don't return the error, as the file conversion was successful.
+	}
+
+	// send notification about new file
+	if requestedUserId == nil {
+		// because only present have whiteboard file upload/manage capability
+		if presenterId, err := m.userModel.FindCurrentPresenter(roomId); err != nil {
+			log.WithError(err).Error("failed to find presenter")
+		} else {
+			requestedUserId = &presenterId
+		}
+	}
+	if requestedUserId != nil {
+		if err := m.natsService.BroadcastSystemNotificationToRoom(roomId, "notifications.whiteboard-new-file-added", plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_INFO, true, requestedUserId); err != nil {
+			log.WithError(err).Error("failed to broadcast notification")
+		}
 	}
 
 	log.WithField("totalPages", totalPages).Info("successfully converted and broadcasted whiteboard file")

@@ -58,7 +58,12 @@ func (ac *AuthController) HandleAuthHeaderCheck(c fiber.Ctx) error {
 	}
 
 	mac := hmac.New(sha256.New, []byte(ac.AppConfig.Client.Secret))
-	mac.Write(body)
+	// For multipart/form-data, we can't rely on the body for the signature as it will be different each time.
+	// In this case, we'll generate a signature based on an empty body.
+	if !strings.Contains(c.Get("Content-type"), "multipart/form-data") {
+		mac.Write(body)
+	}
+
 	expectedSignature := hex.EncodeToString(mac.Sum(nil))
 	if subtle.ConstantTimeCompare([]byte(expectedSignature), []byte(signature)) != 1 {
 		c.Status(fiber.StatusUnauthorized)

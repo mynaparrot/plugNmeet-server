@@ -21,14 +21,16 @@ import (
 type FileController struct {
 	AppConfig *config.AppConfig
 	FileModel *models.FileModel
+	RoomModel *models.RoomModel
 	logger    *logrus.Entry
 }
 
 // NewFileController creates a new FileController.
-func NewFileController(config *config.AppConfig, fm *models.FileModel, logger *logrus.Logger) *FileController {
+func NewFileController(config *config.AppConfig, fm *models.FileModel, rm *models.RoomModel, logger *logrus.Logger) *FileController {
 	return &FileController{
 		AppConfig: config,
 		FileModel: fm,
+		RoomModel: rm,
 		logger:    logger.WithField("controller", "file"),
 	}
 }
@@ -42,22 +44,22 @@ func (fc *FileController) HandleFileUpload(c fiber.Ctx) error {
 	// this will be used to verify regarding file origin only
 	req := new(models.ResumableUploadReq)
 	if err := c.Bind().Query(req); err != nil {
-		return commonFileErrorResponse(c, err.Error(), fiber.StatusBadRequest)
+		return commonFileErrorResponse(c, err.Error(), fiber.StatusBadRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	if req.RoomSid == "" || req.RoomId == "" || req.UserId == "" {
-		return commonFileErrorResponse(c, "missing required fields", fiber.StatusBadRequest)
+		return commonFileErrorResponse(c, "missing required fields", fiber.StatusBadRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 	if roomId != req.RoomId {
-		return commonFileErrorResponse(c, "token roomId & requested roomId didn't matched", fiber.StatusBadRequest)
+		return commonFileErrorResponse(c, "token roomId & requested roomId didn't matched", fiber.StatusBadRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 	if requestedUserId != req.UserId {
-		return commonFileErrorResponse(c, "token roomId & requested roomId didn't matched", fiber.StatusBadRequest)
+		return commonFileErrorResponse(c, "token roomId & requested roomId didn't matched", fiber.StatusBadRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	res, fErr := fc.FileModel.ResumableFileUpload(c)
 	if fErr != nil {
-		return commonFileErrorResponse(c, fErr.Message, fErr.Code)
+		return commonFileErrorResponse(c, fErr.Message, fErr.Code, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 
 	if res.FilePath == "part_uploaded" {
@@ -80,16 +82,16 @@ func (fc *FileController) HandleUploadedFileMerge(c fiber.Ctx) error {
 	}
 
 	if err != nil {
-		return commonFileErrorResponse(c, err.Error(), fiber.StatusBadRequest)
+		return commonFileErrorResponse(c, err.Error(), fiber.StatusBadRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	if req.RoomSid == "" || req.RoomId == "" {
-		return commonFileErrorResponse(c, "missing required fields", fiber.StatusBadRequest)
+		return commonFileErrorResponse(c, "missing required fields", fiber.StatusBadRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	res, err := fc.FileModel.UploadedFileMerge(req)
 	if err != nil {
-		return commonFileErrorResponse(c, err.Error(), fiber.StatusBadRequest)
+		return commonFileErrorResponse(c, err.Error(), fiber.StatusBadRequest, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 
 	if ctnType == "application/protobuf" {
@@ -121,6 +123,26 @@ func (fc *FileController) HandleUploadBase64EncodedData(c fiber.Ctx) error {
 	}
 
 	return utils.SendProtobufResponse(c, res)
+}
+
+// HandleUploadWhiteboardFile will upload file from Auth API.
+// Uploading from client we use resumable.js library not this endpoint.
+func (fc *FileController) HandleUploadWhiteboardFile(c fiber.Ctx) error {
+	roomId := c.FormValue("room_id")
+	if roomId == "" {
+		return commonFileErrorResponse(c, "missing required field room_id", fiber.StatusBadRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
+	}
+	res, rf, _ := fc.RoomModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{RoomId: roomId})
+	if !res.GetIsActive() {
+		return commonFileErrorResponse(c, res.GetMsg(), fiber.StatusBadRequest, res.GetStatusCode())
+	}
+
+	statusCode, err := fc.FileModel.UploadWhiteboardFileFromAuthApi(c, rf)
+	if err != nil {
+		return commonFileErrorResponse(c, err.Error(), err.Code, statusCode)
+	}
+
+	return utils.SendCommonProtoJsonResponse(c, true, "file uploaded successfully", plugnmeet.StatusCode_SUCCESS)
 }
 
 // HandleDownloadUploadedFile handles downloading an uploaded file.
@@ -168,8 +190,9 @@ func (fc *FileController) HandleConvertWhiteboardFile(c fiber.Ctx) error {
 			"msg":    "file path require",
 		})
 	}
+	requestedUserId := new(fiber.Locals[string](c, "requestedUserId"))
 
-	res, err := fc.FileModel.ConvertAndBroadcastWhiteboardFile(req.RoomId, req.RoomSid, req.FilePath)
+	res, err := fc.FileModel.ConvertAndBroadcastWhiteboardFile(req.RoomId, req.RoomSid, req.FilePath, requestedUserId)
 	if err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
@@ -227,12 +250,13 @@ func (fc *FileController) HandleGetClientFiles(c fiber.Ctx) error {
 	})
 }
 
-func commonFileErrorResponse(c fiber.Ctx, msg string, status int) error {
+func commonFileErrorResponse(c fiber.Ctx, msg string, status int, statusCode plugnmeet.StatusCode) error {
 	if status > 0 {
 		_ = c.SendStatus(status)
 	}
 	return c.JSON(fiber.Map{
-		"status": false,
-		"msg":    msg,
+		"status":      false,
+		"msg":         msg,
+		"status_code": statusCode.String(),
 	})
 }
