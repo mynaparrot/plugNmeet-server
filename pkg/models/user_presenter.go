@@ -18,7 +18,7 @@ func (m *UserModel) CreateNewPresenter(r *plugnmeet.GenerateTokenReq) error {
 	})
 	log.Infoln("request to check for new presenter")
 
-	presenter, err := m.findCurrentPresenter(r.RoomId)
+	presenter, err := m.FindCurrentPresenter(r.RoomId)
 	if err != nil {
 		log.WithError(err).Warnln("failed to find current presenter")
 		return err
@@ -51,7 +51,7 @@ func (m *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
 	if r.Task == plugnmeet.SwitchPresenterTask_PROMOTE {
 		newPresenterId = r.UserId
 		// Find the current presenter so we can demote them later.
-		currentPresenter, err := m.findCurrentPresenter(r.RoomId)
+		currentPresenter, err := m.FindCurrentPresenter(r.RoomId)
 		if err != nil {
 			log.WithError(err).Warnln("could not find current presenter to demote")
 		}
@@ -86,8 +86,8 @@ func (m *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
 	return nil
 }
 
-// findCurrentPresenter check all the online users to find the current presenter
-func (m *UserModel) findCurrentPresenter(roomId string) (string, error) {
+// FindCurrentPresenter check all the online users to find the current presenter
+func (m *UserModel) FindCurrentPresenter(roomId string) (string, error) {
 	ids, err := m.natsService.GetOnlineUsersId(roomId)
 	if err != nil {
 		return "", fmt.Errorf("failed to get online users: %w", err)

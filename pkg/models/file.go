@@ -22,15 +22,17 @@ type FileModel struct {
 	app         *config.AppConfig
 	ds          *dbservice.DatabaseService
 	natsService *natsservice.NatsService
+	userModel   *UserModel
 	logger      *logrus.Entry
 }
 
-func NewFileModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, natsService *natsservice.NatsService, logger *logrus.Logger) *FileModel {
+func NewFileModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, natsService *natsservice.NatsService, um *UserModel, logger *logrus.Logger) *FileModel {
 	return &FileModel{
 		ctx:         ctx,
 		app:         app,
 		ds:          ds,
 		natsService: natsService,
+		userModel:   um,
 		logger:      logger.WithField("model", "file"),
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/sirupsen/logrus"
 )
 
@@ -233,4 +234,55 @@ func (m *FileModel) combineResumableFiles(req *plugnmeet.UploadedFileMergeReq, c
 	}
 
 	return combinedFile, nil
+}
+
+func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.NatsKvRoomInfo) (plugnmeet.StatusCode, *fiber.Error) {
+	log := m.logger.WithFields(logrus.Fields{
+		"method":  "UploadWhiteboardFileFromAuthApi",
+		"roomId":  rf.RoomId,
+		"roomSid": rf.RoomSid,
+	})
+	log.Info("New whiteboard file upload request received")
+
+	document, err := c.FormFile("document")
+	if err != nil {
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+
+	// Check file size before saving
+	if document.Size > int64(m.app.UploadFileSettings.MaxSizeWhiteboardFile*1024*1024) {
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.ErrRequestEntityTooLarge
+	}
+
+	f, err := document.Open()
+	if err != nil {
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+	defer f.Close()
+
+	if err := m.detectMimeTypeForValidation(f); err != nil {
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+
+	fileName := helpers.MakeSafeFilename(document.Filename)
+	savePath := filepath.Join(rf.RoomSid, fileName)
+	finalFile := filepath.Join(m.app.UploadFileSettings.Path, savePath)
+
+	if err := os.MkdirAll(filepath.Join(m.app.UploadFileSettings.Path, rf.RoomSid), 0755); err != nil {
+		log.WithError(err).Errorln("failed to create chunk directory")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, "failed to create directory")
+	}
+
+	if err := c.SaveFile(document, finalFile); err != nil {
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, err.Error())
+	}
+
+	// now we're good to for start converting, ConvertAndBroadcastWhiteboardFile expect savePath not full path
+	if _, err = m.ConvertAndBroadcastWhiteboardFile(rf.RoomId, rf.RoomSid, savePath, nil); err != nil {
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, err.Error())
+	}
+
+	log.Infof("File %s successfully uploaded and broadcasted", fileName)
+
+	return plugnmeet.StatusCode_SUCCESS, nil
 }
