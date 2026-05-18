@@ -86,7 +86,7 @@ func (m *FileModel) DownloadAndProcessPreUploadWBfile(roomId, roomSid, fileUrl s
 	filePath := filepath.Join(roomSid, filepath.Base(resp.Filename))
 
 	// Convert and broadcast. This is a synchronous, long-running task.
-	res, err := m.ConvertAndBroadcastWhiteboardFile(roomId, roomSid, filePath, nil)
+	res, err := m.ConvertAndBroadcastWhiteboardFile(m.ctx, roomId, roomSid, filePath, nil)
 	if err != nil {
 		log.WithError(err).Errorln("conversion/broadcast failed")
 		return nil, fmt.Errorf("conversion/broadcast failed: %w", err)

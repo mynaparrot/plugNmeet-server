@@ -13,6 +13,7 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/sirupsen/logrus"
 )
 
@@ -34,15 +35,46 @@ type ConvertWhiteboardFileRes struct {
 	TotalPages int    `json:"totalPages"`
 }
 
-// ConvertAndBroadcastWhiteboardFile will convert & broadcast files for whiteboard.
-func (m *FileModel) ConvertAndBroadcastWhiteboardFile(roomId, roomSid, filePath string, requestedUserId *string) (*ConvertWhiteboardFileRes, error) {
+// conversionResult is a private struct to pass results over a channel.
+type conversionResult struct {
+	res *ConvertWhiteboardFileRes
+	err error
+}
+
+// ConvertAndBroadcastWhiteboardFile starts a file conversion and waits for the result up to the context's timeout.
+// If the timeout is exceeded, it returns ErrConversionTimeout, but the background process continues.
+func (m *FileModel) ConvertAndBroadcastWhiteboardFile(ctx context.Context, roomId, roomSid, filePath string, requestedUserId *string) (*ConvertWhiteboardFileRes, error) {
+	resultChan := make(chan conversionResult, 1)
+
+	// Run the conversion in a goroutine.
+	go func() {
+		res, err := m.processAndBroadcastWhiteboardFile(roomId, roomSid, filePath, requestedUserId)
+		resultChan <- conversionResult{res, err}
+	}()
+
+	select {
+	case result := <-resultChan:
+		// Conversion finished in time. Return the result directly.
+		return result.res, result.err
+	case <-ctx.Done():
+		// The handler's timeout was reached.
+		m.logger.WithFields(logrus.Fields{
+			"roomId":   roomId,
+			"filePath": filePath,
+		}).Infoln("handler timeout reached, conversion will continue in background")
+		return nil, config.ErrConversionTimeout
+	}
+}
+
+// processAndBroadcastWhiteboardFile contains the original, unmodified conversion logic.
+func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath string, requestedUserId *string) (res *ConvertWhiteboardFileRes, err error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId":   roomId,
 		"roomSid":  roomSid,
 		"filePath": filePath,
-		"method":   "ConvertAndBroadcastWhiteboardFile",
+		"method":   "processAndBroadcastWhiteboardFile",
 	})
-	log.Infoln("request to convert and broadcast whiteboard file")
+	log.Infoln("New request to convert and broadcast whiteboard file received")
 
 	if roomId == "" || filePath == "" {
 		err := errors.New("roomId or filePath is empty")
@@ -83,6 +115,12 @@ func (m *FileModel) ConvertAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 		return nil, err
 	}
 
+	defer func() {
+		if err != nil {
+			_ = os.RemoveAll(outputDir)
+		}
+	}()
+
 	convertedFile, err := m.convertToPDFIfNeeded(fullPath, info.Name(), roomId, mType, outputDir)
 	if err != nil {
 		log.WithError(err).Error("failed to convert file to PDF")
@@ -100,7 +138,7 @@ func (m *FileModel) ConvertAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 		return nil, err
 	}
 
-	res := &ConvertWhiteboardFileRes{
+	res = &ConvertWhiteboardFileRes{
 		Status:     true,
 		Msg:        "success",
 		FileName:   info.Name(),
@@ -129,7 +167,7 @@ func (m *FileModel) ConvertAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 		}
 	}
 
-	log.WithField("totalPages", totalPages).Info("successfully converted and broadcasted whiteboard file")
+	log.WithField("totalPages", totalPages).Info("Successfully converted and broadcasted whiteboard file")
 	return res, nil
 }
 

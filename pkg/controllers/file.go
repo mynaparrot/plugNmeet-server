@@ -1,10 +1,13 @@
 package controllers
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/gofiber/fiber/v3"
@@ -193,8 +196,19 @@ func (fc *FileController) HandleConvertWhiteboardFile(c fiber.Ctx) error {
 	}
 	requestedUserId := new(fiber.Locals[string](c, "requestedUserId"))
 
-	res, err := fc.FileModel.ConvertAndBroadcastWhiteboardFile(req.RoomId, req.RoomSid, req.FilePath, requestedUserId)
+	// We'll give 30 seconds to complete the task
+	ctx, cancel := context.WithTimeout(c.RequestCtx(), 30*time.Second)
+	defer cancel()
+
+	res, err := fc.FileModel.ConvertAndBroadcastWhiteboardFile(ctx, req.RoomId, req.RoomSid, req.FilePath, requestedUserId)
 	if err != nil {
+		if errors.Is(err, config.ErrConversionTimeout) {
+			// process will continue in background
+			return c.JSON(fiber.Map{
+				"status": true,
+				"msg":    "File conversion started. It will be available soon.",
+			})
+		}
 		return c.JSON(fiber.Map{
 			"status": false,
 			"msg":    err.Error(),

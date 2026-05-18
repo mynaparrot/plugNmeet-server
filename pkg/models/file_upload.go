@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/sirupsen/logrus"
 )
@@ -278,7 +280,11 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 	}
 
 	// now we're good to for start converting, ConvertAndBroadcastWhiteboardFile expect savePath not full path
-	if _, err = m.ConvertAndBroadcastWhiteboardFile(rf.RoomId, rf.RoomSid, savePath, nil); err != nil {
+	if _, err = m.ConvertAndBroadcastWhiteboardFile(c.RequestCtx(), rf.RoomId, rf.RoomSid, savePath, nil); err != nil {
+		if errors.Is(err, config.ErrConversionTimeout) {
+			// process will continue in background
+			return plugnmeet.StatusCode_SUCCESS, nil
+		}
 		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 
