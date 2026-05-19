@@ -11,19 +11,23 @@ import (
 	"github.com/cavaliergopher/grab/v3"
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
+	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
 )
 
 // DownloadAndProcessWhiteboardFile downloads and processes a pre-uploaded whiteboard file.
 // It validates the file, saves it, and triggers conversion and broadcasting.
 // This should be run in a separate goroutine due to its potentially long execution time.
-func (m *FileModel) DownloadAndProcessWhiteboardFile(roomId, roomSid, fileUrl string, maxSize uint64, log *logrus.Entry) (*ConvertWhiteboardFileRes, error) {
+func (m *FileModel) DownloadAndProcessWhiteboardFile(roomId, roomSid, fileUrl string, maxSize uint64, lock *redisservice.Lock, log *logrus.Entry) (*ConvertWhiteboardFileRes, error) {
 	log = log.WithFields(logrus.Fields{
 		"sub-method": "DownloadAndProcessWhiteboardFile",
 	})
 
 	filePath, err := m.downloadFile(m.ctx, fileUrl, roomSid, maxSize, log)
 	if err != nil {
+		if lock != nil {
+			_ = lock.Unlock(context.Background())
+		}
 		return nil, err
 	}
 	log.Info("File downloaded successfully")
@@ -32,7 +36,7 @@ func (m *FileModel) DownloadAndProcessWhiteboardFile(roomId, roomSid, fileUrl st
 	relativeFilePath := filepath.Join(roomSid, filepath.Base(filePath))
 
 	// Convert and broadcast. This is a synchronous, long-running task.
-	res, err := m.ConvertAndBroadcastWhiteboardFile(m.ctx, roomId, roomSid, relativeFilePath, nil, log)
+	res, err := m.ConvertAndBroadcastWhiteboardFile(m.ctx, roomId, roomSid, relativeFilePath, nil, lock, log)
 	if err != nil {
 		log.WithError(err).Errorln("conversion/broadcast failed")
 		return nil, fmt.Errorf("conversion/broadcast failed: %w", err)

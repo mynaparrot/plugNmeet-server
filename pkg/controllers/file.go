@@ -189,7 +189,7 @@ func (fc *FileController) HandleConvertWhiteboardFile(c fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.RequestCtx(), 30*time.Second)
 	defer cancel()
 
-	res, err := fc.FileModel.ConvertAndBroadcastWhiteboardFile(ctx, req.RoomId, req.RoomSid, req.FilePath, requestedUserId, log)
+	res, err := fc.FileModel.ConvertAndBroadcastWhiteboardFile(ctx, req.RoomId, req.RoomSid, req.FilePath, requestedUserId, nil, log)
 	if err != nil {
 		if errors.Is(err, config.ErrConversionTimeout) {
 			// process will continue in background

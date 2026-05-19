@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
 )
 
@@ -43,7 +44,7 @@ type conversionResult struct {
 
 // ConvertAndBroadcastWhiteboardFile starts a file conversion and waits for the result up to the context's timeout.
 // If the timeout is exceeded, it returns ErrConversionTimeout, but the background process continues.
-func (m *FileModel) ConvertAndBroadcastWhiteboardFile(ctx context.Context, roomId, roomSid, filePath string, requestedUserId *string, log *logrus.Entry) (*ConvertWhiteboardFileRes, error) {
+func (m *FileModel) ConvertAndBroadcastWhiteboardFile(ctx context.Context, roomId, roomSid, filePath string, requestedUserId *string, lock *redisservice.Lock, log *logrus.Entry) (*ConvertWhiteboardFileRes, error) {
 	log = m.logger.WithFields(logrus.Fields{
 		"roomId":     roomId,
 		"roomSid":    roomSid,
@@ -54,6 +55,9 @@ func (m *FileModel) ConvertAndBroadcastWhiteboardFile(ctx context.Context, roomI
 
 	// Run the conversion in a goroutine.
 	go func() {
+		if lock != nil {
+			defer lock.Unlock(context.Background())
+		}
 		res, err := m.processAndBroadcastWhiteboardFile(roomId, roomSid, filePath, requestedUserId, log)
 		resultChan <- conversionResult{res, err}
 	}()

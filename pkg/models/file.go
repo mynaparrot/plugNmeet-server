@@ -13,26 +13,29 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
+	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
 )
 
 type FileModel struct {
-	ctx         context.Context
-	app         *config.AppConfig
-	ds          *dbservice.DatabaseService
-	natsService *natsservice.NatsService
-	userModel   *UserModel
-	logger      *logrus.Entry
+	ctx          context.Context
+	app          *config.AppConfig
+	ds           *dbservice.DatabaseService
+	natsService  *natsservice.NatsService
+	redisService *redisservice.RedisService
+	userModel    *UserModel
+	logger       *logrus.Entry
 }
 
-func NewFileModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, natsService *natsservice.NatsService, um *UserModel, logger *logrus.Logger) *FileModel {
+func NewFileModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, natsService *natsservice.NatsService, rs *redisservice.RedisService, um *UserModel, logger *logrus.Logger) *FileModel {
 	return &FileModel{
-		ctx:         ctx,
-		app:         app,
-		ds:          ds,
-		natsService: natsService,
-		userModel:   um,
-		logger:      logger.WithField("model", "file"),
+		ctx:          ctx,
+		app:          app,
+		ds:           ds,
+		natsService:  natsService,
+		redisService: rs,
+		userModel:    um,
+		logger:       logger.WithField("model", "file"),
 	}
 }
 

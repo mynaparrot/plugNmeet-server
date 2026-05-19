@@ -1,12 +1,14 @@
 package models
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/gofiber/fiber/v3"
@@ -239,15 +241,34 @@ func (m *FileModel) combineResumableFiles(req *plugnmeet.UploadedFileMergeReq, c
 	return combinedFile, nil
 }
 
-func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.NatsKvRoomInfo) (plugnmeet.StatusCode, *fiber.Error) {
+func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.NatsKvRoomInfo) (statusCode plugnmeet.StatusCode, fiberErr *fiber.Error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"method":  "UploadWhiteboardFileFromAuthApi",
 		"roomId":  rf.RoomId,
 		"roomSid": rf.RoomSid,
 	})
 	log.Info("New whiteboard file upload request received")
-	maxSize := m.app.UploadFileSettings.MaxSizeWhiteboardFile * 1024 * 1024
 
+	// Lock to prevent concurrent processing in the same room
+	lock := m.redisService.NewLock(fmt.Sprintf("whiteboardUploadLock-%s", rf.RoomId), 5*time.Minute)
+	locked, err := lock.TryLock(c.RequestCtx())
+	if err != nil {
+		log.WithError(err).Error("failed to acquire lock")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, "failed to acquire lock")
+	}
+	if !locked {
+		log.Warn("another whiteboard file upload is already in progress")
+		return plugnmeet.StatusCode_CONFLICT, fiber.NewError(fiber.StatusConflict, "Another whiteboard file upload is already in progress for this room")
+	}
+	defer func() {
+		if fiberErr != nil {
+			// if error other than timeout then we'll unlock as it's real error
+			_ = lock.Unlock(context.Background())
+		}
+	}()
+	// otherwise unlock will be from the relevant process
+
+	maxSize := m.app.UploadFileSettings.MaxSizeWhiteboardFile * 1024 * 1024
 	documentLink := c.FormValue("document_link")
 	if documentLink != "" {
 		gLog := m.logger.WithFields(logrus.Fields{
@@ -258,7 +279,7 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 
 		// Run download and conversion in the background
 		go func() {
-			_, err := m.DownloadAndProcessWhiteboardFile(rf.RoomId, rf.RoomSid, documentLink, maxSize, gLog)
+			_, err := m.DownloadAndProcessWhiteboardFile(rf.RoomId, rf.RoomSid, documentLink, maxSize, lock, gLog)
 			errChan <- err
 		}()
 
@@ -312,7 +333,7 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 	}
 
 	// now we're good to for start converting, ConvertAndBroadcastWhiteboardFile expect savePath not full path
-	if _, err := m.ConvertAndBroadcastWhiteboardFile(c.RequestCtx(), rf.RoomId, rf.RoomSid, savePath, nil, log); err != nil {
+	if _, err := m.ConvertAndBroadcastWhiteboardFile(c.RequestCtx(), rf.RoomId, rf.RoomSid, savePath, nil, lock, log); err != nil {
 		if errors.Is(err, config.ErrConversionTimeout) {
 			// process will continue in background
 			return plugnmeet.StatusCode_SUCCESS, nil
