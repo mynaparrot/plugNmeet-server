@@ -86,7 +86,8 @@ func (ac *AuthController) HandleVerifyHeaderToken(c fiber.Ctx) error {
 
 	errStatus := fiber.StatusUnauthorized
 	path := c.Path()
-	if strings.Contains(path, "file_upload") {
+	if strings.Contains(path, "fileUpload") {
+		// mostly to handle resumable.js path
 		errStatus = fiber.StatusBadRequest
 	}
 
