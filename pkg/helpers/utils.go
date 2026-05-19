@@ -55,8 +55,7 @@ func GenerateSipPin(length int) string {
 
 var (
 	// A minimal regex to remove characters that are illegal in Windows filenames,
-	// plus the null byte which is a general security risk. This is much more
-	// permissive than the previous version to preserve original filenames.
+	// plus the null byte which is a general security risk.
 	// We explicitly include / and \ even though filepath.Base handles them, for clarity.
 	minimalIllegalChars = regexp.MustCompile(`[<>:"/\\|?*\x00]`)
 )
