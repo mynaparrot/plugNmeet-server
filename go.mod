@@ -12,14 +12,14 @@ require (
 	github.com/go-sql-driver/mysql v1.10.0
 	github.com/goccy/go-json v0.10.6
 	github.com/gofiber/fiber/v3 v3.2.0
-	github.com/gofiber/template/html/v3 v3.0.3
+	github.com/gofiber/template/html/v3 v3.0.4
 	github.com/google/uuid v1.6.0
 	github.com/google/wire v0.7.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/media-sdk v0.0.0-20260424094251-1e21ae1138de
 	github.com/livekit/protocol v1.45.8
 	github.com/livekit/server-sdk-go/v2 v2.16.3
-	github.com/mynaparrot/plugnmeet-protocol v1.2.2-0.20260517215845-e3b1d636d838
+	github.com/mynaparrot/plugnmeet-protocol v1.2.2-0.20260519095518-e59837f54570
 	github.com/nats-io/jwt/v2 v2.8.1
 	github.com/nats-io/nats.go v1.52.0
 	github.com/nats-io/nkeys v0.4.15
@@ -62,7 +62,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gofiber/schema v1.7.1 // indirect
 	github.com/gofiber/template/v2 v2.1.0 // indirect
-	github.com/gofiber/utils/v2 v2.0.4 // indirect
+	github.com/gofiber/utils/v2 v2.0.5 // indirect
 	github.com/google/cel-go v0.28.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect

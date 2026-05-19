@@ -189,7 +189,7 @@ func (m *RoomModel) BroadcastToRoom(r *plugnmeet.BroadcastToRoomReq) (plugnmeet.
 		}
 
 		if users == nil {
-			return plugnmeet.StatusCode_USER_NOT_FOUND, fmt.Errorf("no online user found")
+			return plugnmeet.StatusCode_USER_NOT_FOUND, config.NoOnlineUserFound
 		}
 
 		for _, u := range users {
@@ -198,8 +198,11 @@ func (m *RoomModel) BroadcastToRoom(r *plugnmeet.BroadcastToRoomReq) (plugnmeet.
 			}
 		}
 		if len(toUsersIds) == 0 {
-			return plugnmeet.StatusCode_USER_NOT_FOUND, fmt.Errorf("no online admin user found")
+			return plugnmeet.StatusCode_USER_NOT_FOUND, config.NoOnlineAdminFound
 		}
+	}
+	if r.ToUserId != nil && *r.ToUserId != "" {
+		toUsersIds[*r.ToUserId] = true
 	}
 
 	var event plugnmeet.NatsMsgServerToClientEvents
@@ -215,15 +218,9 @@ func (m *RoomModel) BroadcastToRoom(r *plugnmeet.BroadcastToRoomReq) (plugnmeet.
 			SentAt:    time.Now().UnixMilli(),
 			WithSound: v.NotificationMsg.WithSound,
 		}
-		if v.NotificationMsg.ToUserId != nil && *v.NotificationMsg.ToUserId != "" {
-			toUsersIds[*v.NotificationMsg.ToUserId] = true
-		}
 	case *plugnmeet.BroadcastToRoomReq_ChatMsg:
 		event = plugnmeet.NatsMsgServerToClientEvents_SYSTEM_CHAT_MSG
 		data = v.ChatMsg.Message
-		if v.ChatMsg.ToUserId != nil && *v.ChatMsg.ToUserId != "" {
-			toUsersIds[*v.ChatMsg.ToUserId] = true
-		}
 	}
 
 	if len(toUsersIds) > 0 {
