@@ -44,16 +44,16 @@ func (ac *AuthController) HandleAuthHeaderCheck(c fiber.Ctx) error {
 
 	if apiKey == "" {
 		c.Status(fiber.StatusUnauthorized)
-		return utils.SendCommonProtoJsonResponse(c, false, "Missing API-KEY header.", plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER)
+		return ac.sendVerificationRes(c, false, "Missing API-KEY header.", plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER)
 	}
 	if apiKey != ac.AppConfig.Client.ApiKey {
 		c.Status(fiber.StatusUnauthorized)
-		return utils.SendCommonProtoJsonResponse(c, false, "Invalid API key provided.", plugnmeet.StatusCode_INVALID_API_KEY)
+		return ac.sendVerificationRes(c, false, "Invalid API key provided.", plugnmeet.StatusCode_INVALID_API_KEY)
 	}
 
 	if signature == "" {
 		c.Status(fiber.StatusUnauthorized)
-		return utils.SendCommonProtoJsonResponse(c, false, "Missing HASH-SIGNATURE header.", plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER)
+		return ac.sendVerificationRes(c, false, "Missing HASH-SIGNATURE header.", plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER)
 	}
 
 	mac := hmac.New(sha256.New, []byte(ac.AppConfig.Client.Secret))
@@ -63,7 +63,7 @@ func (ac *AuthController) HandleAuthHeaderCheck(c fiber.Ctx) error {
 		if roomId == "" {
 			// The client MUST send Room-Id for the signature contract to be met.
 			c.Status(fiber.StatusUnauthorized)
-			return utils.SendCommonProtoJsonResponse(c, false, "Missing Room-Id header for multipart request.", plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER)
+			return ac.sendVerificationRes(c, false, "Missing Room-Id header for multipart request.", plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER)
 		}
 		mac.Write([]byte(roomId))
 	} else {
@@ -74,7 +74,7 @@ func (ac *AuthController) HandleAuthHeaderCheck(c fiber.Ctx) error {
 	expectedSignature := hex.EncodeToString(mac.Sum(nil))
 	if subtle.ConstantTimeCompare([]byte(expectedSignature), []byte(signature)) != 1 {
 		c.Status(fiber.StatusUnauthorized)
-		return utils.SendCommonProtoJsonResponse(c, false, "Failed to verify provided authentication details.", plugnmeet.StatusCode_INVALID_TOKEN_OR_SIGNATURE)
+		return ac.sendVerificationRes(c, false, "Failed to verify provided authentication details.", plugnmeet.StatusCode_INVALID_TOKEN_OR_SIGNATURE)
 	}
 
 	return c.Next()
@@ -92,7 +92,7 @@ func (ac *AuthController) HandleVerifyHeaderToken(c fiber.Ctx) error {
 
 	if authToken == "" {
 		_ = c.SendStatus(errStatus)
-		return utils.SendCommonProtoJsonResponse(c, false, "notifications.auth-header-missing", plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER)
+		return ac.sendVerificationRes(c, false, "notifications.auth-header-missing", plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER)
 	}
 
 	claims, err := ac.AuthModel.VerifyPlugNmeetAccessToken(authToken, 0)
@@ -102,14 +102,34 @@ func (ac *AuthController) HandleVerifyHeaderToken(c fiber.Ctx) error {
 		if errors.Is(err, jwt.ErrExpired) {
 			errMsg = "notifications.token-expired"
 		}
-		return utils.SendCommonProtoJsonResponse(c, false, errMsg, plugnmeet.StatusCode_INVALID_TOKEN_OR_SIGNATURE)
+		return ac.sendVerificationRes(c, false, errMsg, plugnmeet.StatusCode_INVALID_TOKEN_OR_SIGNATURE)
+	}
+
+	rf, err := ac.NatsService.GetRoomInfo(claims.RoomId)
+	if err != nil {
+		_ = c.SendStatus(errStatus)
+		return ac.sendVerificationRes(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
+	}
+	if rf == nil || rf.DbTableId == 0 {
+		_ = c.SendStatus(errStatus)
+		return ac.sendVerificationRes(c, false, "notifications.room-not-active", plugnmeet.StatusCode_ROOM_NOT_FOUND)
 	}
 
 	c.Locals("isAdmin", claims.IsAdmin)
 	c.Locals("roomId", claims.RoomId)
+	c.Locals("roomSid", rf.RoomSid)
+	c.Locals("roomDbTableId", rf.DbTableId)
 	c.Locals("requestedUserId", claims.UserId)
 
 	return c.Next()
+}
+
+func (ac *AuthController) sendVerificationRes(c fiber.Ctx, s bool, m string, statusCode plugnmeet.StatusCode) error {
+	cType := c.Get(fiber.HeaderContentType)
+	if cType == fiber.MIMEApplicationJSON {
+		return utils.SendCommonProtoJsonResponse(c, s, m, statusCode)
+	}
+	return utils.SendCommonProtobufResponse(c, s, m)
 }
 
 // HandleVerifyToken verifies a user's token before they join a room.

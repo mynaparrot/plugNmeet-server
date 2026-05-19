@@ -41,24 +41,15 @@ func NewFileController(config *config.AppConfig, fm *models.FileModel, rm *model
 // HandleFileUpload method can only be use if you are using resumable.js as your frontend.
 // Library link: https://github.com/23/resumable.js
 func (fc *FileController) HandleFileUpload(c fiber.Ctx) error {
-	roomId := fiber.Locals[string](c, "roomId")
-	requestedUserId := fiber.Locals[string](c, "requestedUserId")
-
 	// this will be used to verify regarding file origin only
 	req := new(models.ResumableUploadReq)
 	if err := c.Bind().Query(req); err != nil {
 		return commonFileErrorResponse(c, err.Error(), fiber.StatusBadRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
-	if req.RoomSid == "" || req.RoomId == "" || req.UserId == "" {
-		return commonFileErrorResponse(c, "missing required fields", fiber.StatusBadRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
-	}
-	if roomId != req.RoomId {
-		return commonFileErrorResponse(c, "token roomId & requested roomId didn't matched", fiber.StatusBadRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
-	}
-	if requestedUserId != req.UserId {
-		return commonFileErrorResponse(c, "token roomId & requested roomId didn't matched", fiber.StatusBadRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
-	}
+	req.RoomId = fiber.Locals[string](c, "roomId")
+	req.RoomSid = fiber.Locals[string](c, "roomSid")
+	req.UserId = fiber.Locals[string](c, "requestedUserId")
 
 	res, fErr := fc.FileModel.ResumableFileUpload(c)
 	if fErr != nil {
@@ -83,15 +74,12 @@ func (fc *FileController) HandleUploadedFileMerge(c fiber.Ctx) error {
 	} else {
 		err = protojson.Unmarshal(c.Body(), req)
 	}
-
 	if err != nil {
 		return commonFileErrorResponse(c, err.Error(), fiber.StatusBadRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
-	if req.RoomSid == "" || req.RoomId == "" {
-		return commonFileErrorResponse(c, "missing required fields", fiber.StatusBadRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
-	}
-
+	req.RoomId = fiber.Locals[string](c, "roomId")
+	req.RoomSid = fiber.Locals[string](c, "roomSid")
 	res, err := fc.FileModel.UploadedFileMerge(req)
 	if err != nil {
 		return commonFileErrorResponse(c, err.Error(), fiber.StatusBadRequest, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)

@@ -44,19 +44,20 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx) (*plugnmeet.UploadedFileRes
 	if req.RoomId == "" || req.RoomSid == "" {
 		return nil, fiber.NewError(fiber.StatusBadRequest, "roomId or roomSid is empty")
 	}
+	safeIdentifier := helpers.MakeSafeFilename(req.ResumableIdentifier)
 
 	// Create a logger with more context for this specific upload operation.
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId":              req.RoomId,
 		"roomSid":             req.RoomSid,
 		"userId":              req.UserId,
-		"resumableIdentifier": req.ResumableIdentifier,
+		"resumableIdentifier": safeIdentifier,
 		"resumableFilename":   req.ResumableFilename,
 		"method":              "ResumableFileUpload",
 	})
 
 	tempFolder := filepath.Join(m.app.UploadFileSettings.Path, req.RoomSid, "tmp")
-	chunkDir := filepath.Join(tempFolder, req.ResumableIdentifier)
+	chunkDir := filepath.Join(tempFolder, safeIdentifier)
 	chunkPath := filepath.Join(chunkDir, fmt.Sprintf("part%d", req.ResumableChunkNumber))
 
 	switch c.Method() {
