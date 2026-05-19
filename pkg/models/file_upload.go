@@ -250,9 +250,7 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 	documentLink := c.FormValue("document_link")
 	if documentLink != "" {
 		gLog := m.logger.WithFields(logrus.Fields{
-			"roomId":  rf.RoomId,
-			"roomSid": rf.RoomSid,
-			"url":     documentLink,
+			"url": documentLink,
 		})
 		gLog.Info("Starting async download and processing of whiteboard file")
 		errChan := make(chan error, 1)
