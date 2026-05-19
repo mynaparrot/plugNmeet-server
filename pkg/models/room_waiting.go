@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
 func (m *RoomModel) ApproveWaitingUsers(r *plugnmeet.ApproveWaitingUsersReq) error {
@@ -53,7 +54,7 @@ func (m *RoomModel) UpdateWaitingRoomMessage(r *plugnmeet.UpdateWaitingRoomMessa
 		return err
 	}
 	if roomMeta == nil {
-		return fmt.Errorf("invalid nil room metadata information")
+		return config.InvalidNilRoomMetadata
 	}
 
 	roomMeta.RoomFeatures.WaitingRoomFeatures.WaitingRoomMsg = r.Msg

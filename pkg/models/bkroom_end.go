@@ -2,8 +2,8 @@ package models
 
 import (
 	"context"
-	"errors"
 
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/sirupsen/logrus"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -15,17 +15,16 @@ func (m *BreakoutRoomModel) EndBreakoutRoom(ctx context.Context, r *plugnmeet.En
 		"breakoutRoomId": r.BreakoutRoomId,
 		"method":         "EndBreakoutRoom",
 	})
-	log.Infoln("request to end a single breakout room")
+	log.Infoln("Request received to end a single breakout room")
 
 	rm, err := m.rs.GetBreakoutRoom(r.RoomId, r.BreakoutRoomId)
 	if err != nil {
-		log.WithError(err).Error("failed to get breakout room from nats")
+		log.WithError(err).Error("Failed to get breakout room from nats")
 		return err
 	}
 	if rm == "" {
-		err = errors.New("breakout room not found")
-		log.WithError(err).Warn()
-		return err
+		log.WithError(config.NoBreakoutRoomsFound).Warn()
+		return config.NoBreakoutRoomsFound
 	}
 	m.proceedToEndBkRoom(ctx, r.BreakoutRoomId, r.RoomId, log)
 	return nil
@@ -40,7 +39,7 @@ func (m *BreakoutRoomModel) EndAllBreakoutRoomsByParentRoomId(ctx context.Contex
 
 	ids, err := m.rs.GetBreakoutRoomIdsByParentRoomId(parentRoomId)
 	if err != nil {
-		log.WithError(err).Error("failed to get breakout room ids from nats")
+		log.WithError(err).Error("Failed to get breakout room ids from nats")
 		return err
 	}
 
@@ -56,28 +55,33 @@ func (m *BreakoutRoomModel) EndAllBreakoutRoomsByParentRoomId(ctx context.Contex
 }
 
 func (m *BreakoutRoomModel) proceedToEndBkRoom(ctx context.Context, bkRoomId, parentRoomId string, log *logrus.Entry) {
-	roomLog := log.WithField("breakoutRoomId", bkRoomId)
-	roomLog.Info("proceeding to end breakout room")
+	roomLog := log.WithFields(logrus.Fields{
+		"breakoutRoomId": bkRoomId,
+		"method":         "proceedToEndBkRoom",
+	})
+	roomLog.Info("Proceeding to end breakout room")
 
 	ok, msg, _ := m.rm.EndRoom(ctx, &plugnmeet.RoomEndReq{RoomId: bkRoomId})
 	if !ok {
-		roomLog.WithField("endRoomMsg", msg).Error("failed to end breakout room via room model")
+		roomLog.WithField("endRoomMsg", msg).Error("Failed to end breakout room via room model")
 	}
 
 	err := m.rs.DeleteBreakoutRoom(parentRoomId, bkRoomId)
 	if err != nil {
-		roomLog.WithError(err).Error("failed to delete breakout room from nats")
+		roomLog.WithError(err).Error("Failed to delete breakout room from nats")
 	}
 
 	m.onAfterBkRoomEnded(parentRoomId, bkRoomId, roomLog)
 }
 
 func (m *BreakoutRoomModel) onAfterBkRoomEnded(parentRoomId, bkRoomId string, log *logrus.Entry) {
-	log.Info("performing post-end tasks for breakout room")
+	log = log.WithField("method", "onAfterBkRoomEnded")
+	log.Info("Performing post-end tasks for breakout room")
+
 	if c, err := m.rs.CountBreakoutRooms(parentRoomId); err == nil && c == 0 {
-		log.Info("last breakout room ended, cleaning up parent room metadata")
+		log.Info("Last breakout room ended, cleaning up parent room metadata")
 		// no room left so, delete breakoutRoomKey key for this room
-		m.rs.DeleteAllBreakoutRoomsByParentRoomId(parentRoomId)
+		_ = m.rs.DeleteAllBreakoutRoomsByParentRoomId(parentRoomId)
 		_ = m.updateParentRoomMetadata(parentRoomId, log)
 	}
 	// notify to the room for updating list
@@ -87,31 +91,31 @@ func (m *BreakoutRoomModel) onAfterBkRoomEnded(parentRoomId, bkRoomId string, lo
 }
 
 func (m *BreakoutRoomModel) updateParentRoomMetadata(parentRoomId string, log *logrus.Entry) error {
-	log.Info("updating parent room metadata to disable breakout room features")
+	log = log.WithField("method", "updateParentRoomMetadata")
+	log.Info("Updating parent room metadata to disable breakout room features")
 	// if no rooms left, then we can update metadata
 	meta, err := m.natsService.GetRoomMetadataStruct(parentRoomId)
 	if err != nil {
-		log.WithError(err).Error("failed to get parent room metadata")
+		log.WithError(err).Error("Failed to get parent room metadata")
 		return err
 	}
 	if meta == nil {
-		log.Warn("parent room metadata not found, likely room already ended")
+		log.Warn("Parent room metadata not found, likely room already ended")
 		return nil
 	}
 
 	if !meta.RoomFeatures.BreakoutRoomFeatures.IsActive {
-		log.Info("breakout room feature is already inactive in parent room metadata")
+		log.Info("Breakout room feature is already inactive in parent room metadata")
 		return nil
 	}
 
 	meta.RoomFeatures.BreakoutRoomFeatures.IsActive = false
-	err = m.natsService.UpdateAndBroadcastRoomMetadata(parentRoomId, meta)
-	if err != nil {
-		log.WithError(err).Error("failed to update and broadcast parent room metadata")
+	if err = m.natsService.UpdateAndBroadcastRoomMetadata(parentRoomId, meta); err != nil {
+		log.WithError(err).Error("Failed to update and broadcast parent room metadata")
 		return err
 	}
 
-	log.Info("successfully updated parent room metadata")
+	log.Info("Successfully updated parent room metadata")
 	return nil
 }
 
@@ -126,7 +130,7 @@ func (m *BreakoutRoomModel) PostTaskAfterRoomEndWebhook(ctx context.Context, roo
 	}
 	meta, err := m.natsService.UnmarshalRoomMetadata(metadata)
 	if err != nil {
-		log.WithError(err).Warn("could not unmarshal room metadata, skipping breakout room webhook tasks")
+		log.WithError(err).Warn("Could not unmarshal room metadata, skipping breakout room webhook tasks")
 		return err
 	}
 

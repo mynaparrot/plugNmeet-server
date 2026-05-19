@@ -56,6 +56,10 @@ func (m *BreakoutRoomModel) JoinBreakoutRoom(ctx context.Context, r *plugnmeet.J
 		return "", err
 	}
 
+	if p == nil || meta == nil {
+		return "", errors.New("failed to get user info from parent room")
+	}
+
 	req := &plugnmeet.GenerateTokenReq{
 		RoomId: r.BreakoutRoomId,
 		UserInfo: &plugnmeet.UserInfo{

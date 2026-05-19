@@ -20,16 +20,16 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 		"method":   "CreateBreakoutRooms",
 		"numRooms": len(r.Rooms),
 	})
-	log.Infoln("request to create breakout rooms")
+	log.Infoln("New request to create breakout rooms received")
 
 	mainRoom, meta, err := m.natsService.GetRoomInfoWithMetadata(r.RoomId)
 	if err != nil {
-		log.WithError(err).Error("failed to get parent room info")
+		log.WithError(err).Error("Failed to get parent room info")
 		return err
 	}
 
 	if mainRoom == nil || meta == nil {
-		err = errors.New("invalid parent room information")
+		err = errors.New("invalid empty parent room information")
 		log.WithError(err).Error()
 		return err
 	}
@@ -38,7 +38,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	if meta.RoomFeatures.RoomDuration != nil && *meta.RoomFeatures.RoomDuration > 0 {
 		err = m.rm.CompareDurationWithParentRoom(r.RoomId, r.Duration)
 		if err != nil {
-			log.WithError(err).Error("duration comparison with parent room failed")
+			log.WithError(err).Error("Duration comparison with parent room failed")
 			return err
 		}
 	}
@@ -77,7 +77,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 		_, err := m.rm.CreateRoom(userCtx, bRoom)
 
 		if err != nil {
-			roomLog.WithError(err).Error("failed to create breakout room")
+			roomLog.WithError(err).Error("Failed to create breakout room")
 			e[bRoom.RoomId] = true
 			continue
 		}
@@ -87,14 +87,14 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 
 		marshal, err := protojson.Marshal(room)
 		if err != nil {
-			roomLog.WithError(err).Error("failed to marshal breakout room data")
+			roomLog.WithError(err).Error("Failed to marshal breakout room data")
 			e[bRoom.RoomId] = true
 			continue
 		}
 
 		err = m.rs.InsertOrUpdateBreakoutRoom(r.RoomId, bRoom.RoomId, marshal)
 		if err != nil {
-			roomLog.WithError(err).Error("failed to insert breakout room in nats")
+			roomLog.WithError(err).Error("Failed to insert breakout room in nats")
 			e[bRoom.RoomId] = true
 			continue
 		}
@@ -103,7 +103,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 		for _, u := range room.Users {
 			err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_JOIN_BREAKOUT_ROOM, r.RoomId, bRoom.RoomId, &u.Id)
 			if err != nil {
-				roomLog.WithError(err).WithField("userId", u.Id).Error("failed to send breakout room invitation")
+				roomLog.WithError(err).WithField("userId", u.Id).Error("Failed to send breakout room invitation")
 				continue
 			}
 		}
@@ -118,13 +118,13 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	// again here for update
 	origMeta, err := m.natsService.UnmarshalRoomMetadata(mainRoom.Metadata)
 	if err != nil {
-		log.WithError(err).Error("failed to unmarshal original parent room metadata")
+		log.WithError(err).Error("Failed to unmarshal original parent room metadata")
 		return err
 	}
 	origMeta.RoomFeatures.BreakoutRoomFeatures.IsActive = true
 	err = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, origMeta)
 	if err != nil {
-		log.WithError(err).Error("failed to update parent room metadata")
+		log.WithError(err).Error("Failed to update parent room metadata")
 	}
 
 	// send analytics
@@ -134,7 +134,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 		RoomId:    r.RoomId,
 	})
 
-	log.Info("finished creating breakout rooms")
+	log.Info("Finished breakout rooms creation")
 	return err
 }
 
@@ -144,7 +144,7 @@ func (m *BreakoutRoomModel) PostTaskAfterRoomStartWebhook(roomId string, metadat
 		"parentRoomId": metadata.ParentRoomId,
 		"method":       "PostTaskAfterRoomStartWebhook",
 	})
-	log.Info("handling post-start tasks for breakout room")
+	log.Info("Handling post-start tasks for breakout room")
 
 	// now in livekit rooms are created almost instantly & sending webhook response
 	// if this happened then we'll have to wait few seconds otherwise room info can't be found
@@ -152,7 +152,7 @@ func (m *BreakoutRoomModel) PostTaskAfterRoomStartWebhook(roomId string, metadat
 
 	room, err := m.fetchBreakoutRoom(metadata.ParentRoomId, roomId)
 	if err != nil {
-		log.WithError(err).Error("failed to fetch breakout room info")
+		log.WithError(err).Error("Failed to fetch breakout room info")
 		return err
 	}
 	room.Created = metadata.StartedAt
@@ -160,16 +160,16 @@ func (m *BreakoutRoomModel) PostTaskAfterRoomStartWebhook(roomId string, metadat
 
 	marshal, err := protojson.Marshal(room)
 	if err != nil {
-		log.WithError(err).Error("failed to marshal breakout room data")
+		log.WithError(err).Error("Failed to marshal breakout room data")
 		return err
 	}
 
 	err = m.rs.InsertOrUpdateBreakoutRoom(metadata.ParentRoomId, roomId, marshal)
 	if err != nil {
-		log.WithError(err).Error("failed to update breakout room info in nats")
+		log.WithError(err).Error("Failed to update breakout room info in nats")
 		return err
 	}
 
-	log.Info("successfully handled post-start tasks for breakout room")
+	log.Info("Successfully handled post-start tasks for breakout room")
 	return nil
 }

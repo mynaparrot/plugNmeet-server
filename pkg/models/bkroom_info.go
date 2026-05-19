@@ -1,9 +1,8 @@
 package models
 
 import (
-	"errors"
-
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -15,7 +14,7 @@ func (m *BreakoutRoomModel) GetBreakoutRooms(roomId string) ([]*plugnmeet.Breako
 	}
 
 	if breakoutRooms == nil || len(breakoutRooms) == 0 {
-		return nil, errors.New("no breakout rooms found")
+		return nil, config.NoBreakoutRoomsFound
 	}
 
 	return breakoutRooms, nil
@@ -28,7 +27,7 @@ func (m *BreakoutRoomModel) GetMyBreakoutRooms(roomId, userId string) (*plugnmee
 	}
 
 	if breakoutRooms == nil || len(breakoutRooms) == 0 {
-		return nil, errors.New("no breakout rooms found")
+		return nil, config.NoBreakoutRoomsFound
 	}
 
 	for _, rr := range breakoutRooms {
@@ -39,7 +38,7 @@ func (m *BreakoutRoomModel) GetMyBreakoutRooms(roomId, userId string) (*plugnmee
 		}
 	}
 
-	return nil, errors.New("not found")
+	return nil, config.NotFoundErr
 }
 
 func (m *BreakoutRoomModel) fetchBreakoutRoom(roomId, breakoutRoomId string) (*plugnmeet.BreakoutRoom, error) {
@@ -48,7 +47,7 @@ func (m *BreakoutRoomModel) fetchBreakoutRoom(roomId, breakoutRoomId string) (*p
 		return nil, err
 	}
 	if result == "" {
-		return nil, errors.New("not info found")
+		return nil, config.NotFoundErr
 	}
 
 	room := new(plugnmeet.BreakoutRoom)

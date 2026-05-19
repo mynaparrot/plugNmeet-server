@@ -20,10 +20,10 @@ func (m *EtherpadModel) CreateSession(roomId, requestedUserId string) (*plugnmee
 		"requestedUserId": requestedUserId,
 		"method":          "CreateSession",
 	})
-	log.Infoln("request to create etherpad session")
+	log.Infoln("New request to create Etherpad session received")
 
 	if len(m.app.SharedNotePad.EtherpadHosts) < 1 {
-		err := errors.New("need at least one etherpad host")
+		err := errors.New("need at least one Etherpad host")
 		log.WithError(err).Error()
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func (m *EtherpadModel) CreateSession(roomId, requestedUserId string) (*plugnmee
 	}
 	if r.Code > 0 {
 		err = errors.New(r.Message)
-		log.WithError(err).Error("etherpad API returned error while creating pad")
+		log.WithError(err).Error("Etherpad API returned error while creating pad")
 		return nil, err
 	}
 
@@ -58,7 +58,7 @@ func (m *EtherpadModel) CreateSession(roomId, requestedUserId string) (*plugnmee
 	}
 	if r.Code > 0 {
 		err = errors.New(r.Message)
-		log.WithError(err).Error("etherpad API returned error while creating readonly pad")
+		log.WithError(err).Error("Etherpad API returned error while creating readonly pad")
 		return nil, err
 	}
 	res.ReadonlyPadId = &r.Data.ReadOnlyID
@@ -66,18 +66,18 @@ func (m *EtherpadModel) CreateSession(roomId, requestedUserId string) (*plugnmee
 	// add roomId to redis for this node
 	err = m.rs.AddEtherpadRoom(selectedHost.Id, roomId)
 	if err != nil {
-		log.WithError(err).Errorln("failed to add room to etherpad in nats")
+		log.WithError(err).Errorln("Failed to add room to Etherpad in NATS")
 	}
 
 	// finally, update to room
 	err = m.addPadToRoomMetadata(roomId, selectedHost, res, log)
 	if err != nil {
-		log.WithError(err).Errorln("failed to add pad to room metadata")
+		log.WithError(err).Errorln("Failed to add pad to room metadata")
 	}
 
 	res.Status = true
 	res.Msg = "success"
-	log.Info("successfully created etherpad session")
+	log.Info("Successfully created Etherpad session")
 	return res, nil
 }
 
@@ -101,7 +101,7 @@ func (m *EtherpadModel) createReadonlyPad(host *config.EtherpadInfo, sessionId s
 // selectHost will choose server based on simple active number
 func (m *EtherpadModel) selectHost(log *logrus.Entry) (*config.EtherpadInfo, error) {
 	log = log.WithField("method", "selectHost")
-	log.Info("selecting an etherpad host")
+	log.Info("Selecting an Etherpad host")
 
 	type host struct {
 		i      int
@@ -122,7 +122,7 @@ func (m *EtherpadModel) selectHost(log *logrus.Entry) (*config.EtherpadInfo, err
 		}
 	}
 	if len(hosts) == 0 {
-		err := fmt.Errorf("no active etherpad host found")
+		err := fmt.Errorf("no active Etherpad host found")
 		log.WithError(err).Error()
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func (m *EtherpadModel) selectHost(log *logrus.Entry) (*config.EtherpadInfo, err
 	log.WithFields(logrus.Fields{
 		"selectedHostId": selectedHost.Id,
 		"host":           selectedHost.Host,
-	}).Info("etherpad host selected")
+	}).Info("Etherpad host selected")
 	return &selectedHost, nil
 }
 
@@ -143,10 +143,9 @@ func (m *EtherpadModel) checkStatus(h config.EtherpadInfo, log *logrus.Entry) bo
 	log = log.WithField("checkingHost", h.Host)
 
 	vals := url.Values{}
-	_, err := m.postToEtherpad(&h, "getStats", vals, log)
-	if err != nil {
+	if _, err := m.postToEtherpad(&h, "getStats", vals, log); err != nil {
 		// postToEtherpad will log the error
-		log.Warn("etherpad host is not healthy")
+		log.Warn("Etherpad host is not healthy")
 		return false
 	}
 

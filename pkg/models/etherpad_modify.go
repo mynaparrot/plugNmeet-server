@@ -23,23 +23,22 @@ func (m *EtherpadModel) ChangeEtherpadStatus(r *plugnmeet.ChangeEtherpadStatusRe
 		"isActive": r.IsActive,
 		"method":   "ChangeEtherpadStatus",
 	})
-	log.Infoln("request to change etherpad status")
+	log.Infoln("Request to change Etherpad status received")
 
 	meta, err := m.natsService.GetRoomMetadataStruct(r.RoomId)
 	if err != nil {
-		log.WithError(err).Errorln("failed to get room metadata")
+		log.WithError(err).Errorln("Failed to get room metadata")
 		return err
 	}
 	if meta == nil {
-		err = errors.New("invalid nil room metadata information")
-		log.WithError(err).Errorln()
-		return err
+		log.WithError(config.InvalidNilRoomMetadata).Errorln()
+		return config.InvalidNilRoomMetadata
 	}
 
 	meta.RoomFeatures.SharedNotePadFeatures.IsActive = r.IsActive
 	err = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, meta)
 	if err != nil {
-		log.WithError(err).Errorln("failed to update and broadcast room metadata")
+		log.WithError(err).Errorln("Failed to update and broadcast room metadata")
 	}
 
 	// send analytics
@@ -58,14 +57,14 @@ func (m *EtherpadModel) ChangeEtherpadStatus(r *plugnmeet.ChangeEtherpadStatusRe
 	m.analyticsModel.HandleEvent(d)
 
 	if err == nil {
-		log.Info("successfully changed etherpad status")
+		log.Info("Successfully changed Etherpad status")
 	}
 	return err
 }
 
 func (m *EtherpadModel) addPadToRoomMetadata(roomId string, selectedHost *config.EtherpadInfo, c *plugnmeet.CreateEtherpadSessionRes, log *logrus.Entry) error {
 	log = log.WithField("method", "addPadToRoomMetadata")
-	log.Info("adding pad info to room metadata")
+	log.Info("Adding pad info to room metadata")
 
 	meta, err := m.natsService.GetRoomMetadataStruct(roomId)
 	if err != nil {
@@ -73,9 +72,8 @@ func (m *EtherpadModel) addPadToRoomMetadata(roomId string, selectedHost *config
 		return err
 	}
 	if meta == nil {
-		err = errors.New("invalid room information")
-		log.WithError(err).Errorln()
-		return err
+		log.WithError(config.InvalidNilRoomMetadata).Errorln()
+		return config.InvalidNilRoomMetadata
 	}
 
 	f := &plugnmeet.SharedNotePadFeatures{
@@ -88,9 +86,8 @@ func (m *EtherpadModel) addPadToRoomMetadata(roomId string, selectedHost *config
 	}
 	meta.RoomFeatures.SharedNotePadFeatures = f
 
-	err = m.natsService.UpdateAndBroadcastRoomMetadata(roomId, meta)
-	if err != nil {
-		log.WithError(err).Errorln("failed to update and broadcast room metadata")
+	if err = m.natsService.UpdateAndBroadcastRoomMetadata(roomId, meta); err != nil {
+		log.WithError(err).Error("Failed to update and broadcast room metadata")
 	}
 
 	// send analytics
@@ -102,13 +99,16 @@ func (m *EtherpadModel) addPadToRoomMetadata(roomId string, selectedHost *config
 	})
 
 	if err == nil {
-		log.Info("successfully added pad to room metadata")
+		log.Info("Successfully added pad to room metadata")
 	}
 	return err
 }
 
 func (m *EtherpadModel) postToEtherpad(host *config.EtherpadInfo, method string, vals url.Values, log *logrus.Entry) (*EtherpadHttpRes, error) {
-	log = log.WithField("etherpadMethod", method)
+	log = log.WithFields(logrus.Fields{
+		"etherpadMethod": method,
+		"method":         "postToEtherpad",
+	})
 
 	if host.Id == "" {
 		err := errors.New("no notepad nodeId found")
@@ -124,14 +124,14 @@ func (m *EtherpadModel) postToEtherpad(host *config.EtherpadInfo, method string,
 	client := &http.Client{}
 	en := vals.Encode()
 	endPoint := fmt.Sprintf("%s/api/%s/%s?%s", host.Host, APIVersion, method, en)
-	log.WithField("endpoint", endPoint).Debug("sending request to etherpad")
+	log.WithField("endpoint", endPoint).Debug("Sending request to Etherpad")
 
 	ctx, cancel := context.WithTimeout(m.ctx, 20*time.Second)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, "GET", endPoint, nil)
 	if err != nil {
-		log.WithError(err).Error("failed to create http request")
+		log.WithError(err).Error("Failed to create http request")
 		return nil, err
 	}
 
@@ -145,20 +145,19 @@ func (m *EtherpadModel) postToEtherpad(host *config.EtherpadInfo, method string,
 
 	if res.StatusCode != 200 {
 		err = fmt.Errorf("received non-200 status code: %s", res.Status)
-		log.WithError(err).Error("etherpad API request failed")
+		log.WithError(err).Error("Etherpad API request failed")
 		return nil, err
 	}
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		log.WithError(err).Error("failed to read response body")
+		log.WithError(err).Error("Failed to read response body")
 		return nil, err
 	}
 
 	mar := new(EtherpadHttpRes)
-	err = json.Unmarshal(body, mar)
-	if err != nil {
-		log.WithError(err).Error("failed to unmarshal etherpad response")
+	if err = json.Unmarshal(body, mar); err != nil {
+		log.WithError(err).Error("Failed to unmarshal Etherpad response")
 		return nil, err
 	}
 
@@ -166,12 +165,13 @@ func (m *EtherpadModel) postToEtherpad(host *config.EtherpadInfo, method string,
 }
 
 func (m *EtherpadModel) getAccessToken(host *config.EtherpadInfo, log *logrus.Entry) (string, error) {
+	log = log.WithField("method", "getAccessToken")
 	token, _ := m.rs.GetEtherpadToken(host.Id)
 	if token != "" {
-		log.Debug("using cached etherpad access token")
+		log.Debug("using cached Etherpad access token")
 		return token, nil
 	}
-	log.Info("requesting new etherpad access token")
+	log.Info("Requesting new Etherpad access token")
 
 	data := url.Values{}
 	data.Set("grant_type", "client_credentials")
@@ -184,7 +184,7 @@ func (m *EtherpadModel) getAccessToken(host *config.EtherpadInfo, log *logrus.En
 
 	req, err := http.NewRequest("POST", urlPath, strings.NewReader(encodedData))
 	if err != nil {
-		log.WithError(err).Error("failed to create http request for access token")
+		log.WithError(err).Error("Failed to create http request for access token")
 		return "", err
 	}
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -203,7 +203,7 @@ func (m *EtherpadModel) getAccessToken(host *config.EtherpadInfo, log *logrus.En
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		log.WithError(err).Error("failed to read access token response body")
+		log.WithError(err).Error("Failed to read access token response body")
 		return "", err
 	}
 
@@ -212,7 +212,7 @@ func (m *EtherpadModel) getAccessToken(host *config.EtherpadInfo, log *logrus.En
 	}{}
 	err = json.Unmarshal(body, &vals)
 	if err != nil {
-		log.WithError(err).Error("failed to unmarshal access token response")
+		log.WithError(err).Error("Failed to unmarshal access token response")
 		return "", err
 	}
 
@@ -225,7 +225,7 @@ func (m *EtherpadModel) getAccessToken(host *config.EtherpadInfo, log *logrus.En
 	// we'll store the value with expiry of 30-minute max
 	err = m.rs.AddEtherpadToken(host.Id, vals.AccessToken, time.Minute*30)
 	if err != nil {
-		log.WithError(err).Warn("failed to cache etherpad access token")
+		log.WithError(err).Warn("Failed to cache Etherpad access token")
 	}
 
 	return vals.AccessToken, nil

@@ -15,7 +15,7 @@ func (m *EtherpadModel) CleanPad(roomId, nodeId, padId string) error {
 		"padId":  padId,
 		"method": "CleanPad",
 	})
-	log.Infoln("Request to clean etherpad pad")
+	log.Infoln("Request to clean Etherpad pad")
 
 	var selectedHost *config.EtherpadInfo
 	for _, h := range m.app.SharedNotePad.EtherpadHosts {
@@ -36,15 +36,15 @@ func (m *EtherpadModel) CleanPad(roomId, nodeId, padId string) error {
 	_, err := m.postToEtherpad(selectedHost, "deletePad", vals, log)
 	if err != nil {
 		// postToEtherpad will log the error details, so we just log a warning here.
-		log.WithError(err).Warn("failed to delete pad from etherpad, continuing cleanup")
+		log.WithError(err).Warn("failed to delete pad from Etherpad, continuing cleanup")
 	}
 
 	// add roomId to redis for this node
 	if err = m.rs.RemoveEtherpadRoom(nodeId, roomId); err != nil {
-		log.WithError(err).Error("failed to remove room from etherpad nats store")
+		log.WithError(err).Error("failed to remove room from Etherpad nats store")
 	}
 
-	log.Info("Successfully cleaned etherpad pad")
+	log.Info("Successfully cleaned Etherpad pad")
 	return nil
 }
 
@@ -73,6 +73,6 @@ func (m *EtherpadModel) CleanAfterRoomEnd(roomId, metadata string) error {
 		return nil
 	}
 
-	log.Info("Triggering etherpad cleanup after room end")
+	log.Info("Triggering Etherpad cleanup after room end")
 	return m.CleanPad(roomId, np.NodeId, np.NotePadId)
 }

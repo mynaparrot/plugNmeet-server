@@ -133,7 +133,7 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx) (*plugnmeet.UploadedFileRes
 
 // UploadedFileMerge will combine all the parts and create a final file
 func (m *FileModel) UploadedFileMerge(req *plugnmeet.UploadedFileMergeReq) (*plugnmeet.UploadedFileRes, error) {
-	safeFilename := filepath.Base(req.ResumableFilename)
+	safeFilename := helpers.MakeSafeFilename(req.ResumableFilename)
 	tempFolder := filepath.Join(m.app.UploadFileSettings.Path, req.RoomSid, "tmp")
 	chunkDir := filepath.Join(tempFolder, req.ResumableIdentifier)
 

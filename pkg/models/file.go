@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"mime/multipart"
 	"os"
@@ -72,7 +71,7 @@ func (m *FileModel) updateRoomMetadataWithOfficeFile(roomId string, f *ConvertWh
 		return err
 	}
 	if roomMeta == nil {
-		return errors.New("invalid nil room metadata information")
+		return config.InvalidNilRoomMetadata
 	}
 
 	wbf := roomMeta.RoomFeatures.WhiteboardFeatures
