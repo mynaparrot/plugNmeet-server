@@ -305,8 +305,9 @@ func (m *RoomModel) prepareWhiteboardPreloadFile(meta *plugnmeet.RoomMetadata, r
 	})
 
 	log.Info("Preparing preloaded whiteboard file")
+	maxSize := *m.app.RoomDefaultSettings.MaxPreloadedWhiteboardFileSizeByte
 
-	if _, err := m.fileModel.DownloadAndProcessPreUploadWBfile(roomId, roomSid, preloadFile, log); err != nil {
+	if _, err := m.fileModel.DownloadAndProcessWhiteboardFile(roomId, roomSid, preloadFile, maxSize, log); err != nil {
 		log.WithError(err).Error("Failed to download and process preloaded whiteboard file")
 		if notifyErr := m.natsService.NotifyErrorMsg(roomId, "notifications.preloaded-whiteboard-file-processing-error", nil); notifyErr != nil {
 			log.WithError(notifyErr).Error("failed to send notification for whiteboard processing error")

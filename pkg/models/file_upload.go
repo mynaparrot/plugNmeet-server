@@ -245,14 +245,47 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 		"roomSid": rf.RoomSid,
 	})
 	log.Info("New whiteboard file upload request received")
+	maxSize := m.app.UploadFileSettings.MaxSizeWhiteboardFile * 1024 * 1024
 
+	documentLink := c.FormValue("document_link")
+	if documentLink != "" {
+		gLog := m.logger.WithFields(logrus.Fields{
+			"roomId":  rf.RoomId,
+			"roomSid": rf.RoomSid,
+			"url":     documentLink,
+		})
+		gLog.Info("Starting async download and processing of whiteboard file")
+		errChan := make(chan error, 1)
+
+		// Run download and conversion in the background
+		go func() {
+			_, err := m.DownloadAndProcessWhiteboardFile(rf.RoomId, rf.RoomSid, documentLink, maxSize, gLog)
+			errChan <- err
+		}()
+
+		select {
+		case err := <-errChan:
+			if err != nil {
+				gLog.WithError(err).Error("Failed to process file")
+				return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusBadRequest, err.Error())
+			}
+			gLog.Info("File successfully processed")
+		case <-c.RequestCtx().Done():
+			// The handler's timeout was reached.
+			gLog.Warn("Handler timeout reached, conversion will continue in background")
+		}
+
+		return plugnmeet.StatusCode_SUCCESS, nil
+	}
+
+	// The rest of the function handles direct file uploads
 	document, err := c.FormFile("document")
 	if err != nil {
 		return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusBadRequest, err.Error())
 	}
 
 	// Check file size before saving
-	if document.Size > int64(m.app.UploadFileSettings.MaxSizeWhiteboardFile*1024*1024) {
+	if document.Size > int64(maxSize) {
 		return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.ErrRequestEntityTooLarge
 	}
 
@@ -280,7 +313,7 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 	}
 
 	// now we're good to for start converting, ConvertAndBroadcastWhiteboardFile expect savePath not full path
-	if _, err = m.ConvertAndBroadcastWhiteboardFile(c.RequestCtx(), rf.RoomId, rf.RoomSid, savePath, nil); err != nil {
+	if _, err := m.ConvertAndBroadcastWhiteboardFile(c.RequestCtx(), rf.RoomId, rf.RoomSid, savePath, nil, log); err != nil {
 		if errors.Is(err, config.ErrConversionTimeout) {
 			// process will continue in background
 			return plugnmeet.StatusCode_SUCCESS, nil

@@ -43,12 +43,18 @@ type conversionResult struct {
 
 // ConvertAndBroadcastWhiteboardFile starts a file conversion and waits for the result up to the context's timeout.
 // If the timeout is exceeded, it returns ErrConversionTimeout, but the background process continues.
-func (m *FileModel) ConvertAndBroadcastWhiteboardFile(ctx context.Context, roomId, roomSid, filePath string, requestedUserId *string) (*ConvertWhiteboardFileRes, error) {
+func (m *FileModel) ConvertAndBroadcastWhiteboardFile(ctx context.Context, roomId, roomSid, filePath string, requestedUserId *string, log *logrus.Entry) (*ConvertWhiteboardFileRes, error) {
+	log = m.logger.WithFields(logrus.Fields{
+		"roomId":     roomId,
+		"roomSid":    roomSid,
+		"filePath":   filePath,
+		"sub-method": "ConvertAndBroadcastWhiteboardFile",
+	})
 	resultChan := make(chan conversionResult, 1)
 
 	// Run the conversion in a goroutine.
 	go func() {
-		res, err := m.processAndBroadcastWhiteboardFile(roomId, roomSid, filePath, requestedUserId)
+		res, err := m.processAndBroadcastWhiteboardFile(roomId, roomSid, filePath, requestedUserId, log)
 		resultChan <- conversionResult{res, err}
 	}()
 
@@ -58,7 +64,7 @@ func (m *FileModel) ConvertAndBroadcastWhiteboardFile(ctx context.Context, roomI
 		return result.res, result.err
 	case <-ctx.Done():
 		// The handler's timeout was reached.
-		m.logger.WithFields(logrus.Fields{
+		log.WithFields(logrus.Fields{
 			"roomId":   roomId,
 			"filePath": filePath,
 		}).Infoln("handler timeout reached, conversion will continue in background")
@@ -67,13 +73,8 @@ func (m *FileModel) ConvertAndBroadcastWhiteboardFile(ctx context.Context, roomI
 }
 
 // processAndBroadcastWhiteboardFile contains the original, unmodified conversion logic.
-func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath string, requestedUserId *string) (res *ConvertWhiteboardFileRes, err error) {
-	log := m.logger.WithFields(logrus.Fields{
-		"roomId":   roomId,
-		"roomSid":  roomSid,
-		"filePath": filePath,
-		"method":   "processAndBroadcastWhiteboardFile",
-	})
+func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath string, requestedUserId *string, log *logrus.Entry) (res *ConvertWhiteboardFileRes, err error) {
+	log = m.logger.WithField("sub-method", "processAndBroadcastWhiteboardFile")
 	log.Infoln("New request to convert and broadcast whiteboard file received")
 
 	if roomId == "" || filePath == "" {

@@ -171,6 +171,7 @@ func (fc *FileController) HandleDownloadUploadedFile(c fiber.Ctx) error {
 
 // HandleConvertWhiteboardFile handles converting a file for the whiteboard.
 func (fc *FileController) HandleConvertWhiteboardFile(c fiber.Ctx) error {
+	log := fc.logger.WithField("method", "HandleConvertWhiteboardFile")
 	req := new(models.ConvertWhiteboardFileReq)
 	err := c.Bind().Body(req)
 	if err != nil {
@@ -200,7 +201,7 @@ func (fc *FileController) HandleConvertWhiteboardFile(c fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.RequestCtx(), 30*time.Second)
 	defer cancel()
 
-	res, err := fc.FileModel.ConvertAndBroadcastWhiteboardFile(ctx, req.RoomId, req.RoomSid, req.FilePath, requestedUserId)
+	res, err := fc.FileModel.ConvertAndBroadcastWhiteboardFile(ctx, req.RoomId, req.RoomSid, req.FilePath, requestedUserId, log)
 	if err != nil {
 		if errors.Is(err, config.ErrConversionTimeout) {
 			// process will continue in background
