@@ -46,7 +46,10 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx) (*plugnmeet.UploadedFileRes
 	if req.RoomId == "" || req.RoomSid == "" {
 		return nil, fiber.NewError(fiber.StatusBadRequest, "roomId or roomSid is empty")
 	}
-	safeIdentifier := helpers.MakeSafeFilename(req.ResumableIdentifier)
+	safeIdentifier := helpers.MakeSafeFilename(req.ResumableIdentifier, false)
+	if safeIdentifier == "" {
+		return nil, fiber.NewError(fiber.StatusBadRequest, "invalid resumableIdentifier")
+	}
 
 	// Create a logger with more context for this specific upload operation.
 	log := m.logger.WithFields(logrus.Fields{
@@ -93,21 +96,15 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx) (*plugnmeet.UploadedFileRes
 			return nil, fiber.NewError(fiber.StatusBadRequest, "missing 'file' in form-data")
 		}
 
-		file, err := reqf.Open()
-		if err != nil {
-			log.WithError(err).Errorln("failed to open multipart file header")
-			return nil, fiber.NewError(fiber.StatusInternalServerError, "failed to open uploaded file")
-		}
-		defer file.Close()
-
 		if req.ResumableChunkNumber == 1 {
+			file, err := reqf.Open()
+			if err != nil {
+				log.WithError(err).Errorln("failed to open multipart file header")
+				return nil, fiber.NewError(fiber.StatusInternalServerError, "failed to open uploaded file")
+			}
+			// etectMimeTypeForValidation will run f.Close() in defer
 			if err := m.detectMimeTypeForValidation(file); err != nil {
 				return nil, fiber.NewError(fiber.StatusUnsupportedMediaType, err.Error())
-			}
-			// Reset reader to the beginning of the file for the next read (io.Copy)
-			if _, err := file.Seek(0, io.SeekStart); err != nil {
-				log.WithError(err).Errorln("failed to reset file reader")
-				return nil, fiber.NewError(fiber.StatusInternalServerError, "failed to reset file reader")
 			}
 		}
 
@@ -116,14 +113,7 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx) (*plugnmeet.UploadedFileRes
 			return nil, fiber.NewError(fiber.StatusInternalServerError, "failed to create chunk directory")
 		}
 
-		out, err := os.OpenFile(chunkPath, os.O_WRONLY|os.O_CREATE, 0644)
-		if err != nil {
-			log.WithError(err).Errorln("failed to create chunk file")
-			return nil, fiber.NewError(fiber.StatusServiceUnavailable, "failed to create chunk file")
-		}
-		defer out.Close()
-
-		if _, err := io.Copy(out, file); err != nil {
+		if err := c.SaveFile(reqf, chunkPath); err != nil {
 			log.WithError(err).Errorln("failed to write chunk data")
 			return nil, fiber.NewError(fiber.StatusServiceUnavailable, "failed to write chunk data")
 		}
@@ -136,7 +126,11 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx) (*plugnmeet.UploadedFileRes
 
 // UploadedFileMerge will combine all the parts and create a final file
 func (m *FileModel) UploadedFileMerge(req *plugnmeet.UploadedFileMergeReq) (*plugnmeet.UploadedFileRes, error) {
-	safeFilename := helpers.MakeSafeFilename(req.ResumableFilename)
+	safeFilename := helpers.MakeSafeFilename(req.ResumableFilename, true)
+	req.ResumableIdentifier = helpers.MakeSafeFilename(req.ResumableIdentifier, false) // should be fine here as already uploaded
+	if req.ResumableIdentifier == "" {
+		return nil, fmt.Errorf("invalid empty resumableIdentifier")
+	}
 	tempFolder := filepath.Join(m.app.UploadFileSettings.Path, req.RoomSid, "tmp")
 	chunkDir := filepath.Join(tempFolder, req.ResumableIdentifier)
 
@@ -313,18 +307,18 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 	if err != nil {
 		return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusBadRequest, err.Error())
 	}
-	defer f.Close()
 
+	// detectMimeTypeForValidation will run f.Close() in defer
 	if err := m.detectMimeTypeForValidation(f); err != nil {
 		return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusBadRequest, err.Error())
 	}
 
-	fileName := helpers.MakeSafeFilename(document.Filename)
+	fileName := helpers.MakeSafeFilename(document.Filename, true)
 	savePath := filepath.Join(rf.RoomSid, fileName)
 	finalFile := filepath.Join(m.app.UploadFileSettings.Path, savePath)
 
 	if err := os.MkdirAll(filepath.Join(m.app.UploadFileSettings.Path, rf.RoomSid), 0755); err != nil {
-		log.WithError(err).Errorln("failed to create chunk directory")
+		log.WithError(err).Errorln("failed to create file directory")
 		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, "failed to create directory")
 	}
 

@@ -54,37 +54,32 @@ func GenerateSipPin(length int) string {
 }
 
 var (
-	// Match anything that is NOT a Unicode letter, number, dash, dot, or underscore.
-	// \p{L} matches any kind of letter from any language.
-	// \p{N} matches any kind of numeric character in any script.
-	illegalNameChars = regexp.MustCompile(`[^\p{L}\p{N}\.\-\_]`)
-
-	// Match multiple consecutive underscores to clean up the resulting string.
-	multipleUnderscores = regexp.MustCompile(`_+`)
+	// A minimal regex to remove characters that are illegal in Windows filenames,
+	// plus the null byte which is a general security risk. This is much more
+	// permissive than the previous version to preserve original filenames.
+	// We explicitly include / and \ even though filepath.Base handles them, for clarity.
+	minimalIllegalChars = regexp.MustCompile(`[<>:"/\\|?*\x00]`)
 )
 
-// MakeSafeFilename sanitizes a string to be used as a safe filename, preserving Unicode.
-func MakeSafeFilename(name string) string {
-	// 1. Prevent path traversal by extracting only the base file name
-	// (e.g., "../../secret.txt" becomes "secret.txt")
+// MakeSafeFilename sanitizes a string to be used as a safe filename.
+// It is designed to be as permissive as possible, only removing characters
+// that are illegal on major filesystems or pose a security risk.
+func MakeSafeFilename(name string, fallbackToUUID bool) string {
+	// 1. Prevent path traversal. This is the most important security step.
 	name = filepath.Base(filepath.Clean(name))
 
-	// 2. Replace illegal characters (like spaces, slashes, quotes) with an underscore
-	safeName := illegalNameChars.ReplaceAllString(name, "_")
+	// 2. Replace the minimal set of illegal/unsafe characters with an underscore.
+	safeName := minimalIllegalChars.ReplaceAllString(name, "_")
 
-	// 3. Clean up multiple consecutive underscores for better readability
-	safeName = multipleUnderscores.ReplaceAllString(safeName, "_")
+	// 3. Trim leading/trailing dots and spaces, which can cause issues on Windows.
+	safeName = strings.Trim(safeName, " .")
 
-	// 4. Trim leading/trailing dots, spaces, or underscores (Windows dislikes trailing dots)
-	safeName = strings.Trim(safeName, " ._")
-
-	// 5. Provide a fallback if the resulting string is empty
-	if safeName == "" {
+	// 4. Provide a fallback if the sanitization results in an empty string.
+	if safeName == "" && fallbackToUUID {
 		return uuid.New().String()
 	}
 
-	// 6. Enforce a max length of 255 bytes (standard limit for ext4, NTFS, APFS)
-	// We truncate by runes rather than bytes to prevent slicing a multibyte Unicode character in half.
+	// 5. Enforce a standard max length to prevent filesystem errors.
 	const maxBytes = 255
 	if len(safeName) > maxBytes {
 		runes := []rune(safeName)

@@ -16,7 +16,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -67,35 +66,18 @@ func (fc *FileController) HandleFileUpload(c fiber.Ctx) error {
 // HandleUploadedFileMerge handles merging chunks of a resumable upload.
 func (fc *FileController) HandleUploadedFileMerge(c fiber.Ctx) error {
 	req := new(plugnmeet.UploadedFileMergeReq)
-	ctnType := c.Get("Content-Type")
-	var err error
-	if ctnType == "application/protobuf" {
-		err = proto.Unmarshal(c.Body(), req)
-	} else {
-		err = protojson.Unmarshal(c.Body(), req)
-	}
-	if err != nil {
-		return commonFileErrorResponse(c, err.Error(), fiber.StatusBadRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
 	req.RoomId = fiber.Locals[string](c, "roomId")
 	req.RoomSid = fiber.Locals[string](c, "roomSid")
 	res, err := fc.FileModel.UploadedFileMerge(req)
 	if err != nil {
-		return commonFileErrorResponse(c, err.Error(), fiber.StatusBadRequest, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
-	}
-
-	if ctnType == "application/protobuf" {
-		return utils.SendProtobufResponse(c, res)
-	}
-
-	// for backward compatibility
-	marshal, err := protojson.Marshal(res)
-	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
-	c.Set("Content-Type", "application/json")
-	return c.Send(marshal)
+
+	return utils.SendProtobufResponse(c, res)
 }
 
 // HandleUploadBase64EncodedData handles uploading base64 encoded data.

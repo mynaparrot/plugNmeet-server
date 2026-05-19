@@ -107,7 +107,7 @@ func (m *FileModel) downloadFile(ctx context.Context, fileUrl, roomSid string, m
 		return "", err
 	}
 
-	safeFileName := helpers.MakeSafeFilename(filepath.Base(resp.Filename))
+	safeFileName := helpers.MakeSafeFilename(filepath.Base(resp.Filename), true)
 	newPath := filepath.Join(filepath.Dir(resp.Filename), safeFileName)
 
 	if err := os.Rename(resp.Filename, newPath); err != nil {
