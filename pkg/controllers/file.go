@@ -3,8 +3,9 @@ package controllers
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/url"
+	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -50,7 +51,11 @@ func (fc *FileController) HandleFileUpload(c fiber.Ctx) error {
 	req.RoomSid = fiber.Locals[string](c, "roomSid")
 	req.UserId = fiber.Locals[string](c, "requestedUserId")
 
-	res, fErr := fc.FileModel.ResumableFileUpload(c)
+	if req.RoomSid == "" || req.RoomId == "" {
+		return commonFileErrorResponse(c, "missing required fields", fiber.StatusBadRequest, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
+	}
+
+	res, fErr := fc.FileModel.ResumableFileUpload(c, req)
 	if fErr != nil {
 		return commonFileErrorResponse(c, fErr.Message, fErr.Code, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
@@ -102,7 +107,7 @@ func (fc *FileController) HandleUploadBase64EncodedData(c fiber.Ctx) error {
 // HandleUploadWhiteboardFile will upload file from Auth API.
 // Uploading from client we use resumable.js library not this endpoint.
 func (fc *FileController) HandleUploadWhiteboardFile(c fiber.Ctx) error {
-	roomId := c.Get("Room-Id")
+	roomId := c.Get(config.HeaderRoomId)
 	if roomId == "" {
 		return commonFileErrorResponse(c, "missing required header Room-Id", fiber.StatusBadRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
@@ -124,33 +129,67 @@ func (fc *FileController) HandleUploadWhiteboardFile(c fiber.Ctx) error {
 func (fc *FileController) HandleDownloadUploadedFile(c fiber.Ctx) error {
 	sid := c.Params("sid")
 	otherParts := c.Params("*")
-	otherParts, _ = url.QueryUnescape(otherParts)
-
-	file := fmt.Sprintf("%s/%s/%s", fc.AppConfig.UploadFileSettings.Path, sid, otherParts)
-	mtype, err := mimetype.DetectFile(file)
+	otherParts, err := url.QueryUnescape(otherParts)
 	if err != nil {
-		ms := strings.SplitN(err.Error(), "/", -1)
-		return c.Status(fiber.StatusNotFound).SendString(ms[len(ms)-1])
+		return c.Status(fiber.StatusBadRequest).SendString("invalid file path")
+	}
+
+	// prevent path traversal
+	if strings.Contains(otherParts, "..") || strings.Contains(sid, "..") {
+		return c.Status(fiber.StatusBadRequest).SendString("invalid file path")
+	}
+
+	// prevent to download from temp dir by checking path segments
+	cleanedPath := path.Clean(otherParts)
+	pathSegments := strings.Split(cleanedPath, "/")
+	for _, segment := range pathSegments {
+		if segment == config.UploadFileTempDir {
+			return c.Status(fiber.StatusForbidden).SendString("access to temporary directory is forbidden")
+		}
+	}
+
+	basePath := fc.AppConfig.UploadFileSettings.Path
+	file := filepath.Join(basePath, sid, otherParts)
+
+	// ensure the final path is within the intended directory
+	absBasePath, err := filepath.Abs(basePath)
+	if err != nil {
+		fc.logger.WithError(err).Errorln("failed to get absolute path for base directory")
+		return c.Status(fiber.StatusInternalServerError).SendString("internal server error")
+	}
+	absFile, err := filepath.Abs(file)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).SendString("invalid file path")
+	}
+
+	if !strings.HasPrefix(absFile, absBasePath) {
+		return c.Status(fiber.StatusBadRequest).SendString("invalid file path")
+	}
+
+	mType, err := mimetype.DetectFile(file)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).SendString("file not found")
 	}
 
 	ff := strings.SplitN(file, "/", -1)
 	c.Set("Content-Disposition", "attachment; filename="+strconv.Quote(ff[len(ff)-1]))
-	c.Set("Content-Type", mtype.String())
+	c.Set("Content-Type", mType.String())
 
 	return c.SendFile(file)
 }
 
 // HandleConvertWhiteboardFile handles converting a file for the whiteboard.
 func (fc *FileController) HandleConvertWhiteboardFile(c fiber.Ctx) error {
-	log := fc.logger.WithField("method", "HandleConvertWhiteboardFile")
 	req := new(models.ConvertWhiteboardFileReq)
-	err := c.Bind().Body(req)
-	if err != nil {
+	if err := c.Bind().Body(req); err != nil {
 		return c.JSON(fiber.Map{
 			"status": false,
 			"msg":    err.Error(),
 		})
 	}
+	req.RoomId = fiber.Locals[string](c, "roomId")
+	req.RoomSid = fiber.Locals[string](c, "roomSid")
+	requestedUserId := new(fiber.Locals[string](c, "requestedUserId"))
 
 	if req.RoomSid == "" || req.RoomId == "" {
 		_ = c.SendStatus(fiber.StatusBadRequest)
@@ -166,10 +205,10 @@ func (fc *FileController) HandleConvertWhiteboardFile(c fiber.Ctx) error {
 			"msg":    "file path require",
 		})
 	}
-	requestedUserId := new(fiber.Locals[string](c, "requestedUserId"))
+	log := fc.logger.WithField("method", "HandleConvertWhiteboardFile")
 
-	// We'll give 30 seconds to complete the task
-	ctx, cancel := context.WithTimeout(c.RequestCtx(), 30*time.Second)
+	// We'll give 25 seconds to complete the task
+	ctx, cancel := context.WithTimeout(c.RequestCtx(), 25*time.Second)
 	defer cancel()
 
 	res, err := fc.FileModel.ConvertAndBroadcastWhiteboardFile(ctx, req.RoomId, req.RoomSid, req.FilePath, requestedUserId, nil, log)
@@ -192,8 +231,7 @@ func (fc *FileController) HandleConvertWhiteboardFile(c fiber.Ctx) error {
 
 func (fc *FileController) HandleGetRoomFilesByType(c fiber.Ctx) error {
 	req := new(plugnmeet.GetRoomUploadedFilesReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
@@ -212,12 +250,12 @@ func (fc *FileController) HandleGetClientFiles(c fiber.Ctx) error {
 
 	if fc.AppConfig.Client.Debug {
 		var err error
-		cssFiles, err = utils.GetFilesFromDir(fc.AppConfig.Client.Path+"/assets/css", ".css", "des")
+		cssFiles, err = utils.GetFilesFromDir(path.Join(fc.AppConfig.Client.Path, "assets", "css"), ".css", "des")
 		if err != nil {
 			fc.logger.WithError(err).Errorln("error getting css files")
 		}
 
-		jsFiles, err = utils.GetFilesFromDir(fc.AppConfig.Client.Path+"/assets/js", ".js", "asc")
+		jsFiles, err = utils.GetFilesFromDir(path.Join(fc.AppConfig.Client.Path, "assets", "js"), ".js", "asc")
 		if err != nil {
 			fc.logger.WithError(err).Errorln("error getting js files")
 		}

@@ -10,6 +10,8 @@ const (
 	TTSAgentUserIdPrefix  = "pnm_tts_agent-"
 	SipUserIdPrefix       = "sip_"
 	RecorderUserAuthName  = "PLUGNMEET_RECORDER_AUTH"
+	HeaderRoomId          = "Room-Id"
+	UploadFileTempDir     = "tmp"
 
 	// all the time.Sleep() values
 	WaitBeforeTriggerOnAfterRoomEnded      = 10 * time.Second

@@ -57,9 +57,9 @@ func (ac *AuthController) HandleAuthHeaderCheck(c fiber.Ctx) error {
 	}
 
 	mac := hmac.New(sha256.New, []byte(ac.AppConfig.Client.Secret))
-	if strings.Contains(c.Get("Content-type"), "multipart/form-data") {
+	if c.Get(fiber.HeaderContentType) == fiber.MIMEMultipartForm {
 		// For multipart/form-data, we sign the Room-Id header to ensure its integrity.
-		roomId := c.Get("Room-Id")
+		roomId := c.Get(config.HeaderRoomId)
 		if roomId == "" {
 			// The client MUST send Room-Id for the signature contract to be met.
 			c.Status(fiber.StatusUnauthorized)
