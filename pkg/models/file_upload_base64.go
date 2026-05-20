@@ -66,7 +66,6 @@ func (m *FileModel) UploadBase64EncodedData(req *plugnmeet.UploadBase64EncodedDa
 		log.WithError(err).Error("failed to store file metadata in NATS")
 	}
 
-	//TODO: replace with UploadedFileMergeReq and set file ID
 	return &plugnmeet.UploadBase64EncodedDataRes{
 		Status:        true,
 		Msg:           "file uploaded successfully",
