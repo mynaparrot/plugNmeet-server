@@ -34,7 +34,7 @@ func (m *RoomModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoo
 		return res, nil, nil
 	}
 
-	if rInfo.Status == natsservice.RoomStatusCreated || rInfo.Status == natsservice.RoomStatusActive {
+	if m.natsService.IsRoomStatusActive(rInfo.Status) {
 		res.IsActive = true
 		res.Msg = "room is active"
 		res.StatusCode = plugnmeet.StatusCode_SUCCESS

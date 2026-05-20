@@ -83,6 +83,7 @@ func (fc *FileController) HandleUploadedFileMerge(c fiber.Ctx) error {
 // HandleUploadBase64EncodedData handles uploading base64 encoded data.
 func (fc *FileController) HandleUploadBase64EncodedData(c fiber.Ctx) error {
 	roomId := fiber.Locals[string](c, "roomId")
+	roomSid := fiber.Locals[string](c, "roomSid")
 
 	req := new(plugnmeet.UploadBase64EncodedDataReq)
 	if err := proto.Unmarshal(c.Body(), req); err != nil {
@@ -90,7 +91,7 @@ func (fc *FileController) HandleUploadBase64EncodedData(c fiber.Ctx) error {
 	}
 
 	req.RoomId = roomId
-	res, err := fc.FileModel.UploadBase64EncodedData(req)
+	res, err := fc.FileModel.UploadBase64EncodedData(req, roomSid)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}

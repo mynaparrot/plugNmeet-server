@@ -90,3 +90,9 @@ func (s *NatsService) GetRoomMetadataStruct(roomId string) (*plugnmeet.RoomMetad
 
 	return s.UnmarshalRoomMetadata(string(entry.Value()))
 }
+
+// IsRoomStatusActive determines if a given room status string represents
+// a state where the room is considered active (either newly created or actively running).
+func (s *NatsService) IsRoomStatusActive(status string) bool {
+	return status == RoomStatusCreated || status == RoomStatusActive
+}

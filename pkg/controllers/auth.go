@@ -111,7 +111,7 @@ func (ac *AuthController) HandleVerifyHeaderToken(c fiber.Ctx) error {
 		_ = c.SendStatus(errStatus)
 		return ac.sendVerificationRes(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
-	if rf == nil || rf.DbTableId == 0 {
+	if rf == nil || rf.DbTableId == 0 || !ac.NatsService.IsRoomStatusActive(rf.Status) {
 		_ = c.SendStatus(errStatus)
 		return ac.sendVerificationRes(c, false, "notifications.room-not-active", plugnmeet.StatusCode_ROOM_NOT_FOUND)
 	}
