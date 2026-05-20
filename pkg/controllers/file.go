@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -171,11 +170,10 @@ func (fc *FileController) HandleDownloadUploadedFile(c fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).SendString("file not found")
 	}
 
-	ff := strings.SplitN(file, "/", -1)
-	c.Set("Content-Disposition", "attachment; filename="+strconv.Quote(ff[len(ff)-1]))
-	c.Set("Content-Type", mType.String())
-
-	return c.SendFile(file)
+	c.Set(fiber.HeaderContentType, mType.String())
+	return c.SendFile(file, fiber.SendFile{
+		Download: true,
+	})
 }
 
 // HandleConvertWhiteboardFile handles converting a file for the whiteboard.

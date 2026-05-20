@@ -77,15 +77,15 @@ func (ac *ArtifactController) HandleDownloadArtifact(c fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).SendString("token required or invalid url")
 	}
 
-	filePath, fileName, err := ac.ArtifactModel.VerifyArtifactDownloadJWT(token)
+	filePath, mType, err := ac.ArtifactModel.VerifyArtifactDownloadJWT(token)
 	if err != nil {
 		// Use fiber.StatusBadRequest for client-side errors like invalid tokens.
 		return c.Status(fiber.StatusBadRequest).SendString(err.Error())
 	}
 
-	c.Attachment(fileName)
+	c.Set(fiber.HeaderContentType, mType.String())
 	return c.SendFile(filePath, fiber.SendFile{
-		Compress: false,
+		Download: true,
 	})
 }
 

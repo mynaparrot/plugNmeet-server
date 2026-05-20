@@ -4,9 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
+	"path/filepath"
 	"time"
 
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/gofiber/fiber/v3"
@@ -31,28 +32,32 @@ func (m *RecordingModel) CreateTokenForDownload(path string) (string, error) {
 }
 
 // VerifyRecordingToken verify token & provide file path
-func (m *RecordingModel) VerifyRecordingToken(token string) (string, int, error) {
+func (m *RecordingModel) VerifyRecordingToken(token string) (string, *mimetype.MIME, int, error) {
 	tok, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.HS256})
 	if err != nil {
-		return "", fiber.StatusUnauthorized, err
+		return "", nil, fiber.StatusUnauthorized, err
 	}
 
 	out := jwt.Claims{}
 	if err = tok.Claims([]byte(m.app.Client.Secret), &out); err != nil {
-		return "", fiber.StatusUnauthorized, err
+		return "", nil, fiber.StatusUnauthorized, err
 	}
 
 	if err = out.Validate(jwt.Expected{Issuer: m.app.Client.ApiKey, Time: time.Now().UTC()}); err != nil {
-		return "", fiber.StatusUnauthorized, err
+		if errors.Is(err, jwt.ErrExpired) {
+			return "", nil, fiber.StatusUnauthorized, errors.New("token expired")
+		}
+		return "", nil, fiber.StatusUnauthorized, err
 	}
 
 	file := fmt.Sprintf("%s/%s", m.app.RecorderInfo.RecordingFilesPath, out.Subject)
-	_, err = os.Lstat(file)
-
+	mType, err := mimetype.DetectFile(file)
 	if err != nil {
-		ms := strings.SplitN(err.Error(), "/", -1)
-		return "", fiber.StatusNotFound, errors.New(ms[len(ms)-1])
+		if os.IsNotExist(err) {
+			return "", nil, fiber.StatusNotFound, fmt.Errorf("record file %s not found", filepath.Base(file))
+		}
+		return "", nil, fiber.StatusInternalServerError, err
 	}
 
-	return file, fiber.StatusOK, nil
+	return file, mType, fiber.StatusOK, nil
 }

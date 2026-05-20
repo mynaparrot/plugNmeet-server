@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -140,37 +140,42 @@ func (m *ArtifactModel) GetArtifactDownloadToken(req *plugnmeet.GetArtifactDownl
 }
 
 // VerifyArtifactDownloadJWT validates a JWT and returns the file's absolute path and name.
-func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (string, string, error) {
+func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (string, *mimetype.MIME, error) {
 	tok, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.HS256})
 	if err != nil {
-		return "", "", err
+		return "", nil, err
 	}
 
 	out := jwt.Claims{}
 	if err = tok.Claims([]byte(m.app.Client.Secret), &out); err != nil {
-		return "", "", err
+		return "", nil, err
 	}
 
 	if err = out.Validate(jwt.Expected{
 		Issuer: m.app.Client.ApiKey,
 		Time:   time.Now().UTC(),
 	}); err != nil {
-		return "", "", err
+		if errors.Is(err, jwt.ErrExpired) {
+			return "", nil, errors.New("token expired")
+		}
+		return "", nil, err
 	}
 
 	relativePath := out.Subject
 	if relativePath == "" {
-		return "", "", errors.New("invalid token: file path not found")
+		return "", nil, errors.New("invalid token: file path not found")
 	}
 
 	absolutePath := filepath.Join(*m.app.ArtifactsSettings.StoragePath, relativePath)
-	f, err := os.Lstat(absolutePath)
+	mType, err := mimetype.DetectFile(absolutePath)
 	if err != nil {
-		ms := strings.SplitN(err.Error(), "/", -1)
-		return "", "", errors.New(ms[len(ms)-1])
+		if os.IsNotExist(err) {
+			return "", nil, fmt.Errorf("artifact file %s not found", filepath.Base(absolutePath))
+		}
+		return "", nil, err
 	}
 
-	return absolutePath, f.Name(), nil
+	return absolutePath, mType, nil
 }
 
 // DeleteArtifact checks permissions and deletes an artifact record and its associated file.

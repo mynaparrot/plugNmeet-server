@@ -132,13 +132,13 @@ func (ac *AnalyticsController) HandleDownloadAnalytics(c fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).SendString("token required or invalid url")
 	}
 
-	filePath, fileName, err := ac.artifactModel.VerifyArtifactDownloadJWT(token)
+	filePath, mType, err := ac.artifactModel.VerifyArtifactDownloadJWT(token)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).SendString(err.Error())
 	}
 
-	c.Attachment(fileName)
+	c.Set(fiber.HeaderContentType, mType.String())
 	return c.SendFile(filePath, fiber.SendFile{
-		Compress: false,
+		Download: true,
 	})
 }

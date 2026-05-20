@@ -139,14 +139,14 @@ func (rc *RecordingController) HandleDownloadRecording(c fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).SendString("token require or invalid url")
 	}
 
-	file, status, err := rc.recordingModel.VerifyRecordingToken(token)
+	file, mType, status, err := rc.recordingModel.VerifyRecordingToken(token)
 	if err != nil {
 		return c.Status(status).SendString(err.Error())
 	}
 
-	c.Attachment(file)
+	c.Set(fiber.HeaderContentType, mType.String())
 	return c.SendFile(file, fiber.SendFile{
-		Compress: false,
+		Download: true,
 	})
 }
 
