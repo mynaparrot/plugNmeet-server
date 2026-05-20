@@ -50,6 +50,10 @@ func (m *RecordingModel) VerifyRecordingToken(token string) (string, *mimetype.M
 		return "", nil, fiber.StatusUnauthorized, err
 	}
 
+	if out.Subject == "" {
+		return "", nil, fiber.StatusBadRequest, errors.New("invalid file path")
+	}
+
 	file := fmt.Sprintf("%s/%s", m.app.RecorderInfo.RecordingFilesPath, out.Subject)
 	mType, err := mimetype.DetectFile(file)
 	if err != nil {

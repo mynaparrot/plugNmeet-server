@@ -10,6 +10,7 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
+	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -140,15 +141,15 @@ func (m *ArtifactModel) GetArtifactDownloadToken(req *plugnmeet.GetArtifactDownl
 }
 
 // VerifyArtifactDownloadJWT validates a JWT and returns the file's absolute path and name.
-func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (string, *mimetype.MIME, error) {
+func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (string, *mimetype.MIME, int, error) {
 	tok, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.HS256})
 	if err != nil {
-		return "", nil, err
+		return "", nil, fiber.StatusUnauthorized, err
 	}
 
 	out := jwt.Claims{}
 	if err = tok.Claims([]byte(m.app.Client.Secret), &out); err != nil {
-		return "", nil, err
+		return "", nil, fiber.StatusUnauthorized, err
 	}
 
 	if err = out.Validate(jwt.Expected{
@@ -156,26 +157,26 @@ func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (string, *mimety
 		Time:   time.Now().UTC(),
 	}); err != nil {
 		if errors.Is(err, jwt.ErrExpired) {
-			return "", nil, errors.New("token expired")
+			return "", nil, fiber.StatusUnauthorized, errors.New("token expired")
 		}
-		return "", nil, err
+		return "", nil, fiber.StatusUnauthorized, err
 	}
 
 	relativePath := out.Subject
 	if relativePath == "" {
-		return "", nil, errors.New("invalid token: file path not found")
+		return "", nil, fiber.StatusBadRequest, errors.New("invalid file path")
 	}
 
 	absolutePath := filepath.Join(*m.app.ArtifactsSettings.StoragePath, relativePath)
 	mType, err := mimetype.DetectFile(absolutePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "", nil, fmt.Errorf("artifact file %s not found", filepath.Base(absolutePath))
+			return "", nil, fiber.StatusNotFound, fmt.Errorf("artifact file %s not found", filepath.Base(absolutePath))
 		}
-		return "", nil, err
+		return "", nil, fiber.StatusInternalServerError, err
 	}
 
-	return absolutePath, mType, nil
+	return absolutePath, mType, fiber.StatusOK, nil
 }
 
 // DeleteArtifact checks permissions and deletes an artifact record and its associated file.
