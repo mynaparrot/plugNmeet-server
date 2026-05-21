@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -272,6 +273,11 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 	maxSize := m.app.UploadFileSettings.MaxSizeWhiteboardFile * 1024 * 1024
 	documentLink := c.FormValue("document_link")
 	if documentLink != "" {
+		// fast checking and return if error
+		if _, err := url.ParseRequestURI(documentLink); err != nil {
+			return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusBadRequest, "Invalid document_link provided")
+		}
+
 		gLog := m.logger.WithFields(logrus.Fields{
 			"url": documentLink,
 		})
