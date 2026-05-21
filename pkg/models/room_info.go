@@ -24,13 +24,14 @@ func (m *RoomModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoo
 	rInfo, meta, err := m.natsService.GetRoomInfoWithMetadata(r.RoomId)
 	if err != nil {
 		res.Status = false
-		res.Msg = err.Error()
+		res.Msg = "error getting room info from NATS"
 		res.StatusCode = plugnmeet.StatusCode_INTERNAL_SERVER_ERROR
 		return res, nil, nil
 	}
 
 	if rInfo == nil || meta == nil {
-		// Room isn't active in NATS.
+		res.Msg = "room not found"
+		res.StatusCode = plugnmeet.StatusCode_ROOM_NOT_FOUND
 		return res, nil, nil
 	}
 
