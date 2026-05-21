@@ -57,7 +57,8 @@ func (ac *AuthController) HandleAuthHeaderCheck(c fiber.Ctx) error {
 	}
 
 	mac := hmac.New(sha256.New, []byte(ac.AppConfig.Client.Secret))
-	if c.Get(fiber.HeaderContentType) == fiber.MIMEMultipartForm {
+	// we should use strings.Contains to match as different platform may add extra data
+	if strings.Contains(c.Get(fiber.HeaderContentType), fiber.MIMEMultipartForm) {
 		// For multipart/form-data, we sign the Room-Id header to ensure its integrity.
 		roomId := c.Get(config.HeaderRoomId)
 		if roomId == "" {
@@ -127,10 +128,10 @@ func (ac *AuthController) HandleVerifyHeaderToken(c fiber.Ctx) error {
 
 func (ac *AuthController) sendVerificationRes(c fiber.Ctx, s bool, m string, statusCode plugnmeet.StatusCode) error {
 	cType := c.Get(fiber.HeaderContentType)
-	if cType == fiber.MIMEApplicationJSON {
-		return utils.SendCommonProtoJsonResponse(c, s, m, statusCode)
+	if cType == "application/protobuf" {
+		return utils.SendCommonProtobufResponse(c, s, m)
 	}
-	return utils.SendCommonProtobufResponse(c, s, m)
+	return utils.SendCommonProtoJsonResponse(c, s, m, statusCode)
 }
 
 // HandleVerifyToken verifies a user's token before they join a room.
