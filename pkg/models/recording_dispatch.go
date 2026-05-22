@@ -26,8 +26,10 @@ func (m *RecordingModel) DispatchRecorderTask(req *plugnmeet.RecordingReq) error
 		"task":   req.Task.String(),
 		"method": "DispatchRecorderTask",
 	})
+	isStartTask := false
 
 	if req.Task == plugnmeet.RecordingTasks_START_RECORDING || req.Task == plugnmeet.RecordingTasks_START_RTMP {
+		isStartTask = true
 		// we'll use a lock to ensure that we're not sending multiple requests for the same task
 		// we'll use a TTL of 30 seconds, which is more than enough for the recorder to respond
 		lockKey := fmt.Sprintf(redisservice.RecorderTaskLockKey, req.RoomId, req.Task.String())
@@ -126,6 +128,23 @@ func (m *RecordingModel) DispatchRecorderTask(req *plugnmeet.RecordingReq) error
 		err = errors.New(res.GetMsg())
 		log.WithError(err).Error("Recorder returned a non-successful response")
 		return err
+	}
+
+	// we'll update room metadata for recorder options
+	if isStartTask && req.RecorderBotOptions != nil {
+		if _, metadata, err := m.natsService.GetRoomInfoWithMetadata(req.RoomId); err == nil && metadata != nil {
+			if req.Task == plugnmeet.RecordingTasks_START_RECORDING {
+				metadata.RoomFeatures.RecordingFeatures.RecorderBotOptions = req.RecorderBotOptions
+			} else if req.Task == plugnmeet.RecordingTasks_START_RTMP {
+				metadata.RoomFeatures.ExternalBroadcastingFeatures.RecorderBotOptions = req.RecorderBotOptions
+			}
+
+			if err = m.natsService.UpdateAndBroadcastRoomMetadata(req.RoomId, metadata); err != nil {
+				log.WithError(err).Error("Failed to update room metadata")
+			}
+		} else {
+			log.WithError(err).Error("Failed to get room info with metadata")
+		}
 	}
 
 	log.Info("Successfully sent message to recorder and got a success response")

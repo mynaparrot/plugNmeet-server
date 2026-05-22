@@ -55,7 +55,8 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 
 	// we'll disable now. in the future, we can think about those
 	meta.RoomFeatures.RecordingFeatures.IsAllow = false
-	meta.RoomFeatures.AllowRtmp = false
+	meta.RoomFeatures.AllowRtmp = new(false)
+	meta.RoomFeatures.ExternalBroadcastingFeatures.IsAllow = false
 
 	// clear few main room data
 	meta.RoomFeatures.DisplayExternalLinkFeatures.IsActive = false
