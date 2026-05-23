@@ -1,16 +1,22 @@
 package models
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
 	"reflect"
 	"time"
 
+	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
+	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 // recordingStarted update when recorder will start recording
@@ -269,4 +275,104 @@ func (m *RecordingModel) UpdateRecordingMetadata(req *plugnmeet.UpdateRecordingM
 	}
 
 	return nil
+}
+
+func (m *RecordingModel) MergeRecordings(ctx context.Context, req *plugnmeet.MergeRecordingsReq) (statusCode plugnmeet.StatusCode, err error) {
+	log := m.logger.WithFields(logrus.Fields{
+		"method":   "MergeRecordings",
+		"room_sid": req.GetRoomSid(),
+	})
+	lockKey := fmt.Sprintf(redisservice.MergeRecordingReqLockKey, req.RoomSid)
+	lock := m.rs.NewLock(lockKey, 24*time.Hour) // lock for 24 hours
+	locked, err := lock.TryLock(ctx)
+	if err != nil {
+		log.WithError(err).Error("failed to acquire lock")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, "failed to acquire lock")
+	}
+	if !locked {
+		log.Warn("another whiteboard file upload is already in progress")
+		return plugnmeet.StatusCode_CONFLICT, fiber.NewError(fiber.StatusConflict, "another request from same roomSid already registered or proceeded successfully, rejecting new one")
+	}
+	defer func() {
+		if err != nil {
+			// if error other than timeout then we'll unlock as it's real error
+			_ = lock.Unlock(context.Background())
+		}
+	}()
+	// unlock will be for ProcessRecorderEvent method when we'll receive final notification
+
+	roomInfo, err := m.ds.GetRoomInfoBySid(req.RoomSid, nil)
+	if err != nil {
+		log.WithError(err).Error("failed to get room info")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, err
+	}
+	if roomInfo == nil {
+		return plugnmeet.StatusCode_ROOM_NOT_FOUND, config.ErrRoomNotFound
+	}
+	log = log.WithFields(logrus.Fields{
+		"table_id": roomInfo.ID,
+		"room_id":  roomInfo.RoomId,
+	})
+
+	recordings, total, err := m.ds.GetRecordings(nil, &roomInfo.Sid, 0, 0, nil)
+	if err != nil {
+		log.WithError(err).Error("failed to get recordings")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, err
+	}
+	if total == 0 {
+		return plugnmeet.StatusCode_NOT_FOUND, config.ErrRecordingNotFound
+	}
+
+	excludeRecordingIds := make(map[string]bool)
+	for _, id := range req.ExcludeRecordingIds {
+		excludeRecordingIds[id] = true
+	}
+
+	var filePaths []string
+	recorderId := "merged-recording" // for all this types
+	for _, r := range recordings {
+		if found, _ := excludeRecordingIds[r.RecordID]; found {
+			continue
+		}
+		if r.RecorderID == recorderId {
+			// this session already have one merged recording, so we' won't continue
+			return plugnmeet.StatusCode_CONFLICT, fmt.Errorf("this session already have one merged recording, rejecting new request")
+		}
+		filePaths = append(filePaths, r.FilePath)
+	}
+	if len(filePaths) == 0 {
+		return plugnmeet.StatusCode_NOT_FOUND, fmt.Errorf("no recordings found to merge")
+	}
+
+	task := &plugnmeet.TranscodingTask{
+		RecordingId: fmt.Sprintf("%s-%d", req.RoomSid, time.Now().UnixMilli()),
+		RecorderId:  recorderId,
+		RoomId:      roomInfo.RoomId,
+		RoomSid:     req.RoomSid,
+		RoomTableId: int64(roomInfo.ID),
+		TaskDetails: &plugnmeet.TranscodingTask_MergeRecordings{
+			MergeRecordings: &plugnmeet.TranscodingTaskMergeRecordings{
+				FilePaths: filePaths,
+			},
+		},
+	}
+	data, err := proto.Marshal(task)
+	if err != nil {
+		log.WithError(err).Errorln("Failed to marshal transcoding task")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, err
+	}
+
+	// we'll also use lockKey just for preventing repeated request, default: 2 minutes
+	pubAck, err := m.app.JetStream.Publish(ctx, m.app.NatsInfo.Recorder.TranscodingJobs, data, jetstream.WithMsgID(lockKey))
+	if err != nil {
+		log.WithError(err).Error("failed to publish message to NATS")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, err
+	}
+	if pubAck.Duplicate {
+		return plugnmeet.StatusCode_CONFLICT, fmt.Errorf("another request (%d) from same roomSid already registered or proceeded successfully, rejecting new one", pubAck.Sequence)
+	}
+
+	log.Infof("Successfully registered new recordings merge task (%d) with %d files", pubAck.Sequence, len(filePaths))
+
+	return plugnmeet.StatusCode_SUCCESS, nil
 }

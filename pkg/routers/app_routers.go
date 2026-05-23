@@ -160,6 +160,7 @@ func (r *router) registerAuthRoutes() {
 	recording.Post("/fetch", r.ctrl.RecordingController.HandleFetchRecordings)
 	recording.Post("/info", r.ctrl.RecordingController.HandleRecordingInfo)
 	recording.Post("/updateMetadata", r.ctrl.RecordingController.HandleUpdateRecordingMetadata)
+	recording.Post("/mergeRecordings", r.ctrl.RecordingController.HandleMergeRecordings)
 	recording.Post("/delete", r.ctrl.RecordingController.HandleDeleteRecording)
 	recording.Post("/getDownloadToken", r.ctrl.RecordingController.HandleGetDownloadToken)
 	// TODO: remove deprecated: use /info

@@ -1,6 +1,9 @@
 package models
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
@@ -58,6 +61,22 @@ func (m *RecordingModel) ProcessRecorderEvent(r *plugnmeet.RecorderToPlugNmeet, 
 		}
 		// keep record of this file
 		m.addRecordingInfoFile(r, creation, roomInfo)
+	case plugnmeet.RecordingTasks_RECORDING_TRANSCODING_FINISHED:
+		// delete if we held any lock
+		_ = m.rs.DeleteLockKey(context.Background(), fmt.Sprintf(redisservice.MergeRecordingReqLockKey, r.RoomSid))
+		log := m.logger.WithFields(logrus.Fields{
+			"recordingId": r.RecordingId,
+			"room_sid":    r.RoomSid,
+			"table_id":    r.RoomTableId,
+			"room_id":     r.RoomId,
+			"res_status":  r.Status,
+			"res_msg":     r.GetMsg(),
+		})
+		if r.Status {
+			log.Info("Received RECORDING_TRANSCODING_FINISHED event from transcoder")
+		} else {
+			log.Error("Received RECORDING_TRANSCODING_FINISHED event from transcoder")
+		}
 	}
 
 	m.sendToWebhookNotifier(r)

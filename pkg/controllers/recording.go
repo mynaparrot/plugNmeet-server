@@ -89,6 +89,21 @@ func (rc *RecordingController) HandleUpdateRecordingMetadata(c fiber.Ctx) error 
 	return utils.SendCommonProtoJsonResponse(c, true, "success", plugnmeet.StatusCode_SUCCESS)
 }
 
+// HandleMergeRecordings handles merging multiple recordings into a single new one.
+func (rc *RecordingController) HandleMergeRecordings(c fiber.Ctx) error {
+	req := new(plugnmeet.MergeRecordingsReq)
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
+	}
+
+	statusCode, err := rc.recordingModel.MergeRecordings(c.RequestCtx(), req)
+	if err != nil {
+		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), statusCode)
+	}
+
+	return utils.SendCommonProtoJsonResponse(c, true, "successfully registered new recording merging task", statusCode)
+}
+
 // HandleDeleteRecording handles deleting a recording.
 func (rc *RecordingController) HandleDeleteRecording(c fiber.Ctx) error {
 	req := new(plugnmeet.DeleteRecordingReq)
@@ -219,8 +234,7 @@ func (rc *RecordingController) HandleRecorderTasks(c fiber.Ctx) error {
 // HandleRecorderEvents handles events coming from the recorder.
 func (rc *RecordingController) HandleRecorderEvents(c fiber.Ctx) error {
 	req := new(plugnmeet.RecorderToPlugNmeet)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		rc.logger.WithError(err).Errorln("unmarshalling failed")
 		return c.JSON(fiber.Map{
 			"status": false,

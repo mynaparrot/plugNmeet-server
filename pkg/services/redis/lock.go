@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	RoomCreationLockKey = Prefix + "roomCreationLock-%s"
-	janitorLockKey      = Prefix + "janitorLeaderLock"
-	RecorderTaskLockKey = Prefix + "recorderTaskLock-%s-%s" // roomID, taskType
+	RoomCreationLockKey      = Prefix + "roomCreationLock-%s"
+	janitorLockKey           = Prefix + "janitorLeaderLock"
+	RecorderTaskLockKey      = Prefix + "recorderTaskLock-%s-%s" // roomID, taskType
+	MergeRecordingReqLockKey = Prefix + "mergeRecording-%s"      // roomSid
 )
 
 // unlockScript is a Lua script for atomic check-and-delete.
@@ -83,6 +84,11 @@ func (l *Lock) Refresh(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// DeleteLockKey will delete key that was created by NewLock without providing its value
+func (s *RedisService) DeleteLockKey(ctx context.Context, key string) error {
+	return s.rc.Del(ctx, key).Err()
 }
 
 // LockRoomCreation attempts to acquire a distributed lock.
