@@ -65,12 +65,13 @@ func (m *RecordingModel) ProcessRecorderEvent(r *plugnmeet.RecorderToPlugNmeet, 
 		// delete if we held any lock
 		_ = m.rs.DeleteLockKey(context.Background(), fmt.Sprintf(redisservice.MergeRecordingReqLockKey, r.RoomSid))
 		log := m.logger.WithFields(logrus.Fields{
-			"recordingId": r.RecordingId,
-			"room_sid":    r.RoomSid,
-			"table_id":    r.RoomTableId,
-			"room_id":     r.RoomId,
-			"res_status":  r.Status,
-			"res_msg":     r.GetMsg(),
+			"recording_id": r.RecordingId,
+			"room_sid":     r.RoomSid,
+			"table_id":     r.RoomTableId,
+			"room_id":      r.RoomId,
+			"recorder_id":  r.RecorderId,
+			"res_status":   r.Status,
+			"res_msg":      r.GetMsg(),
 		})
 		if r.Status {
 			log.Info("Received RECORDING_TRANSCODING_FINISHED event from transcoder")

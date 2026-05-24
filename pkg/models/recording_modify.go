@@ -341,7 +341,7 @@ func (m *RecordingModel) MergeRecordings(ctx context.Context, req *plugnmeet.Mer
 		filePaths = append(filePaths, r.FilePath)
 	}
 	if len(filePaths) == 0 {
-		return plugnmeet.StatusCode_NOT_FOUND, fmt.Errorf("no recordings found to merge")
+		return plugnmeet.StatusCode_NOT_FOUND, fmt.Errorf("no recording found to merge")
 	}
 
 	task := &plugnmeet.TranscodingTask{
@@ -358,7 +358,7 @@ func (m *RecordingModel) MergeRecordings(ctx context.Context, req *plugnmeet.Mer
 	}
 	data, err := proto.Marshal(task)
 	if err != nil {
-		log.WithError(err).Errorln("Failed to marshal transcoding task")
+		log.WithError(err).Error("Failed to marshal transcoding task")
 		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, err
 	}
 
