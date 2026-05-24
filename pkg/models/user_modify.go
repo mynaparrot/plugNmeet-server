@@ -14,7 +14,7 @@ func (m *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 		"blockUser": r.GetBlockUser(),
 		"method":    "RemoveParticipant",
 	})
-	log.Infoln("request to remove participant")
+	log.Infoln("New request to remove participant received")
 
 	status, err := m.natsService.GetRoomUserStatus(r.RoomId, r.UserId)
 	if err != nil {
@@ -28,20 +28,17 @@ func (m *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 		return err
 	}
 
-	err = m.natsService.NotifyErrorMsg(r.RoomId, r.Msg, &r.UserId)
-	if err != nil {
+	if err := m.natsService.NotifyErrorMsg(r.RoomId, r.Msg, &r.UserId); err != nil {
 		log.WithError(err).Errorln("error notifying user with custom message")
 	}
 
 	// send notification to be disconnected
-	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SESSION_ENDED, r.GetRoomId(), "notifications.room-disconnected-participant-removed", &r.UserId)
-	if err != nil {
+	if err := m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SESSION_ENDED, r.GetRoomId(), "notifications.room-disconnected-participant-removed", &r.UserId); err != nil {
 		log.WithError(err).Errorln("error broadcasting SESSION_ENDED event")
 	}
 
 	// now remove from lk
-	_, err = m.lk.RemoveParticipant(r.RoomId, r.UserId)
-	if err != nil {
+	if _, err = m.lk.RemoveParticipant(r.RoomId, r.UserId); err != nil {
 		log.WithError(err).Errorln("error removing user from livekit, keep continuing")
 	}
 
@@ -54,7 +51,7 @@ func (m *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 		}
 	}
 
-	log.Infoln("participant removed successfully")
+	log.Infoln("Participant removed successfully")
 	return nil
 }
 
@@ -75,8 +72,7 @@ func (m *UserModel) RaisedHand(roomId, userId, msg string) {
 
 	// now update user's metadata
 	metadata.RaisedHand = true
-	err = m.natsService.UpdateAndBroadcastUserMetadata(roomId, userId, metadata, nil)
-	if err != nil {
+	if err := m.natsService.UpdateAndBroadcastUserMetadata(roomId, userId, metadata, nil); err != nil {
 		log.WithError(err).Errorln("error updating user metadata")
 	}
 
@@ -117,8 +113,7 @@ func (m *UserModel) LowerHand(roomId, userId string) {
 
 	// now update user's metadata
 	metadata.RaisedHand = false
-	err = m.natsService.UpdateAndBroadcastUserMetadata(roomId, userId, metadata, nil)
-	if err != nil {
+	if err = m.natsService.UpdateAndBroadcastUserMetadata(roomId, userId, metadata, nil); err != nil {
 		log.WithError(err).Errorln("error updating user metadata")
 	}
 }

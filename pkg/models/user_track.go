@@ -65,7 +65,7 @@ func (m *UserModel) MuteUnMuteTrack(ctx context.Context, r *plugnmeet.MuteUnMute
 		return err
 	}
 
-	log.Infoln("successfully muted/unmuted track")
+	log.Infoln("Successfully muted/unmuted track")
 	return nil
 }
 
@@ -97,6 +97,6 @@ func (m *UserModel) muteUnmuteAllMic(ctx context.Context, r *plugnmeet.MuteUnMut
 		}
 	}
 
-	log.Info("successfully processed mute/unmute all microphones request")
+	log.Info("Successfully processed mute/unmute all microphones request")
 	return nil
 }

@@ -19,7 +19,7 @@ func (m *WebhookModel) trackPublished(event *livekit.WebhookEvent) {
 		"event":         event.GetEvent(),
 		"source":        event.Track.Source,
 	})
-	log.Infoln("handling track_published webhook")
+	log.Infoln("Handling track_published webhook")
 
 	rInfo, err := m.natsService.GetRoomInfo(event.Room.Name)
 	if err != nil {
@@ -61,7 +61,7 @@ func (m *WebhookModel) trackPublished(event *livekit.WebhookEvent) {
 	}
 	data.HsetValue = &val
 	m.analyticsModel.HandleEvent(data)
-	log.Info("successfully processed track_published webhook")
+	log.Info("Successfully processed track_published webhook")
 }
 
 func (m *WebhookModel) trackUnpublished(event *livekit.WebhookEvent) {
@@ -76,7 +76,7 @@ func (m *WebhookModel) trackUnpublished(event *livekit.WebhookEvent) {
 		"trackId":       event.Track.Sid,
 		"event":         event.GetEvent(),
 	})
-	log.Infoln("handling track_unpublished webhook")
+	log.Infoln("Handling track_unpublished webhook")
 
 	// Use the new helper function to get room info
 	rInfo, err := m.getRoomInfoFromNatsOrRedis(event.Room.Name, log)
@@ -115,5 +115,5 @@ func (m *WebhookModel) trackUnpublished(event *livekit.WebhookEvent) {
 	}
 	data.HsetValue = &val
 	m.analyticsModel.HandleEvent(data)
-	log.Info("successfully processed track_unpublished webhook")
+	log.Info("Successfully processed track_unpublished webhook")
 }

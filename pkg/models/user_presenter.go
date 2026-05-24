@@ -16,7 +16,7 @@ func (m *UserModel) CreateNewPresenter(r *plugnmeet.GenerateTokenReq) error {
 		"userId": r.UserInfo.UserId,
 		"method": "CreateNewPresenter",
 	})
-	log.Infoln("request to check for new presenter")
+	log.Infoln("New request to check or create new presenter received")
 
 	presenter, err := m.FindCurrentPresenter(r.RoomId)
 	if err != nil {
@@ -28,7 +28,7 @@ func (m *UserModel) CreateNewPresenter(r *plugnmeet.GenerateTokenReq) error {
 		return nil
 	}
 
-	log.Infoln("no presenter found, making this user presenter")
+	log.Infoln("No presenter found, making this user presenter")
 	r.UserInfo.UserMetadata.IsPresenter = true
 	return nil
 }
@@ -44,7 +44,7 @@ func (m *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
 		"task":            r.Task.String(),
 		"method":          "SwitchPresenter",
 	})
-	log.Infoln("request to switch presenter")
+	log.Infoln("Request to switch presenter received")
 
 	var newPresenterId, oldPresenterId string
 
@@ -64,8 +64,7 @@ func (m *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
 	}
 
 	// 1. Promote the new presenter first.
-	err := m.updatePresenterStatus(r.RoomId, newPresenterId, true)
-	if err != nil {
+	if err := m.updatePresenterStatus(r.RoomId, newPresenterId, true); err != nil {
 		// If we can't even promote the new presenter, we must stop.
 		log.WithError(err).WithField("promote_user_id", newPresenterId).Errorln("failed to promote new presenter")
 		return err
@@ -74,15 +73,14 @@ func (m *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
 	// 2. Only after a successful promotion, demote the old presenter.
 	// Ensure we don't accidentally demote the person we just promoted.
 	if oldPresenterId != "" && oldPresenterId != newPresenterId {
-		err = m.updatePresenterStatus(r.RoomId, oldPresenterId, false)
-		if err != nil {
+		if err := m.updatePresenterStatus(r.RoomId, oldPresenterId, false); err != nil {
 			// This is not a fatal error. The room now has two presenters,
 			// which is better than zero. We should log it as a warning.
 			log.WithError(err).WithField("demote_user_id", oldPresenterId).Warnln("successfully promoted new presenter but failed to demote old one")
 		}
 	}
 
-	log.Info("presenter switch process completed successfully")
+	log.Info("Presenter switch process completed successfully")
 	return nil
 }
 
@@ -109,8 +107,7 @@ func (m *UserModel) FindCurrentPresenter(roomId string) (string, error) {
 // updatePresenterStatus performs the complete, two-step update for a user's presenter status.
 func (m *UserModel) updatePresenterStatus(roomId, userId string, isPresenter bool) error {
 	// 1. Update the primary Key-Value store first.
-	err := m.natsService.UpdateUserKeyValue(roomId, userId, natsservice.UserIsPresenterKey, fmt.Sprintf("%v", isPresenter))
-	if err != nil {
+	if err := m.natsService.UpdateUserKeyValue(roomId, userId, natsservice.UserIsPresenterKey, fmt.Sprintf("%v", isPresenter)); err != nil {
 		return fmt.Errorf("failed to update user key-value for %s: %w", userId, err)
 	}
 
@@ -124,8 +121,7 @@ func (m *UserModel) updatePresenterStatus(roomId, userId string, isPresenter boo
 	}
 
 	metadata.IsPresenter = isPresenter
-	err = m.natsService.UpdateAndBroadcastUserMetadata(roomId, userId, metadata, nil)
-	if err != nil {
+	if err := m.natsService.UpdateAndBroadcastUserMetadata(roomId, userId, metadata, nil); err != nil {
 		return fmt.Errorf("failed to update and broadcast metadata for %s: %w", userId, err)
 	}
 

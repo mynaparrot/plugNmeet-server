@@ -31,7 +31,7 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 	})
 	started := time.Now()
 
-	// Wait until any ongoing room creation process is complete to avoid race conditions.
+	// Wait until any ongoing room creation or ending in process to complete first to avoid race conditions.
 	if errWait := waitUntilRoomCreationCompletes(ctx, m.rs, roomID, m.logger); errWait != nil {
 		log.WithError(errWait).Error("Cannot end room as it's locked during creation")
 		return false, "failed to end room, it may be starting", plugnmeet.StatusCode_INTERNAL_SERVER_ERROR

@@ -254,21 +254,18 @@ func (rc *RoomController) HandleExternalDisplayLink(c fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	rid := roomId
-	if rid == "" {
+	if roomId == "" {
 		return utils.SendCommonProtobufResponse(c, false, "roomId required")
 	}
 
 	req := new(plugnmeet.ExternalDisplayLinkReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	req.RoomId = rid
+	req.RoomId = roomId
 	req.UserId = requestedUserId
-	err = rc.RoomModel.HandleExternalDisplayTask(req)
-	if err != nil {
+	if err := rc.RoomModel.HandleExternalDisplayTask(req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
@@ -285,21 +282,18 @@ func (rc *RoomController) HandleExternalMediaPlayer(c fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	rid := roomId
-	if rid == "" {
+	if roomId == "" {
 		return utils.SendCommonProtobufResponse(c, false, "roomId required")
 	}
 
 	req := new(plugnmeet.ExternalMediaPlayerReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	req.RoomId = rid
+	req.RoomId = roomId
 	req.UserId = requestedUserId
-	err = rc.RoomModel.HandleExternalMediaTask(req)
-	if err != nil {
+	if err := rc.RoomModel.HandleExternalMediaTask(req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
@@ -316,14 +310,12 @@ func (rc *RoomController) HandleApproveUsers(c fiber.Ctx) error {
 	}
 
 	req := new(plugnmeet.ApproveWaitingUsersReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
 	req.RoomId = roomId
-	err = rc.RoomModel.ApproveWaitingUsers(req)
-	if err != nil {
+	if err := rc.RoomModel.ApproveWaitingUsers(req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
@@ -340,14 +332,12 @@ func (rc *RoomController) HandleUpdateWaitingRoomMessage(c fiber.Ctx) error {
 	}
 
 	req := new(plugnmeet.UpdateWaitingRoomMessageReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
 	req.RoomId = roomId
-	err = rc.RoomModel.UpdateWaitingRoomMessage(req)
-	if err != nil {
+	if err := rc.RoomModel.UpdateWaitingRoomMessage(req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 

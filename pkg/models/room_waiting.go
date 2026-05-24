@@ -40,8 +40,7 @@ func (m *RoomModel) approveUser(roomId, userId, metadata string) error {
 	}
 	mt.WaitForApproval = false // this mean doesn't need to wait anymore
 
-	err = m.natsService.UpdateAndBroadcastUserMetadata(roomId, userId, mt, nil)
-	if err != nil {
+	if err := m.natsService.UpdateAndBroadcastUserMetadata(roomId, userId, mt, nil); err != nil {
 		return fmt.Errorf("can't approve user. try again")
 	}
 
@@ -56,9 +55,7 @@ func (m *RoomModel) UpdateWaitingRoomMessage(r *plugnmeet.UpdateWaitingRoomMessa
 	if roomMeta == nil {
 		return config.InvalidNilRoomMetadata
 	}
-
 	roomMeta.RoomFeatures.WaitingRoomFeatures.WaitingRoomMsg = r.Msg
-	err = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, roomMeta)
 
-	return err
+	return m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, roomMeta)
 }

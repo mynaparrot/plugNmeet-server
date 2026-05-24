@@ -21,7 +21,7 @@ func (m *WebhookModel) participantJoined(event *livekit.WebhookEvent) {
 		"participantId": event.Participant.Identity,
 		"event":         event.GetEvent(),
 	})
-	log.Infoln("handling participant_joined webhook")
+	log.Infoln("Handling participant_joined webhook")
 
 	rInfo, err := m.natsService.GetRoomInfo(event.Room.Name)
 	if err != nil {
@@ -62,7 +62,7 @@ func (m *WebhookModel) participantJoined(event *livekit.WebhookEvent) {
 
 	// webhook notification
 	m.sendToWebhookNotifier(event)
-	log.Info("successfully processed participant_joined webhook")
+	log.Info("Successfully processed participant_joined webhook")
 }
 
 func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
@@ -76,7 +76,7 @@ func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 		"participantId": event.Participant.Identity,
 		"event":         event.GetEvent(),
 	})
-	log.Infoln("handling participant_left webhook")
+	log.Infoln("Handling participant_left webhook")
 
 	// Use the new helper function to get room info
 	rInfo, err := m.getRoomInfoFromNatsOrRedis(event.Room.Name, log)
@@ -105,7 +105,7 @@ func (m *WebhookModel) participantLeft(event *livekit.WebhookEvent) {
 	// webhook notification
 	m.sendToWebhookNotifier(event)
 
-	log.Info("successfully processed participant_left webhook")
+	log.Info("Successfully processed participant_left webhook")
 
 	m.ensureUserIsOffline(event, log)
 }
@@ -139,7 +139,7 @@ func (m *WebhookModel) ensureUserIsOffline(event *livekit.WebhookEvent, log *log
 
 		// user should be offline because it's disconnected from media server
 		// but may be for some reason it wasn't triggered by Nats correctly
-		log.Warnln("user status remain online, triggering OnAfterUserDisconnected manually")
+		log.Warnln("User status remain online, triggering OnAfterUserDisconnected manually")
 		m.nm.OnAfterUserDisconnected(event.Room.Name, event.Participant.Identity, "ensureUserIsOffline")
 	}
 }

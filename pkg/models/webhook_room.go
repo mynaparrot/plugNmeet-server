@@ -19,7 +19,7 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 		"roomId": event.Room.Name,
 		"event":  event.GetEvent(),
 	})
-	log.Infoln("handling room_started webhook")
+	log.Infoln("Handling room_started webhook")
 
 	// we'll check the room from kv
 	rInfo, meta, err := m.natsService.GetRoomInfoWithMetadata(event.Room.Name)
@@ -32,8 +32,7 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 		// This can happen if a room is created directly in LiveKit without going through plugNmeet's API.
 		// We'll forcefully end it to maintain consistency.
 		log.Warnln("room not found in plugNmeet's NATS store, forcing room termination")
-		_, err := m.lk.EndRoom(event.Room.Name)
-		if err != nil {
+		if _, err := m.lk.EndRoom(event.Room.Name); err != nil {
 			log.WithError(err).Errorln("failed to forcefully end room in livekit")
 		}
 		return
@@ -41,8 +40,7 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 
 	if rInfo.Status != natsservice.RoomStatusActive {
 		log.WithField("current_status", rInfo.Status).Info("updating room status to active")
-		err = m.natsService.UpdateRoomStatus(rInfo.RoomId, natsservice.RoomStatusActive)
-		if err != nil {
+		if err := m.natsService.UpdateRoomStatus(rInfo.RoomId, natsservice.RoomStatusActive); err != nil {
 			log.WithError(err).Errorln("failed to update room status")
 			return
 		}
@@ -62,14 +60,12 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 	}
 
 	if meta.IsBreakoutRoom {
-		err := m.bm.PostTaskAfterRoomStartWebhook(rInfo.RoomId, meta)
-		if err != nil {
+		if err := m.bm.PostTaskAfterRoomStartWebhook(rInfo.RoomId, meta); err != nil {
 			log.WithError(err).Errorln("failed to run post-start task for breakout room")
 		}
 	}
 
-	err = m.natsService.UpdateAndBroadcastRoomMetadata(rInfo.RoomId, meta)
-	if err != nil {
+	if err := m.natsService.UpdateAndBroadcastRoomMetadata(rInfo.RoomId, meta); err != nil {
 		log.WithError(err).Errorln("failed to update and broadcast room metadata")
 	}
 
@@ -82,7 +78,7 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 
 	// webhook notification
 	m.sendToWebhookNotifier(event)
-	log.Info("successfully processed room_started webhook")
+	log.Info("Successfully processed room_started webhook")
 }
 
 func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
@@ -115,7 +111,7 @@ func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 		log.Warnln("room was not ended via API, triggering plugNmeet EndRoom flow")
 
 		// change status to ended
-		if err = m.natsService.UpdateRoomStatus(rInfo.RoomId, natsservice.RoomStatusEnded); err != nil {
+		if err := m.natsService.UpdateRoomStatus(rInfo.RoomId, natsservice.RoomStatusEnded); err != nil {
 			log.WithError(err).Errorln("failed to update room status")
 		}
 		// end the room in the proper plugNmeet way
@@ -125,6 +121,6 @@ func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 	// at the end we'll handle event notification
 	m.sendToWebhookNotifier(event)
 
-	log.Info("successfully processed room_finished webhook")
+	log.Info("Successfully processed room_finished webhook")
 	// webhook data will be clean after analytics export method call e.g. PrepareToExportAnalytics
 }

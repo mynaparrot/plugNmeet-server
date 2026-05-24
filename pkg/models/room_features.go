@@ -27,9 +27,7 @@ func (m *RoomModel) ChangeVisibility(r *plugnmeet.ChangeVisibilityRes) (bool, st
 		roomMeta.RoomFeatures.SharedNotePadFeatures.Visible = *r.VisibleNotepad
 	}
 
-	err = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, roomMeta)
-
-	if err != nil {
+	if err := m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, roomMeta); err != nil {
 		return false, err.Error()
 	}
 

@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"net/url"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/sirupsen/logrus"
@@ -28,16 +29,17 @@ func (m *RoomModel) startExternalMediaPlayBack(req *plugnmeet.ExternalMediaPlaye
 	})
 	log.Infoln("request to start external media playback")
 
-	if req.Url != nil && *req.Url == "" {
+	if req.Url == nil && *req.Url == "" {
 		err := errors.New("valid url required")
 		log.WithError(err).Warnln()
 		return err
 	}
-	active := new(bool)
-	*active = true
+	if _, err := url.ParseRequestURI(*req.Url); err != nil {
+		return err
+	}
 
 	opts := &updateRoomMetadataOpts{
-		isActive: active,
+		isActive: new(true),
 		url:      req.Url,
 		sharedBy: &req.UserId,
 	}
@@ -52,10 +54,8 @@ func (m *RoomModel) endExternalMediaPlayBack(req *plugnmeet.ExternalMediaPlayerR
 	})
 	log.Infoln("request to end external media playback")
 
-	active := new(bool)
-
 	opts := &updateRoomMetadataOpts{
-		isActive: active,
+		isActive: new(false),
 	}
 	return m.updateExternalMediaRoomMetadata(req.RoomId, opts, log)
 }
@@ -105,7 +105,7 @@ func (m *RoomModel) updateExternalMediaRoomMetadata(roomId string, opts *updateR
 	m.analyticsModel.HandleEvent(d)
 
 	if err == nil {
-		log.Info("successfully updated room metadata")
+		log.Info("Successfully updated room metadata")
 	}
 
 	return err
