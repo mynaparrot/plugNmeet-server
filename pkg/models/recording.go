@@ -63,7 +63,7 @@ func (m *RecordingModel) ProcessRecorderEvent(r *plugnmeet.RecorderToPlugNmeet, 
 		m.addRecordingInfoFile(r, creation, roomInfo)
 	case plugnmeet.RecordingTasks_RECORDING_TRANSCODING_FINISHED:
 		// delete if we held any lock
-		_ = m.rs.DeleteLockKey(context.Background(), fmt.Sprintf(redisservice.MergeRecordingReqLockKey, r.RoomSid))
+		_ = m.rs.DeleteLockKey(context.Background(), fmt.Sprintf(redisservice.MergeRecordingReqLockKey, r.GetRoomId()))
 		log := m.logger.WithFields(logrus.Fields{
 			"recording_id": r.RecordingId,
 			"room_sid":     r.RoomSid,

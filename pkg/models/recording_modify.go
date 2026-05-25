@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -279,10 +280,87 @@ func (m *RecordingModel) UpdateRecordingMetadata(req *plugnmeet.UpdateRecordingM
 
 func (m *RecordingModel) MergeRecordings(ctx context.Context, req *plugnmeet.MergeRecordingsReq) (statusCode plugnmeet.StatusCode, err error) {
 	log := m.logger.WithFields(logrus.Fields{
-		"method":   "MergeRecordings",
-		"room_sid": req.GetRoomSid(),
+		"method": "MergeRecordings",
 	})
-	lockKey := fmt.Sprintf(redisservice.MergeRecordingReqLockKey, req.RoomSid)
+
+	var recordings []dbmodels.Recording
+	var roomInfo *dbmodels.RoomInfo // This will be populated in both successful cases.
+	var roomId, roomSid string
+	var roomTableId int64
+
+	switch v := req.MergeScope.(type) {
+	case *plugnmeet.MergeRecordingsReq_BySession:
+		{
+			log = log.WithField("room_sid", v.BySession.GetRoomSid())
+
+			roomInfo, err = m.ds.GetRoomInfoBySid(v.BySession.GetRoomSid(), nil)
+			if err != nil {
+				log.WithError(err).Error("failed to get room info")
+				return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, err
+			}
+			if roomInfo == nil {
+				return plugnmeet.StatusCode_ROOM_NOT_FOUND, config.ErrRoomNotFound
+			}
+			// Set context for the rest of the function
+			roomId = roomInfo.RoomId
+			roomSid = roomInfo.Sid
+			roomTableId = int64(roomInfo.ID)
+
+			recs, total, err := m.ds.GetRecordings(nil, &roomInfo.Sid, 0, 0, nil)
+			if err != nil {
+				log.WithError(err).Error("failed to get recordings")
+				return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, err
+			}
+			if total == 0 {
+				return plugnmeet.StatusCode_NOT_FOUND, config.ErrRecordingNotFound
+			}
+
+			excludeRecordingIds := make(map[string]bool)
+			for _, id := range v.BySession.GetExcludeRecordingIds() {
+				excludeRecordingIds[id] = true
+			}
+
+			for _, r := range recs {
+				if found, _ := excludeRecordingIds[r.RecordID]; found {
+					continue
+				}
+				recordings = append(recordings, r)
+			}
+		}
+	case *plugnmeet.MergeRecordingsReq_ByIds:
+		{
+			log = log.WithField("room_id", v.ByIds.GetRoomId())
+			roomId = v.ByIds.GetRoomId()
+
+			recordings, err = m.ds.GetRecordingsByIDs(v.ByIds.GetRecordingIds(), v.ByIds.GetRoomId())
+			if err != nil {
+				log.WithError(err).Error("failed to get recordings by ids")
+				// Check for our new specific error.
+				if errors.Is(err, config.ErrRequestedRecordingsNotFound) {
+					return plugnmeet.StatusCode_NOT_FOUND, err
+				}
+				// Fallback for other potential database errors.
+				return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, err
+			}
+
+			// Use the session ID from the LAST recording in the list.
+			lastRecording := recordings[len(recordings)-1]
+			roomSid = lastRecording.RoomSid.String
+
+			// We also need the room table ID from that session for the transcoding task.
+			roomInfo, err = m.ds.GetRoomInfoBySid(roomSid, nil)
+			if err != nil {
+				return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fmt.Errorf("could not fetch room info for sid: %s", roomSid)
+			}
+			// We MUST have roomInfo here.
+			if roomInfo == nil {
+				return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fmt.Errorf("data integrity issue: room session not found for sid %s", roomSid)
+			}
+			roomTableId = int64(roomInfo.ID)
+		}
+	}
+
+	lockKey := fmt.Sprintf(redisservice.MergeRecordingReqLockKey, roomId)
 	lock := m.rs.NewLock(lockKey, 24*time.Hour) // lock for 24 hours
 	locked, err := lock.TryLock(ctx)
 	if err != nil {
@@ -290,8 +368,8 @@ func (m *RecordingModel) MergeRecordings(ctx context.Context, req *plugnmeet.Mer
 		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, "failed to acquire lock")
 	}
 	if !locked {
-		log.Warn("another whiteboard file upload is already in progress")
-		return plugnmeet.StatusCode_CONFLICT, fiber.NewError(fiber.StatusConflict, "another request from same roomSid already registered or proceeded successfully, rejecting new one")
+		log.Warn("another merge request is already in progress")
+		return plugnmeet.StatusCode_CONFLICT, fiber.NewError(fiber.StatusConflict, "another request for this scope already registered, rejecting new one")
 	}
 	defer func() {
 		if err != nil {
@@ -299,57 +377,28 @@ func (m *RecordingModel) MergeRecordings(ctx context.Context, req *plugnmeet.Mer
 			_ = lock.Unlock(context.Background())
 		}
 	}()
-	// unlock will be for ProcessRecorderEvent method when we'll receive final notification
+	// unlock will be from ProcessRecorderEvent method when we'll receive final notification
 
-	roomInfo, err := m.ds.GetRoomInfoBySid(req.RoomSid, nil)
-	if err != nil {
-		log.WithError(err).Error("failed to get room info")
-		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, err
-	}
-	if roomInfo == nil {
-		return plugnmeet.StatusCode_ROOM_NOT_FOUND, config.ErrRoomNotFound
-	}
 	log = log.WithFields(logrus.Fields{
-		"table_id": roomInfo.ID,
-		"room_id":  roomInfo.RoomId,
+		"table_id": roomTableId,
+		"room_id":  roomId,
 	})
 
-	recordings, total, err := m.ds.GetRecordings(nil, &roomInfo.Sid, 0, 0, nil)
-	if err != nil {
-		log.WithError(err).Error("failed to get recordings")
-		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, err
-	}
-	if total == 0 {
-		return plugnmeet.StatusCode_NOT_FOUND, config.ErrRecordingNotFound
-	}
-
-	excludeRecordingIds := make(map[string]bool)
-	for _, id := range req.ExcludeRecordingIds {
-		excludeRecordingIds[id] = true
-	}
-
 	var filePaths []string
-	recorderId := "merged-recording" // for all this types
 	for _, r := range recordings {
-		if found, _ := excludeRecordingIds[r.RecordID]; found {
-			continue
-		}
-		if r.RecorderID == recorderId {
-			// this session already have one merged recording, so we' won't continue
-			return plugnmeet.StatusCode_CONFLICT, fmt.Errorf("this session already have one merged recording, rejecting new request")
-		}
 		filePaths = append(filePaths, r.FilePath)
 	}
-	if len(filePaths) == 0 {
-		return plugnmeet.StatusCode_NOT_FOUND, fmt.Errorf("no recording found to merge")
+
+	if len(filePaths) < 2 { // A merge requires at least two files.
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, fmt.Errorf("at least two recordings are required to merge")
 	}
 
 	task := &plugnmeet.TranscodingTask{
-		RecordingId: fmt.Sprintf("%s-%d", req.RoomSid, time.Now().UnixMilli()),
-		RecorderId:  recorderId,
-		RoomId:      roomInfo.RoomId,
-		RoomSid:     req.RoomSid,
-		RoomTableId: int64(roomInfo.ID),
+		RecordingId: fmt.Sprintf("%s-%d", roomSid, time.Now().UnixMilli()),
+		RecorderId:  "merged-recording",
+		RoomId:      roomId,
+		RoomSid:     roomSid,
+		RoomTableId: roomTableId,
 		TaskDetails: &plugnmeet.TranscodingTask_MergeRecordings{
 			MergeRecordings: &plugnmeet.TranscodingTaskMergeRecordings{
 				FilePaths: filePaths,
@@ -369,7 +418,7 @@ func (m *RecordingModel) MergeRecordings(ctx context.Context, req *plugnmeet.Mer
 		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, err
 	}
 	if pubAck.Duplicate {
-		return plugnmeet.StatusCode_CONFLICT, fmt.Errorf("another request (%d) from same roomSid already registered or proceeded successfully, rejecting new one", pubAck.Sequence)
+		return plugnmeet.StatusCode_CONFLICT, fmt.Errorf("another request (%d) for this scope already registered, rejecting new one", pubAck.Sequence)
 	}
 
 	log.Infof("Successfully registered new recordings merge task (%d) with %d files", pubAck.Sequence, len(filePaths))

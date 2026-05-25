@@ -19,7 +19,7 @@ require (
 	github.com/livekit/media-sdk v0.0.0-20260424094251-1e21ae1138de
 	github.com/livekit/protocol v1.45.8
 	github.com/livekit/server-sdk-go/v2 v2.16.3
-	github.com/mynaparrot/plugnmeet-protocol v1.2.2-0.20260524070323-50dc5f6871ed
+	github.com/mynaparrot/plugnmeet-protocol v1.2.2-0.20260525142214-9f8c00945bcc
 	github.com/nats-io/jwt/v2 v2.8.1
 	github.com/nats-io/nats.go v1.52.0
 	github.com/nats-io/nkeys v0.4.15
