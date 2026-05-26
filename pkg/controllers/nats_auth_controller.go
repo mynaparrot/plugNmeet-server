@@ -13,6 +13,7 @@ import (
 	"github.com/nats-io/nats.go/micro"
 	"github.com/nats-io/nkeys"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type NatsAuthController struct {
@@ -82,24 +83,26 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 	claims := jwt.NewUserClaims(req.UserNkey)
 	claims.Audience = s.app.NatsInfo.Account
 
-	// nats v2.10.28 & v2.11.2 (#6808) Auth tokens are now redacted
-	// but for our case it is necessary to have it, so we'll add here
-	// otherwise user CONNECT & DISCONNECT logics will be breaking
-	claims.Name = req.ConnectOptions.Token
-
 	// check the info first
 	data, err := s.authModel.VerifyPlugNmeetAccessToken(req.ConnectOptions.Token, 0)
 	if err != nil {
 		return nil, err
 	}
 
+	marshal, err := protojson.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+	// Before we were using Auth tokens as default name but NATS v2.10.28 & v2.11.2 (#6808) Auth tokens are now redacted.
+	// So we'll add plain user info here otherwise user CONNECT & DISCONNECT logics will be breaking.
+	claims.Name = string(marshal)
+
 	if data.GetName() == config.RecorderUserAuthName {
 		s.setPermissionForRecorder(claims)
 		return claims, nil
 	}
 
-	err = s.setPermissionForClient(data, claims)
-	if err != nil {
+	if err := s.setPermissionForClient(data, claims); err != nil {
 		return nil, err
 	}
 

@@ -19,6 +19,7 @@ import (
 	"github.com/nats-io/nats.go/micro"
 	"github.com/nats-io/nkeys"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -203,10 +204,10 @@ func (c *NatsController) handleUserConnectionEvent(data []byte, isConnect bool) 
 		return
 	}
 
-	if userToken, ok := e.Client["user"].(string); ok {
-		claims, err := c.authModel.UnsafeClaimsWithoutVerification(userToken)
-		if err != nil {
-			log.WithError(err).Errorln("failed to parse claims from connection event")
+	if user, ok := e.Client["user"].(string); ok {
+		claims := new(plugnmeet.PlugNmeetTokenClaims)
+		if err := protojson.Unmarshal([]byte(user), claims); err != nil {
+			log.WithError(err).Warn("failed to unmarshal user claims")
 			return
 		}
 		if claims.GetName() != config.RecorderUserAuthName {

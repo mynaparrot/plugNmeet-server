@@ -89,26 +89,24 @@ func (s *DatabaseService) GetRecordingsForBBB(recordIds, meetingIds []string, of
 func (s *DatabaseService) GetRecordingsByIDs(recordIDs []string, roomID string) ([]dbmodels.Recording, error) {
 	var recordingsFromDB []dbmodels.Recording
 
-	// 1. Fetch all recordings in one efficient query, filtering by both record IDs and room ID.
-	// This is more efficient as the database does the filtering.
-	result := s.db.Model(&dbmodels.Recording{}).Where("room_id = ? AND record_id IN ?", roomID, recordIDs).Find(&recordingsFromDB)
-	if result.Error != nil {
-		return nil, result.Error
+	// Fetch all recordings in one query, filtering by both record IDs and room ID.
+	if err := s.db.Model(&dbmodels.Recording{}).Where("room_id = ? AND record_id IN ?", roomID, recordIDs).Find(&recordingsFromDB).Error; err != nil {
+		return nil, err
 	}
 
-	// 2. Ensure all requested recordings were found for that room.
+	// Ensure all requested recordings were found for that room.
 	if len(recordingsFromDB) != len(recordIDs) {
 		// This indicates that either some recordIDs did not exist, or they did not belong to the specified roomID.
 		return nil, config.ErrRequestedRecordingsNotFound
 	}
 
-	// 3. Create a map for quick lookups to preserve the original order.
+	// Create a map for quick lookups to preserve the original order.
 	recordMap := make(map[string]dbmodels.Recording)
 	for _, rec := range recordingsFromDB {
 		recordMap[rec.RecordID] = rec
 	}
 
-	// 4. Re-order the results to match the input order.
+	// Re-order the results to match the input order.
 	var orderedRecordings []dbmodels.Recording
 	for _, id := range recordIDs {
 		rec, found := recordMap[id]
