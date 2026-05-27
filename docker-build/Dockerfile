@@ -13,7 +13,6 @@ COPY ../go.sum go.sum
 RUN go mod download
 
 # Copy the go source
-COPY ../helpers helpers/
 COPY ../pkg pkg/
 COPY ../version version/
 
