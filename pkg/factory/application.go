@@ -8,6 +8,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	livekitservice "github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
+	"github.com/sirupsen/logrus"
 )
 
 // ApplicationControllers holds all the controllers.
@@ -69,4 +70,18 @@ func (a *Application) Shutdown() {
 	a.Controllers.InsightsController.Shutdown()
 	a.Controllers.WebhookController.Shutdown()
 	a.janitorModel.Shutdown()
+
+	// handle to close DB connection
+	if db, err := a.AppConfig.DB.DB(); err == nil {
+		_ = db.Close()
+	}
+
+	// close redis
+	_ = a.AppConfig.RDS.Close()
+
+	_ = a.AppConfig.NatsConn.Drain()
+	a.AppConfig.NatsConn.Close()
+
+	// close logger
+	logrus.Exit(0)
 }

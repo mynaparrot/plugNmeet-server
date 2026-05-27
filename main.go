@@ -11,12 +11,12 @@ import (
 
 	lkLogger "github.com/livekit/protocol/logger"
 	"github.com/mynaparrot/plugnmeet-protocol/logging"
-	"github.com/mynaparrot/plugnmeet-server/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/factory"
 	"github.com/mynaparrot/plugnmeet-server/pkg/routers"
 	"github.com/mynaparrot/plugnmeet-server/version"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 )
 
 func main() {
@@ -37,7 +37,7 @@ func startServer(configFile string) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Read the main configuration from the YAML file.
-	appCnf, err := helpers.ReadYamlConfigFile(configFile)
+	appCnf, err := readYamlConfigFile(configFile)
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to read config file")
 	}
@@ -61,7 +61,7 @@ func startServer(configFile string) {
 	lkLogger.InitFromConfig(logConf, "pnm")
 
 	// Prepare server dependencies like database, Redis, and NATS connections.
-	err = helpers.PrepareServer(ctx, appCnf)
+	appCnf, err = factory.InitConnections(ctx, appCnf)
 	if err != nil {
 		logger.WithError(err).Fatalln("Failed to prepare server")
 	}
@@ -74,9 +74,6 @@ func startServer(configFile string) {
 	}
 	// Boot up background services (e.g., NATS listeners, janitor for cleanup tasks).
 	appFactory.Boot()
-
-	// Defer the closing of connections (DB, Redis, NATS) to ensure they are closed gracefully on exit.
-	defer helpers.HandleCloseConnections(appFactory.AppConfig)
 
 	// Create a new Fiber router and register all the application routes.
 	rt := routers.New(appFactory.AppConfig, appFactory.Controllers)
@@ -111,4 +108,28 @@ func startServer(configFile string) {
 	if err != nil {
 		logger.WithError(err).Fatalln("Failed to start server")
 	}
+}
+
+func readYamlConfigFile(file string) (*config.AppConfig, error) {
+	yamlFile, err := os.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+
+	appCnf := new(config.AppConfig)
+	err = yaml.Unmarshal(yamlFile, &appCnf)
+	if err != nil {
+		return nil, err
+	}
+
+	// get current working dir
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+
+	// set the root path
+	appCnf.RootWorkingDir = wd
+
+	return appCnf, err
 }

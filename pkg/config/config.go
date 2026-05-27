@@ -349,8 +349,7 @@ func New(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 	}
 
 	// read client files and cache it
-	err = readClientFiles(appCnf)
-	if err != nil {
+	if err := readClientFiles(appCnf); err != nil {
 		return nil, err
 	}
 
