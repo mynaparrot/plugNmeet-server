@@ -5,17 +5,14 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
 	lkLogger "github.com/livekit/protocol/logger"
 	"github.com/mynaparrot/plugnmeet-protocol/logging"
+	"github.com/mynaparrot/plugnmeet-server/pkg/app"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/factory"
-	"github.com/mynaparrot/plugnmeet-server/pkg/routers"
 	"github.com/mynaparrot/plugnmeet-server/version"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 	"gopkg.in/yaml.v3"
 )
 
@@ -29,15 +26,12 @@ func main() {
 		return
 	}
 
-	startServer(*configFile)
-}
-
-func startServer(configFile string) {
 	// Create a context that can be canceled to signal all services to shut down.
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// Read the main configuration from the YAML file.
-	cnf, err := readYamlConfigFile(configFile)
+	cnf, err := readYamlConfigFile(*configFile)
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to read config file")
 	}
@@ -61,52 +55,21 @@ func startServer(configFile string) {
 	lkLogger.InitFromConfig(logConf, "pnm")
 
 	// Prepare server dependencies like database, Redis, and NATS connections.
-	appCnf, err = factory.InitConnections(ctx, appCnf)
+	appCnf, err = app.InitConnections(ctx, appCnf)
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to prepare server")
 	}
 
-	// Use the dependency injection container (wire) to build the main application object,
-	//    which includes all the controllers.
-	appFactory, err := factory.NewAppFactory(ctx, appCnf)
-	if err != nil {
-		logger.WithError(err).Fatal("Failed to create app factory")
+	fxOpts := []fx.Option{
+		fx.Provide(func() context.Context { return ctx }),
+		fx.Supply(appCnf, appCnf.DB, appCnf.RDS, appCnf.Logger, appCnf.NatsConn, appCnf.JetStream),
+		app.ApplicationModule,
 	}
-	// Boot up background services (e.g., NATS listeners, janitor for cleanup tasks).
-	appFactory.Boot()
-
-	// Create a new Fiber router and register all the application routes.
-	rt := routers.New(appFactory.AppConfig, appFactory.Controllers)
-
-	// Set up a channel to listen for OS signals (like Ctrl+C) for graceful shutdown.
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-
-	// Start a goroutine to handle the shutdown process when a signal is received.
-	go func() {
-		sig := <-sigChan
-		logger.WithField("signal", sig).Info("Exit requested, attempting graceful shutdown...")
-
-		// shut down the application
-		appFactory.Shutdown()
-
-		// Attempt to gracefully shut down the Fiber server, waiting for active connections to finish.
-		if err := rt.ShutdownWithTimeout(15 * time.Second); err != nil {
-			logger.WithError(err).Warn("Graceful shutdown failed, forcing exit.")
-		}
-		// Cancel the context to signal all other parts of the application (like background services) to stop.
-		cancel()
-	}()
-
-	appCnf.Logger.WithFields(logrus.Fields{
-		"version": version.Version,
-		"port":    appFactory.AppConfig.Client.Port,
-	}).Info("Starting plugNmeet server")
-
-	// Start the Fiber web server and listen for incoming HTTP requests. This is a blocking call.
-	if err := rt.Listen(fmt.Sprintf(":%d", appFactory.AppConfig.Client.Port)); err != nil {
-		logger.WithError(err).Fatal("Failed to start server")
+	if !appCnf.Client.Debug {
+		fxOpts = append(fxOpts, fx.NopLogger)
 	}
+
+	fx.New(fxOpts...).Run()
 }
 
 func readYamlConfigFile(file string) (*config.AppConfig, error) {

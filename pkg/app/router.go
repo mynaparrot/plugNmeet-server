@@ -1,4 +1,4 @@
-package routers
+package app
 
 import (
 	"io"
@@ -16,20 +16,19 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/static"
 	"github.com/gofiber/template/html/v3"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/factory"
 	"github.com/mynaparrot/plugnmeet-server/version"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // router is a struct to hold the dependencies for setting up routes,
-// allowing us to break down the monolithic New() function into smaller,
+// allowing us to break down the monolithic newRouter() function into smaller,
 // more manageable methods.
 type router struct {
 	app  *fiber.App
-	ctrl *factory.ApplicationControllers
+	ctrl *ApplicationControllers
 }
 
-func New(appConfig *config.AppConfig, ctrl *factory.ApplicationControllers) *fiber.App {
+func newRouter(appConfig *config.AppConfig, ctrl *ApplicationControllers) *fiber.App {
 	// --- Fiber App Configuration ---
 	templateEngine := html.New(appConfig.Client.Path, ".html")
 

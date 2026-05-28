@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"encoding/json"
+	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -17,6 +18,7 @@ import (
 )
 
 type InsightsController struct {
+	sync.RWMutex
 	app             *config.AppConfig
 	agentTaskSub    *nats.Subscription
 	summarizeJobSub *nats.Subscription
@@ -50,7 +52,10 @@ func (i *InsightsController) SubscribeToAgentTaskRequests() {
 		i.logger.WithError(err).Fatalln("failed to subscribe to NATS for insights tasks")
 	}
 	i.logger.Infof("successfully connected with %s channel", sub.Subject)
+
+	i.Lock()
 	i.agentTaskSub = sub
+	i.Unlock()
 }
 
 // SubscribeToSummarizeJobs sets up a queue subscription to handle summarization jobs.
@@ -69,10 +74,16 @@ func (i *InsightsController) SubscribeToSummarizeJobs() {
 		i.logger.WithError(err).Fatalln("failed to subscribe to NATS for summarize jobs")
 	}
 	i.logger.Infof("successfully connected with %s queue", sub.Subject)
+
+	i.Lock()
 	i.summarizeJobSub = sub
+	i.Unlock()
 }
 
 func (i *InsightsController) Shutdown() {
+	i.RLock()
+	defer i.RUnlock()
+
 	if i.agentTaskSub != nil {
 		if err := i.agentTaskSub.Unsubscribe(); err != nil {
 			i.logger.WithError(err).Errorln("failed to unsubscribe from agent tasks")
