@@ -20,7 +20,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 		"method":   "CreateBreakoutRooms",
 		"numRooms": len(r.Rooms),
 	})
-	log.Infoln("New request to create breakout rooms received")
+	log.Infoln("InitAppConfig request to create breakout rooms received")
 
 	mainRoom, meta, err := m.natsService.GetRoomInfoWithMetadata(r.RoomId)
 	if err != nil {

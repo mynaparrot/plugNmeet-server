@@ -41,13 +41,11 @@ type AppConfig struct {
 	UploadFileSettings  UploadFileSettings         `yaml:"upload_file_settings"`
 	RecorderInfo        RecorderInfo               `yaml:"recorder_info"`
 	SharedNotePad       SharedNotePad              `yaml:"shared_notepad"`
-	//deprecated: use insights features
-	AzureCognitiveServicesSpeech AzureCognitiveServicesSpeech `yaml:"azure_cognitive_services_speech"`
-	AnalyticsSettings            *AnalyticsSettings           `yaml:"analytics_settings"`
-	ArtifactsSettings            *ArtifactsSettings           `yaml:"artifacts_settings"`
-	NatsInfo                     NatsInfo                     `yaml:"nats_info"`
-	Insights                     *InsightsConfig              `yaml:"insights"`
-	TurnServer                   *TurnConfig                  `yaml:"turn_server"`
+	AnalyticsSettings   *AnalyticsSettings         `yaml:"analytics_settings"`
+	ArtifactsSettings   *ArtifactsSettings         `yaml:"artifacts_settings"`
+	NatsInfo            NatsInfo                   `yaml:"nats_info"`
+	Insights            *InsightsConfig            `yaml:"insights"`
+	TurnServer          *TurnConfig                `yaml:"turn_server"`
 }
 
 type ClientInfo struct {
@@ -130,19 +128,6 @@ type EtherpadInfo struct {
 	Host         string `yaml:"host"`
 	ClientId     string `yaml:"client_id"`
 	ClientSecret string `yaml:"client_secret"`
-}
-
-type AzureCognitiveServicesSpeech struct {
-	Enabled                       bool                   `yaml:"enabled"`
-	MaxNumTranLangsAllowSelecting int32                  `yaml:"max_num_tran_langs"`
-	SubscriptionKeys              []AzureSubscriptionKey `yaml:"subscription_keys"`
-}
-
-type AzureSubscriptionKey struct {
-	Id              string `yaml:"id"`
-	SubscriptionKey string `yaml:"subscription_key"`
-	ServiceRegion   string `yaml:"service_region"`
-	MaxConnection   int64  `yaml:"max_connection"`
 }
 
 type AnalyticsSettings struct {
@@ -242,7 +227,7 @@ type NatsInfoRecorder struct {
 	TranscodingJobs string `yaml:"transcoding_jobs_subject"`
 }
 
-func New(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
+func InitAppConfig(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 	// default validation of token is 10 minutes
 	if appCnf.Client.TokenValidity == nil || *appCnf.Client.TokenValidity < 0 {
 		appCnf.Client.TokenValidity = new(10 * time.Minute)

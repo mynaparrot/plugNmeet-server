@@ -37,13 +37,13 @@ func startServer(configFile string) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Read the main configuration from the YAML file.
-	appCnf, err := readYamlConfigFile(configFile)
+	cnf, err := readYamlConfigFile(configFile)
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to read config file")
 	}
 
 	// Initialize the configuration, setting default values and creating necessary directories.
-	appCnf, err = config.New(ctx, appCnf)
+	appCnf, err := config.InitAppConfig(ctx, cnf)
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to initialize config")
 	}
@@ -63,14 +63,14 @@ func startServer(configFile string) {
 	// Prepare server dependencies like database, Redis, and NATS connections.
 	appCnf, err = factory.InitConnections(ctx, appCnf)
 	if err != nil {
-		logger.WithError(err).Fatalln("Failed to prepare server")
+		logger.WithError(err).Fatal("Failed to prepare server")
 	}
 
 	// Use the dependency injection container (wire) to build the main application object,
 	//    which includes all the controllers.
 	appFactory, err := factory.NewAppFactory(ctx, appCnf)
 	if err != nil {
-		logger.WithError(err).Fatalln("Failed to create app factory")
+		logger.WithError(err).Fatal("Failed to create app factory")
 	}
 	// Boot up background services (e.g., NATS listeners, janitor for cleanup tasks).
 	appFactory.Boot()
@@ -85,7 +85,7 @@ func startServer(configFile string) {
 	// Start a goroutine to handle the shutdown process when a signal is received.
 	go func() {
 		sig := <-sigChan
-		logger.WithField("signal", sig).Infoln("Exit requested, attempting graceful shutdown...")
+		logger.WithField("signal", sig).Info("Exit requested, attempting graceful shutdown...")
 
 		// shut down the application
 		appFactory.Shutdown()
@@ -101,12 +101,11 @@ func startServer(configFile string) {
 	appCnf.Logger.WithFields(logrus.Fields{
 		"version": version.Version,
 		"port":    appFactory.AppConfig.Client.Port,
-	}).Info("starting plugNmeet server")
+	}).Info("Starting plugNmeet server")
 
 	// Start the Fiber web server and listen for incoming HTTP requests. This is a blocking call.
-	err = rt.Listen(fmt.Sprintf(":%d", appFactory.AppConfig.Client.Port))
-	if err != nil {
-		logger.WithError(err).Fatalln("Failed to start server")
+	if err := rt.Listen(fmt.Sprintf(":%d", appFactory.AppConfig.Client.Port)); err != nil {
+		logger.WithError(err).Fatal("Failed to start server")
 	}
 }
 
@@ -116,9 +115,8 @@ func readYamlConfigFile(file string) (*config.AppConfig, error) {
 		return nil, err
 	}
 
-	appCnf := new(config.AppConfig)
-	err = yaml.Unmarshal(yamlFile, &appCnf)
-	if err != nil {
+	var appCnf config.AppConfig
+	if err := yaml.Unmarshal(yamlFile, &appCnf); err != nil {
 		return nil, err
 	}
 
@@ -131,5 +129,5 @@ func readYamlConfigFile(file string) (*config.AppConfig, error) {
 	// set the root path
 	appCnf.RootWorkingDir = wd
 
-	return appCnf, err
+	return &appCnf, err
 }

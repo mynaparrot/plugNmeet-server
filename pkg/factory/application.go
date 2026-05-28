@@ -43,9 +43,8 @@ type Application struct {
 
 func (a *Application) Boot() {
 	if a.AppConfig.LivekitSipInfo != nil && a.AppConfig.LivekitSipInfo.Enabled {
-		err := a.lkServices.CreateSIPInboundTrunk()
-		if err != nil {
-			a.AppConfig.Logger.WithError(err).Fatalln("Failed to create SIP inbound trunk")
+		if err := a.lkServices.CreateSIPInboundTrunk(); err != nil {
+			a.AppConfig.Logger.WithError(err).Fatal("Failed to create SIP inbound trunk")
 		}
 	}
 

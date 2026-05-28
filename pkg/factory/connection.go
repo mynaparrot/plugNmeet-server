@@ -93,7 +93,7 @@ func (c *connection) openDbConn() error {
 
 	// If read replicas are configured, set up the dbresolver.
 	if len(info.Replicas) > 0 {
-		c.appCnf.Logger.Infof("found %d read replicas, configuring dbresolver", len(info.Replicas))
+		c.appCnf.Logger.Infof("Found %d read replicas, configuring dbresolver", len(info.Replicas))
 		var replicaDialectors []gorm.Dialector
 
 		for _, r := range info.Replicas {
@@ -145,7 +145,7 @@ func (c *connection) openDbConn() error {
 
 	dbVersion := ""
 	db.Raw("SELECT VERSION()").Scan(&dbVersion)
-	c.appCnf.Logger.WithField("version", dbVersion).Info("successfully connected to database")
+	c.appCnf.Logger.WithField("version", dbVersion).Info("Successfully connected to database")
 
 	c.appCnf.DB = db
 	return nil
@@ -183,7 +183,7 @@ func (c *connection) openNatsConn() error {
 	c.appCnf.Logger.WithFields(logrus.Fields{
 		"version": nc.ConnectedServerVersion(),
 		"address": nc.ConnectedAddr(),
-	}).Info("successfully connected to NATS server")
+	}).Info("Successfully connected to NATS server")
 	c.appCnf.JetStream = js
 
 	return nil
@@ -231,7 +231,7 @@ func (c *connection) openRedisConn() error {
 		for _, line := range lines {
 			if strings.HasPrefix(line, "redis_version:") {
 				version := strings.TrimPrefix(line, "redis_version:")
-				c.appCnf.Logger.WithField("version", version).Info("successfully connected to Redis")
+				c.appCnf.Logger.WithField("version", version).Info("Successfully connected to Redis")
 				break
 			}
 		}
