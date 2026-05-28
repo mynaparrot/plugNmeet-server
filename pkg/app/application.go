@@ -39,6 +39,7 @@ type ApplicationControllers struct {
 // Application is the root struct holding all dependencies for lifecycle management.
 type Application struct {
 	ctx                context.Context
+	shutDowner         fx.Shutdowner
 	appConfig          *config.AppConfig
 	httpServer         *fiber.App
 	controllers        *ApplicationControllers
@@ -52,6 +53,7 @@ type Application struct {
 // NewApplication creates a new Application instance.
 func NewApplication(
 	ctx context.Context,
+	shutDowner fx.Shutdowner,
 	appConfig *config.AppConfig,
 	controllers *ApplicationControllers,
 	natsController *controllers.NatsController,
@@ -62,6 +64,7 @@ func NewApplication(
 ) *Application {
 	return &Application{
 		ctx:                ctx,
+		shutDowner:         shutDowner,
 		appConfig:          appConfig,
 		httpServer:         newRouter(appConfig, controllers),
 		controllers:        controllers,
@@ -85,7 +88,8 @@ func (a *Application) RegisterHooks(lifecycle fx.Lifecycle) {
 func (a *Application) Start(ctx context.Context) error {
 	if a.appConfig.LivekitSipInfo != nil && a.appConfig.LivekitSipInfo.Enabled {
 		if err := a.lkServices.CreateSIPInboundTrunk(); err != nil {
-			a.appConfig.Logger.WithError(err).Fatal("Failed to create SIP inbound trunk")
+			a.appConfig.Logger.WithError(err).Error("Failed to create SIP inbound trunk")
+			return err
 		}
 	}
 
@@ -105,7 +109,8 @@ func (a *Application) Start(ctx context.Context) error {
 		}).Info("Starting plugNmeet server")
 
 		if err := a.httpServer.Listen(fmt.Sprintf(":%d", a.appConfig.Client.Port)); err != nil {
-			a.appConfig.Logger.WithError(err).Fatal("Failed to start server")
+			a.appConfig.Logger.WithError(err).Error("Failed to start server")
+			_ = a.shutDowner.Shutdown()
 		}
 	}()
 	return nil
@@ -128,6 +133,5 @@ func (a *Application) Stop(ctx context.Context) error {
 	_ = a.appConfig.NatsConn.Drain()
 	a.appConfig.NatsConn.Close()
 
-	logrus.Exit(0)
 	return nil
 }

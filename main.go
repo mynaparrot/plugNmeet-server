@@ -60,13 +60,16 @@ func main() {
 		logger.WithError(err).Fatal("Failed to prepare server")
 	}
 
-	fxApp := fx.New(
+	fxOpts := []fx.Option{
 		fx.Provide(func() context.Context { return ctx }),
 		fx.Supply(appCnf, appCnf.DB, appCnf.RDS, appCnf.Logger, appCnf.NatsConn, appCnf.JetStream),
 		app.ApplicationModule,
-	)
+	}
+	if !appCnf.Client.Debug {
+		fxOpts = append(fxOpts, fx.NopLogger)
+	}
 
-	fxApp.Run()
+	fx.New(fxOpts...).Run()
 }
 
 func readYamlConfigFile(file string) (*config.AppConfig, error) {
