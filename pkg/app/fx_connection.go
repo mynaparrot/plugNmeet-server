@@ -161,11 +161,11 @@ func provideNATSConnection(appCnf *config.AppConfig) (*nats.Conn, error) {
 	return nc, nil
 }
 
-func provideJetStream(nc *nats.Conn) (jetstream.JetStream, error) {
+func provideJetStream(nc *nats.Conn, logger *logrus.Logger) (jetstream.JetStream, error) {
+	log := logger.WithField("method", "provideJetStream")
 	js, err := jetstream.New(nc)
 	if err != nil {
-		// Assuming you want to log this, you'd need a logger.
-		// For now, just returning the error.
+		log.WithError(err).Error("failed to create jetstream context")
 		return nil, err
 	}
 	return js, nil

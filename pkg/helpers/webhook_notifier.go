@@ -12,6 +12,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 )
 
 // roomNotifier holds a dedicated worker and the cached webhook URLs for a single room.
@@ -57,22 +58,27 @@ func NewWebhookNotifier(ctx context.Context, app *config.AppConfig, ds *dbservic
 }
 
 // SubscribeToCleanup listens for cleanup messages broadcast to all servers.
-func (w *WebhookNotifier) SubscribeToCleanup() {
+func (w *WebhookNotifier) SubscribeToCleanup(lc fx.Lifecycle) {
 	log := w.logger.WithField("method", "SubscribeToCleanup")
-	_, err := w.app.NatsConn.Subscribe(redisservice.WebhookCleanupSubject, func(m *nats.Msg) {
-		roomId := string(m.Data) // Make a copy of the data
-		log.WithFields(logrus.Fields{
-			"room_id": roomId,
-			"method":  "subscribeToCleanup",
-		}).Info("received webhook cleanup signal")
-		w.cleanupNotifier(roomId)
+
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			_, err := w.app.NatsConn.Subscribe(redisservice.WebhookCleanupSubject, func(m *nats.Msg) {
+				roomId := string(m.Data)
+				log.WithFields(logrus.Fields{
+					"room_id": roomId,
+					"method":  "subscribeToCleanup",
+				}).Info("received webhook cleanup signal")
+				w.cleanupNotifier(roomId)
+			})
+			if err != nil {
+				log.WithError(err).Error("failed to subscribe to webhook cleanup subject")
+				return err
+			}
+			log.Info("Successfully subscribed to webhook cleanup subject")
+			return nil
+		},
 	})
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"method": "subscribeToCleanup",
-		}).WithError(err).Error("failed to subscribe to webhook cleanup subject")
-	}
-	log.Info("Successfully subscribed to webhook cleanup subject")
 }
 
 // getOrCreateNotifier gets a notifier for a room, creating it just-in-time if it doesn't exist on this server instance.

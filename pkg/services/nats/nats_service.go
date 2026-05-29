@@ -10,6 +10,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -59,9 +60,19 @@ func New(ctx context.Context, app *config.AppConfig, nc *nats.Conn, js jetstream
 	return s
 }
 
-func (s *NatsService) Initialized() {
-	s.createRoomNatsStream()
-	s.createRecorderKVAndWatch()
+func (s *NatsService) Initialized(lc fx.Lifecycle) error {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			if err := s.createRoomNatsStream(); err != nil {
+				return err
+			}
+			if err := s.createRecorderKVAndWatch(); err != nil {
+				return err
+			}
+			return nil
+		},
+	})
+	return nil
 }
 
 // formatConsolidatedRoomBucket generates the bucket name for a consolidated room.

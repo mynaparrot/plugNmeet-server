@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -251,11 +252,12 @@ func (c *NatsController) subscribeToSystemWorkerCore() (*nats.Subscription, erro
 // This is used for messages that require guaranteed delivery, such as PINGs, token renewals, and private messages.
 // It runs in parallel with the core NATS pub/sub subscriber.
 func (c *NatsController) subscribeToSystemWorker(ctx context.Context, stream jetstream.Stream) (jetstream.ConsumeContext, error) {
+	log := c.logger.WithField("method", "subscribeToSystemWorker")
 	cons, err := stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
 		Durable: fmt.Sprintf("%s%s", prefix, c.app.NatsInfo.Subjects.SystemJsWorker),
 	})
 	if err != nil {
-		c.logger.WithError(err).Fatalln("error creating system worker consumer")
+		log.WithError(err).Fatalln("error creating system worker consumer")
 	}
 
 	consumeContext, err := cons.Consume(func(msg jetstream.Msg) {
@@ -276,7 +278,9 @@ func (c *NatsController) subscribeToSystemWorker(ctx context.Context, stream jet
 		})
 	}, jetstream.ConsumeErrHandler(func(consumeCtx jetstream.ConsumeContext, err error) {
 		if ctx.Err() == nil {
-			c.logger.WithError(err).Warn("jetstream consume error")
+			if !errors.Is(err, jetstream.ErrConnectionClosed) {
+				log.WithError(err).Warn("jetstream consume error")
+			}
 		}
 	}))
 
