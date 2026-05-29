@@ -42,6 +42,7 @@ const (
 )
 
 type NatsController struct {
+	ctx              context.Context
 	app              *config.AppConfig
 	natsService      *natsservice.NatsService
 	issuerKeyPair    nkeys.KeyPair
@@ -56,7 +57,7 @@ type NatsController struct {
 	authService      micro.Service
 }
 
-func NewNatsController(app *config.AppConfig, natsService *natsservice.NatsService, authModel *models.AuthModel, natsModel *models.NatsModel, logger *logrus.Logger) (*NatsController, error) {
+func NewNatsController(ctx context.Context, app *config.AppConfig, natsService *natsservice.NatsService, authModel *models.AuthModel, natsModel *models.NatsModel, logger *logrus.Logger) (*NatsController, error) {
 	issuerKeyPair, err := nkeys.FromSeed([]byte(app.NatsInfo.AuthCalloutIssuerPrivate))
 	if err != nil {
 		logger.WithError(err).Error("Failed to load issuer private key")
@@ -64,6 +65,7 @@ func NewNatsController(app *config.AppConfig, natsService *natsservice.NatsServi
 	}
 
 	c := &NatsController{
+		ctx:           ctx,
 		app:           app,
 		natsService:   natsService,
 		issuerKeyPair: issuerKeyPair,
@@ -85,11 +87,11 @@ func NewNatsController(app *config.AppConfig, natsService *natsservice.NatsServi
 }
 
 // Initialize performs setup and signals completion via the channel.
-func (c *NatsController) Initialize(ctx context.Context) error {
+func (c *NatsController) Initialize() error {
 	log := c.logger.WithField("method", "initialize")
 
 	// system receiver as worker
-	stream, err := c.app.JetStream.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
+	stream, err := c.app.JetStream.CreateOrUpdateStream(c.ctx, jetstream.StreamConfig{
 		Name:        fmt.Sprintf("%s", c.app.NatsInfo.Subjects.SystemJsWorker),
 		Description: "plugNmeet system worker",
 		Replicas:    c.app.NatsInfo.NumReplicas,
@@ -102,7 +104,7 @@ func (c *NatsController) Initialize(ctx context.Context) error {
 	}
 	log.Info("Created/Updated system worker stream")
 
-	c.sysWorkerCon, err = c.subscribeToSystemWorker(ctx, stream)
+	c.sysWorkerCon, err = c.subscribeToSystemWorker(c.ctx, stream)
 	if err != nil {
 		log.WithError(err).Error("error subscribing to system worker")
 		return err
@@ -117,7 +119,7 @@ func (c *NatsController) Initialize(ctx context.Context) error {
 	log.Info("Subscribed to system worker via core NATS")
 
 	// create recorder transcoder worker
-	transcoderStream, err := c.app.JetStream.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
+	transcoderStream, err := c.app.JetStream.CreateOrUpdateStream(c.ctx, jetstream.StreamConfig{
 		Name:        c.app.NatsInfo.Recorder.TranscodingJobs,
 		Description: "plugNmeet recorder transcoding jobs",
 		Replicas:    c.app.NatsInfo.NumReplicas,
@@ -130,7 +132,7 @@ func (c *NatsController) Initialize(ctx context.Context) error {
 	}
 	log.Info("Created/Updated recorder transcoder stream")
 
-	_, err = transcoderStream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
+	_, err = transcoderStream.CreateOrUpdateConsumer(c.ctx, jetstream.ConsumerConfig{
 		Durable:   utils.TranscoderConsumerDurable,
 		AckPolicy: jetstream.AckExplicitPolicy,
 	})

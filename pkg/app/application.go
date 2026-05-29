@@ -104,7 +104,7 @@ func (a *Application) Start(ctx context.Context) error {
 	go a.artifactModel.MigrateAnalyticsToArtifacts()
 
 	// Initialize NATS controller.
-	if err := a.natsController.Initialize(a.ctx); err != nil {
+	if err := a.natsController.Initialize(); err != nil {
 		log.WithError(err).Error("Failed to initialize NATS controller")
 		return err
 	}
@@ -145,13 +145,6 @@ func (a *Application) Stop(ctx context.Context) error {
 	if err := a.httpServer.ShutdownWithTimeout(15 * time.Second); err != nil {
 		a.appConfig.Logger.WithError(err).Warn("Graceful shutdown failed, forcing exit.")
 	}
-
-	if db, err := a.appConfig.DB.DB(); err == nil {
-		_ = db.Close()
-	}
-	_ = a.appConfig.RDS.Close()
-	_ = a.appConfig.NatsConn.Drain()
-	a.appConfig.NatsConn.Close()
 
 	return nil
 }

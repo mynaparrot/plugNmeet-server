@@ -20,7 +20,7 @@ import (
 	"gorm.io/plugin/dbresolver"
 )
 
-func provideDBConnection(ctx context.Context, appCnf *config.AppConfig) (*gorm.DB, error) {
+func provideDBConnection(lc fx.Lifecycle, ctx context.Context, appCnf *config.AppConfig) (*gorm.DB, error) {
 	log := appCnf.Logger.WithField("method", "provideDBConnection")
 	info := appCnf.DatabaseInfo
 	charset := "utf8mb4"
@@ -125,10 +125,19 @@ func provideDBConnection(ctx context.Context, appCnf *config.AppConfig) (*gorm.D
 	db.Raw("SELECT VERSION()").Scan(&dbVersion)
 	log.WithField("version", dbVersion).Info("Successfully connected to database")
 
+	lc.Append(fx.Hook{OnStop: func(_ context.Context) error {
+		log.Info("Closing database connection")
+		sqlDB, err := db.DB()
+		if err != nil {
+			return err
+		}
+		return sqlDB.Close()
+	}})
+
 	return db, nil
 }
 
-func provideNATSConnection(appCnf *config.AppConfig) (*nats.Conn, error) {
+func provideNATSConnection(lc fx.Lifecycle, appCnf *config.AppConfig) (*nats.Conn, error) {
 	log := appCnf.Logger.WithField("method", "provideNATSConnection")
 	info := appCnf.NatsInfo
 	opts := []nats.Option{
@@ -158,6 +167,17 @@ func provideNATSConnection(appCnf *config.AppConfig) (*nats.Conn, error) {
 		"address": nc.ConnectedAddr(),
 	}).Info("Successfully connected to NATS server")
 
+	lc.Append(fx.Hook{
+		OnStop: func(ctx context.Context) error {
+			log.Info("Closing NATS connection")
+			if err := nc.Drain(); err != nil {
+				return err
+			}
+			nc.Close()
+			return nil
+		},
+	})
+
 	return nc, nil
 }
 
@@ -171,7 +191,7 @@ func provideJetStream(nc *nats.Conn, logger *logrus.Logger) (jetstream.JetStream
 	return js, nil
 }
 
-func provideRedisConnection(ctx context.Context, appCnf *config.AppConfig) (*redis.Client, error) {
+func provideRedisConnection(lc fx.Lifecycle, ctx context.Context, appCnf *config.AppConfig) (*redis.Client, error) {
 	log := appCnf.Logger.WithField("method", "provideRedisConnection")
 	rf := appCnf.RedisInfo
 	var rdb *redis.Client
@@ -220,6 +240,13 @@ func provideRedisConnection(ctx context.Context, appCnf *config.AppConfig) (*red
 			}
 		}
 	}
+
+	lc.Append(fx.Hook{
+		OnStop: func(ctx context.Context) error {
+			log.Info("Closing Redis connection")
+			return rdb.Close()
+		},
+	})
 
 	return rdb, nil
 }
