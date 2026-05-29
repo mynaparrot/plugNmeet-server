@@ -2,7 +2,7 @@ package controllers
 
 import (
 	"encoding/json"
-	"sync"
+	"fmt"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -18,7 +18,6 @@ import (
 )
 
 type InsightsController struct {
-	sync.RWMutex
 	app             *config.AppConfig
 	agentTaskSub    *nats.Subscription
 	summarizeJobSub *nats.Subscription
@@ -36,30 +35,35 @@ func NewInsightsController(app *config.AppConfig, natsService *natsservice.NatsS
 	}
 }
 
-func (i *InsightsController) StartSubscription() {
-	go i.SubscribeToAgentTaskRequests()
-	go i.SubscribeToSummarizeJobs()
+// Initialize performs the synchronous setup for the NATS subscriptions.
+func (i *InsightsController) Initialize() error {
+	if err := i.subscribeToAgentTaskRequests(); err != nil {
+		return err
+	}
+	if err := i.subscribeToSummarizeJobs(); err != nil {
+		return err
+	}
+	return nil
 }
 
-// SubscribeToAgentTaskRequests is the central handler for all incoming agent tasks.
-func (i *InsightsController) SubscribeToAgentTaskRequests() {
+// subscribeToAgentTaskRequests is the central handler for all incoming agent tasks.
+func (i *InsightsController) subscribeToAgentTaskRequests() error {
 	sub, err := i.app.NatsConn.Subscribe(insights.InsightsNatsChannel, func(msg *nats.Msg) {
 		// Pass the raw message directly to the model's handler.
 		// The model is now responsible for unmarshalling and replying.
 		i.insightsModel.HandleIncomingAgentTask(msg)
 	})
 	if err != nil {
-		i.logger.WithError(err).Fatalln("failed to subscribe to NATS for insights tasks")
+		return fmt.Errorf("failed to subscribe to NATS for insights tasks: %w", err)
 	}
 	i.logger.Infof("successfully connected with %s channel", sub.Subject)
 
-	i.Lock()
 	i.agentTaskSub = sub
-	i.Unlock()
+	return nil
 }
 
-// SubscribeToSummarizeJobs sets up a queue subscription to handle summarization jobs.
-func (i *InsightsController) SubscribeToSummarizeJobs() {
+// subscribeToSummarizeJobs sets up a queue subscription to handle summarization jobs.
+func (i *InsightsController) subscribeToSummarizeJobs() error {
 	sub, err := i.app.NatsConn.QueueSubscribe(insights.SummarizeJobQueue, "pnm-summarize-worker-group", func(msg *nats.Msg) {
 		var payload insights.SummarizeJobPayload
 		err := json.Unmarshal(msg.Data, &payload)
@@ -71,19 +75,15 @@ func (i *InsightsController) SubscribeToSummarizeJobs() {
 		i.insightsModel.StartProcessingSummarizeJob(&payload)
 	})
 	if err != nil {
-		i.logger.WithError(err).Fatalln("failed to subscribe to NATS for summarize jobs")
+		return fmt.Errorf("failed to subscribe to NATS for summarize jobs: %w", err)
 	}
 	i.logger.Infof("successfully connected with %s queue", sub.Subject)
 
-	i.Lock()
 	i.summarizeJobSub = sub
-	i.Unlock()
+	return nil
 }
 
 func (i *InsightsController) Shutdown() {
-	i.RLock()
-	defer i.RUnlock()
-
 	if i.agentTaskSub != nil {
 		if err := i.agentTaskSub.Unsubscribe(); err != nil {
 			i.logger.WithError(err).Errorln("failed to unsubscribe from agent tasks")

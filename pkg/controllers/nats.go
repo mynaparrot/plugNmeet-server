@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/gammazero/workerpool"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -43,20 +42,25 @@ const (
 )
 
 type NatsController struct {
-	app           *config.AppConfig
-	natsService   *natsservice.NatsService
-	issuerKeyPair nkeys.KeyPair
-	curveKeyPair  nkeys.KeyPair
-	authModel     *models.AuthModel
-	natsModel     *models.NatsModel
-	wp            *workerpool.WorkerPool
-	logger        *logrus.Entry
+	app              *config.AppConfig
+	natsService      *natsservice.NatsService
+	issuerKeyPair    nkeys.KeyPair
+	curveKeyPair     nkeys.KeyPair
+	authModel        *models.AuthModel
+	natsModel        *models.NatsModel
+	wp               *workerpool.WorkerPool
+	logger           *logrus.Entry
+	sysWorkerCon     jetstream.ConsumeContext
+	sysWorkerCoreSub *nats.Subscription
+	userConnSub      *nats.Subscription
+	authService      micro.Service
 }
 
-func NewNatsController(app *config.AppConfig, natsService *natsservice.NatsService, authModel *models.AuthModel, natsModel *models.NatsModel, logger *logrus.Logger) *NatsController {
+func NewNatsController(app *config.AppConfig, natsService *natsservice.NatsService, authModel *models.AuthModel, natsModel *models.NatsModel, logger *logrus.Logger) (*NatsController, error) {
 	issuerKeyPair, err := nkeys.FromSeed([]byte(app.NatsInfo.AuthCalloutIssuerPrivate))
 	if err != nil {
-		logger.WithError(err).Fatal("error creating issuer key pair")
+		logger.WithError(err).Error("Failed to load issuer private key")
+		return nil, fmt.Errorf("error creating issuer key pair: %w", err)
 	}
 
 	c := &NatsController{
@@ -72,39 +76,45 @@ func NewNatsController(app *config.AppConfig, natsService *natsservice.NatsServi
 	if app.NatsInfo.AuthCalloutXkeyPrivate != nil && *app.NatsInfo.AuthCalloutXkeyPrivate != "" {
 		c.curveKeyPair, err = nkeys.FromSeed([]byte(*app.NatsInfo.AuthCalloutXkeyPrivate))
 		if err != nil {
-			c.logger.WithError(err).Fatal("error creating curve key pair")
+			logger.WithError(err).Error("Failed to load curve private key")
+			return nil, fmt.Errorf("error creating curve key pair: %w", err)
 		}
 	}
 
-	return c
+	return c, nil
 }
 
-func (c *NatsController) BootUp(ctx context.Context, wg *sync.WaitGroup) {
+// Initialize performs setup and signals completion via the channel.
+func (c *NatsController) Initialize(ctx context.Context) error {
+	log := c.logger.WithField("method", "initialize")
+
 	// system receiver as worker
 	stream, err := c.app.JetStream.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
 		Name:        fmt.Sprintf("%s", c.app.NatsInfo.Subjects.SystemJsWorker),
 		Description: "plugNmeet system worker",
 		Replicas:    c.app.NatsInfo.NumReplicas,
-		Retention:   jetstream.WorkQueuePolicy, // to become a worker
-		Subjects: []string{
-			fmt.Sprintf("%s.*.*", c.app.NatsInfo.Subjects.SystemJsWorker),
-		},
+		Retention:   jetstream.WorkQueuePolicy,
+		Subjects:    []string{fmt.Sprintf("%s.*.*", c.app.NatsInfo.Subjects.SystemJsWorker)},
 	})
 	if err != nil {
-		c.logger.WithError(err).Fatal("error creating system worker stream")
+		log.WithError(err).Error("error creating system worker stream")
+		return err
 	}
+	log.Info("Created/Updated system worker stream")
 
-	// now subscribe via JetStream for guaranteed messages (e.g., PINGs)
-	sysWorkerCon, err := c.subscribeToSystemWorker(ctx, stream)
+	c.sysWorkerCon, err = c.subscribeToSystemWorker(ctx, stream)
 	if err != nil {
-		c.logger.WithError(err).Fatal("error subscribing to system worker")
+		log.WithError(err).Error("error subscribing to system worker")
+		return err
 	}
+	log.Info("Subscribed to system worker")
 
-	// Subscribe to the same subject via core NATS for lightweight pub/sub messages
-	sysWorkerCoreSub, err := c.subscribeToSystemWorkerCore()
+	c.sysWorkerCoreSub, err = c.subscribeToSystemWorkerCore()
 	if err != nil {
-		c.logger.WithError(err).Fatal("error subscribing to system worker via core NATS")
+		log.WithError(err).Error("error subscribing to system worker via core NATS")
+		return err
 	}
+	log.Info("Subscribed to system worker via core NATS")
 
 	// create recorder transcoder worker
 	transcoderStream, err := c.app.JetStream.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
@@ -115,26 +125,31 @@ func (c *NatsController) BootUp(ctx context.Context, wg *sync.WaitGroup) {
 		Subjects:    []string{c.app.NatsInfo.Recorder.TranscodingJobs},
 	})
 	if err != nil {
-		c.logger.WithError(err).Fatal("error creating recorder transcoder stream")
+		log.WithError(err).Error("error creating recorder transcoder stream")
+		return err
 	}
+	log.Info("Created/Updated recorder transcoder stream")
 
 	_, err = transcoderStream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
 		Durable:   utils.TranscoderConsumerDurable,
 		AckPolicy: jetstream.AckExplicitPolicy,
 	})
 	if err != nil {
-		c.logger.WithError(err).Fatal("error creating recorder transcoder consumer")
+		log.WithError(err).Error("error creating recorder transcoder consumer")
+		return err
 	}
+	log.Info("Created/Updated recorder transcoder consumer")
 
-	// subscribe to connection events
-	con, err := c.subscribeToUsersConnEvents()
+	c.userConnSub, err = c.subscribeToUsersConnEvents()
 	if err != nil {
-		c.logger.WithError(err).Fatal("error subscribing to users connection events")
+		log.WithError(err).Error("error subscribing to users connection events")
+		return err
 	}
+	log.Info("Subscribed to users connection events")
 
 	// auth service
 	authService := NewNatsAuthController(c.app, c.natsService, c.authModel, c.issuerKeyPair, c.curveKeyPair, c.logger)
-	_, err = micro.AddService(c.app.NatsConn, micro.Config{
+	c.authService, err = micro.AddService(c.app.NatsConn, micro.Config{
 		Name:        natsAuthServiceName,
 		Version:     version.Version,
 		Description: "Handle authorization of pnm nats client",
@@ -144,18 +159,30 @@ func (c *NatsController) BootUp(ctx context.Context, wg *sync.WaitGroup) {
 			Handler: micro.HandlerFunc(authService.Handle),
 		},
 	})
-
 	if err != nil {
-		c.logger.WithError(err).Fatal("error adding auth service")
+		log.WithError(err).Error("error adding auth service")
+		return err
 	}
-	wg.Done()
 
-	// Keep the application running until context remain valid
-	<-ctx.Done()
+	log.Info("Added auth service")
+	return nil
+}
 
-	sysWorkerCon.Stop()
-	_ = sysWorkerCoreSub.Unsubscribe()
-	_ = con.Unsubscribe()
+// Stop gracefully shuts down the NATS controller's consumers.
+func (c *NatsController) Stop() {
+	c.logger.Info("Shutting down nats controller")
+	if c.authService != nil {
+		_ = c.authService.Stop()
+	}
+	if c.sysWorkerCon != nil {
+		c.sysWorkerCon.Stop()
+	}
+	if c.sysWorkerCoreSub != nil {
+		_ = c.sysWorkerCoreSub.Unsubscribe()
+	}
+	if c.userConnSub != nil {
+		_ = c.userConnSub.Unsubscribe()
+	}
 	c.wp.Stop()
 }
 
@@ -257,7 +284,8 @@ func (c *NatsController) subscribeToSystemWorker(ctx context.Context, stream jet
 		Durable: fmt.Sprintf("%s%s", prefix, c.app.NatsInfo.Subjects.SystemJsWorker),
 	})
 	if err != nil {
-		log.WithError(err).Fatalln("error creating system worker consumer")
+		log.WithError(err).Error("error creating system worker consumer")
+		return nil, err
 	}
 
 	consumeContext, err := cons.Consume(func(msg jetstream.Msg) {
