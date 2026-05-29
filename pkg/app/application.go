@@ -17,6 +17,7 @@ import (
 
 // ApplicationControllers holds all the controllers.
 type ApplicationControllers struct {
+	fx.In
 	AnalyticsController    *controllers.AnalyticsController
 	AuthController         *controllers.AuthController
 	BBBController          *controllers.BBBController
@@ -37,16 +38,14 @@ type ApplicationControllers struct {
 
 // Application is the root struct holding all dependencies for lifecycle management.
 type Application struct {
-	ctx                context.Context
-	shutDowner         fx.Shutdowner
-	appConfig          *config.AppConfig
-	httpServer         *fiber.App
-	controllers        *ApplicationControllers
-	natsController     *controllers.NatsController
-	insightsController *controllers.InsightsController
-	janitorModel       *models.JanitorModel
-	artifactModel      *models.ArtifactModel
-	lkServices         *livekitservice.LivekitService
+	ctx           context.Context
+	shutDowner    fx.Shutdowner
+	appConfig     *config.AppConfig
+	httpServer    *fiber.App
+	controllers   ApplicationControllers
+	janitorModel  *models.JanitorModel
+	artifactModel *models.ArtifactModel
+	lkServices    *livekitservice.LivekitService
 }
 
 // NewApplication creates a new Application instance.
@@ -54,24 +53,20 @@ func NewApplication(
 	ctx context.Context,
 	shutDowner fx.Shutdowner,
 	appConfig *config.AppConfig,
-	controllers *ApplicationControllers,
-	natsController *controllers.NatsController,
-	insightsController *controllers.InsightsController,
+	controllers ApplicationControllers,
 	janitorModel *models.JanitorModel,
 	artifactModel *models.ArtifactModel,
 	lkServices *livekitservice.LivekitService,
 ) *Application {
 	return &Application{
-		ctx:                ctx,
-		shutDowner:         shutDowner,
-		appConfig:          appConfig,
-		httpServer:         newRouter(appConfig, controllers),
-		controllers:        controllers,
-		natsController:     natsController,
-		insightsController: insightsController,
-		janitorModel:       janitorModel,
-		artifactModel:      artifactModel,
-		lkServices:         lkServices,
+		ctx:           ctx,
+		shutDowner:    shutDowner,
+		appConfig:     appConfig,
+		controllers:   controllers,
+		janitorModel:  janitorModel,
+		artifactModel: artifactModel,
+		lkServices:    lkServices,
+		httpServer:    newRouter(appConfig, &controllers),
 	}
 }
 
@@ -104,13 +99,13 @@ func (a *Application) Start(ctx context.Context) error {
 	go a.artifactModel.MigrateAnalyticsToArtifacts()
 
 	// Initialize NATS controller.
-	if err := a.natsController.Initialize(); err != nil {
+	if err := a.controllers.NatsController.Initialize(); err != nil {
 		log.WithError(err).Error("Failed to initialize NATS controller")
 		return err
 	}
 
 	// Initialize Insights controller.
-	if err := a.insightsController.Initialize(); err != nil {
+	if err := a.controllers.InsightsController.Initialize(); err != nil {
 		log.WithError(err).Error("Failed to initialize Insights controller")
 		return err
 	}
@@ -137,8 +132,8 @@ func (a *Application) Start(ctx context.Context) error {
 
 // Stop is called when the application is shutting down.
 func (a *Application) Stop(ctx context.Context) error {
-	a.natsController.Stop()
-	a.insightsController.Shutdown()
+	a.controllers.NatsController.Stop()
+	a.controllers.InsightsController.Shutdown()
 	a.controllers.WebhookController.Shutdown()
 	a.janitorModel.Shutdown()
 
