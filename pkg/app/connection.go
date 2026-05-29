@@ -45,6 +45,7 @@ func InitConnections(ctx context.Context, appCnf *config.AppConfig) (*config.App
 }
 
 func (c *connection) openDbConn() error {
+	log := c.appCnf.Logger.WithField("method", "openDbConn")
 	info := c.appCnf.DatabaseInfo
 	charset := "utf8mb4"
 	loc := "UTC"
@@ -88,6 +89,7 @@ func (c *connection) openDbConn() error {
 
 	db, err := gorm.Open(mysql.New(mysqlCnf), cnf)
 	if err != nil {
+		log.WithError(err).Error("Failed to connect to database")
 		return err
 	}
 
@@ -124,12 +126,14 @@ func (c *connection) openDbConn() error {
 			SetMaxOpenConns(maxOpenConns).
 			SetMaxIdleConns(maxOpenConns))
 		if err != nil {
+			log.WithError(err).Error("Failed to configure dbresolver")
 			return err
 		}
 	}
 
 	d, err := db.DB()
 	if err != nil {
+		log.WithError(err).Error("Failed to get database instance")
 		return err
 	}
 
@@ -140,18 +144,20 @@ func (c *connection) openDbConn() error {
 
 	err = d.PingContext(c.ctx)
 	if err != nil {
+		log.WithError(err).Error("Failed to ping database")
 		return err
 	}
 
 	dbVersion := ""
 	db.Raw("SELECT VERSION()").Scan(&dbVersion)
-	c.appCnf.Logger.WithField("version", dbVersion).Info("Successfully connected to database")
+	log.WithField("version", dbVersion).Info("Successfully connected to database")
 
 	c.appCnf.DB = db
 	return nil
 }
 
 func (c *connection) openNatsConn() error {
+	log := c.appCnf.Logger.WithField("method", "openNatsConn")
 	info := c.appCnf.NatsInfo
 	var err error
 	opts := []nats.Option{
@@ -161,6 +167,7 @@ func (c *connection) openNatsConn() error {
 	if info.Nkey != nil {
 		opt, err := utils.NkeyOptionFromSeedText(*info.Nkey)
 		if err != nil {
+			log.WithError(err).Error("Failed to create nkey option")
 			return err
 		}
 		opts = append(opts, opt)
@@ -171,16 +178,18 @@ func (c *connection) openNatsConn() error {
 
 	nc, err := nats.Connect(strings.Join(info.NatsUrls, ","), opts...)
 	if err != nil {
+		log.WithError(err).Error("Failed to connect to NATS server")
 		return err
 	}
 	c.appCnf.NatsConn = nc
 
 	js, err := jetstream.New(nc)
 	if err != nil {
+		log.WithError(err).Error("Failed to create jetstream context")
 		return err
 	}
 
-	c.appCnf.Logger.WithFields(logrus.Fields{
+	log.WithFields(logrus.Fields{
 		"version": nc.ConnectedServerVersion(),
 		"address": nc.ConnectedAddr(),
 	}).Info("Successfully connected to NATS server")
@@ -190,6 +199,7 @@ func (c *connection) openNatsConn() error {
 }
 
 func (c *connection) openRedisConn() error {
+	log := c.appCnf.Logger.WithField("method", "openRedisConn")
 	rf := c.appCnf.RedisInfo
 	var rdb *redis.Client
 	var tlsConfig *tls.Config
@@ -222,6 +232,7 @@ func (c *connection) openRedisConn() error {
 
 	_, err := rdb.Ping(c.ctx).Result()
 	if err != nil {
+		log.WithError(err).Error("Failed to connect to Redis")
 		return err
 	}
 
@@ -231,7 +242,7 @@ func (c *connection) openRedisConn() error {
 		for _, line := range lines {
 			if strings.HasPrefix(line, "redis_version:") {
 				version := strings.TrimPrefix(line, "redis_version:")
-				c.appCnf.Logger.WithField("version", version).Info("Successfully connected to Redis")
+				log.WithField("version", version).Info("Successfully connected to Redis")
 				break
 			}
 		}
