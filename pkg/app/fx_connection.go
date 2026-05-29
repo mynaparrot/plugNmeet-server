@@ -251,8 +251,7 @@ func provideRedisConnection(lc fx.Lifecycle, ctx context.Context, appCnf *config
 	return rdb, nil
 }
 
-// populateAppCnfConnections ensures that any legacy code still accessing
-// connections via the main config struct will not break.
+// populateAppCnfConnections will update main app config struct.
 func populateAppCnfConnections(appCnf *config.AppConfig, db *gorm.DB, rds *redis.Client, nc *nats.Conn, js jetstream.JetStream) {
 	appCnf.DB = db
 	appCnf.RDS = rds
