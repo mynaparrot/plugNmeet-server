@@ -6,7 +6,7 @@ import (
 )
 
 // createRecorderKVAndWatch ensures the recorder KV bucket exists and starts the watcher.
-func (s *NatsService) createRecorderKVAndWatch() {
+func (s *NatsService) createRecorderKVAndWatch() error {
 	bucket := s.app.NatsInfo.Recorder.RecorderInfoKv
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
 		Bucket:      bucket,
@@ -14,12 +14,14 @@ func (s *NatsService) createRecorderKVAndWatch() {
 		Replicas:    s.app.NatsInfo.NumReplicas,
 	})
 	if err != nil {
-		s.logger.WithError(err).Fatalf("could not create recorder info bucket %s", bucket)
+		s.logger.WithError(err).Errorf("could not create recorder info bucket %s", bucket)
+		return err
 	}
-	s.logger.Infof("successfully created recorder info bucket: %s", bucket)
+	s.logger.Infof("Successfully created recorder info bucket: %s", bucket)
 
 	// Now that the bucket exists, tell the cache service to start watching it.
 	s.cs.watchRecorderKV(kv, s.logger)
+	return nil
 }
 
 // GetAllActiveRecorders retrieves all active recorders directly from the local cache.

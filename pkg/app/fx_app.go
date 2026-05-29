@@ -1,9 +1,6 @@
 package app
 
 import (
-	"context"
-
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
@@ -15,22 +12,6 @@ import (
 	"go.uber.org/fx"
 )
 
-func provideBreakoutRoomModel(rm *models.RoomModel) *models.BreakoutRoomModel {
-	// we need to create BreakoutRoomModel first
-	bm := models.NewBreakoutRoomModel(rm)
-	// then set it to RoomModel to solve circular dependency
-	rm.SetBreakoutRoomModel(bm)
-	return bm
-}
-
-func provideArtifactModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, redisService *redisservice.RedisService, natsService *natsservice.NatsService, webhookNotifier *helpers.WebhookNotifier, analyticsModel *models.AnalyticsModel) *models.ArtifactModel {
-	// create the artifact model, which requires analyticsModel
-	artifactModel := models.NewArtifactModel(ctx, app, ds, redisService, natsService, webhookNotifier, analyticsModel)
-	// now complete the circular dependency by setting artifactModel on analyticsModel
-	analyticsModel.SetArtifactModel(artifactModel)
-	return artifactModel
-}
-
 var ServiceModule = fx.Module("services",
 	fx.Provide(
 		dbservice.New,
@@ -39,18 +20,26 @@ var ServiceModule = fx.Module("services",
 		livekitservice.New,
 		turnservice.New,
 	),
+	fx.Invoke((*dbservice.DatabaseService).AutoMigrate, (*natsservice.NatsService).Initialized),
 )
 
 var HelperModule = fx.Module("helpers",
 	fx.Provide(
 		helpers.NewWebhookNotifier,
 	),
+	fx.Invoke((*helpers.WebhookNotifier).SubscribeToCleanup),
 )
+
+// wireCircularModels is a dedicated Invoke function for wiring circular model dependencies.
+func wireCircularModels(rm *models.RoomModel, bm *models.BreakoutRoomModel, analyticsModel *models.AnalyticsModel, artifactModel *models.ArtifactModel) {
+	rm.SetBreakoutRoomModel(bm)
+	analyticsModel.SetArtifactModel(artifactModel)
+}
 
 var ModelModule = fx.Module("models",
 	fx.Provide(
 		models.NewAnalyticsModel,
-		provideArtifactModel,
+		models.NewArtifactModel,
 		models.NewAuthModel,
 		models.NewInsightsModel,
 		models.NewBBBApiWrapperModel,
@@ -61,11 +50,12 @@ var ModelModule = fx.Module("models",
 		models.NewPollModel,
 		models.NewRecordingModel,
 		models.NewRoomModel,
-		provideBreakoutRoomModel,
+		models.NewBreakoutRoomModel,
 		models.NewJanitorModel,
 		models.NewUserModel,
 		models.NewWebhookModel,
 	),
+	fx.Invoke(wireCircularModels),
 )
 
 var ControllerModule = fx.Module("controllers",
@@ -128,6 +118,7 @@ var ControllerModule = fx.Module("controllers",
 )
 
 var ApplicationModule = fx.Module("application",
+	ConnectionModule,
 	ServiceModule,
 	HelperModule,
 	ModelModule,

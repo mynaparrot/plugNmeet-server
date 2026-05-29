@@ -5,6 +5,7 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 	"gorm.io/gorm"
 )
 
@@ -18,14 +19,21 @@ func New(ctx context.Context, db *gorm.DB, logger *logrus.Logger) *DatabaseServi
 		db:     db.WithContext(ctx),
 		logger: logger.WithField("service", "database"),
 	}
-	s.autoMigrate()
 
 	return s
 }
 
-func (s *DatabaseService) autoMigrate() {
-	err := s.db.AutoMigrate(&dbmodels.RoomInfo{}, &dbmodels.Recording{}, &dbmodels.RoomArtifact{}, &dbmodels.Analytics{})
-	if err != nil {
-		s.logger.WithError(err).Error("failed to migrate database")
-	}
+func (s *DatabaseService) AutoMigrate(lc fx.Lifecycle) error {
+	log := s.logger.WithField("method", "AutoMigrate")
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			err := s.db.AutoMigrate(&dbmodels.RoomInfo{}, &dbmodels.Recording{}, &dbmodels.RoomArtifact{}, &dbmodels.Analytics{})
+			if err != nil {
+				log.WithError(err).Error("Failed to migrate database")
+				return err
+			}
+			return nil
+		},
+	})
+	return nil
 }

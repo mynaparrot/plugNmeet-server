@@ -9,7 +9,7 @@ import (
 const DurableNameTpl = "%s_%s"
 
 // createRoomNatsStream will create a single stream for all rooms.
-func (s *NatsService) createRoomNatsStream() {
+func (s *NatsService) createRoomNatsStream() error {
 	_, err := s.js.CreateOrUpdateStream(s.ctx, jetstream.StreamConfig{
 		Name:        s.app.NatsInfo.RoomStreamName,
 		Description: "plugNmeet room stream",
@@ -21,9 +21,11 @@ func (s *NatsService) createRoomNatsStream() {
 		},
 	})
 	if err != nil {
-		s.logger.WithError(err).Fatalf("error creating room stream: %s", s.app.NatsInfo.RoomStreamName)
+		s.logger.WithError(err).Errorf("error creating room stream: %s", s.app.NatsInfo.RoomStreamName)
+		return err
 	}
-	s.logger.Infof("successfully created room stream: %s", s.app.NatsInfo.RoomStreamName)
+	s.logger.Infof("Successfully created room stream: %s", s.app.NatsInfo.RoomStreamName)
+	return nil
 }
 
 // PurgeRoomMessagesFromStream purges all message subjects for a specific room from the main stream.

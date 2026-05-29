@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -84,40 +83,61 @@ func (a *Application) RegisterHooks(lifecycle fx.Lifecycle) {
 	})
 }
 
-// Start is called when the application is starting.
+// Start is called when the application is starting. It must be non-blocking.
 func (a *Application) Start(ctx context.Context) error {
+	log := a.appConfig.Logger.WithFields(logrus.Fields{
+		"method":     "start",
+		"controller": "Application",
+	})
+
+	// Perform synchronous, fallible startup steps first.
 	if a.appConfig.LivekitSipInfo != nil && a.appConfig.LivekitSipInfo.Enabled {
 		if err := a.lkServices.CreateSIPInboundTrunk(); err != nil {
-			a.appConfig.Logger.WithError(err).Error("Failed to create SIP inbound trunk")
+			log.WithError(err).Error("Failed to create SIP inbound trunk")
 			return err
 		}
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go a.natsController.BootUp(a.ctx, &wg)
-	wg.Wait()
-
-	a.insightsController.StartSubscription()
+	// Start the janitor in a separate goroutine.
 	go a.janitorModel.StartJanitor()
+	// TODO: will remove in future
 	go a.artifactModel.MigrateAnalyticsToArtifacts()
 
+	// Initialize NATS controller.
+	if err := a.natsController.Initialize(a.ctx); err != nil {
+		log.WithError(err).Error("Failed to initialize NATS controller")
+		return err
+	}
+
+	// Initialize Insights controller.
+	if err := a.insightsController.Initialize(); err != nil {
+		log.WithError(err).Error("Failed to initialize Insights controller")
+		return err
+	}
+
+	// Start the HTTP server in a background goroutine.
 	go func() {
-		a.appConfig.Logger.WithFields(logrus.Fields{
+		log.WithFields(logrus.Fields{
 			"version": version.Version,
 			"port":    a.appConfig.Client.Port,
 		}).Info("Starting plugNmeet server")
 
 		if err := a.httpServer.Listen(fmt.Sprintf(":%d", a.appConfig.Client.Port)); err != nil {
-			a.appConfig.Logger.WithError(err).Error("Failed to start server")
-			_ = a.shutDowner.Shutdown()
+			log.WithError(err).Error("HTTP server failed to start, initiating shutdown")
+			// Use the Shutdowner to gracefully stop the entire Fx application.
+			if shutdownErr := a.shutDowner.Shutdown(); shutdownErr != nil {
+				log.WithError(shutdownErr).Error("Failed to gracefully shutdown")
+			}
 		}
 	}()
+
+	// OnStart must return nil to signal to Fx that the startup was successful.
 	return nil
 }
 
 // Stop is called when the application is shutting down.
 func (a *Application) Stop(ctx context.Context) error {
+	a.natsController.Stop()
 	a.insightsController.Shutdown()
 	a.controllers.WebhookController.Shutdown()
 	a.janitorModel.Shutdown()

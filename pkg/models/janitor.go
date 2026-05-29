@@ -164,6 +164,6 @@ func (m *JanitorModel) Shutdown() {
 	currentLockVal := m.leaderLockVal
 	m.mu.RUnlock()
 
-	m.rs.ReleaseJanitorLeadershipLock(m.ctx, currentLockVal, m.logger)
+	m.rs.ReleaseJanitorLeadershipLock(context.Background(), currentLockVal, m.logger)
 	m.cancel()
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -46,20 +47,32 @@ type NatsService struct {
 	logger *logrus.Entry
 }
 
-func New(ctx context.Context, app *config.AppConfig, logger *logrus.Logger) *NatsService {
+func New(ctx context.Context, app *config.AppConfig, nc *nats.Conn, js jetstream.JetStream, logger *logrus.Logger) *NatsService {
 	log := logger.WithField("service", "nats")
 	s := &NatsService{
 		ctx:    ctx,
 		app:    app,
-		nc:     app.NatsConn,
-		js:     app.JetStream,
+		nc:     nc,
+		js:     js,
 		cs:     newNatsCacheService(ctx, log),
 		logger: log,
 	}
-	s.createRoomNatsStream()
-	s.createRecorderKVAndWatch()
-
 	return s
+}
+
+func (s *NatsService) Initialized(lc fx.Lifecycle) error {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			if err := s.createRoomNatsStream(); err != nil {
+				return err
+			}
+			if err := s.createRecorderKVAndWatch(); err != nil {
+				return err
+			}
+			return nil
+		},
+	})
+	return nil
 }
 
 // formatConsolidatedRoomBucket generates the bucket name for a consolidated room.
@@ -134,8 +147,7 @@ func (s *NatsService) MarshalUserMetadata(meta *plugnmeet.UserMetadata) (string,
 // UnmarshalUserMetadata will create proper formatted medata from json string
 func (s *NatsService) UnmarshalUserMetadata(metadata string) (*plugnmeet.UserMetadata, error) {
 	m := new(plugnmeet.UserMetadata)
-	err := protojson.Unmarshal([]byte(metadata), m)
-	if err != nil {
+	if err := protojson.Unmarshal([]byte(metadata), m); err != nil {
 		return nil, err
 	}
 
