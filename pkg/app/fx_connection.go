@@ -13,40 +13,16 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 	"gorm.io/plugin/dbresolver"
 )
 
-type connection struct {
-	appCnf *config.AppConfig
-	ctx    context.Context
-}
-
-func InitConnections(ctx context.Context, appCnf *config.AppConfig) (*config.AppConfig, error) {
-	c := &connection{
-		appCnf: appCnf,
-		ctx:    ctx,
-	}
-
-	if err := c.openDbConn(); err != nil {
-		return nil, err
-	}
-
-	if err := c.openNatsConn(); err != nil {
-		return nil, err
-	}
-
-	if err := c.openRedisConn(); err != nil {
-		return nil, err
-	}
-	return c.appCnf, nil
-}
-
-func (c *connection) openDbConn() error {
-	log := c.appCnf.Logger.WithField("method", "openDbConn")
-	info := c.appCnf.DatabaseInfo
+func provideDBConnection(ctx context.Context, appCnf *config.AppConfig) (*gorm.DB, error) {
+	log := appCnf.Logger.WithField("method", "provideDBConnection")
+	info := appCnf.DatabaseInfo
 	charset := "utf8mb4"
 	loc := "UTC"
 	connMaxLifetime := time.Minute * 4
@@ -68,38 +44,36 @@ func (c *connection) openDbConn() error {
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s&parseTime=True&loc=%s", info.Username, info.Password, info.Host, info.Port, info.DBName, charset, loc)
 
 	mysqlCnf := mysql.Config{
-		DSN: dsn, // data source name
+		DSN: dsn,
 	}
 	cnf := &gorm.Config{}
 
 	loggerCnf := logger.Config{
-		SlowThreshold:             time.Second, // Slow SQL threshold
+		SlowThreshold:             time.Second,
 		LogLevel:                  logger.Info,
 		IgnoreRecordNotFoundError: true,
 		ParameterizedQueries:      false,
 		Colorful:                  true,
 	}
 
-	if !c.appCnf.Client.Debug {
+	if !appCnf.Client.Debug {
 		loggerCnf.LogLevel = logger.Warn
-		cnf.Logger = logger.New(c.appCnf.Logger, loggerCnf)
+		cnf.Logger = logger.New(appCnf.Logger, loggerCnf)
 	} else {
-		cnf.Logger = logger.New(c.appCnf.Logger, loggerCnf)
+		cnf.Logger = logger.New(appCnf.Logger, loggerCnf)
 	}
 
 	db, err := gorm.Open(mysql.New(mysqlCnf), cnf)
 	if err != nil {
-		log.WithError(err).Error("Failed to connect to database")
-		return err
+		log.WithError(err).Error("failed to connect to database")
+		return nil, err
 	}
 
-	// If read replicas are configured, set up the dbresolver.
 	if len(info.Replicas) > 0 {
-		c.appCnf.Logger.Infof("Found %d read replicas, configuring dbresolver", len(info.Replicas))
+		appCnf.Logger.Infof("Found %d read replicas, configuring dbresolver", len(info.Replicas))
 		var replicaDialectors []gorm.Dialector
 
 		for _, r := range info.Replicas {
-			// Use primary's settings as default for replicas if not specified.
 			if r.Username == "" {
 				r.Username = info.Username
 			}
@@ -115,9 +89,9 @@ func (c *connection) openDbConn() error {
 		}
 		resolverCnf := dbresolver.Config{
 			Replicas: replicaDialectors,
-			Policy:   dbresolver.RandomPolicy{}, // Use random policy to distribute read load.
+			Policy:   dbresolver.RandomPolicy{},
 		}
-		if c.appCnf.Client.Debug {
+		if appCnf.Client.Debug {
 			resolverCnf.TraceResolverMode = true
 		}
 
@@ -126,40 +100,37 @@ func (c *connection) openDbConn() error {
 			SetMaxOpenConns(maxOpenConns).
 			SetMaxIdleConns(maxOpenConns))
 		if err != nil {
-			log.WithError(err).Error("Failed to configure dbresolver")
-			return err
+			log.WithError(err).Error("failed to configure dbresolver")
+			return nil, err
 		}
 	}
 
 	d, err := db.DB()
 	if err != nil {
-		log.WithError(err).Error("Failed to get database instance")
-		return err
+		log.WithError(err).Error("failed to get database instance")
+		return nil, err
 	}
 
-	// https://github.com/go-sql-driver/mysql?tab=readme-ov-file#important-settings
 	d.SetConnMaxLifetime(connMaxLifetime)
 	d.SetMaxOpenConns(maxOpenConns)
 	d.SetMaxIdleConns(maxOpenConns)
 
-	err = d.PingContext(c.ctx)
+	err = d.PingContext(ctx)
 	if err != nil {
-		log.WithError(err).Error("Failed to ping database")
-		return err
+		log.WithError(err).Error("failed to ping database")
+		return nil, err
 	}
 
 	dbVersion := ""
 	db.Raw("SELECT VERSION()").Scan(&dbVersion)
 	log.WithField("version", dbVersion).Info("Successfully connected to database")
 
-	c.appCnf.DB = db
-	return nil
+	return db, nil
 }
 
-func (c *connection) openNatsConn() error {
-	log := c.appCnf.Logger.WithField("method", "openNatsConn")
-	info := c.appCnf.NatsInfo
-	var err error
+func provideNATSConnection(appCnf *config.AppConfig) (*nats.Conn, error) {
+	log := appCnf.Logger.WithField("method", "provideNATSConnection")
+	info := appCnf.NatsInfo
 	opts := []nats.Option{
 		nats.Name("plugnmeet-server"),
 	}
@@ -167,8 +138,8 @@ func (c *connection) openNatsConn() error {
 	if info.Nkey != nil {
 		opt, err := utils.NkeyOptionFromSeedText(*info.Nkey)
 		if err != nil {
-			log.WithError(err).Error("Failed to create nkey option")
-			return err
+			log.WithError(err).Error("failed to create nkey option")
+			return nil, err
 		}
 		opts = append(opts, opt)
 	} else {
@@ -178,29 +149,31 @@ func (c *connection) openNatsConn() error {
 
 	nc, err := nats.Connect(strings.Join(info.NatsUrls, ","), opts...)
 	if err != nil {
-		log.WithError(err).Error("Failed to connect to NATS server")
-		return err
-	}
-	c.appCnf.NatsConn = nc
-
-	js, err := jetstream.New(nc)
-	if err != nil {
-		log.WithError(err).Error("Failed to create jetstream context")
-		return err
+		log.WithError(err).Error("failed to connect to NATS server")
+		return nil, err
 	}
 
 	log.WithFields(logrus.Fields{
 		"version": nc.ConnectedServerVersion(),
 		"address": nc.ConnectedAddr(),
 	}).Info("Successfully connected to NATS server")
-	c.appCnf.JetStream = js
 
-	return nil
+	return nc, nil
 }
 
-func (c *connection) openRedisConn() error {
-	log := c.appCnf.Logger.WithField("method", "openRedisConn")
-	rf := c.appCnf.RedisInfo
+func provideJetStream(nc *nats.Conn) (jetstream.JetStream, error) {
+	js, err := jetstream.New(nc)
+	if err != nil {
+		// Assuming you want to log this, you'd need a logger.
+		// For now, just returning the error.
+		return nil, err
+	}
+	return js, nil
+}
+
+func provideRedisConnection(ctx context.Context, appCnf *config.AppConfig) (*redis.Client, error) {
+	log := appCnf.Logger.WithField("method", "provideRedisConnection")
+	rf := appCnf.RedisInfo
 	var rdb *redis.Client
 	var tlsConfig *tls.Config
 
@@ -230,13 +203,13 @@ func (c *connection) openRedisConn() error {
 		})
 	}
 
-	_, err := rdb.Ping(c.ctx).Result()
+	_, err := rdb.Ping(ctx).Result()
 	if err != nil {
-		log.WithError(err).Error("Failed to connect to Redis")
-		return err
+		log.WithError(err).Error("failed to connect to Redis")
+		return nil, err
 	}
 
-	info, err := rdb.Info(c.ctx, "server").Result()
+	info, err := rdb.Info(ctx, "server").Result()
 	if err == nil && info != "" {
 		lines := strings.Split(info, "\r\n")
 		for _, line := range lines {
@@ -248,6 +221,26 @@ func (c *connection) openRedisConn() error {
 		}
 	}
 
-	c.appCnf.RDS = rdb
-	return nil
+	return rdb, nil
 }
+
+// populateAppCnfConnections ensures that any legacy code still accessing
+// connections via the main config struct will not break.
+func populateAppCnfConnections(appCnf *config.AppConfig, db *gorm.DB, rds *redis.Client, nc *nats.Conn, js jetstream.JetStream) {
+	appCnf.DB = db
+	appCnf.RDS = rds
+	appCnf.NatsConn = nc
+	appCnf.JetStream = js
+}
+
+var ConnectionModule = fx.Module("connections",
+	// Providers for each connection type
+	fx.Provide(
+		provideDBConnection,
+		provideRedisConnection,
+		provideNATSConnection,
+		provideJetStream,
+	),
+	// It runs after the connections are created and populates the appCnf struct.
+	fx.Invoke(populateAppCnfConnections),
+)

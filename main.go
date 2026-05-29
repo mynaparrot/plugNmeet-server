@@ -54,15 +54,9 @@ func main() {
 	}
 	lkLogger.InitFromConfig(logConf, "pnm")
 
-	// Prepare server dependencies like database, Redis, and NATS connections.
-	appCnf, err = app.InitConnections(ctx, appCnf)
-	if err != nil {
-		logger.WithError(err).Fatal("Failed to prepare server")
-	}
-
 	fxOpts := []fx.Option{
 		fx.Provide(func() context.Context { return ctx }),
-		fx.Supply(appCnf, appCnf.DB, appCnf.RDS, appCnf.Logger, appCnf.NatsConn, appCnf.JetStream),
+		fx.Supply(appCnf, appCnf.Logger),
 		app.ApplicationModule,
 	}
 	if !appCnf.Client.Debug {

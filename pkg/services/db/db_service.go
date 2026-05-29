@@ -18,14 +18,13 @@ func New(ctx context.Context, db *gorm.DB, logger *logrus.Logger) *DatabaseServi
 		db:     db.WithContext(ctx),
 		logger: logger.WithField("service", "database"),
 	}
-	s.autoMigrate()
 
 	return s
 }
 
-func (s *DatabaseService) autoMigrate() {
+func (s *DatabaseService) AutoMigrate() {
 	err := s.db.AutoMigrate(&dbmodels.RoomInfo{}, &dbmodels.Recording{}, &dbmodels.RoomArtifact{}, &dbmodels.Analytics{})
 	if err != nil {
-		s.logger.WithError(err).Error("failed to migrate database")
+		s.logger.WithError(err).Error("Failed to migrate database")
 	}
 }

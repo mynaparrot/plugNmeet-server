@@ -23,7 +23,7 @@ func (s *NatsService) createRoomNatsStream() {
 	if err != nil {
 		s.logger.WithError(err).Fatalf("error creating room stream: %s", s.app.NatsInfo.RoomStreamName)
 	}
-	s.logger.Infof("successfully created room stream: %s", s.app.NatsInfo.RoomStreamName)
+	s.logger.Infof("Successfully created room stream: %s", s.app.NatsInfo.RoomStreamName)
 }
 
 // PurgeRoomMessagesFromStream purges all message subjects for a specific room from the main stream.

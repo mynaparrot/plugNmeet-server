@@ -16,7 +16,7 @@ func (s *NatsService) createRecorderKVAndWatch() {
 	if err != nil {
 		s.logger.WithError(err).Fatalf("could not create recorder info bucket %s", bucket)
 	}
-	s.logger.Infof("successfully created recorder info bucket: %s", bucket)
+	s.logger.Infof("Successfully created recorder info bucket: %s", bucket)
 
 	// Now that the bucket exists, tell the cache service to start watching it.
 	s.cs.watchRecorderKV(kv, s.logger)

@@ -53,27 +53,26 @@ func NewWebhookNotifier(ctx context.Context, app *config.AppConfig, ds *dbservic
 		logger:               logger.WithField("helper", "webhookNotifier"),
 	}
 
-	// Subscribe to the cleanup broadcast channel for clustered environments.
-	w.subscribeToCleanup()
-
 	return w
 }
 
-// subscribeToCleanup listens for cleanup messages broadcast to all servers.
-func (w *WebhookNotifier) subscribeToCleanup() {
+// SubscribeToCleanup listens for cleanup messages broadcast to all servers.
+func (w *WebhookNotifier) SubscribeToCleanup() {
+	log := w.logger.WithField("method", "SubscribeToCleanup")
 	_, err := w.app.NatsConn.Subscribe(redisservice.WebhookCleanupSubject, func(m *nats.Msg) {
 		roomId := string(m.Data) // Make a copy of the data
-		w.logger.WithFields(logrus.Fields{
+		log.WithFields(logrus.Fields{
 			"room_id": roomId,
 			"method":  "subscribeToCleanup",
 		}).Info("received webhook cleanup signal")
 		w.cleanupNotifier(roomId)
 	})
 	if err != nil {
-		w.logger.WithFields(logrus.Fields{
+		log.WithFields(logrus.Fields{
 			"method": "subscribeToCleanup",
 		}).WithError(err).Error("failed to subscribe to webhook cleanup subject")
 	}
+	log.Info("Successfully subscribed to webhook cleanup subject")
 }
 
 // getOrCreateNotifier gets a notifier for a room, creating it just-in-time if it doesn't exist on this server instance.
