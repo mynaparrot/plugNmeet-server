@@ -249,7 +249,7 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 		"roomId":  rf.RoomId,
 		"roomSid": rf.RoomSid,
 	})
-	log.Info("InitAppConfig whiteboard file upload request received")
+	log.Info("New whiteboard file upload request received")
 
 	// Lock to prevent concurrent processing in the same room
 	lock := m.redisService.NewLock(fmt.Sprintf("whiteboardUploadLock-%s", rf.RoomId), 5*time.Minute)

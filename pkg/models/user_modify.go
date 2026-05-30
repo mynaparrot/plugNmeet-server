@@ -14,7 +14,7 @@ func (m *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 		"blockUser": r.GetBlockUser(),
 		"method":    "RemoveParticipant",
 	})
-	log.Infoln("InitAppConfig request to remove participant received")
+	log.Infoln("New request to remove participant received")
 
 	status, err := m.natsService.GetRoomUserStatus(r.RoomId, r.UserId)
 	if err != nil {

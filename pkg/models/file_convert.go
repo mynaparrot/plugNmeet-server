@@ -79,7 +79,7 @@ func (m *FileModel) ConvertAndBroadcastWhiteboardFile(ctx context.Context, roomI
 // processAndBroadcastWhiteboardFile contains the original, unmodified conversion logic.
 func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath string, requestedUserId *string, log *logrus.Entry) (res *ConvertWhiteboardFileRes, err error) {
 	log = m.logger.WithField("sub-method", "processAndBroadcastWhiteboardFile")
-	log.Infoln("InitAppConfig request to convert and broadcast whiteboard file received")
+	log.Infoln("New request to convert and broadcast whiteboard file received")
 
 	if roomId == "" || filePath == "" {
 		err := errors.New("roomId or filePath is empty")

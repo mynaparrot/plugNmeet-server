@@ -20,7 +20,7 @@ func (m *EtherpadModel) CreateSession(roomId, requestedUserId string) (*plugnmee
 		"requestedUserId": requestedUserId,
 		"method":          "CreateSession",
 	})
-	log.Infoln("InitAppConfig request to create Etherpad session received")
+	log.Infoln("New request to create Etherpad session received")
 
 	if len(m.app.SharedNotePad.EtherpadHosts) < 1 {
 		err := errors.New("need at least one Etherpad host")
