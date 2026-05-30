@@ -12,9 +12,8 @@ case "$ARCH" in
         ;;
 esac
 
-# 2. Configure the system's runtime linker cache for the application
-echo "/opt/speechsdk/lib/${SPEECHSDK_ARCH_DIR}" > /etc/ld.so.conf.d/speechsdk.conf
-ldconfig
+# 2. Tell the OS where to find the dynamic .so libraries for the Speech SDK safely
+export LD_LIBRARY_PATH="/opt/speechsdk/lib/${SPEECHSDK_ARCH_DIR}:$LD_LIBRARY_PATH"
 
 # 3. Export CGO flags for build tools like 'air'
 export CGO_CFLAGS="-I/opt/speechsdk/include/c_api"

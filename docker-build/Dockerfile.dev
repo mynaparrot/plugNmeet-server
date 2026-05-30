@@ -1,34 +1,30 @@
-FROM golang:latest
+# Start from our pre-built base image, which contains all heavy dependencies.
+FROM mynaparrot/plugnmeet-server:base
 
-ARG TARGETARCH
-
-# Align with production Dockerfile and entrypoint script
+# Align with production: Environment variables
 ENV SPEECHSDK_ROOT="/opt/speechsdk"
-RUN mkdir -p $SPEECHSDK_ROOT && \
-    wget -O SpeechSDK-Linux.tar.gz https://aka.ms/csspeech/linuxbinary && \
-    tar --strip 1 -xzf SpeechSDK-Linux.tar.gz -C "$SPEECHSDK_ROOT" && \
-    rm SpeechSDK-Linux.tar.gz
 
 WORKDIR /app
 
-RUN export DEBIAN_FRONTEND=noninteractive; \
-    apt update && \
-    apt install --no-install-recommends -y build-essential wget curl libreoffice mupdf-tools && \
-    apt install --no-install-recommends -y fontconfig fonts-dejavu fonts-dejavu-extra \
-    fonts-noto fonts-noto-cjk fonts-liberation fonts-liberation2 fonts-linuxlibertine \
-    fonts-sil-gentium fonts-sil-gentium-basic ca-certificates \
-    libasound2-dev libopus-dev libopusfile-dev libssl-dev libsoxr-dev && \
-    apt clean && \
-    rm -rf /var/lib/apt/lists/*
-
+# Install Go hot-reload tool (cacheable step)
 RUN go install github.com/air-verse/air@latest
 
-#COPY . .
-COPY go.mod go.mod
-COPY go.sum go.sum
+# Install runtime dependencies needed for development that might not be in the base image.
+# For example, fonts for libreoffice.
+RUN export DEBIAN_FRONTEND=noninteractive; \
+    apt-get update && \
+    apt-get install --no-install-recommends -y \
+    libreoffice fontconfig fonts-dejavu fonts-dejavu-extra fonts-noto fonts-noto-cjk \
+    fonts-liberation fonts-liberation2 fonts-linuxlibertine \
+    fonts-sil-gentium fonts-sil-gentium-basic && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Cache Go modules
+COPY go.mod go.sum ./
 RUN go mod download
 
-# Add the entrypoint script
+# Entrypoint script
 COPY docker-build/docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 

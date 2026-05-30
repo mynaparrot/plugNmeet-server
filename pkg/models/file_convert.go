@@ -262,7 +262,7 @@ func convertPDFToImages(ctx context.Context, pdfPath, outputDir, roomId string, 
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
-	err := executeCommand(ctx, logger, "mutool", "convert", "-O", "resolution=300", "-o", filepath.Join(outputDir, "page_%d.png"), pdfPath)
+	err := executeCommand(ctx, logger, "mutool", "draw", "-r", "300", "-o", filepath.Join(outputDir, "page_%d.png"), pdfPath)
 	if err != nil {
 		logger.Errorf("mutool conversion failed for roomId: %s; file: %s; msg: %s", roomId, pdfPath, err)
 		return fmt.Errorf("mutool: converting to images failed")
