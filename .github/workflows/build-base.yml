@@ -50,6 +50,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          provenance: false
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/plugnmeet-server:base-cache-${{ matrix.arch }}
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/plugnmeet-server:base-cache-${{ matrix.arch }},mode=max
 
