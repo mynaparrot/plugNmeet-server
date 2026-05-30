@@ -1,5 +1,62 @@
 # Changelog
 
+## [2.2.0](https://github.com/mynaparrot/plugNmeet-server/compare/v2.1.9...v2.2.0) (2026-05-30)
+
+
+### Features
+
+* added more details proxy config based on fiber v3 + prometheus basic auth ([a864a9d](https://github.com/mynaparrot/plugNmeet-server/commit/a864a9d7ed3ff00adbe6819a7b5b879b51953221))
+* added new API `BroadcastToRoom` ([203e950](https://github.com/mynaparrot/plugNmeet-server/commit/203e95009149ff596363dfae634ad9a5232390e4))
+* added new API `BroadcastToRoom` ([b925d24](https://github.com/mynaparrot/plugNmeet-server/commit/b925d24e842c6504ebdc55909828d7fdb0231595))
+* added new API endpoint `uploadWhiteboardFile` ([95173fb](https://github.com/mynaparrot/plugNmeet-server/commit/95173fb3fea5f0358470aae8f7d56d12d5b66562))
+* added new API endpoint `uploadWhiteboardFile` ([3474ee8](https://github.com/mynaparrot/plugNmeet-server/commit/3474ee8c8e95345bfcf2b99c92c3b272cc4f7592))
+* added recorder bot controlling options ([ec5dc97](https://github.com/mynaparrot/plugNmeet-server/commit/ec5dc9726c7e86949a35def7bc111ccbccdd6943))
+* allow to use direct link as `document_link` for `uploadWhiteboardFile` as well ([4c91bd4](https://github.com/mynaparrot/plugNmeet-server/commit/4c91bd492929661d67f5b687354cfc7f2f544dfd))
+* **API:** added merge recordings API ([753f51e](https://github.com/mynaparrot/plugNmeet-server/commit/753f51e1726c59ac3214fffb6a628266330a31b9))
+* migrate project from `google wire` to `uber fx` ([e191e38](https://github.com/mynaparrot/plugNmeet-server/commit/e191e38aa3c6b17098f31f5597a635adaf1e2e4f))
+* migrate project from `google wire` to `uber fx` ([7e591f1](https://github.com/mynaparrot/plugNmeet-server/commit/7e591f13885154331e5ba8c3cf59bdf1a80d17a5))
+
+
+### Bug Fixes
+
+* `MergeRecordingsReq` now support roomId as well ([00ff03a](https://github.com/mynaparrot/plugNmeet-server/commit/00ff03a2599ec6dcc3dd319fb74d6a2179b3b01c))
+* add base docker for faster build ([9dd5ee6](https://github.com/mynaparrot/plugNmeet-server/commit/9dd5ee666cceef8c80b6a28e03163c1d7768b36f))
+* added better way to download file ([34edd65](https://github.com/mynaparrot/plugNmeet-server/commit/34edd65d63e2bb68941c592febc1851d94f60e0c))
+* adopt idiomatic fx for dependency management ([3a8394f](https://github.com/mynaparrot/plugNmeet-server/commit/3a8394f42fa8d9eff9534be5c52c35b6c8b7e032))
+* backed previous value will delete upcoming releases ([720de60](https://github.com/mynaparrot/plugNmeet-server/commit/720de60255bf2f8b90b5090b1fb553215c9b9936))
+* better error handling ([d6f6232](https://github.com/mynaparrot/plugNmeet-server/commit/d6f623273b65bfb5282ea98d5fcceb7a2e6b94ca))
+* bump proto ([bc5bbac](https://github.com/mynaparrot/plugNmeet-server/commit/bc5bbac3b17251b6340b20915b9b2be17f2cee91))
+* connection provider should use self-closing ([fbbe6b8](https://github.com/mynaparrot/plugNmeet-server/commit/fbbe6b8d24b2c88d052d230cb426086c7721cd21))
+* disable features when `SelfInsertEncryptionKey` enabled ([6633cb2](https://github.com/mynaparrot/plugNmeet-server/commit/6633cb24ece714549d79f2c69e4cb0ed6a23dd52))
+* fast url validation ([6c715d5](https://github.com/mynaparrot/plugNmeet-server/commit/6c715d5c4886650cf98ea11b24cdf90167023432))
+* few clean up ([c943220](https://github.com/mynaparrot/plugNmeet-server/commit/c943220a0a58dfbfc093884379fbbd2ccb059609))
+* handle conversion in a separate goroutine ([f7fa998](https://github.com/mynaparrot/plugNmeet-server/commit/f7fa998c71cc9c80309e6b8729ae35ed77585400))
+* improve file upload/download ([2ac8125](https://github.com/mynaparrot/plugNmeet-server/commit/2ac81251a5a6476d6db8841801afd63182f15120))
+* install curl ([18f176c](https://github.com/mynaparrot/plugNmeet-server/commit/18f176cd0d91329fc20323c66fce87077722c63b))
+* invalid status code was returning ([7409152](https://github.com/mynaparrot/plugNmeet-server/commit/7409152a53cd58a5e2856c339ebc09f2350bd07a))
+* moved `to_user_id` to root ([5886163](https://github.com/mynaparrot/plugNmeet-server/commit/5886163d071a20e1f2293c9f57935ea20795b9d3))
+* moved connection related logic to single file ([a4941c5](https://github.com/mynaparrot/plugNmeet-server/commit/a4941c5f43131eaed021f3284624372316650002))
+* moved default values to proto ([b56f5ca](https://github.com/mynaparrot/plugNmeet-server/commit/b56f5cac70748dc6a83a2d3d0348087a690ae667))
+* moved some other deps part to base ([c86d69f](https://github.com/mynaparrot/plugNmeet-server/commit/c86d69fca4aba4633af2c797e2a50a29ce1f2bfd))
+* must need to use `strings.Contains` for header matching ([402c6b2](https://github.com/mynaparrot/plugNmeet-server/commit/402c6b20df9d96668e00084c9d88fd3c985d711b))
+* prevent concurrent uploading by API for the same room ([1302997](https://github.com/mynaparrot/plugNmeet-server/commit/130299762ab86c28b29a9539a3dc8fc112f74bce))
+* **refactor:** adopt idiomatic fx for dependency management ([07dedb7](https://github.com/mynaparrot/plugNmeet-server/commit/07dedb7807019d8ff8a44e503ddfe3531b26cc85))
+* replace `QEMU` with native runner ([71b497f](https://github.com/mynaparrot/plugNmeet-server/commit/71b497f6c7183c8b368424d244d80494794a0d7f))
+* replaced by `fiber.Locals` ([bc178e6](https://github.com/mynaparrot/plugNmeet-server/commit/bc178e63bbd5c2a93f5a915ac37ec46680cf1d4d))
+* replaced with `c.RequestCtx()` ([cff65fb](https://github.com/mynaparrot/plugNmeet-server/commit/cff65fb74202b0a91de6c42f492ddc46be7f6466))
+* router for v3 where need to specify both `GET` and `HEAD` ([b74f2e7](https://github.com/mynaparrot/plugNmeet-server/commit/b74f2e7be5536c6bd1ef05e95c1c0791e6d677e6))
+* send proper http status code ([d47cb04](https://github.com/mynaparrot/plugNmeet-server/commit/d47cb04a94a36fe25ab12ecff830972381ae3535))
+* updated logic for `UploadBase64EncodedData` ([55d0599](https://github.com/mynaparrot/plugNmeet-server/commit/55d0599439e8a1961532506dcdd333d9179a469a))
+* upgrade gofiber v3 ([b5f2a3e](https://github.com/mynaparrot/plugNmeet-server/commit/b5f2a3e42bbf3614895ad945962250ad9bc03f8f))
+* upgrade to gofiber v3 ([90e176c](https://github.com/mynaparrot/plugNmeet-server/commit/90e176c12d7c2b2a761bac7a875a97629d82c5a0))
+* use `favicon` middleware ([1bc3eaa](https://github.com/mynaparrot/plugNmeet-server/commit/1bc3eaa87a20ec96a60671947f991d0be3d87c4a))
+* use `fx.In` for easy initialization ([eb4d1b1](https://github.com/mynaparrot/plugNmeet-server/commit/eb4d1b106b97e1c88541e5f60905994c5778dc96))
+* use `mutool` `draw` command ([d4ba4af](https://github.com/mynaparrot/plugNmeet-server/commit/d4ba4af68473b19d43885be5ed1e7190ad111731))
+* use `Room-Id` as header value so that can include in signature validation ([0779ab0](https://github.com/mynaparrot/plugNmeet-server/commit/0779ab09c4a41598d3e81f596b07d87c731a8253))
+* use plain user info to avoid confusion ([0731e74](https://github.com/mynaparrot/plugNmeet-server/commit/0731e745966a8540b9888c8d45302202ad824eeb))
+* use same file path checking for all download type ([c2b25b5](https://github.com/mynaparrot/plugNmeet-server/commit/c2b25b5617647ed06979329246aabb521b36e0b4))
+* validate resumableIdentifier + made MakeSafeFilename less sensitive ([d4042e7](https://github.com/mynaparrot/plugNmeet-server/commit/d4042e790caccf3e552f22cf01ed16f225aba0de))
+
 ## [2.1.9](https://github.com/mynaparrot/plugNmeet-server/compare/v2.1.8...v2.1.9) (2026-05-07)
 
 
