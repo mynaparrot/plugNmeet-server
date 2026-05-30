@@ -1,7 +1,7 @@
 # This image contains the build environment for plugnmeet-server,
 # including pre-built dependencies like MuPDF and the Speech SDK.
 # It is intended to be used as a base for the main application build.
-FROM golang:latest
+FROM golang:1.26.3-trixie
 
 ARG TARGETPLATFORM
 ARG TARGETARCH
@@ -13,9 +13,15 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
     apt-get update && \
     apt-get install --no-install-recommends -y \
     build-essential ca-certificates wget curl git make pkg-config \
-    libasound2-dev libopus-dev libopusfile-dev libssl-dev libsoxr-dev && \
+    libasound2-dev libopus-dev libopusfile-dev libssl-dev libsoxr-dev \
+    libreoffice fontconfig fonts-dejavu fonts-dejavu-extra fonts-noto fonts-noto-cjk \
+    fonts-liberation fonts-liberation2 fonts-linuxlibertine \
+    fonts-sil-gentium fonts-sil-gentium-basic && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+# Install Go hot-reload tool (cacheable step)
+RUN go install github.com/air-verse/air@latest
 
 # 2. Build MuPDF from source.
 # This is a slow step. It's placed here so it remains cached as long as the version doesn't change.

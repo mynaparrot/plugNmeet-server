@@ -6,20 +6,6 @@ ENV SPEECHSDK_ROOT="/opt/speechsdk"
 
 WORKDIR /app
 
-# Install Go hot-reload tool (cacheable step)
-RUN go install github.com/air-verse/air@latest
-
-# Install runtime dependencies needed for development that might not be in the base image.
-# For example, fonts for libreoffice.
-RUN export DEBIAN_FRONTEND=noninteractive; \
-    apt-get update && \
-    apt-get install --no-install-recommends -y \
-    libreoffice fontconfig fonts-dejavu fonts-dejavu-extra fonts-noto fonts-noto-cjk \
-    fonts-liberation fonts-liberation2 fonts-linuxlibertine \
-    fonts-sil-gentium fonts-sil-gentium-basic && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
 # Cache Go modules
 COPY go.mod go.sum ./
 RUN go mod download
