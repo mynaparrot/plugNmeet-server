@@ -2,13 +2,18 @@ package helpers
 
 import (
 	"crypto/rand"
+	"errors"
+	"fmt"
 	"math"
 	"math/big"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/google/uuid"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
 func ToFixed(num float32, precision int) float32 {
@@ -90,4 +95,44 @@ func MakeSafeFilename(name string, fallbackToUUID bool) string {
 	}
 
 	return safeName
+}
+
+// ValidateAndGetAbsFilePath performs security checks on a file path and detects its MIME type.
+// It returns the sanitized absolute path, the detected MIME type, or an error if any check fails.
+func ValidateAndGetAbsFilePath(basePath, relativePath string) (string, *mimetype.MIME, error) {
+	// Check for path traversal sequences in the raw relative path.
+	if strings.Contains(relativePath, "..") {
+		return "", nil, errors.New("invalid file path: contains '..'")
+	}
+
+	// Join the base path with the relative path.
+	joinedPath := filepath.Join(basePath, relativePath)
+
+	// Get the absolute path of the base directory. This is our security boundary.
+	absBasePath, err := filepath.Abs(basePath)
+	if err != nil {
+		return "", nil, fmt.Errorf("could not get absolute path for base directory: %w", err)
+	}
+
+	// Get the absolute path of the final joined path.
+	absJoinedPath, err := filepath.Abs(joinedPath)
+	if err != nil {
+		return "", nil, fmt.Errorf("could not get absolute path for file: %w", err)
+	}
+
+	// The crucial security check: ensure the final path is within the base directory.
+	if !strings.HasPrefix(absJoinedPath, absBasePath) || absJoinedPath == absBasePath {
+		return "", nil, errors.New("invalid file path: path is outside the allowed directory")
+	}
+
+	// Now that the path is validated, detect the MIME type.
+	mType, err := mimetype.DetectFile(absJoinedPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil, config.ErrFileNotFound
+		}
+		return "", nil, fmt.Errorf("could not detect file type: %w", err)
+	}
+
+	return absJoinedPath, mType, nil
 }

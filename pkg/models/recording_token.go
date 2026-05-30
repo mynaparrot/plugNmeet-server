@@ -2,9 +2,6 @@ package models
 
 import (
 	"errors"
-	"fmt"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/gabriel-vasile/mimetype"
@@ -13,6 +10,8 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 )
 
 // GetDownloadToken will use the same JWT token generator as plugNmeet is using
@@ -50,18 +49,18 @@ func (m *RecordingModel) VerifyRecordingToken(token string) (string, *mimetype.M
 		return "", nil, fiber.StatusUnauthorized, err
 	}
 
-	if out.Subject == "" {
+	relativePath := out.Subject
+	if relativePath == "" {
 		return "", nil, fiber.StatusBadRequest, errors.New("invalid file path")
 	}
 
-	file := fmt.Sprintf("%s/%s", m.app.RecorderInfo.RecordingFilesPath, out.Subject)
-	mType, err := mimetype.DetectFile(file)
+	absolutePath, mType, err := helpers.ValidateAndGetAbsFilePath(m.app.RecorderInfo.RecordingFilesPath, relativePath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return "", nil, fiber.StatusNotFound, fmt.Errorf("record file %s not found", filepath.Base(file))
+		if errors.Is(err, config.ErrFileNotFound) {
+			return "", nil, fiber.StatusNotFound, config.ErrFileNotFound
 		}
-		return "", nil, fiber.StatusInternalServerError, err
+		return "", nil, fiber.StatusBadRequest, err
 	}
 
-	return file, mType, fiber.StatusOK, nil
+	return absolutePath, mType, fiber.StatusOK, nil
 }

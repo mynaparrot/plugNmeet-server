@@ -3,7 +3,6 @@ package models
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -167,13 +167,12 @@ func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (string, *mimety
 		return "", nil, fiber.StatusBadRequest, errors.New("invalid file path")
 	}
 
-	absolutePath := filepath.Join(*m.app.ArtifactsSettings.StoragePath, relativePath)
-	mType, err := mimetype.DetectFile(absolutePath)
+	absolutePath, mType, err := helpers.ValidateAndGetAbsFilePath(*m.app.ArtifactsSettings.StoragePath, relativePath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return "", nil, fiber.StatusNotFound, fmt.Errorf("artifact file %s not found", filepath.Base(absolutePath))
+		if errors.Is(err, config.ErrFileNotFound) {
+			return "", nil, fiber.StatusNotFound, config.ErrFileNotFound
 		}
-		return "", nil, fiber.StatusInternalServerError, err
+		return "", nil, fiber.StatusBadRequest, err
 	}
 
 	return absolutePath, mType, fiber.StatusOK, nil

@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gabriel-vasile/mimetype"
 	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
@@ -133,11 +133,6 @@ func (fc *FileController) HandleDownloadUploadedFile(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).SendString("invalid file path")
 	}
 
-	// prevent path traversal
-	if strings.Contains(otherParts, "..") || strings.Contains(sid, "..") {
-		return c.Status(fiber.StatusBadRequest).SendString("invalid file path")
-	}
-
 	// prevent to download from temp dir by checking path segments
 	cleanedPath := path.Clean(otherParts)
 	pathSegments := strings.Split(cleanedPath, "/")
@@ -148,30 +143,19 @@ func (fc *FileController) HandleDownloadUploadedFile(c fiber.Ctx) error {
 	}
 
 	basePath := fc.AppConfig.UploadFileSettings.Path
-	file := filepath.Join(basePath, sid, otherParts)
+	relativePath := filepath.Join(sid, otherParts)
 
-	// ensure the final path is within the intended directory
-	absBasePath, err := filepath.Abs(basePath)
+	absFile, mType, err := helpers.ValidateAndGetAbsFilePath(basePath, relativePath)
 	if err != nil {
-		fc.logger.WithError(err).Errorln("failed to get absolute path for base directory")
-		return c.Status(fiber.StatusInternalServerError).SendString("internal server error")
-	}
-	absFile, err := filepath.Abs(file)
-	if err != nil {
+		fc.logger.WithError(err).Warn("file path validation failed")
+		if errors.Is(err, config.ErrFileNotFound) {
+			return c.Status(fiber.StatusNotFound).SendString(err.Error())
+		}
 		return c.Status(fiber.StatusBadRequest).SendString("invalid file path")
-	}
-
-	if !strings.HasPrefix(absFile, absBasePath) {
-		return c.Status(fiber.StatusBadRequest).SendString("invalid file path")
-	}
-
-	mType, err := mimetype.DetectFile(file)
-	if err != nil {
-		return c.Status(fiber.StatusNotFound).SendString("file not found")
 	}
 
 	c.Set(fiber.HeaderContentType, mType.String())
-	return c.SendFile(file, fiber.SendFile{
+	return c.SendFile(absFile, fiber.SendFile{
 		Download: true,
 	})
 }
