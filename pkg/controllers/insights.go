@@ -56,7 +56,7 @@ func (i *InsightsController) subscribeToAgentTaskRequests() error {
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to NATS for insights tasks: %w", err)
 	}
-	i.logger.Infof("successfully connected with %s channel", sub.Subject)
+	i.logger.Infof("Successfully connected with %s channel", sub.Subject)
 
 	i.agentTaskSub = sub
 	return nil
@@ -77,7 +77,7 @@ func (i *InsightsController) subscribeToSummarizeJobs() error {
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to NATS for summarize jobs: %w", err)
 	}
-	i.logger.Infof("successfully connected with %s queue", sub.Subject)
+	i.logger.Infof("Successfully connected with %s queue", sub.Subject)
 
 	i.summarizeJobSub = sub
 	return nil
@@ -144,8 +144,7 @@ func (i *InsightsController) HandleEndTranscription(c fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	err := i.insightsModel.EndTranscription(roomId)
-	if err != nil {
+	if err := i.insightsModel.EndTranscription(roomId); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
@@ -167,8 +166,7 @@ func (i *InsightsController) HandleGetTranscriptionUserTaskStatus(c fiber.Ctx) e
 
 func (i *InsightsController) HandleGetSupportedLangs(c fiber.Ctx) error {
 	req := new(plugnmeet.InsightsGetSupportedLanguagesReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 

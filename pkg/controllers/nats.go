@@ -50,7 +50,7 @@ type NatsController struct {
 	authModel        *models.AuthModel
 	natsModel        *models.NatsModel
 	wp               *workerpool.WorkerPool
-	logger           *logrus.Entry
+	log              *logrus.Entry
 	sysWorkerCon     jetstream.ConsumeContext
 	sysWorkerCoreSub *nats.Subscription
 	userConnSub      *nats.Subscription
@@ -58,9 +58,11 @@ type NatsController struct {
 }
 
 func NewNatsController(ctx context.Context, app *config.AppConfig, natsService *natsservice.NatsService, authModel *models.AuthModel, natsModel *models.NatsModel, logger *logrus.Logger) (*NatsController, error) {
+	log := logger.WithField("controller", "nats")
+
 	issuerKeyPair, err := nkeys.FromSeed([]byte(app.NatsInfo.AuthCalloutIssuerPrivate))
 	if err != nil {
-		logger.WithError(err).Error("Failed to load issuer private key")
+		log.WithError(err).Error("Failed to load issuer private key")
 		return nil, fmt.Errorf("error creating issuer key pair: %w", err)
 	}
 
@@ -72,13 +74,13 @@ func NewNatsController(ctx context.Context, app *config.AppConfig, natsService *
 		authModel:     authModel,
 		natsModel:     natsModel,
 		wp:            workerpool.New(DefaultNumWorkers),
-		logger:        logger.WithField("controller", "nats"),
+		log:           log,
 	}
 
 	if app.NatsInfo.AuthCalloutXkeyPrivate != nil && *app.NatsInfo.AuthCalloutXkeyPrivate != "" {
 		c.curveKeyPair, err = nkeys.FromSeed([]byte(*app.NatsInfo.AuthCalloutXkeyPrivate))
 		if err != nil {
-			logger.WithError(err).Error("Failed to load curve private key")
+			log.WithError(err).Error("Failed to load curve private key")
 			return nil, fmt.Errorf("error creating curve key pair: %w", err)
 		}
 	}
@@ -88,7 +90,7 @@ func NewNatsController(ctx context.Context, app *config.AppConfig, natsService *
 
 // Initialize performs setup and signals completion via the channel.
 func (c *NatsController) Initialize() error {
-	log := c.logger.WithField("method", "initialize")
+	log := c.log.WithField("method", "initialize")
 
 	// system receiver as worker
 	stream, err := c.app.JetStream.CreateOrUpdateStream(c.ctx, jetstream.StreamConfig{
@@ -150,7 +152,7 @@ func (c *NatsController) Initialize() error {
 	log.Info("Subscribed to users connection events")
 
 	// auth service
-	authService := NewNatsAuthController(c.app, c.natsService, c.authModel, c.issuerKeyPair, c.curveKeyPair, c.logger)
+	authService := NewNatsAuthController(c.app, c.natsService, c.authModel, c.issuerKeyPair, c.curveKeyPair, c.log)
 	c.authService, err = micro.AddService(c.app.NatsConn, micro.Config{
 		Name:        natsAuthServiceName,
 		Version:     version.Version,
@@ -172,7 +174,7 @@ func (c *NatsController) Initialize() error {
 
 // Stop gracefully shuts down the NATS controller's consumers.
 func (c *NatsController) Stop() {
-	c.logger.Info("Shutting down nats controller")
+	c.log.Info("Shutting down nats controller")
 	if c.authService != nil {
 		_ = c.authService.Stop()
 	}
@@ -216,16 +218,16 @@ func (c *NatsController) handleUserConnectionEvent(data []byte, isConnect bool) 
 		Reason string                 `json:"reason"`
 	}{}
 	if err := json.Unmarshal(data, e); err != nil {
-		c.logger.WithError(err).Warn("failed to unmarshal NATS connection event")
+		c.log.WithError(err).Warn("failed to unmarshal NATS connection event")
 		return
 	}
-	log := c.logger.WithFields(logrus.Fields{
+	log := c.log.WithFields(logrus.Fields{
 		"type":      e.Type,
 		"client":    e.Client,
 		"reason":    e.Reason,
 		"isConnect": isConnect,
 	})
-	log.Debug("received NATS connection event")
+	log.Debug("Received NATS connection event")
 
 	if clientType, ok := e.Client["client_type"]; ok && clientType != websocketClientType {
 		// this feature only for websocket connections from frontend only
@@ -281,7 +283,7 @@ func (c *NatsController) subscribeToSystemWorkerCore() (*nats.Subscription, erro
 // This is used for messages that require guaranteed delivery, such as PINGs, token renewals, and private messages.
 // It runs in parallel with the core NATS pub/sub subscriber.
 func (c *NatsController) subscribeToSystemWorker(ctx context.Context, stream jetstream.Stream) (jetstream.ConsumeContext, error) {
-	log := c.logger.WithField("method", "subscribeToSystemWorker")
+	log := c.log.WithField("method", "subscribeToSystemWorker")
 	cons, err := stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
 		Durable: fmt.Sprintf("%s%s", prefix, c.app.NatsInfo.Subjects.SystemJsWorker),
 	})

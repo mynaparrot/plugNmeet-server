@@ -49,7 +49,8 @@ type NatsService struct {
 
 func New(ctx context.Context, app *config.AppConfig, nc *nats.Conn, js jetstream.JetStream, logger *logrus.Logger) *NatsService {
 	log := logger.WithField("service", "nats")
-	s := &NatsService{
+
+	return &NatsService{
 		ctx:    ctx,
 		app:    app,
 		nc:     nc,
@@ -57,7 +58,6 @@ func New(ctx context.Context, app *config.AppConfig, nc *nats.Conn, js jetstream
 		cs:     newNatsCacheService(ctx, log),
 		logger: log,
 	}
-	return s
 }
 
 func (s *NatsService) Initialized(lc fx.Lifecycle) error {

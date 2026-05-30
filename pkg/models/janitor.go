@@ -85,7 +85,10 @@ func (m *JanitorModel) StartJanitor() {
 				m.mu.Unlock()
 				// We are the leader. Run the tasks until we lose the lock or context is canceled.
 				m.runJanitorTasks()
-				m.logger.Warnln("Stopped being the janitor leader.")
+
+				if m.ctx.Err() == nil {
+					m.logger.Warnln("Stopped being the janitor leader.")
+				}
 			} else {
 				// Not the leader, wait and try again later.
 				time.Sleep(m.leaderRenewal)

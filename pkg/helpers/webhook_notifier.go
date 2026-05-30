@@ -210,13 +210,11 @@ func (w *WebhookNotifier) DeleteWebhook(roomId string, log *logrus.Entry) {
 
 	// Broadcast a cleanup message to all servers in the cluster.
 	// Only the server running the worker for this room will act on it.
-	err = w.app.NatsConn.Publish(redisservice.WebhookCleanupSubject, []byte(roomId))
-	if err != nil {
+	if err := w.app.NatsConn.Publish(redisservice.WebhookCleanupSubject, []byte(roomId)); err != nil {
 		log.WithError(err).Error("failed to publish webhook cleanup")
 	}
 
-	err = w.rs.DeleteWebhookData(roomId)
-	if err != nil {
+	if err := w.rs.DeleteWebhookData(roomId); err != nil {
 		log.WithError(err).Error("failed to delete webhook data from redis")
 	}
 }
@@ -296,8 +294,7 @@ func (w *WebhookNotifier) saveData(roomId string, d *webhookRedisFields) error {
 	}
 
 	// we'll simply override any existing value & put new
-	err = w.rs.AddWebhookData(roomId, marshal)
-	if err != nil {
+	if err := w.rs.AddWebhookData(roomId, marshal); err != nil {
 		return err
 	}
 
@@ -315,8 +312,7 @@ func (w *WebhookNotifier) getData(roomId string) (*webhookRedisFields, error) {
 	}
 
 	d := new(webhookRedisFields)
-	err = json.Unmarshal(data, d)
-	if err != nil {
+	if err := json.Unmarshal(data, d); err != nil {
 		return nil, err
 	}
 

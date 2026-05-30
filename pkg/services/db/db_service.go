@@ -22,6 +22,8 @@ func New(ctx context.Context, db *gorm.DB, logger *logrus.Logger) *DatabaseServi
 	return s
 }
 
+// AutoMigrate should be run after initializing of dbservice to ensure DB is ready before using it
+// don't use OnStart hook for AutoMigrate
 func (s *DatabaseService) AutoMigrate() error {
 	log := s.logger.WithField("method", "AutoMigrate")
 	err := s.db.AutoMigrate(&dbmodels.RoomInfo{}, &dbmodels.Recording{}, &dbmodels.RoomArtifact{}, &dbmodels.Analytics{})

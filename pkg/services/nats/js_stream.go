@@ -24,7 +24,7 @@ func (s *NatsService) createRoomNatsStream() error {
 		s.logger.WithError(err).Errorf("error creating room stream: %s", s.app.NatsInfo.RoomStreamName)
 		return err
 	}
-	s.logger.Infof("Successfully created room stream: %s", s.app.NatsInfo.RoomStreamName)
+	s.logger.Infof("Successfully created/updated room stream: %s", s.app.NatsInfo.RoomStreamName)
 	return nil
 }
 
