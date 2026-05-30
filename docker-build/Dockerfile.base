@@ -1,0 +1,37 @@
+# This image contains the build environment for plugnmeet-server,
+# including pre-built dependencies like MuPDF and the Speech SDK.
+# It is intended to be used as a base for the main application build.
+FROM golang:latest
+
+ARG TARGETPLATFORM
+ARG TARGETARCH
+RUN echo "Building for platform: $TARGETPLATFORM"
+
+# 1. Install essential build tools & libraries required by MuPDF and other CGO dependencies.
+# This layer is cached and only re-run if this command changes.
+RUN export DEBIAN_FRONTEND=noninteractive; \
+    apt-get update && \
+    apt-get install --no-install-recommends -y \
+    build-essential ca-certificates wget curl git make pkg-config \
+    libasound2-dev libopus-dev libopusfile-dev libssl-dev libsoxr-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# 2. Build MuPDF from source.
+# This is a slow step. It's placed here so it remains cached as long as the version doesn't change.
+# We use a specific version for deterministic builds.
+ARG MUPDF_VERSION=1.27.2
+RUN wget -O mupdf.tar.gz "https://casper.mupdf.com/downloads/archive/mupdf-${MUPDF_VERSION}-source.tar.gz" && \
+    mkdir mupdf && tar --strip-components=1 -xzf mupdf.tar.gz -C mupdf && \
+    rm mupdf.tar.gz && \
+    cd mupdf && \
+    make HAVE_X11=no HAVE_GLUT=no HAVE_LEPTONICA=no HAVE_TESSERACT=no prefix=/usr/local install && \
+    cd .. && rm -rf mupdf
+
+# 3. Download and extract the Azure Speech SDK.
+# This is also cached. It will only re-run if the URL changes.
+ENV SPEECHSDK_ROOT=/opt/speechsdk
+RUN mkdir -p "$SPEECHSDK_ROOT" && \
+     wget -O SpeechSDK-Linux.tar.gz https://aka.ms/csspeech/linuxbinary && \
+     tar --strip 1 -xzf SpeechSDK-Linux.tar.gz -C "$SPEECHSDK_ROOT" && \
+     rm SpeechSDK-Linux.tar.gz
