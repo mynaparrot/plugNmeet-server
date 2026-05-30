@@ -9,8 +9,13 @@ permissions:
   pull-requests: write
 
 jobs:
-  release-server:
+  release-please:
     runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      major: ${{ steps.release.outputs.major }}
+      minor: ${{ steps.release.outputs.minor }}
     steps:
       - uses: googleapis/release-please-action@v5
         id: release
@@ -18,44 +23,75 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-      - name: Checkout
+
+  build:
+    needs: release-please
+    if: needs.release-please.outputs.release_created
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            arch: amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            arch: arm64
+            runner: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout code for the new tag
         uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+
       - name: Docker meta
-        if: ${{ steps.release.outputs.release_created }}
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@v5
         with:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/plugnmeet-server
           tags: |
-            type=ref,event=tag
-            type=semver,pattern=${{ steps.release.outputs.tag_name }},value=${{ steps.release.outputs.tag_name }}
-            type=semver,pattern=v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }},value=${{ steps.release.outputs.tag_name }}
+            type=raw,value=${{ needs.release-please.outputs.tag_name }}-${{ matrix.arch }}
+            type=raw,value=v${{ needs.release-please.outputs.major }}.${{ needs.release-please.outputs.minor }}-${{ matrix.arch }}
 
-      - name: Set up QEMU
-        if: ${{ steps.release.outputs.release_created }}
-        uses: docker/setup-qemu-action@v4
-        with:
-          image: tonistiigi/binfmt:latest
-          platforms: all
-
-      - name: Set up Docker Buildx
-        if: ${{ steps.release.outputs.release_created }}
-        uses: docker/setup-buildx-action@v4
-
-      - name: Login to DockerHub
-        if: ${{ steps.release.outputs.release_created }}
+      - name: Login to Docker Hub
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_ACCESS_TOKEN }}
 
-      - name: Build and push
-        if: ${{ steps.release.outputs.release_created }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push arch-specific image
         uses: docker/build-push-action@v7
         with:
           context: .
           file: ./docker-build/Dockerfile
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ matrix.platform }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          provenance: false
+
+  push-manifest:
+    needs: [release-please, build]
+    if: needs.release-please.outputs.release_created
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_ACCESS_TOKEN }}
+
+      - name: Create and push manifest
+        run: |
+          TAGS="${{ needs.release-please.outputs.tag_name }} v${{ needs.release-please.outputs.major }}.${{ needs.release-please.outputs.minor }}"
+          for TAG in $TAGS; do
+            echo "Creating and pushing manifest for tag: $TAG"
+            docker manifest create ${{ secrets.DOCKERHUB_USERNAME }}/plugnmeet-server:$TAG \
+              --amend ${{ secrets.DOCKERHUB_USERNAME }}/plugnmeet-server:$TAG-amd64 \
+              --amend ${{ secrets.DOCKERHUB_USERNAME }}/plugnmeet-server:$TAG-arm64
+            docker manifest push ${{ secrets.DOCKERHUB_USERNAME }}/plugnmeet-server:$TAG
+          done
