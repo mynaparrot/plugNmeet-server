@@ -19,6 +19,7 @@ require (
 	github.com/livekit/protocol v1.46.0
 	github.com/livekit/server-sdk-go/v2 v2.16.4
 	github.com/mynaparrot/plugnmeet-protocol v1.3.0
+	github.com/mynaparrot/plugnmeet-protocol/v2 v2.0.1
 	github.com/nats-io/jwt/v2 v2.8.1
 	github.com/nats-io/nats.go v1.52.0
 	github.com/nats-io/nkeys v0.4.15
