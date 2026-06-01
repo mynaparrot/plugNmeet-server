@@ -19,7 +19,8 @@ export LD_LIBRARY_PATH="/opt/speechsdk/lib/${SPEECHSDK_ARCH_DIR}:$LD_LIBRARY_PAT
 export CGO_CFLAGS="-I/opt/speechsdk/include/c_api"
 export CGO_LDFLAGS="-L/opt/speechsdk/lib/${SPEECHSDK_ARCH_DIR} -lMicrosoft.CognitiveServices.Speech.core"
 
-# 4. Change to the application directory
+# 4. Change to the /app directory to ensure that it will read config.yaml or write logs in correct dir
+mkdir -p /app
 cd /app
 
 # 5. Execute the main command (e.g., "plugnmeet-server" or "air")
