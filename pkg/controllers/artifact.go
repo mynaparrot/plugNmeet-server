@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"errors"
+	"path/filepath"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -84,9 +85,8 @@ func (ac *ArtifactController) HandleDownloadArtifact(c fiber.Ctx) error {
 	}
 
 	c.Set(fiber.HeaderContentType, mType.String())
-	return c.SendFile(filePath, fiber.SendFile{
-		Download: true,
-	})
+	c.Set(fiber.HeaderContentDisposition, "attachment; filename="+filepath.Base(filePath))
+	return c.SendFile(filePath)
 }
 
 func (ac *ArtifactController) HandleGetArtifactInfo(c fiber.Ctx) error {

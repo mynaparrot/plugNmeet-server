@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"errors"
+	"path/filepath"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -160,9 +161,8 @@ func (rc *RecordingController) HandleDownloadRecording(c fiber.Ctx) error {
 	}
 
 	c.Set(fiber.HeaderContentType, mType.String())
-	return c.SendFile(file, fiber.SendFile{
-		Download: true,
-	})
+	c.Set(fiber.HeaderContentDisposition, "attachment; filename="+filepath.Base(file))
+	return c.SendFile(file)
 }
 
 // HandleRecorderTasks handles start/stop recording & RTMP requests.
