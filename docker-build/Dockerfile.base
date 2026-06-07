@@ -1,7 +1,7 @@
 # This image contains the build environment for plugnmeet-server,
 # including pre-built dependencies like MuPDF and the Speech SDK.
 # It is intended to be used as a base for the main application build.
-FROM golang:1.26.3
+FROM golang:1.26.4
 
 ARG TARGETPLATFORM
 ARG TARGETARCH
