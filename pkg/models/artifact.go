@@ -69,7 +69,7 @@ func (m *ArtifactModel) buildPath(fileName, roomId string, artifactType plugnmee
 // runUploadHook is a helper that executes the upload hook pipeline if a file is present in the metadata.
 // It modifies the FilePath in the metadata object in-place if the hook is successful.
 // If the hook fails, it logs the error but does not return it, allowing fallback to local storage.
-func (m *ArtifactModel) runUploadHook(metadata *plugnmeet.RoomArtifactMetadata, log *logrus.Entry) {
+func (m *ArtifactModel) runUploadHook(roomId, roomSid string, roomTableId uint64, metadata *plugnmeet.RoomArtifactMetadata, log *logrus.Entry) {
 	if m.app.StorageHooks == nil || len(m.app.StorageHooks.UploadHook) == 0 {
 		return
 	}
@@ -88,6 +88,9 @@ func (m *ArtifactModel) runUploadHook(metadata *plugnmeet.RoomArtifactMetadata, 
 	req := config.UploadHookRequest{
 		SourceFilePath: absolutePath,
 		ServiceType:    "artifact",
+		RoomId:         roomId,
+		RoomSid:        roomSid,
+		RoomTableId:    roomTableId,
 	}
 
 	resBytes, err := config.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.UploadHook, &req, log)
@@ -224,7 +227,7 @@ func (m *ArtifactModel) HandleAnalyticsEvent(roomId string, eventName plugnmeet.
 // createAndSaveArtifact is a helper to save data to DB.
 func (m *ArtifactModel) createAndSaveArtifact(roomId, roomSid string, roomTableId uint64, artifactType plugnmeet.RoomArtifactType, metadata *plugnmeet.RoomArtifactMetadata, forceSend bool, log *logrus.Entry) (*dbmodels.RoomArtifact, error) {
 	// If a file is associated, run the upload hook to potentially move it and update the metadata path.
-	m.runUploadHook(metadata, log)
+	m.runUploadHook(roomId, roomSid, roomTableId, metadata, log)
 
 	metadataBytes, err := protojson.Marshal(metadata)
 	if err != nil {

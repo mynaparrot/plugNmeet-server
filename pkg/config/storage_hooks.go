@@ -26,6 +26,9 @@ type UploadHookRequest struct {
 	SourceFilePath string `json:"source_file_path"`
 	LogicalPath    string `json:"logical_path,omitempty"`
 	ServiceType    string `json:"service_type"`
+	RoomId         string `json:"room_id"`
+	RoomSid        string `json:"room_sid"`
+	RoomTableId    uint64 `json:"room_table_id"`
 }
 
 // UploadHookResponse is the JSON payload expected from the *last* script in the upload pipeline.
@@ -82,8 +85,6 @@ func ExecuteHookPipeline(ctx context.Context, scripts []string, initialData inte
 			return nil, fmt.Errorf("storage hook script %s failed: %w, stderr: %s", script, err, stderr.String())
 		}
 
-		// The output of the script becomes the input for the next one.
-		// If output is empty, we stick with the previous jsonData to allow scripts in the chain to optionally modify the data.
 		if len(bytes.TrimSpace(out.Bytes())) > 0 {
 			if !json.Valid(out.Bytes()) {
 				return nil, fmt.Errorf("storage hook script %s returned invalid JSON: %s", script, out.String())

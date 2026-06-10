@@ -77,7 +77,7 @@ func (m *RecordingModel) VerifyRecordingToken(token string) (*config.DownloadHoo
 		ServiceType: "recording",
 	}
 
-	resBytes, err := config.ExecuteHookPipeline(ctx, m.app.StorageHooks.DownloadHook, &req, m.logger)
+	resBytes, err := config.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.DownloadHook, &req, m.logger)
 	if err != nil {
 		m.logger.WithError(err).Error("download hook pipeline failed")
 		return nil, fiber.StatusInternalServerError, errors.New("download hook pipeline failed")

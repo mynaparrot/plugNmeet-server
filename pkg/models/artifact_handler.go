@@ -189,7 +189,7 @@ func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (*config.Downloa
 		ServiceType: "artifact",
 	}
 
-	resBytes, err := config.ExecuteHookPipeline(ctx, m.app.StorageHooks.DownloadHook, &req, m.log)
+	resBytes, err := config.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.DownloadHook, &req, m.log)
 	if err != nil {
 		m.log.WithError(err).Error("download hook pipeline failed")
 		return nil, fiber.StatusInternalServerError, errors.New("download hook pipeline failed")
