@@ -24,7 +24,6 @@ type StorageHooks struct {
 // UploadHookRequest is the JSON payload sent to the *first* script in the upload pipeline.
 type UploadHookRequest struct {
 	SourceFilePath string `json:"source_file_path"`
-	LogicalPath    string `json:"logical_path,omitempty"`
 	ServiceType    string `json:"service_type"`
 	RoomId         string `json:"room_id"`
 	RoomSid        string `json:"room_sid"`
