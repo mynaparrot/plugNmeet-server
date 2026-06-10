@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/livekit/protocol/livekit"
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/logging"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/nats-io/nats.go"
@@ -46,6 +47,7 @@ type AppConfig struct {
 	NatsInfo            NatsInfo                   `yaml:"nats_info"`
 	Insights            *InsightsConfig            `yaml:"insights"`
 	TurnServer          *TurnConfig                `yaml:"turn_server"`
+	StorageHooks        *StorageHooks              `yaml:"storage_hooks"`
 }
 
 type ClientInfo struct {
@@ -227,6 +229,16 @@ type NatsInfoRecorder struct {
 	TranscodingJobs string `yaml:"transcoding_jobs_subject"`
 }
 
+// StorageHooks defines optional script pipelines for handling file I/O.
+type StorageHooks struct {
+	// A list of scripts to execute sequentially for an upload operation.
+	UploadHook []string `yaml:"upload_hook"`
+	// A list of scripts for a download operation.
+	DownloadHook []string `yaml:"download_hook"`
+	// A list of scripts for a delete operation.
+	DeleteHook []string `yaml:"delete_hook"`
+}
+
 func InitAppConfig(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 	// default validation of token is 10 minutes
 	if appCnf.Client.TokenValidity == nil || *appCnf.Client.TokenValidity < 0 {
@@ -338,6 +350,10 @@ func InitAppConfig(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 		return nil, err
 	}
 
+	if err := handleStorageHooks(appCnf); err != nil {
+		return nil, err
+	}
+
 	return appCnf, nil
 }
 
@@ -360,6 +376,7 @@ func handleArtifactsSettings(appCnf *AppConfig) error {
 	p := *appCnf.ArtifactsSettings.StoragePath
 	if strings.HasPrefix(p, "./") {
 		p = filepath.Join(appCnf.RootWorkingDir, p)
+		appCnf.ArtifactsSettings.StoragePath = &p
 	}
 
 	if _, err := os.Stat(p); os.IsNotExist(err) {
@@ -388,6 +405,45 @@ func handleArtifactsSettings(appCnf *AppConfig) error {
 			return fmt.Errorf("failed to create artifacts backup directory %s: %w", trashPath, err)
 		}
 	}
+	return nil
+}
+
+func handleStorageHooks(appCnf *AppConfig) error {
+	if appCnf.StorageHooks == nil {
+		return nil // Feature is not enabled.
+	}
+
+	resolvePath := func(scriptPath string) string {
+		if strings.HasPrefix(scriptPath, "./") {
+			return filepath.Join(appCnf.RootWorkingDir, scriptPath)
+		}
+		return scriptPath
+	}
+
+	for i, script := range appCnf.StorageHooks.UploadHook {
+		resolved := resolvePath(script)
+		appCnf.StorageHooks.UploadHook[i] = resolved
+		if err := hooks.ValidateHookScript(resolved, "upload_hook"); err != nil {
+			return err
+		}
+	}
+
+	for i, script := range appCnf.StorageHooks.DownloadHook {
+		resolved := resolvePath(script)
+		appCnf.StorageHooks.DownloadHook[i] = resolved
+		if err := hooks.ValidateHookScript(resolved, "download_hook"); err != nil {
+			return err
+		}
+	}
+
+	for i, script := range appCnf.StorageHooks.DeleteHook {
+		resolved := resolvePath(script)
+		appCnf.StorageHooks.DeleteHook[i] = resolved
+		if err := hooks.ValidateHookScript(resolved, "delete_hook"); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

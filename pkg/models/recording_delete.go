@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/sirupsen/logrus"
 )
@@ -19,7 +21,7 @@ func (m *RecordingModel) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error 
 		"recordId": r.RecordId,
 		"method":   "DeleteRecording",
 	})
-	log.Infoln("request to delete recording")
+	log.Infoln("Request to delete recording received")
 
 	recording, err := m.FetchRecording(r.RecordId)
 	if err != nil {
@@ -27,79 +29,79 @@ func (m *RecordingModel) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error 
 		return err
 	}
 
-	filePath := fmt.Sprintf("%s/%s", m.app.RecorderInfo.RecordingFilesPath, recording.FilePath)
-	log = log.WithField("filePath", filePath)
-	fileExist := true
-
-	f, err := os.Stat(filePath)
-	if err != nil {
-		if _, ok := errors.AsType[*fs.PathError](err); ok {
-			log.WithError(err).Warnln("recording file does not exist, will proceed to delete DB record")
-			fileExist = false
+	// If delete hook is configured, we'll use it.
+	if m.app.StorageHooks != nil && len(m.app.StorageHooks.DeleteHook) > 0 {
+		delReq := hooks.DeleteHookRequest{
+			LogicalPath: recording.FilePath,
+			ServiceType: "recording",
 		}
-	}
-
-	// if the file not exists then will delete
-	// if not, we can just skip this and delete from DB
-	if fileExist {
-		// if enabled backup
-		if m.app.RecorderInfo.EnableDelRecordingBackup {
-			log.Info("backing up recording before deletion")
-			// first with the video file
-			toFile := path.Join(m.app.RecorderInfo.DelRecordingBackupPath, f.Name())
-			err := os.Rename(filePath, toFile)
-			if err != nil {
-				log.WithError(err).Errorln("error moving file to backup")
-				return err
+		resBytes, err := hooks.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.DeleteHook, &delReq, log)
+		if err != nil {
+			log.WithError(err).Warn("delete hook pipeline failed for recording")
+		} else {
+			var res hooks.DeleteHookResponse
+			if err := json.Unmarshal(resBytes, &res); err != nil {
+				log.WithError(err).Warn("failed to unmarshal delete hook response")
+			} else if res.Error != "" {
+				log.Warnf("delete hook script returned an error: %s", res.Error)
 			}
+		}
+		// After running the hook (even if it failed), we proceed to delete the DB record.
+		// The hook is fire-and-forget; its failure should not block DB cleanup.
+	} else {
+		// Otherwise, if it's a local file, we'll try to delete it.
+		filePath := fmt.Sprintf("%s/%s", m.app.RecorderInfo.RecordingFilesPath, recording.FilePath)
+		log.WithField("filePath", filePath).Info("deleting local recording file")
+		fileExist := true
 
-			// otherwise during cleanup will be hard to detect
-			newTime := time.Now().UTC()
-			if err := os.Chtimes(toFile, newTime, newTime); err != nil {
-				log.WithError(err).Warnln("failed to update file modification time for backup")
+		f, err := os.Stat(filePath)
+		if err != nil {
+			if _, ok := errors.AsType[*fs.PathError](err); ok {
+				log.WithError(err).Warn("recording file does not exist, will proceed to delete DB record")
+				fileExist = false
 			}
+		}
 
-			// now the JSON file
-			metadataFile := toFile + ".json"
-			err = os.Rename(filePath+".json", metadataFile)
-			if err != nil {
-				// just log
-				log.WithError(err).Warnln("error moving json info file to backup")
-			} else {
-				if err := os.Chtimes(metadataFile, newTime, newTime); err != nil {
+		if fileExist {
+			if m.app.RecorderInfo.EnableDelRecordingBackup {
+				log.Info("backing up recording before deletion")
+				toFile := path.Join(m.app.RecorderInfo.DelRecordingBackupPath, f.Name())
+				if err := os.Rename(filePath, toFile); err != nil {
+					log.WithError(err).Errorln("error moving file to backup")
+					return err
+				}
+				newTime := time.Now().UTC()
+				if err := os.Chtimes(toFile, newTime, newTime); err != nil {
 					log.WithError(err).Warnln("failed to update file modification time for backup")
 				}
-			}
-
-		} else {
-			log.Info("deleting recording file permanently")
-			err = os.Remove(filePath)
-			if err != nil {
-				ms := strings.SplitN(err.Error(), "/", -1)
-				err = fmt.Errorf(ms[len(ms)-1])
-				log.WithError(err).Errorln("failed to remove recording file")
-				return err
+				metadataFile := toFile + ".json"
+				if err = os.Rename(filePath+".json", metadataFile); err == nil {
+					if err := os.Chtimes(metadataFile, newTime, newTime); err != nil {
+						log.WithError(err).Warnln("failed to update file modification time for backup")
+					}
+				}
+			} else {
+				log.Info("deleting recording file permanently")
+				if err = os.Remove(filePath); err != nil {
+					log.WithError(err).Errorln("failed to remove recording file")
+					return fmt.Errorf("delete recording file permanently failed")
+				}
 			}
 		}
-	}
 
-	// delete compressed, if any
-	_ = os.Remove(filePath + ".fiber.gz")
-	// delete record info file too
-	_ = os.Remove(filePath + ".json")
+		_ = os.Remove(filePath + ".fiber.gz")
+		_ = os.Remove(filePath + ".json")
 
-	// we will check if the directory is empty or not
-	// if empty then better to delete that directory
-	if fileExist {
-		dir := strings.Replace(filePath, f.Name(), "", 1)
-		if dir != m.app.RecorderInfo.RecordingFilesPath {
-			log.WithField("dir", dir).Info("checking if recording directory is empty")
-			empty, err := m.isDirEmpty(dir)
-			if err == nil && empty {
-				log.Info("recording directory is empty, removing it")
-				err = os.Remove(dir)
-				if err != nil {
-					log.WithError(err).Error("error deleting directory")
+		if fileExist {
+			dir := strings.Replace(filePath, f.Name(), "", 1)
+			if dir != m.app.RecorderInfo.RecordingFilesPath {
+				log.WithField("dir", dir).Info("checking if recording directory is empty")
+				empty, err := m.isDirEmpty(dir)
+				if err == nil && empty {
+					log.Info("recording directory is empty, removing it")
+					if err := os.Remove(dir); err != nil {
+						log.WithError(err).Error("error deleting directory")
+					}
 				}
 			}
 		}
@@ -107,13 +109,12 @@ func (m *RecordingModel) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error 
 
 	// no error, so we'll delete record from DB
 	log.Info("deleting recording record from database")
-	_, err = m.ds.DeleteRecording(r.RecordId)
-	if err != nil {
+	if _, err := m.ds.DeleteRecording(r.RecordId); err != nil {
 		log.WithError(err).Errorln("failed to delete recording from db")
 		return err
 	}
 
-	log.Info("successfully deleted recording")
+	log.Info("Successfully deleted recording")
 	return nil
 }
 

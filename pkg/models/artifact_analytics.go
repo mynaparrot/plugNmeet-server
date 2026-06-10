@@ -33,7 +33,7 @@ func (m *ArtifactModel) CreateAnalyticsArtifact(roomTableId uint64, jsonData []b
 	}
 
 	// Generate a unique filename for the analytics JSON file.
-	fileName := fmt.Sprintf("analytics-%s-%d.json", roomInfo.Sid, time.Now().Unix())
+	fileName := fmt.Sprintf("analytics-%s-%d.json", roomInfo.Sid, time.Now().UnixMilli())
 
 	relativePath, absolutePath, err := m.buildPath(fileName, roomInfo.RoomId, plugnmeet.RoomArtifactType_MEETING_ANALYTICS)
 	if err != nil {

@@ -1,14 +1,16 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
-	"github.com/gabriel-vasile/mimetype"
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/auth"
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
@@ -31,36 +33,65 @@ func (m *RecordingModel) CreateTokenForDownload(path string) (string, error) {
 }
 
 // VerifyRecordingToken verify token & provide file path
-func (m *RecordingModel) VerifyRecordingToken(token string) (string, *mimetype.MIME, int, error) {
+func (m *RecordingModel) VerifyRecordingToken(token string) (*hooks.DownloadHookResponse, int, error) {
 	tok, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.HS256})
 	if err != nil {
-		return "", nil, fiber.StatusUnauthorized, err
+		return nil, fiber.StatusUnauthorized, err
 	}
 
 	out := jwt.Claims{}
 	if err = tok.Claims([]byte(m.app.Client.Secret), &out); err != nil {
-		return "", nil, fiber.StatusUnauthorized, err
+		return nil, fiber.StatusUnauthorized, err
 	}
 
 	if err = out.Validate(jwt.Expected{Issuer: m.app.Client.ApiKey, Time: time.Now().UTC()}); err != nil {
 		if errors.Is(err, jwt.ErrExpired) {
-			return "", nil, fiber.StatusUnauthorized, errors.New("token expired")
+			return nil, fiber.StatusUnauthorized, errors.New("token expired")
 		}
-		return "", nil, fiber.StatusUnauthorized, err
+		return nil, fiber.StatusUnauthorized, err
 	}
 
-	relativePath := out.Subject
-	if relativePath == "" {
-		return "", nil, fiber.StatusBadRequest, errors.New("invalid file path")
+	logicalPath := out.Subject
+	if logicalPath == "" {
+		return nil, fiber.StatusBadRequest, errors.New("invalid file path")
 	}
 
-	absolutePath, mType, err := helpers.ValidateAndGetAbsFilePath(m.app.RecorderInfo.RecordingFilesPath, relativePath)
+	// If no hooks are defined, fallback to local.
+	if m.app.StorageHooks == nil || len(m.app.StorageHooks.DownloadHook) == 0 {
+		absolutePath, mType, err := helpers.ValidateAndGetAbsFilePath(m.app.RecorderInfo.RecordingFilesPath, logicalPath)
+		if err != nil {
+			if errors.Is(err, config.ErrFileNotFound) {
+				return nil, fiber.StatusNotFound, config.ErrFileNotFound
+			}
+			return nil, fiber.StatusBadRequest, err
+		}
+		return &hooks.DownloadHookResponse{
+			Action:    "serve_local",
+			LocalPath: absolutePath,
+			MimeType:  mType.String(),
+		}, fiber.StatusOK, nil
+	}
+
+	// Hooks are defined, so use the pipeline.
+	req := hooks.DownloadHookRequest{
+		LogicalPath: logicalPath,
+		ServiceType: "recording",
+	}
+
+	resBytes, err := hooks.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.DownloadHook, &req, m.logger)
 	if err != nil {
-		if errors.Is(err, config.ErrFileNotFound) {
-			return "", nil, fiber.StatusNotFound, config.ErrFileNotFound
-		}
-		return "", nil, fiber.StatusBadRequest, err
+		m.logger.WithError(err).Error("download hook pipeline failed")
+		return nil, fiber.StatusInternalServerError, errors.New("download hook pipeline failed")
 	}
 
-	return absolutePath, mType, fiber.StatusOK, nil
+	var res hooks.DownloadHookResponse
+	if err := json.Unmarshal(resBytes, &res); err != nil {
+		return nil, fiber.StatusInternalServerError, fmt.Errorf("failed to unmarshal download hook response: %w", err)
+	}
+
+	if res.Error != "" {
+		return nil, fiber.StatusInternalServerError, fmt.Errorf("download hook script returned an error: %s", res.Error)
+	}
+
+	return &res, fiber.StatusOK, nil
 }

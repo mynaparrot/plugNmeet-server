@@ -16,6 +16,7 @@ import (
 )
 
 type RecordingModel struct {
+	ctx             context.Context
 	app             *config.AppConfig
 	ds              *dbservice.DatabaseService
 	rs              *redisservice.RedisService
@@ -27,8 +28,9 @@ type RecordingModel struct {
 	logger          *logrus.Entry
 }
 
-func NewRecordingModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, analyticsModel *AnalyticsModel, um *UserModel, webhookNotifier *helpers.WebhookNotifier, logger *logrus.Logger) *RecordingModel {
+func NewRecordingModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, analyticsModel *AnalyticsModel, um *UserModel, webhookNotifier *helpers.WebhookNotifier, logger *logrus.Logger) *RecordingModel {
 	return &RecordingModel{
+		ctx:             ctx,
 		app:             app,
 		ds:              ds,
 		rs:              rs,
