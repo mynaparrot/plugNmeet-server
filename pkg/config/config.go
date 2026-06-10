@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/livekit/protocol/livekit"
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/logging"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/nats-io/nats.go"
@@ -228,6 +229,16 @@ type NatsInfoRecorder struct {
 	TranscodingJobs string `yaml:"transcoding_jobs_subject"`
 }
 
+// StorageHooks defines optional script pipelines for handling file I/O.
+type StorageHooks struct {
+	// A list of scripts to execute sequentially for an upload operation.
+	UploadHook []string `yaml:"upload_hook"`
+	// A list of scripts for a download operation.
+	DownloadHook []string `yaml:"download_hook"`
+	// A list of scripts for a delete operation.
+	DeleteHook []string `yaml:"delete_hook"`
+}
+
 func InitAppConfig(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 	// default validation of token is 10 minutes
 	if appCnf.Client.TokenValidity == nil || *appCnf.Client.TokenValidity < 0 {
@@ -402,20 +413,6 @@ func handleStorageHooks(appCnf *AppConfig) error {
 		return nil // Feature is not enabled.
 	}
 
-	validate := func(scriptPath string, hookType string) error {
-		info, err := os.Stat(scriptPath)
-		if os.IsNotExist(err) {
-			return fmt.Errorf("%s script not found at %s", hookType, scriptPath)
-		}
-		if info.IsDir() {
-			return fmt.Errorf("%s script at %s is a directory", hookType, scriptPath)
-		}
-		if info.Mode()&0111 == 0 {
-			return fmt.Errorf("%s script at %s is not executable", hookType, scriptPath)
-		}
-		return nil
-	}
-
 	resolvePath := func(scriptPath string) string {
 		if strings.HasPrefix(scriptPath, "./") {
 			return filepath.Join(appCnf.RootWorkingDir, scriptPath)
@@ -426,7 +423,7 @@ func handleStorageHooks(appCnf *AppConfig) error {
 	for i, script := range appCnf.StorageHooks.UploadHook {
 		resolved := resolvePath(script)
 		appCnf.StorageHooks.UploadHook[i] = resolved
-		if err := validate(resolved, "upload_hook"); err != nil {
+		if err := hooks.ValidateHookScript(resolved, "upload_hook"); err != nil {
 			return err
 		}
 	}
@@ -434,7 +431,7 @@ func handleStorageHooks(appCnf *AppConfig) error {
 	for i, script := range appCnf.StorageHooks.DownloadHook {
 		resolved := resolvePath(script)
 		appCnf.StorageHooks.DownloadHook[i] = resolved
-		if err := validate(resolved, "download_hook"); err != nil {
+		if err := hooks.ValidateHookScript(resolved, "download_hook"); err != nil {
 			return err
 		}
 	}
@@ -442,7 +439,7 @@ func handleStorageHooks(appCnf *AppConfig) error {
 	for i, script := range appCnf.StorageHooks.DeleteHook {
 		resolved := resolvePath(script)
 		appCnf.StorageHooks.DeleteHook[i] = resolved
-		if err := validate(resolved, "delete_hook"); err != nil {
+		if err := hooks.ValidateHookScript(resolved, "delete_hook"); err != nil {
 			return err
 		}
 	}

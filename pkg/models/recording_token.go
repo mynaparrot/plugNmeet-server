@@ -10,6 +10,7 @@ import (
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/auth"
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
@@ -32,7 +33,7 @@ func (m *RecordingModel) CreateTokenForDownload(path string) (string, error) {
 }
 
 // VerifyRecordingToken verify token & provide file path
-func (m *RecordingModel) VerifyRecordingToken(token string) (*config.DownloadHookResponse, int, error) {
+func (m *RecordingModel) VerifyRecordingToken(token string) (*hooks.DownloadHookResponse, int, error) {
 	tok, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.HS256})
 	if err != nil {
 		return nil, fiber.StatusUnauthorized, err
@@ -64,7 +65,7 @@ func (m *RecordingModel) VerifyRecordingToken(token string) (*config.DownloadHoo
 			}
 			return nil, fiber.StatusBadRequest, err
 		}
-		return &config.DownloadHookResponse{
+		return &hooks.DownloadHookResponse{
 			Action:    "serve_local",
 			LocalPath: absolutePath,
 			MimeType:  mType.String(),
@@ -72,18 +73,18 @@ func (m *RecordingModel) VerifyRecordingToken(token string) (*config.DownloadHoo
 	}
 
 	// Hooks are defined, so use the pipeline.
-	req := config.DownloadHookRequest{
+	req := hooks.DownloadHookRequest{
 		LogicalPath: logicalPath,
 		ServiceType: "recording",
 	}
 
-	resBytes, err := config.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.DownloadHook, &req, m.logger)
+	resBytes, err := hooks.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.DownloadHook, &req, m.logger)
 	if err != nil {
 		m.logger.WithError(err).Error("download hook pipeline failed")
 		return nil, fiber.StatusInternalServerError, errors.New("download hook pipeline failed")
 	}
 
-	var res config.DownloadHookResponse
+	var res hooks.DownloadHookResponse
 	if err := json.Unmarshal(resBytes, &res); err != nil {
 		return nil, fiber.StatusInternalServerError, fmt.Errorf("failed to unmarshal download hook response: %w", err)
 	}

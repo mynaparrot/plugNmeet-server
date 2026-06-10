@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/sirupsen/logrus"
 )
 
@@ -31,15 +31,15 @@ func (m *RecordingModel) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error 
 
 	// If delete hook is configured, we'll use it.
 	if m.app.StorageHooks != nil && len(m.app.StorageHooks.DeleteHook) > 0 {
-		delReq := config.DeleteHookRequest{
+		delReq := hooks.DeleteHookRequest{
 			LogicalPath: recording.FilePath,
 			ServiceType: "recording",
 		}
-		resBytes, err := config.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.DeleteHook, &delReq, log)
+		resBytes, err := hooks.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.DeleteHook, &delReq, log)
 		if err != nil {
 			log.WithError(err).Warn("delete hook pipeline failed for recording")
 		} else {
-			var res config.DeleteHookResponse
+			var res hooks.DeleteHookResponse
 			if err := json.Unmarshal(resBytes, &res); err != nil {
 				log.WithError(err).Warn("failed to unmarshal delete hook response")
 			} else if res.Error != "" {

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
@@ -85,7 +86,7 @@ func (m *ArtifactModel) runUploadHook(roomId, roomSid string, roomTableId uint64
 		return
 	}
 
-	req := config.UploadHookRequest{
+	req := hooks.UploadHookRequest{
 		SourceFilePath: absolutePath,
 		ServiceType:    "artifact",
 		RoomId:         roomId,
@@ -93,13 +94,13 @@ func (m *ArtifactModel) runUploadHook(roomId, roomSid string, roomTableId uint64
 		RoomTableId:    roomTableId,
 	}
 
-	resBytes, err := config.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.UploadHook, &req, log)
+	resBytes, err := hooks.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.UploadHook, &req, log)
 	if err != nil {
 		log.WithError(err).Error("upload hook pipeline failed, fallback to local storage")
 		return
 	}
 
-	var res config.UploadHookResponse
+	var res hooks.UploadHookResponse
 	if err := json.Unmarshal(resBytes, &res); err != nil {
 		log.WithError(err).Error("failed to unmarshal upload hook response, fallback to local storage")
 		return

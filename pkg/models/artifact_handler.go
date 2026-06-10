@@ -10,6 +10,7 @@ import (
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/gofiber/fiber/v3"
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
@@ -141,7 +142,7 @@ func (m *ArtifactModel) GetArtifactDownloadToken(req *plugnmeet.GetArtifactDownl
 }
 
 // VerifyArtifactDownloadJWT validates a JWT and returns either a local file path or a redirect URL.
-func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (*config.DownloadHookResponse, int, error) {
+func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (*hooks.DownloadHookResponse, int, error) {
 	tok, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.HS256})
 	if err != nil {
 		return nil, fiber.StatusUnauthorized, err
@@ -176,7 +177,7 @@ func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (*config.Downloa
 			}
 			return nil, fiber.StatusBadRequest, err
 		}
-		return &config.DownloadHookResponse{
+		return &hooks.DownloadHookResponse{
 			Action:    "serve_local",
 			LocalPath: absolutePath,
 			MimeType:  mType.String(),
@@ -184,18 +185,18 @@ func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (*config.Downloa
 	}
 
 	// Hooks are defined, so use the pipeline.
-	req := config.DownloadHookRequest{
+	req := hooks.DownloadHookRequest{
 		LogicalPath: logicalPath,
 		ServiceType: "artifact",
 	}
 
-	resBytes, err := config.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.DownloadHook, &req, m.log)
+	resBytes, err := hooks.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.DownloadHook, &req, m.log)
 	if err != nil {
 		m.log.WithError(err).Error("download hook pipeline failed")
 		return nil, fiber.StatusInternalServerError, errors.New("download hook pipeline failed")
 	}
 
-	var res config.DownloadHookResponse
+	var res hooks.DownloadHookResponse
 	if err := json.Unmarshal(resBytes, &res); err != nil {
 		return nil, fiber.StatusInternalServerError, fmt.Errorf("failed to unmarshal download hook response: %w", err)
 	}
@@ -227,15 +228,15 @@ func (m *ArtifactModel) DeleteArtifact(req *plugnmeet.DeleteArtifactReq) error {
 		if metadata.FileInfo != nil && metadata.FileInfo.FilePath != "" {
 			// If delete hook is configured, we'll use it.
 			if m.app.StorageHooks != nil && len(m.app.StorageHooks.DeleteHook) > 0 {
-				delReq := config.DeleteHookRequest{
+				delReq := hooks.DeleteHookRequest{
 					LogicalPath: metadata.FileInfo.FilePath,
 					ServiceType: "artifact",
 				}
-				resBytes, err := config.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.DeleteHook, &delReq, m.log)
+				resBytes, err := hooks.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.DeleteHook, &delReq, m.log)
 				if err != nil {
 					m.log.WithError(err).Warn("delete hook pipeline failed for artifact")
 				} else {
-					var res config.DeleteHookResponse
+					var res hooks.DeleteHookResponse
 					if err := json.Unmarshal(resBytes, &res); err != nil {
 						m.log.WithError(err).Warn("failed to unmarshal delete hook response for artifact")
 					} else if res.Error != "" {
