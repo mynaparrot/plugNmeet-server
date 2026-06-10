@@ -28,4 +28,3 @@ nats_server.conf
 !test/*
 scripts/*
 !/scripts/examples_hooks/
-!/scripts/test_app/
