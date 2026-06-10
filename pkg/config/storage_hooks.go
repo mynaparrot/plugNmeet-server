@@ -45,7 +45,7 @@ type DownloadHookRequest struct {
 // DownloadHookResponse is the JSON payload expected from the *last* script in the download pipeline.
 type DownloadHookResponse struct {
 	Error       string `json:"error,omitempty"`
-	Action      string `json:"action,omitempty"`
+	Action      string `json:"action,omitempty"` // serve_local or redirect
 	RedirectUrl string `json:"redirect_url,omitempty"`
 	LocalPath   string `json:"local_path,omitempty"`
 	MimeType    string `json:"mime_type,omitempty"`
