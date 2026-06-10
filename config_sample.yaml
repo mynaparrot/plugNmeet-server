@@ -354,3 +354,29 @@ insights:
 #        shared_secret: "YOUR_COTURN_SHARED_SECRET"
 #        uris:
 #          - "turn:turn.your-domain.com:3478?transport=udp"
+
+# (Optional) Storage Hooks for Advanced File Management
+# These hooks allow you to override the default local file storage and integrate
+# with any external storage provider (e.g., S3, Google Cloud Storage) using custom scripts.
+# This is ideal for cloud-native or multi-server deployments.
+#
+# If this section is omitted, the server will store all files on the local disk
+# in the paths defined under 'recorder_info' and 'artifacts_settings'.
+#
+#storage_hooks:
+#  # A list of scripts to run sequentially for file uploads.
+#  # The output of one script becomes the input for the next.
+#  # The final script in the chain must output a JSON object with a 'logical_path'.
+#  upload_hook:
+#    - "./scripts/examples_hooks/upload.sh"
+#
+#  # A list of scripts for file downloads.
+#  # The final script must output a JSON object with an 'action' ('redirect' or 'serve_local')
+#  # and a corresponding 'redirect_url' or 'local_path'.
+#  download_hook:
+#    - "./scripts/examples_hooks/download.sh"
+#
+#  # A list of scripts for file deletion.
+#  # This is a "fire-and-forget" operation. The script should handle its own errors.
+#  delete_hook:
+#    - "./scripts/examples_hooks/delete.sh"

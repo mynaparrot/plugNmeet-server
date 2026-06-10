@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -63,6 +64,55 @@ func (m *ArtifactModel) buildPath(fileName, roomId string, artifactType plugnmee
 	relativePath = filepath.Join(relativeDir, fileName)
 	absolutePath = filepath.Join(absoluteDir, fileName)
 	return
+}
+
+// runUploadHook is a helper that executes the upload hook pipeline if a file is present in the metadata.
+// It modifies the FilePath in the metadata object in-place if the hook is successful.
+// If the hook fails, it logs the error but does not return it, allowing fallback to local storage.
+func (m *ArtifactModel) runUploadHook(metadata *plugnmeet.RoomArtifactMetadata, log *logrus.Entry) {
+	if m.app.StorageHooks == nil || len(m.app.StorageHooks.UploadHook) == 0 {
+		return
+	}
+	if metadata.FileInfo == nil || metadata.FileInfo.FilePath == "" {
+		return
+	}
+
+	log.Info("Upload hook is configured, preparing to run pipeline...")
+
+	absolutePath, err := filepath.Abs(filepath.Join(*m.app.ArtifactsSettings.StoragePath, metadata.FileInfo.FilePath))
+	if err != nil {
+		log.WithError(err).Error("could not build absolute path for hook, fallback to local storage")
+		return
+	}
+
+	req := config.UploadHookRequest{
+		SourceFilePath: absolutePath,
+		ServiceType:    "artifact",
+	}
+
+	resBytes, err := config.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.UploadHook, &req, log)
+	if err != nil {
+		log.WithError(err).Error("upload hook pipeline failed, fallback to local storage")
+		return
+	}
+
+	var res config.UploadHookResponse
+	if err := json.Unmarshal(resBytes, &res); err != nil {
+		log.WithError(err).Error("failed to unmarshal upload hook response, fallback to local storage")
+		return
+	}
+
+	if res.Error != "" {
+		log.Errorf("upload hook script returned an error: %s, fallback to local storage", res.Error)
+		return
+	}
+	if res.LogicalPath == "" {
+		log.Error("upload hook did not return a logical_path, fallback to local storage")
+		return
+	}
+
+	log.Infof("upload hook successful, updating file path from '%s' to '%s'", metadata.FileInfo.FilePath, res.LogicalPath)
+	metadata.FileInfo.FilePath = res.LogicalPath
 }
 
 // MoveToTrash moves a specified file to the configured backup/trash directory.
@@ -173,6 +223,9 @@ func (m *ArtifactModel) HandleAnalyticsEvent(roomId string, eventName plugnmeet.
 
 // createAndSaveArtifact is a helper to save data to DB.
 func (m *ArtifactModel) createAndSaveArtifact(roomId, roomSid string, roomTableId uint64, artifactType plugnmeet.RoomArtifactType, metadata *plugnmeet.RoomArtifactMetadata, forceSend bool, log *logrus.Entry) (*dbmodels.RoomArtifact, error) {
+	// If a file is associated, run the upload hook to potentially move it and update the metadata path.
+	m.runUploadHook(metadata, log)
+
 	metadataBytes, err := protojson.Marshal(metadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal metadata: %w", err)

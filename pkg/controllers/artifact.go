@@ -78,15 +78,30 @@ func (ac *ArtifactController) HandleDownloadArtifact(c fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).SendString("token required or invalid url")
 	}
 
-	filePath, mType, status, err := ac.ArtifactModel.VerifyArtifactDownloadJWT(token)
+	res, status, err := ac.ArtifactModel.VerifyArtifactDownloadJWT(token)
 	if err != nil {
-		// Use fiber.StatusBadRequest for client-side errors like invalid tokens.
 		return c.Status(status).SendString(err.Error())
 	}
 
-	c.Set(fiber.HeaderContentType, mType.String())
-	c.Set(fiber.HeaderContentDisposition, "attachment; filename="+filepath.Base(filePath))
-	return c.SendFile(filePath)
+	switch res.Action {
+	case "redirect":
+		if res.RedirectUrl == "" {
+			return c.Status(fiber.StatusInternalServerError).SendString("hook script did not provide a redirect_url")
+		}
+		return c.Redirect().Status(fiber.StatusTemporaryRedirect).To(res.RedirectUrl)
+	case "serve_local":
+		if res.LocalPath == "" {
+			return c.Status(fiber.StatusInternalServerError).SendString("hook script did not provide a local_path")
+		}
+		if res.MimeType == "" {
+			return c.Status(fiber.StatusInternalServerError).SendString("hook script did not provide a mime_type")
+		}
+		c.Set(fiber.HeaderContentType, res.MimeType)
+		c.Set(fiber.HeaderContentDisposition, "attachment; filename="+filepath.Base(res.LocalPath))
+		return c.SendFile(res.LocalPath)
+	default:
+		return c.Status(fiber.StatusInternalServerError).SendString("invalid action from download hook")
+	}
 }
 
 func (ac *ArtifactController) HandleGetArtifactInfo(c fiber.Ctx) error {

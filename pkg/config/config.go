@@ -46,6 +46,7 @@ type AppConfig struct {
 	NatsInfo            NatsInfo                   `yaml:"nats_info"`
 	Insights            *InsightsConfig            `yaml:"insights"`
 	TurnServer          *TurnConfig                `yaml:"turn_server"`
+	StorageHooks        *StorageHooks              `yaml:"storage_hooks"`
 }
 
 type ClientInfo struct {
@@ -338,6 +339,10 @@ func InitAppConfig(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 		return nil, err
 	}
 
+	if err := handleStorageHooks(appCnf); err != nil {
+		return nil, err
+	}
+
 	return appCnf, nil
 }
 
@@ -388,6 +393,46 @@ func handleArtifactsSettings(appCnf *AppConfig) error {
 			return fmt.Errorf("failed to create artifacts backup directory %s: %w", trashPath, err)
 		}
 	}
+	return nil
+}
+
+func handleStorageHooks(appCnf *AppConfig) error {
+	if appCnf.StorageHooks == nil {
+		return nil // Feature is not enabled.
+	}
+
+	validate := func(scriptPath string, hookType string) error {
+		info, err := os.Stat(scriptPath)
+		if os.IsNotExist(err) {
+			return fmt.Errorf("%s script not found at %s", hookType, scriptPath)
+		}
+		if info.IsDir() {
+			return fmt.Errorf("%s script at %s is a directory", hookType, scriptPath)
+		}
+		if info.Mode()&0111 == 0 {
+			return fmt.Errorf("%s script at %s is not executable", hookType, scriptPath)
+		}
+		return nil
+	}
+
+	for _, script := range appCnf.StorageHooks.UploadHook {
+		if err := validate(script, "upload_hook"); err != nil {
+			return err
+		}
+	}
+
+	for _, script := range appCnf.StorageHooks.DownloadHook {
+		if err := validate(script, "download_hook"); err != nil {
+			return err
+		}
+	}
+
+	for _, script := range appCnf.StorageHooks.DeleteHook {
+		if err := validate(script, "delete_hook"); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

@@ -26,3 +26,5 @@ nats_server.conf
 /artifacts/
 
 !test/*
+scripts/*
+!/scripts/examples_hooks/
