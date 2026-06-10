@@ -230,10 +230,16 @@ func (m *ArtifactModel) DeleteArtifact(req *plugnmeet.DeleteArtifactReq) error {
 					LogicalPath: metadata.FileInfo.FilePath,
 					ServiceType: "artifact",
 				}
-				_, err := config.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.DeleteHook, &delReq, m.log)
+				resBytes, err := config.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.DeleteHook, &delReq, m.log)
 				if err != nil {
-					// Log the error but don't block the DB deletion.
 					m.log.WithError(err).Warn("delete hook pipeline failed for artifact")
+				} else {
+					var res config.DeleteHookResponse
+					if err := json.Unmarshal(resBytes, &res); err != nil {
+						m.log.WithError(err).Warn("failed to unmarshal delete hook response for artifact")
+					} else if res.Error != "" {
+						m.log.Warnf("delete hook script returned an error for artifact: %s", res.Error)
+					}
 				}
 			} else {
 				// Otherwise, we'll only try to delete if it's a local file.

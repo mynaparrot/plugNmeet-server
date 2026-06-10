@@ -365,6 +365,7 @@ func handleArtifactsSettings(appCnf *AppConfig) error {
 	p := *appCnf.ArtifactsSettings.StoragePath
 	if strings.HasPrefix(p, "./") {
 		p = filepath.Join(appCnf.RootWorkingDir, p)
+		appCnf.ArtifactsSettings.StoragePath = &p
 	}
 
 	if _, err := os.Stat(p); os.IsNotExist(err) {
@@ -415,20 +416,33 @@ func handleStorageHooks(appCnf *AppConfig) error {
 		return nil
 	}
 
-	for _, script := range appCnf.StorageHooks.UploadHook {
-		if err := validate(script, "upload_hook"); err != nil {
+	resolvePath := func(scriptPath string) string {
+		if strings.HasPrefix(scriptPath, "./") {
+			return filepath.Join(appCnf.RootWorkingDir, scriptPath)
+		}
+		return scriptPath
+	}
+
+	for i, script := range appCnf.StorageHooks.UploadHook {
+		resolved := resolvePath(script)
+		appCnf.StorageHooks.UploadHook[i] = resolved
+		if err := validate(resolved, "upload_hook"); err != nil {
 			return err
 		}
 	}
 
-	for _, script := range appCnf.StorageHooks.DownloadHook {
-		if err := validate(script, "download_hook"); err != nil {
+	for i, script := range appCnf.StorageHooks.DownloadHook {
+		resolved := resolvePath(script)
+		appCnf.StorageHooks.DownloadHook[i] = resolved
+		if err := validate(resolved, "download_hook"); err != nil {
 			return err
 		}
 	}
 
-	for _, script := range appCnf.StorageHooks.DeleteHook {
-		if err := validate(script, "delete_hook"); err != nil {
+	for i, script := range appCnf.StorageHooks.DeleteHook {
+		resolved := resolvePath(script)
+		appCnf.StorageHooks.DeleteHook[i] = resolved
+		if err := validate(resolved, "delete_hook"); err != nil {
 			return err
 		}
 	}
