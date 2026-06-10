@@ -25,7 +25,7 @@ func (m *ArtifactModel) CreateMeetingSummaryArtifact(roomTableId uint64, summary
 	}
 
 	// --- Create the downloadable file artifact FIRST ---
-	summaryFileName := fmt.Sprintf("summary_%d.txt", time.Now().Unix())
+	summaryFileName := fmt.Sprintf("summary_%s-%d.txt", roomInfo.Sid, time.Now().UnixMilli())
 	relativePath, absolutePath, err := m.buildPath(summaryFileName, roomInfo.RoomId, plugnmeet.RoomArtifactType_MEETING_SUMMARY)
 	if err != nil {
 		return err

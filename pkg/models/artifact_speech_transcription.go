@@ -149,7 +149,7 @@ func (m *ArtifactModel) createSpeechTranscriptionFileArtifact(roomId, roomSid st
 	}
 
 	// 5. Build the file path and write the file.
-	fileName := fmt.Sprintf("transcription_%d.vtt", time.Now().Unix())
+	fileName := fmt.Sprintf("transcription_%s-%d.vtt", roomSid, time.Now().UnixMilli())
 	relativePath, absolutePath, err := m.buildPath(fileName, roomId, plugnmeet.RoomArtifactType_SPEECH_TRANSCRIPTION)
 	if err != nil {
 		return nil, err
