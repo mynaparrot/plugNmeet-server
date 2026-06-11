@@ -33,7 +33,7 @@ func (m *RecordingModel) CreateTokenForDownload(path string) (string, error) {
 }
 
 // VerifyRecordingToken verify token & provide file path
-func (m *RecordingModel) VerifyRecordingToken(token string) (*hooks.DownloadHookResponse, int, error) {
+func (m *RecordingModel) VerifyRecordingToken(token string) (*hooks.DownloadHookData, int, error) {
 	tok, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.HS256})
 	if err != nil {
 		return nil, fiber.StatusUnauthorized, err
@@ -65,16 +65,16 @@ func (m *RecordingModel) VerifyRecordingToken(token string) (*hooks.DownloadHook
 			}
 			return nil, fiber.StatusBadRequest, err
 		}
-		return &hooks.DownloadHookResponse{
-			Action:    "serve_local",
-			LocalPath: absolutePath,
-			MimeType:  mType.String(),
+		return &hooks.DownloadHookData{
+			Action:     "serve_local",
+			OutputPath: absolutePath,
+			MimeType:   mType.String(),
 		}, fiber.StatusOK, nil
 	}
 
 	// Hooks are defined, so use the pipeline.
-	req := hooks.DownloadHookRequest{
-		LogicalPath: logicalPath,
+	req := hooks.DownloadHookData{
+		InputPath:   logicalPath,
 		ServiceType: "recording",
 	}
 
@@ -84,7 +84,8 @@ func (m *RecordingModel) VerifyRecordingToken(token string) (*hooks.DownloadHook
 		return nil, fiber.StatusInternalServerError, errors.New("download hook pipeline failed")
 	}
 
-	var res hooks.DownloadHookResponse
+	// script will return same struct
+	var res hooks.DownloadHookData
 	if err := json.Unmarshal(resBytes, &res); err != nil {
 		return nil, fiber.StatusInternalServerError, fmt.Errorf("failed to unmarshal download hook response: %w", err)
 	}

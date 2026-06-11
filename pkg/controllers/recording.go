@@ -167,15 +167,15 @@ func (rc *RecordingController) HandleDownloadRecording(c fiber.Ctx) error {
 		}
 		return c.Redirect().Status(fiber.StatusTemporaryRedirect).To(res.RedirectUrl)
 	case "serve_local":
-		if res.LocalPath == "" {
+		if res.OutputPath == "" {
 			return c.Status(fiber.StatusInternalServerError).SendString("hook script did not provide a local_path")
 		}
 		if res.MimeType == "" {
 			return c.Status(fiber.StatusInternalServerError).SendString("hook script did not provide a mime_type")
 		}
 		c.Set(fiber.HeaderContentType, res.MimeType)
-		c.Set(fiber.HeaderContentDisposition, "attachment; filename="+filepath.Base(res.LocalPath))
-		return c.SendFile(res.LocalPath)
+		c.Set(fiber.HeaderContentDisposition, "attachment; filename="+filepath.Base(res.OutputPath))
+		return c.SendFile(res.OutputPath)
 	default:
 		return c.Status(fiber.StatusInternalServerError).SendString("invalid action from download hook")
 	}

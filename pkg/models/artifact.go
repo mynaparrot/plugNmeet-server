@@ -86,12 +86,12 @@ func (m *ArtifactModel) runUploadHook(roomId, roomSid string, roomTableId uint64
 		return
 	}
 
-	req := hooks.UploadHookRequest{
-		SourceFilePath: absolutePath,
-		ServiceType:    "artifact",
-		RoomId:         roomId,
-		RoomSid:        roomSid,
-		RoomTableId:    roomTableId,
+	req := hooks.UploadHookData{
+		InputPath:   absolutePath,
+		ServiceType: "artifact",
+		RoomId:      roomId,
+		RoomSid:     roomSid,
+		RoomTableId: roomTableId,
 	}
 
 	resBytes, err := hooks.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.UploadHook, &req, log)
@@ -100,7 +100,8 @@ func (m *ArtifactModel) runUploadHook(roomId, roomSid string, roomTableId uint64
 		return
 	}
 
-	var res hooks.UploadHookResponse
+	// script will return same struct
+	var res hooks.UploadHookData
 	if err := json.Unmarshal(resBytes, &res); err != nil {
 		log.WithError(err).Error("failed to unmarshal upload hook response, fallback to local storage")
 		return
@@ -110,13 +111,13 @@ func (m *ArtifactModel) runUploadHook(roomId, roomSid string, roomTableId uint64
 		log.Errorf("upload hook script returned an error: %s, fallback to local storage", res.Error)
 		return
 	}
-	if res.LogicalPath == "" {
-		log.Error("upload hook did not return a logical_path, fallback to local storage")
+	if res.OutputPath == "" {
+		log.Error("upload hook did not return a output_path, fallback to local storage")
 		return
 	}
 
-	log.Infof("upload hook successful, updating file path from '%s' to '%s'", metadata.FileInfo.FilePath, res.LogicalPath)
-	metadata.FileInfo.FilePath = res.LogicalPath
+	log.Infof("Upload hook successful, updating file path from '%s' to '%s'", metadata.FileInfo.FilePath, res.OutputPath)
+	metadata.FileInfo.FilePath = res.OutputPath
 }
 
 // MoveToTrash moves a specified file to the configured backup/trash directory.

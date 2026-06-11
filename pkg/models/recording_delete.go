@@ -31,15 +31,15 @@ func (m *RecordingModel) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error 
 
 	// If delete hook is configured, we'll use it.
 	if m.app.StorageHooks != nil && len(m.app.StorageHooks.DeleteHook) > 0 {
-		delReq := hooks.DeleteHookRequest{
-			LogicalPath: recording.FilePath,
+		delReq := hooks.DeleteHookData{
+			InputPath:   recording.FilePath,
 			ServiceType: "recording",
 		}
 		resBytes, err := hooks.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.DeleteHook, &delReq, log)
 		if err != nil {
 			log.WithError(err).Warn("delete hook pipeline failed for recording")
 		} else {
-			var res hooks.DeleteHookResponse
+			var res hooks.DeleteHookData
 			if err := json.Unmarshal(resBytes, &res); err != nil {
 				log.WithError(err).Warn("failed to unmarshal delete hook response")
 			} else if res.Error != "" {

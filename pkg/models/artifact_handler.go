@@ -142,7 +142,7 @@ func (m *ArtifactModel) GetArtifactDownloadToken(req *plugnmeet.GetArtifactDownl
 }
 
 // VerifyArtifactDownloadJWT validates a JWT and returns either a local file path or a redirect URL.
-func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (*hooks.DownloadHookResponse, int, error) {
+func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (*hooks.DownloadHookData, int, error) {
 	tok, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.HS256})
 	if err != nil {
 		return nil, fiber.StatusUnauthorized, err
@@ -177,16 +177,16 @@ func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (*hooks.Download
 			}
 			return nil, fiber.StatusBadRequest, err
 		}
-		return &hooks.DownloadHookResponse{
-			Action:    "serve_local",
-			LocalPath: absolutePath,
-			MimeType:  mType.String(),
+		return &hooks.DownloadHookData{
+			Action:     "serve_local",
+			OutputPath: absolutePath,
+			MimeType:   mType.String(),
 		}, fiber.StatusOK, nil
 	}
 
 	// Hooks are defined, so use the pipeline.
-	req := hooks.DownloadHookRequest{
-		LogicalPath: logicalPath,
+	req := hooks.DownloadHookData{
+		InputPath:   logicalPath,
 		ServiceType: "artifact",
 	}
 
@@ -196,7 +196,8 @@ func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (*hooks.Download
 		return nil, fiber.StatusInternalServerError, errors.New("download hook pipeline failed")
 	}
 
-	var res hooks.DownloadHookResponse
+	// return will be using same struct
+	var res hooks.DownloadHookData
 	if err := json.Unmarshal(resBytes, &res); err != nil {
 		return nil, fiber.StatusInternalServerError, fmt.Errorf("failed to unmarshal download hook response: %w", err)
 	}
@@ -228,15 +229,15 @@ func (m *ArtifactModel) DeleteArtifact(req *plugnmeet.DeleteArtifactReq) error {
 		if metadata.FileInfo != nil && metadata.FileInfo.FilePath != "" {
 			// If delete hook is configured, we'll use it.
 			if m.app.StorageHooks != nil && len(m.app.StorageHooks.DeleteHook) > 0 {
-				delReq := hooks.DeleteHookRequest{
-					LogicalPath: metadata.FileInfo.FilePath,
+				delReq := hooks.DeleteHookData{
+					InputPath:   metadata.FileInfo.FilePath,
 					ServiceType: "artifact",
 				}
 				resBytes, err := hooks.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.DeleteHook, &delReq, m.log)
 				if err != nil {
 					m.log.WithError(err).Warn("delete hook pipeline failed for artifact")
 				} else {
-					var res hooks.DeleteHookResponse
+					var res hooks.DeleteHookData
 					if err := json.Unmarshal(resBytes, &res); err != nil {
 						m.log.WithError(err).Warn("failed to unmarshal delete hook response for artifact")
 					} else if res.Error != "" {

@@ -2,22 +2,23 @@
 
 # Example Delete Script
 # This script is a placeholder to demonstrate how to handle the delete hook.
-# It receives a 'logical_path' and should perform the deletion from the external storage.
+# It receives an 'input_path' (which is the stored logical path) and should perform the deletion from the external storage.
 
 set -e
 
 INPUT_JSON=$(cat)
-LOGICAL_PATH=$(echo "$INPUT_JSON" | jq -r '.logical_path')
+# 'input_path' is the path/URL of the file in remote storage to be deleted.
+INPUT_PATH=$(echo "$INPUT_JSON" | jq -r '.input_path')
 
 # --- Your Custom Logic Goes Here ---
 #
 # For a real S3 deletion, you might do:
-#   aws s3 rm "$LOGICAL_PATH"
+#   aws s3 rm "$INPUT_PATH"
 #
 # For rclone:
-#   rclone deletefile "$LOGICAL_PATH"
+#   rclone deletefile "$INPUT_PATH"
 
-echo "Received delete request for $LOGICAL_PATH" >&2
+echo "Received delete request for $INPUT_PATH" >&2
 
 # --- End of Custom Logic ---
 
