@@ -170,14 +170,14 @@ func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (*hooks.Download
 		return nil, fiber.StatusBadRequest, errors.New("invalid file path in token")
 	}
 
-	if m.app.StorageHooks != nil || len(m.app.StorageHooks.DownloadHook) > 0 {
+	if m.app.StorageHooks != nil && (len(m.app.StorageHooks.DownloadHook) > 0) && m.app.HookManager != nil {
 		// Hooks are defined, so use the pipeline.
 		req := hooks.DownloadHookData{
 			InputPath:   inputPath,
 			ServiceType: "artifact",
 		}
 
-		resBytes, err := hooks.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.DownloadHook, &req, m.log)
+		resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.DownloadHook, &req, m.log)
 		if err != nil {
 			log.WithError(err).Error("download hook pipeline failed")
 			return nil, fiber.StatusInternalServerError, errors.New("download hook pipeline failed")
@@ -232,12 +232,12 @@ func (m *ArtifactModel) DeleteArtifact(req *plugnmeet.DeleteArtifactReq) error {
 	if err := protojson.Unmarshal([]byte(artifact.Metadata), &metadata); err == nil {
 		if metadata.FileInfo != nil && metadata.FileInfo.FilePath != "" {
 			// If delete hook is configured, we'll use it.
-			if m.app.StorageHooks != nil && len(m.app.StorageHooks.DeleteHook) > 0 {
+			if m.app.StorageHooks != nil && len(m.app.StorageHooks.DeleteHook) > 0 && m.app.HookManager != nil {
 				delReq := hooks.DeleteHookData{
 					InputPath:   metadata.FileInfo.FilePath,
 					ServiceType: "artifact",
 				}
-				resBytes, err := hooks.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.DeleteHook, &delReq, m.log)
+				resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.DeleteHook, &delReq, m.log)
 				if err != nil {
 					m.log.WithError(err).Warn("delete hook pipeline failed for artifact")
 				} else {

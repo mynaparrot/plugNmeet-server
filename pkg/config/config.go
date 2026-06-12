@@ -30,6 +30,7 @@ type AppConfig struct {
 	NatsConn    *nats.Conn
 	JetStream   jetstream.JetStream
 	ClientFiles map[string][]string
+	HookManager *hooks.HookProcessManager
 
 	RootWorkingDir      string
 	Client              ClientInfo                 `yaml:"client"`
@@ -350,10 +351,6 @@ func InitAppConfig(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 		return nil, err
 	}
 
-	if err := handleStorageHooks(appCnf); err != nil {
-		return nil, err
-	}
-
 	return appCnf, nil
 }
 
@@ -408,7 +405,7 @@ func handleArtifactsSettings(appCnf *AppConfig) error {
 	return nil
 }
 
-func handleStorageHooks(appCnf *AppConfig) error {
+func InitializeStorageHooks(ctx context.Context, appCnf *AppConfig) error {
 	if appCnf.StorageHooks == nil {
 		return nil // Feature is not enabled.
 	}
@@ -420,12 +417,15 @@ func handleStorageHooks(appCnf *AppConfig) error {
 		return scriptPath
 	}
 
+	// Collect all unique scripts to start them once
+	var allScripts []string
 	for i, script := range appCnf.StorageHooks.UploadHook {
 		resolved := resolvePath(script)
 		appCnf.StorageHooks.UploadHook[i] = resolved
 		if err := hooks.ValidateHookScript(resolved, "upload_hook"); err != nil {
 			return err
 		}
+		allScripts = append(allScripts, resolved)
 	}
 
 	for i, script := range appCnf.StorageHooks.DownloadHook {
@@ -434,6 +434,7 @@ func handleStorageHooks(appCnf *AppConfig) error {
 		if err := hooks.ValidateHookScript(resolved, "download_hook"); err != nil {
 			return err
 		}
+		allScripts = append(allScripts, resolved)
 	}
 
 	for i, script := range appCnf.StorageHooks.DeleteHook {
@@ -442,6 +443,13 @@ func handleStorageHooks(appCnf *AppConfig) error {
 		if err := hooks.ValidateHookScript(resolved, "delete_hook"); err != nil {
 			return err
 		}
+		allScripts = append(allScripts, resolved)
+	}
+
+	// Initialize the HookProcessManager and start all unique scripts
+	appCnf.HookManager = hooks.NewHookProcessManager(ctx, appCnf.Logger.WithField("service", "hook_manager"))
+	if err := appCnf.HookManager.StartHookProcesses(allScripts); err != nil {
+		return fmt.Errorf("failed to start hook processes: %w", err)
 	}
 
 	return nil

@@ -54,6 +54,10 @@ func main() {
 	}
 	lkLogger.InitFromConfig(logConf, "pnm")
 
+	if err := config.InitializeStorageHooks(ctx, appCnf); err != nil {
+		logger.WithError(err).Fatal("Failed to setup hooks")
+	}
+
 	fxOpts := []fx.Option{
 		fx.Provide(func() context.Context { return ctx }),
 		fx.Supply(appCnf, appCnf.Logger),

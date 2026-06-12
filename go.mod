@@ -18,17 +18,17 @@ require (
 	github.com/livekit/media-sdk v0.0.0-20260424094251-1e21ae1138de
 	github.com/livekit/protocol v1.46.0
 	github.com/livekit/server-sdk-go/v2 v2.16.6
-	github.com/mynaparrot/plugnmeet-protocol v1.3.1-0.20260611205744-84953fa899b3
+	github.com/mynaparrot/plugnmeet-protocol v1.3.1-0.20260612113827-4808bc54a8ed
 	github.com/nats-io/jwt/v2 v2.8.2
 	github.com/nats-io/nats.go v1.52.0
 	github.com/nats-io/nkeys v0.4.16
 	github.com/pion/webrtc/v4 v4.2.12
 	github.com/prometheus/client_golang v1.23.2
-	github.com/redis/go-redis/v9 v9.20.0
+	github.com/redis/go-redis/v9 v9.20.1
 	github.com/sirupsen/logrus v1.9.4
 	go.uber.org/fx v1.24.0
 	golang.org/x/sync v0.21.0
-	google.golang.org/genai v1.59.0
+	google.golang.org/genai v1.60.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/mysql v1.6.0
