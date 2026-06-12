@@ -34,6 +34,8 @@ func (m *RecordingModel) CreateTokenForDownload(path string) (string, error) {
 
 // VerifyRecordingToken verify token & provide file path
 func (m *RecordingModel) VerifyRecordingToken(token string) (*hooks.DownloadHookData, int, error) {
+	log := m.logger.WithField("method", "VerifyRecordingToken")
+
 	tok, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.HS256})
 	if err != nil {
 		return nil, fiber.StatusUnauthorized, err
@@ -51,48 +53,50 @@ func (m *RecordingModel) VerifyRecordingToken(token string) (*hooks.DownloadHook
 		return nil, fiber.StatusUnauthorized, err
 	}
 
-	logicalPath := out.Subject
-	if logicalPath == "" {
+	inputPath := out.Subject
+	if inputPath == "" {
 		return nil, fiber.StatusBadRequest, errors.New("invalid file path")
 	}
 
-	// If no hooks are defined, fallback to local.
-	if m.app.StorageHooks == nil || len(m.app.StorageHooks.DownloadHook) == 0 {
-		absolutePath, mType, err := helpers.ValidateAndGetAbsFilePath(m.app.RecorderInfo.RecordingFilesPath, logicalPath)
-		if err != nil {
-			if errors.Is(err, config.ErrFileNotFound) {
-				return nil, fiber.StatusNotFound, config.ErrFileNotFound
-			}
-			return nil, fiber.StatusBadRequest, err
+	if m.app.StorageHooks != nil || len(m.app.StorageHooks.DownloadHook) > 0 {
+		// Hooks are defined, so use the pipeline.
+		req := hooks.DownloadHookData{
+			InputPath:   inputPath,
+			ServiceType: "recording",
 		}
-		return &hooks.DownloadHookData{
-			Action:     "serve_local",
-			OutputPath: absolutePath,
-			MimeType:   mType.String(),
-		}, fiber.StatusOK, nil
+
+		resBytes, err := hooks.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.DownloadHook, &req, m.logger)
+		if err != nil {
+			log.WithError(err).Error("download hook pipeline failed")
+			return nil, fiber.StatusInternalServerError, errors.New("download hook pipeline failed")
+		}
+
+		// script will return same struct
+		var res hooks.DownloadHookData
+		if err := json.Unmarshal(resBytes, &res); err != nil {
+			log.WithError(err).Error("failed to unmarshal download hook response")
+			return nil, fiber.StatusInternalServerError, fmt.Errorf("failed to unmarshal download hook response")
+		}
+		if res.Error != "" {
+			log.Error("download hook script returned an error: %s", res.Error)
+			return nil, fiber.StatusInternalServerError, fmt.Errorf("download hook script returned an error")
+		}
+		if res.OutputPath != "" || res.RedirectUrl != "" {
+			return &res, fiber.StatusOK, nil
+		}
 	}
 
-	// Hooks are defined, so use the pipeline.
-	req := hooks.DownloadHookData{
-		InputPath:   logicalPath,
-		ServiceType: "recording",
-	}
-
-	resBytes, err := hooks.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.DownloadHook, &req, m.logger)
+	// If no hooks are defined or no output from script, fallback to local.
+	absolutePath, mType, err := helpers.ValidateAndGetAbsFilePath(m.app.RecorderInfo.RecordingFilesPath, inputPath)
 	if err != nil {
-		m.logger.WithError(err).Error("download hook pipeline failed")
-		return nil, fiber.StatusInternalServerError, errors.New("download hook pipeline failed")
+		if errors.Is(err, config.ErrFileNotFound) {
+			return nil, fiber.StatusNotFound, config.ErrFileNotFound
+		}
+		return nil, fiber.StatusBadRequest, err
 	}
-
-	// script will return same struct
-	var res hooks.DownloadHookData
-	if err := json.Unmarshal(resBytes, &res); err != nil {
-		return nil, fiber.StatusInternalServerError, fmt.Errorf("failed to unmarshal download hook response: %w", err)
-	}
-
-	if res.Error != "" {
-		return nil, fiber.StatusInternalServerError, fmt.Errorf("download hook script returned an error: %s", res.Error)
-	}
-
-	return &res, fiber.StatusOK, nil
+	return &hooks.DownloadHookData{
+		Action:     "serve_local",
+		OutputPath: absolutePath,
+		MimeType:   mType.String(),
+	}, fiber.StatusOK, nil
 }

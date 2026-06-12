@@ -143,6 +143,8 @@ func (m *ArtifactModel) GetArtifactDownloadToken(req *plugnmeet.GetArtifactDownl
 
 // VerifyArtifactDownloadJWT validates a JWT and returns either a local file path or a redirect URL.
 func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (*hooks.DownloadHookData, int, error) {
+	log := m.log.WithField("method", "VerifyArtifactDownloadJWT")
+
 	tok, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.HS256})
 	if err != nil {
 		return nil, fiber.StatusUnauthorized, err
@@ -163,50 +165,52 @@ func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (*hooks.Download
 		return nil, fiber.StatusUnauthorized, err
 	}
 
-	logicalPath := out.Subject
-	if logicalPath == "" {
+	inputPath := out.Subject
+	if inputPath == "" {
 		return nil, fiber.StatusBadRequest, errors.New("invalid file path in token")
 	}
 
-	// If no hooks are defined, fallback to local.
-	if m.app.StorageHooks == nil || len(m.app.StorageHooks.DownloadHook) == 0 {
-		absolutePath, mType, err := helpers.ValidateAndGetAbsFilePath(*m.app.ArtifactsSettings.StoragePath, logicalPath)
-		if err != nil {
-			if errors.Is(err, config.ErrFileNotFound) {
-				return nil, fiber.StatusNotFound, config.ErrFileNotFound
-			}
-			return nil, fiber.StatusBadRequest, err
+	if m.app.StorageHooks != nil || len(m.app.StorageHooks.DownloadHook) > 0 {
+		// Hooks are defined, so use the pipeline.
+		req := hooks.DownloadHookData{
+			InputPath:   inputPath,
+			ServiceType: "artifact",
 		}
-		return &hooks.DownloadHookData{
-			Action:     "serve_local",
-			OutputPath: absolutePath,
-			MimeType:   mType.String(),
-		}, fiber.StatusOK, nil
+
+		resBytes, err := hooks.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.DownloadHook, &req, m.log)
+		if err != nil {
+			log.WithError(err).Error("download hook pipeline failed")
+			return nil, fiber.StatusInternalServerError, errors.New("download hook pipeline failed")
+		}
+
+		// return will be using same struct
+		var res hooks.DownloadHookData
+		if err := json.Unmarshal(resBytes, &res); err != nil {
+			log.WithError(err).Error("failed to unmarshal download hook response")
+			return nil, fiber.StatusInternalServerError, fmt.Errorf("failed to unmarshal download hook response")
+		}
+		if res.Error != "" {
+			log.Error("download hook script returned an error: %s", res.Error)
+			return nil, fiber.StatusInternalServerError, fmt.Errorf("download hook script returned an error")
+		}
+		if res.OutputPath != "" || res.RedirectUrl != "" {
+			return &res, fiber.StatusOK, nil
+		}
 	}
 
-	// Hooks are defined, so use the pipeline.
-	req := hooks.DownloadHookData{
-		InputPath:   logicalPath,
-		ServiceType: "artifact",
-	}
-
-	resBytes, err := hooks.ExecuteHookPipeline(m.ctx, m.app.StorageHooks.DownloadHook, &req, m.log)
+	// If no hooks are defined or no output from script, fallback to local.
+	absolutePath, mType, err := helpers.ValidateAndGetAbsFilePath(*m.app.ArtifactsSettings.StoragePath, inputPath)
 	if err != nil {
-		m.log.WithError(err).Error("download hook pipeline failed")
-		return nil, fiber.StatusInternalServerError, errors.New("download hook pipeline failed")
+		if errors.Is(err, config.ErrFileNotFound) {
+			return nil, fiber.StatusNotFound, config.ErrFileNotFound
+		}
+		return nil, fiber.StatusBadRequest, err
 	}
-
-	// return will be using same struct
-	var res hooks.DownloadHookData
-	if err := json.Unmarshal(resBytes, &res); err != nil {
-		return nil, fiber.StatusInternalServerError, fmt.Errorf("failed to unmarshal download hook response: %w", err)
-	}
-
-	if res.Error != "" {
-		return nil, fiber.StatusInternalServerError, fmt.Errorf("download hook script returned an error: %s", res.Error)
-	}
-
-	return &res, fiber.StatusOK, nil
+	return &hooks.DownloadHookData{
+		Action:     "serve_local",
+		OutputPath: absolutePath,
+		MimeType:   mType.String(),
+	}, fiber.StatusOK, nil
 }
 
 // DeleteArtifact checks permissions and deletes an artifact record and its associated file.
