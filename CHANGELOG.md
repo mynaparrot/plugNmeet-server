@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.2.1](https://github.com/mynaparrot/plugNmeet-server/compare/v2.2.0...v2.2.1) (2026-06-12)
+
+
+### Bug Fixes
+
+* added option to set hook timeout ([ace1894](https://github.com/mynaparrot/plugNmeet-server/commit/ace18940db88e48d480ecb34c7077048c6d33363))
+* check pipeline first and fallback to default path ([7542b78](https://github.com/mynaparrot/plugNmeet-server/commit/7542b780756772775751194e1cb143736a34d303))
+* ensure file names are unique and following same format ([ebdbfc4](https://github.com/mynaparrot/plugNmeet-server/commit/ebdbfc4ebb0030963596c81ac33edb4ba210d409))
+* ensure we're in the right dir e.g. `/app` ([c745978](https://github.com/mynaparrot/plugNmeet-server/commit/c745978d894d478f5fa0e9155feb00df3a5697b6))
+* **feat:** storage hooks ([8aaf82d](https://github.com/mynaparrot/plugNmeet-server/commit/8aaf82d3fe394e01be1c691cecaf237a09f980c8))
+* **feat:** storage hooks ([f1e5925](https://github.com/mynaparrot/plugNmeet-server/commit/f1e5925d26a069aac58ea527664178388b19e379))
+* **hooks:** use same pattern for communicating with hooks scripts ([336f0d0](https://github.com/mynaparrot/plugNmeet-server/commit/336f0d04b18e804cdf9ad92111e5d6276d353513))
+* implemented long-lived hook ([ed62106](https://github.com/mynaparrot/plugNmeet-server/commit/ed62106c855fa66afeccb31d3478949857fc18d3))
+* set `attachment` manually ([7cdee60](https://github.com/mynaparrot/plugNmeet-server/commit/7cdee604627db9da64f76b9c25444b739b2c0c98))
+* use proto to handle hooks code ([97c3bbd](https://github.com/mynaparrot/plugNmeet-server/commit/97c3bbd49516d9a5490497618bc21d8b13e80cd7))
+
 ## [2.2.0](https://github.com/mynaparrot/plugNmeet-server/compare/v2.1.9...v2.2.0) (2026-05-30)
 
 
