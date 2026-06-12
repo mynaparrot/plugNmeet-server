@@ -232,6 +232,7 @@ type NatsInfoRecorder struct {
 
 // StorageHooks defines optional script pipelines for handling file I/O.
 type StorageHooks struct {
+	HookTimeout time.Duration `yaml:"hook_timeout"`
 	// A list of scripts to execute sequentially for an upload operation.
 	UploadHook []string `yaml:"upload_hook"`
 	// A list of scripts for a download operation.
@@ -408,6 +409,10 @@ func handleArtifactsSettings(appCnf *AppConfig) error {
 func InitializeStorageHooks(ctx context.Context, appCnf *AppConfig) error {
 	if appCnf.StorageHooks == nil {
 		return nil // Feature is not enabled.
+	}
+
+	if appCnf.StorageHooks.HookTimeout == 0 {
+		appCnf.StorageHooks.HookTimeout = 5 * time.Minute
 	}
 
 	resolvePath := func(scriptPath string) string {

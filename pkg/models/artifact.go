@@ -94,7 +94,7 @@ func (m *ArtifactModel) runUploadHook(roomId, roomSid string, roomTableId uint64
 		RoomTableId: roomTableId,
 	}
 
-	resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.UploadHook, &req, log)
+	resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.UploadHook, &req, m.app.StorageHooks.HookTimeout, log)
 	if err != nil {
 		log.WithError(err).Error("upload hook pipeline failed, fallback to local storage")
 		return

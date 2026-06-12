@@ -177,7 +177,7 @@ func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (*hooks.Download
 			ServiceType: "artifact",
 		}
 
-		resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.DownloadHook, &req, m.log)
+		resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.DownloadHook, &req, m.app.StorageHooks.HookTimeout, m.log)
 		if err != nil {
 			log.WithError(err).Error("download hook pipeline failed")
 			return nil, fiber.StatusInternalServerError, errors.New("download hook pipeline failed")
@@ -237,7 +237,7 @@ func (m *ArtifactModel) DeleteArtifact(req *plugnmeet.DeleteArtifactReq) error {
 					InputPath:   metadata.FileInfo.FilePath,
 					ServiceType: "artifact",
 				}
-				resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.DeleteHook, &delReq, m.log)
+				resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.DeleteHook, &delReq, m.app.StorageHooks.HookTimeout, m.log)
 				if err != nil {
 					m.log.WithError(err).Warn("delete hook pipeline failed for artifact")
 				} else {

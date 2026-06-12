@@ -35,7 +35,7 @@ func (m *RecordingModel) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error 
 			InputPath:   recording.FilePath,
 			ServiceType: "recording",
 		}
-		resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.DeleteHook, &delReq, log)
+		resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.DeleteHook, &delReq, m.app.StorageHooks.HookTimeout, log)
 		if err != nil {
 			log.WithError(err).Warn("delete hook pipeline failed for recording")
 		} else {

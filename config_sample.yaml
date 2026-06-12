@@ -364,6 +364,12 @@ insights:
 # in the paths defined under 'recorder_info' and 'artifacts_settings'.
 #
 #storage_hooks:
+##  # Maximum time to wait for a hook script to respond before timing out.
+##  # Since b-server hooks are for quick operations (artifact uploads, downloads),
+##  # a shorter timeout is recommended.
+##  # Default: 5m
+#  hook_timeout: 5m
+#
 #  # A list of scripts to run sequentially for file uploads.
 #  # The output of one script becomes the input for the next.
 #  # The final script in the chain must output a JSON object with a 'logical_path'.
@@ -376,7 +382,7 @@ insights:
 #  download_hook:
 #    - "./scripts/examples_hooks/download.sh"
 #
-#  # A list of scripts for file deletion.
-#  # This is a "fire-and-forget" operation. The script should handle its own errors.
+#  # This is a blocking operation. The server will wait for the script to respond.
+#  # The script can return a "msg" field in its JSON response for logging purposes.
 #  delete_hook:
 #    - "./scripts/examples_hooks/delete.sh"
