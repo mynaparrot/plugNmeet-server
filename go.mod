@@ -15,8 +15,8 @@ require (
 	github.com/gofiber/template/html/v3 v3.0.5
 	github.com/google/uuid v1.6.0
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
-	github.com/livekit/media-sdk v0.0.0-20260424094251-1e21ae1138de
-	github.com/livekit/protocol v1.46.0
+	github.com/livekit/media-sdk v0.0.0-20260612175532-3d4d26d136c9
+	github.com/livekit/protocol v1.46.7-0.20260605212020-c0615a2f6f84
 	github.com/livekit/server-sdk-go/v2 v2.16.6
 	github.com/mynaparrot/plugnmeet-protocol v1.3.1-0.20260612144833-4328e15417a2
 	github.com/nats-io/jwt/v2 v2.8.2
@@ -47,7 +47,7 @@ require (
 	github.com/DeRuina/timberjack v1.4.5 // indirect
 	github.com/andybalholm/brotli v1.2.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
-	github.com/at-wat/ebml-go v0.17.2 // indirect
+	github.com/at-wat/ebml-go v0.18.0 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
@@ -63,6 +63,7 @@ require (
 	github.com/gofiber/schema v1.7.1 // indirect
 	github.com/gofiber/template/v2 v2.1.0 // indirect
 	github.com/gofiber/utils/v2 v2.1.0 // indirect
+	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/google/cel-go v0.28.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
@@ -106,6 +107,7 @@ require (
 	github.com/prometheus/common v0.68.1 // indirect
 	github.com/prometheus/procfs v0.20.1 // indirect
 	github.com/puzpuzpuz/xsync/v3 v3.5.1 // indirect
+	github.com/puzpuzpuz/xsync/v4 v4.5.0 // indirect
 	github.com/tinylib/msgp v1.6.4 // indirect
 	github.com/twitchtv/twirp v8.1.3+incompatible // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
