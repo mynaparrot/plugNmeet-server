@@ -87,11 +87,11 @@ func (m *ArtifactModel) runUploadHook(roomId, roomSid string, roomTableId uint64
 	}
 
 	req := hooks.UploadHookData{
-		InputPath:   absolutePath,
-		ServiceType: "artifact",
-		RoomId:      roomId,
-		RoomSid:     roomSid,
-		RoomTableId: roomTableId,
+		InputPath:    absolutePath,
+		HookFileType: hooks.HookFileTypeArtifact,
+		RoomId:       roomId,
+		RoomSid:      roomSid,
+		RoomTableId:  roomTableId,
 	}
 
 	resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.UploadHook, &req, m.app.StorageHooks.HookTimeout, log)

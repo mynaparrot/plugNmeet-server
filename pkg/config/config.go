@@ -239,6 +239,10 @@ type StorageHooks struct {
 	DownloadHook []string `yaml:"download_hook"`
 	// A list of scripts for a delete operation.
 	DeleteHook []string `yaml:"delete_hook"`
+	// A list of scripts for resumable upload operation.
+	ResumableUploadHook []string `yaml:"resumable_upload_hook"`
+	// A list of scripts for room end operation.
+	RoomEndHook []string `yaml:"room_end_hook"`
 }
 
 func InitAppConfig(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
@@ -446,6 +450,24 @@ func InitializeStorageHooks(ctx context.Context, appCnf *AppConfig) error {
 		resolved := resolvePath(script)
 		appCnf.StorageHooks.DeleteHook[i] = resolved
 		if err := hooks.ValidateHookScript(resolved, "delete_hook"); err != nil {
+			return err
+		}
+		allScripts = append(allScripts, resolved)
+	}
+
+	for i, script := range appCnf.StorageHooks.ResumableUploadHook {
+		resolved := resolvePath(script)
+		appCnf.StorageHooks.ResumableUploadHook[i] = resolved
+		if err := hooks.ValidateHookScript(resolved, "resumable_upload_hook"); err != nil {
+			return err
+		}
+		allScripts = append(allScripts, resolved)
+	}
+
+	for i, script := range appCnf.StorageHooks.RoomEndHook {
+		resolved := resolvePath(script)
+		appCnf.StorageHooks.RoomEndHook[i] = resolved
+		if err := hooks.ValidateHookScript(resolved, "room_end_hook"); err != nil {
 			return err
 		}
 		allScripts = append(allScripts, resolved)

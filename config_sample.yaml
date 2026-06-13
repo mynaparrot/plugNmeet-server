@@ -364,10 +364,10 @@ insights:
 # in the paths defined under 'recorder_info' and 'artifacts_settings'.
 #
 #storage_hooks:
-##  # Maximum time to wait for a hook script to respond before timing out.
-##  # Since b-server hooks are for quick operations (artifact uploads, downloads),
-##  # a shorter timeout is recommended.
-##  # Default: 5m
+#  # Maximum time to wait for a hook script to respond before timing out.
+#  # Since b-server hooks are for quick operations (artifact uploads, downloads),
+#  # a shorter timeout is recommended.
+#  # Default: 5m
 #  hook_timeout: 5m
 #
 #  # A list of scripts to run sequentially for file uploads.
@@ -386,3 +386,13 @@ insights:
 #  # The script can return a "msg" field in its JSON response for logging purposes.
 #  delete_hook:
 #    - "./scripts/examples_hooks/delete.sh"
+#
+#  # A list of scripts for resumable upload operations.
+#  # This allows offloading chunk management and merging to an external service like S3.
+#  resumable_upload_hook:
+#    - "./scripts/examples_hooks/resumable_upload.sh"
+#
+#  # A list of scripts to run after a room has ended.
+#  # Useful for cleaning up temporary resources created by other hooks.
+#  room_end_hook:
+#    - "./scripts/examples_hooks/room_end.sh"

@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
@@ -60,59 +62,109 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx, req *ResumableUploadReq) (*
 
 	switch c.Method() {
 	case fiber.MethodGet:
-		stat, err := os.Stat(chunkPath)
-		if os.IsNotExist(err) {
-			return res, fiber.NewError(fiber.StatusNoContent, "OK to upload")
+		{
+			// If hook is enabled, we'll check with the script first.
+			if m.app.StorageHooks != nil && len(m.app.StorageHooks.ResumableUploadHook) > 0 && m.app.HookManager != nil {
+				hookData := &hooks.ResumableUploadHookData{
+					Type:                 hooks.ResumableUploadHookTypeCheck,
+					RoomSid:              req.RoomSid,
+					RoomId:               req.RoomId,
+					UserId:               req.UserId,
+					ResumableIdentifier:  safeIdentifier,
+					ResumableFilename:    req.ResumableFilename,
+					ResumableChunkNumber: req.ResumableChunkNumber,
+				}
+				result, err := m.runResumableUploadHook(hookData, log)
+				if err != nil {
+					log.WithError(err).Error("resumable upload hook 'part-check' failed")
+					return nil, fiber.NewError(fiber.StatusNoContent, "OK to upload")
+				}
+
+				if result.OutputResponseType == hooks.ResumableUploadOutputTypePartExists {
+					res.Msg = "skipping upload as previously uploaded chunk"
+					return res, fiber.NewError(fiber.StatusCreated, "skipping upload as previously uploaded chunk")
+				}
+				return nil, fiber.NewError(fiber.StatusNoContent, "OK to upload")
+			}
+			// Original logic if no hook is configured.
+			stat, err := os.Stat(chunkPath)
+			if os.IsNotExist(err) {
+				return res, fiber.NewError(fiber.StatusNoContent, "OK to upload")
+			}
+			if stat.Size() == req.ResumableCurrentChunkSize {
+				res.Msg = "skipping upload as previously uploaded chunk"
+				return res, fiber.NewError(fiber.StatusCreated, "skipping upload as previously uploaded chunk")
+			}
+			// Chunk is corrupted or size mismatch, remove it.
+			_ = os.Remove(chunkPath)
+			return nil, fiber.NewError(fiber.StatusNoContent, "OK to upload")
 		}
-		if stat.Size() == req.ResumableCurrentChunkSize {
-			res.Msg = "skipping upload as previously uploaded chunk"
-			return res, fiber.NewError(fiber.StatusCreated, "skipping upload as previously uploaded chunk")
-		}
-		// Chunk is corrupted or size mismatch, remove it.
-		_ = os.Remove(chunkPath)
-		return nil, fiber.NewError(fiber.StatusNoContent, "OK to upload")
 
 	case fiber.MethodPost:
-		reqFile, err := c.FormFile("file")
-		if err != nil {
-			log.WithError(err).Errorln("failed to get 'file' from form-data")
-			return nil, fiber.NewError(fiber.StatusBadRequest, "missing 'file' in form-data")
-		}
-
-		if req.ResumableChunkNumber == 1 {
-			if req.ResumableTotalSize > int64(m.app.UploadFileSettings.MaxSize*1024*1024) {
-				return nil, fiber.NewError(fiber.StatusBadRequest, fmt.Sprintf("file too large: max allowed is %dMB", m.app.UploadFileSettings.MaxSize))
-			}
-
-			if err := os.MkdirAll(chunkDir, 0755); err != nil {
-				log.WithError(err).Errorln("failed to create chunk directory")
-				return nil, fiber.NewError(fiber.StatusInternalServerError, "failed to create chunk directory")
-			}
-
-			file, err := reqFile.Open()
+		{
+			reqFile, err := c.FormFile("file")
 			if err != nil {
-				log.WithError(err).Errorln("failed to open multipart file header")
-				return nil, fiber.NewError(fiber.StatusInternalServerError, "failed to open uploaded file")
+				log.WithError(err).Errorln("failed to get 'file' from form-data")
+				return nil, fiber.NewError(fiber.StatusBadRequest, "missing 'file' in form-data")
 			}
-			// etectMimeTypeForValidation will run f.Close() in defer
-			if err := m.detectMimeTypeForValidation(file); err != nil {
-				return nil, fiber.NewError(fiber.StatusUnsupportedMediaType, err.Error())
-			}
-		} else {
-			// For chunks other than the first, verify that the chunk directory already exists.
-			// This ensures that the first chunk has been uploaded and processed.
-			if _, err := os.Stat(chunkDir); os.IsNotExist(err) {
-				return nil, fiber.NewError(fiber.StatusBadRequest, "invalid upload sequence: chunk 1 must be uploaded first")
-			}
-		}
 
-		if err := c.SaveFile(reqFile, chunkPath); err != nil {
-			log.WithError(err).Errorln("failed to write chunk data")
-			return nil, fiber.NewError(fiber.StatusServiceUnavailable, "failed to write chunk data")
-		}
+			if req.ResumableChunkNumber == 1 {
+				if req.ResumableTotalSize > int64(m.app.UploadFileSettings.MaxSize*1024*1024) {
+					return nil, fiber.NewError(fiber.StatusBadRequest, fmt.Sprintf("file too large: max allowed is %dMB", m.app.UploadFileSettings.MaxSize))
+				}
 
-		res.FilePath = "part_uploaded"
-		return res, nil
+				if err := os.MkdirAll(chunkDir, 0755); err != nil {
+					log.WithError(err).Errorln("failed to create chunk directory")
+					return nil, fiber.NewError(fiber.StatusInternalServerError, "failed to create chunk directory")
+				}
+
+				file, err := reqFile.Open()
+				if err != nil {
+					log.WithError(err).Errorln("failed to open multipart file header")
+					return nil, fiber.NewError(fiber.StatusInternalServerError, "failed to open uploaded file")
+				}
+				// detectMimeTypeForValidation will run f.Close() in defer
+				if err := m.detectMimeTypeForValidation(file); err != nil {
+					return nil, fiber.NewError(fiber.StatusUnsupportedMediaType, err.Error())
+				}
+			}
+			/*else {
+				// For chunks other than the first, verify that the chunk directory already exists.
+				// This ensures that the first chunk has been uploaded and processed.
+				if _, err := os.Stat(chunkDir); os.IsNotExist(err) {
+					return nil, fiber.NewError(fiber.StatusBadRequest, "invalid upload sequence: chunk 1 must be uploaded first")
+				}
+			}*/
+
+			// Always save the file to the local chunk path first.
+			if err := c.SaveFile(reqFile, chunkPath); err != nil {
+				log.WithError(err).Errorln("failed to write chunk data")
+				return nil, fiber.NewError(fiber.StatusServiceUnavailable, "failed to write chunk data")
+			}
+
+			// If hook is enabled, pass the saved chunk to the script.
+			if m.app.StorageHooks != nil && len(m.app.StorageHooks.ResumableUploadHook) > 0 && m.app.HookManager != nil {
+				inputPath, _ := filepath.Abs(chunkPath)
+				// The script is responsible for the chunk including remove the local copy.
+				hookData := &hooks.ResumableUploadHookData{
+					Type:                 hooks.ResumableUploadHookTypeUpload,
+					RoomSid:              req.RoomSid,
+					RoomId:               req.RoomId,
+					UserId:               req.UserId,
+					ResumableIdentifier:  safeIdentifier,
+					ResumableFilename:    req.ResumableFilename,
+					ResumableChunkNumber: req.ResumableChunkNumber,
+					InputPath:            inputPath,
+				}
+				if _, err = m.runResumableUploadHook(hookData, log); err != nil {
+					log.WithError(err).Error("resumable upload hook 'part-upload' failed")
+					return nil, fiber.NewError(fiber.StatusServiceUnavailable, "hook failed to upload part")
+				}
+			}
+
+			res.FilePath = "part_uploaded"
+			return res, nil
+		}
 	}
 	return res, nil
 }
@@ -124,41 +176,80 @@ func (m *FileModel) UploadedFileMerge(req *plugnmeet.UploadedFileMergeReq) (*plu
 	if req.ResumableIdentifier == "" {
 		return nil, fmt.Errorf("invalid empty resumableIdentifier")
 	}
-	tempFolder := filepath.Join(m.app.UploadFileSettings.Path, req.RoomSid, config.UploadFileTempDir)
-	chunkDir := filepath.Join(tempFolder, req.ResumableIdentifier)
+	log := m.logger.WithFields(logrus.Fields{
+		"roomId":              req.RoomId,
+		"roomSid":             req.RoomSid,
+		"resumableIdentifier": req.ResumableIdentifier,
+		"resumableFilename":   req.ResumableFilename,
+		"method":              "uploadedFileMergeHook",
+	})
 
-	if _, err := os.Stat(chunkDir); os.IsNotExist(err) {
-		return nil, fmt.Errorf("requested file's chunks not found for identifier %s, make sure those were uploaded", req.ResumableIdentifier)
+	var finalPath, fileMimeType, fileExtension string
+	var err error
+
+	// If hook is enabled, the script will perform the merge.
+	if m.app.StorageHooks != nil && len(m.app.StorageHooks.ResumableUploadHook) > 0 && m.app.HookManager != nil {
+		hookData := &hooks.ResumableUploadHookData{
+			Type:                 hooks.ResumableUploadHookTypeMerge,
+			RoomSid:              req.RoomSid,
+			RoomId:               req.RoomId,
+			FileType:             req.FileType.String(),
+			ResumableIdentifier:  req.ResumableIdentifier,
+			ResumableFilename:    safeFilename,
+			ResumableTotalChunks: req.ResumableTotalChunks,
+		}
+
+		result, err := m.runResumableUploadHook(hookData, log)
+		if err != nil {
+			return nil, fmt.Errorf("hook failed to merge file: %w", err)
+		}
+		if result.OutputResponseType != hooks.ResumableUploadOutputTypeMergeSuccess || result.OutputPath == "" {
+			return nil, errors.New("resumable upload hook 'merge' did not return success status or output_path")
+		}
+		finalPath = result.OutputPath
+		fileMimeType = result.FileMimeType
+		fileExtension = result.FileExtension
+	} else {
+		// Original logic if no hook is configured.
+		tempFolder := filepath.Join(m.app.UploadFileSettings.Path, req.RoomSid, config.UploadFileTempDir)
+		chunkDir := filepath.Join(tempFolder, req.ResumableIdentifier)
+
+		if _, err := os.Stat(chunkDir); os.IsNotExist(err) {
+			return nil, fmt.Errorf("requested file's chunks not found for identifier %s, make sure those were uploaded", req.ResumableIdentifier)
+		}
+
+		// combining chunks into one file
+		combinedFile, err := m.combineResumableFiles(req, chunkDir, safeFilename)
+		if err != nil {
+			return nil, err
+		}
+
+		// check the file size again
+		stat, err := os.Stat(combinedFile)
+		if err != nil {
+			return nil, err
+		}
+		if stat.Size() > int64(m.app.UploadFileSettings.MaxSize*1024*1024) {
+			_ = os.Remove(combinedFile)
+			return nil, fmt.Errorf("file too large: max allowed is %dMB", m.app.UploadFileSettings.MaxSize)
+		}
+
+		// we'll detect mime type again for sending data
+		mType, err := mimetype.DetectFile(combinedFile)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := m.ValidateMimeType(mType); err != nil {
+			_ = os.Remove(combinedFile)
+			return nil, err
+		}
+		finalPath = filepath.Join(req.RoomSid, safeFilename)
+		fileMimeType = mType.String()
+		fileExtension = strings.Replace(mType.Extension(), ".", "", 1)
 	}
 
-	// combining chunks into one file
-	combinedFile, err := m.combineResumableFiles(req, chunkDir, safeFilename)
-	if err != nil {
-		return nil, err
-	}
-
-	// check the file size again
-	stat, err := os.Stat(combinedFile)
-	if err != nil {
-		return nil, err
-	}
-	if stat.Size() > int64(m.app.UploadFileSettings.MaxSize*1024*1024) {
-		_ = os.Remove(combinedFile)
-		return nil, fmt.Errorf("file too large: max allowed is %dMB", m.app.UploadFileSettings.MaxSize)
-	}
-
-	// we'll detect mime type again for sending data
-	mType, err := mimetype.DetectFile(combinedFile)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := m.ValidateMimeType(mType); err != nil {
-		_ = os.Remove(combinedFile)
-		return nil, err
-	}
-
-	finalPath := filepath.Join(req.RoomSid, safeFilename)
+	// Common logic for creating metadata and response
 	fileId := uuid.NewString()
 	if req.FileType != plugnmeet.RoomUploadedFileType_WHITEBOARD_CONVERTED_FILE {
 		// we can save other files because this type file will process again
@@ -168,7 +259,7 @@ func (m *FileModel) UploadedFileMerge(req *plugnmeet.UploadedFileMergeReq) (*plu
 			FileName: safeFilename,
 			FilePath: finalPath,
 			FileType: req.FileType,
-			MimeType: mType.String(),
+			MimeType: fileMimeType,
 		}
 		err = m.natsService.AddRoomFile(req.RoomId, meta)
 		if err != nil {
@@ -185,10 +276,10 @@ func (m *FileModel) UploadedFileMerge(req *plugnmeet.UploadedFileMergeReq) (*plu
 		Msg:           "file uploaded successfully",
 		FileId:        fileId,
 		FileType:      req.FileType,
-		FileMimeType:  mType.String(),
+		FileMimeType:  fileMimeType,
 		FilePath:      finalPath,
 		FileName:      safeFilename,
-		FileExtension: strings.Replace(mType.Extension(), ".", "", 1),
+		FileExtension: fileExtension,
 	}
 
 	return res, nil
@@ -351,4 +442,23 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 	log.Infof("File %s successfully uploaded and broadcasted", fileName)
 
 	return plugnmeet.StatusCode_SUCCESS, nil
+}
+
+// runResumableUploadHook is a helper that executes the resumable upload hook pipeline.
+func (m *FileModel) runResumableUploadHook(req *hooks.ResumableUploadHookData, log *logrus.Entry) (*hooks.ResumableUploadHookData, error) {
+	resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.ResumableUploadHook, req, m.app.StorageHooks.HookTimeout, log)
+	if err != nil {
+		return nil, err
+	}
+
+	var res hooks.ResumableUploadHookData
+	if err := json.Unmarshal(resBytes, &res); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal resumable upload hook response: %w", err)
+	}
+
+	if res.Error != "" {
+		return nil, fmt.Errorf("resumable upload hook script returned an error: %s", res.Error)
+	}
+
+	return &res, nil
 }

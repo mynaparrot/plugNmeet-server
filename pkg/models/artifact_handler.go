@@ -173,8 +173,8 @@ func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (*hooks.Download
 	if m.app.StorageHooks != nil && (len(m.app.StorageHooks.DownloadHook) > 0) && m.app.HookManager != nil {
 		// Hooks are defined, so use the pipeline.
 		req := hooks.DownloadHookData{
-			InputPath:   inputPath,
-			ServiceType: "artifact",
+			InputPath:    inputPath,
+			HookFileType: hooks.HookFileTypeArtifact,
 		}
 
 		resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.DownloadHook, &req, m.app.StorageHooks.HookTimeout, m.log)
@@ -234,8 +234,8 @@ func (m *ArtifactModel) DeleteArtifact(req *plugnmeet.DeleteArtifactReq) error {
 			// If delete hook is configured, we'll use it.
 			if m.app.StorageHooks != nil && len(m.app.StorageHooks.DeleteHook) > 0 && m.app.HookManager != nil {
 				delReq := hooks.DeleteHookData{
-					InputPath:   metadata.FileInfo.FilePath,
-					ServiceType: "artifact",
+					InputPath:    metadata.FileInfo.FilePath,
+					HookFileType: hooks.HookFileTypeArtifact,
 				}
 				resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.DeleteHook, &delReq, m.app.StorageHooks.HookTimeout, m.log)
 				if err != nil {

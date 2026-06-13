@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/url"
 	"path"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -131,6 +133,33 @@ func (fc *FileController) HandleDownloadUploadedFile(c fiber.Ctx) error {
 	otherParts, err := url.QueryUnescape(otherParts)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).SendString("invalid file path")
+	}
+
+	if fc.AppConfig.StorageHooks != nil && len(fc.AppConfig.StorageHooks.DownloadHook) > 0 && fc.AppConfig.HookManager != nil {
+		req := hooks.DownloadHookData{
+			InputPath:    otherParts,
+			HookFileType: hooks.HookFileTypeRoomFile,
+		}
+
+		resBytes, err := hooks.ExecuteHookPipeline(fc.AppConfig.HookManager, fc.AppConfig.StorageHooks.DownloadHook, &req, fc.AppConfig.StorageHooks.HookTimeout, fc.logger)
+		if err != nil {
+			fc.logger.WithError(err).Error("download hook pipeline failed")
+			return c.Status(fiber.StatusInternalServerError).SendString("download hook pipeline failed")
+		}
+
+		// script will return same struct
+		var res hooks.DownloadHookData
+		if err := json.Unmarshal(resBytes, &res); err != nil {
+			fc.logger.WithError(err).Error("failed to unmarshal download hook response")
+			return c.Status(fiber.StatusInternalServerError).SendString("failed to unmarshal download hook response")
+		}
+		if res.Error != "" {
+			fc.logger.Error("download hook script returned an error: %s", res.Error)
+			return c.Status(fiber.StatusInternalServerError).SendString("download hook script returned an error")
+		}
+		if res.RedirectUrl != "" {
+			return c.Redirect().Status(fiber.StatusTemporaryRedirect).To(res.RedirectUrl)
+		}
 	}
 
 	// prevent to download from temp dir by checking path segments

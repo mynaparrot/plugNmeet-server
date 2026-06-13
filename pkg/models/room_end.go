@@ -2,8 +2,11 @@ package models
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"time"
 
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
@@ -169,6 +172,14 @@ func (m *RoomModel) onAfterRoomEnded(p *onAfterRoomEndedParams) {
 		RoomTableId: int64(p.dbTableId),
 	})
 
+	// Trigger room end hook for any external cleanup
+	if m.app.StorageHooks != nil && len(m.app.StorageHooks.RoomEndHook) > 0 && m.app.HookManager != nil {
+		log.Info("running room end hook")
+		if err := m.runRoomEndHook(p.roomId, p.roomSid, log); err != nil {
+			log.WithError(err).Error("room end hook execution failed")
+		}
+	}
+
 	// If not configured to keep files, delete all uploaded files for this session.
 	if !m.app.UploadFileSettings.KeepForever {
 		if err := m.fileModel.DeleteRoomUploadedDir(p.roomSid); err != nil {
@@ -265,4 +276,27 @@ func (m *RoomModel) sendSessionEndedWebhook(roomId, roomSid, metadata string, cr
 			m.logger.WithError(err).Errorln("error sending session ended webhook")
 		}
 	}
+}
+
+func (m *RoomModel) runRoomEndHook(roomId, roomSid string, log *logrus.Entry) error {
+	req := &hooks.RoomEndHookData{
+		RoomId:  roomId,
+		RoomSid: roomSid,
+	}
+
+	resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.RoomEndHook, req, m.app.StorageHooks.HookTimeout, log)
+	if err != nil {
+		return err
+	}
+
+	var res hooks.RoomEndHookData
+	if err := json.Unmarshal(resBytes, &res); err != nil {
+		return fmt.Errorf("failed to unmarshal room end hook response: %w", err)
+	}
+
+	if res.Error != "" {
+		return fmt.Errorf("room end hook script returned an error: %s", res.Error)
+	}
+
+	return nil
 }
