@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/google/uuid"
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
@@ -92,32 +94,65 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 		return nil, err
 	}
 
-	fullPath := filepath.Join(m.app.UploadFileSettings.Path, filePath)
-	info, err := os.Stat(fullPath)
-	if err != nil {
-		err = fmt.Errorf("failed to stat file: %w", err)
-		log.WithError(err).Error()
-		return nil, err
+	var fullPath string
+
+	// If hooks are enabled, we need to download the file first.
+	if m.app.StorageHooks != nil && len(m.app.StorageHooks.DownloadHook) > 0 && m.app.HookManager != nil {
+		req := hooks.DownloadHookData{
+			InputPath:    filePath,
+			HookFileType: hooks.HookFileTypeRoomFile,
+		}
+		resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.DownloadHook, &req, m.app.StorageHooks.HookTimeout, log)
+		if err != nil {
+			return nil, fmt.Errorf("download hook pipeline failed")
+		}
+
+		var res hooks.DownloadHookData
+		if err := json.Unmarshal(resBytes, &res); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal download hook response")
+		}
+		if res.Error != "" {
+			log.Errorf("download hook script returned an error: %s", res.Error)
+			return nil, fmt.Errorf("download hook script returned an error")
+		}
+
+		if res.RedirectUrl != "" {
+			outputDir := filepath.Join(m.app.UploadFileSettings.Path, roomSid)
+			if err := os.MkdirAll(outputDir, 0755); err != nil {
+				log.WithError(err).Error("failed to create output dir")
+				return nil, fmt.Errorf("failed to create output dir")
+			}
+			fullPath, err = m.downloadFileToDest(m.ctx, res.RedirectUrl, outputDir, log)
+			if err != nil {
+				log.WithError(err).Error("failed to download file")
+				return nil, fmt.Errorf("failed to download file")
+			}
+		} else if res.OutputPath != "" {
+			fullPath = res.OutputPath
+		} else {
+			return nil, fmt.Errorf("invalid download hook response")
+		}
+	} else {
+		fullPath = filepath.Join(m.app.UploadFileSettings.Path, filePath)
 	}
 
+	fileName := filepath.Base(fullPath)
 	mType, err := mimetype.DetectFile(fullPath)
 	if err != nil {
-		err = fmt.Errorf("mime detection failed: %w", err)
-		log.WithError(err).Error()
-		return nil, err
+		log.WithError(err).Error("mime detection failed")
+		return nil, fmt.Errorf("mime detection failed")
 	}
 
 	if err := m.ValidateMimeType(mType); err != nil {
 		log.WithError(err).Error("mime type validation failed")
-		return nil, err
+		return nil, fmt.Errorf("mime type validation failed")
 	}
 
 	fileId := uuid.NewString()
 	outputDir := filepath.Join(m.app.UploadFileSettings.Path, roomSid, fileId)
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		err = fmt.Errorf("failed to create output dir: %w", err)
-		log.WithError(err).Error()
-		return nil, err
+		log.WithError(err).Error("failed to create output dir")
+		return nil, fmt.Errorf("failed to create output dir")
 	}
 
 	defer func() {
@@ -126,27 +161,43 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 		}
 	}()
 
-	convertedFile, err := m.convertToPDFIfNeeded(fullPath, info.Name(), roomId, mType, outputDir)
+	convertedFile, err := m.convertToPDFIfNeeded(fullPath, fileName, roomId, mType, outputDir)
 	if err != nil {
 		log.WithError(err).Error("failed to convert file to PDF")
-		return nil, err
+		return nil, fmt.Errorf("failed to convert file to PDF")
 	}
 
 	if err := convertPDFToImages(m.ctx, convertedFile, outputDir, roomId, m.logger); err != nil {
 		log.WithError(err).Error("failed to convert PDF to images")
-		return nil, err
+		return nil, fmt.Errorf("failed to convert PDF to images")
 	}
 
 	totalPages, err := countPages(outputDir)
 	if err != nil {
 		log.WithError(err).Error("failed to count pages")
-		return nil, err
+		return nil, fmt.Errorf("failed to count pages")
+	}
+
+	// If hooks are enabled, upload the entire directory of converted images.
+	if m.app.StorageHooks != nil && len(m.app.StorageHooks.UploadHook) > 0 && m.app.HookManager != nil {
+		req := hooks.UploadHookData{
+			InputDirectoryPath: outputDir,
+			HookFileType:       hooks.HookFileTypeWhiteboardConvertedImgs,
+			RoomId:             roomId,
+			RoomSid:            roomSid,
+		}
+		// After successful upload, it's script's responsibility to remove the local directory.
+		_, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.UploadHook, &req, m.app.StorageHooks.HookTimeout, log)
+		if err != nil {
+			log.WithError(err).Error("upload hook pipeline for converted images failed")
+			return nil, fmt.Errorf("upload hook pipeline for converted images failed")
+		}
 	}
 
 	res = &ConvertWhiteboardFileRes{
 		Status:     true,
 		Msg:        "success",
-		FileName:   info.Name(),
+		FileName:   fileName,
 		FilePath:   filepath.Join(roomSid, fileId),
 		FileId:     fileId,
 		TotalPages: totalPages,

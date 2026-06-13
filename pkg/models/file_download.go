@@ -60,30 +60,13 @@ func (m *FileModel) downloadFile(ctx context.Context, fileUrl, roomSid string, m
 		return "", fmt.Errorf("failed to create download directory: %w", err)
 	}
 
-	// Create a new grab client
-	client := grab.NewClient()
-	req, err := grab.NewRequest(downloadDir, fileUrl)
+	fileFullPath, err := m.downloadFileToDest(ctx, fileUrl, downloadDir, log)
 	if err != nil {
-		log.WithError(err).Errorln("failed to create download request")
-		return "", fmt.Errorf("failed to create download request: %w", err)
-	}
-
-	// Create a context with a 3-minute timeout for the download.
-	gctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
-	defer cancel()
-
-	// Run the download
-	resp := client.Do(req.WithContext(gctx))
-	<-resp.Done // Wait for the download to complete or be canceled.
-
-	// Check for download errors (e.g., timeout, connection issues)
-	if err := resp.Err(); err != nil {
-		log.WithError(err).Errorln("failed to download file")
-		return "", fmt.Errorf("failed to download file: %w", err)
+		return "", err
 	}
 
 	// Verify actual file size as the server might not have sent Content-Length header
-	stat, err := os.Stat(resp.Filename)
+	stat, err := os.Stat(fileFullPath)
 	if err != nil {
 		log.WithError(err).Errorln("failed to stat downloaded file")
 		return "", fmt.Errorf("failed to stat downloaded file: %w", err)
@@ -97,7 +80,7 @@ func (m *FileModel) downloadFile(ctx context.Context, fileUrl, roomSid string, m
 	}
 
 	// Validate downloaded file type
-	mType, err := mimetype.DetectFile(resp.Filename)
+	mType, err := mimetype.DetectFile(fileFullPath)
 	if err != nil {
 		log.WithError(err).Errorln("failed to detect file type")
 		return "", fmt.Errorf("failed to detect file type: %w", err)
@@ -107,12 +90,12 @@ func (m *FileModel) downloadFile(ctx context.Context, fileUrl, roomSid string, m
 		return "", err
 	}
 
-	safeFileName := helpers.MakeSafeFilename(filepath.Base(resp.Filename), true)
-	newPath := filepath.Join(filepath.Dir(resp.Filename), safeFileName)
+	safeFileName := helpers.MakeSafeFilename(filepath.Base(fileFullPath), true)
+	newPath := filepath.Join(filepath.Dir(fileFullPath), safeFileName)
 
-	if err := os.Rename(resp.Filename, newPath); err != nil {
+	if err := os.Rename(fileFullPath, newPath); err != nil {
 		log.WithError(err).Errorln("failed to rename downloaded file")
-		_ = os.Remove(resp.Filename)
+		_ = os.Remove(fileFullPath)
 		return "", fmt.Errorf("failed to rename downloaded file: %w", err)
 	}
 
@@ -144,4 +127,28 @@ func (m *FileModel) validateRemoteFile(fileUrl string, maxSize uint64) error {
 	}
 
 	return nil
+}
+
+func (m *FileModel) downloadFileToDest(ctx context.Context, fileUrl, dstDir string, log *logrus.Entry) (fileFullPath string, err error) {
+	log = log.WithField("sub-method", "downloadFileToDest")
+
+	client := grab.NewClient()
+	req, err := grab.NewRequest(dstDir, fileUrl)
+	if err != nil {
+		log.WithError(err).Error("failed to create download request")
+		return "", fmt.Errorf("failed to create download request: %w", err)
+	}
+
+	gctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer cancel()
+
+	resp := client.Do(req.WithContext(gctx))
+	<-resp.Done
+
+	if err := resp.Err(); err != nil {
+		log.WithError(err).Error("failed to download file")
+		return "", fmt.Errorf("failed to download file: %w", err)
+	}
+
+	return resp.Filename, nil
 }

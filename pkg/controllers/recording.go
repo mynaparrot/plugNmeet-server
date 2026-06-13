@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -161,12 +162,12 @@ func (rc *RecordingController) HandleDownloadRecording(c fiber.Ctx) error {
 	}
 
 	switch res.Action {
-	case "redirect":
+	case hooks.DownloadHookDataActionRedirect:
 		if res.RedirectUrl == "" {
 			return c.Status(fiber.StatusInternalServerError).SendString("hook script did not provide a redirect_url")
 		}
 		return c.Redirect().Status(fiber.StatusTemporaryRedirect).To(res.RedirectUrl)
-	case "serve_local":
+	case hooks.DownloadHookDataActionServeLocal:
 		if res.OutputPath == "" {
 			return c.Status(fiber.StatusInternalServerError).SendString("hook script did not provide a local_path")
 		}

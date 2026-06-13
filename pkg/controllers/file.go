@@ -6,7 +6,6 @@ import (
 	"errors"
 	"net/url"
 	"path"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -128,16 +127,29 @@ func (fc *FileController) HandleUploadWhiteboardFile(c fiber.Ctx) error {
 
 // HandleDownloadUploadedFile handles downloading an uploaded file.
 func (fc *FileController) HandleDownloadUploadedFile(c fiber.Ctx) error {
-	sid := c.Params("sid")
-	otherParts := c.Params("*")
-	otherParts, err := url.QueryUnescape(otherParts)
+	unescapedPath, err := url.QueryUnescape(c.Params("*"))
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).SendString("invalid file path")
 	}
 
+	relativePath := path.Clean(unescapedPath)
+	pathSegments := strings.Split(relativePath, "/")
+
+	// must have at least 2 segments e.g. roomSid/other parts
+	if len(pathSegments) < 2 {
+		return c.Status(fiber.StatusBadRequest).SendString("invalid url")
+	}
+
+	for _, segment := range pathSegments {
+		// prevent to download from temp dir by checking path segments
+		if segment == config.UploadFileTempDir {
+			return c.Status(fiber.StatusForbidden).SendString("access to temporary directory is forbidden")
+		}
+	}
+
 	if fc.AppConfig.StorageHooks != nil && len(fc.AppConfig.StorageHooks.DownloadHook) > 0 && fc.AppConfig.HookManager != nil {
 		req := hooks.DownloadHookData{
-			InputPath:    otherParts,
+			InputPath:    relativePath,
 			HookFileType: hooks.HookFileTypeRoomFile,
 		}
 
@@ -162,19 +174,7 @@ func (fc *FileController) HandleDownloadUploadedFile(c fiber.Ctx) error {
 		}
 	}
 
-	// prevent to download from temp dir by checking path segments
-	cleanedPath := path.Clean(otherParts)
-	pathSegments := strings.Split(cleanedPath, "/")
-	for _, segment := range pathSegments {
-		if segment == config.UploadFileTempDir {
-			return c.Status(fiber.StatusForbidden).SendString("access to temporary directory is forbidden")
-		}
-	}
-
-	basePath := fc.AppConfig.UploadFileSettings.Path
-	relativePath := filepath.Join(sid, otherParts)
-
-	absFile, mType, err := helpers.ValidateAndGetAbsFilePath(basePath, relativePath)
+	absFile, mType, err := helpers.ValidateAndGetAbsFilePath(fc.AppConfig.UploadFileSettings.Path, relativePath)
 	if err != nil {
 		fc.logger.WithError(err).Warn("file path validation failed")
 		if errors.Is(err, config.ErrFileNotFound) {

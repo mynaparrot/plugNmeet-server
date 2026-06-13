@@ -207,7 +207,7 @@ func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (*hooks.Download
 		return nil, fiber.StatusBadRequest, err
 	}
 	return &hooks.DownloadHookData{
-		Action:     "serve_local",
+		Action:     hooks.DownloadHookDataActionServeLocal,
 		OutputPath: absolutePath,
 		MimeType:   mType.String(),
 	}, fiber.StatusOK, nil

@@ -108,14 +108,15 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx, req *ResumableUploadReq) (*
 				return nil, fiber.NewError(fiber.StatusBadRequest, "missing 'file' in form-data")
 			}
 
+			// for hook system we'll need to ensure dir exists
+			if err := os.MkdirAll(chunkDir, 0755); err != nil {
+				log.WithError(err).Errorln("failed to create chunk directory")
+				return nil, fiber.NewError(fiber.StatusInternalServerError, "failed to create chunk directory")
+			}
+
 			if req.ResumableChunkNumber == 1 {
 				if req.ResumableTotalSize > int64(m.app.UploadFileSettings.MaxSize*1024*1024) {
 					return nil, fiber.NewError(fiber.StatusBadRequest, fmt.Sprintf("file too large: max allowed is %dMB", m.app.UploadFileSettings.MaxSize))
-				}
-
-				if err := os.MkdirAll(chunkDir, 0755); err != nil {
-					log.WithError(err).Errorln("failed to create chunk directory")
-					return nil, fiber.NewError(fiber.StatusInternalServerError, "failed to create chunk directory")
 				}
 
 				file, err := reqFile.Open()
@@ -128,13 +129,6 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx, req *ResumableUploadReq) (*
 					return nil, fiber.NewError(fiber.StatusUnsupportedMediaType, err.Error())
 				}
 			}
-			/*else {
-				// For chunks other than the first, verify that the chunk directory already exists.
-				// This ensures that the first chunk has been uploaded and processed.
-				if _, err := os.Stat(chunkDir); os.IsNotExist(err) {
-					return nil, fiber.NewError(fiber.StatusBadRequest, "invalid upload sequence: chunk 1 must be uploaded first")
-				}
-			}*/
 
 			// Always save the file to the local chunk path first.
 			if err := c.SaveFile(reqFile, chunkPath); err != nil {
@@ -201,16 +195,17 @@ func (m *FileModel) UploadedFileMerge(req *plugnmeet.UploadedFileMergeReq) (*plu
 
 		result, err := m.runResumableUploadHook(hookData, log)
 		if err != nil {
-			return nil, fmt.Errorf("hook failed to merge file: %w", err)
+			log.WithError(err).Error("resumable upload hook 'merge' failed")
+			return nil, fmt.Errorf("resumable upload hook 'merge' failed")
 		}
 		if result.OutputResponseType != hooks.ResumableUploadOutputTypeMergeSuccess || result.OutputPath == "" {
-			return nil, errors.New("resumable upload hook 'merge' did not return success status or output_path")
+			return nil, fmt.Errorf("resumable upload hook 'merge' did not return success status or output_path")
 		}
 		finalPath = result.OutputPath
 		fileMimeType = result.FileMimeType
 		fileExtension = result.FileExtension
 	} else {
-		// Original logic if no hook is configured.
+		// default logic if no hook is configured.
 		tempFolder := filepath.Join(m.app.UploadFileSettings.Path, req.RoomSid, config.UploadFileTempDir)
 		chunkDir := filepath.Join(tempFolder, req.ResumableIdentifier)
 
@@ -221,13 +216,15 @@ func (m *FileModel) UploadedFileMerge(req *plugnmeet.UploadedFileMergeReq) (*plu
 		// combining chunks into one file
 		combinedFile, err := m.combineResumableFiles(req, chunkDir, safeFilename)
 		if err != nil {
-			return nil, err
+			log.WithError(err).Error("failed to combine chunks")
+			return nil, fmt.Errorf("failed to combine chunks")
 		}
 
 		// check the file size again
 		stat, err := os.Stat(combinedFile)
 		if err != nil {
-			return nil, err
+			log.WithError(err).Error("failed to get file info")
+			return nil, fmt.Errorf("failed to get file info")
 		}
 		if stat.Size() > int64(m.app.UploadFileSettings.MaxSize*1024*1024) {
 			_ = os.Remove(combinedFile)
@@ -237,7 +234,8 @@ func (m *FileModel) UploadedFileMerge(req *plugnmeet.UploadedFileMergeReq) (*plu
 		// we'll detect mime type again for sending data
 		mType, err := mimetype.DetectFile(combinedFile)
 		if err != nil {
-			return nil, err
+			log.WithError(err).Error("mime detection failed")
+			return nil, fmt.Errorf("mime detection failed")
 		}
 
 		if err := m.ValidateMimeType(mType); err != nil {
