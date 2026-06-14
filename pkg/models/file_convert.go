@@ -129,10 +129,11 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 			}
 		} else if res.OutputPath != "" {
 			fullPath = res.OutputPath
-		} else {
-			return nil, fmt.Errorf("invalid download hook response")
 		}
-	} else {
+	}
+
+	if fullPath == "" {
+		// fallback to default
 		fullPath = filepath.Join(m.app.UploadFileSettings.Path, filePath)
 	}
 
