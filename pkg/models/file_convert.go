@@ -182,6 +182,7 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 	if m.app.StorageHooks != nil && len(m.app.StorageHooks.UploadHook) > 0 && m.app.HookManager != nil {
 		req := hooks.UploadHookData{
 			InputDirectoryPath: outputDir,
+			FileId:             fileId,
 			HookFileType:       hooks.HookFileTypeWhiteboardConvertedImgs,
 			RoomId:             roomId,
 			RoomSid:            roomSid,

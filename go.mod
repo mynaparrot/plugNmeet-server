@@ -2,8 +2,6 @@ module github.com/mynaparrot/plugnmeet-server
 
 go 1.26
 
-replace github.com/mynaparrot/plugnmeet-protocol => ../protocol
-
 require (
 	buf.build/go/protovalidate v1.2.0
 	github.com/Microsoft/cognitive-services-speech-sdk-go v1.50.0
@@ -20,7 +18,7 @@ require (
 	github.com/livekit/media-sdk v0.0.0-20260424094251-1e21ae1138de
 	github.com/livekit/protocol v1.46.0
 	github.com/livekit/server-sdk-go/v2 v2.16.6
-	github.com/mynaparrot/plugnmeet-protocol v1.3.1-0.20260612144833-4328e15417a2
+	github.com/mynaparrot/plugnmeet-protocol v1.3.1-0.20260614073006-999345bc77fe
 	github.com/nats-io/jwt/v2 v2.8.2
 	github.com/nats-io/nats.go v1.52.0
 	github.com/nats-io/nkeys v0.4.16
