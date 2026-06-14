@@ -355,10 +355,10 @@ insights:
 #        uris:
 #          - "turn:turn.your-domain.com:3478?transport=udp"
 
-# (Optional) Storage Hooks for Advanced File Management
+# (Optional) Hooks for Advanced File Management
 # These hooks allow you to override the default local file storage and integrate
-# with any external storage provider (e.g., S3, Google Cloud Storage) using custom scripts.
-# This is ideal for cloud-native or multi-server deployments.
+# with an external storage provider (e.g., S3, Google Cloud Storage) using custom scripts.
+# This is ideal for cloud-native or multi-server deployments where centralized storage is required.
 #
 # If this section is omitted, the server will store all files on the local disk
 # in the paths defined under 'recorder_info' and 'artifacts_settings'.
