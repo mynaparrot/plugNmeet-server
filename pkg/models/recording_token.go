@@ -58,14 +58,14 @@ func (m *RecordingModel) VerifyRecordingToken(token string) (*hooks.DownloadHook
 		return nil, fiber.StatusBadRequest, errors.New("invalid file path")
 	}
 
-	if m.app.StorageHooks != nil && m.app.HookManager != nil && m.app.StorageHooks.DownloadHook != nil && len(m.app.StorageHooks.DownloadHook.Scripts) > 0 {
+	if m.app.Hooks != nil && m.app.HookManager != nil && m.app.Hooks.DownloadHook != nil && len(m.app.Hooks.DownloadHook.Scripts) > 0 {
 		// Hooks are defined, so use the pipeline.
 		req := hooks.DownloadHookData{
 			InputPath:    inputPath,
 			HookFileType: hooks.HookFileTypeRecording,
 		}
 
-		resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.DownloadHook.Scripts, &req, m.app.StorageHooks.DownloadHook.HookTimeout, m.logger)
+		resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.Hooks.DownloadHook.Scripts, &req, m.app.Hooks.DownloadHook.HookTimeout, m.logger)
 		if err != nil {
 			log.WithError(err).Error("download hook pipeline failed")
 			return nil, fiber.StatusInternalServerError, errors.New("download hook pipeline failed")

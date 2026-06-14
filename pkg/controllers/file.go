@@ -147,13 +147,13 @@ func (fc *FileController) HandleDownloadUploadedFile(c fiber.Ctx) error {
 		}
 	}
 
-	if fc.AppConfig.StorageHooks != nil && fc.AppConfig.HookManager != nil && fc.AppConfig.StorageHooks.DownloadHook != nil && len(fc.AppConfig.StorageHooks.DownloadHook.Scripts) > 0 {
+	if fc.AppConfig.Hooks != nil && fc.AppConfig.HookManager != nil && fc.AppConfig.Hooks.DownloadHook != nil && len(fc.AppConfig.Hooks.DownloadHook.Scripts) > 0 {
 		req := hooks.DownloadHookData{
 			InputPath:    relativePath,
 			HookFileType: hooks.HookFileTypeRoomFile,
 		}
 
-		resBytes, err := hooks.ExecuteHookPipeline(fc.AppConfig.HookManager, fc.AppConfig.StorageHooks.DownloadHook.Scripts, &req, fc.AppConfig.StorageHooks.DownloadHook.HookTimeout, fc.logger)
+		resBytes, err := hooks.ExecuteHookPipeline(fc.AppConfig.HookManager, fc.AppConfig.Hooks.DownloadHook.Scripts, &req, fc.AppConfig.Hooks.DownloadHook.HookTimeout, fc.logger)
 		if err != nil {
 			fc.logger.WithError(err).Error("download hook pipeline failed")
 			return c.Status(fiber.StatusInternalServerError).SendString("download hook pipeline failed")

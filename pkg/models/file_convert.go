@@ -97,12 +97,12 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 	var fullPath string
 
 	// If hooks are enabled, we need to download the file first.
-	if m.app.StorageHooks != nil && m.app.HookManager != nil && m.app.StorageHooks.DownloadHook != nil && len(m.app.StorageHooks.DownloadHook.Scripts) > 0 {
+	if m.app.Hooks != nil && m.app.HookManager != nil && m.app.Hooks.DownloadHook != nil && len(m.app.Hooks.DownloadHook.Scripts) > 0 {
 		req := hooks.DownloadHookData{
 			InputPath:    filePath,
 			HookFileType: hooks.HookFileTypeRoomFile,
 		}
-		resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.DownloadHook.Scripts, &req, m.app.StorageHooks.DownloadHook.HookTimeout, log)
+		resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.Hooks.DownloadHook.Scripts, &req, m.app.Hooks.DownloadHook.HookTimeout, log)
 		if err != nil {
 			return nil, fmt.Errorf("download hook pipeline failed")
 		}
@@ -180,7 +180,7 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 	}
 
 	// If hooks are enabled, upload the entire directory of converted images.
-	if m.app.StorageHooks != nil && m.app.HookManager != nil && m.app.StorageHooks.UploadHook != nil && len(m.app.StorageHooks.UploadHook.Scripts) > 0 {
+	if m.app.Hooks != nil && m.app.HookManager != nil && m.app.Hooks.UploadHook != nil && len(m.app.Hooks.UploadHook.Scripts) > 0 {
 		req := hooks.UploadHookData{
 			InputDirectoryPath: outputDir,
 			FileId:             fileId,
@@ -189,7 +189,7 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 			RoomSid:            roomSid,
 		}
 		// After successful upload, it's script's responsibility to remove the local directory.
-		_, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.UploadHook.Scripts, &req, m.app.StorageHooks.UploadHook.HookTimeout, log)
+		_, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.Hooks.UploadHook.Scripts, &req, m.app.Hooks.UploadHook.HookTimeout, log)
 		if err != nil {
 			log.WithError(err).Error("upload hook pipeline for converted images failed")
 			return nil, fmt.Errorf("upload hook pipeline for converted images failed")

@@ -48,7 +48,7 @@ type AppConfig struct {
 	NatsInfo            NatsInfo                   `yaml:"nats_info"`
 	Insights            *InsightsConfig            `yaml:"insights"`
 	TurnServer          *TurnConfig                `yaml:"turn_server"`
-	StorageHooks        *StorageHooks              `yaml:"storage_hooks"`
+	Hooks               *Hooks                     `yaml:"hooks"`
 }
 
 type ClientInfo struct {
@@ -237,8 +237,8 @@ type HookScriptConfig struct {
 	HookTimeout time.Duration `yaml:"hook_timeout"`
 }
 
-// StorageHooks defines optional script pipelines for handling file I/O.
-type StorageHooks struct {
+// Hooks defines optional script pipelines for handling file I/O.
+type Hooks struct {
 	UploadHook          *HookScriptConfig `yaml:"upload_hook"`
 	DownloadHook        *HookScriptConfig `yaml:"download_hook"`
 	DeleteHook          *HookScriptConfig `yaml:"delete_hook"`
@@ -412,7 +412,7 @@ func handleArtifactsSettings(appCnf *AppConfig) error {
 }
 
 func InitializeStorageHooks(ctx context.Context, appCnf *AppConfig) error {
-	if appCnf.StorageHooks == nil {
+	if appCnf.Hooks == nil {
 		return nil // Feature is not enabled.
 	}
 
@@ -452,19 +452,19 @@ func InitializeStorageHooks(ctx context.Context, appCnf *AppConfig) error {
 		return nil
 	}
 
-	if err := processHookCategory(appCnf.StorageHooks.UploadHook, "upload_hook"); err != nil {
+	if err := processHookCategory(appCnf.Hooks.UploadHook, "upload_hook"); err != nil {
 		return err
 	}
-	if err := processHookCategory(appCnf.StorageHooks.DownloadHook, "download_hook"); err != nil {
+	if err := processHookCategory(appCnf.Hooks.DownloadHook, "download_hook"); err != nil {
 		return err
 	}
-	if err := processHookCategory(appCnf.StorageHooks.DeleteHook, "delete_hook"); err != nil {
+	if err := processHookCategory(appCnf.Hooks.DeleteHook, "delete_hook"); err != nil {
 		return err
 	}
-	if err := processHookCategory(appCnf.StorageHooks.ResumableUploadHook, "resumable_upload_hook"); err != nil {
+	if err := processHookCategory(appCnf.Hooks.ResumableUploadHook, "resumable_upload_hook"); err != nil {
 		return err
 	}
-	if err := processHookCategory(appCnf.StorageHooks.RoomEndHook, "room_end_hook"); err != nil {
+	if err := processHookCategory(appCnf.Hooks.RoomEndHook, "room_end_hook"); err != nil {
 		return err
 	}
 

@@ -64,7 +64,7 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx, req *ResumableUploadReq) (*
 	case fiber.MethodGet:
 		{
 			// If hook is enabled, we'll check with the script first.
-			if m.app.StorageHooks != nil && m.app.HookManager != nil && m.app.StorageHooks.ResumableUploadHook != nil && len(m.app.StorageHooks.ResumableUploadHook.Scripts) > 0 {
+			if m.app.Hooks != nil && m.app.HookManager != nil && m.app.Hooks.ResumableUploadHook != nil && len(m.app.Hooks.ResumableUploadHook.Scripts) > 0 {
 				hookData := &hooks.ResumableUploadHookData{
 					Type:                 hooks.ResumableUploadHookTypeCheck,
 					RoomSid:              req.RoomSid,
@@ -137,7 +137,7 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx, req *ResumableUploadReq) (*
 			}
 
 			// If hook is enabled, pass the saved chunk to the script.
-			if m.app.StorageHooks != nil && m.app.HookManager != nil && m.app.StorageHooks.ResumableUploadHook != nil && len(m.app.StorageHooks.ResumableUploadHook.Scripts) > 0 {
+			if m.app.Hooks != nil && m.app.HookManager != nil && m.app.Hooks.ResumableUploadHook != nil && len(m.app.Hooks.ResumableUploadHook.Scripts) > 0 {
 				inputPath, _ := filepath.Abs(chunkPath)
 				// The script is responsible for the chunk including remove the local copy.
 				hookData := &hooks.ResumableUploadHookData{
@@ -182,7 +182,7 @@ func (m *FileModel) UploadedFileMerge(req *plugnmeet.UploadedFileMergeReq) (*plu
 	var err error
 
 	// If hook is enabled, the script will perform the merge.
-	if m.app.StorageHooks != nil && m.app.HookManager != nil && m.app.StorageHooks.ResumableUploadHook != nil && len(m.app.StorageHooks.ResumableUploadHook.Scripts) > 0 {
+	if m.app.Hooks != nil && m.app.HookManager != nil && m.app.Hooks.ResumableUploadHook != nil && len(m.app.Hooks.ResumableUploadHook.Scripts) > 0 {
 		hookData := &hooks.ResumableUploadHookData{
 			Type:                 hooks.ResumableUploadHookTypeMerge,
 			RoomSid:              req.RoomSid,
@@ -444,7 +444,7 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 
 // runResumableUploadHook is a helper that executes the resumable upload hook pipeline.
 func (m *FileModel) runResumableUploadHook(req *hooks.ResumableUploadHookData, log *logrus.Entry) (*hooks.ResumableUploadHookData, error) {
-	resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.ResumableUploadHook.Scripts, req, m.app.StorageHooks.ResumableUploadHook.HookTimeout, log)
+	resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.Hooks.ResumableUploadHook.Scripts, req, m.app.Hooks.ResumableUploadHook.HookTimeout, log)
 	if err != nil {
 		return nil, err
 	}

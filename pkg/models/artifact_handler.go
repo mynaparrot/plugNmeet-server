@@ -170,14 +170,14 @@ func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (*hooks.Download
 		return nil, fiber.StatusBadRequest, errors.New("invalid file path in token")
 	}
 
-	if m.app.StorageHooks != nil && m.app.HookManager != nil && m.app.StorageHooks.DownloadHook != nil && (len(m.app.StorageHooks.DownloadHook.Scripts) > 0) {
+	if m.app.Hooks != nil && m.app.HookManager != nil && m.app.Hooks.DownloadHook != nil && (len(m.app.Hooks.DownloadHook.Scripts) > 0) {
 		// Hooks are defined, so use the pipeline.
 		req := hooks.DownloadHookData{
 			InputPath:    inputPath,
 			HookFileType: hooks.HookFileTypeArtifact,
 		}
 
-		resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.DownloadHook.Scripts, &req, m.app.StorageHooks.DownloadHook.HookTimeout, m.log)
+		resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.Hooks.DownloadHook.Scripts, &req, m.app.Hooks.DownloadHook.HookTimeout, m.log)
 		if err != nil {
 			log.WithError(err).Error("download hook pipeline failed")
 			return nil, fiber.StatusInternalServerError, errors.New("download hook pipeline failed")
@@ -232,12 +232,12 @@ func (m *ArtifactModel) DeleteArtifact(req *plugnmeet.DeleteArtifactReq) error {
 	if err := protojson.Unmarshal([]byte(artifact.Metadata), &metadata); err == nil {
 		if metadata.FileInfo != nil && metadata.FileInfo.FilePath != "" {
 			// If delete hook is configured, we'll use it.
-			if m.app.StorageHooks != nil && m.app.HookManager != nil && m.app.StorageHooks.DeleteHook != nil && len(m.app.StorageHooks.DeleteHook.Scripts) > 0 {
+			if m.app.Hooks != nil && m.app.HookManager != nil && m.app.Hooks.DeleteHook != nil && len(m.app.Hooks.DeleteHook.Scripts) > 0 {
 				delReq := hooks.DeleteHookData{
 					InputPath:    metadata.FileInfo.FilePath,
 					HookFileType: hooks.HookFileTypeArtifact,
 				}
-				resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.DeleteHook.Scripts, &delReq, m.app.StorageHooks.DeleteHook.HookTimeout, m.log)
+				resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.Hooks.DeleteHook.Scripts, &delReq, m.app.Hooks.DeleteHook.HookTimeout, m.log)
 				if err != nil {
 					m.log.WithError(err).Warn("delete hook pipeline failed for artifact")
 				} else {

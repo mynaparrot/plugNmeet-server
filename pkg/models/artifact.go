@@ -71,7 +71,7 @@ func (m *ArtifactModel) buildPath(fileName, roomId string, artifactType plugnmee
 // It modifies the FilePath in the metadata object in-place if the hook is successful.
 // If the hook fails, it logs the error but does not return it, allowing fallback to local storage.
 func (m *ArtifactModel) runUploadHook(roomId, roomSid string, roomTableId uint64, metadata *plugnmeet.RoomArtifactMetadata, log *logrus.Entry) {
-	if m.app.StorageHooks == nil || m.app.HookManager == nil || m.app.StorageHooks.UploadHook == nil || len(m.app.StorageHooks.UploadHook.Scripts) == 0 {
+	if m.app.Hooks == nil || m.app.HookManager == nil || m.app.Hooks.UploadHook == nil || len(m.app.Hooks.UploadHook.Scripts) == 0 {
 		return
 	}
 	if metadata.FileInfo == nil || metadata.FileInfo.FilePath == "" {
@@ -94,7 +94,7 @@ func (m *ArtifactModel) runUploadHook(roomId, roomSid string, roomTableId uint64
 		RoomTableId:  roomTableId,
 	}
 
-	resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.UploadHook.Scripts, &req, m.app.StorageHooks.UploadHook.HookTimeout, log)
+	resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.Hooks.UploadHook.Scripts, &req, m.app.Hooks.UploadHook.HookTimeout, log)
 	if err != nil {
 		log.WithError(err).Error("upload hook pipeline failed, fallback to local storage")
 		return

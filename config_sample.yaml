@@ -363,7 +363,7 @@ insights:
 # If this section is omitted, the server will store all files on the local disk
 # in the paths defined under 'recorder_info' and 'artifacts_settings'.
 #
-#storage_hooks:
+#hooks:
 #  # For each hook category, you can specify a 'pool_size', a 'hook_timeout' and a list of 'scripts'.
 #  # 'pool_size' controls how many pipelines for that category can run in parallel.
 #  # 'hook_timeout' sets a specific timeout for this category.
