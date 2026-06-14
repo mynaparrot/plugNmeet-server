@@ -173,7 +173,7 @@ func (m *RoomModel) onAfterRoomEnded(p *onAfterRoomEndedParams) {
 	})
 
 	// Trigger room end hook for any external cleanup
-	if m.app.StorageHooks != nil && len(m.app.StorageHooks.RoomEndHook) > 0 && m.app.HookManager != nil {
+	if m.app.StorageHooks != nil && m.app.HookManager != nil && m.app.StorageHooks.RoomEndHook != nil && len(m.app.StorageHooks.RoomEndHook.Scripts) > 0 {
 		log.Info("running room end hook")
 		if err := m.runRoomEndHook(p.roomId, p.roomSid, log); err != nil {
 			log.WithError(err).Error("room end hook execution failed")
@@ -284,7 +284,7 @@ func (m *RoomModel) runRoomEndHook(roomId, roomSid string, log *logrus.Entry) er
 		RoomSid: roomSid,
 	}
 
-	resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.RoomEndHook, req, m.app.StorageHooks.HookTimeout, log)
+	resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.RoomEndHook.Scripts, req, m.app.StorageHooks.RoomEndHook.HookTimeout, log)
 	if err != nil {
 		return err
 	}

@@ -364,35 +364,34 @@ insights:
 # in the paths defined under 'recorder_info' and 'artifacts_settings'.
 #
 #storage_hooks:
-#  # Maximum time to wait for a hook script to respond before timing out.
-#  # Since b-server hooks are for quick operations (artifact uploads, downloads),
-#  # a shorter timeout is recommended.
-#  # Default: 5m
-#  hook_timeout: 5m
+#  # For each hook category, you can specify a 'pool_size', a 'hook_timeout' and a list of 'scripts'.
+#  # 'pool_size' controls how many pipelines for that category can run in parallel.
+#  # 'hook_timeout' sets a specific timeout for this category.
+#  # If a value is not set or is 0, it will default to 1 for pool_size and 5m for hook_timeout.
 #
-#  # A list of scripts to run sequentially for file uploads.
-#  # The output of one script becomes the input for the next.
-#  # The final script in the chain must output a JSON object with a 'logical_path'.
 #  upload_hook:
-#    - "./scripts/examples_hooks/upload.sh"
+#    pool_size: 5
+#    hook_timeout: 10m
+#    scripts:
+#      - "./scripts/examples_hooks/upload.sh"
 #
-#  # A list of scripts for file downloads.
-#  # The final script must output a JSON object with an 'action' ('redirect' or 'serve_local')
-#  # and a corresponding 'redirect_url' or 'local_path'.
 #  download_hook:
-#    - "./scripts/examples_hooks/download.sh"
+#    pool_size: 2
+#    hook_timeout: 1m
+#    scripts:
+#      - "./scripts/examples_hooks/download.sh"
 #
-#  # This is a blocking operation. The server will wait for the script to respond.
-#  # The script can return a "msg" field in its JSON response for logging purposes.
 #  delete_hook:
-#    - "./scripts/examples_hooks/delete.sh"
+#    # If pool_size and hook_timeout are omitted, they will use the default values.
+#    scripts:
+#      - "./scripts/examples_hooks/delete.sh"
 #
-#  # A list of scripts for resumable upload operations.
-#  # This allows offloading chunk management and merging to an external service like S3.
 #  resumable_upload_hook:
-#    - "./scripts/examples_hooks/resumable_upload.sh"
+#    pool_size: 5
+#    hook_timeout: 15m
+#    scripts:
+#      - "./scripts/examples_hooks/resumable_upload.sh"
 #
-#  # A list of scripts to run after a room has ended.
-#  # Useful for cleaning up temporary resources created by other hooks.
 #  room_end_hook:
-#    - "./scripts/examples_hooks/room_end.sh"
+#    scripts:
+#      - "./scripts/examples_hooks/room_end.sh"

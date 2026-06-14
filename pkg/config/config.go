@@ -230,19 +230,20 @@ type NatsInfoRecorder struct {
 	TranscodingJobs string `yaml:"transcoding_jobs_subject"`
 }
 
+// HookScriptConfig defines the configuration for a specific hook category.
+type HookScriptConfig struct {
+	PoolSize    int           `yaml:"pool_size"`
+	Scripts     []string      `yaml:"scripts"`
+	HookTimeout time.Duration `yaml:"hook_timeout"`
+}
+
 // StorageHooks defines optional script pipelines for handling file I/O.
 type StorageHooks struct {
-	HookTimeout time.Duration `yaml:"hook_timeout"`
-	// A list of scripts to execute sequentially for an upload operation.
-	UploadHook []string `yaml:"upload_hook"`
-	// A list of scripts for a download operation.
-	DownloadHook []string `yaml:"download_hook"`
-	// A list of scripts for a delete operation.
-	DeleteHook []string `yaml:"delete_hook"`
-	// A list of scripts for resumable upload operation.
-	ResumableUploadHook []string `yaml:"resumable_upload_hook"`
-	// A list of scripts for room end operation.
-	RoomEndHook []string `yaml:"room_end_hook"`
+	UploadHook          *HookScriptConfig `yaml:"upload_hook"`
+	DownloadHook        *HookScriptConfig `yaml:"download_hook"`
+	DeleteHook          *HookScriptConfig `yaml:"delete_hook"`
+	ResumableUploadHook *HookScriptConfig `yaml:"resumable_upload_hook"`
+	RoomEndHook         *HookScriptConfig `yaml:"room_end_hook"`
 }
 
 func InitAppConfig(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
@@ -415,10 +416,6 @@ func InitializeStorageHooks(ctx context.Context, appCnf *AppConfig) error {
 		return nil // Feature is not enabled.
 	}
 
-	if appCnf.StorageHooks.HookTimeout == 0 {
-		appCnf.StorageHooks.HookTimeout = 5 * time.Minute
-	}
-
 	resolvePath := func(scriptPath string) string {
 		if strings.HasPrefix(scriptPath, "./") {
 			return filepath.Join(appCnf.RootWorkingDir, scriptPath)
@@ -426,56 +423,54 @@ func InitializeStorageHooks(ctx context.Context, appCnf *AppConfig) error {
 		return scriptPath
 	}
 
-	// Collect all unique scripts to start them once
-	var allScripts []string
-	for i, script := range appCnf.StorageHooks.UploadHook {
-		resolved := resolvePath(script)
-		appCnf.StorageHooks.UploadHook[i] = resolved
-		if err := hooks.ValidateHookScript(resolved, "upload_hook"); err != nil {
-			return err
+	// scriptsWithPoolSize maps each unique script path to its required pool size.
+	// We take the max pool size if a script is used in multiple categories.
+	scriptsWithPoolSize := make(map[string]int)
+
+	processHookCategory := func(config *HookScriptConfig, name string) error {
+		if config == nil {
+			return nil
 		}
-		allScripts = append(allScripts, resolved)
+		if config.PoolSize <= 0 {
+			config.PoolSize = 1
+		}
+		if config.HookTimeout == 0 {
+			config.HookTimeout = 5 * time.Minute
+		}
+		for i, script := range config.Scripts {
+			resolved := resolvePath(script)
+			if err := hooks.ValidateHookScript(resolved, name); err != nil {
+				return err
+			}
+			config.Scripts[i] = resolved
+
+			// If the same script is used in multiple hooks, use the larger pool size.
+			if currentSize, ok := scriptsWithPoolSize[resolved]; !ok || config.PoolSize > currentSize {
+				scriptsWithPoolSize[resolved] = config.PoolSize
+			}
+		}
+		return nil
 	}
 
-	for i, script := range appCnf.StorageHooks.DownloadHook {
-		resolved := resolvePath(script)
-		appCnf.StorageHooks.DownloadHook[i] = resolved
-		if err := hooks.ValidateHookScript(resolved, "download_hook"); err != nil {
-			return err
-		}
-		allScripts = append(allScripts, resolved)
+	if err := processHookCategory(appCnf.StorageHooks.UploadHook, "upload_hook"); err != nil {
+		return err
 	}
-
-	for i, script := range appCnf.StorageHooks.DeleteHook {
-		resolved := resolvePath(script)
-		appCnf.StorageHooks.DeleteHook[i] = resolved
-		if err := hooks.ValidateHookScript(resolved, "delete_hook"); err != nil {
-			return err
-		}
-		allScripts = append(allScripts, resolved)
+	if err := processHookCategory(appCnf.StorageHooks.DownloadHook, "download_hook"); err != nil {
+		return err
 	}
-
-	for i, script := range appCnf.StorageHooks.ResumableUploadHook {
-		resolved := resolvePath(script)
-		appCnf.StorageHooks.ResumableUploadHook[i] = resolved
-		if err := hooks.ValidateHookScript(resolved, "resumable_upload_hook"); err != nil {
-			return err
-		}
-		allScripts = append(allScripts, resolved)
+	if err := processHookCategory(appCnf.StorageHooks.DeleteHook, "delete_hook"); err != nil {
+		return err
 	}
-
-	for i, script := range appCnf.StorageHooks.RoomEndHook {
-		resolved := resolvePath(script)
-		appCnf.StorageHooks.RoomEndHook[i] = resolved
-		if err := hooks.ValidateHookScript(resolved, "room_end_hook"); err != nil {
-			return err
-		}
-		allScripts = append(allScripts, resolved)
+	if err := processHookCategory(appCnf.StorageHooks.ResumableUploadHook, "resumable_upload_hook"); err != nil {
+		return err
+	}
+	if err := processHookCategory(appCnf.StorageHooks.RoomEndHook, "room_end_hook"); err != nil {
+		return err
 	}
 
 	// Initialize the HookProcessManager and start all unique scripts
 	appCnf.HookManager = hooks.NewHookProcessManager(ctx, appCnf.Logger.WithField("service", "hook_manager"))
-	if err := appCnf.HookManager.StartHookProcesses(allScripts); err != nil {
+	if err := appCnf.HookManager.StartHookProcesses(scriptsWithPoolSize); err != nil {
 		return fmt.Errorf("failed to start hook processes: %w", err)
 	}
 
