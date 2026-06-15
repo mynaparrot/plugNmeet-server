@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"reflect"
 	"time"
 
@@ -112,7 +113,7 @@ func (m *RecordingModel) addRecordingInfoToDB(r *plugnmeet.RecorderToPlugNmeet, 
 // format: path/recording_file_name.{mp4|webm}.json
 func (m *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet, creation int64, roomInfo *dbmodels.RoomInfo) {
 	log := m.logger.WithFields(logrus.Fields{
-		"roomId":      r.RoomId,
+		"roomId":      roomInfo.RoomId,
 		"recordingId": r.RecordingId,
 		"filePath":    r.FilePath,
 		"method":      "addRecordingInfoFile",
@@ -120,7 +121,7 @@ func (m *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet, 
 	log.Infoln("creating recording info file")
 	toRecord := &plugnmeet.RecordingInfoFile{
 		RoomTableId:      r.RoomTableId,
-		RoomId:           r.RoomId,
+		RoomId:           roomInfo.RoomId,
 		RoomTitle:        roomInfo.RoomTitle,
 		RoomSid:          roomInfo.Sid,
 		RoomCreationTime: roomInfo.CreationTime,
@@ -141,7 +142,20 @@ func (m *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet, 
 		return
 	}
 
-	p := path.Join(m.app.RecorderInfo.RecordingFilesPath, r.FilePath+".json")
+	p := path.Join(m.app.RecorderInfo.RecordingFilesPath, filepath.Dir(r.FilePath))
+	if _, err := os.Stat(p); err != nil && errors.Is(err, os.ErrNotExist) {
+		// this can be expected when using hook system as file was uploaded and deleted
+		// in this case we'll use temporary dir for hook
+		p, err = os.MkdirTemp(m.app.RecorderInfo.RecordingFilesPath, "recording-meta")
+		if err != nil {
+			log.WithError(err).Errorln("failed to create temporary directory")
+			return
+		}
+		// we should clean up as this was created only for hook script
+		defer os.RemoveAll(p)
+	}
+
+	p = path.Join(p, filepath.Base(r.FilePath)+".json")
 	if err = os.WriteFile(p, marshal, 0644); err != nil {
 		log.WithError(err).Errorln("failed to write recording info file")
 		return
@@ -150,7 +164,7 @@ func (m *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet, 
 	log.Infoln("Successfully created recording info file")
 
 	// run upload hook
-	m.runUploadHook(r.RoomId, r.RoomSid, uint64(r.RoomTableId), p, log)
+	m.runUploadHook(roomInfo.RoomId, roomInfo.Sid, roomInfo.ID, p, log)
 }
 
 // UpdateRecordingMetadata updates the metadata of a specific recording.

@@ -54,7 +54,7 @@ func main() {
 	}
 	lkLogger.InitFromConfig(logConf, "pnm")
 
-	if err := config.InitializeStorageHooks(ctx, appCnf); err != nil {
+	if err := config.InitializeHooks(ctx, appCnf); err != nil {
 		logger.WithError(err).Fatal("Failed to setup hooks")
 	}
 

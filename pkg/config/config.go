@@ -274,16 +274,23 @@ func InitAppConfig(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 	}
 	appCnf.RoomDefaultSettings.MaxPreloadedWhiteboardFileSizeByte = &bytes
 
-	if strings.HasPrefix(appCnf.LogSettings.LogFile, "./") {
+	if !filepath.IsAbs(appCnf.LogSettings.LogFile) {
 		appCnf.LogSettings.LogFile = filepath.Join(appCnf.RootWorkingDir, appCnf.LogSettings.LogFile)
 	}
-	if strings.HasPrefix(appCnf.UploadFileSettings.Path, "./") {
+	appCnf.LogSettings.LogFile = filepath.Clean(appCnf.LogSettings.LogFile)
+
+	if !filepath.IsAbs(appCnf.UploadFileSettings.Path) {
 		appCnf.UploadFileSettings.Path = filepath.Join(appCnf.RootWorkingDir, appCnf.UploadFileSettings.Path)
 	}
-	if strings.HasPrefix(appCnf.RecorderInfo.RecordingFilesPath, "./") {
+	appCnf.UploadFileSettings.Path = filepath.Clean(appCnf.UploadFileSettings.Path)
+
+	if !filepath.IsAbs(appCnf.RecorderInfo.RecordingFilesPath) {
 		appCnf.RecorderInfo.RecordingFilesPath = filepath.Join(appCnf.RootWorkingDir, appCnf.RecorderInfo.RecordingFilesPath)
 		appCnf.RecorderInfo.DelRecordingBackupPath = filepath.Join(appCnf.RootWorkingDir, appCnf.RecorderInfo.DelRecordingBackupPath)
 	}
+	appCnf.RecorderInfo.RecordingFilesPath = filepath.Clean(appCnf.RecorderInfo.RecordingFilesPath)
+	appCnf.RecorderInfo.DelRecordingBackupPath = filepath.Clean(appCnf.RecorderInfo.DelRecordingBackupPath)
+
 	if appCnf.RecorderInfo.PingTimeout == 0 {
 		appCnf.RecorderInfo.PingTimeout = time.Second * 8
 	}
@@ -303,6 +310,7 @@ func InitAppConfig(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 		if appCnf.RecorderInfo.DelRecordingBackupPath == "" {
 			appCnf.RecorderInfo.DelRecordingBackupPath = path.Join(appCnf.RecorderInfo.RecordingFilesPath, "del_backup")
 		}
+		appCnf.RecorderInfo.DelRecordingBackupPath = filepath.Clean(appCnf.RecorderInfo.DelRecordingBackupPath)
 
 		if err := os.MkdirAll(appCnf.RecorderInfo.DelRecordingBackupPath, 0755); err != nil {
 			return nil, fmt.Errorf("failed to create recording backup directory %s: %w", appCnf.RecorderInfo.DelRecordingBackupPath, err)
@@ -370,10 +378,12 @@ func handleArtifactsSettings(appCnf *AppConfig) error {
 	}
 
 	p := *appCnf.ArtifactsSettings.StoragePath
-	if strings.HasPrefix(p, "./") {
+	if !filepath.IsAbs(p) {
 		p = filepath.Join(appCnf.RootWorkingDir, p)
 		appCnf.ArtifactsSettings.StoragePath = &p
 	}
+	p = filepath.Clean(p)
+	appCnf.ArtifactsSettings.StoragePath = &p
 
 	if _, err := os.Stat(p); os.IsNotExist(err) {
 		err = os.MkdirAll(p, os.ModePerm)
@@ -393,9 +403,11 @@ func handleArtifactsSettings(appCnf *AppConfig) error {
 		}
 
 		trashPath := appCnf.ArtifactsSettings.DelArtifactsBackupPath
-		if strings.HasPrefix(trashPath, "./") {
+		if !filepath.IsAbs(trashPath) {
 			trashPath = filepath.Join(appCnf.RootWorkingDir, trashPath)
 		}
+		appCnf.ArtifactsSettings.DelArtifactsBackupPath = filepath.Clean(trashPath)
+
 		err := os.MkdirAll(trashPath, 0755)
 		if err != nil {
 			return fmt.Errorf("failed to create artifacts backup directory %s: %w", trashPath, err)
@@ -404,14 +416,15 @@ func handleArtifactsSettings(appCnf *AppConfig) error {
 	return nil
 }
 
-func InitializeStorageHooks(ctx context.Context, appCnf *AppConfig) error {
+func InitializeHooks(ctx context.Context, appCnf *AppConfig) error {
 	if appCnf.Hooks == nil {
 		return nil // Feature is not enabled.
 	}
 
 	resolvePath := func(scriptPath string) string {
-		if strings.HasPrefix(scriptPath, "./") {
-			return filepath.Join(appCnf.RootWorkingDir, scriptPath)
+		if !filepath.IsAbs(scriptPath) {
+			p := filepath.Join(appCnf.RootWorkingDir, scriptPath)
+			return filepath.Clean(p)
 		}
 		return scriptPath
 	}
@@ -492,9 +505,10 @@ func readClientFiles(a *AppConfig) error {
 		return nil
 	}
 
-	if strings.HasPrefix(a.Client.Path, "./") {
+	if !filepath.IsAbs(a.Client.Path) {
 		a.Client.Path = filepath.Join(a.RootWorkingDir, a.Client.Path)
 	}
+	a.Client.Path = filepath.Clean(a.Client.Path)
 
 	cssPath := filepath.Join(a.Client.Path, "assets", "css")
 	css, err := utils.GetFilesFromDir(cssPath, ".css", "des")
