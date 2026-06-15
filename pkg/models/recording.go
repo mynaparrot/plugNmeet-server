@@ -2,11 +2,8 @@ package models
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"path/filepath"
 
-	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
@@ -143,51 +140,4 @@ func (m *RecordingModel) sendToWebhookNotifier(r *plugnmeet.RecorderToPlugNmeet)
 		data.HsetValue = &val
 		m.analyticsModel.HandleEvent(data)
 	}
-}
-
-// runUploadHook mostly use to upload recording medata file
-func (m *RecordingModel) runUploadHook(roomId, roomSid string, roomTableId uint64, filePath string, log *logrus.Entry) {
-	if m.app.Hooks == nil || m.app.HookManager == nil || m.app.Hooks.UploadHook == nil || len(m.app.Hooks.UploadHook.Scripts) == 0 {
-		return
-	}
-
-	log.Info("Upload hook is configured, preparing to run pipeline...")
-
-	absolutePath, err := filepath.Abs(filePath)
-	if err != nil {
-		log.WithError(err).Error("could not build absolute path for hook, fallback to local storage")
-		return
-	}
-
-	req := hooks.UploadHookData{
-		InputPath:    absolutePath,
-		HookFileType: hooks.HookFileTypeRecordingMetadata,
-		RoomId:       roomId,
-		RoomSid:      roomSid,
-		RoomTableId:  roomTableId,
-	}
-
-	resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.Hooks.UploadHook.Scripts, &req, m.app.Hooks.UploadHook.HookTimeout, log)
-	if err != nil {
-		log.WithError(err).Error("upload hook pipeline failed, fallback to local storage")
-		return
-	}
-
-	// script will return same struct
-	var res hooks.UploadHookData
-	if err := json.Unmarshal(resBytes, &res); err != nil {
-		log.WithError(err).Error("failed to unmarshal upload hook response, fallback to local storage")
-		return
-	}
-
-	if res.Error != "" {
-		log.Errorf("upload hook script returned an error: %s, fallback to local storage", res.Error)
-		return
-	}
-	if res.OutputPath == "" {
-		log.Error("upload hook did not return a output_path, fallback to local storage")
-		return
-	}
-
-	log.Infof("Upload hook successful proceeded with output %s ", res.OutputPath)
 }
