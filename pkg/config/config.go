@@ -230,20 +230,13 @@ type NatsInfoRecorder struct {
 	TranscodingJobs string `yaml:"transcoding_jobs_subject"`
 }
 
-// HookScriptConfig defines the configuration for a specific hook category.
-type HookScriptConfig struct {
-	PoolSize    int           `yaml:"pool_size"`
-	Scripts     []string      `yaml:"scripts"`
-	HookTimeout time.Duration `yaml:"hook_timeout"`
-}
-
 // Hooks defines optional script pipelines for handling file I/O.
 type Hooks struct {
-	UploadHook          *HookScriptConfig `yaml:"upload_hook"`
-	DownloadHook        *HookScriptConfig `yaml:"download_hook"`
-	DeleteHook          *HookScriptConfig `yaml:"delete_hook"`
-	ResumableUploadHook *HookScriptConfig `yaml:"resumable_upload_hook"`
-	RoomEndHook         *HookScriptConfig `yaml:"room_end_hook"`
+	UploadHook          *hooks.HookScriptConfig `yaml:"upload_hook"`
+	DownloadHook        *hooks.HookScriptConfig `yaml:"download_hook"`
+	DeleteHook          *hooks.HookScriptConfig `yaml:"delete_hook"`
+	ResumableUploadHook *hooks.HookScriptConfig `yaml:"resumable_upload_hook"`
+	RoomEndHook         *hooks.HookScriptConfig `yaml:"room_end_hook"`
 }
 
 func InitAppConfig(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
@@ -427,7 +420,7 @@ func InitializeStorageHooks(ctx context.Context, appCnf *AppConfig) error {
 	// We take the max pool size if a script is used in multiple categories.
 	scriptsWithPoolSize := make(map[string]int)
 
-	processHookCategory := func(config *HookScriptConfig, name string) error {
+	processHookCategory := func(config *hooks.HookScriptConfig, name string) error {
 		if config == nil {
 			return nil
 		}
@@ -438,15 +431,23 @@ func InitializeStorageHooks(ctx context.Context, appCnf *AppConfig) error {
 			config.HookTimeout = 5 * time.Minute
 		}
 		for i, script := range config.Scripts {
-			resolved := resolvePath(script)
+			var resolved string
+			if strings.HasPrefix(script.Script, hooks.HookCommandHttpRequest) {
+				resolved = script.Script
+			} else {
+				resolved = resolvePath(script.Script)
+			}
+
 			if err := hooks.ValidateHookScript(resolved, name); err != nil {
 				return err
 			}
-			config.Scripts[i] = resolved
+			config.Scripts[i].Script = resolved
 
-			// If the same script is used in multiple hooks, use the larger pool size.
-			if currentSize, ok := scriptsWithPoolSize[resolved]; !ok || config.PoolSize > currentSize {
-				scriptsWithPoolSize[resolved] = config.PoolSize
+			if !script.IsOneShot {
+				// If the same script is used in multiple hooks, use the larger pool size.
+				if currentSize, ok := scriptsWithPoolSize[resolved]; !ok || config.PoolSize > currentSize {
+					scriptsWithPoolSize[resolved] = config.PoolSize
+				}
 			}
 		}
 		return nil

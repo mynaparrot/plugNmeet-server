@@ -362,36 +362,36 @@ insights:
 #
 # If this section is omitted, the server will store all files on the local disk
 # in the paths defined under 'recorder_info' and 'artifacts_settings'.
-#
 #hooks:
-#  # For each hook category, you can specify a 'pool_size', a 'hook_timeout' and a list of 'scripts'.
-#  # 'pool_size' controls how many pipelines for that category can run in parallel.
-#  # 'hook_timeout' sets a specific timeout for this category.
-#  # If a value is not set or is 0, it will default to 1 for pool_size and 5m for hook_timeout.
-#
 #  upload_hook:
-#    pool_size: 5
-#    hook_timeout: 10m
+#    pool_size: 2
+#    hook_timeout: 5m
 #    scripts:
-#      - "./scripts/examples_hooks/upload.sh"
-#
+#      - script: "/path/to/your/script.sh"
+#        is_one_shot: false
+#      - script: "http-request http://localhost:8090/your/endpoint"
+#        is_one_shot: true
 #  download_hook:
 #    pool_size: 2
-#    hook_timeout: 1m
+#    hook_timeout: 5m
 #    scripts:
-#      - "./scripts/examples_hooks/download.sh"
-#
+#      - script: "/path/to/your/script.sh"
+#        is_one_shot: false
 #  delete_hook:
-#    # If pool_size and hook_timeout are omitted, they will use the default values.
+#    pool_size: 2
+#    hook_timeout: 5m
 #    scripts:
-#      - "./scripts/examples_hooks/delete.sh"
-#
+#      - script: "/path/to/your/script.sh"
+#        is_one_shot: false
 #  resumable_upload_hook:
-#    pool_size: 5
-#    hook_timeout: 15m
+#    pool_size: 2
+#    hook_timeout: 5m
 #    scripts:
-#      - "./scripts/examples_hooks/resumable_upload.sh"
-#
+#      - script: "/path/to/your/script.sh"
+#        is_one_shot: false
 #  room_end_hook:
+#    pool_size: 2
+#    hook_timeout: 5m
 #    scripts:
-#      - "./scripts/examples_hooks/room_end.sh"
+#      - script: "/path/to/your/script.sh"
+#        is_one_shot: false
