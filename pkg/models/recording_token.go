@@ -1,9 +1,7 @@
 package models
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/go-jose/go-jose/v4"
@@ -58,31 +56,20 @@ func (m *RecordingModel) VerifyRecordingToken(token string) (*hooks.DownloadHook
 		return nil, fiber.StatusBadRequest, errors.New("invalid file path")
 	}
 
-	if m.app.Hooks != nil && m.app.HookManager != nil && m.app.Hooks.DownloadHook != nil && len(m.app.Hooks.DownloadHook.Scripts) > 0 {
+	if m.app.HookManager != nil {
 		// Hooks are defined, so use the pipeline.
 		req := hooks.DownloadHookData{
 			InputPath:    inputPath,
 			HookFileType: hooks.HookFileTypeRecording,
 		}
-
-		resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.Hooks.DownloadHook.Scripts, &req, m.app.Hooks.DownloadHook.HookTimeout, m.logger)
+		res, err := m.app.Hooks.RunDownloadHook(m.ctx, m.app.HookManager, &req, nil, 0, log)
 		if err != nil {
 			log.WithError(err).Error("download hook pipeline failed")
 			return nil, fiber.StatusInternalServerError, errors.New("download hook pipeline failed")
 		}
 
-		// script will return same struct
-		var res hooks.DownloadHookData
-		if err := json.Unmarshal(resBytes, &res); err != nil {
-			log.WithError(err).Error("failed to unmarshal download hook response")
-			return nil, fiber.StatusInternalServerError, fmt.Errorf("failed to unmarshal download hook response")
-		}
-		if res.Error != "" {
-			log.Error("download hook script returned an error: %s", res.Error)
-			return nil, fiber.StatusInternalServerError, fmt.Errorf("download hook script returned an error")
-		}
-		if res.OutputPath != "" || res.RedirectUrl != "" {
-			return &res, fiber.StatusOK, nil
+		if res != nil && (res.OutputPath != "" || res.RedirectUrl != "") {
+			return res, fiber.StatusOK, nil
 		}
 	}
 

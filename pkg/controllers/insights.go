@@ -66,8 +66,7 @@ func (i *InsightsController) subscribeToAgentTaskRequests() error {
 func (i *InsightsController) subscribeToSummarizeJobs() error {
 	sub, err := i.app.NatsConn.QueueSubscribe(insights.SummarizeJobQueue, "pnm-summarize-worker-group", func(msg *nats.Msg) {
 		var payload insights.SummarizeJobPayload
-		err := json.Unmarshal(msg.Data, &payload)
-		if err != nil {
+		if err := json.Unmarshal(msg.Data, &payload); err != nil {
 			i.logger.WithError(err).Error("failed to unmarshal summarize job payload")
 			return
 		}

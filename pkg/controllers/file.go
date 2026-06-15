@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/url"
 	"path"
@@ -147,29 +146,17 @@ func (fc *FileController) HandleDownloadUploadedFile(c fiber.Ctx) error {
 		}
 	}
 
-	if fc.AppConfig.Hooks != nil && fc.AppConfig.HookManager != nil && fc.AppConfig.Hooks.DownloadHook != nil && len(fc.AppConfig.Hooks.DownloadHook.Scripts) > 0 {
+	if fc.AppConfig.HookManager != nil {
 		req := hooks.DownloadHookData{
 			InputPath:    relativePath,
 			HookFileType: hooks.HookFileTypeRoomFile,
 		}
-
-		resBytes, err := hooks.ExecuteHookPipeline(fc.AppConfig.HookManager, fc.AppConfig.Hooks.DownloadHook.Scripts, &req, fc.AppConfig.Hooks.DownloadHook.HookTimeout, fc.logger)
+		res, err := fc.AppConfig.Hooks.RunDownloadHook(context.Background(), fc.AppConfig.HookManager, &req, nil, 0, fc.logger)
 		if err != nil {
 			fc.logger.WithError(err).Error("download hook pipeline failed")
 			return c.Status(fiber.StatusInternalServerError).SendString("download hook pipeline failed")
 		}
-
-		// script will return same struct
-		var res hooks.DownloadHookData
-		if err := json.Unmarshal(resBytes, &res); err != nil {
-			fc.logger.WithError(err).Error("failed to unmarshal download hook response")
-			return c.Status(fiber.StatusInternalServerError).SendString("failed to unmarshal download hook response")
-		}
-		if res.Error != "" {
-			fc.logger.Error("download hook script returned an error: %s", res.Error)
-			return c.Status(fiber.StatusInternalServerError).SendString("download hook script returned an error")
-		}
-		if res.RedirectUrl != "" {
+		if res != nil && res.RedirectUrl != "" {
 			return c.Redirect().Status(fiber.StatusTemporaryRedirect).To(res.RedirectUrl)
 		}
 	}

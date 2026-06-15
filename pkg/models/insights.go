@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
@@ -260,6 +263,23 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 		return
 	}
 	userPrompt := string(payload.Options)
+
+	// download the file to local
+	if s.appConfig.HookManager != nil {
+		req := &hooks.DownloadHookData{
+			InputPath:    payload.FilePath,
+			HookFileType: hooks.HookFileTypeArtifact,
+		}
+		outputDir := filepath.Join(*s.appConfig.ArtifactsSettings.StoragePath, strings.ToLower(plugnmeet.RoomArtifactType_MEETING_SUMMARY.String()), payload.RoomId)
+		res, err := s.appConfig.Hooks.RunDownloadHook(s.ctx, s.appConfig.HookManager, req, &outputDir, time.Minute*3, log)
+		if err != nil {
+			log.WithError(err).Error("download hook pipeline failed")
+			return
+		}
+		if res != nil && res.OutputPath != "" {
+			payload.FilePath = res.OutputPath
+		}
+	}
 
 	// 3. Start the batch job.
 	jobId, fileName, err := provider.StartBatchSummarizeAudioFile(s.ctx, payload.FilePath, summarizeModel, userPrompt)

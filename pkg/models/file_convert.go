@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -97,37 +96,17 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 	var fullPath string
 
 	// If hooks are enabled, we need to download the file first.
-	if m.app.Hooks != nil && m.app.HookManager != nil && m.app.Hooks.DownloadHook != nil && len(m.app.Hooks.DownloadHook.Scripts) > 0 {
+	if m.app.HookManager != nil {
 		req := hooks.DownloadHookData{
 			InputPath:    filePath,
 			HookFileType: hooks.HookFileTypeRoomFile,
 		}
-		resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.Hooks.DownloadHook.Scripts, &req, m.app.Hooks.DownloadHook.HookTimeout, log)
+		outputDir := filepath.Join(m.app.UploadFileSettings.Path, roomSid)
+		res, err := m.app.Hooks.RunDownloadHook(m.ctx, m.app.HookManager, &req, &outputDir, time.Minute*3, log)
 		if err != nil {
-			return nil, fmt.Errorf("download hook pipeline failed")
+			return nil, err
 		}
-
-		var res hooks.DownloadHookData
-		if err := json.Unmarshal(resBytes, &res); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal download hook response")
-		}
-		if res.Error != "" {
-			log.Errorf("download hook script returned an error: %s", res.Error)
-			return nil, fmt.Errorf("download hook script returned an error")
-		}
-
-		if res.RedirectUrl != "" {
-			outputDir := filepath.Join(m.app.UploadFileSettings.Path, roomSid)
-			if err := os.MkdirAll(outputDir, 0755); err != nil {
-				log.WithError(err).Error("failed to create output dir")
-				return nil, fmt.Errorf("failed to create output dir")
-			}
-			fullPath, err = m.downloadFileToDest(m.ctx, res.RedirectUrl, outputDir, log)
-			if err != nil {
-				log.WithError(err).Error("failed to download file")
-				return nil, fmt.Errorf("failed to download file")
-			}
-		} else if res.OutputPath != "" {
+		if res != nil && res.OutputPath != "" {
 			fullPath = res.OutputPath
 		}
 	}
@@ -180,7 +159,7 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 	}
 
 	// If hooks are enabled, upload the entire directory of converted images.
-	if m.app.Hooks != nil && m.app.HookManager != nil && m.app.Hooks.UploadHook != nil && len(m.app.Hooks.UploadHook.Scripts) > 0 {
+	if m.app.HookManager != nil {
 		req := hooks.UploadHookData{
 			InputDirectoryPath: outputDir,
 			FileId:             fileId,
@@ -188,11 +167,13 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 			RoomId:             roomId,
 			RoomSid:            roomSid,
 		}
-		// After successful upload, it's script's responsibility to remove the local directory.
-		_, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.Hooks.UploadHook.Scripts, &req, m.app.Hooks.UploadHook.HookTimeout, log)
+		res, err := m.app.Hooks.RunUploadHook(m.app.HookManager, &req, log)
 		if err != nil {
 			log.WithError(err).Error("upload hook pipeline for converted images failed")
 			return nil, fmt.Errorf("upload hook pipeline for converted images failed")
+		}
+		if res != nil && res.OutputPath != "" {
+			log.Infof("Successfully uploaded images into %s", res.OutputPath)
 		}
 	}
 

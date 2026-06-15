@@ -1,7 +1,6 @@
 package models
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -30,21 +29,13 @@ func (m *RecordingModel) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error 
 	}
 
 	// If delete hook is configured, we'll use it.
-	if m.app.Hooks != nil && m.app.HookManager != nil && m.app.Hooks.DeleteHook != nil && len(m.app.Hooks.DeleteHook.Scripts) > 0 {
+	if m.app.HookManager != nil {
 		delReq := hooks.DeleteHookData{
 			InputPath:    recording.FilePath,
 			HookFileType: hooks.HookFileTypeRecording,
 		}
-		resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.Hooks.DeleteHook.Scripts, &delReq, m.app.Hooks.DeleteHook.HookTimeout, log)
-		if err != nil {
-			log.WithError(err).Warn("delete hook pipeline failed for recording")
-		} else {
-			var res hooks.DeleteHookData
-			if err := json.Unmarshal(resBytes, &res); err != nil {
-				log.WithError(err).Warn("failed to unmarshal delete hook response")
-			} else if res.Error != "" {
-				log.Warnf("delete hook script returned an error: %s", res.Error)
-			}
+		if _, err := m.app.Hooks.RunDeleteHook(m.app.HookManager, &delReq, log); err != nil {
+			log.WithError(err).Warn("delete hook failed for recording")
 		}
 		// After running the hook (even if it failed), we proceed to delete the DB record.
 		// The hook is fire-and-forget; its failure should not block DB cleanup.

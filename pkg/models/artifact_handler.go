@@ -1,7 +1,6 @@
 package models
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -170,31 +169,20 @@ func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (*hooks.Download
 		return nil, fiber.StatusBadRequest, errors.New("invalid file path in token")
 	}
 
-	if m.app.Hooks != nil && m.app.HookManager != nil && m.app.Hooks.DownloadHook != nil && (len(m.app.Hooks.DownloadHook.Scripts) > 0) {
+	if m.app.HookManager != nil {
 		// Hooks are defined, so use the pipeline.
 		req := hooks.DownloadHookData{
 			InputPath:    inputPath,
 			HookFileType: hooks.HookFileTypeArtifact,
 		}
-
-		resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.Hooks.DownloadHook.Scripts, &req, m.app.Hooks.DownloadHook.HookTimeout, m.log)
+		res, err := m.app.Hooks.RunDownloadHook(m.ctx, m.app.HookManager, &req, nil, 0, log)
 		if err != nil {
 			log.WithError(err).Error("download hook pipeline failed")
 			return nil, fiber.StatusInternalServerError, errors.New("download hook pipeline failed")
 		}
 
-		// return will be using same struct
-		var res hooks.DownloadHookData
-		if err := json.Unmarshal(resBytes, &res); err != nil {
-			log.WithError(err).Error("failed to unmarshal download hook response")
-			return nil, fiber.StatusInternalServerError, fmt.Errorf("failed to unmarshal download hook response")
-		}
-		if res.Error != "" {
-			log.Error("download hook script returned an error: %s", res.Error)
-			return nil, fiber.StatusInternalServerError, fmt.Errorf("download hook script returned an error")
-		}
-		if res.OutputPath != "" || res.RedirectUrl != "" {
-			return &res, fiber.StatusOK, nil
+		if res != nil && (res.OutputPath != "" || res.RedirectUrl != "") {
+			return res, fiber.StatusOK, nil
 		}
 	}
 
@@ -232,21 +220,13 @@ func (m *ArtifactModel) DeleteArtifact(req *plugnmeet.DeleteArtifactReq) error {
 	if err := protojson.Unmarshal([]byte(artifact.Metadata), &metadata); err == nil {
 		if metadata.FileInfo != nil && metadata.FileInfo.FilePath != "" {
 			// If delete hook is configured, we'll use it.
-			if m.app.Hooks != nil && m.app.HookManager != nil && m.app.Hooks.DeleteHook != nil && len(m.app.Hooks.DeleteHook.Scripts) > 0 {
+			if m.app.HookManager != nil {
 				delReq := hooks.DeleteHookData{
 					InputPath:    metadata.FileInfo.FilePath,
 					HookFileType: hooks.HookFileTypeArtifact,
 				}
-				resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.Hooks.DeleteHook.Scripts, &delReq, m.app.Hooks.DeleteHook.HookTimeout, m.log)
-				if err != nil {
-					m.log.WithError(err).Warn("delete hook pipeline failed for artifact")
-				} else {
-					var res hooks.DeleteHookData
-					if err := json.Unmarshal(resBytes, &res); err != nil {
-						m.log.WithError(err).Warn("failed to unmarshal delete hook response for artifact")
-					} else if res.Error != "" {
-						m.log.Warnf("delete hook script returned an error for artifact: %s", res.Error)
-					}
+				if _, err := m.app.Hooks.RunDeleteHook(m.app.HookManager, &delReq, m.log); err != nil {
+					m.log.Warnf("delete hook script returned an error for artifact: %s", err.Error())
 				}
 			} else {
 				// Otherwise, we'll only try to delete if it's a local file.

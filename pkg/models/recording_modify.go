@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
@@ -164,7 +165,18 @@ func (m *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet, 
 	log.Infoln("Successfully created recording info file")
 
 	// run upload hook
-	m.runUploadHook(roomInfo.RoomId, roomInfo.Sid, roomInfo.ID, p, log)
+	if m.app.HookManager != nil {
+		req := hooks.UploadHookData{
+			InputPath:    p,
+			HookFileType: hooks.HookFileTypeRecordingMetadata,
+			RoomId:       roomInfo.RoomId,
+			RoomSid:      roomInfo.Sid,
+			RoomTableId:  roomInfo.ID,
+		}
+		if _, err := m.app.Hooks.RunUploadHook(m.app.HookManager, &req, log); err != nil {
+			log.WithError(err).Error("failed to run upload hook")
+		}
+	}
 }
 
 // UpdateRecordingMetadata updates the metadata of a specific recording.

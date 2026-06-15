@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -71,7 +70,7 @@ func (m *ArtifactModel) buildPath(fileName, roomId string, artifactType plugnmee
 // It modifies the FilePath in the metadata object in-place if the hook is successful.
 // If the hook fails, it logs the error but does not return it, allowing fallback to local storage.
 func (m *ArtifactModel) runUploadHook(roomId, roomSid string, roomTableId uint64, metadata *plugnmeet.RoomArtifactMetadata, log *logrus.Entry) {
-	if m.app.Hooks == nil || m.app.HookManager == nil || m.app.Hooks.UploadHook == nil || len(m.app.Hooks.UploadHook.Scripts) == 0 {
+	if m.app.HookManager == nil {
 		return
 	}
 	if metadata.FileInfo == nil || metadata.FileInfo.FilePath == "" {
@@ -94,30 +93,16 @@ func (m *ArtifactModel) runUploadHook(roomId, roomSid string, roomTableId uint64
 		RoomTableId:  roomTableId,
 	}
 
-	resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.Hooks.UploadHook.Scripts, &req, m.app.Hooks.UploadHook.HookTimeout, log)
+	res, err := m.app.Hooks.RunUploadHook(m.app.HookManager, &req, log)
 	if err != nil {
 		log.WithError(err).Error("upload hook pipeline failed, fallback to local storage")
 		return
 	}
 
-	// script will return same struct
-	var res hooks.UploadHookData
-	if err := json.Unmarshal(resBytes, &res); err != nil {
-		log.WithError(err).Error("failed to unmarshal upload hook response, fallback to local storage")
-		return
+	if res != nil && res.OutputPath != "" {
+		log.Infof("Upload hook successful, updating file path from '%s' to '%s'", metadata.FileInfo.FilePath, res.OutputPath)
+		metadata.FileInfo.FilePath = res.OutputPath
 	}
-
-	if res.Error != "" {
-		log.Errorf("upload hook script returned an error: %s, fallback to local storage", res.Error)
-		return
-	}
-	if res.OutputPath == "" {
-		log.Error("upload hook did not return a output_path, fallback to local storage")
-		return
-	}
-
-	log.Infof("Upload hook successful, updating file path from '%s' to '%s'", metadata.FileInfo.FilePath, res.OutputPath)
-	metadata.FileInfo.FilePath = res.OutputPath
 }
 
 // MoveToTrash moves a specified file to the configured backup/trash directory.
