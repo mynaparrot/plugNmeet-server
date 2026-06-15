@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"reflect"
 	"time"
 
@@ -139,14 +140,17 @@ func (m *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet, 
 		log.WithError(err).Errorln("failed to marshal recording info file data")
 		return
 	}
-	path := fmt.Sprintf("%s/%s.json", m.app.RecorderInfo.RecordingFilesPath, r.FilePath)
 
-	err = os.WriteFile(path, marshal, 0644)
-	if err != nil {
+	p := path.Join(m.app.RecorderInfo.RecordingFilesPath, r.FilePath+".json")
+	if err = os.WriteFile(p, marshal, 0644); err != nil {
 		log.WithError(err).Errorln("failed to write recording info file")
 		return
 	}
-	log.Infoln("successfully created recording info file")
+
+	log.Infoln("Successfully created recording info file")
+
+	// run upload hook
+	m.runUploadHook(r.RoomId, r.RoomSid, uint64(r.RoomTableId), p, log)
 }
 
 // UpdateRecordingMetadata updates the metadata of a specific recording.
