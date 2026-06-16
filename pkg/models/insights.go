@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -277,6 +278,7 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 			return
 		}
 		if res != nil && res.OutputPath != "" {
+			defer os.RemoveAll(outputDir) // delete the dir when we're done
 			payload.FilePath = res.OutputPath
 		}
 	}
@@ -287,7 +289,7 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 		log.WithError(err).Error("failed to start batch summarization job")
 		return
 	}
-	log.Infof("successfully added batch job with ID: %s for fileName: %s", jobId, fileName)
+	log.Infof("Successfully added batch job with ID: %s for fileName: %s", jobId, fileName)
 
 	pendingJob := &insights.SummarizePendingJobPayload{
 		RoomTableId:      payload.RoomTableId,
@@ -314,7 +316,7 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 		return
 	}
 
-	log.Infof("successfully registered new batch job with ID: %s for fileName: %s", jobId, fileName)
+	log.Infof("Successfully registered new batch job with ID: %s for fileName: %s", jobId, fileName)
 }
 
 func (s *InsightsModel) OnAfterRoomEnded(dbTableId uint64, roomId, roomSid string) {
