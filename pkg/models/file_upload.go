@@ -63,7 +63,7 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx, req *ResumableUploadReq) (*
 	case fiber.MethodGet:
 		{
 			// If hook is enabled, we'll check with the script first.
-			if m.app.HookManager != nil {
+			if m.app.Hooks != nil {
 				hookData := &hooks.ResumableUploadHookData{
 					Type:                 hooks.ResumableUploadHookTypeCheck,
 					RoomSid:              req.RoomSid,
@@ -73,7 +73,7 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx, req *ResumableUploadReq) (*
 					ResumableFilename:    req.ResumableFilename,
 					ResumableChunkNumber: req.ResumableChunkNumber,
 				}
-				result, err := m.app.Hooks.RunResumableUploadHook(m.app.HookManager, hookData, log)
+				result, err := m.app.Hooks.RunResumableUploadHook(hookData, log)
 				if err != nil {
 					log.WithError(err).Error("resumable upload hook 'part-check' failed")
 					return nil, fiber.NewError(fiber.StatusNoContent, "OK to upload")
@@ -137,7 +137,7 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx, req *ResumableUploadReq) (*
 			}
 
 			// If hook is enabled, pass the saved chunk to the script.
-			if m.app.HookManager != nil {
+			if m.app.Hooks != nil {
 				inputPath, _ := filepath.Abs(chunkPath)
 				// The script is responsible for the chunk including remove the local copy.
 				hookData := &hooks.ResumableUploadHookData{
@@ -150,7 +150,7 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx, req *ResumableUploadReq) (*
 					ResumableChunkNumber: req.ResumableChunkNumber,
 					InputPath:            inputPath,
 				}
-				if _, err = m.app.Hooks.RunResumableUploadHook(m.app.HookManager, hookData, log); err != nil {
+				if _, err = m.app.Hooks.RunResumableUploadHook(hookData, log); err != nil {
 					log.WithError(err).Error("resumable upload hook 'part-upload' failed")
 					return nil, fiber.NewError(fiber.StatusServiceUnavailable, "hook failed to upload part")
 				}
@@ -182,7 +182,7 @@ func (m *FileModel) UploadedFileMerge(req *plugnmeet.UploadedFileMergeReq) (*plu
 	var err error
 
 	// If hook is enabled, the script will perform the merge.
-	if m.app.HookManager != nil {
+	if m.app.Hooks != nil {
 		hookData := &hooks.ResumableUploadHookData{
 			Type:                 hooks.ResumableUploadHookTypeMerge,
 			RoomSid:              req.RoomSid,
@@ -193,7 +193,7 @@ func (m *FileModel) UploadedFileMerge(req *plugnmeet.UploadedFileMergeReq) (*plu
 			ResumableTotalChunks: req.ResumableTotalChunks,
 		}
 
-		result, err := m.app.Hooks.RunResumableUploadHook(m.app.HookManager, hookData, log)
+		result, err := m.app.Hooks.RunResumableUploadHook(hookData, log)
 		if err != nil {
 			log.WithError(err).Error("resumable upload hook 'merge' failed")
 			return nil, fmt.Errorf("resumable upload hook 'merge' failed")

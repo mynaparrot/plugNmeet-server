@@ -14,20 +14,31 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// Hooks defines optional script pipelines for different hooks
+type Hooks struct {
+	hookManager *hooks.HookProcessManager
+	client      *grab.Client
+
+	UploadHook          *hooks.HookScriptConfig `yaml:"upload_hook"`
+	DownloadHook        *hooks.HookScriptConfig `yaml:"download_hook"`
+	DeleteHook          *hooks.HookScriptConfig `yaml:"delete_hook"`
+	ResumableUploadHook *hooks.HookScriptConfig `yaml:"resumable_upload_hook"`
+	RoomEndHook         *hooks.HookScriptConfig `yaml:"room_end_hook"`
+}
+
 // InitializeHooks sets up the entire hook system for the server.
 // It resolves script paths, validates them, and starts the long-lived processes
 // for all unique, non-one-shot scripts defined in the configuration.
-func InitializeHooks(ctx context.Context, appCnf *AppConfig) error {
-	if appCnf.Hooks == nil {
+func (h *Hooks) InitializeHooks(ctx context.Context, rootWorkingDir string, logger *logrus.Logger) error {
+	if h == nil {
 		return nil // Feature is not enabled.
 	}
 
 	resolvePath := func(scriptPath string) string {
 		if !filepath.IsAbs(scriptPath) {
-			p := filepath.Join(appCnf.RootWorkingDir, scriptPath)
-			return filepath.Clean(p)
+			scriptPath = filepath.Join(rootWorkingDir, scriptPath)
 		}
-		return scriptPath
+		return filepath.Clean(scriptPath)
 	}
 
 	// scriptsWithPoolSize maps each unique script path to its required pool size.
@@ -67,27 +78,28 @@ func InitializeHooks(ctx context.Context, appCnf *AppConfig) error {
 		return nil
 	}
 
-	if err := processHookCategory(appCnf.Hooks.UploadHook, "upload_hook"); err != nil {
+	if err := processHookCategory(h.UploadHook, "upload_hook"); err != nil {
 		return err
 	}
-	if err := processHookCategory(appCnf.Hooks.DownloadHook, "download_hook"); err != nil {
+	if err := processHookCategory(h.DownloadHook, "download_hook"); err != nil {
 		return err
 	}
-	if err := processHookCategory(appCnf.Hooks.DeleteHook, "delete_hook"); err != nil {
+	if err := processHookCategory(h.DeleteHook, "delete_hook"); err != nil {
 		return err
 	}
-	if err := processHookCategory(appCnf.Hooks.ResumableUploadHook, "resumable_upload_hook"); err != nil {
+	if err := processHookCategory(h.ResumableUploadHook, "resumable_upload_hook"); err != nil {
 		return err
 	}
-	if err := processHookCategory(appCnf.Hooks.RoomEndHook, "room_end_hook"); err != nil {
+	if err := processHookCategory(h.RoomEndHook, "room_end_hook"); err != nil {
 		return err
 	}
 
 	// Initialize the HookProcessManager and start all unique scripts
-	appCnf.HookManager = hooks.NewHookProcessManager(ctx, appCnf.Logger.WithField("service", "hook_manager"))
-	if err := appCnf.HookManager.StartHookProcesses(scriptsWithPoolSize); err != nil {
+	h.hookManager = hooks.NewHookProcessManager(ctx, logger.WithField("service", "hook_manager"))
+	if err := h.hookManager.StartHookProcesses(scriptsWithPoolSize); err != nil {
 		return fmt.Errorf("failed to start hook processes: %w", err)
 	}
+	h.client = grab.NewClient()
 
 	return nil
 }
@@ -95,12 +107,12 @@ func InitializeHooks(ctx context.Context, appCnf *AppConfig) error {
 // RunUploadHook executes the pipeline for uploading files.
 // It sends the UploadHookData to the configured scripts and returns the final, modified data.
 // Returns nil if no upload hooks are configured.
-func (h *Hooks) RunUploadHook(manager *hooks.HookProcessManager, req *hooks.UploadHookData, log *logrus.Entry) (*hooks.UploadHookData, error) {
-	if manager == nil || h.UploadHook == nil || len(h.UploadHook.Scripts) == 0 {
+func (h *Hooks) RunUploadHook(req *hooks.UploadHookData, log *logrus.Entry) (*hooks.UploadHookData, error) {
+	if h.UploadHook == nil || len(h.UploadHook.Scripts) == 0 {
 		return nil, nil
 	}
 
-	resBytes, err := hooks.ExecuteHookPipeline(manager, h.UploadHook.Scripts, &req, h.UploadHook.HookTimeout, log)
+	resBytes, err := hooks.ExecuteHookPipeline(h.hookManager, h.UploadHook.Scripts, &req, h.UploadHook.HookTimeout, log)
 	if err != nil {
 		return nil, fmt.Errorf("upload hook pipeline failed with error: %w", err)
 	}
@@ -123,12 +135,12 @@ func (h *Hooks) RunUploadHook(manager *hooks.HookProcessManager, req *hooks.Uplo
 // It sends DownloadHookData to the scripts. If a localDownloadDirPath is provided,
 // it will also attempt to download the file from the final redirect URL to that directory.
 // Returns nil if no download hooks are configured.
-func (h *Hooks) RunDownloadHook(ctx context.Context, manager *hooks.HookProcessManager, req *hooks.DownloadHookData, localDownloadDirPath *string, downloadTimeout time.Duration, log *logrus.Entry) (*hooks.DownloadHookData, error) {
-	if manager == nil || h.DownloadHook == nil || len(h.DownloadHook.Scripts) == 0 {
+func (h *Hooks) RunDownloadHook(ctx context.Context, req *hooks.DownloadHookData, localDownloadDirPath *string, downloadTimeout time.Duration, log *logrus.Entry) (*hooks.DownloadHookData, error) {
+	if h.DownloadHook == nil || len(h.DownloadHook.Scripts) == 0 {
 		return nil, nil
 	}
 
-	resBytes, err := hooks.ExecuteHookPipeline(manager, h.DownloadHook.Scripts, &req, h.DownloadHook.HookTimeout, log)
+	resBytes, err := hooks.ExecuteHookPipeline(h.hookManager, h.DownloadHook.Scripts, &req, h.DownloadHook.HookTimeout, log)
 	if err != nil {
 		return nil, fmt.Errorf("download hook pipeline failed with error: %w", err)
 	}
@@ -162,12 +174,12 @@ func (h *Hooks) RunDownloadHook(ctx context.Context, manager *hooks.HookProcessM
 // RunDeleteHook executes the pipeline for deleting files.
 // It sends DeleteHookData to the configured scripts to handle deletion from external storage.
 // Returns nil if no delete hooks are configured.
-func (h *Hooks) RunDeleteHook(manager *hooks.HookProcessManager, req *hooks.DeleteHookData, log *logrus.Entry) (*hooks.DeleteHookData, error) {
-	if manager == nil || h.DeleteHook == nil || len(h.DeleteHook.Scripts) == 0 {
+func (h *Hooks) RunDeleteHook(req *hooks.DeleteHookData, log *logrus.Entry) (*hooks.DeleteHookData, error) {
+	if h.DeleteHook == nil || len(h.DeleteHook.Scripts) == 0 {
 		return nil, nil
 	}
 
-	resBytes, err := hooks.ExecuteHookPipeline(manager, h.DeleteHook.Scripts, &req, h.DeleteHook.HookTimeout, log)
+	resBytes, err := hooks.ExecuteHookPipeline(h.hookManager, h.DeleteHook.Scripts, &req, h.DeleteHook.HookTimeout, log)
 	if err != nil {
 		return nil, fmt.Errorf("delete hook pipeline failed with error: %w", err)
 	}
@@ -184,43 +196,15 @@ func (h *Hooks) RunDeleteHook(manager *hooks.HookProcessManager, req *hooks.Dele
 	return &res, nil
 }
 
-// downloadFileToDest uses the 'grab' library to download a file from a URL to a destination directory.
-// It respects the provided context and timeout.
-// It returns the full path to the downloaded file upon success.
-func (h *Hooks) downloadFileToDest(ctx context.Context, fileUrl, dstDir string, timeout time.Duration, log *logrus.Entry) (fileFullPath string, err error) {
-	log = log.WithField("sub-method", "downloadFileToDest")
-	if timeout == 0 {
-		timeout = time.Minute * 3
-	}
-
-	client := grab.NewClient()
-	req, err := grab.NewRequest(dstDir, fileUrl)
-	if err != nil {
-		return "", fmt.Errorf("failed to create download request: %w", err)
-	}
-
-	gctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	resp := client.Do(req.WithContext(gctx))
-	<-resp.Done
-
-	if err := resp.Err(); err != nil {
-		return "", fmt.Errorf("failed to download file: %w", err)
-	}
-
-	return resp.Filename, nil
-}
-
 // RunResumableUploadHook executes the pipeline for uploading files.
 // It sends the ResumableUploadHookData to the configured scripts and returns the final, modified data.
 // Returns nil if no upload hooks are configured.
-func (h *Hooks) RunResumableUploadHook(manager *hooks.HookProcessManager, req *hooks.ResumableUploadHookData, log *logrus.Entry) (*hooks.ResumableUploadHookData, error) {
-	if manager == nil || h.ResumableUploadHook == nil || len(h.ResumableUploadHook.Scripts) == 0 {
+func (h *Hooks) RunResumableUploadHook(req *hooks.ResumableUploadHookData, log *logrus.Entry) (*hooks.ResumableUploadHookData, error) {
+	if h.ResumableUploadHook == nil || len(h.ResumableUploadHook.Scripts) == 0 {
 		return nil, nil
 	}
 
-	resBytes, err := hooks.ExecuteHookPipeline(manager, h.ResumableUploadHook.Scripts, req, h.ResumableUploadHook.HookTimeout, log)
+	resBytes, err := hooks.ExecuteHookPipeline(h.hookManager, h.ResumableUploadHook.Scripts, req, h.ResumableUploadHook.HookTimeout, log)
 	if err != nil {
 		return nil, err
 	}
@@ -235,4 +219,56 @@ func (h *Hooks) RunResumableUploadHook(manager *hooks.HookProcessManager, req *h
 	}
 
 	return &res, nil
+}
+
+// RunRoomEndHook executes the pipeline for room end hooks.
+// It sends the RoomEndHookData to the configured scripts and returns the final, modified data.
+// Returns nil if no room end hooks are configured.
+func (h *Hooks) RunRoomEndHook(req *hooks.RoomEndHookData, log *logrus.Entry) (*hooks.RoomEndHookData, error) {
+	if h.RoomEndHook == nil || len(h.RoomEndHook.Scripts) == 0 {
+		return nil, nil
+	}
+
+	resBytes, err := hooks.ExecuteHookPipeline(h.hookManager, h.RoomEndHook.Scripts, req, h.RoomEndHook.HookTimeout, log)
+	if err != nil {
+		return nil, err
+	}
+
+	var res hooks.RoomEndHookData
+	if err := json.Unmarshal(resBytes, &res); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal room end hook response: %w", err)
+	}
+
+	if res.Error != "" {
+		return nil, fmt.Errorf("room end hook script returned an error: %s", res.Error)
+	}
+
+	return &res, nil
+}
+
+// downloadFileToDest uses the 'grab' library to download a file from a URL to a destination directory.
+// It respects the provided context and timeout.
+// It returns the full path to the downloaded file upon success.
+func (h *Hooks) downloadFileToDest(ctx context.Context, fileUrl, dstDir string, timeout time.Duration, log *logrus.Entry) (fileFullPath string, err error) {
+	log = log.WithField("sub-method", "downloadFileToDest")
+	if timeout == 0 {
+		timeout = time.Minute * 3
+	}
+
+	req, err := grab.NewRequest(dstDir, fileUrl)
+	if err != nil {
+		return "", fmt.Errorf("failed to create download request: %w", err)
+	}
+
+	gctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	resp := h.client.Do(req.WithContext(gctx))
+	<-resp.Done
+
+	if err := resp.Err(); err != nil {
+		return "", fmt.Errorf("failed to download file: %w", err)
+	}
+
+	return resp.Filename, nil
 }

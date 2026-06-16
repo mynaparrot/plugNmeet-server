@@ -29,12 +29,12 @@ func (m *RecordingModel) DeleteRecording(r *plugnmeet.DeleteRecordingReq) error 
 	}
 
 	// If delete hook is configured, we'll use it.
-	if m.app.HookManager != nil {
+	if m.app.Hooks != nil {
 		delReq := hooks.DeleteHookData{
 			InputPath:    recording.FilePath,
 			HookFileType: hooks.HookFileTypeRecording,
 		}
-		if _, err := m.app.Hooks.RunDeleteHook(m.app.HookManager, &delReq, log); err != nil {
+		if _, err := m.app.Hooks.RunDeleteHook(&delReq, log); err != nil {
 			log.WithError(err).Warn("delete hook failed for recording")
 		}
 		// After running the hook (even if it failed), we proceed to delete the DB record.

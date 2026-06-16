@@ -54,8 +54,10 @@ func main() {
 	}
 	lkLogger.InitFromConfig(logConf, "pnm")
 
-	if err := config.InitializeHooks(ctx, appCnf); err != nil {
-		logger.WithError(err).Fatal("Failed to setup hooks")
+	if appCnf.Hooks != nil {
+		if err := appCnf.Hooks.InitializeHooks(ctx, appCnf.RootWorkingDir, logger); err != nil {
+			logger.WithError(err).Fatal("Failed to setup hooks")
+		}
 	}
 
 	fxOpts := []fx.Option{

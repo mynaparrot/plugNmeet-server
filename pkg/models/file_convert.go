@@ -101,13 +101,13 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 	var fullPath string
 
 	// If hooks are enabled, we need to download the file first.
-	if m.app.HookManager != nil {
+	if m.app.Hooks != nil {
 		req := hooks.DownloadHookData{
 			InputPath:    filePath,
 			HookFileType: hooks.HookFileTypeRoomFile,
 		}
 		outputDir := filepath.Join(m.app.UploadFileSettings.Path, roomSid)
-		res, err := m.app.Hooks.RunDownloadHook(m.ctx, m.app.HookManager, &req, &outputDir, time.Minute*3, log)
+		res, err := m.app.Hooks.RunDownloadHook(m.ctx, &req, &outputDir, time.Minute*3, log)
 		if err != nil {
 			return nil, err
 		}
@@ -164,7 +164,7 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 	}
 
 	// If hooks are enabled, upload the entire directory of converted images.
-	if m.app.HookManager != nil {
+	if m.app.Hooks != nil {
 		req := hooks.UploadHookData{
 			InputDirectoryPath: outputDir,
 			FileId:             fileId,
@@ -172,7 +172,7 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 			RoomId:             roomId,
 			RoomSid:            roomSid,
 		}
-		res, err := m.app.Hooks.RunUploadHook(m.app.HookManager, &req, log)
+		res, err := m.app.Hooks.RunUploadHook(&req, log)
 		if err != nil {
 			log.WithError(err).Error("upload hook pipeline for converted images failed")
 			return nil, fmt.Errorf("upload hook pipeline for converted images failed")

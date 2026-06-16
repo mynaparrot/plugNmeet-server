@@ -2,8 +2,6 @@ package models
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/hooks"
@@ -173,9 +171,13 @@ func (m *RoomModel) onAfterRoomEnded(p *onAfterRoomEndedParams) {
 	})
 
 	// Trigger room end hook for any external cleanup
-	if m.app.Hooks != nil && m.app.HookManager != nil && m.app.Hooks.RoomEndHook != nil && len(m.app.Hooks.RoomEndHook.Scripts) > 0 {
-		log.Info("running room end hook")
-		if err := m.runRoomEndHook(p.roomId, p.roomSid, log); err != nil {
+	if m.app.Hooks != nil {
+		log.Info("Running room end hook")
+		req := &hooks.RoomEndHookData{
+			RoomId:  p.roomId,
+			RoomSid: p.roomSid,
+		}
+		if _, err := m.app.Hooks.RunRoomEndHook(req, log); err != nil {
 			log.WithError(err).Error("room end hook execution failed")
 		}
 	}
@@ -276,27 +278,4 @@ func (m *RoomModel) sendSessionEndedWebhook(roomId, roomSid, metadata string, cr
 			m.logger.WithError(err).Errorln("error sending session ended webhook")
 		}
 	}
-}
-
-func (m *RoomModel) runRoomEndHook(roomId, roomSid string, log *logrus.Entry) error {
-	req := &hooks.RoomEndHookData{
-		RoomId:  roomId,
-		RoomSid: roomSid,
-	}
-
-	resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.Hooks.RoomEndHook.Scripts, req, m.app.Hooks.RoomEndHook.HookTimeout, log)
-	if err != nil {
-		return err
-	}
-
-	var res hooks.RoomEndHookData
-	if err := json.Unmarshal(resBytes, &res); err != nil {
-		return fmt.Errorf("failed to unmarshal room end hook response: %w", err)
-	}
-
-	if res.Error != "" {
-		return fmt.Errorf("room end hook script returned an error: %s", res.Error)
-	}
-
-	return nil
 }

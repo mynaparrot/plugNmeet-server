@@ -265,13 +265,13 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 	userPrompt := string(payload.Options)
 
 	// download the file to local
-	if s.appConfig.HookManager != nil {
+	if s.appConfig.Hooks != nil {
 		req := &hooks.DownloadHookData{
 			InputPath:    payload.FilePath,
 			HookFileType: hooks.HookFileTypeArtifact,
 		}
 		outputDir := filepath.Join(*s.appConfig.ArtifactsSettings.StoragePath, strings.ToLower(plugnmeet.RoomArtifactType_MEETING_SUMMARY.String()), payload.RoomId)
-		res, err := s.appConfig.Hooks.RunDownloadHook(s.ctx, s.appConfig.HookManager, req, &outputDir, time.Minute*3, log)
+		res, err := s.appConfig.Hooks.RunDownloadHook(s.ctx, req, &outputDir, time.Minute*3, log)
 		if err != nil {
 			log.WithError(err).Error("download hook pipeline failed")
 			return

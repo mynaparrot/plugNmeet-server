@@ -147,14 +147,14 @@ func (t *MeetingSummarizingTask) doRoomSummarizing(roomTableId uint64, roomId, f
 	log.Infof("file writing finished for %s. publishing summarization job.", filePath)
 
 	// we'll check hook to upload file
-	if t.appConf.HookManager != nil {
+	if t.appConf.Hooks != nil {
 		req := &hooks.UploadHookData{
 			InputPath:    filePath,
 			HookFileType: hooks.HookFileTypeArtifact,
 			RoomId:       roomId,
 			RoomTableId:  roomTableId,
 		}
-		res, err := t.appConf.Hooks.RunUploadHook(t.appConf.HookManager, req, log)
+		res, err := t.appConf.Hooks.RunUploadHook(req, log)
 		if err != nil {
 			log.WithError(err).Error("upload hook pipeline failed")
 		} else if res != nil && res.OutputPath != "" {

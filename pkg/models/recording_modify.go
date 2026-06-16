@@ -165,7 +165,7 @@ func (m *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet, 
 	log.Infoln("Successfully created recording info file")
 
 	// run upload hook
-	if m.app.HookManager != nil {
+	if m.app.Hooks != nil {
 		req := hooks.UploadHookData{
 			InputPath:    p,
 			HookFileType: hooks.HookFileTypeRecordingMetadata,
@@ -173,7 +173,7 @@ func (m *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet, 
 			RoomSid:      roomInfo.Sid,
 			RoomTableId:  roomInfo.ID,
 		}
-		if _, err := m.app.Hooks.RunUploadHook(m.app.HookManager, &req, log); err != nil {
+		if _, err := m.app.Hooks.RunUploadHook(&req, log); err != nil {
 			log.WithError(err).Error("failed to run upload hook")
 		}
 	}

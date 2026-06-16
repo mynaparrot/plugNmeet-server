@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/livekit/protocol/livekit"
-	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/logging"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/nats-io/nats.go"
@@ -30,7 +29,6 @@ type AppConfig struct {
 	NatsConn    *nats.Conn
 	JetStream   jetstream.JetStream
 	ClientFiles map[string][]string
-	HookManager *hooks.HookProcessManager
 
 	RootWorkingDir      string
 	Client              ClientInfo                 `yaml:"client"`
@@ -228,15 +226,6 @@ type NatsInfoRecorder struct {
 	RecorderChannel string `yaml:"recorder_channel"`
 	RecorderInfoKv  string `yaml:"recorder_info_kv"`
 	TranscodingJobs string `yaml:"transcoding_jobs_subject"`
-}
-
-// Hooks defines optional script pipelines for handling file I/O.
-type Hooks struct {
-	UploadHook          *hooks.HookScriptConfig `yaml:"upload_hook"`
-	DownloadHook        *hooks.HookScriptConfig `yaml:"download_hook"`
-	DeleteHook          *hooks.HookScriptConfig `yaml:"delete_hook"`
-	ResumableUploadHook *hooks.HookScriptConfig `yaml:"resumable_upload_hook"`
-	RoomEndHook         *hooks.HookScriptConfig `yaml:"room_end_hook"`
 }
 
 func InitAppConfig(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
