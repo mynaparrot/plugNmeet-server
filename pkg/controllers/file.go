@@ -205,8 +205,8 @@ func (fc *FileController) HandleConvertWhiteboardFile(c fiber.Ctx) error {
 	}
 	log := fc.logger.WithField("method", "HandleConvertWhiteboardFile")
 
-	// We'll give 5 minutes to complete the task
-	ctx, cancel := context.WithTimeout(c.RequestCtx(), 5*time.Minute)
+	// We'll give 50 seconds to complete the task
+	ctx, cancel := context.WithTimeout(c.RequestCtx(), 50*time.Second)
 	defer cancel()
 
 	res, err := fc.FileModel.ConvertAndBroadcastWhiteboardFile(ctx, req.RoomId, req.RoomSid, req.FilePath, requestedUserId, nil, log)
