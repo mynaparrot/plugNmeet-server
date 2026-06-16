@@ -72,6 +72,7 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx, req *ResumableUploadReq) (*
 					ResumableIdentifier:  safeIdentifier,
 					ResumableFilename:    req.ResumableFilename,
 					ResumableChunkNumber: req.ResumableChunkNumber,
+					ResumableTotalChunks: int32(req.ResumableTotalChunks),
 				}
 				result, err := m.app.Hooks.RunResumableUploadHook(hookData, log)
 				if err != nil {
@@ -148,6 +149,7 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx, req *ResumableUploadReq) (*
 					ResumableIdentifier:  safeIdentifier,
 					ResumableFilename:    req.ResumableFilename,
 					ResumableChunkNumber: req.ResumableChunkNumber,
+					ResumableTotalChunks: int32(req.ResumableTotalChunks),
 					InputPath:            inputPath,
 				}
 				if _, err = m.app.Hooks.RunResumableUploadHook(hookData, log); err != nil {
