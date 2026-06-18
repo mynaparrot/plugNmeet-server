@@ -6,11 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/gammazero/workerpool"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
@@ -40,11 +38,6 @@ const (
 	// nats connection event queue
 	natsConnectionEventQueueGroup = prefix + "conn-event-queue"
 	websocketClientType           = "websocket"
-
-	// we'll try maximum of 3 times, we've same the value in recorder as well
-	maxTranscodingRetries = 3
-	// in transcoder we've msg.InProgress() update loop but still we can set time little bit longer
-	maxTranscodingAckWait = time.Minute * 10
 )
 
 type NatsController struct {
@@ -127,30 +120,9 @@ func (c *NatsController) Initialize() error {
 	log.Info("Subscribed to system worker via core NATS")
 
 	// create recorder transcoder worker
-	transcoderStream, err := c.app.JetStream.CreateOrUpdateStream(c.ctx, jetstream.StreamConfig{
-		Name:        c.app.NatsInfo.Recorder.TranscodingJobs,
-		Description: "plugNmeet recorder transcoding jobs",
-		Replicas:    c.app.NatsInfo.NumReplicas,
-		Retention:   jetstream.WorkQueuePolicy,
-		Subjects:    []string{c.app.NatsInfo.Recorder.TranscodingJobs},
-	})
-	if err != nil {
-		log.WithError(err).Error("error creating recorder transcoder stream")
+	if err := c.natsService.CreateTranscoderStreamWithConsumer(c.ctx, log); err != nil {
 		return err
 	}
-	log.Info("Created/Updated recorder transcoder stream")
-
-	_, err = transcoderStream.CreateOrUpdateConsumer(c.ctx, jetstream.ConsumerConfig{
-		Durable:    utils.TranscoderConsumerDurable,
-		AckPolicy:  jetstream.AckExplicitPolicy,
-		AckWait:    maxTranscodingAckWait,
-		MaxDeliver: maxTranscodingRetries,
-	})
-	if err != nil {
-		log.WithError(err).Error("error creating recorder transcoder consumer")
-		return err
-	}
-	log.Info("Created/Updated recorder transcoder consumer")
 
 	c.userConnSub, err = c.subscribeToUsersConnEvents()
 	if err != nil {
