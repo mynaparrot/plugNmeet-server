@@ -17,6 +17,7 @@ import (
 	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/sirupsen/logrus"
 )
 
@@ -235,7 +236,7 @@ func (s *InsightsModel) Shutdown() {
 }
 
 // StartProcessingSummarizeJob will be called by the NATS subscription in the controller.
-func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJobPayload) {
+func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJobPayload, metadata *jetstream.MsgMetadata) (err error) {
 	log := s.logger.WithFields(logrus.Fields{
 		"roomTableId": payload.RoomTableId,
 		"roomId":      payload.RoomId,
@@ -244,24 +245,47 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 	})
 	log.Infoln("received new meeting summarization job")
 
+	originalPath := payload.FilePath // copy the original path for defer usage
+	defer func() {
+		if err != nil {
+			if insights.SummarizeJobMaxDeliverNum == metadata.NumDelivered {
+				// so, maximum delivery done, and we can delete the original file to ensure it's remain as orphan
+				if s.appConfig.Hooks != nil {
+					req := &hooks.DeleteHookData{
+						InputPath:    originalPath,
+						HookFileType: hooks.HookFileTypeArtifact,
+					}
+					if _, err := s.appConfig.Hooks.RunDeleteHook(req, log); err != nil {
+						log.WithError(err).Error("delete hook pipeline failed")
+					}
+				} else {
+					if err := os.Remove(originalPath); err != nil {
+						log.WithError(err).Error("failed to delete file")
+					}
+				}
+			}
+		}
+	}()
+
 	// 1. Get the configuration for the service.
 	targetAccount, serviceConfig, err := s.appConfig.Insights.GetProviderAccountForService(insights.ServiceTypeMeetingSummarizing)
 	if err != nil {
 		log.WithError(err).Error("failed to get provider account")
-		return
+		return err
 	}
 
 	// 2. Create a new provider instance.
 	provider, err := insightsservice.NewProvider(s.ctx, serviceConfig.Provider, targetAccount, serviceConfig, s.logger)
 	if err != nil {
 		log.WithError(err).Error("failed to create provider")
-		return
+		return err
 	}
 
 	summarizeModel, ok := serviceConfig.Options["summarize_model"].(string)
 	if !ok {
-		log.Error("summarize_model not configured for meeting_summarizing service")
-		return
+		err = fmt.Errorf("summarize_model not configured for meeting_summarizing service")
+		log.Error(err.Error())
+		return err
 	}
 	userPrompt := string(payload.Options)
 
@@ -275,7 +299,7 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 		res, err := s.appConfig.Hooks.RunDownloadHook(s.ctx, req, &outputDir, time.Minute*3, log)
 		if err != nil {
 			log.WithError(err).Error("download hook pipeline failed")
-			return
+			return err
 		}
 		if res != nil && res.OutputPath != "" {
 			defer os.RemoveAll(outputDir) // delete the dir when we're done
@@ -287,7 +311,7 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 	jobId, fileName, err := provider.StartBatchSummarizeAudioFile(s.ctx, payload.FilePath, summarizeModel, userPrompt)
 	if err != nil {
 		log.WithError(err).Error("failed to start batch summarization job")
-		return
+		return err
 	}
 	log.Infof("Successfully added batch job with ID: %s for fileName: %s", jobId, fileName)
 
@@ -302,7 +326,7 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 	marshal, err := json.Marshal(&pendingJob)
 	if err != nil {
 		log.WithError(err).Error("failed to marshal pending job")
-		return
+		return err
 	}
 
 	data := map[string]string{
@@ -310,13 +334,13 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 	}
 
 	// 4. Store the job ID in Redis for the janitor to track.
-	err = s.appConfig.RDS.HSet(s.ctx, insights.PendingSummarizeJobRedisKey, data).Err()
-	if err != nil {
+	if err = s.appConfig.RDS.HSet(s.ctx, insights.PendingSummarizeJobRedisKey, data).Err(); err != nil {
 		log.WithError(err).Error("failed to store pending summarization job in Redis")
-		return
+		return err
 	}
 
 	log.Infof("Successfully registered new batch job with ID: %s for fileName: %s", jobId, fileName)
+	return nil
 }
 
 func (s *InsightsModel) OnAfterRoomEnded(dbTableId uint64, roomId, roomSid string) {

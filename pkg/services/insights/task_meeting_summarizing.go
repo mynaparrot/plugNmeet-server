@@ -19,6 +19,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights/media"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/sirupsen/logrus"
 )
 
@@ -174,8 +175,8 @@ func (t *MeetingSummarizingTask) doRoomSummarizing(roomTableId uint64, roomId, f
 		return
 	}
 
-	// Publish to the NATS queue.
-	if err := t.appConf.NatsConn.Publish(insights.SummarizeJobQueue, payloadBytes); err != nil {
+	// Publish to the NATS stream.
+	if _, err := t.appConf.JetStream.Publish(t.ctx, insights.SummarizeJobQueueSubject, payloadBytes, jetstream.WithExpectStream(insights.InsightsJobsStream)); err != nil {
 		log.WithError(err).Error("failed to publish summarization job")
 	}
 }

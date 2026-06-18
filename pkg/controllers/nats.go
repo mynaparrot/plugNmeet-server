@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/gammazero/workerpool"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -39,6 +40,11 @@ const (
 	// nats connection event queue
 	natsConnectionEventQueueGroup = prefix + "conn-event-queue"
 	websocketClientType           = "websocket"
+
+	// we'll try maximum of 3 times, we've same the value in recorder as well
+	maxTranscodingRetries = 3
+	// in transcoder we've msg.InProgress() update loop but still we can set time little bit longer
+	maxTranscodingAckWait = time.Minute * 10
 )
 
 type NatsController struct {
@@ -135,8 +141,10 @@ func (c *NatsController) Initialize() error {
 	log.Info("Created/Updated recorder transcoder stream")
 
 	_, err = transcoderStream.CreateOrUpdateConsumer(c.ctx, jetstream.ConsumerConfig{
-		Durable:   utils.TranscoderConsumerDurable,
-		AckPolicy: jetstream.AckExplicitPolicy,
+		Durable:    utils.TranscoderConsumerDurable,
+		AckPolicy:  jetstream.AckExplicitPolicy,
+		AckWait:    maxTranscodingAckWait,
+		MaxDeliver: maxTranscodingRetries,
 	})
 	if err != nil {
 		log.WithError(err).Error("error creating recorder transcoder consumer")
