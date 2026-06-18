@@ -259,7 +259,7 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 						log.WithError(err).Error("delete hook pipeline failed")
 					}
 				} else {
-					if err := os.Remove(originalPath); err != nil {
+					if _, err := s.artifactModel.MoveToTrash(originalPath); err != nil {
 						log.WithError(err).Error("failed to delete file")
 					}
 				}

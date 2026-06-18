@@ -67,25 +67,9 @@ func (i *InsightsController) subscribeToAgentTaskRequests() error {
 
 // subscribeToSummarizeJobs sets up a durable consumer to handle summarization jobs from the JetStream.
 func (i *InsightsController) subscribeToSummarizeJobs(ctx context.Context) error {
-	stream, err := i.app.JetStream.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
-		Name:        insights.InsightsJobsStream,
-		Description: "plugNmeet meeting summarization jobs",
-		Subjects:    []string{insights.SummarizeJobQueueSubject},
-		Retention:   jetstream.WorkQueuePolicy,
-		Replicas:    i.app.NatsInfo.NumReplicas,
-	})
+	consumer, err := i.natsService.CreateSummarizeJobStreamWithConsumer(ctx, i.logger)
 	if err != nil {
-		return fmt.Errorf("failed to create/update stream: %w", err)
-	}
-
-	consumer, err := stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
-		Durable:    insights.SummarizeJobQueueSubject + "-durable",
-		AckPolicy:  jetstream.AckExplicitPolicy,
-		MaxDeliver: insights.SummarizeJobMaxDeliverNum,
-		AckWait:    5 * time.Minute, // just bit higher than default 30 seconds
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create/update consumer: %w", err)
+		return err
 	}
 
 	consumeCtx, err := consumer.Consume(func(msg jetstream.Msg) {

@@ -110,8 +110,7 @@ func (m *ArtifactModel) runUploadHook(roomId, roomSid string, roomTableId uint64
 func (m *ArtifactModel) MoveToTrash(filePath string) (string, error) {
 	if !m.app.ArtifactsSettings.EnableDelArtifactsBackup {
 		// If backup is disabled, delete the file permanently.
-		err := os.Remove(filePath)
-		if err != nil {
+		if err := os.Remove(filePath); err != nil {
 			return "", err
 		}
 		return "", nil // Return empty string to indicate permanent deletion
@@ -122,20 +121,18 @@ func (m *ArtifactModel) MoveToTrash(filePath string) (string, error) {
 	trashPath := filepath.Join(m.app.ArtifactsSettings.DelArtifactsBackupPath, fileName)
 
 	// Use os.Rename to move the file.
-	err := os.Rename(filePath, trashPath)
-	if err != nil {
+	if err := os.Rename(filePath, trashPath); err != nil {
 		return "", err
 	}
 
 	// Update the modification time otherwise janitor will delete it based on old value.
 	currentTime := time.Now().UTC()
-	err = os.Chtimes(trashPath, currentTime, currentTime)
-	if err != nil {
+	if err := os.Chtimes(trashPath, currentTime, currentTime); err != nil {
 		// Log a warning and continue.
 		m.log.WithError(err).Warnf("failed to update modification time for moved artifact: %s", trashPath)
 	}
 
-	m.log.Infof("moved artifact file %s to trash at %s", filePath, trashPath)
+	m.log.Infof("Moved artifact file %s to trash at %s", filePath, trashPath)
 	return trashPath, nil
 }
 
