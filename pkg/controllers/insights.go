@@ -84,6 +84,10 @@ func (i *InsightsController) subscribeToSummarizeJobs(ctx context.Context) error
 
 		metadata, err := msg.Metadata()
 		if err != nil {
+			i.logger.WithError(err).Error("failed to get msg metadata")
+			if err := msg.Nak(); err != nil {
+				i.logger.WithError(err).Error("failed to send NAK")
+			}
 			return
 		}
 
