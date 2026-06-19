@@ -140,7 +140,7 @@ func (h *Hooks) RunDownloadHook(ctx context.Context, req *hooks.DownloadHookData
 		return nil, nil
 	}
 
-	resBytes, err := hooks.ExecuteHookPipeline(h.hookManager, h.DownloadHook.Scripts, &req, h.DownloadHook.HookTimeout, log)
+resBytes, err := hooks.ExecuteHookPipeline(h.hookManager, h.DownloadHook.Scripts, req, h.DownloadHook.HookTimeout, log)
 	if err != nil {
 		return nil, fmt.Errorf("download hook pipeline failed with error: %w", err)
 	}
