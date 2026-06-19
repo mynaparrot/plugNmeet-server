@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/livekit/protocol/livekit"
-	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/logging"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/nats-io/nats.go"
@@ -30,7 +29,6 @@ type AppConfig struct {
 	NatsConn    *nats.Conn
 	JetStream   jetstream.JetStream
 	ClientFiles map[string][]string
-	HookManager *hooks.HookProcessManager
 
 	RootWorkingDir      string
 	Client              ClientInfo                 `yaml:"client"`
@@ -48,7 +46,7 @@ type AppConfig struct {
 	NatsInfo            NatsInfo                   `yaml:"nats_info"`
 	Insights            *InsightsConfig            `yaml:"insights"`
 	TurnServer          *TurnConfig                `yaml:"turn_server"`
-	StorageHooks        *StorageHooks              `yaml:"storage_hooks"`
+	Hooks               *Hooks                     `yaml:"hooks"`
 }
 
 type ClientInfo struct {
@@ -230,17 +228,6 @@ type NatsInfoRecorder struct {
 	TranscodingJobs string `yaml:"transcoding_jobs_subject"`
 }
 
-// StorageHooks defines optional script pipelines for handling file I/O.
-type StorageHooks struct {
-	HookTimeout time.Duration `yaml:"hook_timeout"`
-	// A list of scripts to execute sequentially for an upload operation.
-	UploadHook []string `yaml:"upload_hook"`
-	// A list of scripts for a download operation.
-	DownloadHook []string `yaml:"download_hook"`
-	// A list of scripts for a delete operation.
-	DeleteHook []string `yaml:"delete_hook"`
-}
-
 func InitAppConfig(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 	// default validation of token is 10 minutes
 	if appCnf.Client.TokenValidity == nil || *appCnf.Client.TokenValidity < 0 {
@@ -276,16 +263,23 @@ func InitAppConfig(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 	}
 	appCnf.RoomDefaultSettings.MaxPreloadedWhiteboardFileSizeByte = &bytes
 
-	if strings.HasPrefix(appCnf.LogSettings.LogFile, "./") {
+	if !filepath.IsAbs(appCnf.LogSettings.LogFile) {
 		appCnf.LogSettings.LogFile = filepath.Join(appCnf.RootWorkingDir, appCnf.LogSettings.LogFile)
 	}
-	if strings.HasPrefix(appCnf.UploadFileSettings.Path, "./") {
+	appCnf.LogSettings.LogFile = filepath.Clean(appCnf.LogSettings.LogFile)
+
+	if !filepath.IsAbs(appCnf.UploadFileSettings.Path) {
 		appCnf.UploadFileSettings.Path = filepath.Join(appCnf.RootWorkingDir, appCnf.UploadFileSettings.Path)
 	}
-	if strings.HasPrefix(appCnf.RecorderInfo.RecordingFilesPath, "./") {
+	appCnf.UploadFileSettings.Path = filepath.Clean(appCnf.UploadFileSettings.Path)
+
+	if !filepath.IsAbs(appCnf.RecorderInfo.RecordingFilesPath) {
 		appCnf.RecorderInfo.RecordingFilesPath = filepath.Join(appCnf.RootWorkingDir, appCnf.RecorderInfo.RecordingFilesPath)
 		appCnf.RecorderInfo.DelRecordingBackupPath = filepath.Join(appCnf.RootWorkingDir, appCnf.RecorderInfo.DelRecordingBackupPath)
 	}
+	appCnf.RecorderInfo.RecordingFilesPath = filepath.Clean(appCnf.RecorderInfo.RecordingFilesPath)
+	appCnf.RecorderInfo.DelRecordingBackupPath = filepath.Clean(appCnf.RecorderInfo.DelRecordingBackupPath)
+
 	if appCnf.RecorderInfo.PingTimeout == 0 {
 		appCnf.RecorderInfo.PingTimeout = time.Second * 8
 	}
@@ -305,6 +299,7 @@ func InitAppConfig(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 		if appCnf.RecorderInfo.DelRecordingBackupPath == "" {
 			appCnf.RecorderInfo.DelRecordingBackupPath = path.Join(appCnf.RecorderInfo.RecordingFilesPath, "del_backup")
 		}
+		appCnf.RecorderInfo.DelRecordingBackupPath = filepath.Clean(appCnf.RecorderInfo.DelRecordingBackupPath)
 
 		if err := os.MkdirAll(appCnf.RecorderInfo.DelRecordingBackupPath, 0755); err != nil {
 			return nil, fmt.Errorf("failed to create recording backup directory %s: %w", appCnf.RecorderInfo.DelRecordingBackupPath, err)
@@ -372,10 +367,12 @@ func handleArtifactsSettings(appCnf *AppConfig) error {
 	}
 
 	p := *appCnf.ArtifactsSettings.StoragePath
-	if strings.HasPrefix(p, "./") {
+	if !filepath.IsAbs(p) {
 		p = filepath.Join(appCnf.RootWorkingDir, p)
 		appCnf.ArtifactsSettings.StoragePath = &p
 	}
+	p = filepath.Clean(p)
+	appCnf.ArtifactsSettings.StoragePath = &p
 
 	if _, err := os.Stat(p); os.IsNotExist(err) {
 		err = os.MkdirAll(p, os.ModePerm)
@@ -395,68 +392,16 @@ func handleArtifactsSettings(appCnf *AppConfig) error {
 		}
 
 		trashPath := appCnf.ArtifactsSettings.DelArtifactsBackupPath
-		if strings.HasPrefix(trashPath, "./") {
+		if !filepath.IsAbs(trashPath) {
 			trashPath = filepath.Join(appCnf.RootWorkingDir, trashPath)
 		}
+		appCnf.ArtifactsSettings.DelArtifactsBackupPath = filepath.Clean(trashPath)
+
 		err := os.MkdirAll(trashPath, 0755)
 		if err != nil {
 			return fmt.Errorf("failed to create artifacts backup directory %s: %w", trashPath, err)
 		}
 	}
-	return nil
-}
-
-func InitializeStorageHooks(ctx context.Context, appCnf *AppConfig) error {
-	if appCnf.StorageHooks == nil {
-		return nil // Feature is not enabled.
-	}
-
-	if appCnf.StorageHooks.HookTimeout == 0 {
-		appCnf.StorageHooks.HookTimeout = 5 * time.Minute
-	}
-
-	resolvePath := func(scriptPath string) string {
-		if strings.HasPrefix(scriptPath, "./") {
-			return filepath.Join(appCnf.RootWorkingDir, scriptPath)
-		}
-		return scriptPath
-	}
-
-	// Collect all unique scripts to start them once
-	var allScripts []string
-	for i, script := range appCnf.StorageHooks.UploadHook {
-		resolved := resolvePath(script)
-		appCnf.StorageHooks.UploadHook[i] = resolved
-		if err := hooks.ValidateHookScript(resolved, "upload_hook"); err != nil {
-			return err
-		}
-		allScripts = append(allScripts, resolved)
-	}
-
-	for i, script := range appCnf.StorageHooks.DownloadHook {
-		resolved := resolvePath(script)
-		appCnf.StorageHooks.DownloadHook[i] = resolved
-		if err := hooks.ValidateHookScript(resolved, "download_hook"); err != nil {
-			return err
-		}
-		allScripts = append(allScripts, resolved)
-	}
-
-	for i, script := range appCnf.StorageHooks.DeleteHook {
-		resolved := resolvePath(script)
-		appCnf.StorageHooks.DeleteHook[i] = resolved
-		if err := hooks.ValidateHookScript(resolved, "delete_hook"); err != nil {
-			return err
-		}
-		allScripts = append(allScripts, resolved)
-	}
-
-	// Initialize the HookProcessManager and start all unique scripts
-	appCnf.HookManager = hooks.NewHookProcessManager(ctx, appCnf.Logger.WithField("service", "hook_manager"))
-	if err := appCnf.HookManager.StartHookProcesses(allScripts); err != nil {
-		return fmt.Errorf("failed to start hook processes: %w", err)
-	}
-
 	return nil
 }
 
@@ -474,9 +419,10 @@ func readClientFiles(a *AppConfig) error {
 		return nil
 	}
 
-	if strings.HasPrefix(a.Client.Path, "./") {
+	if !filepath.IsAbs(a.Client.Path) {
 		a.Client.Path = filepath.Join(a.RootWorkingDir, a.Client.Path)
 	}
+	a.Client.Path = filepath.Clean(a.Client.Path)
 
 	cssPath := filepath.Join(a.Client.Path, "assets", "css")
 	css, err := utils.GetFilesFromDir(cssPath, ".css", "des")

@@ -1,7 +1,9 @@
 package controllers
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -13,6 +15,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 )
@@ -20,7 +23,7 @@ import (
 type InsightsController struct {
 	app             *config.AppConfig
 	agentTaskSub    *nats.Subscription
-	summarizeJobSub *nats.Subscription
+	summarizeJobSub jetstream.ConsumeContext
 	natsService     *natsservice.NatsService
 	logger          *logrus.Entry
 	insightsModel   *models.InsightsModel
@@ -36,11 +39,11 @@ func NewInsightsController(app *config.AppConfig, natsService *natsservice.NatsS
 }
 
 // Initialize performs the synchronous setup for the NATS subscriptions.
-func (i *InsightsController) Initialize() error {
+func (i *InsightsController) Initialize(ctx context.Context) error {
 	if err := i.subscribeToAgentTaskRequests(); err != nil {
 		return err
 	}
-	if err := i.subscribeToSummarizeJobs(); err != nil {
+	if err := i.subscribeToSummarizeJobs(ctx); err != nil {
 		return err
 	}
 	return nil
@@ -62,24 +65,58 @@ func (i *InsightsController) subscribeToAgentTaskRequests() error {
 	return nil
 }
 
-// subscribeToSummarizeJobs sets up a queue subscription to handle summarization jobs.
-func (i *InsightsController) subscribeToSummarizeJobs() error {
-	sub, err := i.app.NatsConn.QueueSubscribe(insights.SummarizeJobQueue, "pnm-summarize-worker-group", func(msg *nats.Msg) {
+// subscribeToSummarizeJobs sets up a durable consumer to handle summarization jobs from the JetStream.
+func (i *InsightsController) subscribeToSummarizeJobs(ctx context.Context) error {
+	consumer, err := i.natsService.CreateSummarizeJobStreamWithConsumer(ctx, i.logger)
+	if err != nil {
+		return err
+	}
+
+	consumeCtx, err := consumer.Consume(func(msg jetstream.Msg) {
 		var payload insights.SummarizeJobPayload
-		err := json.Unmarshal(msg.Data, &payload)
-		if err != nil {
+		if err := json.Unmarshal(msg.Data(), &payload); err != nil {
 			i.logger.WithError(err).Error("failed to unmarshal summarize job payload")
+			if err := msg.Nak(); err != nil {
+				i.logger.WithError(err).Error("failed to send NAK")
+			}
 			return
 		}
+
+		metadata, err := msg.Metadata()
+		if err != nil {
+			i.logger.WithError(err).Error("failed to get msg metadata")
+			if err := msg.Nak(); err != nil {
+				i.logger.WithError(err).Error("failed to send NAK")
+			}
+			return
+		}
+
 		// Pass the payload to a new model method for processing.
-		i.insightsModel.StartProcessingSummarizeJob(&payload)
-	})
+		if err := i.insightsModel.StartProcessingSummarizeJob(&payload, metadata); err != nil {
+			i.logger.WithError(err).Error("failed to process summarize job")
+			if err := msg.NakWithDelay(time.Minute * 5); err != nil {
+				i.logger.WithError(err).Error("failed to send NAK with delay")
+			}
+			return
+		}
+
+		if err := msg.Ack(); err != nil {
+			i.logger.WithError(err).Error("failed to send ACK")
+		}
+	}, jetstream.ConsumeErrHandler(func(consumeCtx jetstream.ConsumeContext, err error) {
+		if ctx.Err() == nil {
+			if !errors.Is(err, jetstream.ErrConnectionClosed) {
+				i.logger.WithError(err).Warn("jetstream consume error for summarization jobs")
+			}
+		}
+	}))
+
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to NATS for summarize jobs: %w", err)
 	}
-	i.logger.Infof("Successfully connected with %s queue", sub.Subject)
 
-	i.summarizeJobSub = sub
+	i.logger.Infof("Successfully connected with %s queue", insights.SummarizeJobQueueSubject)
+	i.summarizeJobSub = consumeCtx
 	return nil
 }
 
@@ -90,9 +127,7 @@ func (i *InsightsController) Shutdown() {
 		}
 	}
 	if i.summarizeJobSub != nil {
-		if err := i.summarizeJobSub.Unsubscribe(); err != nil {
-			i.logger.WithError(err).Errorln("failed to unsubscribe from summarize jobs")
-		}
+		i.summarizeJobSub.Stop()
 	}
 	i.insightsModel.Shutdown()
 }

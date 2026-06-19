@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -71,7 +70,7 @@ func (m *ArtifactModel) buildPath(fileName, roomId string, artifactType plugnmee
 // It modifies the FilePath in the metadata object in-place if the hook is successful.
 // If the hook fails, it logs the error but does not return it, allowing fallback to local storage.
 func (m *ArtifactModel) runUploadHook(roomId, roomSid string, roomTableId uint64, metadata *plugnmeet.RoomArtifactMetadata, log *logrus.Entry) {
-	if m.app.StorageHooks == nil || len(m.app.StorageHooks.UploadHook) == 0 || m.app.HookManager == nil {
+	if m.app.Hooks == nil {
 		return
 	}
 	if metadata.FileInfo == nil || metadata.FileInfo.FilePath == "" {
@@ -87,37 +86,23 @@ func (m *ArtifactModel) runUploadHook(roomId, roomSid string, roomTableId uint64
 	}
 
 	req := hooks.UploadHookData{
-		InputPath:   absolutePath,
-		ServiceType: "artifact",
-		RoomId:      roomId,
-		RoomSid:     roomSid,
-		RoomTableId: roomTableId,
+		InputPath:    absolutePath,
+		HookFileType: hooks.HookFileTypeArtifact,
+		RoomId:       roomId,
+		RoomSid:      roomSid,
+		RoomTableId:  roomTableId,
 	}
 
-	resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.UploadHook, &req, m.app.StorageHooks.HookTimeout, log)
+	res, err := m.app.Hooks.RunUploadHook(&req, log)
 	if err != nil {
 		log.WithError(err).Error("upload hook pipeline failed, fallback to local storage")
 		return
 	}
 
-	// script will return same struct
-	var res hooks.UploadHookData
-	if err := json.Unmarshal(resBytes, &res); err != nil {
-		log.WithError(err).Error("failed to unmarshal upload hook response, fallback to local storage")
-		return
+	if res != nil && res.OutputPath != "" {
+		log.Infof("Upload hook successful, updating file path from '%s' to '%s'", metadata.FileInfo.FilePath, res.OutputPath)
+		metadata.FileInfo.FilePath = res.OutputPath
 	}
-
-	if res.Error != "" {
-		log.Errorf("upload hook script returned an error: %s, fallback to local storage", res.Error)
-		return
-	}
-	if res.OutputPath == "" {
-		log.Error("upload hook did not return a output_path, fallback to local storage")
-		return
-	}
-
-	log.Infof("Upload hook successful, updating file path from '%s' to '%s'", metadata.FileInfo.FilePath, res.OutputPath)
-	metadata.FileInfo.FilePath = res.OutputPath
 }
 
 // MoveToTrash moves a specified file to the configured backup/trash directory.
@@ -125,8 +110,7 @@ func (m *ArtifactModel) runUploadHook(roomId, roomSid string, roomTableId uint64
 func (m *ArtifactModel) MoveToTrash(filePath string) (string, error) {
 	if !m.app.ArtifactsSettings.EnableDelArtifactsBackup {
 		// If backup is disabled, delete the file permanently.
-		err := os.Remove(filePath)
-		if err != nil {
+		if err := os.Remove(filePath); err != nil {
 			return "", err
 		}
 		return "", nil // Return empty string to indicate permanent deletion
@@ -137,20 +121,18 @@ func (m *ArtifactModel) MoveToTrash(filePath string) (string, error) {
 	trashPath := filepath.Join(m.app.ArtifactsSettings.DelArtifactsBackupPath, fileName)
 
 	// Use os.Rename to move the file.
-	err := os.Rename(filePath, trashPath)
-	if err != nil {
+	if err := os.Rename(filePath, trashPath); err != nil {
 		return "", err
 	}
 
 	// Update the modification time otherwise janitor will delete it based on old value.
 	currentTime := time.Now().UTC()
-	err = os.Chtimes(trashPath, currentTime, currentTime)
-	if err != nil {
+	if err := os.Chtimes(trashPath, currentTime, currentTime); err != nil {
 		// Log a warning and continue.
 		m.log.WithError(err).Warnf("failed to update modification time for moved artifact: %s", trashPath)
 	}
 
-	m.log.Infof("moved artifact file %s to trash at %s", filePath, trashPath)
+	m.log.Infof("Moved artifact file %s to trash at %s", filePath, trashPath)
 	return trashPath, nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
@@ -168,6 +169,18 @@ func (m *RoomModel) onAfterRoomEnded(p *onAfterRoomEndedParams) {
 		RoomId:      p.roomId,
 		RoomTableId: int64(p.dbTableId),
 	})
+
+	// Trigger room end hook for any external cleanup
+	if m.app.Hooks != nil {
+		log.Info("Running room end hook")
+		req := &hooks.RoomEndHookData{
+			RoomId:  p.roomId,
+			RoomSid: p.roomSid,
+		}
+		if _, err := m.app.Hooks.RunRoomEndHook(req, log); err != nil {
+			log.WithError(err).Error("room end hook execution failed")
+		}
+	}
 
 	// If not configured to keep files, delete all uploaded files for this session.
 	if !m.app.UploadFileSettings.KeepForever {

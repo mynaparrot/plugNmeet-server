@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 )
@@ -53,10 +54,24 @@ func (m *JanitorModel) CheckInsightsPendingSummarizeJobs() {
 			if err := provider.DeleteUploadedFile(m.ctx, payload.FileName); err != nil {
 				log.WithError(err).Errorf("failed to delete provider file %s for job %s", payload.FileName, payload.JobId)
 			}
-			// move local file to trash
-			if _, err := m.artifactModel.MoveToTrash(payload.OriginalFilePath); err != nil {
-				log.WithError(err).Errorf("failed to move local file %s to trash for job %s", payload.OriginalFilePath, payload.JobId)
+
+			deletedFile := false
+			if m.app.Hooks != nil {
+				if res, err := m.app.Hooks.RunDeleteHook(&hooks.DeleteHookData{
+					InputPath:    payload.OriginalFilePath,
+					HookFileType: hooks.HookFileTypeArtifact,
+				}, log); err == nil && res != nil {
+					deletedFile = true
+				}
 			}
+
+			if !deletedFile {
+				// move local file to trash
+				if _, err := m.artifactModel.MoveToTrash(payload.OriginalFilePath); err != nil {
+					log.WithError(err).Errorf("failed to move local file %s to trash for job %s", payload.OriginalFilePath, payload.JobId)
+				}
+			}
+
 			// Delete from Redis
 			if err := m.app.RDS.HDel(m.ctx, insights.PendingSummarizeJobRedisKey, id).Err(); err != nil {
 				log.WithError(err).Errorf("failed to delete job %s from Redis", id)

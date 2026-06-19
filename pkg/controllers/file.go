@@ -5,11 +5,11 @@ import (
 	"errors"
 	"net/url"
 	"path"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -126,26 +126,42 @@ func (fc *FileController) HandleUploadWhiteboardFile(c fiber.Ctx) error {
 
 // HandleDownloadUploadedFile handles downloading an uploaded file.
 func (fc *FileController) HandleDownloadUploadedFile(c fiber.Ctx) error {
-	sid := c.Params("sid")
-	otherParts := c.Params("*")
-	otherParts, err := url.QueryUnescape(otherParts)
+	unescapedPath, err := url.QueryUnescape(c.Params("*"))
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).SendString("invalid file path")
 	}
 
-	// prevent to download from temp dir by checking path segments
-	cleanedPath := path.Clean(otherParts)
-	pathSegments := strings.Split(cleanedPath, "/")
+	relativePath := path.Clean(unescapedPath)
+	pathSegments := strings.Split(relativePath, "/")
+
+	// must have at least 2 segments e.g. roomSid/other parts
+	if len(pathSegments) < 2 {
+		return c.Status(fiber.StatusBadRequest).SendString("invalid url")
+	}
+
 	for _, segment := range pathSegments {
+		// prevent to download from temp dir by checking path segments
 		if segment == config.UploadFileTempDir {
 			return c.Status(fiber.StatusForbidden).SendString("access to temporary directory is forbidden")
 		}
 	}
 
-	basePath := fc.AppConfig.UploadFileSettings.Path
-	relativePath := filepath.Join(sid, otherParts)
+	if fc.AppConfig.Hooks != nil {
+		req := hooks.DownloadHookData{
+			InputPath:    relativePath,
+			HookFileType: hooks.HookFileTypeRoomFile,
+		}
+		res, err := fc.AppConfig.Hooks.RunDownloadHook(c.RequestCtx(), &req, nil, 0, fc.logger)
+		if err != nil {
+			fc.logger.WithError(err).Error("download hook pipeline failed")
+			return c.Status(fiber.StatusInternalServerError).SendString("download hook pipeline failed")
+		}
+		if res != nil && res.RedirectUrl != "" {
+			return c.Redirect().Status(fiber.StatusTemporaryRedirect).To(res.RedirectUrl)
+		}
+	}
 
-	absFile, mType, err := helpers.ValidateAndGetAbsFilePath(basePath, relativePath)
+	absFile, mType, err := helpers.ValidateAndGetAbsFilePath(fc.AppConfig.UploadFileSettings.Path, relativePath)
 	if err != nil {
 		fc.logger.WithError(err).Warn("file path validation failed")
 		if errors.Is(err, config.ErrFileNotFound) {
@@ -189,8 +205,8 @@ func (fc *FileController) HandleConvertWhiteboardFile(c fiber.Ctx) error {
 	}
 	log := fc.logger.WithField("method", "HandleConvertWhiteboardFile")
 
-	// We'll give 25 seconds to complete the task
-	ctx, cancel := context.WithTimeout(c.RequestCtx(), 25*time.Second)
+	// We'll give 50 seconds to complete the task
+	ctx, cancel := context.WithTimeout(c.RequestCtx(), 50*time.Second)
 	defer cancel()
 
 	res, err := fc.FileModel.ConvertAndBroadcastWhiteboardFile(ctx, req.RoomId, req.RoomSid, req.FilePath, requestedUserId, nil, log)

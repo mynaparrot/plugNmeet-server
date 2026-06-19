@@ -1,9 +1,7 @@
 package models
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/go-jose/go-jose/v4"
@@ -58,31 +56,20 @@ func (m *RecordingModel) VerifyRecordingToken(token string) (*hooks.DownloadHook
 		return nil, fiber.StatusBadRequest, errors.New("invalid file path")
 	}
 
-	if m.app.StorageHooks != nil || len(m.app.StorageHooks.DownloadHook) > 0 && m.app.HookManager != nil {
+	if m.app.Hooks != nil {
 		// Hooks are defined, so use the pipeline.
 		req := hooks.DownloadHookData{
-			InputPath:   inputPath,
-			ServiceType: "recording",
+			InputPath:    inputPath,
+			HookFileType: hooks.HookFileTypeRecording,
 		}
-
-		resBytes, err := hooks.ExecuteHookPipeline(m.app.HookManager, m.app.StorageHooks.DownloadHook, &req, m.app.StorageHooks.HookTimeout, m.logger)
+		res, err := m.app.Hooks.RunDownloadHook(m.ctx, &req, nil, 0, log)
 		if err != nil {
 			log.WithError(err).Error("download hook pipeline failed")
 			return nil, fiber.StatusInternalServerError, errors.New("download hook pipeline failed")
 		}
 
-		// script will return same struct
-		var res hooks.DownloadHookData
-		if err := json.Unmarshal(resBytes, &res); err != nil {
-			log.WithError(err).Error("failed to unmarshal download hook response")
-			return nil, fiber.StatusInternalServerError, fmt.Errorf("failed to unmarshal download hook response")
-		}
-		if res.Error != "" {
-			log.Error("download hook script returned an error: %s", res.Error)
-			return nil, fiber.StatusInternalServerError, fmt.Errorf("download hook script returned an error")
-		}
-		if res.OutputPath != "" || res.RedirectUrl != "" {
-			return &res, fiber.StatusOK, nil
+		if res != nil && (res.OutputPath != "" || res.RedirectUrl != "") {
+			return res, fiber.StatusOK, nil
 		}
 	}
 
@@ -95,7 +82,7 @@ func (m *RecordingModel) VerifyRecordingToken(token string) (*hooks.DownloadHook
 		return nil, fiber.StatusBadRequest, err
 	}
 	return &hooks.DownloadHookData{
-		Action:     "serve_local",
+		Action:     hooks.DownloadHookDataActionServeLocal,
 		OutputPath: absolutePath,
 		MimeType:   mType.String(),
 	}, fiber.StatusOK, nil

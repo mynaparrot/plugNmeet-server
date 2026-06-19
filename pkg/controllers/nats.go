@@ -9,7 +9,6 @@ import (
 
 	"github.com/gammazero/workerpool"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
@@ -91,22 +90,10 @@ func NewNatsController(ctx context.Context, app *config.AppConfig, natsService *
 // Initialize performs setup and signals completion via the channel.
 func (c *NatsController) Initialize() error {
 	log := c.log.WithField("method", "initialize")
+	var err error
 
 	// system receiver as worker
-	stream, err := c.app.JetStream.CreateOrUpdateStream(c.ctx, jetstream.StreamConfig{
-		Name:        fmt.Sprintf("%s", c.app.NatsInfo.Subjects.SystemJsWorker),
-		Description: "plugNmeet system worker",
-		Replicas:    c.app.NatsInfo.NumReplicas,
-		Retention:   jetstream.WorkQueuePolicy,
-		Subjects:    []string{fmt.Sprintf("%s.*.*", c.app.NatsInfo.Subjects.SystemJsWorker)},
-	})
-	if err != nil {
-		log.WithError(err).Error("error creating system worker stream")
-		return err
-	}
-	log.Info("Created/Updated system worker stream")
-
-	c.sysWorkerCon, err = c.subscribeToSystemWorker(c.ctx, stream)
+	c.sysWorkerCon, err = c.subscribeToSystemWorker(c.ctx)
 	if err != nil {
 		log.WithError(err).Error("error subscribing to system worker")
 		return err
@@ -121,28 +108,9 @@ func (c *NatsController) Initialize() error {
 	log.Info("Subscribed to system worker via core NATS")
 
 	// create recorder transcoder worker
-	transcoderStream, err := c.app.JetStream.CreateOrUpdateStream(c.ctx, jetstream.StreamConfig{
-		Name:        c.app.NatsInfo.Recorder.TranscodingJobs,
-		Description: "plugNmeet recorder transcoding jobs",
-		Replicas:    c.app.NatsInfo.NumReplicas,
-		Retention:   jetstream.WorkQueuePolicy,
-		Subjects:    []string{c.app.NatsInfo.Recorder.TranscodingJobs},
-	})
-	if err != nil {
-		log.WithError(err).Error("error creating recorder transcoder stream")
+	if err := c.natsService.CreateTranscoderStreamWithConsumer(c.ctx, log); err != nil {
 		return err
 	}
-	log.Info("Created/Updated recorder transcoder stream")
-
-	_, err = transcoderStream.CreateOrUpdateConsumer(c.ctx, jetstream.ConsumerConfig{
-		Durable:   utils.TranscoderConsumerDurable,
-		AckPolicy: jetstream.AckExplicitPolicy,
-	})
-	if err != nil {
-		log.WithError(err).Error("error creating recorder transcoder consumer")
-		return err
-	}
-	log.Info("Created/Updated recorder transcoder consumer")
 
 	c.userConnSub, err = c.subscribeToUsersConnEvents()
 	if err != nil {
@@ -282,13 +250,10 @@ func (c *NatsController) subscribeToSystemWorkerCore() (*nats.Subscription, erro
 // subscribeToSystemWorker subscribes to the system worker subject via JetStream.
 // This is used for messages that require guaranteed delivery, such as PINGs, token renewals, and private messages.
 // It runs in parallel with the core NATS pub/sub subscriber.
-func (c *NatsController) subscribeToSystemWorker(ctx context.Context, stream jetstream.Stream) (jetstream.ConsumeContext, error) {
+func (c *NatsController) subscribeToSystemWorker(ctx context.Context) (jetstream.ConsumeContext, error) {
 	log := c.log.WithField("method", "subscribeToSystemWorker")
-	cons, err := stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
-		Durable: fmt.Sprintf("%s%s", prefix, c.app.NatsInfo.Subjects.SystemJsWorker),
-	})
+	cons, err := c.natsService.CreateSystemJsWorkerStreamWithConsumer(ctx, prefix, log)
 	if err != nil {
-		log.WithError(err).Error("error creating system worker consumer")
 		return nil, err
 	}
 

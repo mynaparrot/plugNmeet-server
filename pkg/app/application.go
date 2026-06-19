@@ -105,7 +105,7 @@ func (a *Application) Start(ctx context.Context) error {
 	}
 
 	// Initialize Insights controller.
-	if err := a.controllers.InsightsController.Initialize(); err != nil {
+	if err := a.controllers.InsightsController.Initialize(ctx); err != nil {
 		log.WithError(err).Error("Failed to initialize Insights controller")
 		return err
 	}

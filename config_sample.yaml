@@ -355,34 +355,43 @@ insights:
 #        uris:
 #          - "turn:turn.your-domain.com:3478?transport=udp"
 
-# (Optional) Storage Hooks for Advanced File Management
+# (Optional) Hooks for Advanced File Management
 # These hooks allow you to override the default local file storage and integrate
-# with any external storage provider (e.g., S3, Google Cloud Storage) using custom scripts.
-# This is ideal for cloud-native or multi-server deployments.
+# with an external storage provider (e.g., S3, Google Cloud Storage) using custom scripts.
+# This is ideal for cloud-native or multi-server deployments where centralized storage is required.
 #
 # If this section is omitted, the server will store all files on the local disk
 # in the paths defined under 'recorder_info' and 'artifacts_settings'.
-#
-#storage_hooks:
-##  # Maximum time to wait for a hook script to respond before timing out.
-##  # Since b-server hooks are for quick operations (artifact uploads, downloads),
-##  # a shorter timeout is recommended.
-##  # Default: 5m
-#  hook_timeout: 5m
-#
-#  # A list of scripts to run sequentially for file uploads.
-#  # The output of one script becomes the input for the next.
-#  # The final script in the chain must output a JSON object with a 'logical_path'.
+#hooks:
 #  upload_hook:
-#    - "./scripts/examples_hooks/upload.sh"
-#
-#  # A list of scripts for file downloads.
-#  # The final script must output a JSON object with an 'action' ('redirect' or 'serve_local')
-#  # and a corresponding 'redirect_url' or 'local_path'.
+#    pool_size: 2
+#    hook_timeout: 5m
+#    scripts:
+#      - script: "/path/to/your/script.sh"
+#        is_one_shot: false
+#      - script: "http-request http://localhost:8090/your/endpoint"
+#        is_one_shot: true
 #  download_hook:
-#    - "./scripts/examples_hooks/download.sh"
-#
-#  # This is a blocking operation. The server will wait for the script to respond.
-#  # The script can return a "msg" field in its JSON response for logging purposes.
+#    pool_size: 2
+#    hook_timeout: 5m
+#    scripts:
+#      - script: "/path/to/your/script.sh"
+#        is_one_shot: false
 #  delete_hook:
-#    - "./scripts/examples_hooks/delete.sh"
+#    pool_size: 2
+#    hook_timeout: 5m
+#    scripts:
+#      - script: "/path/to/your/script.sh"
+#        is_one_shot: false
+#  resumable_upload_hook:
+#    pool_size: 2
+#    hook_timeout: 5m
+#    scripts:
+#      - script: "/path/to/your/script.sh"
+#        is_one_shot: false
+#  room_end_hook:
+#    pool_size: 2
+#    hook_timeout: 5m
+#    scripts:
+#      - script: "/path/to/your/script.sh"
+#        is_one_shot: false

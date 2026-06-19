@@ -10,10 +10,13 @@ import (
 )
 
 const (
-	InsightsNatsChannel         = "plug-n-meet-insights"
-	SynthesisNatsChannel        = "plug-n-meet-transcription-output-%s"
-	SummarizeJobQueue           = "pnm.insights.jobs.summarize"
+	InsightsNatsChannel  = "plug-n-meet-insights"
+	SynthesisNatsChannel = "plug-n-meet-transcription-output-%s"
+
+	InsightsJobsStream          = "pnm-insights-jobs"
+	SummarizeJobQueueSubject    = InsightsJobsStream + "-summarize"
 	PendingSummarizeJobRedisKey = "pnm:insights:pending_summarize_jobs"
+	SummarizeJobMaxDeliverNum   = 3 // we'll try maximum of 3 times
 )
 
 // EventType defines the type of transcription lifecycle event.

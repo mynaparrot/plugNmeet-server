@@ -14,10 +14,12 @@ import (
 	lkMedia "github.com/livekit/media-sdk"
 	"github.com/livekit/media-sdk/mixer"
 	"github.com/livekit/media-sdk/rtp"
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights/media"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/sirupsen/logrus"
 )
 
@@ -145,6 +147,22 @@ func (t *MeetingSummarizingTask) doRoomSummarizing(roomTableId uint64, roomId, f
 	})
 	log.Infof("file writing finished for %s. publishing summarization job.", filePath)
 
+	// we'll check hook to upload file
+	if t.appConf.Hooks != nil {
+		req := &hooks.UploadHookData{
+			InputPath:    filePath,
+			HookFileType: hooks.HookFileTypeArtifact,
+			RoomId:       roomId,
+			RoomTableId:  roomTableId,
+		}
+		res, err := t.appConf.Hooks.RunUploadHook(req, log)
+		if err != nil {
+			log.WithError(err).Error("upload hook pipeline failed")
+		} else if res != nil && res.OutputPath != "" {
+			filePath = res.OutputPath
+		}
+	}
+
 	payload := insights.SummarizeJobPayload{
 		RoomTableId: roomTableId,
 		RoomId:      roomId,
@@ -157,9 +175,8 @@ func (t *MeetingSummarizingTask) doRoomSummarizing(roomTableId uint64, roomId, f
 		return
 	}
 
-	// Publish to the NATS queue.
-	err = t.appConf.NatsConn.Publish(insights.SummarizeJobQueue, payloadBytes)
-	if err != nil {
+	// Publish to the NATS stream.
+	if _, err := t.appConf.JetStream.Publish(t.ctx, insights.SummarizeJobQueueSubject, payloadBytes, jetstream.WithExpectStream(insights.InsightsJobsStream)); err != nil {
 		log.WithError(err).Error("failed to publish summarization job")
 	}
 }

@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
@@ -111,7 +113,7 @@ func (m *RecordingModel) addRecordingInfoToDB(r *plugnmeet.RecorderToPlugNmeet, 
 // format: path/recording_file_name.{mp4|webm}.json
 func (m *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet, creation int64, roomInfo *dbmodels.RoomInfo) {
 	log := m.logger.WithFields(logrus.Fields{
-		"roomId":      r.RoomId,
+		"roomId":      roomInfo.RoomId,
 		"recordingId": r.RecordingId,
 		"filePath":    r.FilePath,
 		"method":      "addRecordingInfoFile",
@@ -119,7 +121,7 @@ func (m *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet, 
 	log.Infoln("creating recording info file")
 	toRecord := &plugnmeet.RecordingInfoFile{
 		RoomTableId:      r.RoomTableId,
-		RoomId:           r.RoomId,
+		RoomId:           roomInfo.RoomId,
 		RoomTitle:        roomInfo.RoomTitle,
 		RoomSid:          roomInfo.Sid,
 		RoomCreationTime: roomInfo.CreationTime,
@@ -139,14 +141,41 @@ func (m *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet, 
 		log.WithError(err).Errorln("failed to marshal recording info file data")
 		return
 	}
-	path := fmt.Sprintf("%s/%s.json", m.app.RecorderInfo.RecordingFilesPath, r.FilePath)
 
-	err = os.WriteFile(path, marshal, 0644)
-	if err != nil {
+	p := filepath.Join(m.app.RecorderInfo.RecordingFilesPath, filepath.Dir(r.FilePath))
+	if _, err := os.Stat(p); err != nil && errors.Is(err, os.ErrNotExist) {
+		// this can be expected when using hook system as file was uploaded and deleted
+		// in this case we'll use temporary dir for hook
+		p, err = os.MkdirTemp(m.app.RecorderInfo.RecordingFilesPath, "recording-meta")
+		if err != nil {
+			log.WithError(err).Errorln("failed to create temporary directory")
+			return
+		}
+		// we should clean up as this was created only for hook script
+		defer os.RemoveAll(p)
+	}
+
+	p = filepath.Join(p, filepath.Base(r.FilePath)+".json")
+	if err = os.WriteFile(p, marshal, 0644); err != nil {
 		log.WithError(err).Errorln("failed to write recording info file")
 		return
 	}
-	log.Infoln("successfully created recording info file")
+
+	log.Infoln("Successfully created recording info file")
+
+	// run upload hook
+	if m.app.Hooks != nil {
+		req := hooks.UploadHookData{
+			InputPath:    p,
+			HookFileType: hooks.HookFileTypeRecordingMetadata,
+			RoomId:       roomInfo.RoomId,
+			RoomSid:      roomInfo.Sid,
+			RoomTableId:  roomInfo.ID,
+		}
+		if _, err := m.app.Hooks.RunUploadHook(&req, log); err != nil {
+			log.WithError(err).Error("failed to run upload hook")
+		}
+	}
 }
 
 // UpdateRecordingMetadata updates the metadata of a specific recording.

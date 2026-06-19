@@ -120,7 +120,7 @@ func (r *router) registerBaseRoutes() {
 		return c.Render("login", nil)
 	})
 	r.app.Post("/webhook", r.ctrl.WebhookController.HandleWebhook)
-	r.app.Add([]string{"GET", "HEAD"}, "/download/uploadedFile/:sid/*", r.ctrl.FileController.HandleDownloadUploadedFile)
+	r.app.Add([]string{"GET", "HEAD"}, "/download/uploadedFile/*", r.ctrl.FileController.HandleDownloadUploadedFile)
 	r.app.Add([]string{"GET", "HEAD"}, "/download/recording/:token", r.ctrl.RecordingController.HandleDownloadRecording)
 	r.app.Add([]string{"GET", "HEAD"}, "/download/analytics/:token", r.ctrl.AnalyticsController.HandleDownloadAnalytics)
 	r.app.Add([]string{"GET", "HEAD"}, "/download/artifact/:token", r.ctrl.ArtifactController.HandleDownloadArtifact)
