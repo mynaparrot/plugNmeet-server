@@ -172,14 +172,14 @@ downloadRes, err := m.app.Hooks.RunDownloadHook(m.ctx, &req, &outputDir, time.Mi
 			RoomId:             roomId,
 			RoomSid:            roomSid,
 		}
-		res, err := m.app.Hooks.RunUploadHook(&req, log)
-		if err != nil {
-			log.WithError(err).Error("upload hook pipeline for converted images failed")
-			return nil, fmt.Errorf("upload hook pipeline for converted images failed")
-		}
-		if res != nil && res.OutputPath != "" {
-			log.Infof("Successfully uploaded images into %s", res.OutputPath)
-		}
+uploadRes, err := m.app.Hooks.RunUploadHook(&req, log)
+        if err != nil {
+            log.WithError(err).Error("upload hook pipeline for converted images failed")
+            return nil, fmt.Errorf("upload hook pipeline for converted images failed")
+        }
+        if uploadRes != nil && uploadRes.OutputPath != "" {
+            log.Infof("Successfully uploaded images into %s", uploadRes.OutputPath)
+        }
 	}
 
 	res = &ConvertWhiteboardFileRes{
