@@ -151,7 +151,7 @@ func (fc *FileController) HandleDownloadUploadedFile(c fiber.Ctx) error {
 			InputPath:    relativePath,
 			HookFileType: hooks.HookFileTypeRoomFile,
 		}
-		res, err := fc.AppConfig.Hooks.RunDownloadHook(context.Background(), &req, nil, 0, fc.logger)
+res, err := fc.AppConfig.Hooks.RunDownloadHook(c.RequestCtx(), &req, nil, 0, fc.logger)
 		if err != nil {
 			fc.logger.WithError(err).Error("download hook pipeline failed")
 			return c.Status(fiber.StatusInternalServerError).SendString("download hook pipeline failed")
