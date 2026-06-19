@@ -143,7 +143,7 @@ func (m *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet, 
 		return
 	}
 
-	p := path.Join(m.app.RecorderInfo.RecordingFilesPath, filepath.Dir(r.FilePath))
+p := filepath.Join(m.app.RecorderInfo.RecordingFilesPath, filepath.Dir(r.FilePath))
 	if _, err := os.Stat(p); err != nil && errors.Is(err, os.ErrNotExist) {
 		// this can be expected when using hook system as file was uploaded and deleted
 		// in this case we'll use temporary dir for hook
