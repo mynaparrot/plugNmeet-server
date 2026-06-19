@@ -176,7 +176,7 @@ func (t *MeetingSummarizingTask) doRoomSummarizing(roomTableId uint64, roomId, f
 	}
 
 	// Publish to the NATS stream.
-	if _, err := t.appConf.JetStream.Publish(t.ctx, insights.SummarizeJobQueueSubject, payloadBytes, jetstream.WithExpectStream(insights.InsightsJobsStream)); err != nil {
+	if _, err := t.appConf.JetStream.Publish(context.Background(), insights.SummarizeJobQueueSubject, payloadBytes, jetstream.WithExpectStream(insights.InsightsJobsStream)); err != nil {
 		log.WithError(err).Error("failed to publish summarization job")
 	}
 }

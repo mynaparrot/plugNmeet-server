@@ -238,17 +238,19 @@ func (s *InsightsModel) Shutdown() {
 // StartProcessingSummarizeJob will be called by the NATS subscription in the controller.
 func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJobPayload, metadata *jetstream.MsgMetadata) (err error) {
 	log := s.logger.WithFields(logrus.Fields{
-		"roomTableId": payload.RoomTableId,
-		"roomId":      payload.RoomId,
-		"filePath":    payload.FilePath,
-		"service":     "meeting_summarizing",
+		"roomTableId":  payload.RoomTableId,
+		"roomId":       payload.RoomId,
+		"filePath":     payload.FilePath,
+		"service":      "meeting_summarizing",
+		"numDelivered": metadata.NumDelivered,
 	})
 	log.Infoln("received new meeting summarization job")
 
 	originalPath := payload.FilePath // copy the original path for defer usage
 	defer func() {
 		if err != nil {
-			if metadata != nil && insights.SummarizeJobMaxDeliverNum == metadata.NumDelivered {
+			if insights.SummarizeJobMaxDeliverNum == metadata.NumDelivered {
+				log.Warnf("Maximum number of retrying passed, limit: %d, delivered: %d", insights.SummarizeJobMaxDeliverNum, metadata.NumDelivered)
 				// so, maximum delivery done, and we can delete the original file to ensure it's remain as orphan
 				if s.appConfig.Hooks != nil {
 					req := &hooks.DeleteHookData{
