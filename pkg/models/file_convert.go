@@ -107,13 +107,13 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 			HookFileType: hooks.HookFileTypeRoomFile,
 		}
 		outputDir := filepath.Join(m.app.UploadFileSettings.Path, roomSid)
-		res, err := m.app.Hooks.RunDownloadHook(m.ctx, &req, &outputDir, time.Minute*3, log)
-		if err != nil {
-			return nil, err
-		}
-		if res != nil && res.OutputPath != "" {
-			fullPath = res.OutputPath
-		}
+downloadRes, err := m.app.Hooks.RunDownloadHook(m.ctx, &req, &outputDir, time.Minute*3, log)
+        if err != nil {
+            return nil, err
+        }
+        if downloadRes != nil && downloadRes.OutputPath != "" {
+            fullPath = downloadRes.OutputPath
+        }
 	}
 
 	if fullPath == "" {
