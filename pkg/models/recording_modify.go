@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"reflect"
 	"time"
@@ -143,7 +142,7 @@ func (m *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet, 
 		return
 	}
 
-p := filepath.Join(m.app.RecorderInfo.RecordingFilesPath, filepath.Dir(r.FilePath))
+	p := filepath.Join(m.app.RecorderInfo.RecordingFilesPath, filepath.Dir(r.FilePath))
 	if _, err := os.Stat(p); err != nil && errors.Is(err, os.ErrNotExist) {
 		// this can be expected when using hook system as file was uploaded and deleted
 		// in this case we'll use temporary dir for hook
@@ -156,7 +155,7 @@ p := filepath.Join(m.app.RecorderInfo.RecordingFilesPath, filepath.Dir(r.FilePat
 		defer os.RemoveAll(p)
 	}
 
-p = filepath.Join(p, filepath.Base(r.FilePath)+".json")
+	p = filepath.Join(p, filepath.Base(r.FilePath)+".json")
 	if err = os.WriteFile(p, marshal, 0644); err != nil {
 		log.WithError(err).Errorln("failed to write recording info file")
 		return

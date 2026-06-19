@@ -248,7 +248,7 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 	originalPath := payload.FilePath // copy the original path for defer usage
 	defer func() {
 		if err != nil {
-if metadata != nil && insights.SummarizeJobMaxDeliverNum == metadata.NumDelivered {
+			if metadata != nil && insights.SummarizeJobMaxDeliverNum == metadata.NumDelivered {
 				// so, maximum delivery done, and we can delete the original file to ensure it's remain as orphan
 				if s.appConfig.Hooks != nil {
 					req := &hooks.DeleteHookData{

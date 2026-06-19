@@ -112,7 +112,7 @@ func (h *Hooks) RunUploadHook(req *hooks.UploadHookData, log *logrus.Entry) (*ho
 		return nil, nil
 	}
 
-resBytes, err := hooks.ExecuteHookPipeline(h.hookManager, h.UploadHook.Scripts, req, h.UploadHook.HookTimeout, log)
+	resBytes, err := hooks.ExecuteHookPipeline(h.hookManager, h.UploadHook.Scripts, req, h.UploadHook.HookTimeout, log)
 	if err != nil {
 		return nil, fmt.Errorf("upload hook pipeline failed with error: %w", err)
 	}
@@ -140,7 +140,7 @@ func (h *Hooks) RunDownloadHook(ctx context.Context, req *hooks.DownloadHookData
 		return nil, nil
 	}
 
-resBytes, err := hooks.ExecuteHookPipeline(h.hookManager, h.DownloadHook.Scripts, req, h.DownloadHook.HookTimeout, log)
+	resBytes, err := hooks.ExecuteHookPipeline(h.hookManager, h.DownloadHook.Scripts, req, h.DownloadHook.HookTimeout, log)
 	if err != nil {
 		return nil, fmt.Errorf("download hook pipeline failed with error: %w", err)
 	}
@@ -179,7 +179,7 @@ func (h *Hooks) RunDeleteHook(req *hooks.DeleteHookData, log *logrus.Entry) (*ho
 		return nil, nil
 	}
 
-resBytes, err := hooks.ExecuteHookPipeline(h.hookManager, h.DeleteHook.Scripts, req, h.DeleteHook.HookTimeout, log)
+	resBytes, err := hooks.ExecuteHookPipeline(h.hookManager, h.DeleteHook.Scripts, req, h.DeleteHook.HookTimeout, log)
 	if err != nil {
 		return nil, fmt.Errorf("delete hook pipeline failed with error: %w", err)
 	}

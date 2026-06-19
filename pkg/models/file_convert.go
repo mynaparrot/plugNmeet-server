@@ -107,13 +107,13 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 			HookFileType: hooks.HookFileTypeRoomFile,
 		}
 		outputDir := filepath.Join(m.app.UploadFileSettings.Path, roomSid)
-downloadRes, err := m.app.Hooks.RunDownloadHook(m.ctx, &req, &outputDir, time.Minute*3, log)
-        if err != nil {
-            return nil, err
-        }
-        if downloadRes != nil && downloadRes.OutputPath != "" {
-            fullPath = downloadRes.OutputPath
-        }
+		downloadRes, err := m.app.Hooks.RunDownloadHook(m.ctx, &req, &outputDir, time.Minute*3, log)
+		if err != nil {
+			return nil, err
+		}
+		if downloadRes != nil && downloadRes.OutputPath != "" {
+			fullPath = downloadRes.OutputPath
+		}
 	}
 
 	if fullPath == "" {
@@ -172,14 +172,14 @@ downloadRes, err := m.app.Hooks.RunDownloadHook(m.ctx, &req, &outputDir, time.Mi
 			RoomId:             roomId,
 			RoomSid:            roomSid,
 		}
-uploadRes, err := m.app.Hooks.RunUploadHook(&req, log)
-        if err != nil {
-            log.WithError(err).Error("upload hook pipeline for converted images failed")
-            return nil, fmt.Errorf("upload hook pipeline for converted images failed")
-        }
-        if uploadRes != nil && uploadRes.OutputPath != "" {
-            log.Infof("Successfully uploaded images into %s", uploadRes.OutputPath)
-        }
+		uploadRes, err := m.app.Hooks.RunUploadHook(&req, log)
+		if err != nil {
+			log.WithError(err).Error("upload hook pipeline for converted images failed")
+			return nil, fmt.Errorf("upload hook pipeline for converted images failed")
+		}
+		if uploadRes != nil && uploadRes.OutputPath != "" {
+			log.Infof("Successfully uploaded images into %s", uploadRes.OutputPath)
+		}
 	}
 
 	res = &ConvertWhiteboardFileRes{
