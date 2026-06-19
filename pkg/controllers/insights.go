@@ -90,18 +90,19 @@ func (i *InsightsController) subscribeToSummarizeJobs(ctx context.Context) error
 			}
 			return
 		}
+		log := i.logger.WithField("numDelivered", metadata.NumDelivered)
 
 		// Pass the payload to a new model method for processing.
 		if err := i.insightsModel.StartProcessingSummarizeJob(&payload, metadata); err != nil {
-			i.logger.WithError(err).Error("failed to process summarize job")
+			log.WithError(err).Error("failed to process summarize job")
 			if err := msg.NakWithDelay(time.Minute * 5); err != nil {
-				i.logger.WithError(err).Error("failed to send NAK with delay")
+				log.WithError(err).Error("failed to send NAK with delay")
 			}
 			return
 		}
 
 		if err := msg.Ack(); err != nil {
-			i.logger.WithError(err).Error("failed to send ACK")
+			log.WithError(err).Error("failed to send ACK")
 		}
 	}, jetstream.ConsumeErrHandler(func(consumeCtx jetstream.ConsumeContext, err error) {
 		if ctx.Err() == nil {
