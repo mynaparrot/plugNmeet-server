@@ -156,7 +156,7 @@ p := filepath.Join(m.app.RecorderInfo.RecordingFilesPath, filepath.Dir(r.FilePat
 		defer os.RemoveAll(p)
 	}
 
-	p = path.Join(p, filepath.Base(r.FilePath)+".json")
+p = filepath.Join(p, filepath.Base(r.FilePath)+".json")
 	if err = os.WriteFile(p, marshal, 0644); err != nil {
 		log.WithError(err).Errorln("failed to write recording info file")
 		return
