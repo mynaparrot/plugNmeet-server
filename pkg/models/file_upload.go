@@ -65,14 +65,17 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx, req *ResumableUploadReq) (*
 			// If hook is enabled, we'll check with the script first.
 			if m.app.Hooks != nil {
 				hookData := &hooks.ResumableUploadHookData{
-					Type:                 hooks.ResumableUploadHookTypeCheck,
-					RoomSid:              req.RoomSid,
-					RoomId:               req.RoomId,
-					UserId:               req.UserId,
-					ResumableIdentifier:  safeIdentifier,
-					ResumableFilename:    req.ResumableFilename,
-					ResumableChunkNumber: req.ResumableChunkNumber,
-					ResumableTotalChunks: int32(req.ResumableTotalChunks),
+					Type:    hooks.ResumableUploadHookTypeCheck,
+					RoomSid: req.RoomSid,
+					RoomId:  req.RoomId,
+					UserId:  req.UserId,
+
+					ResumableIdentifier:       safeIdentifier,
+					ResumableFilename:         req.ResumableFilename,
+					ResumableChunkNumber:      req.ResumableChunkNumber,
+					ResumableTotalChunks:      int32(req.ResumableTotalChunks),
+					ResumableCurrentChunkSize: req.ResumableCurrentChunkSize,
+					ResumableTotalSize:        req.ResumableTotalSize,
 				}
 				result, err := m.app.Hooks.RunResumableUploadHook(hookData, log)
 				if err != nil {
@@ -142,15 +145,18 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx, req *ResumableUploadReq) (*
 				inputPath, _ := filepath.Abs(chunkPath)
 				// The script is responsible for the chunk including remove the local copy.
 				hookData := &hooks.ResumableUploadHookData{
-					Type:                 hooks.ResumableUploadHookTypeUpload,
-					RoomSid:              req.RoomSid,
-					RoomId:               req.RoomId,
-					UserId:               req.UserId,
-					ResumableIdentifier:  safeIdentifier,
-					ResumableFilename:    req.ResumableFilename,
-					ResumableChunkNumber: req.ResumableChunkNumber,
-					ResumableTotalChunks: int32(req.ResumableTotalChunks),
-					InputPath:            inputPath,
+					Type:      hooks.ResumableUploadHookTypeUpload,
+					RoomSid:   req.RoomSid,
+					RoomId:    req.RoomId,
+					UserId:    req.UserId,
+					InputPath: inputPath,
+
+					ResumableIdentifier:       safeIdentifier,
+					ResumableFilename:         req.ResumableFilename,
+					ResumableChunkNumber:      req.ResumableChunkNumber,
+					ResumableTotalChunks:      int32(req.ResumableTotalChunks),
+					ResumableCurrentChunkSize: req.ResumableCurrentChunkSize,
+					ResumableTotalSize:        req.ResumableTotalSize,
 				}
 				if _, err = m.app.Hooks.RunResumableUploadHook(hookData, log); err != nil {
 					log.WithError(err).Error("resumable upload hook 'part-upload' failed")
