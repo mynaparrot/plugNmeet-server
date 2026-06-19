@@ -179,7 +179,7 @@ func (h *Hooks) RunDeleteHook(req *hooks.DeleteHookData, log *logrus.Entry) (*ho
 		return nil, nil
 	}
 
-	resBytes, err := hooks.ExecuteHookPipeline(h.hookManager, h.DeleteHook.Scripts, &req, h.DeleteHook.HookTimeout, log)
+resBytes, err := hooks.ExecuteHookPipeline(h.hookManager, h.DeleteHook.Scripts, req, h.DeleteHook.HookTimeout, log)
 	if err != nil {
 		return nil, fmt.Errorf("delete hook pipeline failed with error: %w", err)
 	}
