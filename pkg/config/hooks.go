@@ -112,7 +112,7 @@ func (h *Hooks) RunUploadHook(req *hooks.UploadHookData, log *logrus.Entry) (*ho
 		return nil, nil
 	}
 
-	resBytes, err := hooks.ExecuteHookPipeline(h.hookManager, h.UploadHook.Scripts, &req, h.UploadHook.HookTimeout, log)
+resBytes, err := hooks.ExecuteHookPipeline(h.hookManager, h.UploadHook.Scripts, req, h.UploadHook.HookTimeout, log)
 	if err != nil {
 		return nil, fmt.Errorf("upload hook pipeline failed with error: %w", err)
 	}
