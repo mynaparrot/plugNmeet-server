@@ -251,44 +251,68 @@ func executeCommand(ctx context.Context, log *logrus.Entry, name string, arg ...
 	return nil
 }
 
+// getFileExtension is a helper to normalize and return the file extension.
+func getFileExtension(mime *mimetype.MIME) string {
+	// Use the official extension if available.
+	ext := mime.Extension()
+	if ext != "" {
+		return ext
+	}
+	// Fallback for common cases not covered by the library.
+	switch {
+	case mime.Is("application/vnd.openxmlformats-officedocument.wordprocessingml.document"):
+		return ".docx"
+	case mime.Is("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"):
+		return ".xlsx"
+	case mime.Is("application/vnd.openxmlformats-officedocument.presentationml.presentation"):
+		return ".pptx"
+	}
+	return ""
+}
+
 // convertToPDFIfNeeded checks if the file needs to be converted to PDF based on its MIME type.
 // It returns the path to the PDF and an error.
 func (m *FileModel) convertToPDFIfNeeded(filePath, fileName, roomId string, mime *mimetype.MIME, outputDir string, log *logrus.Entry) (string, error) {
 	if mime.Is("application/pdf") {
 		return filePath, nil
 	}
-	mType := mime.String()
-	if mime.Is("text/plain") {
-		// remove any other suffix like charset=utf-8 otherwise it won't match bellow
-		mType = "text/plain"
-	}
+	ext := getFileExtension(mime)
 
-	log.Infof("New Doc to PDF conversion request for file: %s, mime type: %s", filePath, mType)
-
+	// Map file extensions to soffice conversion variants.
 	conversionMap := map[string]string{
-		"application/vnd.openxmlformats-officedocument.wordprocessingml.document": "pdf:writer_pdf_Export",
-		"application/msword":                      "pdf:writer_pdf_Export",
-		"application/vnd.oasis.opendocument.text": "pdf:writer_pdf_Export",
-		"text/plain":                              "pdf:writer_pdf_Export",
-		"application/rtf":                         "pdf:writer_pdf_Export",
-		"application/xml":                         "pdf:writer_pdf_Export",
-		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "pdf:calc_pdf_Export",
-		"application/vnd.ms-excel":                       "pdf:calc_pdf_Export",
-		"application/vnd.oasis.opendocument.spreadsheet": "pdf:calc_pdf_Export",
-		"text/csv": "pdf:calc_pdf_Export",
-		"application/vnd.openxmlformats-officedocument.presentationml.presentation": "pdf:impress_pdf_Export",
-		"application/vnd.ms-powerpoint":                                             "pdf:impress_pdf_Export",
-		"application/vnd.oasis.opendocument.presentation":                           "pdf:impress_pdf_Export",
-		"application/vnd.visio":                                                     "pdf:draw_pdf_Export",
-		"application/vnd.oasis.opendocument.graphics":                               "pdf:draw_pdf_Export",
-		"text/html": "pdf:writer_web_pdf_Export",
+		// Word processing documents
+		".docx": "pdf:writer_pdf_Export",
+		".doc":  "pdf:writer_pdf_Export",
+		".odt":  "pdf:writer_pdf_Export",
+		".txt":  "pdf:writer_pdf_Export",
+		".rtf":  "pdf:writer_pdf_Export",
+		".xml":  "pdf:writer_pdf_Export",
+		".html": "pdf:writer_web_pdf_Export",
+
+		// Spreadsheet documents
+		".xlsx": "pdf:calc_pdf_Export",
+		".xls":  "pdf:calc_pdf_Export",
+		".ods":  "pdf:calc_pdf_Export",
+		".csv":  "pdf:calc_pdf_Export",
+
+		// Presentation documents
+		".pptx": "pdf:impress_pdf_Export",
+		".ppt":  "pdf:impress_pdf_Export",
+		".odp":  "pdf:impress_pdf_Export",
+
+		// Drawing documents
+		".vsd": "pdf:draw_pdf_Export",
+		".odg": "pdf:draw_pdf_Export",
 	}
 
-	variant, supported := conversionMap[mType]
+	variant, supported := conversionMap[ext]
 	if !supported {
-		// This case should ideally not be reached if ValidateMimeType is comprehensive
-		return "", fmt.Errorf("unsupported file type for conversion: %s", mType)
+		return "", fmt.Errorf("unsupported file type for conversion: %s", ext)
 	}
+	log.WithFields(logrus.Fields{
+		"extension": ext,
+		"variant":   variant,
+	}).Infof("New Doc to PDF conversion request for file: %s", filePath)
 
 	ctx, cancel := context.WithTimeout(m.ctx, SofficeTimeout)
 	defer cancel()

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"mime/multipart"
 	"os"
-	"sort"
 	"strings"
 
 	"github.com/gabriel-vasile/mimetype"
@@ -51,21 +50,18 @@ func (m *FileModel) detectMimeTypeForValidation(file multipart.File) error {
 }
 
 func (m *FileModel) ValidateMimeType(mtype *mimetype.MIME) error {
-	allowedTypes := m.app.UploadFileSettings.AllowedTypes
-	sort.Strings(allowedTypes)
-
 	ext := strings.TrimPrefix(mtype.Extension(), ".")
 	if ext == "" {
-		return fmt.Errorf("invalid file")
+		return fmt.Errorf("invalid: can't determine file type")
 	}
 
-	for _, t := range allowedTypes {
+	for _, t := range m.app.UploadFileSettings.AllowedTypes {
 		if ext == t {
 			return nil
 		}
 	}
 
-	return fmt.Errorf(mtype.Extension() + " file type not allowed")
+	return fmt.Errorf("'%s' is not an allowed file type", ext)
 }
 
 func (m *FileModel) updateRoomMetadataWithOfficeFile(roomId string, f *ConvertWhiteboardFileRes) error {

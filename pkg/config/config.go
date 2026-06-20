@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -338,6 +339,8 @@ func InitAppConfig(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 	if len(appCnf.UploadFileSettings.AllowedTypes) == 0 {
 		appCnf.UploadFileSettings.AllowedTypes = []string{"jpg", "png", "jpeg", "svg", "pdf", "docx", "txt", "xlsx", "pptx", "zip", "mp4", "webm", "mp3"}
 	}
+	sort.Strings(appCnf.UploadFileSettings.AllowedTypes)
+
 	if appCnf.UploadFileSettings.MaxSizeWhiteboardFile > appCnf.UploadFileSettings.MaxSize {
 		return nil, fmt.Errorf("max_size_whiteboard_file value should not be more than max_size")
 	}
