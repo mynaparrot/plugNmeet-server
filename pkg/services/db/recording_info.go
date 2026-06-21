@@ -78,7 +78,7 @@ func (s *DatabaseService) GetRecordingsForBBB(recordIds, meetingIds []string, of
 		return nil, 0, err
 	}
 
-	result := d.Offset(int(offset)).Limit(int(limit)).Find(&recordings)
+	result := d.Offset(int(offset)).Limit(int(limit)).Order("id DESC").Find(&recordings)
 	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, 0, result.Error
 	}

@@ -18,14 +18,9 @@ func (s *DatabaseService) GetArtifacts(roomIds []string, roomSid *string, artifa
 	tx := s.db.Model(&dbmodels.RoomArtifact{})
 
 	if roomSid != nil {
-		roomInfo, err := s.GetRoomInfoBySid(*roomSid, nil)
-		if err != nil {
-			return nil, 0, err
-		}
-		if roomInfo == nil {
-			return nil, 0, config.NotFoundErr
-		}
-		tx.Where("room_table_id = ?", roomInfo.ID)
+		// Use a subquery to avoid the N+1 problem
+		subQuery := s.db.Model(&dbmodels.RoomInfo{}).Select("id").Where("sid = ?", *roomSid)
+		tx.Where("room_table_id = (?)", subQuery)
 	} else if len(roomIds) > 0 {
 		tx.Where("room_id IN ?", roomIds)
 	}
@@ -81,21 +76,24 @@ func (s *DatabaseService) GetRoomArtifactByArtifactID(artifactID string) (*dbmod
 	return &artifact, nil
 }
 
+// GetRoomArtifactDetails retrieves a single artifact by its unique artifact_id,
+// preloading the associated RoomInfo.
+// It returns config.NotFoundErr if the record is not found.
 func (s *DatabaseService) GetRoomArtifactDetails(artifactID string) (*dbmodels.RoomArtifact, *dbmodels.RoomInfo, error) {
-	artifact, err := s.GetRoomArtifactByArtifactID(artifactID)
-	if err != nil {
-		return nil, nil, err
+	var artifact dbmodels.RoomArtifact
+	cond := &dbmodels.RoomArtifact{
+		ArtifactId: artifactID,
 	}
-	if artifact == nil {
+	result := s.db.Preload("RoomInfo").Where(cond).First(&artifact)
+
+	switch {
+	case errors.Is(result.Error, gorm.ErrRecordNotFound):
 		return nil, nil, config.NotFoundErr
+	case result.Error != nil:
+		return nil, nil, result.Error
 	}
 
-	roomInfo, err := s.GetRoomInfoByTableId(artifact.RoomTableID)
-	if err != nil {
-		// it should not happen but we're fine
-	}
-
-	return artifact, roomInfo, nil
+	return &artifact, &artifact.RoomInfo, nil
 }
 
 func (s *DatabaseService) GetAnalyticByRoomTableId(roomTableId uint64) (*dbmodels.RoomArtifact, error) {
