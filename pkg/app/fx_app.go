@@ -1,15 +1,86 @@
 package app
 
 import (
+	"context"
+	"fmt"
+	"os"
+
+	lkLogger "github.com/livekit/protocol/logger"
+	"github.com/mynaparrot/plugnmeet-protocol/logging"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/turn"
+	dbservice "github.com/mynaparrot/plugnmeet-server/pkg/services/db"
+	livekitservice "github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
+	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	turnservice "github.com/mynaparrot/plugnmeet-server/pkg/services/turn"
+	"github.com/sirupsen/logrus"
 	"go.uber.org/fx"
+	"gopkg.in/yaml.v3"
+)
+
+// provideAppConfig reads the config file and initializes the AppConfig.
+func provideAppConfig(ctx context.Context, configFile string) (*config.AppConfig, error) {
+	yamlFile, err := os.ReadFile(configFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file %s: %w", configFile, err)
+	}
+
+	var appCnf config.AppConfig
+	if err := yaml.Unmarshal(yamlFile, &appCnf); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config file %s: %w", configFile, err)
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current working directory: %w", err)
+	}
+	appCnf.RootWorkingDir = wd
+
+	// Initialize the configuration, setting default values and creating necessary directories.
+	initializedAppCnf, err := config.InitAppConfig(ctx, &appCnf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize config: %w", err)
+	}
+
+	return initializedAppCnf, nil
+}
+
+// provideLogger initializes the application logger and livekit protocol logger.
+func provideLogger(appCnf *config.AppConfig) (*logrus.Logger, error) {
+	logger, err := logging.NewLogger(&appCnf.LogSettings)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup logger: %w", err)
+	}
+
+	// to avoid pion logs
+	logConf := &lkLogger.Config{
+		Level: "warn",
+	}
+	lkLogger.InitFromConfig(logConf, "pnm")
+
+	return logger, nil
+}
+
+// ExecutePreStartTasks runs essential setup tasks that depend on core components
+// like the application context, configuration, and logger.
+// In the future, other pre-start logic can be added here.
+func ExecutePreStartTasks(ctx context.Context, appCnf *config.AppConfig, logger *logrus.Logger) error {
+	if appCnf.Hooks != nil {
+		if err := appCnf.Hooks.InitializeHooks(ctx, appCnf.RootWorkingDir, logger); err != nil {
+			logger.WithError(err).Error("failed to initialize hooks")
+			return err
+		}
+	}
+	return nil
+}
+
+var BootstrapModule = fx.Module("bootstrap",
+	fx.Provide(provideAppConfig),
+	fx.Provide(provideLogger),
+	fx.Invoke(ExecutePreStartTasks),
 )
 
 var ServiceModule = fx.Module("services",
@@ -80,6 +151,7 @@ var ControllerModule = fx.Module("controllers",
 )
 
 var ApplicationModule = fx.Module("application",
+	BootstrapModule,
 	ConnectionModule,
 	ServiceModule,
 	HelperModule,

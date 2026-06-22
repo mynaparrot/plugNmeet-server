@@ -26,7 +26,6 @@ type AppConfig struct {
 	ctx         context.Context
 	RDS         *redis.Client
 	DB          *gorm.DB
-	Logger      *logrus.Logger
 	NatsConn    *nats.Conn
 	JetStream   jetstream.JetStream
 	ClientFiles map[string][]string

@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"os"
 
-	lkLogger "github.com/livekit/protocol/logger"
-	"github.com/mynaparrot/plugnmeet-protocol/logging"
 	"github.com/mynaparrot/plugnmeet-server/pkg/app"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/version"
@@ -26,71 +24,51 @@ func main() {
 		return
 	}
 
-	// Create a context that can be canceled to signal all services to shut down.
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Read the main configuration from the YAML file.
-	cnf, err := readYamlConfigFile(*configFile)
+	// Read config early to determine if fx.NopLogger should be used
+	isDebug, err := getClientDebugStatus(*configFile)
 	if err != nil {
-		logrus.WithError(err).Fatal("Failed to read config file")
-	}
-
-	// Initialize the configuration, setting default values and creating necessary directories.
-	appCnf, err := config.InitAppConfig(ctx, cnf)
-	if err != nil {
-		logrus.WithError(err).Fatal("Failed to initialize config")
-	}
-
-	// Set up the structured logger (logrus) based on the configuration.
-	logger, err := logging.NewLogger(&appCnf.LogSettings)
-	if err != nil {
-		logrus.WithError(err).Fatal("Failed to setup logger")
-	}
-	appCnf.Logger = logger
-	// to avoid pion logs
-	logConf := &lkLogger.Config{
-		Level: "warn",
-	}
-	lkLogger.InitFromConfig(logConf, "pnm")
-
-	if appCnf.Hooks != nil {
-		if err := appCnf.Hooks.InitializeHooks(ctx, appCnf.RootWorkingDir, logger); err != nil {
-			logger.WithError(err).Fatal("Failed to setup hooks")
-		}
+		logrus.WithError(err).Fatal("Failed to read client debug status from config")
 	}
 
 	fxOpts := []fx.Option{
-		fx.Provide(func() context.Context { return ctx }),
-		fx.Supply(appCnf, appCnf.Logger),
+		fx.Provide(func(lc fx.Lifecycle) context.Context {
+			ctx, cancel := context.WithCancel(context.Background())
+
+			lc.Append(fx.Hook{
+				OnStop: func(_ context.Context) error {
+					logrus.Info("Shutting down application...")
+					cancel()
+					return nil
+				},
+			})
+			return ctx
+		}),
+
+		fx.Supply(*configFile),
 		app.ApplicationModule,
 	}
-	if !appCnf.Client.Debug {
+
+	if !isDebug {
 		fxOpts = append(fxOpts, fx.NopLogger)
 	}
 
 	fx.New(fxOpts...).Run()
 }
 
-func readYamlConfigFile(file string) (*config.AppConfig, error) {
+// getClientDebugStatus reads the config file to determine the Client.Debug status.
+// This is a temporary read, the full config will be provided by fx.
+func getClientDebugStatus(file string) (bool, error) {
 	yamlFile, err := os.ReadFile(file)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
 
-	var appCnf config.AppConfig
-	if err := yaml.Unmarshal(yamlFile, &appCnf); err != nil {
-		return nil, err
+	var tempConfig struct {
+		Client config.ClientInfo `yaml:"client"`
+	}
+	if err := yaml.Unmarshal(yamlFile, &tempConfig); err != nil {
+		return false, err
 	}
 
-	// get current working dir
-	wd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-
-	// set the root path
-	appCnf.RootWorkingDir = wd
-
-	return &appCnf, err
+	return tempConfig.Client.Debug, nil
 }

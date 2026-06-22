@@ -18,6 +18,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/version"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/sirupsen/logrus"
 )
 
 // router is a struct to hold the dependencies for setting up routes,
@@ -28,7 +29,7 @@ type router struct {
 	ctrl *ApplicationControllers
 }
 
-func newRouter(appConfig *config.AppConfig, ctrl *ApplicationControllers) *fiber.App {
+func newRouter(appConfig *config.AppConfig, ctrl *ApplicationControllers, ll *logrus.Logger) *fiber.App {
 	// --- Fiber App Configuration ---
 	templateEngine := html.New(appConfig.Client.Path, ".html")
 
@@ -64,7 +65,7 @@ func newRouter(appConfig *config.AppConfig, ctrl *ApplicationControllers) *fiber
 
 	app.Use(logger.New(logger.Config{
 		Done: func(c fiber.Ctx, logString []byte) {
-			appConfig.Logger.Debugln(string(logString))
+			ll.Debugln(string(logString))
 		},
 		Format:      "| ${status} | ${latency} | ${ip} | ${method} | ${path} | ${error}",
 		ForceColors: true,

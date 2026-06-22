@@ -39,6 +39,7 @@ type ApplicationControllers struct {
 // Application is the root struct holding all dependencies for lifecycle management.
 type Application struct {
 	ctx           context.Context
+	log           *logrus.Entry
 	shutDowner    fx.Shutdowner
 	appConfig     *config.AppConfig
 	httpServer    *fiber.App
@@ -57,6 +58,7 @@ func NewApplication(
 	janitorModel *models.JanitorModel,
 	artifactModel *models.ArtifactModel,
 	lkServices *livekitservice.LivekitService,
+	logger *logrus.Logger,
 ) *Application {
 	return &Application{
 		ctx:           ctx,
@@ -66,7 +68,8 @@ func NewApplication(
 		janitorModel:  janitorModel,
 		artifactModel: artifactModel,
 		lkServices:    lkServices,
-		httpServer:    newRouter(appConfig, &controllers),
+		httpServer:    newRouter(appConfig, &controllers, logger),
+		log:           logger.WithField("controller", "Application"),
 	}
 }
 
@@ -80,9 +83,8 @@ func (a *Application) RegisterHooks(lifecycle fx.Lifecycle) {
 
 // Start is called when the application is starting. It must be non-blocking.
 func (a *Application) Start(ctx context.Context) error {
-	log := a.appConfig.Logger.WithFields(logrus.Fields{
-		"method":     "start",
-		"controller": "Application",
+	log := a.log.WithFields(logrus.Fields{
+		"method": "start",
 	})
 
 	// Perform synchronous, fallible startup steps first.
@@ -138,7 +140,7 @@ func (a *Application) Stop(ctx context.Context) error {
 	a.janitorModel.Shutdown()
 
 	if err := a.httpServer.ShutdownWithTimeout(15 * time.Second); err != nil {
-		a.appConfig.Logger.WithError(err).Warn("Graceful shutdown failed, forcing exit.")
+		a.log.WithError(err).Warn("Graceful shutdown failed, forcing exit.")
 	}
 
 	return nil

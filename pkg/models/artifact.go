@@ -39,7 +39,7 @@ type ArtifactModel struct {
 	log             *logrus.Entry
 }
 
-func NewArtifactModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, redisService *redisservice.RedisService, natsService *natsservice.NatsService, webhookNotifier *helpers.WebhookNotifier, analyticsModel *AnalyticsModel) *ArtifactModel {
+func NewArtifactModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, redisService *redisservice.RedisService, natsService *natsservice.NatsService, webhookNotifier *helpers.WebhookNotifier, analyticsModel *AnalyticsModel, logger *logrus.Logger) *ArtifactModel {
 	return &ArtifactModel{
 		ctx:             ctx,
 		app:             app,
@@ -48,7 +48,7 @@ func NewArtifactModel(ctx context.Context, app *config.AppConfig, ds *dbservice.
 		natsService:     natsService,
 		webhookNotifier: webhookNotifier,
 		analyticsModel:  analyticsModel,
-		log:             app.Logger.WithField("model", "artifact"),
+		log:             logger.WithField("model", "artifact"),
 	}
 }
 

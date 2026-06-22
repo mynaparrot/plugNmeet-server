@@ -20,8 +20,8 @@ import (
 	"gorm.io/plugin/dbresolver"
 )
 
-func provideDBConnection(lc fx.Lifecycle, ctx context.Context, appCnf *config.AppConfig) (*gorm.DB, error) {
-	log := appCnf.Logger.WithField("method", "provideDBConnection")
+func provideDBConnection(lc fx.Lifecycle, ctx context.Context, appCnf *config.AppConfig, ll *logrus.Logger) (*gorm.DB, error) {
+	log := ll.WithField("method", "provideDBConnection")
 	info := appCnf.DatabaseInfo
 	charset := "utf8mb4"
 	loc := "UTC"
@@ -58,9 +58,9 @@ func provideDBConnection(lc fx.Lifecycle, ctx context.Context, appCnf *config.Ap
 
 	if !appCnf.Client.Debug {
 		loggerCnf.LogLevel = logger.Warn
-		cnf.Logger = logger.New(appCnf.Logger, loggerCnf)
+		cnf.Logger = logger.New(ll, loggerCnf)
 	} else {
-		cnf.Logger = logger.New(appCnf.Logger, loggerCnf)
+		cnf.Logger = logger.New(ll, loggerCnf)
 	}
 
 	db, err := gorm.Open(mysql.New(mysqlCnf), cnf)
@@ -70,7 +70,7 @@ func provideDBConnection(lc fx.Lifecycle, ctx context.Context, appCnf *config.Ap
 	}
 
 	if len(info.Replicas) > 0 {
-		appCnf.Logger.Infof("Found %d read replicas, configuring dbresolver", len(info.Replicas))
+		log.Infof("Found %d read replicas, configuring dbresolver", len(info.Replicas))
 		var replicaDialectors []gorm.Dialector
 
 		for _, r := range info.Replicas {
@@ -137,8 +137,8 @@ func provideDBConnection(lc fx.Lifecycle, ctx context.Context, appCnf *config.Ap
 	return db, nil
 }
 
-func provideNATSConnection(lc fx.Lifecycle, appCnf *config.AppConfig) (*nats.Conn, error) {
-	log := appCnf.Logger.WithField("method", "provideNATSConnection")
+func provideNATSConnection(lc fx.Lifecycle, appCnf *config.AppConfig, ll *logrus.Logger) (*nats.Conn, error) {
+	log := ll.WithField("method", "provideNATSConnection")
 	info := appCnf.NatsInfo
 	opts := []nats.Option{
 		nats.Name("plugnmeet-server"),
@@ -191,8 +191,8 @@ func provideJetStream(nc *nats.Conn, logger *logrus.Logger) (jetstream.JetStream
 	return js, nil
 }
 
-func provideRedisConnection(lc fx.Lifecycle, ctx context.Context, appCnf *config.AppConfig) (*redis.Client, error) {
-	log := appCnf.Logger.WithField("method", "provideRedisConnection")
+func provideRedisConnection(lc fx.Lifecycle, ctx context.Context, appCnf *config.AppConfig, ll *logrus.Logger) (*redis.Client, error) {
+	log := ll.WithField("method", "provideRedisConnection")
 	rf := appCnf.RedisInfo
 	var rdb *redis.Client
 	var tlsConfig *tls.Config
