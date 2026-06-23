@@ -157,6 +157,6 @@ var ApplicationModule = fx.Module("application",
 	HelperModule,
 	ModelModule,
 	ControllerModule,
-	fx.Provide(NewApplication),
+	fx.Provide(NewRouter, NewApplication),
 	fx.Invoke((*Application).RegisterHooks),
 )

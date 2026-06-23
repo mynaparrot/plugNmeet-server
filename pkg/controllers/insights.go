@@ -21,6 +21,7 @@ import (
 )
 
 type InsightsController struct {
+	ctx             context.Context
 	app             *config.AppConfig
 	agentTaskSub    *nats.Subscription
 	summarizeJobSub jetstream.ConsumeContext
@@ -29,8 +30,9 @@ type InsightsController struct {
 	insightsModel   *models.InsightsModel
 }
 
-func NewInsightsController(app *config.AppConfig, natsService *natsservice.NatsService, im *models.InsightsModel, logger *logrus.Logger) *InsightsController {
+func NewInsightsController(ctx context.Context, app *config.AppConfig, natsService *natsservice.NatsService, im *models.InsightsModel, logger *logrus.Logger) *InsightsController {
 	return &InsightsController{
+		ctx:           ctx,
 		app:           app,
 		natsService:   natsService,
 		insightsModel: im,
@@ -39,14 +41,26 @@ func NewInsightsController(app *config.AppConfig, natsService *natsservice.NatsS
 }
 
 // Initialize performs the synchronous setup for the NATS subscriptions.
-func (i *InsightsController) Initialize(ctx context.Context) error {
+func (i *InsightsController) Initialize() error {
 	if err := i.subscribeToAgentTaskRequests(); err != nil {
 		return err
 	}
-	if err := i.subscribeToSummarizeJobs(ctx); err != nil {
+	if err := i.subscribeToSummarizeJobs(i.ctx); err != nil {
 		return err
 	}
 	return nil
+}
+
+func (i *InsightsController) Shutdown() {
+	if i.agentTaskSub != nil {
+		if err := i.agentTaskSub.Unsubscribe(); err != nil {
+			i.logger.WithError(err).Errorln("failed to unsubscribe from agent tasks")
+		}
+	}
+	if i.summarizeJobSub != nil {
+		i.summarizeJobSub.Stop()
+	}
+	i.insightsModel.Shutdown()
 }
 
 // subscribeToAgentTaskRequests is the central handler for all incoming agent tasks.
@@ -119,18 +133,6 @@ func (i *InsightsController) subscribeToSummarizeJobs(ctx context.Context) error
 	i.logger.Infof("Successfully connected with %s queue", insights.SummarizeJobQueueSubject)
 	i.summarizeJobSub = consumeCtx
 	return nil
-}
-
-func (i *InsightsController) Shutdown() {
-	if i.agentTaskSub != nil {
-		if err := i.agentTaskSub.Unsubscribe(); err != nil {
-			i.logger.WithError(err).Errorln("failed to unsubscribe from agent tasks")
-		}
-	}
-	if i.summarizeJobSub != nil {
-		i.summarizeJobSub.Stop()
-	}
-	i.insightsModel.Shutdown()
 }
 
 func (i *InsightsController) HandleTranscriptionConfigure(c fiber.Ctx) error {

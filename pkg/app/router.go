@@ -21,15 +21,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// router is a struct to hold the dependencies for setting up routes,
-// allowing us to break down the monolithic newRouter() function into smaller,
-// more manageable methods.
-type router struct {
-	app  *fiber.App
-	ctrl *ApplicationControllers
+// Router is a struct to hold the dependencies for setting up routes
+type Router struct {
+	fiberApp *fiber.App
+	ctrl     ApplicationControllers
 }
 
-func newRouter(appConfig *config.AppConfig, ctrl *ApplicationControllers, ll *logrus.Logger) *fiber.App {
+func NewRouter(appConfig *config.AppConfig, ctrl ApplicationControllers, ll *logrus.Logger) *Router {
 	// --- Fiber App Configuration ---
 	templateEngine := html.New(appConfig.Client.Path, ".html")
 
@@ -93,9 +91,9 @@ func newRouter(appConfig *config.AppConfig, ctrl *ApplicationControllers, ll *lo
 	}))
 
 	// --- Route Registration ---
-	r := &router{
-		app:  app,
-		ctrl: ctrl,
+	r := &Router{
+		fiberApp: app,
+		ctrl:     ctrl,
 	}
 
 	r.registerBaseRoutes()
@@ -106,30 +104,30 @@ func newRouter(appConfig *config.AppConfig, ctrl *ApplicationControllers, ll *lo
 
 	// --- Final Catch-All 404 Handler ---
 	// This MUST be the last middleware to be registered.
-	app.Use(func(c fiber.Ctx) error {
+	r.fiberApp.Use(func(c fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).SendString("not found")
 	})
 
-	return app
+	return r
 }
 
-func (r *router) registerBaseRoutes() {
-	r.app.Add([]string{"GET", "HEAD"}, "/", func(c fiber.Ctx) error {
+func (r *Router) registerBaseRoutes() {
+	r.fiberApp.Add([]string{"GET", "HEAD"}, "/", func(c fiber.Ctx) error {
 		return c.Render("index", nil)
 	})
-	r.app.Add([]string{"GET", "HEAD"}, "/login*", func(c fiber.Ctx) error {
+	r.fiberApp.Add([]string{"GET", "HEAD"}, "/login*", func(c fiber.Ctx) error {
 		return c.Render("login", nil)
 	})
-	r.app.Post("/webhook", r.ctrl.WebhookController.HandleWebhook)
-	r.app.Add([]string{"GET", "HEAD"}, "/download/uploadedFile/*", r.ctrl.FileController.HandleDownloadUploadedFile)
-	r.app.Add([]string{"GET", "HEAD"}, "/download/recording/:token", r.ctrl.RecordingController.HandleDownloadRecording)
-	r.app.Add([]string{"GET", "HEAD"}, "/download/analytics/:token", r.ctrl.AnalyticsController.HandleDownloadAnalytics)
-	r.app.Add([]string{"GET", "HEAD"}, "/download/artifact/:token", r.ctrl.ArtifactController.HandleDownloadArtifact)
-	r.app.Use("/healthCheck", r.ctrl.HealthCheckController.HandleHealthCheck)
+	r.fiberApp.Post("/webhook", r.ctrl.WebhookController.HandleWebhook)
+	r.fiberApp.Add([]string{"GET", "HEAD"}, "/download/uploadedFile/*", r.ctrl.FileController.HandleDownloadUploadedFile)
+	r.fiberApp.Add([]string{"GET", "HEAD"}, "/download/recording/:token", r.ctrl.RecordingController.HandleDownloadRecording)
+	r.fiberApp.Add([]string{"GET", "HEAD"}, "/download/analytics/:token", r.ctrl.AnalyticsController.HandleDownloadAnalytics)
+	r.fiberApp.Add([]string{"GET", "HEAD"}, "/download/artifact/:token", r.ctrl.ArtifactController.HandleDownloadArtifact)
+	r.fiberApp.Use("/healthCheck", r.ctrl.HealthCheckController.HandleHealthCheck)
 }
 
-func (r *router) registerLtiRoutes() {
-	lti := r.app.Group("/lti")
+func (r *Router) registerLtiRoutes() {
+	lti := r.fiberApp.Group("/lti")
 	lti.Get("/v1", r.ctrl.LtiV1Controller.HandleLTIV1GETREQUEST)
 	lti.Post("/v1", r.ctrl.LtiV1Controller.HandleLTIV1Landing)
 	ltiV1API := lti.Group("/v1/api", r.ctrl.LtiV1Controller.HandleLTIV1VerifyHeaderToken)
@@ -141,8 +139,8 @@ func (r *router) registerLtiRoutes() {
 	ltiV1API.Post("/recording/delete", r.ctrl.LtiV1Controller.HandleLTIV1DeleteRecordings)
 }
 
-func (r *router) registerAuthRoutes() {
-	auth := r.app.Group("/auth", r.ctrl.AuthController.HandleAuthHeaderCheck)
+func (r *Router) registerAuthRoutes() {
+	auth := r.fiberApp.Group("/auth", r.ctrl.AuthController.HandleAuthHeaderCheck)
 	auth.Post("/getClientFiles", r.ctrl.FileController.HandleGetClientFiles)
 
 	room := auth.Group("/room")
@@ -182,8 +180,8 @@ func (r *router) registerAuthRoutes() {
 	recorder.Post("/notify", r.ctrl.RecordingController.HandleRecorderEvents)
 }
 
-func (r *router) registerBBBRoutes() {
-	bbb := r.app.Group("/:apiKey/bigbluebutton/api", r.ctrl.BBBController.HandleVerifyApiRequest)
+func (r *Router) registerBBBRoutes() {
+	bbb := r.fiberApp.Group("/:apiKey/bigbluebutton/api", r.ctrl.BBBController.HandleVerifyApiRequest)
 	bbb.All("/create", r.ctrl.BBBController.HandleBBBCreate)
 	bbb.All("/join", r.ctrl.BBBController.HandleBBBJoin)
 	bbb.All("/isMeetingRunning", r.ctrl.BBBController.HandleBBBIsMeetingRunning)
@@ -196,8 +194,8 @@ func (r *router) registerBBBRoutes() {
 	bbb.All("/publishRecordings", r.ctrl.BBBController.HandleBBBPublishRecordings)
 }
 
-func (r *router) registerAPIRoutes() {
-	api := r.app.Group("/api", r.ctrl.AuthController.HandleVerifyHeaderToken)
+func (r *Router) registerAPIRoutes() {
+	api := r.fiberApp.Group("/api", r.ctrl.AuthController.HandleVerifyHeaderToken)
 	api.Post("/verifyToken", r.ctrl.AuthController.HandleVerifyToken)
 
 	api.Post("/recording", r.ctrl.RecordingController.HandleRecorderTasks)
@@ -266,7 +264,7 @@ func (r *router) registerAPIRoutes() {
 	api.All("/getRoomFilesByType", r.ctrl.FileController.HandleGetRoomFilesByType)
 }
 
-func (r *router) registerInsightsRegisterAPIRoutes(api fiber.Router) {
+func (r *Router) registerInsightsRegisterAPIRoutes(api fiber.Router) {
 	insights := api.Group("/insights")
 	insights.Post("/supportedLangs", r.ctrl.InsightsController.HandleGetSupportedLangs)
 

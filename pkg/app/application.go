@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
@@ -42,8 +41,7 @@ type Application struct {
 	log           *logrus.Entry
 	shutDowner    fx.Shutdowner
 	appConfig     *config.AppConfig
-	httpServer    *fiber.App
-	controllers   ApplicationControllers
+	router        *Router
 	janitorModel  *models.JanitorModel
 	artifactModel *models.ArtifactModel
 	lkServices    *livekitservice.LivekitService
@@ -54,21 +52,20 @@ func NewApplication(
 	ctx context.Context,
 	shutDowner fx.Shutdowner,
 	appConfig *config.AppConfig,
-	controllers ApplicationControllers,
 	janitorModel *models.JanitorModel,
 	artifactModel *models.ArtifactModel,
 	lkServices *livekitservice.LivekitService,
+	router *Router,
 	logger *logrus.Logger,
 ) *Application {
 	return &Application{
 		ctx:           ctx,
 		shutDowner:    shutDowner,
 		appConfig:     appConfig,
-		controllers:   controllers,
 		janitorModel:  janitorModel,
 		artifactModel: artifactModel,
 		lkServices:    lkServices,
-		httpServer:    newRouter(appConfig, &controllers, logger),
+		router:        router,
 		log:           logger.WithField("controller", "Application"),
 	}
 }
@@ -82,7 +79,7 @@ func (a *Application) RegisterHooks(lifecycle fx.Lifecycle) {
 }
 
 // Start is called when the application is starting. It must be non-blocking.
-func (a *Application) Start(ctx context.Context) error {
+func (a *Application) Start(_ context.Context) error {
 	log := a.log.WithFields(logrus.Fields{
 		"method": "start",
 	})
@@ -101,13 +98,13 @@ func (a *Application) Start(ctx context.Context) error {
 	go a.artifactModel.MigrateAnalyticsToArtifacts()
 
 	// Initialize NATS controller.
-	if err := a.controllers.NatsController.Initialize(); err != nil {
+	if err := a.router.ctrl.NatsController.Initialize(); err != nil {
 		log.WithError(err).Error("Failed to initialize NATS controller")
 		return err
 	}
 
 	// Initialize Insights controller.
-	if err := a.controllers.InsightsController.Initialize(ctx); err != nil {
+	if err := a.router.ctrl.InsightsController.Initialize(); err != nil {
 		log.WithError(err).Error("Failed to initialize Insights controller")
 		return err
 	}
@@ -119,7 +116,7 @@ func (a *Application) Start(ctx context.Context) error {
 			"port":    a.appConfig.Client.Port,
 		}).Info("Starting plugNmeet server")
 
-		if err := a.httpServer.Listen(fmt.Sprintf(":%d", a.appConfig.Client.Port)); err != nil {
+		if err := a.router.fiberApp.Listen(fmt.Sprintf(":%d", a.appConfig.Client.Port)); err != nil {
 			log.WithError(err).Error("HTTP server failed to start, initiating shutdown")
 			// Use the Shutdowner to gracefully stop the entire Fx application.
 			if shutdownErr := a.shutDowner.Shutdown(); shutdownErr != nil {
@@ -133,13 +130,13 @@ func (a *Application) Start(ctx context.Context) error {
 }
 
 // Stop is called when the application is shutting down.
-func (a *Application) Stop(ctx context.Context) error {
-	a.controllers.NatsController.Stop()
-	a.controllers.InsightsController.Shutdown()
-	a.controllers.WebhookController.Shutdown()
+func (a *Application) Stop(_ context.Context) error {
+	a.router.ctrl.NatsController.Stop()
+	a.router.ctrl.InsightsController.Shutdown()
+	a.router.ctrl.WebhookController.Shutdown()
 	a.janitorModel.Shutdown()
 
-	if err := a.httpServer.ShutdownWithTimeout(15 * time.Second); err != nil {
+	if err := a.router.fiberApp.ShutdownWithTimeout(15 * time.Second); err != nil {
 		a.log.WithError(err).Warn("Graceful shutdown failed, forcing exit.")
 	}
 
