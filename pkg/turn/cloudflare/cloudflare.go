@@ -10,6 +10,7 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/turn"
+	"github.com/spf13/cast"
 )
 
 const (
@@ -61,8 +62,8 @@ func (p *CloudflareProvider) GetTURNServerCredentials(ctx context.Context, c *co
 	}
 
 	ttl := defaultTTL
-	if configTTL, ok := c.Options["ttl"].(int); ok {
-		ttl = configTTL
+	if configTTL, ok := c.Options["ttl"]; ok {
+		ttl = cast.ToInt(configTTL)
 	}
 
 	// Use the roomId as the custom identifier

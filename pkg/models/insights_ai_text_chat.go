@@ -9,6 +9,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
+	"github.com/spf13/cast"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -116,8 +117,8 @@ func (s *InsightsModel) buildHistoryWithUserPrompt(ctx context.Context, roomId, 
 	}
 
 	contextWindow := float64(defaultAIContextWindow)
-	if cw, ok := service.Options["context_window"].(float64); ok {
-		contextWindow = cw
+	if cw, ok := service.Options["context_window"]; ok {
+		contextWindow = cast.ToFloat64(cw)
 	}
 
 	// Fetch only the last `context_window` messages from Redis.
@@ -159,8 +160,8 @@ func (s *InsightsModel) CheckAndSummarize(ctx context.Context, roomId, userId st
 	}
 
 	contextWindow := float64(defaultAIContextWindow)
-	if cw, ok := service.Options["context_window"].(float64); ok {
-		contextWindow = cw
+	if cw, ok := service.Options["context_window"]; ok {
+		contextWindow = cast.ToFloat64(cw)
 	}
 
 	// 2. Check context length
