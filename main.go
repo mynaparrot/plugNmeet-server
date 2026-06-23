@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/goccy/go-yaml"
 	"github.com/mynaparrot/plugnmeet-server/pkg/app"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/version"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/fx"
-	"gopkg.in/yaml.v3"
 )
 
 func main() {

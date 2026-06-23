@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/goccy/go-yaml"
 	lkLogger "github.com/livekit/protocol/logger"
 	"github.com/mynaparrot/plugnmeet-protocol/logging"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -18,7 +19,6 @@ import (
 	turnservice "github.com/mynaparrot/plugnmeet-server/pkg/services/turn"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/fx"
-	"gopkg.in/yaml.v3"
 )
 
 // provideAppConfig reads the config file and initializes the AppConfig.
