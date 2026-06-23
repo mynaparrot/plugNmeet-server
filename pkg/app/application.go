@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
@@ -130,15 +129,16 @@ func (a *Application) Start(_ context.Context) error {
 }
 
 // Stop is called when the application is shutting down.
-func (a *Application) Stop(_ context.Context) error {
+func (a *Application) Stop(ctx context.Context) error {
+	// Shutdown the server first to prevent new requests from coming in.
+	if err := a.router.fiberApp.ShutdownWithContext(ctx); err != nil {
+		a.log.WithError(err).Warn("Graceful shutdown failed, forcing exit.")
+	}
+
 	a.router.ctrl.NatsController.Stop()
 	a.router.ctrl.InsightsController.Shutdown()
 	a.router.ctrl.WebhookController.Shutdown()
 	a.janitorModel.Shutdown()
-
-	if err := a.router.fiberApp.ShutdownWithTimeout(15 * time.Second); err != nil {
-		a.log.WithError(err).Warn("Graceful shutdown failed, forcing exit.")
-	}
 
 	return nil
 }
