@@ -78,8 +78,7 @@ func ExecutePreStartTasks(ctx context.Context, appCnf *config.AppConfig, logger 
 }
 
 var BootstrapModule = fx.Module("bootstrap",
-	fx.Provide(provideAppConfig),
-	fx.Provide(provideLogger),
+	fx.Provide(provideAppConfig, provideLogger),
 	fx.Invoke(ExecutePreStartTasks),
 )
 
