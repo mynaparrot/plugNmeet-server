@@ -13,6 +13,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/cast"
 )
 
 func (m *RoomModel) CreateRoom(userCtx context.Context, r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoomInfo, error) {
@@ -184,9 +185,16 @@ func (m *RoomModel) handleExistingRoom(r *plugnmeet.CreateRoomReq, roomDbInfo *d
 
 // setRoomDefaults to Sets default values and metadata
 func (m *RoomModel) setRoomDefaults(r *plugnmeet.CreateRoomReq) {
+	// assign all the default features
 	utils.PrepareDefaultRoomFeatures(r)
+
+	// set default values
 	utils.SetCreateRoomDefaultValues(r, m.app.UploadFileSettings.MaxSize, m.app.UploadFileSettings.MaxSizeWhiteboardFile, m.app.UploadFileSettings.AllowedTypes, m.app.SharedNotePad.Enabled)
+
+	// set default lock settings
 	utils.SetRoomDefaultLockSettings(r)
+
+	// set default room settings
 	utils.SetDefaultRoomSettings(m.app.RoomDefaultSettings, r)
 
 	// copyright
@@ -221,7 +229,7 @@ func (m *RoomModel) setRoomDefaults(r *plugnmeet.CreateRoomReq) {
 				maxSelectedTranscriptionTransLangs := 2
 				if _, serviceCnf, err := m.app.Insights.GetProviderAccountForService(insights.ServiceTypeTranscription); err == nil {
 					if num, ok := serviceCnf.Options["max_selected_trans_langs"]; ok {
-						maxSelectedTranscriptionTransLangs = num.(int)
+						maxSelectedTranscriptionTransLangs = cast.ToInt(num)
 					}
 				}
 				r.Metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.MaxSelectedTransLangs = int32(maxSelectedTranscriptionTransLangs)
@@ -231,7 +239,7 @@ func (m *RoomModel) setRoomDefaults(r *plugnmeet.CreateRoomReq) {
 				maxSelectedChatTransLangs := 5
 				if _, serviceCnf, err := m.app.Insights.GetProviderAccountForService(insights.ServiceTypeTranslation); err == nil {
 					if num, ok := serviceCnf.Options["max_selected_trans_langs"]; ok {
-						maxSelectedChatTransLangs = num.(int)
+						maxSelectedChatTransLangs = cast.ToInt(num)
 					}
 				}
 				r.Metadata.RoomFeatures.InsightsFeatures.ChatTranslationFeatures.MaxSelectedTransLangs = int32(maxSelectedChatTransLangs)

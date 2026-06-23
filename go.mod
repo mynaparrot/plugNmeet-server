@@ -27,6 +27,7 @@ require (
 	github.com/prometheus/client_golang v1.23.2
 	github.com/redis/go-redis/v9 v9.21.0
 	github.com/sirupsen/logrus v1.9.4
+	github.com/spf13/cast v1.10.0
 	go.uber.org/fx v1.24.0
 	golang.org/x/sync v0.21.0
 	google.golang.org/genai v1.61.0
