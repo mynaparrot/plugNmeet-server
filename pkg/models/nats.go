@@ -1,6 +1,8 @@
 package models
 
 import (
+	"context"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
@@ -14,6 +16,7 @@ import (
 )
 
 type NatsModel struct {
+	ctx            context.Context
 	app            *config.AppConfig
 	ds             *dbservice.DatabaseService
 	rs             *redisservice.RedisService
@@ -27,8 +30,9 @@ type NatsModel struct {
 	sfGroup        *singleflight.Group
 }
 
-func NewNatsModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, lk *livekitservice.LivekitService, turn *turnservice.TurnService, analyticsModel *AnalyticsModel, authModel *AuthModel, userModel *UserModel, logger *logrus.Logger) *NatsModel {
+func NewNatsModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, lk *livekitservice.LivekitService, turn *turnservice.TurnService, analyticsModel *AnalyticsModel, authModel *AuthModel, userModel *UserModel, logger *logrus.Logger) *NatsModel {
 	return &NatsModel{
+		ctx:            ctx,
 		app:            app,
 		ds:             ds,
 		rs:             rs,

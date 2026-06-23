@@ -229,8 +229,9 @@ func (m *NatsModel) waitForReconnect(roomId, userId string, totalWait, interval 
 }
 
 func (m *NatsModel) revokeTurnCredentials(creds *turn.Credentials, log *logrus.Entry) {
-	ctx, cancel := context.WithTimeout(m.app.GetApplicationCtx(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
 	defer cancel()
+
 	if err := m.turn.RevokeCredentials(ctx, creds); err != nil {
 		log.WithError(err).Warn("Failed to revoke turn credentials")
 	} else {

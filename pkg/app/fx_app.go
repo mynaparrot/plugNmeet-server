@@ -22,7 +22,7 @@ import (
 )
 
 // provideAppConfig reads the config file and initializes the AppConfig.
-func provideAppConfig(ctx context.Context, configFile string) (*config.AppConfig, error) {
+func provideAppConfig(configFile string) (*config.AppConfig, error) {
 	yamlFile, err := os.ReadFile(configFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file %s: %w", configFile, err)
@@ -40,7 +40,7 @@ func provideAppConfig(ctx context.Context, configFile string) (*config.AppConfig
 	appCnf.RootWorkingDir = wd
 
 	// Initialize the configuration, setting default values and creating necessary directories.
-	initializedAppCnf, err := config.InitAppConfig(ctx, &appCnf)
+	initializedAppCnf, err := config.InitAppConfig(&appCnf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize config: %w", err)
 	}

@@ -145,16 +145,6 @@ type ArtifactsSettings struct {
 	DelArtifactsBackupDuration time.Duration  `yaml:"del_artifacts_backup_duration"`
 }
 
-type ChatParticipant struct {
-	RoomSid string
-	RoomId  string
-	Name    string
-	UserSid string
-	UserId  string
-	UUID    string
-	IsAdmin bool
-}
-
 type CopyrightConf struct {
 	Display       bool   `yaml:"display"`
 	AllowOverride bool   `yaml:"allow_override"`
@@ -228,12 +218,12 @@ type NatsInfoRecorder struct {
 	TranscodingJobs string `yaml:"transcoding_jobs_subject"`
 }
 
-func InitAppConfig(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
+func InitAppConfig(appCnf *AppConfig) (*AppConfig, error) {
 	// default validation of token is 10 minutes
 	if appCnf.Client.TokenValidity == nil || *appCnf.Client.TokenValidity < 0 {
 		appCnf.Client.TokenValidity = new(10 * time.Minute)
 	}
-	appCnf.ctx = ctx
+
 	if appCnf.NatsInfo.RoomStreamName == "" {
 		appCnf.NatsInfo.RoomStreamName = "pnm-room-stream"
 	}
@@ -285,8 +275,7 @@ func InitAppConfig(ctx context.Context, appCnf *AppConfig) (*AppConfig, error) {
 	}
 
 	// setup everything for artifacts
-	err = handleArtifactsSettings(appCnf)
-	if err != nil {
+	if err := handleArtifactsSettings(appCnf); err != nil {
 		return nil, err
 	}
 
@@ -399,16 +388,11 @@ func handleArtifactsSettings(appCnf *AppConfig) error {
 		}
 		appCnf.ArtifactsSettings.DelArtifactsBackupPath = filepath.Clean(trashPath)
 
-		err := os.MkdirAll(trashPath, 0755)
-		if err != nil {
+		if err := os.MkdirAll(trashPath, 0755); err != nil {
 			return fmt.Errorf("failed to create artifacts backup directory %s: %w", trashPath, err)
 		}
 	}
 	return nil
-}
-
-func (a *AppConfig) GetApplicationCtx() context.Context {
-	return a.ctx
 }
 
 // readClientFiles will read client files and cache it at startup

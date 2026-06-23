@@ -122,7 +122,7 @@ func (m *NatsModel) HandleMediaServerInfo(roomId, userId string, broadcast bool)
 	}
 
 	// get turn credentials
-	ctx, cancel := context.WithTimeout(m.app.GetApplicationCtx(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
 	defer cancel()
 	turnCred, err := m.turn.GetCredentials(ctx, roomId, userId)
 	if err != nil {
