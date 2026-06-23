@@ -41,7 +41,7 @@ func (m *RecordingModel) DispatchRecorderTask(req *plugnmeet.RecordingReq) error
 		acquired, err := lock.TryLock(ctx)
 		if err != nil {
 			log.WithError(err).Error("failed to acquire recorder task lock")
-			return err
+			return fmt.Errorf("Failed to acquire recorder task lock")
 		}
 		if !acquired {
 			err := errors.New("another request is already in progress")
@@ -87,20 +87,20 @@ func (m *RecordingModel) DispatchRecorderTask(req *plugnmeet.RecordingReq) error
 	case plugnmeet.RecordingTasks_START_RECORDING:
 		if err := m.addTokenAndRecorder(context.Background(), req, toSend, config.RecorderBot, log); err != nil {
 			log.WithError(err).Error("failed to add token for recording bot")
-			return err
+			return fmt.Errorf("Failed to add token for recording bot")
 		}
 	case plugnmeet.RecordingTasks_START_RTMP:
 		toSend.RtmpUrl = req.RtmpUrl
 		if err := m.addTokenAndRecorder(context.Background(), req, toSend, config.RtmpBot, log); err != nil {
 			log.WithError(err).Error("Failed to add token for rtmp bot")
-			return err
+			return fmt.Errorf("Failed to add token for rtmp bot")
 		}
 	}
 
 	payload, err := proto.Marshal(toSend)
 	if err != nil {
 		log.WithError(err).Error("Failed to marshal message for recorder")
-		return err
+		return fmt.Errorf("Failed to marshal message for recorder")
 	}
 
 	log.Info("Sending request to NATS recorder channel")
@@ -116,18 +116,18 @@ func (m *RecordingModel) DispatchRecorderTask(req *plugnmeet.RecordingReq) error
 		} else {
 			log.WithError(err).Errorf("Timed out waiting for a response from the NATS recorder channel after %s", recorderResponseTimeout)
 		}
-		return err
+		return fmt.Errorf("Timed out waiting for a response from the NATS recorder channel")
 	}
 
 	res := new(plugnmeet.CommonResponse)
 	if err = proto.Unmarshal(msg.Data, res); err != nil {
 		log.WithError(err).Error("Failed to unmarshal response from recorder")
-		return err
+		return fmt.Errorf("Failed to unmarshal response from recorder")
 	}
 	if !res.Status {
 		err = errors.New(res.GetMsg())
 		log.WithError(err).Error("Recorder returned a non-successful response")
-		return err
+		return fmt.Errorf("Recorder returned a non-successful response")
 	}
 
 	// we'll update room metadata for recorder options
