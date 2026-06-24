@@ -5,6 +5,7 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 	"gorm.io/gorm"
 )
 
@@ -13,10 +14,17 @@ type DatabaseService struct {
 	logger *logrus.Entry
 }
 
-func New(ctx context.Context, db *gorm.DB, logger *logrus.Logger) *DatabaseService {
+type Args struct {
+	fx.In
+	Ctx    context.Context
+	Db     *gorm.DB
+	Logger *logrus.Logger
+}
+
+func New(args Args) *DatabaseService {
 	s := &DatabaseService{
-		db:     db.WithContext(ctx),
-		logger: logger.WithField("service", "database"),
+		db:     args.Db.WithContext(args.Ctx),
+		logger: args.Logger.WithField("service", "database"),
 	}
 
 	return s

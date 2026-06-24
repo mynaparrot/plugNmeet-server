@@ -8,6 +8,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"go.uber.org/fx"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -16,10 +17,15 @@ type RoomController struct {
 	RoomModel *models.RoomModel
 }
 
+type RoomControllerArgs struct {
+	fx.In
+	RoomModel *models.RoomModel
+}
+
 // NewRoomController creates a new RoomController.
-func NewRoomController(m *models.RoomModel) *RoomController {
+func NewRoomController(args RoomControllerArgs) *RoomController {
 	return &RoomController{
-		RoomModel: m,
+		RoomModel: args.RoomModel,
 	}
 }
 

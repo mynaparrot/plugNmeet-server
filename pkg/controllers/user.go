@@ -8,6 +8,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
+	"go.uber.org/fx"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -20,14 +21,23 @@ type UserController struct {
 	NatsService *natsservice.NatsService
 }
 
+type UserControllerArgs struct {
+	fx.In
+	AppConfig   *config.AppConfig
+	UserModel   *models.UserModel
+	RoomModel   *models.RoomModel
+	Ds          *dbservice.DatabaseService
+	NatsService *natsservice.NatsService
+}
+
 // NewUserController creates a new UserController.
-func NewUserController(appConfig *config.AppConfig, ds *dbservice.DatabaseService, natsService *natsservice.NatsService, userModel *models.UserModel, roomModel *models.RoomModel) *UserController {
+func NewUserController(args UserControllerArgs) *UserController {
 	return &UserController{
-		AppConfig:   appConfig,
-		UserModel:   userModel,
-		RoomModel:   roomModel,
-		ds:          ds,
-		NatsService: natsService,
+		AppConfig:   args.AppConfig,
+		UserModel:   args.UserModel,
+		RoomModel:   args.RoomModel,
+		ds:          args.Ds,
+		NatsService: args.NatsService,
 	}
 }
 

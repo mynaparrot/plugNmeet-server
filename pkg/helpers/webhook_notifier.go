@@ -26,6 +26,7 @@ type WebhookNotifier struct {
 	ds                   *dbservice.DatabaseService
 	rs                   *redisservice.RedisService
 	app                  *config.AppConfig
+	natsConn             *nats.Conn
 	isEnabled            bool
 	enabledForPerMeeting bool
 	defaultUrl           string
@@ -41,17 +42,28 @@ type webhookRedisFields struct {
 	PerformDeleting bool     `json:"perform_deleting"`
 }
 
-func NewWebhookNotifier(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, logger *logrus.Logger) *WebhookNotifier {
+type WebhookNotifierArgs struct {
+	fx.In
+	Ctx      context.Context
+	App      *config.AppConfig
+	NatsConn *nats.Conn
+	Ds       *dbservice.DatabaseService
+	Rs       *redisservice.RedisService
+	Logger   *logrus.Logger
+}
+
+func NewWebhookNotifier(args WebhookNotifierArgs) *WebhookNotifier {
 	w := &WebhookNotifier{
-		ctx:                  ctx,
-		app:                  app,
-		ds:                   ds,
-		rs:                   rs,
-		isEnabled:            app.Client.WebhookConf.Enable,
-		enabledForPerMeeting: app.Client.WebhookConf.EnableForPerMeeting,
-		defaultUrl:           app.Client.WebhookConf.Url,
+		ctx:                  args.Ctx,
+		app:                  args.App,
+		ds:                   args.Ds,
+		rs:                   args.Rs,
+		natsConn:             args.NatsConn,
+		isEnabled:            args.App.Client.WebhookConf.Enable,
+		enabledForPerMeeting: args.App.Client.WebhookConf.EnableForPerMeeting,
+		defaultUrl:           args.App.Client.WebhookConf.Url,
 		notifiers:            make(map[string]*roomNotifier),
-		logger:               logger.WithField("helper", "webhookNotifier"),
+		logger:               args.Logger.WithField("helper", "webhookNotifier"),
 	}
 
 	return w
@@ -60,10 +72,12 @@ func NewWebhookNotifier(ctx context.Context, app *config.AppConfig, ds *dbservic
 // SubscribeToCleanup listens for cleanup messages broadcast to all servers.
 func (w *WebhookNotifier) SubscribeToCleanup(lc fx.Lifecycle) {
 	log := w.logger.WithField("method", "SubscribeToCleanup")
+	var sub *nats.Subscription
+	var err error
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			_, err := w.app.NatsConn.Subscribe(redisservice.WebhookCleanupSubject, func(m *nats.Msg) {
+			sub, err = w.natsConn.Subscribe(redisservice.WebhookCleanupSubject, func(m *nats.Msg) {
 				roomId := string(m.Data)
 				log.WithFields(logrus.Fields{
 					"room_id": roomId,
@@ -76,6 +90,13 @@ func (w *WebhookNotifier) SubscribeToCleanup(lc fx.Lifecycle) {
 				return err
 			}
 			log.Info("Successfully subscribed to webhook cleanup subject")
+			return nil
+		},
+		OnStop: func(_ context.Context) error {
+			log.Info("Unsubscribing from webhook cleanup subject")
+			if sub != nil {
+				return sub.Unsubscribe()
+			}
 			return nil
 		},
 	})
@@ -210,7 +231,7 @@ func (w *WebhookNotifier) DeleteWebhook(roomId string, log *logrus.Entry) {
 
 	// Broadcast a cleanup message to all servers in the cluster.
 	// Only the server running the worker for this room will act on it.
-	if err := w.app.NatsConn.Publish(redisservice.WebhookCleanupSubject, []byte(roomId)); err != nil {
+	if err := w.natsConn.Publish(redisservice.WebhookCleanupSubject, []byte(roomId)); err != nil {
 		log.WithError(err).Error("failed to publish webhook cleanup")
 	}
 

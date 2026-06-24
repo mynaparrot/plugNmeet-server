@@ -14,6 +14,8 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/pion/webrtc/v4"
 	"github.com/sirupsen/logrus"
 
@@ -38,6 +40,7 @@ type RoomAgent struct {
 	Ctx             context.Context
 	cancel          context.CancelFunc
 	conf            *config.AppConfig
+	natsConn        *nats.Conn
 	logger          *logrus.Entry
 	Room            *lksdk.Room
 	lock            sync.RWMutex
@@ -52,46 +55,72 @@ type RoomAgent struct {
 	synthesisTask *TranscriptionSynthesisTask
 }
 
+type RoomAgentArgs struct {
+	Ctx             context.Context
+	AppConf         *config.AppConfig
+	NatsConn        *nats.Conn
+	JS              jetstream.JetStream
+	ServiceConfig   *config.ServiceConfig
+	ProviderAccount *config.ProviderAccount
+	NatsService     *natsservice.NatsService
+	RedisService    *redisservice.RedisService
+	Logger          *logrus.Entry
+	Payload         *insights.InsightsTaskPayload
+}
+
 // NewRoomAgent creates and connects a new RoomAgent to a LiveKit room.
-func NewRoomAgent(ctx context.Context, appConf *config.AppConfig, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, natsService *natsservice.NatsService, redisService *redisservice.RedisService, logger *logrus.Entry, payload *insights.InsightsTaskPayload) (*RoomAgent, error) {
-	ctx, cancel := context.WithCancel(ctx)
-	log := logger.WithFields(logrus.Fields{
+func NewRoomAgent(args *RoomAgentArgs) (*RoomAgent, error) {
+	ctx, cancel := context.WithCancel(args.Ctx)
+	log := args.Logger.WithFields(logrus.Fields{
 		"service":     "room-agent",
-		"roomId":      payload.RoomId,
-		"serviceType": payload.ServiceType,
-		"providerId":  providerAccount.ID,
-		"serviceId":   serviceConfig.ID,
+		"roomId":      args.Payload.RoomId,
+		"serviceType": args.Payload.ServiceType,
+		"providerId":  args.ProviderAccount.ID,
+		"serviceId":   args.ServiceConfig.ID,
 	})
 
 	// Create a single task for this agent's one and only service.
-	task, err := NewTask(ctx, payload.ServiceType, appConf, serviceConfig, providerAccount, natsService, redisService, log)
+	taskArgs := &TaskArgs{
+		Ctx:             ctx,
+		ServiceType:     args.Payload.ServiceType,
+		AppConf:         args.AppConf,
+		NatsConn:        args.NatsConn,
+		JS:              args.JS,
+		ServiceConfig:   args.ServiceConfig,
+		ProviderAccount: args.ProviderAccount,
+		NatsService:     args.NatsService,
+		RedisService:    args.RedisService,
+		Logger:          log,
+	}
+	task, err := NewTask(taskArgs)
 	if err != nil {
 		cancel()
-		return nil, fmt.Errorf("could not create task for service '%s': %w", payload.ServiceType, err)
+		return nil, fmt.Errorf("could not create task for service '%s': %w", args.Payload.ServiceType, err)
 	}
 
 	agent := &RoomAgent{
 		Ctx:             ctx,
 		cancel:          cancel,
-		conf:            appConf,
+		conf:            args.AppConf,
+		natsConn:        args.NatsConn,
 		logger:          log,
 		activePipelines: make(map[string]*activePipeline),
 		allowedUsers:    make(map[string]bool),
 		activeUserTasks: make(map[string][]byte),
 		task:            task,
-		payload:         payload,
-		natsService:     natsService,
-		redisService:    redisService,
+		payload:         args.Payload,
+		natsService:     args.NatsService,
+		redisService:    args.RedisService,
 	}
 
 	c := &plugnmeet.PlugNmeetTokenClaims{
-		RoomId:   payload.RoomId,
-		UserId:   fmt.Sprintf("%s%s-%s", config.AgentUserUserIdPrefix, payload.ServiceType, uuid.NewString()),
+		RoomId:   args.Payload.RoomId,
+		UserId:   fmt.Sprintf("%s%s-%s", config.AgentUserUserIdPrefix, args.Payload.ServiceType, uuid.NewString()),
 		IsAdmin:  true,
-		IsHidden: payload.HiddenAgent,
+		IsHidden: args.Payload.HiddenAgent,
 	}
-	if payload.AgentName != nil && *payload.AgentName != "" {
-		c.Name = *payload.AgentName
+	if args.Payload.AgentName != nil && *args.Payload.AgentName != "" {
+		c.Name = *args.Payload.AgentName
 	}
 
 	token, err := auth.GenerateLivekitAccessToken(agent.conf.LivekitInfo.ApiKey, agent.conf.LivekitInfo.Secret, time.Minute*5, c)
@@ -115,10 +144,10 @@ func NewRoomAgent(ctx context.Context, appConf *config.AppConfig, serviceConfig 
 	}
 
 	agent.Room = room
-	log.Infof("successfully connected with room %s", payload.RoomId)
+	log.Infof("Successfully connected with room %s", args.Payload.RoomId)
 
 	// Start the synthesis task if enabled
-	if payload.EnabledTranscriptionTransSynthesis && len(payload.AllowedTransLangs) > 0 {
+	if args.Payload.EnabledTranscriptionTransSynthesis && len(args.Payload.AllowedTransLangs) > 0 {
 		err := agent.startSynthesisTask()
 		if err != nil {
 			log.WithError(err).Error("failed to start synthesis task")
@@ -138,13 +167,20 @@ func (a *RoomAgent) startSynthesisTask() error {
 	}
 
 	// 2. Create a new provider instance specifically for synthesis.
-	synthProvider, err := NewProvider(a.Ctx, synthServiceConfig.Provider, synthAccount, synthServiceConfig, a.logger)
+	args := &ProviderArgs{
+		Ctx:             a.Ctx,
+		ProviderType:    synthServiceConfig.Provider,
+		ProviderAccount: synthAccount,
+		ServiceConfig:   synthServiceConfig,
+		Logger:          a.logger,
+	}
+	synthProvider, err := NewProvider(args)
 	if err != nil {
 		return fmt.Errorf("failed to create provider for speech-synthesis: %w", err)
 	}
 
 	// 3. Create the new synthesis task.
-	a.synthesisTask = NewTranscriptionSynthesisTask(a.Ctx, a.conf, a.logger, synthProvider, synthServiceConfig, a.redisService, a.natsService, a.Room.Name(), a.payload.AllowedTransLangs, a.payload.RoomE2EEKey)
+	a.synthesisTask = NewTranscriptionSynthesisTask(a.Ctx, a.conf, a.natsConn, a.logger, synthProvider, synthServiceConfig, a.redisService, a.natsService, a.Room.Name(), a.payload.AllowedTransLangs, a.payload.RoomE2EEKey)
 
 	// 4. Run the task in a goroutine.
 	go a.synthesisTask.Run()

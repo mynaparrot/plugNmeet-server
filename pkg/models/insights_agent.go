@@ -50,7 +50,7 @@ func (s *InsightsModel) HandleIncomingAgentTask(msg *nats.Msg) {
 		}
 		res := &AgentTaskResponse{Status: status, Msg: message}
 		resBytes, _ := json.Marshal(res)
-		err := s.appConfig.NatsConn.Publish(msg.Reply, resBytes)
+		err := s.natsConn.Publish(msg.Reply, resBytes)
 		if err != nil {
 			s.logger.WithError(err).Error("failed to publish reply")
 		}
@@ -196,7 +196,20 @@ func (s *InsightsModel) manageLocalAgent(payload *insights.InsightsTaskPayload, 
 		return err
 	}
 
-	agent, err := insightsservice.NewRoomAgent(s.ctx, s.appConfig, serviceConfig, targetAccount, s.natsService, s.redisService, s.logger, payload)
+	args := &insightsservice.RoomAgentArgs{
+		Ctx:             s.ctx,
+		AppConf:         s.appConfig,
+		NatsConn:        s.natsConn,
+		JS:              s.js,
+		ServiceConfig:   serviceConfig,
+		ProviderAccount: targetAccount,
+		NatsService:     s.natsService,
+		RedisService:    s.redisService,
+		Logger:          s.logger,
+		Payload:         payload,
+	}
+
+	agent, err := insightsservice.NewRoomAgent(args)
 	if err != nil {
 		_ = redisLock.Unlock(s.ctx)
 		return fmt.Errorf("failed to create insights agent: %w", err)

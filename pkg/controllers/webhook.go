@@ -5,6 +5,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"go.uber.org/fx"
 )
 
 const (
@@ -19,11 +20,17 @@ type WebhookController struct {
 	wp           *workerpool.WorkerPool
 }
 
+type WebhookControllerArgs struct {
+	fx.In
+	AuthModel    *models.AuthModel
+	WebhookModel *models.WebhookModel
+}
+
 // NewWebhookController creates a new WebhookController.
-func NewWebhookController(authModel *models.AuthModel, webhookModel *models.WebhookModel) *WebhookController {
+func NewWebhookController(args WebhookControllerArgs) *WebhookController {
 	return &WebhookController{
-		AuthModel:    authModel,
-		WebhookModel: webhookModel,
+		AuthModel:    args.AuthModel,
+		WebhookModel: args.WebhookModel,
 		wp:           workerpool.New(WebhookMaxWorkers),
 	}
 }

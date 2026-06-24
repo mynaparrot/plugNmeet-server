@@ -17,12 +17,14 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 	"google.golang.org/protobuf/proto"
 )
 
 type InsightsController struct {
 	ctx             context.Context
 	app             *config.AppConfig
+	nc              *nats.Conn
 	agentTaskSub    *nats.Subscription
 	summarizeJobSub jetstream.ConsumeContext
 	natsService     *natsservice.NatsService
@@ -30,13 +32,24 @@ type InsightsController struct {
 	insightsModel   *models.InsightsModel
 }
 
-func NewInsightsController(ctx context.Context, app *config.AppConfig, natsService *natsservice.NatsService, im *models.InsightsModel, logger *logrus.Logger) *InsightsController {
+type InsightsControllerArgs struct {
+	fx.In
+	Ctx           context.Context
+	App           *config.AppConfig
+	NatsConn      *nats.Conn
+	NatsService   *natsservice.NatsService
+	InsightsModel *models.InsightsModel
+	Logger        *logrus.Logger
+}
+
+func NewInsightsController(args InsightsControllerArgs) *InsightsController {
 	return &InsightsController{
-		ctx:           ctx,
-		app:           app,
-		natsService:   natsService,
-		insightsModel: im,
-		logger:        logger.WithField("controller", "insights"),
+		ctx:           args.Ctx,
+		app:           args.App,
+		nc:            args.NatsConn,
+		natsService:   args.NatsService,
+		insightsModel: args.InsightsModel,
+		logger:        args.Logger.WithField("controller", "insights"),
 	}
 }
 
@@ -65,7 +78,7 @@ func (i *InsightsController) Shutdown() {
 
 // subscribeToAgentTaskRequests is the central handler for all incoming agent tasks.
 func (i *InsightsController) subscribeToAgentTaskRequests() error {
-	sub, err := i.app.NatsConn.Subscribe(insights.InsightsNatsChannel, func(msg *nats.Msg) {
+	sub, err := i.nc.Subscribe(insights.InsightsNatsChannel, func(msg *nats.Msg) {
 		// Pass the raw message directly to the model's handler.
 		// The model is now responsible for unmarshalling and replying.
 		i.insightsModel.HandleIncomingAgentTask(msg)

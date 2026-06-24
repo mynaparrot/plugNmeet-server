@@ -12,6 +12,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	dbservice "github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -22,12 +23,19 @@ type RecordingController struct {
 	logger         *logrus.Entry
 }
 
+type RecordingControllerArgs struct {
+	fx.In
+	Ds             *dbservice.DatabaseService
+	RecordingModel *models.RecordingModel
+	Logger         *logrus.Logger
+}
+
 // NewRecordingController creates a new RecordingController.
-func NewRecordingController(ds *dbservice.DatabaseService, recordingModel *models.RecordingModel, logger *logrus.Logger) *RecordingController {
+func NewRecordingController(args RecordingControllerArgs) *RecordingController {
 	return &RecordingController{
-		ds:             ds,
-		recordingModel: recordingModel,
-		logger:         logger.WithField("controller", "recording"),
+		ds:             args.Ds,
+		recordingModel: args.RecordingModel,
+		logger:         args.Logger.WithField("controller", "recording"),
 	}
 }
 

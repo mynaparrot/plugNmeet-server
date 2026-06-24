@@ -14,6 +14,7 @@ import (
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 )
 
 const (
@@ -59,23 +60,42 @@ type updateRoomMetadataOpts struct {
 	url      *string
 }
 
-func NewRoomModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService, natsService *natsservice.NatsService, webhookNotifier *helpers.WebhookNotifier, userModel *UserModel, recordingModel *RecordingModel, fileModel *FileModel, etherpadModel *EtherpadModel, pollModel *PollModel, analyticsModel *AnalyticsModel, insightsModel *InsightsModel, logger *logrus.Logger) *RoomModel {
+type RoomModelArgs struct {
+	fx.In
+	Ctx             context.Context
+	App             *config.AppConfig
+	Ds              *dbservice.DatabaseService
+	Rs              *redisservice.RedisService
+	Lk              *livekitservice.LivekitService
+	NatsService     *natsservice.NatsService
+	WebhookNotifier *helpers.WebhookNotifier
+	UserModel       *UserModel
+	RecordingModel  *RecordingModel
+	FileModel       *FileModel
+	EtherpadModel   *EtherpadModel
+	PollModel       *PollModel
+	AnalyticsModel  *AnalyticsModel
+	InsightsModel   *InsightsModel
+	Logger          *logrus.Logger
+}
+
+func NewRoomModel(args RoomModelArgs) *RoomModel {
 	return &RoomModel{
-		ctx:             ctx,
-		app:             app,
-		ds:              ds,
-		rs:              rs,
-		lk:              lk,
-		natsService:     natsService,
-		webhookNotifier: webhookNotifier,
-		userModel:       userModel,
-		recordingModel:  recordingModel,
-		fileModel:       fileModel,
-		etherpadModel:   etherpadModel,
-		pollModel:       pollModel,
-		analyticsModel:  analyticsModel,
-		insightsModel:   insightsModel,
-		logger:          logger.WithField("model", "room"),
+		ctx:             args.Ctx,
+		app:             args.App,
+		ds:              args.Ds,
+		rs:              args.Rs,
+		lk:              args.Lk,
+		natsService:     args.NatsService,
+		webhookNotifier: args.WebhookNotifier,
+		userModel:       args.UserModel,
+		recordingModel:  args.RecordingModel,
+		fileModel:       args.FileModel,
+		etherpadModel:   args.EtherpadModel,
+		pollModel:       args.PollModel,
+		analyticsModel:  args.AnalyticsModel,
+		insightsModel:   args.InsightsModel,
+		logger:          args.Logger.WithField("model", "room"),
 	}
 }
 

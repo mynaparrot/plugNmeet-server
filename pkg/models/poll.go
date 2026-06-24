@@ -9,6 +9,7 @@ import (
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 )
 
 type PollModel struct {
@@ -20,14 +21,24 @@ type PollModel struct {
 	logger         *logrus.Entry
 }
 
-func NewPollModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, analyticsModel *AnalyticsModel, logger *logrus.Logger) *PollModel {
+type PollModelArgs struct {
+	fx.In
+	App            *config.AppConfig
+	Ds             *dbservice.DatabaseService
+	Rs             *redisservice.RedisService
+	NatsService    *natsservice.NatsService
+	AnalyticsModel *AnalyticsModel
+	Logger         *logrus.Logger
+}
+
+func NewPollModel(args PollModelArgs) *PollModel {
 	return &PollModel{
-		app:            app,
-		ds:             ds,
-		rs:             rs,
-		natsService:    natsService,
-		analyticsModel: analyticsModel,
-		logger:         logger.WithField("model", "poll"),
+		app:            args.App,
+		ds:             args.Ds,
+		rs:             args.Rs,
+		natsService:    args.NatsService,
+		analyticsModel: args.AnalyticsModel,
+		logger:         args.Logger.WithField("model", "poll"),
 	}
 }
 

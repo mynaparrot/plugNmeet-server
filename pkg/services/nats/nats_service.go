@@ -40,6 +40,7 @@ var protoJsonOpts = protojson.MarshalOptions{
 
 type NatsService struct {
 	ctx    context.Context
+	cancel context.CancelFunc
 	app    *config.AppConfig
 	nc     *nats.Conn
 	js     jetstream.JetStream
@@ -47,15 +48,26 @@ type NatsService struct {
 	logger *logrus.Entry
 }
 
-func New(ctx context.Context, app *config.AppConfig, nc *nats.Conn, js jetstream.JetStream, logger *logrus.Logger) *NatsService {
-	log := logger.WithField("service", "nats")
+type Args struct {
+	fx.In
+	Ctx    context.Context
+	App    *config.AppConfig
+	Nc     *nats.Conn
+	Js     jetstream.JetStream
+	Logger *logrus.Logger
+}
+
+func New(args Args) *NatsService {
+	log := args.Logger.WithField("service", "nats")
+	ctx, cancel := context.WithCancel(args.Ctx)
 
 	return &NatsService{
 		ctx:    ctx,
-		app:    app,
-		nc:     nc,
-		js:     js,
-		cs:     newNatsCacheService(ctx, log),
+		cancel: cancel,
+		app:    args.App,
+		nc:     args.Nc,
+		js:     args.Js,
+		cs:     newNatsCacheService(args.Ctx, log),
 		logger: log,
 	}
 }
@@ -64,11 +76,18 @@ func (s *NatsService) Initialized(lc fx.Lifecycle) error {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			if err := s.createRoomNatsStream(); err != nil {
+				s.logger.WithError(err).Error("failed to initialize nats stream")
 				return err
 			}
 			if err := s.createRecorderKVAndWatch(); err != nil {
+				s.logger.WithError(err).Error("failed to initialize recorder KV and watch")
 				return err
 			}
+			return nil
+		},
+		OnStop: func(_ context.Context) error {
+			s.logger.Info("NatsService closing..")
+			s.cancel()
 			return nil
 		},
 	})

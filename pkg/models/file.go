@@ -14,6 +14,7 @@ import (
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 )
 
 type FileModel struct {
@@ -26,15 +27,26 @@ type FileModel struct {
 	logger       *logrus.Entry
 }
 
-func NewFileModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, natsService *natsservice.NatsService, rs *redisservice.RedisService, um *UserModel, logger *logrus.Logger) *FileModel {
+type FileModelArgs struct {
+	fx.In
+	Ctx         context.Context
+	App         *config.AppConfig
+	Ds          *dbservice.DatabaseService
+	NatsService *natsservice.NatsService
+	Rs          *redisservice.RedisService
+	Um          *UserModel
+	Logger      *logrus.Logger
+}
+
+func NewFileModel(args FileModelArgs) *FileModel {
 	return &FileModel{
-		ctx:          ctx,
-		app:          app,
-		ds:           ds,
-		natsService:  natsService,
-		redisService: rs,
-		userModel:    um,
-		logger:       logger.WithField("model", "file"),
+		ctx:          args.Ctx,
+		app:          args.App,
+		ds:           args.Ds,
+		natsService:  args.NatsService,
+		redisService: args.Rs,
+		userModel:    args.Um,
+		logger:       args.Logger.WithField("model", "file"),
 	}
 }
 

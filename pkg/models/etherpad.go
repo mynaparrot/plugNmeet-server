@@ -9,6 +9,7 @@ import (
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 )
 
 const (
@@ -43,14 +44,25 @@ type EtherpadModel struct {
 	logger         *logrus.Entry
 }
 
-func NewEtherpadModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, analyticsModel *AnalyticsModel, logger *logrus.Logger) *EtherpadModel {
+type EtherpadModelArgs struct {
+	fx.In
+	Ctx            context.Context
+	App            *config.AppConfig
+	Ds             *dbservice.DatabaseService
+	Rs             *redisservice.RedisService
+	NatsService    *natsservice.NatsService
+	AnalyticsModel *AnalyticsModel
+	Logger         *logrus.Logger
+}
+
+func NewEtherpadModel(args EtherpadModelArgs) *EtherpadModel {
 	return &EtherpadModel{
-		ctx:            ctx,
-		app:            app,
-		ds:             ds,
-		rs:             rs,
-		analyticsModel: analyticsModel,
-		natsService:    natsService,
-		logger:         logger.WithField("model", "etherpad"),
+		ctx:            args.Ctx,
+		app:            args.App,
+		ds:             args.Ds,
+		rs:             args.Rs,
+		analyticsModel: args.AnalyticsModel,
+		natsService:    args.NatsService,
+		logger:         args.Logger.WithField("model", "etherpad"),
 	}
 }

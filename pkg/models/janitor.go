@@ -11,8 +11,10 @@ import (
 	livekitservice "github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 )
 
 // JanitorModel performs various background cleanup and maintenance tasks for the application.
@@ -21,6 +23,8 @@ type JanitorModel struct {
 	ctx         context.Context
 	cancel      context.CancelFunc
 	app         *config.AppConfig
+	rds         *redis.Client
+	js          jetstream.JetStream
 	ds          *dbservice.DatabaseService
 	rs          *redisservice.RedisService
 	natsService *natsservice.NatsService
@@ -36,21 +40,38 @@ type JanitorModel struct {
 	leaderRenewal time.Duration
 }
 
+type JanitorModelArgs struct {
+	fx.In
+	MainCtx       context.Context
+	App           *config.AppConfig
+	RDS           *redis.Client
+	JS            jetstream.JetStream
+	Ds            *dbservice.DatabaseService
+	Rs            *redisservice.RedisService
+	NatsService   *natsservice.NatsService
+	Lk            *livekitservice.LivekitService
+	Rm            *RoomModel
+	ArtifactModel *ArtifactModel
+	Logger        *logrus.Logger
+}
+
 // NewJanitorModel creates a new JanitorModel.
-func NewJanitorModel(mainCtx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, lk *livekitservice.LivekitService, rm *RoomModel, artifactModel *ArtifactModel, logger *logrus.Logger) *JanitorModel {
-	ctx, cancel := context.WithCancel(mainCtx)
+func NewJanitorModel(args JanitorModelArgs) *JanitorModel {
+	ctx, cancel := context.WithCancel(args.MainCtx)
 
 	return &JanitorModel{
 		ctx:           ctx,
 		cancel:        cancel,
-		app:           app,
-		ds:            ds,
-		rs:            rs,
-		lk:            lk,
-		rm:            rm,
-		artifactModel: artifactModel,
-		natsService:   natsService,
-		logger:        logger.WithField("model", "janitor"),
+		app:           args.App,
+		rds:           args.RDS,
+		js:            args.JS,
+		ds:            args.Ds,
+		rs:            args.Rs,
+		lk:            args.Lk,
+		rm:            args.Rm,
+		artifactModel: args.ArtifactModel,
+		natsService:   args.NatsService,
+		logger:        args.Logger.WithField("model", "janitor"),
 
 		leaderLockTTL: 1 * time.Minute,
 		leaderRenewal: 30 * time.Second,
@@ -95,6 +116,17 @@ func (m *JanitorModel) StartJanitor() {
 			}
 		}
 	}
+}
+
+func (m *JanitorModel) Shutdown() {
+	m.logger.Infoln("Janitor shutting down.")
+	// Copy the lock value to a local var to avoid holding the lock during a network call.
+	m.mu.RLock()
+	currentLockVal := m.leaderLockVal
+	m.mu.RUnlock()
+
+	m.rs.ReleaseJanitorLeadershipLock(context.Background(), currentLockVal, m.logger)
+	m.cancel()
 }
 
 // runJanitorTasks contains the main loop for performing cleanup tasks.
@@ -158,15 +190,4 @@ func (m *JanitorModel) runJanitorTasks() {
 			}
 		}
 	}
-}
-
-func (m *JanitorModel) Shutdown() {
-	m.logger.Infoln("Janitor shutting down.")
-	// Copy the lock value to a local var to avoid holding the lock during a network call.
-	m.mu.RLock()
-	currentLockVal := m.leaderLockVal
-	m.mu.RUnlock()
-
-	m.rs.ReleaseJanitorLeadershipLock(context.Background(), currentLockVal, m.logger)
-	m.cancel()
 }

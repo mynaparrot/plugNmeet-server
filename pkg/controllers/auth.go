@@ -16,6 +16,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/version"
+	"go.uber.org/fx"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -27,13 +28,21 @@ type AuthController struct {
 	NatsService *natsservice.NatsService
 }
 
+type AuthControllerArgs struct {
+	fx.In
+	AppConfig   *config.AppConfig
+	AuthModel   *models.AuthModel
+	RoomModel   *models.RoomModel
+	NatsService *natsservice.NatsService
+}
+
 // NewAuthController creates a new AuthController.
-func NewAuthController(config *config.AppConfig, natsService *natsservice.NatsService, authModel *models.AuthModel, roomModel *models.RoomModel) *AuthController {
+func NewAuthController(args AuthControllerArgs) *AuthController {
 	return &AuthController{
-		AppConfig:   config,
-		AuthModel:   authModel,
-		RoomModel:   roomModel,
-		NatsService: natsService,
+		AppConfig:   args.AppConfig,
+		AuthModel:   args.AuthModel,
+		RoomModel:   args.RoomModel,
+		NatsService: args.NatsService,
 	}
 }
 

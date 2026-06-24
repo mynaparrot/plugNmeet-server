@@ -10,6 +10,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 )
 
 type LtiV1Model struct {
@@ -54,12 +55,19 @@ type LTIV1FetchRecordingsReq struct {
 	OrderBy string `json:"order_by"`
 }
 
-func NewLtiV1Model(app *config.AppConfig, rm *RoomModel, um *UserModel) *LtiV1Model {
+type LtiV1ModelArgs struct {
+	fx.In
+	App *config.AppConfig
+	Rm  *RoomModel
+	Um  *UserModel
+}
+
+func NewLtiV1Model(args LtiV1ModelArgs) *LtiV1Model {
 	return &LtiV1Model{
-		app:    app,
-		rm:     rm,
-		um:     um,
-		logger: rm.logger.Logger.WithField("model", "lti_v1"),
+		app:    args.App,
+		rm:     args.Rm,
+		um:     args.Um,
+		logger: args.Rm.logger.Logger.WithField("model", "lti_v1"),
 	}
 }
 

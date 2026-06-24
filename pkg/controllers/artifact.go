@@ -10,6 +10,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"go.uber.org/fx"
 )
 
 // ArtifactController holds the dependencies for artifact-related handlers.
@@ -17,10 +18,15 @@ type ArtifactController struct {
 	ArtifactModel *models.ArtifactModel
 }
 
+type ArtifactControllerArgs struct {
+	fx.In
+	ArtifactModel *models.ArtifactModel
+}
+
 // NewArtifactController creates a new ArtifactController.
-func NewArtifactController(am *models.ArtifactModel) *ArtifactController {
+func NewArtifactController(args ArtifactControllerArgs) *ArtifactController {
 	return &ArtifactController{
-		ArtifactModel: am,
+		ArtifactModel: args.ArtifactModel,
 	}
 }
 

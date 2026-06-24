@@ -4,6 +4,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"go.uber.org/fx"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -12,10 +13,15 @@ type BreakoutRoomController struct {
 	BreakoutRoomModel *models.BreakoutRoomModel
 }
 
+type BreakoutRoomControllerArgs struct {
+	fx.In
+	BreakoutRoomModel *models.BreakoutRoomModel
+}
+
 // NewBreakoutRoomController creates a new BreakoutRoomController.
-func NewBreakoutRoomController(brm *models.BreakoutRoomModel) *BreakoutRoomController {
+func NewBreakoutRoomController(args BreakoutRoomControllerArgs) *BreakoutRoomController {
 	return &BreakoutRoomController{
-		BreakoutRoomModel: brm,
+		BreakoutRoomModel: args.BreakoutRoomModel,
 	}
 }
 

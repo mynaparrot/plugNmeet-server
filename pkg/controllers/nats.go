@@ -18,6 +18,7 @@ import (
 	"github.com/nats-io/nats.go/micro"
 	"github.com/nats-io/nkeys"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -43,6 +44,7 @@ const (
 type NatsController struct {
 	ctx              context.Context
 	app              *config.AppConfig
+	natsConn         *nats.Conn
 	natsService      *natsservice.NatsService
 	issuerKeyPair    nkeys.KeyPair
 	curveKeyPair     nkeys.KeyPair
@@ -56,28 +58,40 @@ type NatsController struct {
 	authService      micro.Service
 }
 
-func NewNatsController(ctx context.Context, app *config.AppConfig, natsService *natsservice.NatsService, authModel *models.AuthModel, natsModel *models.NatsModel, logger *logrus.Logger) (*NatsController, error) {
-	log := logger.WithField("controller", "nats")
+type NatsControllerArgs struct {
+	fx.In
+	Ctx         context.Context
+	App         *config.AppConfig
+	NatsConn    *nats.Conn
+	NatsService *natsservice.NatsService
+	AuthModel   *models.AuthModel
+	NatsModel   *models.NatsModel
+	Logger      *logrus.Logger
+}
 
-	issuerKeyPair, err := nkeys.FromSeed([]byte(app.NatsInfo.AuthCalloutIssuerPrivate))
+func NewNatsController(args NatsControllerArgs) (*NatsController, error) {
+	log := args.Logger.WithField("controller", "nats")
+
+	issuerKeyPair, err := nkeys.FromSeed([]byte(args.App.NatsInfo.AuthCalloutIssuerPrivate))
 	if err != nil {
 		log.WithError(err).Error("Failed to load issuer private key")
 		return nil, fmt.Errorf("error creating issuer key pair: %w", err)
 	}
 
 	c := &NatsController{
-		ctx:           ctx,
-		app:           app,
-		natsService:   natsService,
+		ctx:           args.Ctx,
+		app:           args.App,
+		natsConn:      args.NatsConn,
+		natsService:   args.NatsService,
 		issuerKeyPair: issuerKeyPair,
-		authModel:     authModel,
-		natsModel:     natsModel,
+		authModel:     args.AuthModel,
+		natsModel:     args.NatsModel,
 		wp:            workerpool.New(DefaultNumWorkers),
 		log:           log,
 	}
 
-	if app.NatsInfo.AuthCalloutXkeyPrivate != nil && *app.NatsInfo.AuthCalloutXkeyPrivate != "" {
-		c.curveKeyPair, err = nkeys.FromSeed([]byte(*app.NatsInfo.AuthCalloutXkeyPrivate))
+	if args.App.NatsInfo.AuthCalloutXkeyPrivate != nil && *args.App.NatsInfo.AuthCalloutXkeyPrivate != "" {
+		c.curveKeyPair, err = nkeys.FromSeed([]byte(*args.App.NatsInfo.AuthCalloutXkeyPrivate))
 		if err != nil {
 			log.WithError(err).Error("Failed to load curve private key")
 			return nil, fmt.Errorf("error creating curve key pair: %w", err)
@@ -121,7 +135,7 @@ func (c *NatsController) Initialize() error {
 
 	// auth service
 	authService := NewNatsAuthController(c.app, c.natsService, c.authModel, c.issuerKeyPair, c.curveKeyPair, c.log)
-	c.authService, err = micro.AddService(c.app.NatsConn, micro.Config{
+	c.authService, err = micro.AddService(c.natsConn, micro.Config{
 		Name:        natsAuthServiceName,
 		Version:     version.Version,
 		Description: "Handle authorization of pnm nats client",
@@ -161,7 +175,7 @@ func (c *NatsController) Stop() {
 // SubscribeToUsersConnEvents will be used to subscribe with users' connection events
 // based on user connection we can determine user's connection status
 func (c *NatsController) subscribeToUsersConnEvents() (*nats.Subscription, error) {
-	return c.app.NatsConn.QueueSubscribe(fmt.Sprintf(natsConnectionEventSubjectFormat, c.app.NatsInfo.Account), natsConnectionEventQueueGroup, func(msg *nats.Msg) {
+	return c.natsConn.QueueSubscribe(fmt.Sprintf(natsConnectionEventSubjectFormat, c.app.NatsInfo.Account), natsConnectionEventQueueGroup, func(msg *nats.Msg) {
 		isConnect := strings.Contains(msg.Subject, ".CONNECT")
 		isDisconnect := strings.Contains(msg.Subject, ".DISCONNECT")
 
@@ -227,7 +241,7 @@ func (c *NatsController) subscribeToSystemWorkerCore() (*nats.Subscription, erro
 	// Use a queue group to load-balance across multiple server instances.
 	queue := fmt.Sprintf("%s%s", prefix, c.app.NatsInfo.Subjects.SystemCoreWorker)
 
-	return c.app.NatsConn.QueueSubscribe(subject, queue, func(msg *nats.Msg) {
+	return c.natsConn.QueueSubscribe(subject, queue, func(msg *nats.Msg) {
 		// Copy data to avoid race conditions as the message buffer is reused.
 		sub := msg.Subject
 		data := make([]byte, len(msg.Data))

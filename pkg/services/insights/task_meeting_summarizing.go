@@ -26,6 +26,7 @@ import (
 type MeetingSummarizingTask struct {
 	ctx     context.Context // The agent's main context
 	appConf *config.AppConfig
+	js      jetstream.JetStream
 	service *config.ServiceConfig
 	logger  *logrus.Entry
 
@@ -35,10 +36,11 @@ type MeetingSummarizingTask struct {
 }
 
 // NewMeetingSummarizingTask now accepts the agent's main context.
-func NewMeetingSummarizingTask(ctx context.Context, appConf *config.AppConfig, serviceConfig *config.ServiceConfig, logger *logrus.Entry) (insights.Task, error) {
+func NewMeetingSummarizingTask(ctx context.Context, appConf *config.AppConfig, js jetstream.JetStream, serviceConfig *config.ServiceConfig, logger *logrus.Entry) (insights.Task, error) {
 	return &MeetingSummarizingTask{
 		ctx:     ctx,
 		appConf: appConf,
+		js:      js,
 		service: serviceConfig,
 		logger:  logger.WithField("service-task", "meeting_summarizing"),
 	}, nil
@@ -176,7 +178,7 @@ func (t *MeetingSummarizingTask) doRoomSummarizing(roomTableId uint64, roomId, f
 	}
 
 	// Publish to the NATS stream.
-	if _, err := t.appConf.JetStream.Publish(context.Background(), insights.SummarizeJobQueueSubject, payloadBytes, jetstream.WithExpectStream(insights.InsightsJobsStream)); err != nil {
+	if _, err := t.js.Publish(context.Background(), insights.SummarizeJobQueueSubject, payloadBytes, jetstream.WithExpectStream(insights.InsightsJobsStream)); err != nil {
 		log.WithError(err).Error("failed to publish summarization job")
 	}
 }

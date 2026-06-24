@@ -7,6 +7,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	dbservice "github.com/mynaparrot/plugnmeet-server/pkg/services/db"
+	"go.uber.org/fx"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -18,13 +19,21 @@ type EtherpadController struct {
 	ds            *dbservice.DatabaseService
 }
 
+type EtherpadControllerArgs struct {
+	fx.In
+	AppConfig     *config.AppConfig
+	EtherpadModel *models.EtherpadModel
+	RoomModel     *models.RoomModel
+	Ds            *dbservice.DatabaseService
+}
+
 // NewEtherpadController creates a new EtherpadController.
-func NewEtherpadController(config *config.AppConfig, em *models.EtherpadModel, rm *models.RoomModel, ds *dbservice.DatabaseService) *EtherpadController {
+func NewEtherpadController(args EtherpadControllerArgs) *EtherpadController {
 	return &EtherpadController{
-		AppConfig:     config,
-		EtherpadModel: em,
-		RoomModel:     rm,
-		ds:            ds,
+		AppConfig:     args.AppConfig,
+		EtherpadModel: args.EtherpadModel,
+		RoomModel:     args.RoomModel,
+		ds:            args.Ds,
 	}
 }
 

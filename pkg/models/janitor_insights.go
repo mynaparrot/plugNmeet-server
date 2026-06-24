@@ -10,7 +10,7 @@ import (
 
 // CheckInsightsPendingSummarizeJobs checks the status of pending summarization jobs.
 func (m *JanitorModel) CheckInsightsPendingSummarizeJobs() {
-	jobs, err := m.app.RDS.HGetAll(m.ctx, insights.PendingSummarizeJobRedisKey).Result()
+	jobs, err := m.rds.HGetAll(m.ctx, insights.PendingSummarizeJobRedisKey).Result()
 	if err != nil {
 		m.logger.WithError(err).Error("failed to get pending summarization jobs from Redis")
 		return
@@ -29,7 +29,14 @@ func (m *JanitorModel) CheckInsightsPendingSummarizeJobs() {
 		log.WithError(err).Error("failed to get provider account for summarization service")
 		return
 	}
-	provider, err := insightsservice.NewProvider(m.ctx, serviceConfig.Provider, targetAccount, serviceConfig, m.logger)
+	args := &insightsservice.ProviderArgs{
+		Ctx:             m.ctx,
+		ProviderType:    serviceConfig.Provider,
+		ProviderAccount: targetAccount,
+		ServiceConfig:   serviceConfig,
+		Logger:          log,
+	}
+	provider, err := insightsservice.NewProvider(args)
 	if err != nil {
 		log.WithError(err).Error("failed to create provider for summarization service")
 		return
@@ -73,7 +80,7 @@ func (m *JanitorModel) CheckInsightsPendingSummarizeJobs() {
 			}
 
 			// Delete from Redis
-			if err := m.app.RDS.HDel(m.ctx, insights.PendingSummarizeJobRedisKey, id).Err(); err != nil {
+			if err := m.rds.HDel(m.ctx, insights.PendingSummarizeJobRedisKey, id).Err(); err != nil {
 				log.WithError(err).Errorf("failed to delete job %s from Redis", id)
 			}
 		}

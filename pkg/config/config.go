@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path"
@@ -13,21 +12,12 @@ import (
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/logging"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
-	"github.com/nats-io/nats.go"
-	"github.com/nats-io/nats.go/jetstream"
-	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
-	"gorm.io/gorm"
 )
 
 var dbTablePrefix string
 
 type AppConfig struct {
-	ctx         context.Context
-	RDS         *redis.Client
-	DB          *gorm.DB
-	NatsConn    *nats.Conn
-	JetStream   jetstream.JetStream
 	ClientFiles map[string][]string
 
 	RootWorkingDir      string
@@ -110,7 +100,7 @@ type UploadFileSettings struct {
 
 type RecorderInfo struct {
 	RecordingFilesPath string `yaml:"recording_files_path"`
-	//How long generated token will valid to download the file
+	// How long generated token will valid to download the file
 	TokenValidity time.Duration `yaml:"token_validity"`
 	// How long to wait before considering a recorder inactive. default: 8 seconds
 	PingTimeout                time.Duration `yaml:"ping_timeout"`
@@ -233,7 +223,7 @@ func InitAppConfig(appCnf *AppConfig) (*AppConfig, error) {
 
 	// set default values
 	if appCnf.AnalyticsSettings != nil {
-		//TODO: deprecated, will remove in future
+		// TODO: deprecated, will remove in future
 		if appCnf.AnalyticsSettings.FilesStorePath == nil {
 			appCnf.AnalyticsSettings.FilesStorePath = new("./analytics")
 		}

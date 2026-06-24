@@ -12,12 +12,14 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type TranscriptionTask struct {
 	appConf      *config.AppConfig
+	natsConn     *nats.Conn
 	service      *config.ServiceConfig
 	account      *config.ProviderAccount
 	natsService  *natsservice.NatsService
@@ -25,9 +27,10 @@ type TranscriptionTask struct {
 	logger       *logrus.Entry
 }
 
-func NewTranscriptionTask(appConf *config.AppConfig, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, natsService *natsservice.NatsService, redisService *redisservice.RedisService, logger *logrus.Entry) (insights.Task, error) {
+func NewTranscriptionTask(appConf *config.AppConfig, natsConn *nats.Conn, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, natsService *natsservice.NatsService, redisService *redisservice.RedisService, logger *logrus.Entry) (insights.Task, error) {
 	return &TranscriptionTask{
 		appConf:      appConf,
+		natsConn:     natsConn,
 		service:      serviceConfig,
 		account:      providerAccount,
 		natsService:  natsService,
@@ -39,7 +42,14 @@ func NewTranscriptionTask(appConf *config.AppConfig, serviceConfig *config.Servi
 // RunAudioStream implements the insights.Task interface.
 func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-chan media.PCM16Sample, roomTableId uint64, roomId, userId string, options []byte) error {
 	// Use the factory to create a provider instance.
-	provider, err := NewProvider(ctx, t.service.Provider, t.account, t.service, t.logger)
+	args := &ProviderArgs{
+		Ctx:             ctx,
+		ProviderType:    t.service.Provider,
+		ProviderAccount: t.account,
+		ServiceConfig:   t.service,
+		Logger:          t.logger,
+	}
+	provider, err := NewProvider(args)
 	if err != nil {
 		return err
 	}
@@ -103,7 +113,7 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 
 				// If we have a final result, publish it to the dedicated synthesis SynthesisNatsChannel.
 				if event.Type == insights.EventTypeFinalResult {
-					if err = t.appConf.NatsConn.Publish(synthesisChannel, marshal); err != nil {
+					if err = t.natsConn.Publish(synthesisChannel, marshal); err != nil {
 						log.WithError(err).Errorln("error publishing to synthesis SynthesisNatsChannel")
 					}
 					if event.Result.AllowedTranscriptionStorage {

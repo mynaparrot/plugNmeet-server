@@ -15,6 +15,7 @@ import (
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 )
 
 type WebhookModel struct {
@@ -32,20 +33,36 @@ type WebhookModel struct {
 	logger          *logrus.Entry
 }
 
-func NewWebhookModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, lk *livekitservice.LivekitService, rm *RoomModel, analyticsModel *AnalyticsModel, bm *BreakoutRoomModel, nm *NatsModel, webhookNotifier *helpers.WebhookNotifier, logger *logrus.Logger) *WebhookModel {
+type WebhookModelArgs struct {
+	fx.In
+	Ctx             context.Context
+	App             *config.AppConfig
+	Ds              *dbservice.DatabaseService
+	Rs              *redisservice.RedisService
+	NatsService     *natsservice.NatsService
+	Lk              *livekitservice.LivekitService
+	Rm              *RoomModel
+	AnalyticsModel  *AnalyticsModel
+	Bm              *BreakoutRoomModel
+	Nm              *NatsModel
+	WebhookNotifier *helpers.WebhookNotifier
+	Logger          *logrus.Logger
+}
+
+func NewWebhookModel(args WebhookModelArgs) *WebhookModel {
 	return &WebhookModel{
-		ctx:             ctx,
-		app:             app,
-		ds:              ds,
-		rs:              rs,
-		lk:              lk,
-		rm:              rm,
-		analyticsModel:  analyticsModel,
-		bm:              bm,
-		nm:              nm,
-		webhookNotifier: webhookNotifier,
-		natsService:     natsService,
-		logger:          logger.WithField("model", "webhook"),
+		ctx:             args.Ctx,
+		app:             args.App,
+		ds:              args.Ds,
+		rs:              args.Rs,
+		lk:              args.Lk,
+		rm:              args.Rm,
+		analyticsModel:  args.AnalyticsModel,
+		bm:              args.Bm,
+		nm:              args.Nm,
+		webhookNotifier: args.WebhookNotifier,
+		natsService:     args.NatsService,
+		logger:          args.Logger.WithField("model", "webhook"),
 	}
 }
 

@@ -17,8 +17,11 @@ import (
 	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 )
 
 const (
@@ -38,6 +41,9 @@ type AgentTaskResponse struct {
 type InsightsModel struct {
 	ctx           context.Context
 	appConfig     *config.AppConfig
+	rds           *redis.Client
+	natsConn      *nats.Conn
+	js            jetstream.JetStream
 	logger        *logrus.Entry
 	lock          sync.RWMutex
 	roomAgents    map[string]*insightsservice.RoomAgent // Maps a unique key (roomName@serviceName) to a dedicated agent
@@ -46,15 +52,31 @@ type InsightsModel struct {
 	artifactModel *ArtifactModel
 }
 
-func NewInsightsModel(ctx context.Context, appConfig *config.AppConfig, redisService *redisservice.RedisService, natsService *natsservice.NatsService, artifactModel *ArtifactModel, logger *logrus.Logger) *InsightsModel {
+type InsightsModelArgs struct {
+	fx.In
+	Ctx           context.Context
+	AppConfig     *config.AppConfig
+	RDS           *redis.Client
+	NatsConn      *nats.Conn
+	JS            jetstream.JetStream
+	RedisService  *redisservice.RedisService
+	NatsService   *natsservice.NatsService
+	ArtifactModel *ArtifactModel
+	Logger        *logrus.Logger
+}
+
+func NewInsightsModel(args InsightsModelArgs) *InsightsModel {
 	return &InsightsModel{
-		ctx:           ctx,
-		appConfig:     appConfig,
-		redisService:  redisService,
-		natsService:   natsService,
+		ctx:           args.Ctx,
+		appConfig:     args.AppConfig,
+		rds:           args.RDS,
+		natsConn:      args.NatsConn,
+		js:            args.JS,
+		redisService:  args.RedisService,
+		natsService:   args.NatsService,
 		roomAgents:    make(map[string]*insightsservice.RoomAgent),
-		artifactModel: artifactModel,
-		logger:        logger.WithField("model", "insights"),
+		artifactModel: args.ArtifactModel,
+		logger:        args.Logger.WithField("model", "insights"),
 	}
 }
 
@@ -68,7 +90,7 @@ func (s *InsightsModel) ConfigureAgent(payload *insights.InsightsTaskPayload, ti
 	}
 
 	// Use nats request/reply
-	msg, err := s.appConfig.NatsConn.Request(insights.InsightsNatsChannel, p, timeout)
+	msg, err := s.natsConn.Request(insights.InsightsNatsChannel, p, timeout)
 	if err != nil {
 		return fmt.Errorf("NATS request failed: %w", err)
 	}
@@ -94,7 +116,7 @@ func (s *InsightsModel) ActivateAgentTaskForUser(payload *insights.InsightsTaskP
 		return err
 	}
 
-	msg, err := s.appConfig.NatsConn.Request(insights.InsightsNatsChannel, p, timeout)
+	msg, err := s.natsConn.Request(insights.InsightsNatsChannel, p, timeout)
 	if err != nil {
 		return fmt.Errorf("NATS request failed: %w", err)
 	}
@@ -120,7 +142,7 @@ func (s *InsightsModel) EndAgentTaskForUser(payload *insights.InsightsTaskPayloa
 		return err
 	}
 
-	msg, err := s.appConfig.NatsConn.Request(insights.InsightsNatsChannel, p, timeout)
+	msg, err := s.natsConn.Request(insights.InsightsNatsChannel, p, timeout)
 	if err != nil {
 		return fmt.Errorf("NATS request failed: %w", err)
 	}
@@ -150,7 +172,7 @@ func (s *InsightsModel) EndRoomAgentTaskByServiceName(serviceType insights.Servi
 		return err
 	}
 
-	msg, err := s.appConfig.NatsConn.Request(insights.InsightsNatsChannel, p, timeout)
+	msg, err := s.natsConn.Request(insights.InsightsNatsChannel, p, timeout)
 	if err != nil {
 		return fmt.Errorf("NATS request failed: %w", err)
 	}
@@ -177,7 +199,7 @@ func (s *InsightsModel) EndRoomAllAgentTasks(roomName string) error {
 	if err != nil {
 		return err
 	}
-	return s.appConfig.NatsConn.Publish(insights.InsightsNatsChannel, p)
+	return s.natsConn.Publish(insights.InsightsNatsChannel, p)
 }
 
 // ActivateTextTask performs a direct, stateless text-based task using the configured provider.
@@ -189,7 +211,19 @@ func (s *InsightsModel) ActivateTextTask(ctx context.Context, serviceType insigh
 	}
 
 	// 2. Create the appropriate task using the factory.
-	task, err := insightsservice.NewTask(ctx, serviceType, s.appConfig, serviceConfig, targetAccount, s.natsService, s.redisService, s.logger)
+	args := &insightsservice.TaskArgs{
+		Ctx:             ctx,
+		ServiceType:     serviceType,
+		AppConf:         s.appConfig,
+		NatsConn:        s.natsConn,
+		JS:              s.js,
+		ServiceConfig:   serviceConfig,
+		ProviderAccount: targetAccount,
+		NatsService:     s.natsService,
+		RedisService:    s.redisService,
+		Logger:          s.logger,
+	}
+	task, err := insightsservice.NewTask(args)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create task for service '%s': %w", serviceType, err)
 	}
@@ -207,7 +241,14 @@ func (s *InsightsModel) GetSupportedLanguagesForService(ctx context.Context, ser
 	}
 
 	// 2. Create a new provider instance on-the-fly.
-	provider, err := insightsservice.NewProvider(ctx, serviceConfig.Provider, targetAccount, serviceConfig, s.logger)
+	args := &insightsservice.ProviderArgs{
+		Ctx:             ctx,
+		ProviderType:    serviceConfig.Provider,
+		ProviderAccount: targetAccount,
+		ServiceConfig:   serviceConfig,
+		Logger:          s.logger,
+	}
+	provider, err := insightsservice.NewProvider(args)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create provider for service '%s': %w", serviceType, err)
 	}
@@ -277,7 +318,14 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 	}
 
 	// 2. Create a new provider instance.
-	provider, err := insightsservice.NewProvider(s.ctx, serviceConfig.Provider, targetAccount, serviceConfig, s.logger)
+	args := &insightsservice.ProviderArgs{
+		Ctx:             s.ctx,
+		ProviderType:    serviceConfig.Provider,
+		ProviderAccount: targetAccount,
+		ServiceConfig:   serviceConfig,
+		Logger:          log,
+	}
+	provider, err := insightsservice.NewProvider(args)
 	if err != nil {
 		log.WithError(err).Error("failed to create provider")
 		return err
@@ -336,7 +384,7 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 	}
 
 	// 4. Store the job ID in Redis for the janitor to track.
-	if err = s.appConfig.RDS.HSet(s.ctx, insights.PendingSummarizeJobRedisKey, data).Err(); err != nil {
+	if err = s.rds.HSet(s.ctx, insights.PendingSummarizeJobRedisKey, data).Err(); err != nil {
 		log.WithError(err).Error("failed to store pending summarization job in Redis")
 		return err
 	}

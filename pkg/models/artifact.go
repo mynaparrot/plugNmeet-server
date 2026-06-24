@@ -19,6 +19,7 @@ import (
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -39,16 +40,28 @@ type ArtifactModel struct {
 	log             *logrus.Entry
 }
 
-func NewArtifactModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, redisService *redisservice.RedisService, natsService *natsservice.NatsService, webhookNotifier *helpers.WebhookNotifier, analyticsModel *AnalyticsModel, logger *logrus.Logger) *ArtifactModel {
+type ArtifactModelArgs struct {
+	fx.In
+	Ctx             context.Context
+	App             *config.AppConfig
+	Ds              *dbservice.DatabaseService
+	RedisService    *redisservice.RedisService
+	NatsService     *natsservice.NatsService
+	WebhookNotifier *helpers.WebhookNotifier
+	AnalyticsModel  *AnalyticsModel
+	Logger          *logrus.Logger
+}
+
+func NewArtifactModel(args ArtifactModelArgs) *ArtifactModel {
 	return &ArtifactModel{
-		ctx:             ctx,
-		app:             app,
-		ds:              ds,
-		rs:              redisService,
-		natsService:     natsService,
-		webhookNotifier: webhookNotifier,
-		analyticsModel:  analyticsModel,
-		log:             logger.WithField("model", "artifact"),
+		ctx:             args.Ctx,
+		app:             args.App,
+		ds:              args.Ds,
+		rs:              args.RedisService,
+		natsService:     args.NatsService,
+		webhookNotifier: args.WebhookNotifier,
+		analyticsModel:  args.AnalyticsModel,
+		log:             args.Logger.WithField("model", "artifact"),
 	}
 }
 

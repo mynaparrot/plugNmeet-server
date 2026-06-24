@@ -40,7 +40,14 @@ func (t *TranslationTask) RunStateless(ctx context.Context, options []byte) (int
 	}
 
 	// Use the factory to create a provider instance.
-	provider, err := NewProvider(ctx, t.service.Provider, t.account, t.service, t.logger)
+	args := &ProviderArgs{
+		Ctx:             ctx,
+		ProviderType:    t.service.Provider,
+		ProviderAccount: t.account,
+		ServiceConfig:   t.service,
+		Logger:          t.logger,
+	}
+	provider, err := NewProvider(args)
 	if err != nil {
 		return nil, err
 	}
