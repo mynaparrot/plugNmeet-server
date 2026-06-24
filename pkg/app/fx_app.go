@@ -64,22 +64,30 @@ func provideLogger(appCnf *config.AppConfig) (*logrus.Logger, error) {
 	return logger, nil
 }
 
-// ExecutePreStartTasks runs essential setup tasks that depend on core components
+// ExecuteBootstrapTasks runs essential setup tasks that depend on core components
 // like the application context, configuration, and logger.
 // In the future, other pre-start logic can be added here.
-func ExecutePreStartTasks(ctx context.Context, appCnf *config.AppConfig, logger *logrus.Logger) error {
+func ExecuteBootstrapTasks(lc fx.Lifecycle, ctx context.Context, cancel context.CancelFunc, appCnf *config.AppConfig, logger *logrus.Logger) error {
 	if appCnf.Hooks != nil {
 		if err := appCnf.Hooks.InitializeHooks(ctx, appCnf.RootWorkingDir, logger); err != nil {
 			logger.WithError(err).Error("failed to initialize hooks")
 			return err
 		}
 	}
+
+	lc.Append(fx.Hook{
+		OnStop: func(_ context.Context) error {
+			logger.Warn("Shutting down application...")
+			cancel()
+			return nil
+		},
+	})
 	return nil
 }
 
 var BootstrapModule = fx.Module("bootstrap",
 	fx.Provide(provideAppConfig, provideLogger),
-	fx.Invoke(ExecutePreStartTasks),
+	fx.Invoke(ExecuteBootstrapTasks),
 )
 
 var ServiceModule = fx.Module("services",

@@ -31,19 +31,9 @@ func main() {
 	}
 
 	fxOpts := []fx.Option{
-		fx.Provide(func(lc fx.Lifecycle) context.Context {
-			ctx, cancel := context.WithCancel(context.Background())
-
-			lc.Append(fx.Hook{
-				OnStop: func(_ context.Context) error {
-					logrus.Info("Shutting down application...")
-					cancel()
-					return nil
-				},
-			})
-			return ctx
+		fx.Provide(func() (context.Context, context.CancelFunc) {
+			return context.WithCancel(context.Background())
 		}),
-
 		fx.Supply(*configFile),
 		app.ApplicationModule,
 	}
