@@ -8,6 +8,7 @@ import (
 	"github.com/livekit/protocol/livekit"
 	lksdk "github.com/livekit/server-sdk-go/v2"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/fx"
 )
@@ -15,6 +16,7 @@ import (
 type LivekitService struct {
 	app    *config.AppConfig
 	ctx    context.Context
+	rds    *redis.Client
 	lkc    *lksdk.RoomServiceClient
 	logger *logrus.Entry
 }
@@ -23,6 +25,7 @@ type Args struct {
 	fx.In
 	Ctx    context.Context
 	App    *config.AppConfig
+	RDS    *redis.Client
 	Logger *logrus.Logger
 }
 
@@ -32,6 +35,7 @@ func New(args Args) *LivekitService {
 	return &LivekitService{
 		ctx:    args.Ctx,
 		app:    args.App,
+		rds:    args.RDS,
 		lkc:    lkc,
 		logger: args.Logger.WithField("service", "livekit"),
 	}

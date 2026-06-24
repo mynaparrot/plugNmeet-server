@@ -250,9 +250,7 @@ func provideRedisConnection(lc fx.Lifecycle, ctx context.Context, appCnf *config
 }
 
 // populateAppCnfConnections will update main app config struct.
-func populateAppCnfConnections(appCnf *config.AppConfig, db *gorm.DB, rds *redis.Client, nc *nats.Conn, js jetstream.JetStream) {
-	appCnf.DB = db
-	appCnf.RDS = rds
+func populateAppCnfConnections(appCnf *config.AppConfig, nc *nats.Conn, js jetstream.JetStream) {
 	appCnf.NatsConn = nc
 	appCnf.JetStream = js
 }

@@ -18,6 +18,7 @@ import (
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/nats-io/nats.go/jetstream"
+	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/fx"
 )
@@ -39,6 +40,7 @@ type AgentTaskResponse struct {
 type InsightsModel struct {
 	ctx           context.Context
 	appConfig     *config.AppConfig
+	rds           *redis.Client
 	logger        *logrus.Entry
 	lock          sync.RWMutex
 	roomAgents    map[string]*insightsservice.RoomAgent // Maps a unique key (roomName@serviceName) to a dedicated agent
@@ -51,6 +53,7 @@ type InsightsModelArgs struct {
 	fx.In
 	Ctx           context.Context
 	AppConfig     *config.AppConfig
+	RDS           *redis.Client
 	RedisService  *redisservice.RedisService
 	NatsService   *natsservice.NatsService
 	ArtifactModel *ArtifactModel
@@ -61,6 +64,7 @@ func NewInsightsModel(args InsightsModelArgs) *InsightsModel {
 	return &InsightsModel{
 		ctx:           args.Ctx,
 		appConfig:     args.AppConfig,
+		rds:           args.RDS,
 		redisService:  args.RedisService,
 		natsService:   args.NatsService,
 		roomAgents:    make(map[string]*insightsservice.RoomAgent),
@@ -371,7 +375,7 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 	}
 
 	// 4. Store the job ID in Redis for the janitor to track.
-	if err = s.appConfig.RDS.HSet(s.ctx, insights.PendingSummarizeJobRedisKey, data).Err(); err != nil {
+	if err = s.rds.HSet(s.ctx, insights.PendingSummarizeJobRedisKey, data).Err(); err != nil {
 		log.WithError(err).Error("failed to store pending summarization job in Redis")
 		return err
 	}

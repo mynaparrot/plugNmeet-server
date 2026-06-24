@@ -3,24 +3,38 @@ package controllers
 import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/nats-io/nats.go"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/fx"
+	"gorm.io/gorm"
 )
 
 type HealthCheckController struct {
 	app *config.AppConfig
+	rds *redis.Client
+	db  *gorm.DB
+	nc  *nats.Conn
 }
 
 type HealthCheckControllerArgs struct {
 	fx.In
-	App *config.AppConfig
+	App      *config.AppConfig
+	RDS      *redis.Client
+	DB       *gorm.DB
+	NatsConn *nats.Conn
 }
 
 func NewHealthCheckController(args HealthCheckControllerArgs) *HealthCheckController {
-	return &HealthCheckController{app: args.App}
+	return &HealthCheckController{
+		app: args.App,
+		rds: args.RDS,
+		db:  args.DB,
+		nc:  args.NatsConn,
+	}
 }
 
 func (h *HealthCheckController) HandleHealthCheck(c fiber.Ctx) error {
-	db, err := h.app.DB.DB()
+	db, err := h.db.DB()
 	if err != nil {
 		return c.Status(fiber.StatusServiceUnavailable).SendString("DB connection error")
 	}
@@ -28,11 +42,11 @@ func (h *HealthCheckController) HandleHealthCheck(c fiber.Ctx) error {
 		return c.Status(fiber.StatusServiceUnavailable).SendString("DB connection error")
 	}
 
-	if _, err := h.app.RDS.Ping(c.RequestCtx()).Result(); err != nil {
+	if _, err := h.rds.Ping(c.RequestCtx()).Result(); err != nil {
 		return c.Status(fiber.StatusServiceUnavailable).SendString("Redis connection error")
 	}
 
-	if !h.app.NatsConn.IsConnected() {
+	if !h.nc.IsConnected() {
 		return c.Status(fiber.StatusServiceUnavailable).SendString("Nats connection error")
 	}
 

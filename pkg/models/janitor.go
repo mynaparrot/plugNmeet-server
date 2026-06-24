@@ -22,6 +22,7 @@ type JanitorModel struct {
 	ctx         context.Context
 	cancel      context.CancelFunc
 	app         *config.AppConfig
+	rds         *redis.Client
 	ds          *dbservice.DatabaseService
 	rs          *redisservice.RedisService
 	natsService *natsservice.NatsService
@@ -41,6 +42,7 @@ type JanitorModelArgs struct {
 	fx.In
 	MainCtx       context.Context
 	App           *config.AppConfig
+	RDS           *redis.Client
 	Ds            *dbservice.DatabaseService
 	Rs            *redisservice.RedisService
 	NatsService   *natsservice.NatsService
@@ -58,6 +60,7 @@ func NewJanitorModel(args JanitorModelArgs) *JanitorModel {
 		ctx:           ctx,
 		cancel:        cancel,
 		app:           args.App,
+		rds:           args.RDS,
 		ds:            args.Ds,
 		rs:            args.Rs,
 		lk:            args.Lk,

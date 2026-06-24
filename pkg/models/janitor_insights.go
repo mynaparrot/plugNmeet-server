@@ -10,7 +10,7 @@ import (
 
 // CheckInsightsPendingSummarizeJobs checks the status of pending summarization jobs.
 func (m *JanitorModel) CheckInsightsPendingSummarizeJobs() {
-	jobs, err := m.app.RDS.HGetAll(m.ctx, insights.PendingSummarizeJobRedisKey).Result()
+	jobs, err := m.rds.HGetAll(m.ctx, insights.PendingSummarizeJobRedisKey).Result()
 	if err != nil {
 		m.logger.WithError(err).Error("failed to get pending summarization jobs from Redis")
 		return
@@ -80,7 +80,7 @@ func (m *JanitorModel) CheckInsightsPendingSummarizeJobs() {
 			}
 
 			// Delete from Redis
-			if err := m.app.RDS.HDel(m.ctx, insights.PendingSummarizeJobRedisKey, id).Err(); err != nil {
+			if err := m.rds.HDel(m.ctx, insights.PendingSummarizeJobRedisKey, id).Err(); err != nil {
 				log.WithError(err).Errorf("failed to delete job %s from Redis", id)
 			}
 		}

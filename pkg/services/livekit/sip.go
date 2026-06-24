@@ -70,7 +70,7 @@ func (s *LivekitService) CreateSIPInboundTrunk() error {
 		s.logger.Infof("sip trunk updated successfully with id: %s", sipTrunkId)
 	}
 
-	err = s.app.RDS.Set(s.ctx, SipInboundTrunkIdRedisKey, sipTrunkId, 0).Err()
+	err = s.rds.Set(s.ctx, SipInboundTrunkIdRedisKey, sipTrunkId, 0).Err()
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func (s *LivekitService) CreateSIPInboundTrunk() error {
 }
 
 func (s *LivekitService) CreateSIPDispatchRule(roomId string, hidePhoneNumber bool, log *logrus.Entry) (ruleId string, pin string, err error) {
-	sipTrunkId, err := s.app.RDS.Get(s.ctx, SipInboundTrunkIdRedisKey).Result()
+	sipTrunkId, err := s.rds.Get(s.ctx, SipInboundTrunkIdRedisKey).Result()
 	if err != nil {
 		return "", "", err
 	}

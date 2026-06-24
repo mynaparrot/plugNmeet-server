@@ -14,16 +14,12 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
-	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
-	"gorm.io/gorm"
 )
 
 var dbTablePrefix string
 
 type AppConfig struct {
-	RDS         *redis.Client
-	DB          *gorm.DB
 	NatsConn    *nats.Conn
 	JetStream   jetstream.JetStream
 	ClientFiles map[string][]string
