@@ -80,7 +80,7 @@ func (s *NatsService) Initialized(lc fx.Lifecycle) error {
 				return err
 			}
 			if err := s.createRecorderKVAndWatch(); err != nil {
-				s.logger.WithError(err).Error("failed to initialize nats stream")
+				s.logger.WithError(err).Error("failed to initialize recorder KV and watch")
 				return err
 			}
 			return nil
