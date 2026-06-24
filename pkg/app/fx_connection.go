@@ -249,11 +249,6 @@ func provideRedisConnection(lc fx.Lifecycle, ctx context.Context, appCnf *config
 	return rdb, nil
 }
 
-// populateAppCnfConnections will update main app config struct.
-func populateAppCnfConnections(appCnf *config.AppConfig, nc *nats.Conn) {
-	appCnf.NatsConn = nc
-}
-
 var ConnectionModule = fx.Module("connections",
 	// Providers for each connection type
 	fx.Provide(
@@ -262,6 +257,4 @@ var ConnectionModule = fx.Module("connections",
 		provideNATSConnection,
 		provideJetStream,
 	),
-	// It runs after the connections are created and populates the appCnf struct.
-	fx.Invoke(populateAppCnfConnections),
 )

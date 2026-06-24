@@ -44,6 +44,7 @@ const (
 type NatsController struct {
 	ctx              context.Context
 	app              *config.AppConfig
+	natsConn         *nats.Conn
 	natsService      *natsservice.NatsService
 	issuerKeyPair    nkeys.KeyPair
 	curveKeyPair     nkeys.KeyPair
@@ -61,6 +62,7 @@ type NatsControllerArgs struct {
 	fx.In
 	Ctx         context.Context
 	App         *config.AppConfig
+	NatsConn    *nats.Conn
 	NatsService *natsservice.NatsService
 	AuthModel   *models.AuthModel
 	NatsModel   *models.NatsModel
@@ -79,6 +81,7 @@ func NewNatsController(args NatsControllerArgs) (*NatsController, error) {
 	c := &NatsController{
 		ctx:           args.Ctx,
 		app:           args.App,
+		natsConn:      args.NatsConn,
 		natsService:   args.NatsService,
 		issuerKeyPair: issuerKeyPair,
 		authModel:     args.AuthModel,
@@ -132,7 +135,7 @@ func (c *NatsController) Initialize() error {
 
 	// auth service
 	authService := NewNatsAuthController(c.app, c.natsService, c.authModel, c.issuerKeyPair, c.curveKeyPair, c.log)
-	c.authService, err = micro.AddService(c.app.NatsConn, micro.Config{
+	c.authService, err = micro.AddService(c.natsConn, micro.Config{
 		Name:        natsAuthServiceName,
 		Version:     version.Version,
 		Description: "Handle authorization of pnm nats client",
@@ -172,7 +175,7 @@ func (c *NatsController) Stop() {
 // SubscribeToUsersConnEvents will be used to subscribe with users' connection events
 // based on user connection we can determine user's connection status
 func (c *NatsController) subscribeToUsersConnEvents() (*nats.Subscription, error) {
-	return c.app.NatsConn.QueueSubscribe(fmt.Sprintf(natsConnectionEventSubjectFormat, c.app.NatsInfo.Account), natsConnectionEventQueueGroup, func(msg *nats.Msg) {
+	return c.natsConn.QueueSubscribe(fmt.Sprintf(natsConnectionEventSubjectFormat, c.app.NatsInfo.Account), natsConnectionEventQueueGroup, func(msg *nats.Msg) {
 		isConnect := strings.Contains(msg.Subject, ".CONNECT")
 		isDisconnect := strings.Contains(msg.Subject, ".DISCONNECT")
 
@@ -238,7 +241,7 @@ func (c *NatsController) subscribeToSystemWorkerCore() (*nats.Subscription, erro
 	// Use a queue group to load-balance across multiple server instances.
 	queue := fmt.Sprintf("%s%s", prefix, c.app.NatsInfo.Subjects.SystemCoreWorker)
 
-	return c.app.NatsConn.QueueSubscribe(subject, queue, func(msg *nats.Msg) {
+	return c.natsConn.QueueSubscribe(subject, queue, func(msg *nats.Msg) {
 		// Copy data to avoid race conditions as the message buffer is reused.
 		sub := msg.Subject
 		data := make([]byte, len(msg.Data))

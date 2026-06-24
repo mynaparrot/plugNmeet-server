@@ -10,6 +10,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights/providers/google"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/sirupsen/logrus"
 )
@@ -41,6 +42,7 @@ type TaskArgs struct {
 	Ctx             context.Context
 	ServiceType     insights.ServiceType
 	AppConf         *config.AppConfig
+	NatsConn        *nats.Conn
 	JS              jetstream.JetStream
 	ServiceConfig   *config.ServiceConfig
 	ProviderAccount *config.ProviderAccount
@@ -53,7 +55,7 @@ type TaskArgs struct {
 func NewTask(args *TaskArgs) (insights.Task, error) {
 	switch args.ServiceType {
 	case insights.ServiceTypeTranscription:
-		return NewTranscriptionTask(args.AppConf, args.ServiceConfig, args.ProviderAccount, args.NatsService, args.RedisService, args.Logger)
+		return NewTranscriptionTask(args.AppConf, args.NatsConn, args.ServiceConfig, args.ProviderAccount, args.NatsService, args.RedisService, args.Logger)
 	case insights.ServiceTypeTranslation:
 		return NewTranslationTask(args.ServiceConfig, args.ProviderAccount, args.Logger)
 	case insights.ServiceTypeMeetingSummarizing:

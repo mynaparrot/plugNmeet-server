@@ -104,7 +104,7 @@ func (m *RecordingModel) DispatchRecorderTask(req *plugnmeet.RecordingReq) error
 	}
 
 	log.Info("Sending request to NATS recorder channel")
-	msg, err := m.app.NatsConn.RequestMsg(&nats.Msg{
+	msg, err := m.natsConn.RequestMsg(&nats.Msg{
 		Subject: m.app.NatsInfo.Recorder.RecorderChannel,
 		Data:    payload,
 	}, recorderResponseTimeout)

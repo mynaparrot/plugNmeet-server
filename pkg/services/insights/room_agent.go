@@ -14,6 +14,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/pion/webrtc/v4"
 	"github.com/sirupsen/logrus"
@@ -39,6 +40,7 @@ type RoomAgent struct {
 	Ctx             context.Context
 	cancel          context.CancelFunc
 	conf            *config.AppConfig
+	natsConn        *nats.Conn
 	logger          *logrus.Entry
 	Room            *lksdk.Room
 	lock            sync.RWMutex
@@ -56,6 +58,7 @@ type RoomAgent struct {
 type RoomAgentArgs struct {
 	Ctx             context.Context
 	AppConf         *config.AppConfig
+	NatsConn        *nats.Conn
 	JS              jetstream.JetStream
 	ServiceConfig   *config.ServiceConfig
 	ProviderAccount *config.ProviderAccount
@@ -81,6 +84,7 @@ func NewRoomAgent(args *RoomAgentArgs) (*RoomAgent, error) {
 		Ctx:             ctx,
 		ServiceType:     args.Payload.ServiceType,
 		AppConf:         args.AppConf,
+		NatsConn:        args.NatsConn,
 		JS:              args.JS,
 		ServiceConfig:   args.ServiceConfig,
 		ProviderAccount: args.ProviderAccount,
@@ -98,6 +102,7 @@ func NewRoomAgent(args *RoomAgentArgs) (*RoomAgent, error) {
 		Ctx:             ctx,
 		cancel:          cancel,
 		conf:            args.AppConf,
+		natsConn:        args.NatsConn,
 		logger:          log,
 		activePipelines: make(map[string]*activePipeline),
 		allowedUsers:    make(map[string]bool),
@@ -175,7 +180,7 @@ func (a *RoomAgent) startSynthesisTask() error {
 	}
 
 	// 3. Create the new synthesis task.
-	a.synthesisTask = NewTranscriptionSynthesisTask(a.Ctx, a.conf, a.logger, synthProvider, synthServiceConfig, a.redisService, a.natsService, a.Room.Name(), a.payload.AllowedTransLangs, a.payload.RoomE2EEKey)
+	a.synthesisTask = NewTranscriptionSynthesisTask(a.Ctx, a.conf, a.natsConn, a.logger, synthProvider, synthServiceConfig, a.redisService, a.natsService, a.Room.Name(), a.payload.AllowedTransLangs, a.payload.RoomE2EEKey)
 
 	// 4. Run the task in a goroutine.
 	go a.synthesisTask.Run()

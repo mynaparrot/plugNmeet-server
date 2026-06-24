@@ -26,6 +26,7 @@ type WebhookNotifier struct {
 	ds                   *dbservice.DatabaseService
 	rs                   *redisservice.RedisService
 	app                  *config.AppConfig
+	natsConn             *nats.Conn
 	isEnabled            bool
 	enabledForPerMeeting bool
 	defaultUrl           string
@@ -43,11 +44,12 @@ type webhookRedisFields struct {
 
 type WebhookNotifierArgs struct {
 	fx.In
-	Ctx    context.Context
-	App    *config.AppConfig
-	Ds     *dbservice.DatabaseService
-	Rs     *redisservice.RedisService
-	Logger *logrus.Logger
+	Ctx      context.Context
+	App      *config.AppConfig
+	NatsConn *nats.Conn
+	Ds       *dbservice.DatabaseService
+	Rs       *redisservice.RedisService
+	Logger   *logrus.Logger
 }
 
 func NewWebhookNotifier(args WebhookNotifierArgs) *WebhookNotifier {
@@ -56,6 +58,7 @@ func NewWebhookNotifier(args WebhookNotifierArgs) *WebhookNotifier {
 		app:                  args.App,
 		ds:                   args.Ds,
 		rs:                   args.Rs,
+		natsConn:             args.NatsConn,
 		isEnabled:            args.App.Client.WebhookConf.Enable,
 		enabledForPerMeeting: args.App.Client.WebhookConf.EnableForPerMeeting,
 		defaultUrl:           args.App.Client.WebhookConf.Url,
@@ -74,7 +77,7 @@ func (w *WebhookNotifier) SubscribeToCleanup(lc fx.Lifecycle) {
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			sub, err = w.app.NatsConn.Subscribe(redisservice.WebhookCleanupSubject, func(m *nats.Msg) {
+			sub, err = w.natsConn.Subscribe(redisservice.WebhookCleanupSubject, func(m *nats.Msg) {
 				roomId := string(m.Data)
 				log.WithFields(logrus.Fields{
 					"room_id": roomId,
@@ -228,7 +231,7 @@ func (w *WebhookNotifier) DeleteWebhook(roomId string, log *logrus.Entry) {
 
 	// Broadcast a cleanup message to all servers in the cluster.
 	// Only the server running the worker for this room will act on it.
-	if err := w.app.NatsConn.Publish(redisservice.WebhookCleanupSubject, []byte(roomId)); err != nil {
+	if err := w.natsConn.Publish(redisservice.WebhookCleanupSubject, []byte(roomId)); err != nil {
 		log.WithError(err).Error("failed to publish webhook cleanup")
 	}
 

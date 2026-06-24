@@ -28,6 +28,7 @@ type TranscriptionSynthesisTask struct {
 	ctx           context.Context
 	cancel        context.CancelFunc
 	appCnf        *config.AppConfig
+	natsConn      *nats.Conn
 	logger        *logrus.Entry
 	provider      insights.Provider
 	roomId        string
@@ -42,13 +43,14 @@ type TranscriptionSynthesisTask struct {
 	sf      singleflight.Group
 }
 
-func NewTranscriptionSynthesisTask(ctx context.Context, appCnf *config.AppConfig, logger *logrus.Entry, provider insights.Provider, serviceConfig *config.ServiceConfig, redisService *redisservice.RedisService, natsService *natsservice.NatsService, roomId string, transLangs []string, e2eeKey *string) *TranscriptionSynthesisTask {
+func NewTranscriptionSynthesisTask(ctx context.Context, appCnf *config.AppConfig, natsConn *nats.Conn, logger *logrus.Entry, provider insights.Provider, serviceConfig *config.ServiceConfig, redisService *redisservice.RedisService, natsService *natsservice.NatsService, roomId string, transLangs []string, e2eeKey *string) *TranscriptionSynthesisTask {
 	ctx, cancel := context.WithCancel(ctx)
 
 	return &TranscriptionSynthesisTask{
 		ctx:           ctx,
 		cancel:        cancel,
 		appCnf:        appCnf,
+		natsConn:      natsConn,
 		provider:      provider,
 		roomId:        roomId,
 		e2eeKey:       e2eeKey,
@@ -63,7 +65,7 @@ func NewTranscriptionSynthesisTask(ctx context.Context, appCnf *config.AppConfig
 
 // Run creates all workers and then subscribes to NATS to start the main orchestration loop.
 func (t *TranscriptionSynthesisTask) Run() {
-	sub, err := t.appCnf.NatsConn.Subscribe(fmt.Sprintf(insights.SynthesisNatsChannel, t.roomId), func(msg *nats.Msg) {
+	sub, err := t.natsConn.Subscribe(fmt.Sprintf(insights.SynthesisNatsChannel, t.roomId), func(msg *nats.Msg) {
 		res := new(plugnmeet.InsightsTranscriptionResult)
 		err := protojson.Unmarshal(msg.Data, res)
 		if err != nil {

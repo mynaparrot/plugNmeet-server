@@ -50,7 +50,7 @@ func (s *InsightsModel) HandleIncomingAgentTask(msg *nats.Msg) {
 		}
 		res := &AgentTaskResponse{Status: status, Msg: message}
 		resBytes, _ := json.Marshal(res)
-		err := s.appConfig.NatsConn.Publish(msg.Reply, resBytes)
+		err := s.natsConn.Publish(msg.Reply, resBytes)
 		if err != nil {
 			s.logger.WithError(err).Error("failed to publish reply")
 		}
@@ -199,6 +199,7 @@ func (s *InsightsModel) manageLocalAgent(payload *insights.InsightsTaskPayload, 
 	args := &insightsservice.RoomAgentArgs{
 		Ctx:             s.ctx,
 		AppConf:         s.appConfig,
+		NatsConn:        s.natsConn,
 		JS:              s.js,
 		ServiceConfig:   serviceConfig,
 		ProviderAccount: targetAccount,

@@ -12,14 +12,12 @@ import (
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/logging"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
-	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 )
 
 var dbTablePrefix string
 
 type AppConfig struct {
-	NatsConn    *nats.Conn
 	ClientFiles map[string][]string
 
 	RootWorkingDir      string

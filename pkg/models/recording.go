@@ -12,6 +12,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/fx"
@@ -20,6 +21,7 @@ import (
 type RecordingModel struct {
 	ctx             context.Context
 	app             *config.AppConfig
+	natsConn        *nats.Conn
 	js              jetstream.JetStream
 	ds              *dbservice.DatabaseService
 	rs              *redisservice.RedisService
@@ -35,6 +37,7 @@ type RecordingModelArgs struct {
 	fx.In
 	Ctx             context.Context
 	App             *config.AppConfig
+	NatsConn        *nats.Conn
 	JS              jetstream.JetStream
 	Ds              *dbservice.DatabaseService
 	Rs              *redisservice.RedisService
@@ -49,6 +52,7 @@ func NewRecordingModel(args RecordingModelArgs) *RecordingModel {
 	return &RecordingModel{
 		ctx:             args.Ctx,
 		app:             args.App,
+		natsConn:        args.NatsConn,
 		js:              args.JS,
 		ds:              args.Ds,
 		rs:              args.Rs,

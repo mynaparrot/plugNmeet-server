@@ -17,6 +17,7 @@ import (
 	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
@@ -41,6 +42,7 @@ type InsightsModel struct {
 	ctx           context.Context
 	appConfig     *config.AppConfig
 	rds           *redis.Client
+	natsConn      *nats.Conn
 	js            jetstream.JetStream
 	logger        *logrus.Entry
 	lock          sync.RWMutex
@@ -55,6 +57,7 @@ type InsightsModelArgs struct {
 	Ctx           context.Context
 	AppConfig     *config.AppConfig
 	RDS           *redis.Client
+	NatsConn      *nats.Conn
 	JS            jetstream.JetStream
 	RedisService  *redisservice.RedisService
 	NatsService   *natsservice.NatsService
@@ -67,6 +70,7 @@ func NewInsightsModel(args InsightsModelArgs) *InsightsModel {
 		ctx:           args.Ctx,
 		appConfig:     args.AppConfig,
 		rds:           args.RDS,
+		natsConn:      args.NatsConn,
 		js:            args.JS,
 		redisService:  args.RedisService,
 		natsService:   args.NatsService,
@@ -86,7 +90,7 @@ func (s *InsightsModel) ConfigureAgent(payload *insights.InsightsTaskPayload, ti
 	}
 
 	// Use nats request/reply
-	msg, err := s.appConfig.NatsConn.Request(insights.InsightsNatsChannel, p, timeout)
+	msg, err := s.natsConn.Request(insights.InsightsNatsChannel, p, timeout)
 	if err != nil {
 		return fmt.Errorf("NATS request failed: %w", err)
 	}
@@ -112,7 +116,7 @@ func (s *InsightsModel) ActivateAgentTaskForUser(payload *insights.InsightsTaskP
 		return err
 	}
 
-	msg, err := s.appConfig.NatsConn.Request(insights.InsightsNatsChannel, p, timeout)
+	msg, err := s.natsConn.Request(insights.InsightsNatsChannel, p, timeout)
 	if err != nil {
 		return fmt.Errorf("NATS request failed: %w", err)
 	}
@@ -138,7 +142,7 @@ func (s *InsightsModel) EndAgentTaskForUser(payload *insights.InsightsTaskPayloa
 		return err
 	}
 
-	msg, err := s.appConfig.NatsConn.Request(insights.InsightsNatsChannel, p, timeout)
+	msg, err := s.natsConn.Request(insights.InsightsNatsChannel, p, timeout)
 	if err != nil {
 		return fmt.Errorf("NATS request failed: %w", err)
 	}
@@ -168,7 +172,7 @@ func (s *InsightsModel) EndRoomAgentTaskByServiceName(serviceType insights.Servi
 		return err
 	}
 
-	msg, err := s.appConfig.NatsConn.Request(insights.InsightsNatsChannel, p, timeout)
+	msg, err := s.natsConn.Request(insights.InsightsNatsChannel, p, timeout)
 	if err != nil {
 		return fmt.Errorf("NATS request failed: %w", err)
 	}
@@ -195,7 +199,7 @@ func (s *InsightsModel) EndRoomAllAgentTasks(roomName string) error {
 	if err != nil {
 		return err
 	}
-	return s.appConfig.NatsConn.Publish(insights.InsightsNatsChannel, p)
+	return s.natsConn.Publish(insights.InsightsNatsChannel, p)
 }
 
 // ActivateTextTask performs a direct, stateless text-based task using the configured provider.
@@ -211,6 +215,7 @@ func (s *InsightsModel) ActivateTextTask(ctx context.Context, serviceType insigh
 		Ctx:             ctx,
 		ServiceType:     serviceType,
 		AppConf:         s.appConfig,
+		NatsConn:        s.natsConn,
 		JS:              s.js,
 		ServiceConfig:   serviceConfig,
 		ProviderAccount: targetAccount,
