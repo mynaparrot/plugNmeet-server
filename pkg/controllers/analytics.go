@@ -11,6 +11,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"go.uber.org/fx"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -45,11 +46,17 @@ type AnalyticsController struct {
 	artifactModel  *models.ArtifactModel
 }
 
+type AnalyticsControllerArgs struct {
+	fx.In
+	AnalyticsModel *models.AnalyticsModel
+	ArtifactModel  *models.ArtifactModel
+}
+
 // NewAnalyticsController creates a new AnalyticsController.
-func NewAnalyticsController(am *models.AnalyticsModel, artifactModel *models.ArtifactModel) *AnalyticsController {
+func NewAnalyticsController(args AnalyticsControllerArgs) *AnalyticsController {
 	return &AnalyticsController{
-		AnalyticsModel: am,
-		artifactModel:  artifactModel,
+		AnalyticsModel: args.AnalyticsModel,
+		artifactModel:  args.ArtifactModel,
 	}
 }
 

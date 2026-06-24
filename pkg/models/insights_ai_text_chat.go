@@ -27,7 +27,14 @@ func (s *InsightsModel) AITextChatRequest(roomId, userId, prompt string) error {
 		logger.WithError(err).Error("failed to get provider account")
 		return err
 	}
-	provider, err := insightsservice.NewProvider(ctx, service.Provider, providerAccount, service, logger)
+	args := &insightsservice.ProviderArgs{
+		Ctx:             ctx,
+		ProviderType:    service.Provider,
+		ProviderAccount: providerAccount,
+		ServiceConfig:   service,
+		Logger:          logger,
+	}
+	provider, err := insightsservice.NewProvider(args)
 	if err != nil {
 		logger.WithError(err).Error("failed to create provider")
 		return err
@@ -153,7 +160,14 @@ func (s *InsightsModel) CheckAndSummarize(ctx context.Context, roomId, userId st
 		logger.WithError(err).Error("failed to get provider account for summarization")
 		return
 	}
-	provider, err := insightsservice.NewProvider(ctx, service.Provider, providerAccount, service, logger)
+	args := &insightsservice.ProviderArgs{
+		Ctx:             ctx,
+		ProviderType:    service.Provider,
+		ProviderAccount: providerAccount,
+		ServiceConfig:   service,
+		Logger:          logger,
+	}
+	provider, err := insightsservice.NewProvider(args)
 	if err != nil {
 		logger.WithError(err).Error("failed to create provider for summarization")
 		return

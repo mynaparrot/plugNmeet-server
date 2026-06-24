@@ -14,6 +14,7 @@ import (
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -33,15 +34,26 @@ type AnalyticsModel struct {
 	artifactModel   *ArtifactModel
 }
 
-func NewAnalyticsModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, webhookNotifier *helpers.WebhookNotifier, logger *logrus.Logger) *AnalyticsModel {
+type AnalyticsModelArgs struct {
+	fx.In
+	Ctx             context.Context
+	App             *config.AppConfig
+	Ds              *dbservice.DatabaseService
+	Rs              *redisservice.RedisService
+	NatsService     *natsservice.NatsService
+	WebhookNotifier *helpers.WebhookNotifier
+	Logger          *logrus.Logger
+}
+
+func NewAnalyticsModel(args AnalyticsModelArgs) *AnalyticsModel {
 	return &AnalyticsModel{
-		ctx:             ctx,
-		app:             app,
-		ds:              ds,
-		rs:              rs,
-		natsService:     natsService,
-		webhookNotifier: webhookNotifier,
-		logger:          logger.WithField("model", "analytics"),
+		ctx:             args.Ctx,
+		app:             args.App,
+		ds:              args.Ds,
+		rs:              args.Rs,
+		natsService:     args.NatsService,
+		webhookNotifier: args.WebhookNotifier,
+		logger:          args.Logger.WithField("model", "analytics"),
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 )
 
 type UserModel struct {
@@ -20,15 +21,27 @@ type UserModel struct {
 	logger         *logrus.Entry
 }
 
-func NewUserModel(app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, lk *livekitservice.LivekitService, natsService *natsservice.NatsService, analyticsModel *AnalyticsModel, am *AuthModel, logger *logrus.Logger) *UserModel {
+type UserModelArgs struct {
+	fx.In
+	App            *config.AppConfig
+	Ds             *dbservice.DatabaseService
+	Rs             *redisservice.RedisService
+	Lk             *livekitservice.LivekitService
+	NatsService    *natsservice.NatsService
+	AnalyticsModel *AnalyticsModel
+	Am             *AuthModel
+	Logger         *logrus.Logger
+}
+
+func NewUserModel(args UserModelArgs) *UserModel {
 	return &UserModel{
-		app:            app,
-		ds:             ds,
-		rs:             rs,
-		lk:             lk,
-		natsService:    natsService,
-		analyticsModel: analyticsModel,
-		am:             am,
-		logger:         logger.WithField("model", "user"),
+		app:            args.App,
+		ds:             args.Ds,
+		rs:             args.Rs,
+		lk:             args.Lk,
+		natsService:    args.NatsService,
+		analyticsModel: args.AnalyticsModel,
+		am:             args.Am,
+		logger:         args.Logger.WithField("model", "user"),
 	}
 }

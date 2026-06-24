@@ -16,6 +16,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -27,13 +28,21 @@ type FileController struct {
 	logger    *logrus.Entry
 }
 
+type FileControllerArgs struct {
+	fx.In
+	AppConfig *config.AppConfig
+	FileModel *models.FileModel
+	RoomModel *models.RoomModel
+	Logger    *logrus.Logger
+}
+
 // NewFileController creates a new FileController.
-func NewFileController(config *config.AppConfig, fm *models.FileModel, rm *models.RoomModel, logger *logrus.Logger) *FileController {
+func NewFileController(args FileControllerArgs) *FileController {
 	return &FileController{
-		AppConfig: config,
-		FileModel: fm,
-		RoomModel: rm,
-		logger:    logger.WithField("controller", "file"),
+		AppConfig: args.AppConfig,
+		FileModel: args.FileModel,
+		RoomModel: args.RoomModel,
+		logger:    args.Logger.WithField("controller", "file"),
 	}
 }
 

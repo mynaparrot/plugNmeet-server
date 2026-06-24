@@ -115,13 +115,12 @@ func provideDBConnection(lc fx.Lifecycle, ctx context.Context, appCnf *config.Ap
 	d.SetMaxOpenConns(maxOpenConns)
 	d.SetMaxIdleConns(maxOpenConns)
 
-	err = d.PingContext(ctx)
-	if err != nil {
+	if err := d.PingContext(ctx); err != nil {
 		log.WithError(err).Error("failed to ping database")
 		return nil, err
 	}
 
-	dbVersion := ""
+	var dbVersion string
 	db.Raw("SELECT VERSION()").Scan(&dbVersion)
 	log.WithField("version", dbVersion).Info("Successfully connected to database")
 
@@ -223,8 +222,7 @@ func provideRedisConnection(lc fx.Lifecycle, ctx context.Context, appCnf *config
 		})
 	}
 
-	_, err := rdb.Ping(ctx).Result()
-	if err != nil {
+	if _, err := rdb.Ping(ctx).Result(); err != nil {
 		log.WithError(err).Error("failed to connect to Redis")
 		return nil, err
 	}

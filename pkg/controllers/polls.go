@@ -8,6 +8,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"go.uber.org/fx"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -17,11 +18,17 @@ type PollsController struct {
 	RedisService *redisservice.RedisService
 }
 
+type PollsControllerArgs struct {
+	fx.In
+	PollModel    *models.PollModel
+	RedisService *redisservice.RedisService
+}
+
 // NewPollsController creates a new PollsController.
-func NewPollsController(pm *models.PollModel, rs *redisservice.RedisService) *PollsController {
+func NewPollsController(args PollsControllerArgs) *PollsController {
 	return &PollsController{
-		PollModel:    pm,
-		RedisService: rs,
+		PollModel:    args.PollModel,
+		RedisService: args.RedisService,
 	}
 }
 

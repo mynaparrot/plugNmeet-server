@@ -19,6 +19,7 @@ import (
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 )
 
 const (
@@ -46,15 +47,25 @@ type InsightsModel struct {
 	artifactModel *ArtifactModel
 }
 
-func NewInsightsModel(ctx context.Context, appConfig *config.AppConfig, redisService *redisservice.RedisService, natsService *natsservice.NatsService, artifactModel *ArtifactModel, logger *logrus.Logger) *InsightsModel {
+type InsightsModelArgs struct {
+	fx.In
+	Ctx           context.Context
+	AppConfig     *config.AppConfig
+	RedisService  *redisservice.RedisService
+	NatsService   *natsservice.NatsService
+	ArtifactModel *ArtifactModel
+	Logger        *logrus.Logger
+}
+
+func NewInsightsModel(args InsightsModelArgs) *InsightsModel {
 	return &InsightsModel{
-		ctx:           ctx,
-		appConfig:     appConfig,
-		redisService:  redisService,
-		natsService:   natsService,
+		ctx:           args.Ctx,
+		appConfig:     args.AppConfig,
+		redisService:  args.RedisService,
+		natsService:   args.NatsService,
 		roomAgents:    make(map[string]*insightsservice.RoomAgent),
-		artifactModel: artifactModel,
-		logger:        logger.WithField("model", "insights"),
+		artifactModel: args.ArtifactModel,
+		logger:        args.Logger.WithField("model", "insights"),
 	}
 }
 
@@ -189,7 +200,17 @@ func (s *InsightsModel) ActivateTextTask(ctx context.Context, serviceType insigh
 	}
 
 	// 2. Create the appropriate task using the factory.
-	task, err := insightsservice.NewTask(ctx, serviceType, s.appConfig, serviceConfig, targetAccount, s.natsService, s.redisService, s.logger)
+	args := &insightsservice.TaskArgs{
+		Ctx:             ctx,
+		ServiceType:     serviceType,
+		AppConf:         s.appConfig,
+		ServiceConfig:   serviceConfig,
+		ProviderAccount: targetAccount,
+		NatsService:     s.natsService,
+		RedisService:    s.redisService,
+		Logger:          s.logger,
+	}
+	task, err := insightsservice.NewTask(args)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create task for service '%s': %w", serviceType, err)
 	}
@@ -207,7 +228,14 @@ func (s *InsightsModel) GetSupportedLanguagesForService(ctx context.Context, ser
 	}
 
 	// 2. Create a new provider instance on-the-fly.
-	provider, err := insightsservice.NewProvider(ctx, serviceConfig.Provider, targetAccount, serviceConfig, s.logger)
+	args := &insightsservice.ProviderArgs{
+		Ctx:             ctx,
+		ProviderType:    serviceConfig.Provider,
+		ProviderAccount: targetAccount,
+		ServiceConfig:   serviceConfig,
+		Logger:          s.logger,
+	}
+	provider, err := insightsservice.NewProvider(args)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create provider for service '%s': %w", serviceType, err)
 	}
@@ -277,7 +305,14 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 	}
 
 	// 2. Create a new provider instance.
-	provider, err := insightsservice.NewProvider(s.ctx, serviceConfig.Provider, targetAccount, serviceConfig, s.logger)
+	args := &insightsservice.ProviderArgs{
+		Ctx:             s.ctx,
+		ProviderType:    serviceConfig.Provider,
+		ProviderAccount: targetAccount,
+		ServiceConfig:   serviceConfig,
+		Logger:          log,
+	}
+	provider, err := insightsservice.NewProvider(args)
 	if err != nil {
 		log.WithError(err).Error("failed to create provider")
 		return err

@@ -6,6 +6,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 )
 
 const (
@@ -22,12 +23,19 @@ type RedisService struct {
 	logger           *logrus.Entry
 }
 
-func New(ctx context.Context, rc *redis.Client, logger *logrus.Logger) *RedisService {
+type Args struct {
+	fx.In
+	Ctx    context.Context
+	Rc     *redis.Client
+	Logger *logrus.Logger
+}
+
+func New(args Args) *RedisService {
 	return &RedisService{
-		ctx:              ctx,
-		rc:               rc,
+		ctx:              args.Ctx,
+		rc:               args.Rc,
 		unlockScriptExec: redis.NewScript(unlockScript),
 		renewScriptExec:  redis.NewScript(renewScript),
-		logger:           logger.WithField("service", "redis"),
+		logger:           args.Logger.WithField("service", "redis"),
 	}
 }

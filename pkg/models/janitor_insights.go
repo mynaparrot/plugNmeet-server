@@ -29,7 +29,14 @@ func (m *JanitorModel) CheckInsightsPendingSummarizeJobs() {
 		log.WithError(err).Error("failed to get provider account for summarization service")
 		return
 	}
-	provider, err := insightsservice.NewProvider(m.ctx, serviceConfig.Provider, targetAccount, serviceConfig, m.logger)
+	args := &insightsservice.ProviderArgs{
+		Ctx:             m.ctx,
+		ProviderType:    serviceConfig.Provider,
+		ProviderAccount: targetAccount,
+		ServiceConfig:   serviceConfig,
+		Logger:          log,
+	}
+	provider, err := insightsservice.NewProvider(args)
 	if err != nil {
 		log.WithError(err).Error("failed to create provider for summarization service")
 		return

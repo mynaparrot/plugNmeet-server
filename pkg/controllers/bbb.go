@@ -15,6 +15,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
+	"go.uber.org/fx"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -28,15 +29,25 @@ type BBBController struct {
 	NatsService        *natsservice.NatsService
 }
 
+type BBBControllerArgs struct {
+	fx.In
+	AppConfig          *config.AppConfig
+	RoomModel          *models.RoomModel
+	UserModel          *models.UserModel
+	BBBApiWrapperModel *models.BBBApiWrapperModel
+	RecordingModel     *models.RecordingModel
+	NatsService        *natsservice.NatsService
+}
+
 // NewBBBController creates a new BBBController.
-func NewBBBController(config *config.AppConfig, roomModel *models.RoomModel, userModel *models.UserModel, bbbApiWrapperModel *models.BBBApiWrapperModel, recordingModel *models.RecordingModel, natsService *natsservice.NatsService) *BBBController {
+func NewBBBController(args BBBControllerArgs) *BBBController {
 	return &BBBController{
-		AppConfig:          config,
-		RoomModel:          roomModel,
-		UserModel:          userModel,
-		BBBApiWrapperModel: bbbApiWrapperModel,
-		RecordingModel:     recordingModel,
-		NatsService:        natsService,
+		AppConfig:          args.AppConfig,
+		RoomModel:          args.RoomModel,
+		UserModel:          args.UserModel,
+		BBBApiWrapperModel: args.BBBApiWrapperModel,
+		RecordingModel:     args.RecordingModel,
+		NatsService:        args.NatsService,
 	}
 }
 

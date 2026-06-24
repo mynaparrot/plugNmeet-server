@@ -18,6 +18,7 @@ import (
 	"github.com/nats-io/nats.go/micro"
 	"github.com/nats-io/nkeys"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -56,28 +57,38 @@ type NatsController struct {
 	authService      micro.Service
 }
 
-func NewNatsController(ctx context.Context, app *config.AppConfig, natsService *natsservice.NatsService, authModel *models.AuthModel, natsModel *models.NatsModel, logger *logrus.Logger) (*NatsController, error) {
-	log := logger.WithField("controller", "nats")
+type NatsControllerArgs struct {
+	fx.In
+	Ctx         context.Context
+	App         *config.AppConfig
+	NatsService *natsservice.NatsService
+	AuthModel   *models.AuthModel
+	NatsModel   *models.NatsModel
+	Logger      *logrus.Logger
+}
 
-	issuerKeyPair, err := nkeys.FromSeed([]byte(app.NatsInfo.AuthCalloutIssuerPrivate))
+func NewNatsController(args NatsControllerArgs) (*NatsController, error) {
+	log := args.Logger.WithField("controller", "nats")
+
+	issuerKeyPair, err := nkeys.FromSeed([]byte(args.App.NatsInfo.AuthCalloutIssuerPrivate))
 	if err != nil {
 		log.WithError(err).Error("Failed to load issuer private key")
 		return nil, fmt.Errorf("error creating issuer key pair: %w", err)
 	}
 
 	c := &NatsController{
-		ctx:           ctx,
-		app:           app,
-		natsService:   natsService,
+		ctx:           args.Ctx,
+		app:           args.App,
+		natsService:   args.NatsService,
 		issuerKeyPair: issuerKeyPair,
-		authModel:     authModel,
-		natsModel:     natsModel,
+		authModel:     args.AuthModel,
+		natsModel:     args.NatsModel,
 		wp:            workerpool.New(DefaultNumWorkers),
 		log:           log,
 	}
 
-	if app.NatsInfo.AuthCalloutXkeyPrivate != nil && *app.NatsInfo.AuthCalloutXkeyPrivate != "" {
-		c.curveKeyPair, err = nkeys.FromSeed([]byte(*app.NatsInfo.AuthCalloutXkeyPrivate))
+	if args.App.NatsInfo.AuthCalloutXkeyPrivate != nil && *args.App.NatsInfo.AuthCalloutXkeyPrivate != "" {
+		c.curveKeyPair, err = nkeys.FromSeed([]byte(*args.App.NatsInfo.AuthCalloutXkeyPrivate))
 		if err != nil {
 			log.WithError(err).Error("Failed to load curve private key")
 			return nil, fmt.Errorf("error creating curve key pair: %w", err)

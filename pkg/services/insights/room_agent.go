@@ -64,7 +64,17 @@ func NewRoomAgent(ctx context.Context, appConf *config.AppConfig, serviceConfig 
 	})
 
 	// Create a single task for this agent's one and only service.
-	task, err := NewTask(ctx, payload.ServiceType, appConf, serviceConfig, providerAccount, natsService, redisService, log)
+	args := &TaskArgs{
+		Ctx:             ctx,
+		ServiceType:     payload.ServiceType,
+		AppConf:         appConf,
+		ServiceConfig:   serviceConfig,
+		ProviderAccount: providerAccount,
+		NatsService:     natsService,
+		RedisService:    redisService,
+		Logger:          log,
+	}
+	task, err := NewTask(args)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("could not create task for service '%s': %w", payload.ServiceType, err)
@@ -138,7 +148,14 @@ func (a *RoomAgent) startSynthesisTask() error {
 	}
 
 	// 2. Create a new provider instance specifically for synthesis.
-	synthProvider, err := NewProvider(a.Ctx, synthServiceConfig.Provider, synthAccount, synthServiceConfig, a.logger)
+	args := &ProviderArgs{
+		Ctx:             a.Ctx,
+		ProviderType:    synthServiceConfig.Provider,
+		ProviderAccount: synthAccount,
+		ServiceConfig:   synthServiceConfig,
+		Logger:          a.logger,
+	}
+	synthProvider, err := NewProvider(args)
 	if err != nil {
 		return fmt.Errorf("failed to create provider for speech-synthesis: %w", err)
 	}

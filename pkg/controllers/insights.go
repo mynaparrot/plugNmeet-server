@@ -17,6 +17,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -30,13 +31,22 @@ type InsightsController struct {
 	insightsModel   *models.InsightsModel
 }
 
-func NewInsightsController(ctx context.Context, app *config.AppConfig, natsService *natsservice.NatsService, im *models.InsightsModel, logger *logrus.Logger) *InsightsController {
+type InsightsControllerArgs struct {
+	fx.In
+	Ctx           context.Context
+	App           *config.AppConfig
+	NatsService   *natsservice.NatsService
+	InsightsModel *models.InsightsModel
+	Logger        *logrus.Logger
+}
+
+func NewInsightsController(args InsightsControllerArgs) *InsightsController {
 	return &InsightsController{
-		ctx:           ctx,
-		app:           app,
-		natsService:   natsService,
-		insightsModel: im,
-		logger:        logger.WithField("controller", "insights"),
+		ctx:           args.Ctx,
+		app:           args.App,
+		natsService:   args.NatsService,
+		insightsModel: args.InsightsModel,
+		logger:        args.Logger.WithField("controller", "insights"),
 	}
 }
 

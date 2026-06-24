@@ -3,14 +3,20 @@ package controllers
 import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"go.uber.org/fx"
 )
 
 type HealthCheckController struct {
 	app *config.AppConfig
 }
 
-func NewHealthCheckController(app *config.AppConfig) *HealthCheckController {
-	return &HealthCheckController{app: app}
+type HealthCheckControllerArgs struct {
+	fx.In
+	App *config.AppConfig
+}
+
+func NewHealthCheckController(args HealthCheckControllerArgs) *HealthCheckController {
+	return &HealthCheckController{app: args.App}
 }
 
 func (h *HealthCheckController) HandleHealthCheck(c fiber.Ctx) error {

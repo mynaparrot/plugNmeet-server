@@ -5,6 +5,7 @@ import (
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -17,14 +18,24 @@ type BreakoutRoomModel struct {
 	logger         *logrus.Entry
 }
 
-func NewBreakoutRoomModel(rm *RoomModel) *BreakoutRoomModel {
+type BreakoutRoomModelArgs struct {
+	fx.In
+	Rs             *redisservice.RedisService
+	NatsService    *natsservice.NatsService
+	Rm             *RoomModel
+	AnalyticsModel *AnalyticsModel
+	UserModel      *UserModel
+	Logger         *logrus.Logger
+}
+
+func NewBreakoutRoomModel(args BreakoutRoomModelArgs) *BreakoutRoomModel {
 	return &BreakoutRoomModel{
-		rm:             rm,
-		rs:             rm.rs,
-		natsService:    rm.natsService,
-		analyticsModel: rm.analyticsModel,
-		um:             rm.userModel,
-		logger:         rm.logger.Logger.WithField("model", "breakout_room"),
+		rs:             args.Rs,
+		natsService:    args.NatsService,
+		rm:             args.Rm,
+		analyticsModel: args.AnalyticsModel,
+		um:             args.UserModel,
+		logger:         args.Logger.WithField("model", "breakout_room"),
 	}
 }
 

@@ -13,31 +13,50 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type ProviderArgs struct {
+	Ctx             context.Context
+	ProviderType    string
+	ProviderAccount *config.ProviderAccount
+	ServiceConfig   *config.ServiceConfig
+	Logger          *logrus.Entry
+}
+
 // NewProvider is a factory function that creates and returns the configured AI provider.
-func NewProvider(ctx context.Context, providerType string, providerAccount *config.ProviderAccount, serviceConfig *config.ServiceConfig, logger *logrus.Entry) (insights.Provider, error) { // Added ctx
-	log := logger.WithFields(logrus.Fields{
-		"provider": providerType,
+func NewProvider(args *ProviderArgs) (insights.Provider, error) {
+	log := args.Logger.WithFields(logrus.Fields{
+		"provider": args.ProviderType,
 	})
-	switch providerType {
+	switch args.ProviderType {
 	case "azure":
-		return azure.NewProvider(providerAccount, serviceConfig, log)
+		return azure.NewProvider(args.ProviderAccount, args.ServiceConfig, log)
 	case "google":
-		return google.NewProvider(ctx, providerAccount, serviceConfig, log)
+		return google.NewProvider(args.Ctx, args.ProviderAccount, args.ServiceConfig, log)
 	default:
-		return nil, fmt.Errorf("unknown AI provider type: %s", providerType)
+		return nil, fmt.Errorf("unknown AI provider type: %s", args.ProviderType)
 	}
 }
 
+type TaskArgs struct {
+	Ctx             context.Context
+	ServiceType     insights.ServiceType
+	AppConf         *config.AppConfig
+	ServiceConfig   *config.ServiceConfig
+	ProviderAccount *config.ProviderAccount
+	NatsService     *natsservice.NatsService
+	RedisService    *redisservice.RedisService
+	Logger          *logrus.Entry
+}
+
 // NewTask is a factory that returns the correct Task implementation.
-func NewTask(ctx context.Context, serviceType insights.ServiceType, appConf *config.AppConfig, serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, natsService *natsservice.NatsService, redisService *redisservice.RedisService, logger *logrus.Entry) (insights.Task, error) {
-	switch serviceType {
+func NewTask(args *TaskArgs) (insights.Task, error) {
+	switch args.ServiceType {
 	case insights.ServiceTypeTranscription:
-		return NewTranscriptionTask(appConf, serviceConfig, providerAccount, natsService, redisService, logger)
+		return NewTranscriptionTask(args.AppConf, args.ServiceConfig, args.ProviderAccount, args.NatsService, args.RedisService, args.Logger)
 	case insights.ServiceTypeTranslation:
-		return NewTranslationTask(serviceConfig, providerAccount, logger)
+		return NewTranslationTask(args.ServiceConfig, args.ProviderAccount, args.Logger)
 	case insights.ServiceTypeMeetingSummarizing:
-		return NewMeetingSummarizingTask(ctx, appConf, serviceConfig, logger)
+		return NewMeetingSummarizingTask(args.Ctx, args.AppConf, args.ServiceConfig, args.Logger)
 	default:
-		return nil, fmt.Errorf("unknown insights service task: %s", serviceType)
+		return nil, fmt.Errorf("unknown insights service task: %s", args.ServiceType)
 	}
 }

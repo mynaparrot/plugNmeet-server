@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path"
@@ -23,7 +22,6 @@ import (
 var dbTablePrefix string
 
 type AppConfig struct {
-	ctx         context.Context
 	RDS         *redis.Client
 	DB          *gorm.DB
 	NatsConn    *nats.Conn
@@ -110,7 +108,7 @@ type UploadFileSettings struct {
 
 type RecorderInfo struct {
 	RecordingFilesPath string `yaml:"recording_files_path"`
-	//How long generated token will valid to download the file
+	// How long generated token will valid to download the file
 	TokenValidity time.Duration `yaml:"token_validity"`
 	// How long to wait before considering a recorder inactive. default: 8 seconds
 	PingTimeout                time.Duration `yaml:"ping_timeout"`
@@ -233,7 +231,7 @@ func InitAppConfig(appCnf *AppConfig) (*AppConfig, error) {
 
 	// set default values
 	if appCnf.AnalyticsSettings != nil {
-		//TODO: deprecated, will remove in future
+		// TODO: deprecated, will remove in future
 		if appCnf.AnalyticsSettings.FilesStorePath == nil {
 			appCnf.AnalyticsSettings.FilesStorePath = new("./analytics")
 		}

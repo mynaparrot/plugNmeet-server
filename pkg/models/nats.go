@@ -11,6 +11,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	turnservice "github.com/mynaparrot/plugnmeet-server/pkg/services/turn"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 	"golang.org/x/sync/singleflight"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -30,19 +31,34 @@ type NatsModel struct {
 	sfGroup        *singleflight.Group
 }
 
-func NewNatsModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, lk *livekitservice.LivekitService, turn *turnservice.TurnService, analyticsModel *AnalyticsModel, authModel *AuthModel, userModel *UserModel, logger *logrus.Logger) *NatsModel {
+type NatsModelArgs struct {
+	fx.In
+	Ctx            context.Context
+	App            *config.AppConfig
+	Ds             *dbservice.DatabaseService
+	Rs             *redisservice.RedisService
+	NatsService    *natsservice.NatsService
+	Lk             *livekitservice.LivekitService
+	Turn           *turnservice.TurnService
+	AnalyticsModel *AnalyticsModel
+	AuthModel      *AuthModel
+	UserModel      *UserModel
+	Logger         *logrus.Logger
+}
+
+func NewNatsModel(args NatsModelArgs) *NatsModel {
 	return &NatsModel{
-		ctx:            ctx,
-		app:            app,
-		ds:             ds,
-		rs:             rs,
-		lk:             lk,
-		turn:           turn,
-		natsService:    natsService,
-		authModel:      authModel,
-		userModel:      userModel,
-		analyticsModel: analyticsModel,
-		logger:         logger.WithField("model", "nats"),
+		ctx:            args.Ctx,
+		app:            args.App,
+		ds:             args.Ds,
+		rs:             args.Rs,
+		lk:             args.Lk,
+		turn:           args.Turn,
+		natsService:    args.NatsService,
+		authModel:      args.AuthModel,
+		userModel:      args.UserModel,
+		analyticsModel: args.AnalyticsModel,
+		logger:         args.Logger.WithField("model", "nats"),
 		sfGroup:        new(singleflight.Group),
 	}
 }

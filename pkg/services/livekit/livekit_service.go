@@ -9,6 +9,7 @@ import (
 	lksdk "github.com/livekit/server-sdk-go/v2"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 )
 
 type LivekitService struct {
@@ -18,14 +19,21 @@ type LivekitService struct {
 	logger *logrus.Entry
 }
 
-func New(ctx context.Context, app *config.AppConfig, logger *logrus.Logger) *LivekitService {
-	lkc := lksdk.NewRoomServiceClient(app.LivekitInfo.Host, app.LivekitInfo.ApiKey, app.LivekitInfo.Secret)
+type Args struct {
+	fx.In
+	Ctx    context.Context
+	App    *config.AppConfig
+	Logger *logrus.Logger
+}
+
+func New(args Args) *LivekitService {
+	lkc := lksdk.NewRoomServiceClient(args.App.LivekitInfo.Host, args.App.LivekitInfo.ApiKey, args.App.LivekitInfo.Secret)
 
 	return &LivekitService{
-		ctx:    ctx,
-		app:    app,
+		ctx:    args.Ctx,
+		app:    args.App,
 		lkc:    lkc,
-		logger: logger.WithField("service", "livekit"),
+		logger: args.Logger.WithField("service", "livekit"),
 	}
 }
 

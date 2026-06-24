@@ -12,6 +12,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"go.uber.org/fx"
 )
 
 const (
@@ -39,13 +40,21 @@ type LtiV1Controller struct {
 	RecordingModel *models.RecordingModel
 }
 
+type LtiV1ControllerArgs struct {
+	fx.In
+	App            *config.AppConfig
+	LtiV1Model     *models.LtiV1Model
+	RoomModel      *models.RoomModel
+	RecordingModel *models.RecordingModel
+}
+
 // NewLtiV1Controller creates a new LtiV1Controller.
-func NewLtiV1Controller(app *config.AppConfig, lm *models.LtiV1Model, rm *models.RoomModel, recm *models.RecordingModel) *LtiV1Controller {
+func NewLtiV1Controller(args LtiV1ControllerArgs) *LtiV1Controller {
 	return &LtiV1Controller{
-		app:            app,
-		LtiV1Model:     lm,
-		RoomModel:      rm,
-		RecordingModel: recm,
+		app:            args.App,
+		LtiV1Model:     args.LtiV1Model,
+		RoomModel:      args.RoomModel,
+		RecordingModel: args.RecordingModel,
 	}
 }
 

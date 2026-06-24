@@ -13,6 +13,7 @@ import (
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 )
 
 type RecordingModel struct {
@@ -28,17 +29,30 @@ type RecordingModel struct {
 	logger          *logrus.Entry
 }
 
-func NewRecordingModel(ctx context.Context, app *config.AppConfig, ds *dbservice.DatabaseService, rs *redisservice.RedisService, natsService *natsservice.NatsService, analyticsModel *AnalyticsModel, um *UserModel, webhookNotifier *helpers.WebhookNotifier, logger *logrus.Logger) *RecordingModel {
+type RecordingModelArgs struct {
+	fx.In
+	Ctx             context.Context
+	App             *config.AppConfig
+	Ds              *dbservice.DatabaseService
+	Rs              *redisservice.RedisService
+	NatsService     *natsservice.NatsService
+	AnalyticsModel  *AnalyticsModel
+	Um              *UserModel
+	WebhookNotifier *helpers.WebhookNotifier
+	Logger          *logrus.Logger
+}
+
+func NewRecordingModel(args RecordingModelArgs) *RecordingModel {
 	return &RecordingModel{
-		ctx:             ctx,
-		app:             app,
-		ds:              ds,
-		rs:              rs,
-		analyticsModel:  analyticsModel,
-		um:              um,
-		webhookNotifier: webhookNotifier,
-		natsService:     natsService,
-		logger:          logger.WithField("model", "recording"),
+		ctx:             args.Ctx,
+		app:             args.App,
+		ds:              args.Ds,
+		rs:              args.Rs,
+		analyticsModel:  args.AnalyticsModel,
+		um:              args.Um,
+		webhookNotifier: args.WebhookNotifier,
+		natsService:     args.NatsService,
+		logger:          args.Logger.WithField("model", "recording"),
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/fx"
 )
 
 type AuthModel struct {
@@ -20,11 +21,18 @@ type AuthModel struct {
 	logger      *logrus.Entry
 }
 
-func NewAuthModel(app *config.AppConfig, natsService *natsservice.NatsService, logger *logrus.Logger) *AuthModel {
+type AuthModelArgs struct {
+	fx.In
+	App         *config.AppConfig
+	NatsService *natsservice.NatsService
+	Logger      *logrus.Logger
+}
+
+func NewAuthModel(args AuthModelArgs) *AuthModel {
 	return &AuthModel{
-		app:         app,
-		natsService: natsService,
-		logger:      logger.WithField("model", "auth"),
+		app:         args.App,
+		natsService: args.NatsService,
+		logger:      args.Logger.WithField("model", "auth"),
 	}
 }
 
