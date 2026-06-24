@@ -21,7 +21,7 @@ const (
 )
 
 func (s *NatsService) CreateSystemJsWorkerStreamWithConsumer(ctx context.Context, prefix string, log *logrus.Entry) (jetstream.Consumer, error) {
-	stream, err := s.app.JetStream.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
+	stream, err := s.js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
 		Name:        s.app.NatsInfo.Subjects.SystemJsWorker,
 		Description: "plugNmeet system worker",
 		Replicas:    s.app.NatsInfo.NumReplicas,
@@ -104,7 +104,7 @@ func (s *NatsService) CreateUserConsumer(roomId, userId string) (stream string, 
 
 func (s *NatsService) CreateTranscoderStreamWithConsumer(ctx context.Context, log *logrus.Entry) error {
 	// create recorder transcoder worker
-	transcoderStream, err := s.app.JetStream.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
+	transcoderStream, err := s.js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
 		Name:        s.app.NatsInfo.Recorder.TranscodingJobs,
 		Description: "plugNmeet recorder transcoding jobs",
 		Replicas:    s.app.NatsInfo.NumReplicas,
@@ -135,7 +135,7 @@ func (s *NatsService) CreateTranscoderStreamWithConsumer(ctx context.Context, lo
 }
 
 func (s *NatsService) CreateSummarizeJobStreamWithConsumer(ctx context.Context, log *logrus.Entry) (jetstream.Consumer, error) {
-	stream, err := s.app.JetStream.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
+	stream, err := s.js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
 		Name:        insights.InsightsJobsStream,
 		Description: "plugNmeet meeting summarization jobs",
 		Retention:   jetstream.WorkQueuePolicy,

@@ -16,7 +16,7 @@ import (
 func (m *JanitorModel) checkOnlineUsersStatus() {
 	log := m.logger.WithField("task", "checkOnlineUsersStatus")
 
-	kl := m.app.JetStream.KeyValueStoreNames(context.Background())
+	kl := m.js.KeyValueStoreNames(context.Background())
 	for s := range kl.Name() {
 		if !strings.HasPrefix(s, natsservice.ConsolidatedRoomBucketPrefix) {
 			continue

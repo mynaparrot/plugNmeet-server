@@ -10,6 +10,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights/providers/google"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/sirupsen/logrus"
 )
 
@@ -40,6 +41,7 @@ type TaskArgs struct {
 	Ctx             context.Context
 	ServiceType     insights.ServiceType
 	AppConf         *config.AppConfig
+	JS              jetstream.JetStream
 	ServiceConfig   *config.ServiceConfig
 	ProviderAccount *config.ProviderAccount
 	NatsService     *natsservice.NatsService
@@ -55,7 +57,7 @@ func NewTask(args *TaskArgs) (insights.Task, error) {
 	case insights.ServiceTypeTranslation:
 		return NewTranslationTask(args.ServiceConfig, args.ProviderAccount, args.Logger)
 	case insights.ServiceTypeMeetingSummarizing:
-		return NewMeetingSummarizingTask(args.Ctx, args.AppConf, args.ServiceConfig, args.Logger)
+		return NewMeetingSummarizingTask(args.Ctx, args.AppConf, args.JS, args.ServiceConfig, args.Logger)
 	default:
 		return nil, fmt.Errorf("unknown insights service task: %s", args.ServiceType)
 	}

@@ -41,6 +41,7 @@ type InsightsModel struct {
 	ctx           context.Context
 	appConfig     *config.AppConfig
 	rds           *redis.Client
+	js            jetstream.JetStream
 	logger        *logrus.Entry
 	lock          sync.RWMutex
 	roomAgents    map[string]*insightsservice.RoomAgent // Maps a unique key (roomName@serviceName) to a dedicated agent
@@ -54,6 +55,7 @@ type InsightsModelArgs struct {
 	Ctx           context.Context
 	AppConfig     *config.AppConfig
 	RDS           *redis.Client
+	JS            jetstream.JetStream
 	RedisService  *redisservice.RedisService
 	NatsService   *natsservice.NatsService
 	ArtifactModel *ArtifactModel
@@ -65,6 +67,7 @@ func NewInsightsModel(args InsightsModelArgs) *InsightsModel {
 		ctx:           args.Ctx,
 		appConfig:     args.AppConfig,
 		rds:           args.RDS,
+		js:            args.JS,
 		redisService:  args.RedisService,
 		natsService:   args.NatsService,
 		roomAgents:    make(map[string]*insightsservice.RoomAgent),
@@ -208,6 +211,7 @@ func (s *InsightsModel) ActivateTextTask(ctx context.Context, serviceType insigh
 		Ctx:             ctx,
 		ServiceType:     serviceType,
 		AppConf:         s.appConfig,
+		JS:              s.js,
 		ServiceConfig:   serviceConfig,
 		ProviderAccount: targetAccount,
 		NatsService:     s.natsService,

@@ -441,7 +441,7 @@ func (m *RecordingModel) MergeRecordings(ctx context.Context, req *plugnmeet.Mer
 	}
 
 	// we'll also use lockKey just for preventing repeated request, default: 2 minutes
-	pubAck, err := m.app.JetStream.Publish(ctx, m.app.NatsInfo.Recorder.TranscodingJobs, data, jetstream.WithMsgID(lockKey))
+	pubAck, err := m.js.Publish(ctx, m.app.NatsInfo.Recorder.TranscodingJobs, data, jetstream.WithMsgID(lockKey))
 	if err != nil {
 		log.WithError(err).Error("failed to publish message to NATS")
 		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, err

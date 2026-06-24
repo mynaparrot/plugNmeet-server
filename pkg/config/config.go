@@ -13,7 +13,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/logging"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/nats-io/nats.go"
-	"github.com/nats-io/nats.go/jetstream"
 	"github.com/sirupsen/logrus"
 )
 
@@ -21,7 +20,6 @@ var dbTablePrefix string
 
 type AppConfig struct {
 	NatsConn    *nats.Conn
-	JetStream   jetstream.JetStream
 	ClientFiles map[string][]string
 
 	RootWorkingDir      string

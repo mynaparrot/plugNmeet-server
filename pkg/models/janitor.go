@@ -11,6 +11,7 @@ import (
 	livekitservice "github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/fx"
@@ -23,6 +24,7 @@ type JanitorModel struct {
 	cancel      context.CancelFunc
 	app         *config.AppConfig
 	rds         *redis.Client
+	js          jetstream.JetStream
 	ds          *dbservice.DatabaseService
 	rs          *redisservice.RedisService
 	natsService *natsservice.NatsService
@@ -43,6 +45,7 @@ type JanitorModelArgs struct {
 	MainCtx       context.Context
 	App           *config.AppConfig
 	RDS           *redis.Client
+	JS            jetstream.JetStream
 	Ds            *dbservice.DatabaseService
 	Rs            *redisservice.RedisService
 	NatsService   *natsservice.NatsService
@@ -61,6 +64,7 @@ func NewJanitorModel(args JanitorModelArgs) *JanitorModel {
 		cancel:        cancel,
 		app:           args.App,
 		rds:           args.RDS,
+		js:            args.JS,
 		ds:            args.Ds,
 		rs:            args.Rs,
 		lk:            args.Lk,
