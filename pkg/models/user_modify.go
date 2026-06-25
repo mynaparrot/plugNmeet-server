@@ -1,6 +1,8 @@
 package models
 
 import (
+	"time"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
@@ -72,6 +74,7 @@ func (m *UserModel) RaisedHand(roomId, userId, msg string) {
 
 	// now update user's metadata
 	metadata.RaisedHand = true
+	metadata.RaisedHandAt = time.Now().UnixMilli()
 	if err := m.natsService.UpdateAndBroadcastUserMetadata(roomId, userId, metadata, nil); err != nil {
 		log.WithError(err).Errorln("error updating user metadata")
 	}
@@ -113,6 +116,7 @@ func (m *UserModel) LowerHand(roomId, userId string) {
 
 	// now update user's metadata
 	metadata.RaisedHand = false
+	metadata.RaisedHandAt = 0
 	if err = m.natsService.UpdateAndBroadcastUserMetadata(roomId, userId, metadata, nil); err != nil {
 		log.WithError(err).Errorln("error updating user metadata")
 	}
