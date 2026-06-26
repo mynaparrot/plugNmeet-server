@@ -73,13 +73,13 @@ func (m *UserModel) RaisedHand(roomId, userId, msg string) {
 	}
 
 	// now update user's metadata
-	metadata.RaisedHand = true
-	metadata.RaisedHandAt = time.Now().UnixMilli()
+	metadata.RaisedHand.IsRaised = true
+	metadata.RaisedHand.RaisedAt = time.Now().UnixMilli()
 	if err := m.natsService.UpdateAndBroadcastUserMetadata(roomId, userId, metadata, nil); err != nil {
 		log.WithError(err).Errorln("error updating user metadata")
 	}
 
-	if metadata.RaisedHand {
+	if metadata.RaisedHand.IsRaised {
 		m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 			EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
 			EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_RAISE_HAND,
@@ -115,9 +115,9 @@ func (m *UserModel) LowerHand(roomId, userId string) {
 	}
 
 	// now update user's metadata
-	metadata.RaisedHand = false
-	metadata.RaisedHandAt = 0
-	if err = m.natsService.UpdateAndBroadcastUserMetadata(roomId, userId, metadata, nil); err != nil {
+	metadata.RaisedHand.IsRaised = false
+	metadata.RaisedHand.RaisedAt = 0
+	if err := m.natsService.UpdateAndBroadcastUserMetadata(roomId, userId, metadata, nil); err != nil {
 		log.WithError(err).Errorln("error updating user metadata")
 	}
 }

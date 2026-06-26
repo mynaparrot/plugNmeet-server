@@ -64,6 +64,9 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 	if g.UserInfo.UserMetadata == nil {
 		g.UserInfo.UserMetadata = new(plugnmeet.UserMetadata)
 	}
+	if g.UserInfo.UserMetadata.RaisedHand == nil {
+		g.UserInfo.UserMetadata.RaisedHand = new(plugnmeet.UserRaisedHand)
+	}
 
 	// Step 5: If no external user ID is provided, use the internal user ID as the default.
 	if g.UserInfo.UserMetadata.ExUserId == nil || *g.UserInfo.UserMetadata.ExUserId == "" {
