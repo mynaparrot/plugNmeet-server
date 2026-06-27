@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,7 +17,9 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"github.com/signintech/gopdf"
 	"github.com/sirupsen/logrus"
 )
 
@@ -212,6 +216,132 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 	}
 
 	log.WithField("totalPages", totalPages).Info("Successfully converted and broadcasted whiteboard file")
+	return res, nil
+}
+
+func (m *FileModel) BuildWhiteboardPdfExportFile(req *plugnmeet.UploadedFileMergeReq, requestedUserId string) (*plugnmeet.UploadedFileRes, error) {
+	log := m.logger.WithFields(logrus.Fields{
+		"roomSid":  req.RoomSid,
+		"exportId": req.ResumableIdentifier,
+		"method":   "BuildWhiteboardPdfExportFile",
+	})
+	log.Infoln("New request to build whiteboard PDF export file received")
+
+	// original saved path where all the images was saved
+	savedPath := m.buildWhiteboardPdfExportSavePath(req.RoomSid, req.ResumableIdentifier)
+
+	// Ensure the temporary directory exists before trying to read from it
+	if _, err := os.Stat(savedPath); os.IsNotExist(err) {
+		log.WithError(err).Errorf("Temporary directory %s does not exist", savedPath)
+		return nil, fmt.Errorf("temporary directory for export not found")
+	}
+
+	// List all PNG files in the temporary directory
+	pattern := filepath.Join(savedPath, "*.png")
+	imageFiles, err := filepath.Glob(pattern)
+	if err != nil {
+		log.WithError(err).Errorf("Failed to list PNG files in %s", savedPath)
+		return nil, fmt.Errorf("failed to list image slices")
+	}
+	if len(imageFiles) == 0 {
+		log.Warnf("No PNG files found in temporary directory: %s", savedPath)
+		return nil, fmt.Errorf("no image slices found for export")
+	}
+
+	sort.Slice(imageFiles, func(i, j int) bool {
+		nameI := strings.TrimSuffix(filepath.Base(imageFiles[i]), ".png")
+		nameJ := strings.TrimSuffix(filepath.Base(imageFiles[j]), ".png")
+
+		partsI := strings.Split(nameI, "_")
+		partsJ := strings.Split(nameJ, "_")
+
+		if len(partsI) != 2 || len(partsJ) != 2 {
+			// Fallback to lexicographical sort if format is unexpected
+			return nameI < nameJ
+		}
+
+		pageI, errI := strconv.Atoi(partsI[0])
+		sliceI, errSI := strconv.Atoi(partsI[1])
+		pageJ, errJ := strconv.Atoi(partsJ[0])
+		sliceJ, errSJ := strconv.Atoi(partsJ[1])
+
+		if errI != nil || errSI != nil || errJ != nil || errSJ != nil {
+			// Fallback to lexicographical sort if conversion to int fails
+			return nameI < nameJ
+		}
+
+		// Primary sort by page number
+		if pageI != pageJ {
+			return pageI < pageJ
+		}
+		// Secondary sort by slice number if page numbers are equal
+		return sliceI < sliceJ
+	})
+
+	fileId := uuid.NewString()
+	finalPdfOutputDir := filepath.Join(m.app.UploadFileSettings.Path, req.RoomSid)
+	if err := os.MkdirAll(finalPdfOutputDir, 0755); err != nil {
+		log.WithError(err).Errorf("Failed to create final PDF output directory: %s", finalPdfOutputDir)
+		return nil, fmt.Errorf("failed to create output directory for PDF")
+	}
+
+	baseFileName := strings.TrimSuffix(req.ResumableFilename, filepath.Ext(req.ResumableFilename))
+	finalPdfFileName := helpers.MakeSafeFilename("exported_"+baseFileName, true) + ".pdf"
+	finalPdfPath := filepath.Join(finalPdfOutputDir, finalPdfFileName)
+
+	// Initialize gopdf
+	pdf := gopdf.GoPdf{}
+	pdf.Start(gopdf.Config{
+		PageSize: *gopdf.PageSizeA4, // A4 size
+	})
+
+	for _, imagePath := range imageFiles {
+		pdf.AddPage()
+		// Add image to the PDF, scaling it to fit the A4 page without cropping
+		// The client-side images are already prepared to be 2x A4, so they should fit well.
+		if err := pdf.Image(imagePath, 0, 0, &gopdf.Rect{W: gopdf.PageSizeA4.W, H: gopdf.PageSizeA4.H}); err != nil {
+			log.WithError(err).Errorf("Failed to add image %s to PDF", imagePath)
+			return nil, fmt.Errorf("failed to add image to PDF: %w", err)
+		}
+	}
+
+	// Save the PDF
+	if err := pdf.WritePdf(finalPdfPath); err != nil {
+		log.WithError(err).Errorf("Failed to write final PDF to %s", finalPdfPath)
+		return nil, fmt.Errorf("failed to write final PDF: %w", err)
+	}
+
+	// clean original dir
+	_ = os.RemoveAll(savedPath)
+
+	res := &plugnmeet.UploadedFileRes{
+		Status:        true,
+		Msg:           "success",
+		FileId:        fileId,
+		FilePath:      filepath.Join(req.RoomSid, finalPdfFileName),
+		FileName:      finalPdfFileName,
+		FileExtension: "pdf",
+		FileMimeType:  "application/pdf",
+	}
+
+	meta := &plugnmeet.RoomUploadedFileMetadata{
+		FileType:         plugnmeet.RoomUploadedFileType_CHAT_FILE,
+		FileId:           fileId,
+		FileName:         finalPdfFileName,
+		FilePath:         res.FilePath,
+		MimeType:         res.FileMimeType,
+		UploadedByUserId: requestedUserId,
+	}
+	if err := m.natsService.AddRoomFile(req.RoomId, meta); err != nil {
+		log.WithError(err).Error("failed to store exported PDF metadata in NATS")
+		// Don't return the error, as the PDF creation was successful.
+	}
+
+	// we'll send by chat
+	if err := m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SYSTEM_CHAT_MSG, req.RoomId, meta, &requestedUserId); err != nil {
+		log.WithError(err).Error("Failed to broadcast message")
+	}
+
 	return res, nil
 }
 

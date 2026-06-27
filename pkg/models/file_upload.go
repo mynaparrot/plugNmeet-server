@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -450,4 +451,63 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 	log.Infof("File %s successfully uploaded and broadcasted", fileName)
 
 	return plugnmeet.StatusCode_SUCCESS, nil
+}
+
+type WhiteboardPdfExportUploadReq struct {
+	RoomSid     string `form:"roomSid"`
+	RoomId      string `form:"roomId"`
+	UserId      string `form:"userId"`
+	FileId      string `form:"file_id"`
+	FileName    string `form:"file_name"`
+	PageNumber  int64  `form:"page_number"`
+	SliceNumber int64  `form:"slice_number"`
+	ExportId    string `form:"export_id"`
+}
+
+func (m *FileModel) WhiteboardPdfExportUpload(c fiber.Ctx, req *WhiteboardPdfExportUploadReq) *fiber.Error {
+	log := m.logger.WithFields(logrus.Fields{
+		"method":  "WhiteboardPdfExportUpload",
+		"roomId":  req.RoomId,
+		"roomSid": req.RoomSid,
+	})
+
+	// The rest of the function handles direct file uploads
+	file, err := c.FormFile("file")
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+
+	maxSize := m.app.UploadFileSettings.MaxSizeWhiteboardFile * 1024 * 1024
+	// Check file size before saving
+	if file.Size > int64(maxSize) {
+		return fiber.ErrRequestEntityTooLarge
+	}
+
+	f, err := file.Open()
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+
+	// detectMimeTypeForValidation will run f.Close() in defer
+	if err := m.detectMimeTypeForValidation(f); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+
+	fileName := helpers.MakeSafeFilename(file.Filename, true)
+	savePath := m.buildWhiteboardPdfExportSavePath(req.RoomSid, req.ExportId)
+
+	if err := os.MkdirAll(savePath, 0755); err != nil {
+		log.WithError(err).Errorln("failed to create file directory")
+		return fiber.NewError(fiber.StatusInternalServerError, "failed to create directory")
+	}
+
+	if err := c.SaveFile(file, path.Join(savePath, fileName)); err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+	}
+
+	return nil
+}
+
+func (m *FileModel) buildWhiteboardPdfExportSavePath(roomSid, exportId string) string {
+	return filepath.Join(m.app.UploadFileSettings.Path, roomSid, "tmp", exportId)
 }

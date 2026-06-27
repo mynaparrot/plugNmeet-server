@@ -236,6 +236,50 @@ func (fc *FileController) HandleConvertWhiteboardFile(c fiber.Ctx) error {
 	return c.JSON(res)
 }
 
+func (fc *FileController) HandleWhiteboardPdfExportUpload(c fiber.Ctx) error {
+	req := new(models.WhiteboardPdfExportUploadReq)
+	if err := c.Bind().Form(req); err != nil {
+		return commonFileErrorResponse(c, err.Error(), fiber.StatusBadRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
+	}
+
+	req.RoomId = fiber.Locals[string](c, "roomId")
+	req.RoomSid = fiber.Locals[string](c, "roomSid")
+	req.UserId = fiber.Locals[string](c, "requestedUserId")
+
+	acState, _, _ := fc.RoomModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{RoomId: req.RoomId})
+	if !acState.GetIsActive() {
+		return commonFileErrorResponse(c, acState.GetMsg(), fiber.StatusBadRequest, acState.GetStatusCode())
+	}
+
+	if fErr := fc.FileModel.WhiteboardPdfExportUpload(c, req); fErr != nil {
+		return commonFileErrorResponse(c, fErr.Message, fErr.Code, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
+	}
+
+	return c.SendString("file uploaded successfully")
+}
+
+func (fc *FileController) HandleWhiteboardPdfExportFileMerge(c fiber.Ctx) error {
+	req := new(plugnmeet.UploadedFileMergeReq)
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	req.RoomId = fiber.Locals[string](c, "roomId")
+	req.RoomSid = fiber.Locals[string](c, "roomSid")
+	requestedUserId := fiber.Locals[string](c, "requestedUserId")
+
+	acState, _, _ := fc.RoomModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{RoomId: req.RoomId})
+	if !acState.GetIsActive() {
+		return commonFileErrorResponse(c, acState.GetMsg(), fiber.StatusBadRequest, acState.GetStatusCode())
+	}
+
+	res, err := fc.FileModel.BuildWhiteboardPdfExportFile(req, requestedUserId)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+	return utils.SendProtobufResponse(c, res)
+}
+
 func (fc *FileController) HandleGetRoomFilesByType(c fiber.Ctx) error {
 	req := new(plugnmeet.GetRoomUploadedFilesReq)
 	if err := proto.Unmarshal(c.Body(), req); err != nil {

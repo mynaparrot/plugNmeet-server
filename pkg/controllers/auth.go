@@ -93,6 +93,10 @@ func (ac *AuthController) HandleAuthHeaderCheck(c fiber.Ctx) error {
 // HandleVerifyHeaderToken is a middleware to verify the Authorization header token.
 func (ac *AuthController) HandleVerifyHeaderToken(c fiber.Ctx) error {
 	authToken := c.Get("Authorization")
+	if authToken == "" {
+		// fallback to form value
+		authToken = c.FormValue("Authorization")
+	}
 
 	errStatus := fiber.StatusUnauthorized
 	path := c.Path()

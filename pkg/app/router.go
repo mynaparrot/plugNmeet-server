@@ -214,7 +214,6 @@ func (r *Router) registerAPIRoutes() {
 	waitingRoom.Post("/approveUsers", r.ctrl.RoomController.HandleApproveUsers)
 	waitingRoom.Post("/updateMsg", r.ctrl.RoomController.HandleUpdateWaitingRoomMessage)
 
-	api.Post("/convertWhiteboardFile", r.ctrl.FileController.HandleConvertWhiteboardFile)
 	api.Post("/updateLockSettings", r.ctrl.UserController.HandleUpdateUserLockSetting)
 	api.Post("/muteUnmuteTrack", r.ctrl.UserController.HandleMuteUnMuteTrack)
 	api.Post("/removeParticipant", r.ctrl.UserController.HandleRemoveParticipant)
@@ -246,6 +245,11 @@ func (r *Router) registerAPIRoutes() {
 	breakoutRoom.Post("/sendMsg", r.ctrl.BreakoutRoomController.HandleSendBreakoutRoomMsg)
 	breakoutRoom.Post("/endRoom", r.ctrl.BreakoutRoomController.HandleEndBreakoutRoom)
 	breakoutRoom.Post("/endAllRooms", r.ctrl.BreakoutRoomController.HandleEndBreakoutRooms)
+
+	whiteboard := api.Group("/whiteboard")
+	whiteboard.Post("/convert", r.ctrl.FileController.HandleConvertWhiteboardFile)
+	whiteboard.Post("/pdf-export/upload", r.ctrl.FileController.HandleWhiteboardPdfExportUpload)
+	whiteboard.Post("/pdf-export/merge", r.ctrl.FileController.HandleWhiteboardPdfExportFileMerge)
 
 	// insights AI routers
 	r.registerInsightsRegisterAPIRoutes(api)
