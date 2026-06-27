@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -495,14 +494,29 @@ func (m *FileModel) WhiteboardPdfExportUpload(c fiber.Ctx, req *WhiteboardPdfExp
 
 	fileName := helpers.MakeSafeFilename(file.Filename, true)
 	savePath := m.buildWhiteboardPdfExportSavePath(req.RoomSid, req.ExportId)
+	finalFile := filepath.Join(savePath, fileName)
 
 	if err := os.MkdirAll(savePath, 0755); err != nil {
 		log.WithError(err).Errorln("failed to create file directory")
 		return fiber.NewError(fiber.StatusInternalServerError, "failed to create directory")
 	}
 
-	if err := c.SaveFile(file, path.Join(savePath, fileName)); err != nil {
+	if err := c.SaveFile(file, finalFile); err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+	}
+
+	if m.app.Hooks != nil {
+		hookData := &hooks.UploadHookData{
+			HookFileType: hooks.HookFileTypeFileGroup,
+			RoomSid:      req.RoomSid,
+			RoomId:       req.RoomId,
+			GroupId:      req.ExportId,
+			InputPath:    finalFile,
+		}
+		if _, err := m.app.Hooks.RunUploadHook(hookData, log); err != nil {
+			log.WithError(err).Error("upload hook 'upload' failed")
+			return fiber.NewError(fiber.StatusServiceUnavailable, "hook failed to upload file")
+		}
 	}
 
 	return nil

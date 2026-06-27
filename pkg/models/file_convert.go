@@ -219,7 +219,7 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 	return res, nil
 }
 
-func (m *FileModel) BuildWhiteboardPdfExportFile(req *plugnmeet.UploadedFileMergeReq, requestedUserId string) (*plugnmeet.UploadedFileRes, error) {
+func (m *FileModel) BuildWhiteboardPdfExportFile(ctx context.Context, req *plugnmeet.UploadedFileMergeReq, requestedUserId string) (*plugnmeet.UploadedFileRes, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomSid":  req.RoomSid,
 		"exportId": req.ResumableIdentifier,
@@ -229,6 +229,24 @@ func (m *FileModel) BuildWhiteboardPdfExportFile(req *plugnmeet.UploadedFileMerg
 
 	// original saved path where all the images was saved
 	savedPath := m.buildWhiteboardPdfExportSavePath(req.RoomSid, req.ResumableIdentifier)
+
+	if m.app.Hooks != nil {
+		hookData := &hooks.DownloadHookData{
+			HookFileType: hooks.HookFileTypeFileGroup,
+			RoomSid:      req.RoomSid,
+			RoomId:       req.RoomId,
+			GroupId:      req.ResumableIdentifier,
+			InputPath:    savedPath,
+		}
+		hookRes, err := m.app.Hooks.RunDownloadHook(ctx, hookData, nil, time.Minute*10, log)
+		if err != nil {
+			log.WithError(err).Error("download hook failed")
+			return nil, fmt.Errorf("download hook failed")
+		}
+		if hookRes != nil && hookRes.OutputPath != "" {
+			savedPath = hookRes.OutputPath
+		}
+	}
 
 	// Ensure the temporary directory exists before trying to read from it
 	if _, err := os.Stat(savedPath); os.IsNotExist(err) {
@@ -313,6 +331,23 @@ func (m *FileModel) BuildWhiteboardPdfExportFile(req *plugnmeet.UploadedFileMerg
 
 	// clean original dir
 	_ = os.RemoveAll(savedPath)
+
+	if m.app.Hooks != nil {
+		hookData := &hooks.UploadHookData{
+			HookFileType: hooks.HookFileTypeRoomFile, // general room file
+			RoomSid:      req.RoomSid,
+			RoomId:       req.RoomId,
+			InputPath:    finalPdfPath,
+		}
+		uploadRes, err := m.app.Hooks.RunUploadHook(hookData, log)
+		if err != nil {
+			log.WithError(err).Error("upload hook pipeline failed")
+			return nil, fmt.Errorf("upload hook pipeline failed")
+		}
+		if uploadRes != nil && uploadRes.OutputPath != "" {
+			log.Infof("Successfully uploaded file into %s", uploadRes.OutputPath)
+		}
+	}
 
 	res := &plugnmeet.UploadedFileRes{
 		Status:        true,
