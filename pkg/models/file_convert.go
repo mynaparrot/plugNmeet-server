@@ -333,19 +333,31 @@ func (m *FileModel) BuildWhiteboardPdfExportFile(ctx context.Context, req *plugn
 	_ = os.RemoveAll(savedPath)
 
 	if m.app.Hooks != nil {
-		hookData := &hooks.UploadHookData{
+		uploadHookData := &hooks.UploadHookData{
 			HookFileType: hooks.HookFileTypeRoomFile, // general room file
 			RoomSid:      req.RoomSid,
 			RoomId:       req.RoomId,
 			InputPath:    finalPdfPath,
 		}
-		uploadRes, err := m.app.Hooks.RunUploadHook(hookData, log)
+		uploadRes, err := m.app.Hooks.RunUploadHook(uploadHookData, log)
 		if err != nil {
 			log.WithError(err).Error("upload hook pipeline failed")
 			return nil, fmt.Errorf("upload hook pipeline failed")
 		}
 		if uploadRes != nil && uploadRes.OutputPath != "" {
 			log.Infof("Successfully uploaded file into %s", uploadRes.OutputPath)
+		}
+
+		// also deleted the files by group id
+		deleteHookData := &hooks.DeleteHookData{
+			HookFileType: hooks.HookFileTypeFileGroup,
+			RoomSid:      req.RoomSid,
+			RoomId:       req.RoomId,
+			GroupId:      req.ResumableIdentifier,
+		}
+		if _, err := m.app.Hooks.RunDeleteHook(deleteHookData, log); err != nil {
+			// just log
+			log.WithError(err).Error("delete hook pipeline failed")
 		}
 	}
 
