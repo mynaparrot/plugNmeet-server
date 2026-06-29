@@ -79,7 +79,7 @@ func (m *UserModel) handleUpdateAllUsersLockSettings(r *plugnmeet.UpdateUserLock
 	}
 
 	for _, id := range userIds {
-		if id == r.RequestedUserId {
+		if id == r.RequestedUserId && r.Service != "reactions" {
 			// nothing for requested user
 			continue
 		}
@@ -102,7 +102,7 @@ func (m *UserModel) updateAndBroadcastUserLock(roomId, userId, service, directio
 	if mt == nil {
 		return errors.New("user's metadata not found")
 	}
-	if mt.IsAdmin && service != "whiteboard" {
+	if mt.IsAdmin && service != "whiteboard" && service != "reactions" {
 		// no lock for admin other than whiteboard
 		return nil
 	}
@@ -141,6 +141,7 @@ var lockSettingMap = map[string]func(l *plugnmeet.LockSettings, val *bool){
 	"privateChat":   func(l *plugnmeet.LockSettings, val *bool) { l.LockPrivateChat = val },
 	"whiteboard":    func(l *plugnmeet.LockSettings, val *bool) { l.LockWhiteboard = val },
 	"sharedNotepad": func(l *plugnmeet.LockSettings, val *bool) { l.LockSharedNotepad = val },
+	"reactions":     func(l *plugnmeet.LockSettings, val *bool) { l.LockReactions = val },
 }
 
 // assignNewLockSetting use map to find and update
