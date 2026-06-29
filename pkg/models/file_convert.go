@@ -19,13 +19,13 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
-	"github.com/signintech/gopdf"
 	"github.com/sirupsen/logrus"
 )
 
 const (
 	SofficeTimeout = 5 * time.Minute
 	MutoolTimeout  = 5 * time.Minute
+	Pdf2ImgTimeout = 10 * time.Minute
 )
 
 // ConvertWhiteboardFileReq represents the request structure for converting a whiteboard file.
@@ -219,7 +219,7 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 	return res, nil
 }
 
-func (m *FileModel) BuildWhiteboardPdfExportFile(ctx context.Context, req *plugnmeet.UploadedFileMergeReq, requestedUserId string) (*plugnmeet.UploadedFileRes, error) {
+func (m *FileModel) BuildWhiteboardPdfExportFile(req *plugnmeet.UploadedFileMergeReq, requestedUserId string) (*plugnmeet.UploadedFileRes, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomSid":  req.RoomSid,
 		"exportId": req.ResumableIdentifier,
@@ -238,7 +238,7 @@ func (m *FileModel) BuildWhiteboardPdfExportFile(ctx context.Context, req *plugn
 			GroupId:      req.ResumableIdentifier,
 			InputPath:    savedPath,
 		}
-		hookRes, err := m.app.Hooks.RunDownloadHook(ctx, hookData, nil, time.Minute*10, log)
+		hookRes, err := m.app.Hooks.RunDownloadHook(m.ctx, hookData, nil, time.Minute*10, log)
 		if err != nil {
 			log.WithError(err).Error("download hook failed")
 			return nil, fmt.Errorf("download hook failed")
@@ -307,26 +307,21 @@ func (m *FileModel) BuildWhiteboardPdfExportFile(ctx context.Context, req *plugn
 	finalPdfFileName := helpers.MakeSafeFilename("exported_"+baseFileName, true) + ".pdf"
 	finalPdfPath := filepath.Join(finalPdfOutputDir, finalPdfFileName)
 
-	// Initialize gopdf
-	pdf := gopdf.GoPdf{}
-	pdf.Start(gopdf.Config{
-		PageSize: *gopdf.PageSizeA4, // A4 size
-	})
-
-	for _, imagePath := range imageFiles {
-		pdf.AddPage()
-		// Add image to the PDF, scaling it to fit the A4 page without cropping
-		// The client-side images are already prepared to be 2x A4, so they should fit well.
-		if err := pdf.Image(imagePath, 0, 0, &gopdf.Rect{W: gopdf.PageSizeA4.W, H: gopdf.PageSizeA4.H}); err != nil {
-			log.WithError(err).Errorf("Failed to add image %s to PDF", imagePath)
-			return nil, fmt.Errorf("failed to add image to PDF: %w", err)
-		}
+	args := []string{
+		"--output", finalPdfPath,
+		"--pagesize", "A4",
+		"--creator", "plugNmeet",
+		"--title", finalPdfFileName,
+		"--subject", req.ResumableFilename,
 	}
+	args = append(args, imageFiles...)
 
-	// Save the PDF
-	if err := pdf.WritePdf(finalPdfPath); err != nil {
-		log.WithError(err).Errorf("Failed to write final PDF to %s", finalPdfPath)
-		return nil, fmt.Errorf("failed to write final PDF: %w", err)
+	timeoutCtx, cancel := context.WithTimeout(m.ctx, Pdf2ImgTimeout)
+	defer cancel()
+
+	if err := executeCommand(timeoutCtx, log, "img2pdf", args...); err != nil {
+		log.WithError(err).Error("img2pdf execution failed")
+		return nil, fmt.Errorf("failed to build PDF (img2pdf)")
 	}
 
 	// clean original dir
@@ -388,6 +383,7 @@ func (m *FileModel) BuildWhiteboardPdfExportFile(ctx context.Context, req *plugn
 	if err := m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SYSTEM_CHAT_MSG, req.RoomId, meta, &requestedUserId); err != nil {
 		log.WithError(err).Error("Failed to broadcast message")
 	}
+	log.Info("Successfully built and broadcasted whiteboard PDF export file")
 
 	return res, nil
 }
@@ -406,7 +402,7 @@ func (m *FileModel) addFileToNatsStore(roomId string, fileInfo *ConvertWhiteboar
 
 // checkDependencies verifies that required external tools are installed.
 func checkDependencies() error {
-	for _, bin := range []string{"mutool", "soffice"} {
+	for _, bin := range []string{"mutool", "soffice", "img2pdf"} {
 		if _, err := exec.LookPath(bin); err != nil {
 			return fmt.Errorf("required binary not found in PATH: %s", bin)
 		}

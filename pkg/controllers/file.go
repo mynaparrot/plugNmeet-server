@@ -273,7 +273,7 @@ func (fc *FileController) HandleWhiteboardPdfExportFileMerge(c fiber.Ctx) error 
 		return commonFileErrorResponse(c, acState.GetMsg(), fiber.StatusBadRequest, acState.GetStatusCode())
 	}
 
-	res, err := fc.FileModel.BuildWhiteboardPdfExportFile(c.RequestCtx(), req, requestedUserId)
+	res, err := fc.FileModel.BuildWhiteboardPdfExportFile(req, requestedUserId)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
