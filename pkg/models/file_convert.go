@@ -97,11 +97,6 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 		return nil, err
 	}
 
-	if err := checkDependencies(); err != nil {
-		log.WithError(err).Error("dependency check failed")
-		return nil, err
-	}
-
 	var fullPath string
 
 	// If hooks are enabled, we need to download the file first.
@@ -400,49 +395,6 @@ func (m *FileModel) addFileToNatsStore(roomId string, fileInfo *ConvertWhiteboar
 	return m.natsService.AddRoomFile(roomId, &meta)
 }
 
-// checkDependencies verifies that required external tools are installed.
-func checkDependencies() error {
-	for _, bin := range []string{"mutool", "soffice", "img2pdf"} {
-		if _, err := exec.LookPath(bin); err != nil {
-			return fmt.Errorf("required binary not found in PATH: %s", bin)
-		}
-	}
-	return nil
-}
-
-// executeCommand runs a command with a timeout and handles common error cases.
-func executeCommand(ctx context.Context, log *logrus.Entry, name string, arg ...string) error {
-	cmd := exec.CommandContext(ctx, name, arg...)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			log.Errorf("%s command timed out", name)
-			return fmt.Errorf("%s command timed out", name)
-		}
-		log.Errorf("%s command failed: %s; output: %s", name, err, string(output))
-		return fmt.Errorf("%s command failed: %w", name, err)
-	}
-	return nil
-}
-
-// getFileExtension is a helper to normalize and return the file extension.
-func getFileExtension(mime *mimetype.MIME) string {
-	// Use the official extension if available.
-	ext := mime.Extension()
-	if ext != "" {
-		return ext
-	}
-	// Fallback for common cases not covered by the library.
-	switch {
-	case mime.Is("application/vnd.openxmlformats-officedocument.wordprocessingml.document"):
-		return ".docx"
-	case mime.Is("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"):
-		return ".xlsx"
-	case mime.Is("application/vnd.openxmlformats-officedocument.presentationml.presentation"):
-		return ".pptx"
-	}
-	return ""
-}
-
 // convertToPDFIfNeeded checks if the file needs to be converted to PDF based on its MIME type.
 // It returns the path to the PDF and an error.
 func (m *FileModel) convertToPDFIfNeeded(filePath, fileName, roomId string, mime *mimetype.MIME, outputDir string, log *logrus.Entry) (string, error) {
@@ -500,6 +452,20 @@ func (m *FileModel) convertToPDFIfNeeded(filePath, fileName, roomId string, mime
 	return filepath.Join(outputDir, newFile), nil
 }
 
+// executeCommand runs a command with a timeout and handles common error cases.
+func executeCommand(ctx context.Context, log *logrus.Entry, name string, arg ...string) error {
+	cmd := exec.CommandContext(ctx, name, arg...)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			log.Errorf("%s command timed out", name)
+			return fmt.Errorf("%s command timed out", name)
+		}
+		log.Errorf("%s command failed: %s; output: %s", name, err, string(output))
+		return fmt.Errorf("%s command failed: %w", name, err)
+	}
+	return nil
+}
+
 // convertPDFToImages uses mutool to convert a PDF file into PNG images.
 func convertPDFToImages(ctx context.Context, pdfPath, outputDir, roomId string, log *logrus.Entry) error {
 	log.Infof("New PDF to Image conversion request for file: %s", pdfPath)
@@ -521,4 +487,23 @@ func countPages(outputDir string) (int, error) {
 		return 0, fmt.Errorf("failed to count pages: %w", err)
 	}
 	return len(files), nil
+}
+
+// getFileExtension is a helper to normalize and return the file extension.
+func getFileExtension(mime *mimetype.MIME) string {
+	// Use the official extension if available.
+	ext := mime.Extension()
+	if ext != "" {
+		return ext
+	}
+	// Fallback for common cases not covered by the library.
+	switch {
+	case mime.Is("application/vnd.openxmlformats-officedocument.wordprocessingml.document"):
+		return ".docx"
+	case mime.Is("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"):
+		return ".xlsx"
+	case mime.Is("application/vnd.openxmlformats-officedocument.presentationml.presentation"):
+		return ".pptx"
+	}
+	return ""
 }

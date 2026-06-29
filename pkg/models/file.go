@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"mime/multipart"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/gabriel-vasile/mimetype"
@@ -38,7 +39,12 @@ type FileModelArgs struct {
 	Logger      *logrus.Logger
 }
 
-func NewFileModel(args FileModelArgs) *FileModel {
+func NewFileModel(args FileModelArgs) (*FileModel, error) {
+	if err := checkDependencies(); err != nil {
+		args.Logger.WithError(err).Error("dependency check failed")
+		return nil, err
+	}
+
 	return &FileModel{
 		ctx:          args.Ctx,
 		app:          args.App,
@@ -47,7 +53,7 @@ func NewFileModel(args FileModelArgs) *FileModel {
 		redisService: args.Rs,
 		userModel:    args.Um,
 		logger:       args.Logger.WithField("model", "file"),
-	}
+	}, nil
 }
 
 func (m *FileModel) detectMimeTypeForValidation(file multipart.File) error {
@@ -135,4 +141,14 @@ func (m *FileModel) DeleteRoomUploadedDir(roomSid string) error {
 		m.logger.WithField("path", path).WithError(err).Errorln("can't delete room uploaded dir")
 	}
 	return err
+}
+
+// checkDependencies verifies that required external tools are installed.
+func checkDependencies() error {
+	for _, bin := range []string{"mutool", "soffice", "img2pdf"} {
+		if _, err := exec.LookPath(bin); err != nil {
+			return fmt.Errorf("required binary not found in PATH: %s", bin)
+		}
+	}
+	return nil
 }
