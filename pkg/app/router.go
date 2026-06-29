@@ -248,8 +248,8 @@ func (r *Router) registerAPIRoutes() {
 
 	whiteboard := api.Group("/whiteboard")
 	whiteboard.Post("/convert", r.ctrl.FileController.HandleConvertWhiteboardFile)
-	whiteboard.Post("/pdf-export/upload", r.ctrl.FileController.HandleWhiteboardPdfExportUpload)
-	whiteboard.Post("/pdf-export/merge", r.ctrl.FileController.HandleWhiteboardPdfExportFileMerge)
+	whiteboard.Post("/pdf-export/upload", r.ctrl.FileController.HandleWhiteboardPdfExportSliceUpload)
+	whiteboard.Post("/pdf-export/merge", r.ctrl.FileController.HandleWhiteboardPdfExportMerge)
 
 	// insights AI routers
 	r.registerInsightsRegisterAPIRoutes(api)

@@ -452,7 +452,7 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 	return plugnmeet.StatusCode_SUCCESS, nil
 }
 
-type WhiteboardPdfExportUploadReq struct {
+type WhiteboardPdfExportSliceUploadReq struct {
 	RoomSid     string `form:"roomSid"`
 	RoomId      string `form:"roomId"`
 	UserId      string `form:"userId"`
@@ -463,17 +463,19 @@ type WhiteboardPdfExportUploadReq struct {
 	ExportId    string `form:"export_id"`
 }
 
-func (m *FileModel) WhiteboardPdfExportUpload(c fiber.Ctx, req *WhiteboardPdfExportUploadReq) *fiber.Error {
+// WhiteboardPdfExportSliceUpload handles the upload of a single PDF "slice"
+// generated on the client-side during a whiteboard PDF export.
+func (m *FileModel) WhiteboardPdfExportSliceUpload(c fiber.Ctx, req *WhiteboardPdfExportSliceUploadReq) *fiber.Error {
 	log := m.logger.WithFields(logrus.Fields{
-		"method":  "WhiteboardPdfExportUpload",
-		"roomId":  req.RoomId,
-		"roomSid": req.RoomSid,
+		"method":   "WhiteboardPdfExportSliceUpload",
+		"roomId":   req.RoomId,
+		"roomSid":  req.RoomSid,
+		"exportId": req.ExportId,
 	})
 
-	// The rest of the function handles direct file uploads
 	file, err := c.FormFile("file")
 	if err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		return fiber.NewError(fiber.StatusBadRequest, "missing 'file' in form-data")
 	}
 
 	maxSize := m.app.UploadFileSettings.MaxSizeWhiteboardFile * 1024 * 1024
@@ -484,27 +486,30 @@ func (m *FileModel) WhiteboardPdfExportUpload(c fiber.Ctx, req *WhiteboardPdfExp
 
 	f, err := file.Open()
 	if err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		return fiber.NewError(fiber.StatusBadRequest, "failed to open multipart file header")
 	}
 
-	// detectMimeTypeForValidation will run f.Close() in defer
+	// detectMimeTypeForValidation will run f.Close() in defer.
 	if err := m.detectMimeTypeForValidation(f); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, err.Error())
 	}
 
 	fileName := helpers.MakeSafeFilename(file.Filename, true)
-	savePath := m.buildWhiteboardPdfExportSavePath(req.RoomSid, req.ExportId)
-	finalFile := filepath.Join(savePath, fileName)
+	// The directory where all slices for a single export job are stored.
+	exportSlicesDir := m.getWhiteboardPdfExportSlicesDir(req.RoomSid, req.ExportId)
+	finalFile := filepath.Join(exportSlicesDir, fileName)
 
-	if err := os.MkdirAll(savePath, 0755); err != nil {
-		log.WithError(err).Errorln("failed to create file directory")
+	if err := os.MkdirAll(exportSlicesDir, 0755); err != nil {
+		log.WithError(err).Error("failed to create export slices directory")
 		return fiber.NewError(fiber.StatusInternalServerError, "failed to create directory")
 	}
 
 	if err := c.SaveFile(file, finalFile); err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+		log.WithError(err).Error("failed to save file")
+		return fiber.NewError(fiber.StatusInternalServerError, "failed to save file")
 	}
 
+	// Trigger hook if configured.
 	if m.app.Hooks != nil {
 		hookData := &hooks.UploadHookData{
 			HookFileType: hooks.HookFileTypeFileGroup,
@@ -522,6 +527,7 @@ func (m *FileModel) WhiteboardPdfExportUpload(c fiber.Ctx, req *WhiteboardPdfExp
 	return nil
 }
 
-func (m *FileModel) buildWhiteboardPdfExportSavePath(roomSid, exportId string) string {
+// This directory holds the temporary slices for a PDF export.
+func (m *FileModel) getWhiteboardPdfExportSlicesDir(roomSid, exportId string) string {
 	return filepath.Join(m.app.UploadFileSettings.Path, roomSid, "tmp", exportId)
 }

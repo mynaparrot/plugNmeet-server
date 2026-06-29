@@ -7,11 +7,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/facette/natsort"
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/hooks"
@@ -214,16 +213,17 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 	return res, nil
 }
 
-func (m *FileModel) BuildWhiteboardPdfExportFile(req *plugnmeet.UploadedFileMergeReq, requestedUserId string) (*plugnmeet.UploadedFileRes, error) {
+// MergeWhiteboardPdfExport merges the uploaded PDF slices into a single PDF file.
+func (m *FileModel) MergeWhiteboardPdfExport(req *plugnmeet.UploadedFileMergeReq, requestedUserId string) (*plugnmeet.UploadedFileRes, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomSid":  req.RoomSid,
 		"exportId": req.ResumableIdentifier,
-		"method":   "BuildWhiteboardPdfExportFile",
+		"method":   "MergeWhiteboardPdfExport",
 	})
-	log.Infoln("New request to build whiteboard PDF export file received")
+	log.Infoln("New request to merge whiteboard PDF export slices received")
 
-	// original saved path where all the images was saved
-	savedPath := m.buildWhiteboardPdfExportSavePath(req.RoomSid, req.ResumableIdentifier)
+	// The directory where all slices for this export job are stored.
+	savedPath := m.getWhiteboardPdfExportSlicesDir(req.RoomSid, req.ResumableIdentifier)
 
 	if m.app.Hooks != nil {
 		hookData := &hooks.DownloadHookData{
@@ -249,9 +249,7 @@ func (m *FileModel) BuildWhiteboardPdfExportFile(req *plugnmeet.UploadedFileMerg
 		return nil, fmt.Errorf("temporary directory for export not found")
 	}
 
-	// List all PNG files in the temporary directory
-	pattern := filepath.Join(savedPath, "*.png")
-	imageFiles, err := filepath.Glob(pattern)
+	imageFiles, err := filepath.Glob(filepath.Join(savedPath, "*.png"))
 	if err != nil {
 		log.WithError(err).Errorf("Failed to list PNG files in %s", savedPath)
 		return nil, fmt.Errorf("failed to list image slices")
@@ -261,35 +259,9 @@ func (m *FileModel) BuildWhiteboardPdfExportFile(req *plugnmeet.UploadedFileMerg
 		return nil, fmt.Errorf("no image slices found for export")
 	}
 
-	sort.Slice(imageFiles, func(i, j int) bool {
-		nameI := strings.TrimSuffix(filepath.Base(imageFiles[i]), ".png")
-		nameJ := strings.TrimSuffix(filepath.Base(imageFiles[j]), ".png")
-
-		partsI := strings.Split(nameI, "_")
-		partsJ := strings.Split(nameJ, "_")
-
-		if len(partsI) != 2 || len(partsJ) != 2 {
-			// Fallback to lexicographical sort if format is unexpected
-			return nameI < nameJ
-		}
-
-		pageI, errI := strconv.Atoi(partsI[0])
-		sliceI, errSI := strconv.Atoi(partsI[1])
-		pageJ, errJ := strconv.Atoi(partsJ[0])
-		sliceJ, errSJ := strconv.Atoi(partsJ[1])
-
-		if errI != nil || errSI != nil || errJ != nil || errSJ != nil {
-			// Fallback to lexicographical sort if conversion to int fails
-			return nameI < nameJ
-		}
-
-		// Primary sort by page number
-		if pageI != pageJ {
-			return pageI < pageJ
-		}
-		// Secondary sort by slice number if page numbers are equal
-		return sliceI < sliceJ
-	})
+	// Use natural sort for robustness and simplicity.
+	// file name: pageNum_sliceNum.png e.g. 1_1.png, 1_2.png, 2_1.png, 2_2.png ...
+	natsort.Sort(imageFiles)
 
 	fileId := uuid.NewString()
 	finalPdfOutputDir := filepath.Join(m.app.UploadFileSettings.Path, req.RoomSid)
