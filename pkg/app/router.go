@@ -246,6 +246,10 @@ func (r *Router) registerAPIRoutes() {
 	breakoutRoom.Post("/endRoom", r.ctrl.BreakoutRoomController.HandleEndBreakoutRoom)
 	breakoutRoom.Post("/endAllRooms", r.ctrl.BreakoutRoomController.HandleEndBreakoutRooms)
 
+	// TODO: remove in next release
+	// deprecated
+	api.Post("/convertWhiteboardFile", r.ctrl.FileController.HandleConvertWhiteboardFile)
+
 	whiteboard := api.Group("/whiteboard")
 	whiteboard.Post("/convert", r.ctrl.FileController.HandleConvertWhiteboardFile)
 	whiteboard.Post("/pdf-export/upload", r.ctrl.FileController.HandleWhiteboardPdfExportSliceUpload)
