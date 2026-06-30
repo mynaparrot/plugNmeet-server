@@ -215,6 +215,11 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 
 // MergeWhiteboardPdfExport merges the uploaded PDF slices into a single PDF file.
 func (m *FileModel) MergeWhiteboardPdfExport(req *plugnmeet.UploadedFileMergeReq, requestedUserId string) (*plugnmeet.UploadedFileRes, error) {
+	req.ResumableIdentifier = helpers.MakeSafeFilename(req.ResumableIdentifier, false)
+	if req.ResumableIdentifier == "" {
+		return nil, fmt.Errorf("invalid or empty resumableIdentifier")
+	}
+
 	log := m.logger.WithFields(logrus.Fields{
 		"roomSid":  req.RoomSid,
 		"exportId": req.ResumableIdentifier,
