@@ -466,6 +466,11 @@ type WhiteboardPdfExportSliceUploadReq struct {
 // WhiteboardPdfExportSliceUpload handles the upload of a single PDF "slice"
 // generated on the client-side during a whiteboard PDF export.
 func (m *FileModel) WhiteboardPdfExportSliceUpload(c fiber.Ctx, req *WhiteboardPdfExportSliceUploadReq) *fiber.Error {
+	req.ExportId = helpers.MakeSafeFilename(req.ExportId, false)
+	if req.ExportId == "" {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid or empty export_id")
+	}
+
 	log := m.logger.WithFields(logrus.Fields{
 		"method":   "WhiteboardPdfExportSliceUpload",
 		"roomId":   req.RoomId,
