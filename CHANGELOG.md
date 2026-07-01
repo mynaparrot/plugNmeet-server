@@ -1,5 +1,55 @@
 # Changelog
 
+## [2.3.0](https://github.com/mynaparrot/plugNmeet-server/compare/v2.2.0...v2.3.0) (2026-07-01)
+
+
+### Features
+
+* add emoji reaction ([575bf5e](https://github.com/mynaparrot/plugNmeet-server/commit/575bf5e3769129a972adf63d562b01c154fcd986))
+* add emoji reaction ([09713b1](https://github.com/mynaparrot/plugNmeet-server/commit/09713b11ac086159ae58ea6d65b2eb02211ebd1d))
+* set raised-hand timestamp on raise/lower ([92aa317](https://github.com/mynaparrot/plugNmeet-server/commit/92aa3172b35ac0314fc41695da30f67180f3b2e5))
+* set raised-hand timestamp on raise/lower ([5cb09ba](https://github.com/mynaparrot/plugNmeet-server/commit/5cb09ba1c6ef255b0fbe852f4c6bfedcad3e1c85))
+* storage hook ([5f9f23b](https://github.com/mynaparrot/plugNmeet-server/commit/5f9f23b215f88762e6c9da26dbcf7c4e298eb38c))
+* storage hook ([55ad7a7](https://github.com/mynaparrot/plugNmeet-server/commit/55ad7a7e4892da64c0db33e006bb1484c16d688d))
+* **whiteboard:** export to PDF ([4f08913](https://github.com/mynaparrot/plugNmeet-server/commit/4f089138035efce565a5b40c7a99f8a434f740ba))
+* **whiteboard:** export to PDF ([f3360ac](https://github.com/mynaparrot/plugNmeet-server/commit/f3360ac32d71ba562e885cd74ea7ecfe5ef6491b))
+
+
+### Bug Fixes
+
+* added option to set hook timeout ([ace1894](https://github.com/mynaparrot/plugNmeet-server/commit/ace18940db88e48d480ecb34c7077048c6d33363))
+* adding missing cast conversion ([f3e1861](https://github.com/mynaparrot/plugNmeet-server/commit/f3e18617a28be140120afd49c1849582f3cf240a))
+* check pipeline first and fallback to default path ([7542b78](https://github.com/mynaparrot/plugNmeet-server/commit/7542b780756772775751194e1cb143736a34d303))
+* cleaned up confused code ([9006f9b](https://github.com/mynaparrot/plugNmeet-server/commit/9006f9b434b32ab62a57dbed59a16658e066d048))
+* context was canceled before publishing ([a5c6ebf](https://github.com/mynaparrot/plugNmeet-server/commit/a5c6ebf4c764384aecbdf8b8b28e17c658af57fe))
+* detect error if any, during initialization ([ae17b3f](https://github.com/mynaparrot/plugNmeet-server/commit/ae17b3f319595b15d86bc15b4d3b51c909c173b4))
+* don't send raw error message to client ([7e499b1](https://github.com/mynaparrot/plugNmeet-server/commit/7e499b1d6a40812ce28649ae04c7e0ed217e67ea))
+* ensure file names are unique and following same format ([ebdbfc4](https://github.com/mynaparrot/plugNmeet-server/commit/ebdbfc4ebb0030963596c81ac33edb4ba210d409))
+* ensure we're in the right dir e.g. `/app` ([c745978](https://github.com/mynaparrot/plugNmeet-server/commit/c745978d894d478f5fa0e9155feb00df3a5697b6))
+* fallback to default ([86c4839](https://github.com/mynaparrot/plugNmeet-server/commit/86c483995cf2ea5d97d88c4c549c69c172d1db5e))
+* **feat:** storage hooks ([8aaf82d](https://github.com/mynaparrot/plugNmeet-server/commit/8aaf82d3fe394e01be1c691cecaf237a09f980c8))
+* **feat:** storage hooks ([f1e5925](https://github.com/mynaparrot/plugNmeet-server/commit/f1e5925d26a069aac58ea527664178388b19e379))
+* handle correctly with recording metadata ([b1a1c91](https://github.com/mynaparrot/plugNmeet-server/commit/b1a1c9136bcf00f0c9da893960a66b62902ae521))
+* **hooks:** use same pattern for communicating with hooks scripts ([336f0d0](https://github.com/mynaparrot/plugNmeet-server/commit/336f0d04b18e804cdf9ad92111e5d6276d353513))
+* implemented hook for all types file operation ([6305d3f](https://github.com/mynaparrot/plugNmeet-server/commit/6305d3fbfa745a631511224edc2de26ab31f527d))
+* implemented long-lived hook ([ed62106](https://github.com/mynaparrot/plugNmeet-server/commit/ed62106c855fa66afeccb31d3478949857fc18d3))
+* migrate insights `SummarizeJobQueue` to NATS stream ([362bf35](https://github.com/mynaparrot/plugNmeet-server/commit/362bf355c92d976c19db72c3d460dae767716a4a))
+* moved `raised_hand` to its own `UserRaisedHand` message ([3c9519e](https://github.com/mynaparrot/plugNmeet-server/commit/3c9519ef68ac6277549a2edbbafe6e57a81f7f3f))
+* optimized query code ([371e8eb](https://github.com/mynaparrot/plugNmeet-server/commit/371e8eb27657a3744bb74b4bac46a3752fa48f02))
+* panicking during conversion ([14967f4](https://github.com/mynaparrot/plugNmeet-server/commit/14967f4189eceb086d8ed6cda636aa6bf89b20ec))
+* race condition while closing app ([20dfe44](https://github.com/mynaparrot/plugNmeet-server/commit/20dfe446e23dc3dac179bdb1d791be4164c71327))
+* **refactor:** implemented multi pools hook script support ([fc7bf1c](https://github.com/mynaparrot/plugNmeet-server/commit/fc7bf1cfe3a6bd8acac36f4f4561eaeca7564dc4))
+* **refactor:** moved all related code to `BootstrapModule` ([dbcc9c7](https://github.com/mynaparrot/plugNmeet-server/commit/dbcc9c7d3f501dc8b14f8b3608036f34f9970a78))
+* **refactor:** refactored args to use struct for easy to read ([c092422](https://github.com/mynaparrot/plugNmeet-server/commit/c0924226cfe289c6e66b99e30e7f78154fefec77))
+* **refactor:** refactored args to use struct for easy to read ([274c08d](https://github.com/mynaparrot/plugNmeet-server/commit/274c08d4dd1a6f2ab66181d071f49de12647b287))
+* **refactor:** renamed to `hooks` in config ([1a59a6f](https://github.com/mynaparrot/plugNmeet-server/commit/1a59a6f5c3023664c94563ca8dc3ca52984ec285))
+* **refactor:** renamed to `hooks` in config ([91c62a9](https://github.com/mynaparrot/plugNmeet-server/commit/91c62a9105628d0c366be8c935d8a41164579dfd))
+* **refactor:** support for both `long-lived` and `one-shot` commands ([2ca5aab](https://github.com/mynaparrot/plugNmeet-server/commit/2ca5aab23a16a29f7d55cf7d47f998de47ff143f))
+* set `attachment` manually ([7cdee60](https://github.com/mynaparrot/plugNmeet-server/commit/7cdee604627db9da64f76b9c25444b739b2c0c98))
+* use extension based for better reading code ([4a613cf](https://github.com/mynaparrot/plugNmeet-server/commit/4a613cf156ee831649854441fcc61e043d1cdbf4))
+* use proto to handle hooks code ([97c3bbd](https://github.com/mynaparrot/plugNmeet-server/commit/97c3bbd49516d9a5490497618bc21d8b13e80cd7))
+* yaml lib replaced with `goccy/go-yaml` ([f95709d](https://github.com/mynaparrot/plugNmeet-server/commit/f95709d8ff68fc809f0960deb4300cf7cef2821a))
+
 ## [2.2.0](https://github.com/mynaparrot/plugNmeet-server/compare/v2.1.9...v2.2.0) (2026-05-30)
 
 
