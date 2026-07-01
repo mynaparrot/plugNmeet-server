@@ -10,11 +10,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/facette/natsort"
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
 )
@@ -22,6 +24,7 @@ import (
 const (
 	SofficeTimeout = 5 * time.Minute
 	MutoolTimeout  = 5 * time.Minute
+	Pdf2ImgTimeout = 10 * time.Minute
 )
 
 // ConvertWhiteboardFileReq represents the request structure for converting a whiteboard file.
@@ -90,11 +93,6 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 	if roomId == "" || filePath == "" {
 		err := errors.New("roomId or filePath is empty")
 		log.WithError(err).Error()
-		return nil, err
-	}
-
-	if err := checkDependencies(); err != nil {
-		log.WithError(err).Error("dependency check failed")
 		return nil, err
 	}
 
@@ -215,6 +213,153 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 	return res, nil
 }
 
+// MergeWhiteboardPdfExport merges the uploaded PDF slices into a single PDF file.
+func (m *FileModel) MergeWhiteboardPdfExport(req *plugnmeet.UploadedFileMergeReq, requestedUserId string) (*plugnmeet.UploadedFileRes, error) {
+	req.ResumableIdentifier = helpers.MakeSafeFilename(req.ResumableIdentifier, false)
+	if req.ResumableIdentifier == "" {
+		return nil, fmt.Errorf("invalid or empty resumableIdentifier")
+	}
+
+	log := m.logger.WithFields(logrus.Fields{
+		"roomSid":  req.RoomSid,
+		"exportId": req.ResumableIdentifier,
+		"method":   "MergeWhiteboardPdfExport",
+	})
+	log.Infoln("New request to merge whiteboard PDF export slices received")
+
+	// The directory where all slices for this export job are stored.
+	savedPath := m.getWhiteboardPdfExportSlicesDir(req.RoomSid, req.ResumableIdentifier)
+
+	if m.app.Hooks != nil {
+		hookData := &hooks.DownloadHookData{
+			HookFileType: hooks.HookFileTypeFileGroup,
+			RoomSid:      req.RoomSid,
+			RoomId:       req.RoomId,
+			GroupId:      req.ResumableIdentifier,
+			InputPath:    savedPath,
+		}
+		hookRes, err := m.app.Hooks.RunDownloadHook(m.ctx, hookData, nil, time.Minute*10, log)
+		if err != nil {
+			log.WithError(err).Error("download hook failed")
+			return nil, fmt.Errorf("download hook failed")
+		}
+		if hookRes != nil && hookRes.OutputPath != "" {
+			savedPath = hookRes.OutputPath
+		}
+	}
+
+	// Ensure the temporary directory exists before trying to read from it
+	if _, err := os.Stat(savedPath); os.IsNotExist(err) {
+		log.WithError(err).Errorf("Temporary directory %s does not exist", savedPath)
+		return nil, fmt.Errorf("temporary directory for export not found")
+	}
+
+	imageFiles, err := filepath.Glob(filepath.Join(savedPath, "*.png"))
+	if err != nil {
+		log.WithError(err).Errorf("Failed to list PNG files in %s", savedPath)
+		return nil, fmt.Errorf("failed to list image slices")
+	}
+	if len(imageFiles) == 0 {
+		log.Warnf("No PNG files found in temporary directory: %s", savedPath)
+		return nil, fmt.Errorf("no image slices found for export")
+	}
+
+	// Use natural sort for robustness and simplicity.
+	// file name: pageNum_sliceNum.png e.g. 1_1.png, 1_2.png, 2_1.png, 2_2.png ...
+	natsort.Sort(imageFiles)
+
+	fileId := uuid.NewString()
+	finalPdfOutputDir := filepath.Join(m.app.UploadFileSettings.Path, req.RoomSid)
+	if err := os.MkdirAll(finalPdfOutputDir, 0755); err != nil {
+		log.WithError(err).Errorf("Failed to create final PDF output directory: %s", finalPdfOutputDir)
+		return nil, fmt.Errorf("failed to create output directory for PDF")
+	}
+
+	baseFileName := strings.TrimSuffix(req.ResumableFilename, filepath.Ext(req.ResumableFilename))
+	finalPdfFileName := helpers.MakeSafeFilename("exported_"+baseFileName, true) + ".pdf"
+	finalPdfPath := filepath.Join(finalPdfOutputDir, finalPdfFileName)
+
+	args := []string{
+		"--output", finalPdfPath,
+		"--pagesize", "A4",
+		"--creator", "plugNmeet",
+		"--title", finalPdfFileName,
+		"--subject", req.ResumableFilename,
+	}
+	args = append(args, imageFiles...)
+
+	timeoutCtx, cancel := context.WithTimeout(m.ctx, Pdf2ImgTimeout)
+	defer cancel()
+
+	if err := executeCommand(timeoutCtx, log, "img2pdf", args...); err != nil {
+		log.WithError(err).Error("img2pdf execution failed")
+		return nil, fmt.Errorf("failed to build PDF (img2pdf)")
+	}
+
+	// clean original dir
+	_ = os.RemoveAll(savedPath)
+
+	if m.app.Hooks != nil {
+		uploadHookData := &hooks.UploadHookData{
+			HookFileType: hooks.HookFileTypeRoomFile, // general room file
+			RoomSid:      req.RoomSid,
+			RoomId:       req.RoomId,
+			InputPath:    finalPdfPath,
+		}
+		uploadRes, err := m.app.Hooks.RunUploadHook(uploadHookData, log)
+		if err != nil {
+			log.WithError(err).Error("upload hook pipeline failed")
+			return nil, fmt.Errorf("upload hook pipeline failed")
+		}
+		if uploadRes != nil && uploadRes.OutputPath != "" {
+			log.Infof("Successfully uploaded file into %s", uploadRes.OutputPath)
+		}
+
+		// also deleted the files by group id
+		deleteHookData := &hooks.DeleteHookData{
+			HookFileType: hooks.HookFileTypeFileGroup,
+			RoomSid:      req.RoomSid,
+			RoomId:       req.RoomId,
+			GroupId:      req.ResumableIdentifier,
+		}
+		if _, err := m.app.Hooks.RunDeleteHook(deleteHookData, log); err != nil {
+			// just log
+			log.WithError(err).Error("delete hook pipeline failed")
+		}
+	}
+
+	res := &plugnmeet.UploadedFileRes{
+		Status:        true,
+		Msg:           "success",
+		FileId:        fileId,
+		FilePath:      filepath.Join(req.RoomSid, finalPdfFileName),
+		FileName:      finalPdfFileName,
+		FileExtension: "pdf",
+		FileMimeType:  "application/pdf",
+	}
+
+	meta := &plugnmeet.RoomUploadedFileMetadata{
+		FileType:         plugnmeet.RoomUploadedFileType_CHAT_FILE,
+		FileId:           fileId,
+		FileName:         finalPdfFileName,
+		FilePath:         res.FilePath,
+		MimeType:         res.FileMimeType,
+		UploadedByUserId: requestedUserId,
+	}
+	if err := m.natsService.AddRoomFile(req.RoomId, meta); err != nil {
+		log.WithError(err).Error("failed to store exported PDF metadata in NATS")
+		// Don't return the error, as the PDF creation was successful.
+	}
+
+	// we'll send by chat
+	if err := m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SYSTEM_CHAT_MSG, req.RoomId, meta, &requestedUserId); err != nil {
+		log.WithError(err).Error("Failed to broadcast message")
+	}
+	log.Info("Successfully built and broadcasted whiteboard PDF export file")
+
+	return res, nil
+}
+
 // addFileToNatsStore stores the metadata of a converted file into the dedicated NATS KV bucket.
 func (m *FileModel) addFileToNatsStore(roomId string, fileInfo *ConvertWhiteboardFileRes) error {
 	meta := plugnmeet.RoomUploadedFileMetadata{
@@ -225,49 +370,6 @@ func (m *FileModel) addFileToNatsStore(roomId string, fileInfo *ConvertWhiteboar
 		TotalPages: new(int32(fileInfo.TotalPages)),
 	}
 	return m.natsService.AddRoomFile(roomId, &meta)
-}
-
-// checkDependencies verifies that required external tools are installed.
-func checkDependencies() error {
-	for _, bin := range []string{"mutool", "soffice"} {
-		if _, err := exec.LookPath(bin); err != nil {
-			return fmt.Errorf("required binary not found in PATH: %s", bin)
-		}
-	}
-	return nil
-}
-
-// executeCommand runs a command with a timeout and handles common error cases.
-func executeCommand(ctx context.Context, log *logrus.Entry, name string, arg ...string) error {
-	cmd := exec.CommandContext(ctx, name, arg...)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			log.Errorf("%s command timed out", name)
-			return fmt.Errorf("%s command timed out", name)
-		}
-		log.Errorf("%s command failed: %s; output: %s", name, err, string(output))
-		return fmt.Errorf("%s command failed: %w", name, err)
-	}
-	return nil
-}
-
-// getFileExtension is a helper to normalize and return the file extension.
-func getFileExtension(mime *mimetype.MIME) string {
-	// Use the official extension if available.
-	ext := mime.Extension()
-	if ext != "" {
-		return ext
-	}
-	// Fallback for common cases not covered by the library.
-	switch {
-	case mime.Is("application/vnd.openxmlformats-officedocument.wordprocessingml.document"):
-		return ".docx"
-	case mime.Is("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"):
-		return ".xlsx"
-	case mime.Is("application/vnd.openxmlformats-officedocument.presentationml.presentation"):
-		return ".pptx"
-	}
-	return ""
 }
 
 // convertToPDFIfNeeded checks if the file needs to be converted to PDF based on its MIME type.
@@ -327,6 +429,20 @@ func (m *FileModel) convertToPDFIfNeeded(filePath, fileName, roomId string, mime
 	return filepath.Join(outputDir, newFile), nil
 }
 
+// executeCommand runs a command with a timeout and handles common error cases.
+func executeCommand(ctx context.Context, log *logrus.Entry, name string, arg ...string) error {
+	cmd := exec.CommandContext(ctx, name, arg...)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			log.Errorf("%s command timed out", name)
+			return fmt.Errorf("%s command timed out", name)
+		}
+		log.Errorf("%s command failed: %s; output: %s", name, err, string(output))
+		return fmt.Errorf("%s command failed: %w", name, err)
+	}
+	return nil
+}
+
 // convertPDFToImages uses mutool to convert a PDF file into PNG images.
 func convertPDFToImages(ctx context.Context, pdfPath, outputDir, roomId string, log *logrus.Entry) error {
 	log.Infof("New PDF to Image conversion request for file: %s", pdfPath)
@@ -348,4 +464,23 @@ func countPages(outputDir string) (int, error) {
 		return 0, fmt.Errorf("failed to count pages: %w", err)
 	}
 	return len(files), nil
+}
+
+// getFileExtension is a helper to normalize and return the file extension.
+func getFileExtension(mime *mimetype.MIME) string {
+	// Use the official extension if available.
+	ext := mime.Extension()
+	if ext != "" {
+		return ext
+	}
+	// Fallback for common cases not covered by the library.
+	switch {
+	case mime.Is("application/vnd.openxmlformats-officedocument.wordprocessingml.document"):
+		return ".docx"
+	case mime.Is("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"):
+		return ".xlsx"
+	case mime.Is("application/vnd.openxmlformats-officedocument.presentationml.presentation"):
+		return ".pptx"
+	}
+	return ""
 }

@@ -38,7 +38,7 @@ FROM debian:stable-slim
 RUN export DEBIAN_FRONTEND=noninteractive; \
     apt-get update && \
     apt-get install --no-install-recommends -y \
-    wget curl ca-certificates libreoffice \
+    wget curl ca-certificates libreoffice img2pdf \
     libasound2 libssl3 libopus0 libsoxr0 libopusfile0 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*

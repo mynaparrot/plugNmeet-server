@@ -198,19 +198,13 @@ func (fc *FileController) HandleConvertWhiteboardFile(c fiber.Ctx) error {
 	req.RoomSid = fiber.Locals[string](c, "roomSid")
 	requestedUserId := new(fiber.Locals[string](c, "requestedUserId"))
 
-	if req.RoomSid == "" || req.RoomId == "" {
-		_ = c.SendStatus(fiber.StatusBadRequest)
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "missing required fields",
-		})
+	acState, _, _ := fc.RoomModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{RoomId: req.RoomId})
+	if !acState.GetIsActive() {
+		return commonFileErrorResponse(c, acState.GetMsg(), fiber.StatusBadRequest, acState.GetStatusCode())
 	}
 
 	if req.FilePath == "" {
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    "file path require",
-		})
+		return commonFileErrorResponse(c, "file path require", fiber.StatusBadRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 	log := fc.logger.WithField("method", "HandleConvertWhiteboardFile")
 
@@ -227,13 +221,54 @@ func (fc *FileController) HandleConvertWhiteboardFile(c fiber.Ctx) error {
 				"msg":    "File conversion started. It will be available soon.",
 			})
 		}
-		return c.JSON(fiber.Map{
-			"status": false,
-			"msg":    err.Error(),
-		})
+		return commonFileErrorResponse(c, err.Error(), fiber.StatusInternalServerError, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 
 	return c.JSON(res)
+}
+
+func (fc *FileController) HandleWhiteboardPdfExportSliceUpload(c fiber.Ctx) error {
+	req := new(models.WhiteboardPdfExportSliceUploadReq)
+	if err := c.Bind().Form(req); err != nil {
+		return commonFileErrorResponse(c, err.Error(), fiber.StatusBadRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
+	}
+
+	req.RoomId = fiber.Locals[string](c, "roomId")
+	req.RoomSid = fiber.Locals[string](c, "roomSid")
+	req.UserId = fiber.Locals[string](c, "requestedUserId")
+
+	acState, _, _ := fc.RoomModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{RoomId: req.RoomId})
+	if !acState.GetIsActive() {
+		return commonFileErrorResponse(c, acState.GetMsg(), fiber.StatusBadRequest, acState.GetStatusCode())
+	}
+
+	if fErr := fc.FileModel.WhiteboardPdfExportSliceUpload(c, req); fErr != nil {
+		return commonFileErrorResponse(c, fErr.Message, fErr.Code, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
+	}
+
+	return c.SendString("file uploaded successfully")
+}
+
+func (fc *FileController) HandleWhiteboardPdfExportMerge(c fiber.Ctx) error {
+	req := new(plugnmeet.UploadedFileMergeReq)
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	req.RoomId = fiber.Locals[string](c, "roomId")
+	req.RoomSid = fiber.Locals[string](c, "roomSid")
+	requestedUserId := fiber.Locals[string](c, "requestedUserId")
+
+	acState, _, _ := fc.RoomModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{RoomId: req.RoomId})
+	if !acState.GetIsActive() {
+		return utils.SendCommonProtobufResponse(c, false, acState.GetMsg())
+	}
+
+	res, err := fc.FileModel.MergeWhiteboardPdfExport(req, requestedUserId)
+	if err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+	return utils.SendProtobufResponse(c, res)
 }
 
 func (fc *FileController) HandleGetRoomFilesByType(c fiber.Ctx) error {

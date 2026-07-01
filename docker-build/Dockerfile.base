@@ -14,7 +14,7 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
     apt-get install --no-install-recommends -y \
     build-essential ca-certificates wget curl git make pkg-config \
     libasound2-dev libopus-dev libopusfile-dev libssl-dev libsoxr-dev \
-    libreoffice fontconfig fonts-dejavu fonts-dejavu-extra fonts-noto fonts-noto-cjk \
+    libreoffice img2pdf fontconfig fonts-dejavu fonts-dejavu-extra fonts-noto fonts-noto-cjk \
     fonts-liberation fonts-liberation2 fonts-linuxlibertine \
     fonts-sil-gentium fonts-sil-gentium-basic && \
     apt-get clean && \
