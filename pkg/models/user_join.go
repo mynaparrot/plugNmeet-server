@@ -143,6 +143,7 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 		if !g.UserInfo.UserMetadata.GetIsPresenter() {
 			g.UserInfo.UserMetadata.LockSettings.LockWhiteboard = meta.DefaultLockSettings.LockWhiteboard
 		}
+		g.UserInfo.UserMetadata.LockSettings.LockReactions = meta.DefaultLockSettings.LockReactions
 
 	} else {
 		m.AssignLockSettingsToUser(meta, g)
