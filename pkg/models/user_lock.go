@@ -54,7 +54,7 @@ func (m *UserModel) UpdateUserLockSettings(r *plugnmeet.UpdateUserLockSettingsRe
 
 	// For a single user, perform the update and broadcast immediately.
 	log.Info("request to update single user lock settings")
-	err := m.updateAndBroadcastUserLock(r.RoomId, r.UserId, r.Service, r.Direction)
+	err := m.updateAndBroadcastUserLock(r.RoomId, r.UserId, r.Service, r.Direction, false)
 	if err != nil {
 		log.WithError(err).Errorln("failed to update user lock settings")
 	}
@@ -79,12 +79,11 @@ func (m *UserModel) handleUpdateAllUsersLockSettings(r *plugnmeet.UpdateUserLock
 	}
 
 	for _, id := range userIds {
-		if id == r.RequestedUserId && r.Service != "reactions" {
-			// nothing for requested user
+		if id == r.RequestedUserId {
+			// nothing for requested user as is admin
 			continue
 		}
-		err = m.updateAndBroadcastUserLock(r.RoomId, id, r.Service, r.Direction)
-		if err != nil {
+		if err := m.updateAndBroadcastUserLock(r.RoomId, id, r.Service, r.Direction, true); err != nil {
 			log.WithError(err).WithField("user_id", id).Errorln("failed to update user lock settings during all-user change")
 		}
 	}
@@ -94,7 +93,7 @@ func (m *UserModel) handleUpdateAllUsersLockSettings(r *plugnmeet.UpdateUserLock
 
 // updateAndBroadcastUserLock is the single, reusable worker function that updates
 // a specific user's lock settings and broadcasts the change.
-func (m *UserModel) updateAndBroadcastUserLock(roomId, userId, service, direction string) error {
+func (m *UserModel) updateAndBroadcastUserLock(roomId, userId, service, direction string, forAllUserTask bool) error {
 	mt, err := m.natsService.GetUserMetadataStruct(roomId, userId)
 	if err != nil {
 		return err
@@ -102,8 +101,11 @@ func (m *UserModel) updateAndBroadcastUserLock(roomId, userId, service, directio
 	if mt == nil {
 		return errors.New("user's metadata not found")
 	}
-	if mt.IsAdmin && service != "whiteboard" && service != "reactions" {
-		// no lock for admin other than whiteboard
+
+	// when we'll do lock for all user then we should not lock admin except for whiteboard
+	// but for individual no restriction even for admin
+	if direction == "lock" && forAllUserTask && mt.IsAdmin && service != "whiteboard" {
+		// no lock when setting global locking
 		return nil
 	}
 

@@ -143,8 +143,6 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 		if !g.UserInfo.UserMetadata.GetIsPresenter() {
 			g.UserInfo.UserMetadata.LockSettings.LockWhiteboard = meta.DefaultLockSettings.LockWhiteboard
 		}
-		g.UserInfo.UserMetadata.LockSettings.LockReactions = meta.DefaultLockSettings.LockReactions
-
 	} else {
 		m.AssignLockSettingsToUser(meta, g)
 
@@ -174,7 +172,7 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 		IsHidden: g.UserInfo.IsHidden,
 	}
 
-	log.Infoln("successfully generated pnm join token")
+	log.Infoln("Successfully generated pnm join token")
 	return m.am.GeneratePNMJoinToken(c)
 }
 
