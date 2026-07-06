@@ -183,8 +183,8 @@ github.com/moby/moby/client v0.4.1 h1:DMQgisVoMkmMs7fp3ROSdiBnoAu8+vo3GggFl06M/w
 github.com/moby/moby/client v0.4.1/go.mod h1:z52C9O2POPOsnxZAy//WtKcQ32P+jT/NGeXu/7nfjGQ=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
-github.com/mynaparrot/plugnmeet-protocol v1.3.1-0.20260704082248-5a68f026cceb h1:5AQM+ma1CgFZulk124weLWfOGHTC9Bfs8iE94WIqXAs=
-github.com/mynaparrot/plugnmeet-protocol v1.3.1-0.20260704082248-5a68f026cceb/go.mod h1:MaG+TOAIEZES0C7Q5cgd4cA4qJjtMykbcNp+oYeljW8=
+github.com/mynaparrot/plugnmeet-protocol v1.4.0 h1:IPYtTGkuunNbW42Flo6i9XCWxy2Q5/RF3wJDFh67V70=
+github.com/mynaparrot/plugnmeet-protocol v1.4.0/go.mod h1:MaG+TOAIEZES0C7Q5cgd4cA4qJjtMykbcNp+oYeljW8=
 github.com/nats-io/jwt/v2 v2.8.2 h1:XXRgB60MSTnqsRwejQurVDs/hcv2dkt+86GjI+I/bMc=
 github.com/nats-io/jwt/v2 v2.8.2/go.mod h1:Ag/56sq9OblL4JgdYufDd16Egb17Kr/8WwwuO/forVc=
 github.com/nats-io/nats.go v1.52.0 h1:n3avV4VBsCgsdwh71TppsTwtv+QdPs7ntSKM8qJLGsc=
