@@ -498,23 +498,13 @@ func convertPDFToImages(ctx context.Context, pdfPath, outputDir, roomId string, 
 	if workers > MaxMutoolWorkers {
 		workers = MaxMutoolWorkers
 	}
-	if workers > totalPages {
-		workers = totalPages
-	}
-	if workers < 1 {
-		workers = 1
-	}
 	log.Infof("Total pages: %d; workers: %d", totalPages, workers)
 
 	wp := workerpool.New(workers)
-
 	var once sync.Once
 	var firstErr error
 
 	setErr := func(err error) {
-		if err == nil {
-			return
-		}
 		once.Do(func() {
 			firstErr = err
 			cancel()
@@ -526,27 +516,11 @@ func convertPDFToImages(ctx context.Context, pdfPath, outputDir, roomId string, 
 		if end > totalPages {
 			end = totalPages
 		}
-
-		startPage := start
-		endPage := end
+		pageRange := fmt.Sprintf("%d-%d", start, end)
 
 		wp.Submit(func() {
-			if ctx.Err() != nil {
-				return
-			}
-
-			pageRange := fmt.Sprintf("%d-%d", startPage, endPage)
-
-			err := executeCommand(
-				ctx,
-				log,
-				"mutool",
-				"draw",
-				"-q",
-				"-r", "300",
-				"-o", filepath.Join(outputDir, "page_%d.png"),
-				pdfPath,
-				pageRange,
+			err := executeCommand(ctx, log, "mutool", "draw", "-q", "-r", "300", "-o",
+				filepath.Join(outputDir, "page_%d.png"), pdfPath, pageRange,
 			)
 			if err != nil {
 				log.Errorf("mutool conversion failed for roomId: %s; file: %s; pages: %s; msg: %s", roomId, pdfPath, pageRange, err)
@@ -561,11 +535,7 @@ func convertPDFToImages(ctx context.Context, pdfPath, outputDir, roomId string, 
 		return firstErr
 	}
 
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
 	log.Infof("Successfully converted PDF to images in %s, Total pages: %d; workers: %d", time.Since(now), totalPages, workers)
-
 	return nil
 }
 
