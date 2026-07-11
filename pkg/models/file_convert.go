@@ -7,11 +7,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/facette/natsort"
 	"github.com/gabriel-vasile/mimetype"
+	"github.com/gammazero/workerpool"
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -25,6 +29,9 @@ const (
 	SofficeTimeout = 5 * time.Minute
 	MutoolTimeout  = 5 * time.Minute
 	Pdf2ImgTimeout = 10 * time.Minute
+
+	MaxMutoolWorkers    = 4
+	MutoolPageChunkSize = 25
 )
 
 // ConvertWhiteboardFileReq represents the request structure for converting a whiteboard file.
@@ -150,12 +157,19 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 		return nil, fmt.Errorf("failed to convert file to PDF")
 	}
 
-	if err := convertPDFToImages(m.ctx, convertedFile, outputDir, roomId, log); err != nil {
+	totalPages, err := getPDFPageCount(m.ctx, convertedFile, log)
+	if err != nil {
+		log.WithError(err).Error("failed to count PDF pages")
+		return nil, fmt.Errorf("failed to count PDF pages")
+	}
+
+	if err := convertPDFToImages(m.ctx, convertedFile, outputDir, roomId, totalPages, log); err != nil {
 		log.WithError(err).Error("failed to convert PDF to images")
 		return nil, fmt.Errorf("failed to convert PDF to images")
 	}
 
-	totalPages, err := countPages(outputDir)
+	// get actual images count
+	totalPages, err = countPages(outputDir)
 	if err != nil {
 		log.WithError(err).Error("failed to count pages")
 		return nil, fmt.Errorf("failed to count pages")
@@ -443,17 +457,115 @@ func executeCommand(ctx context.Context, log *logrus.Entry, name string, arg ...
 	return nil
 }
 
-// convertPDFToImages uses mutool to convert a PDF file into PNG images.
-func convertPDFToImages(ctx context.Context, pdfPath, outputDir, roomId string, log *logrus.Entry) error {
-	log.Infof("New PDF to Image conversion request for file: %s", pdfPath)
+// getPDFPageCount counts pages directly from the PDF before rendering.
+func getPDFPageCount(ctx context.Context, pdfPath string, log *logrus.Entry) (int, error) {
 	ctx, cancel := context.WithTimeout(ctx, MutoolTimeout)
 	defer cancel()
 
-	err := executeCommand(ctx, log, "mutool", "draw", "-r", "300", "-o", filepath.Join(outputDir, "page_%d.png"), pdfPath)
+	cmd := exec.CommandContext(ctx, "mutool", "show", pdfPath, "trailer/Root/Pages/Count")
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Errorf("mutool conversion failed for roomId: %s; file: %s; msg: %s", roomId, pdfPath, err)
-		return fmt.Errorf("mutool: converting to images failed")
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			log.Errorf("mutool page count command timed out")
+			return 0, fmt.Errorf("mutool page count command timed out")
+		}
+		log.Errorf("mutool page count command failed: %s; output: %s", err, string(output))
+		return 0, fmt.Errorf("mutool page count command failed: %w", err)
 	}
+
+	totalPages, err := strconv.Atoi(strings.TrimSpace(string(output)))
+	if err != nil {
+		log.Errorf("failed to parse PDF page count; output: %s", string(output))
+		return 0, fmt.Errorf("failed to parse PDF page count")
+	}
+
+	if totalPages <= 0 {
+		return 0, fmt.Errorf("invalid PDF page count: %d", totalPages)
+	}
+
+	return totalPages, nil
+}
+
+// convertPDFToImages uses mutool to convert a PDF file into PNG images.
+func convertPDFToImages(ctx context.Context, pdfPath, outputDir, roomId string, totalPages int, log *logrus.Entry) error {
+	log.Infof("New PDF to Image conversion request for file: %s", pdfPath)
+	now := time.Now()
+
+	ctx, cancel := context.WithTimeout(ctx, MutoolTimeout)
+	defer cancel()
+
+	workers := runtime.NumCPU()
+	if workers > MaxMutoolWorkers {
+		workers = MaxMutoolWorkers
+	}
+	if workers > totalPages {
+		workers = totalPages
+	}
+	if workers < 1 {
+		workers = 1
+	}
+	log.Infof("Total pages: %d; workers: %d", totalPages, workers)
+
+	wp := workerpool.New(workers)
+
+	var once sync.Once
+	var firstErr error
+
+	setErr := func(err error) {
+		if err == nil {
+			return
+		}
+		once.Do(func() {
+			firstErr = err
+			cancel()
+		})
+	}
+
+	for start := 1; start <= totalPages; start += MutoolPageChunkSize {
+		end := start + MutoolPageChunkSize - 1
+		if end > totalPages {
+			end = totalPages
+		}
+
+		startPage := start
+		endPage := end
+
+		wp.Submit(func() {
+			if ctx.Err() != nil {
+				return
+			}
+
+			pageRange := fmt.Sprintf("%d-%d", startPage, endPage)
+
+			err := executeCommand(
+				ctx,
+				log,
+				"mutool",
+				"draw",
+				"-q",
+				"-r", "300",
+				"-o", filepath.Join(outputDir, "page_%d.png"),
+				pdfPath,
+				pageRange,
+			)
+			if err != nil {
+				log.Errorf("mutool conversion failed for roomId: %s; file: %s; pages: %s; msg: %s", roomId, pdfPath, pageRange, err)
+				setErr(fmt.Errorf("mutool: converting pages %s to images failed", pageRange))
+			}
+		})
+	}
+
+	wp.StopWait()
+
+	if firstErr != nil {
+		return firstErr
+	}
+
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	log.Infof("Successfully converted PDF to images in %s, Total pages: %d; workers: %d", time.Since(now), totalPages, workers)
+
 	return nil
 }
 
