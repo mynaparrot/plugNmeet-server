@@ -10,21 +10,24 @@ import (
 	"github.com/livekit/media-sdk"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
+	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
 )
 
 // TranslationTask implements the insights.Task interface for stateless text translation.
 type TranslationTask struct {
-	service *config.ServiceConfig
-	account *config.ProviderAccount
-	logger  *logrus.Entry
+	service      *config.ServiceConfig
+	account      *config.ProviderAccount
+	redisService *redisservice.RedisService
+	logger       *logrus.Entry
 }
 
-func NewTranslationTask(serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, logger *logrus.Entry) (insights.Task, error) {
+func NewTranslationTask(serviceConfig *config.ServiceConfig, providerAccount *config.ProviderAccount, redisService *redisservice.RedisService, logger *logrus.Entry) (insights.Task, error) {
 	return &TranslationTask{
-		service: serviceConfig,
-		account: providerAccount,
-		logger:  logger,
+		service:      serviceConfig,
+		account:      providerAccount,
+		redisService: redisService,
+		logger:       logger,
 	}, nil
 }
 
@@ -45,6 +48,7 @@ func (t *TranslationTask) RunStateless(ctx context.Context, options []byte) (int
 		ProviderType:    t.service.Provider,
 		ProviderAccount: t.account,
 		ServiceConfig:   t.service,
+		RDS:             t.redisService.GetRedisClient(),
 		Logger:          t.logger,
 	}
 	provider, err := NewProvider(args)

@@ -19,7 +19,7 @@ type ModelPricing struct {
 // InsightsConfig is the main config block for the insights feature.
 type InsightsConfig struct {
 	Enabled bool `yaml:"enabled"`
-	// The key is the provider type ("azure", "google"), the value is a list of accounts.
+	// The key is the provider type ("azure", "google", "openai"), the value is a list of accounts.
 	Providers map[string][]ProviderAccount           `yaml:"providers"`
 	Services  map[insights.ServiceType]ServiceConfig `yaml:"services"`
 }
@@ -31,12 +31,32 @@ type ProviderAccount struct {
 	Options     map[string]interface{} `yaml:"options"` // Generic options for the provider
 }
 
+// GetOptionsString is a helper to safely get a string value from the generic options map.
+func (pa *ProviderAccount) GetOptionsString(key, defaultValue string) string {
+	if pa.Options != nil {
+		if val, ok := pa.Options[key].(string); ok {
+			return val
+		}
+	}
+	return defaultValue
+}
+
 // ServiceConfig now references a provider type and a specific account ID.
 type ServiceConfig struct {
 	Provider string                  `yaml:"provider"`
 	ID       string                  `yaml:"id"`
 	Options  map[string]interface{}  `yaml:"options"` // Generic options, e.g., model
 	Pricing  map[string]ModelPricing `yaml:"pricing"`
+}
+
+// GetOptionsString is a helper to safely get a string value from the generic options map.
+func (sc *ServiceConfig) GetOptionsString(key, defaultValue string) string {
+	if sc.Options != nil {
+		if val, ok := sc.Options[key].(string); ok {
+			return val
+		}
+	}
+	return defaultValue
 }
 
 // GetVoiceMappings safely extracts the voice mappings from the generic options map.
@@ -81,7 +101,7 @@ func (c *InsightsConfig) GetProviderAccountForService(serviceType insights.Servi
 	// 3. Find the specific account within the list by its ID.
 	for _, acc := range providerAccounts {
 		if acc.ID == serviceConfig.ID {
-			return new(acc), &serviceConfig, nil
+			return &acc, &serviceConfig, nil
 		}
 	}
 

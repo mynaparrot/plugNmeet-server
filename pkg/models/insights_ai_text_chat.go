@@ -32,6 +32,7 @@ func (s *InsightsModel) AITextChatRequest(roomId, userId, prompt string) error {
 		ProviderType:    service.Provider,
 		ProviderAccount: providerAccount,
 		ServiceConfig:   service,
+		RDS:             s.rds,
 		Logger:          logger,
 	}
 	provider, err := insightsservice.NewProvider(args)
@@ -165,6 +166,7 @@ func (s *InsightsModel) CheckAndSummarize(ctx context.Context, roomId, userId st
 		ProviderType:    service.Provider,
 		ProviderAccount: providerAccount,
 		ServiceConfig:   service,
+		RDS:             s.rds,
 		Logger:          logger,
 	}
 	provider, err := insightsservice.NewProvider(args)

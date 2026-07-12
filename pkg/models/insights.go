@@ -246,6 +246,7 @@ func (s *InsightsModel) GetSupportedLanguagesForService(ctx context.Context, ser
 		ProviderType:    serviceConfig.Provider,
 		ProviderAccount: targetAccount,
 		ServiceConfig:   serviceConfig,
+		RDS:             s.rds,
 		Logger:          s.logger,
 	}
 	provider, err := insightsservice.NewProvider(args)
@@ -323,6 +324,7 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 		ProviderType:    serviceConfig.Provider,
 		ProviderAccount: targetAccount,
 		ServiceConfig:   serviceConfig,
+		RDS:             s.rds,
 		Logger:          log,
 	}
 	provider, err := insightsservice.NewProvider(args)
