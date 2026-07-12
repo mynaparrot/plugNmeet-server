@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -80,7 +79,7 @@ func (c *realtimeClient) CreateTranscription(
 	ctx, cancel := context.WithCancel(mainCtx)
 
 	stream := newOpenAIRealtimeStream(ctx, cancel, log, opts, c.llmProvider)
-	stream.inputSampleRate = getIntOption(c.service, "input_sample_rate", defaultLiveKitInputSampleRate)
+	stream.inputSampleRate = c.service.GetIntOption("input_sample_rate", defaultLiveKitInputSampleRate)
 
 	if err := c.createTranscriptionSession(wsURL, stream, opts); err != nil {
 		cancel()
@@ -113,11 +112,11 @@ func (c *realtimeClient) createTranscriptionSession(
 	turnDetectionMode := getTranscriptionTurnDetectionMode(c.service)
 	manualCommit := shouldUseManualTranscriptionCommit(turnDetectionMode)
 
-	minCommitMs := getIntOption(c.service, "transcription_min_commit_ms", defaultTranscriptionMinCommitMs)
-	silenceCommitMs := getIntOption(c.service, "transcription_silence_commit_ms", defaultTranscriptionSilenceCommitMs)
-	maxCommitMs := getIntOption(c.service, "transcription_max_commit_ms", defaultTranscriptionMaxCommitMs)
-	maxBufferedSilenceMs := getIntOption(c.service, "transcription_max_buffered_silence_ms", defaultTranscriptionMaxBufferedSilenceMs)
-	speechRMS := getIntOption(c.service, "transcription_speech_rms", defaultTranscriptionSpeechRMS)
+	minCommitMs := c.service.GetIntOption("transcription_min_commit_ms", defaultTranscriptionMinCommitMs)
+	silenceCommitMs := c.service.GetIntOption("transcription_silence_commit_ms", defaultTranscriptionSilenceCommitMs)
+	maxCommitMs := c.service.GetIntOption("transcription_max_commit_ms", defaultTranscriptionMaxCommitMs)
+	maxBufferedSilenceMs := c.service.GetIntOption("transcription_max_buffered_silence_ms", defaultTranscriptionMaxBufferedSilenceMs)
+	speechRMS := c.service.GetIntOption("transcription_speech_rms", defaultTranscriptionSpeechRMS)
 
 	stream.manualCommit = manualCommit
 	stream.transcriptionMinCommitSamples = samplesForDuration(defaultRealtimeSampleRate, minCommitMs)
@@ -229,11 +228,7 @@ func (c *realtimeClient) createTranscriptionSession(
 }
 
 func (c *realtimeClient) startTranscriptionCommitLoop(stream *openaiRealtimeStream) {
-	intervalMs := getIntOption(
-		c.service,
-		"transcription_commit_check_interval_ms",
-		defaultTranscriptionCommitCheckIntervalMs,
-	)
+	intervalMs := c.service.GetIntOption("transcription_commit_check_interval_ms", defaultTranscriptionCommitCheckIntervalMs)
 
 	if intervalMs <= 0 {
 		stream.log.Infoln("openai realtime transcription adaptive commit loop disabled")
@@ -388,20 +383,6 @@ func toWebSocketURL(baseURL string) string {
 	wsURL = strings.Replace(wsURL, "https://", "wss://", 1)
 
 	return wsURL
-}
-
-func getIntOption(service *config.ServiceConfig, key string, fallback int) int {
-	raw := strings.TrimSpace(service.GetOptionsString(key, strconv.Itoa(fallback)))
-	if raw == "" {
-		return fallback
-	}
-
-	value, err := strconv.Atoi(raw)
-	if err != nil || value <= 0 {
-		return fallback
-	}
-
-	return value
 }
 
 func samplesForDuration(sampleRate int, durationMs int) int {

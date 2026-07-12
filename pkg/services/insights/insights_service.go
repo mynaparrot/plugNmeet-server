@@ -19,7 +19,7 @@ import (
 
 type ProviderArgs struct {
 	Ctx             context.Context
-	ProviderType    string
+	ProviderType    config.ProviderType
 	ProviderAccount *config.ProviderAccount
 	ServiceConfig   *config.ServiceConfig
 	Logger          *logrus.Entry
@@ -32,11 +32,11 @@ func NewProvider(args *ProviderArgs) (insights.Provider, error) {
 		"provider": args.ProviderType,
 	})
 	switch args.ProviderType {
-	case "azure":
+	case config.ProviderAzure:
 		return azure.NewProvider(args.ProviderAccount, args.ServiceConfig, log)
-	case "google":
+	case config.ProviderGoogle:
 		return google.NewProvider(args.Ctx, args.ProviderAccount, args.ServiceConfig, log)
-	case "openai":
+	case config.ProviderOpenAI:
 		return openai.NewProvider(args.Ctx, args.ProviderAccount, args.ServiceConfig, log, args.RDS)
 	default:
 		return nil, fmt.Errorf("unknown AI provider type: %s", args.ProviderType)

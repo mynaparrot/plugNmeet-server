@@ -2,9 +2,18 @@ package config
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
+)
+
+type ProviderType string
+
+const (
+	ProviderAzure  ProviderType = "azure"
+	ProviderGoogle ProviderType = "google"
+	ProviderOpenAI ProviderType = "openai"
 )
 
 // ModelPricing holds pricing information for a service.
@@ -20,7 +29,7 @@ type ModelPricing struct {
 type InsightsConfig struct {
 	Enabled bool `yaml:"enabled"`
 	// The key is the provider type ("azure", "google", "openai"), the value is a list of accounts.
-	Providers map[string][]ProviderAccount           `yaml:"providers"`
+	Providers map[ProviderType][]ProviderAccount     `yaml:"providers"`
 	Services  map[insights.ServiceType]ServiceConfig `yaml:"services"`
 }
 
@@ -43,7 +52,7 @@ func (pa *ProviderAccount) GetOptionsString(key, defaultValue string) string {
 
 // ServiceConfig now references a provider type and a specific account ID.
 type ServiceConfig struct {
-	Provider string                  `yaml:"provider"`
+	Provider ProviderType            `yaml:"provider"`
 	ID       string                  `yaml:"id"`
 	Options  map[string]interface{}  `yaml:"options"` // Generic options, e.g., model
 	Pricing  map[string]ModelPricing `yaml:"pricing"`
@@ -57,6 +66,24 @@ func (sc *ServiceConfig) GetOptionsString(key, defaultValue string) string {
 		}
 	}
 	return defaultValue
+}
+
+func (sc *ServiceConfig) GetIntOption(key string, fallback int) int {
+	if sc.Options == nil {
+		return fallback
+	}
+
+	raw := strings.TrimSpace(sc.GetOptionsString(key, fmt.Sprintf("%d", fallback)))
+	if raw == "" {
+		return fallback
+	}
+
+	value, err := strconv.Atoi(raw)
+	if err != nil || value <= 0 {
+		return fallback
+	}
+
+	return value
 }
 
 // GetVoiceMappings safely extracts the voice mappings from the generic options map.

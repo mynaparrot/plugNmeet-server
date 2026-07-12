@@ -6,7 +6,6 @@ import (
 	"io"
 	"strings"
 
-	inMedia "github.com/mynaparrot/plugnmeet-server/pkg/insights/media"
 	sdk "github.com/openai/openai-go/v3"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -68,7 +67,5 @@ func (c *ttsClient) SynthesizeText(
 		return nil, fmt.Errorf("failed to execute tts request: %w", err)
 	}
 
-	// OpenAI PCM TTS returns 24kHz signed 16-bit little-endian mono PCM.
-	// The LiveKit publisher expects 16kHz PCM.
-	return inMedia.NewPCM16ResampleReadCloser(res.Body, 24000, 16000), nil
+	return res.Body, nil
 }
