@@ -26,7 +26,7 @@ RUN go install github.com/air-verse/air@latest
 # 2. Build MuPDF from source.
 # This is a slow step. It's placed here so it remains cached as long as the version doesn't change.
 # We use a specific version for deterministic builds.
-ARG MUPDF_VERSION=1.27.2
+ARG MUPDF_VERSION=1.28.0
 RUN wget -O mupdf.tar.gz "https://casper.mupdf.com/downloads/archive/mupdf-${MUPDF_VERSION}-source.tar.gz" && \
     mkdir mupdf && tar --strip-components=1 -xzf mupdf.tar.gz -C mupdf && \
     rm mupdf.tar.gz && \
