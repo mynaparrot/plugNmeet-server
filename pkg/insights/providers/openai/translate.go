@@ -29,7 +29,7 @@ func translateText(
 		return nil, fmt.Errorf("text and at least one target language are required")
 	}
 
-	model := service.GetOptionsString("model", sdk.ChatModelGPT4Turbo)
+	model := service.GetOptionsString("model", sdk.ChatModelGPT5_4Mini)
 
 	targets := make([]string, 0, len(targetLangs))
 	seen := make(map[string]bool)

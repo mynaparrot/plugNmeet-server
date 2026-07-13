@@ -26,7 +26,7 @@ func newChatStream(
 	streamId := uuid.NewString()
 
 	if model == "" {
-		model = service.GetOptionsString("chat_model", sdk.ChatModelGPT4)
+		model = service.GetOptionsString("chat_model", sdk.ChatModelGPT5_4)
 	}
 
 	messages := toOpenAIMessageParams(history)
@@ -83,7 +83,7 @@ func summarize(
 	history []*plugnmeet.InsightsAITextChatContent,
 ) (summaryText string, promptTokens uint32, completionTokens uint32, err error) {
 	if model == "" {
-		model = service.GetOptionsString("summarize_model", sdk.ChatModelGPT4Turbo)
+		model = service.GetOptionsString("summarize_model", sdk.ChatModelGPT5_4Mini)
 	}
 
 	messages := toOpenAIMessageParams(history)
