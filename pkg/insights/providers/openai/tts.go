@@ -9,45 +9,22 @@ import (
 	sdk "github.com/openai/openai-go/v3"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/sirupsen/logrus"
 )
 
-// ttsClient holds the configuration for OpenAI text-to-speech.
-type ttsClient struct {
-	client  sdk.Client
-	service *config.ServiceConfig
-	log     *logrus.Entry
-}
-
-func newTTSClient(
-	client sdk.Client,
-	service *config.ServiceConfig,
-	log *logrus.Entry,
-) (*ttsClient, error) {
-	return &ttsClient{
-		client:  client,
-		service: service,
-		log:     log.WithField("service", "openai-tts"),
-	}, nil
-}
-
-// SynthesizeText performs the synthesis and returns a streaming reader for 16kHz PCM audio.
-func (c *ttsClient) SynthesizeText(
-	ctx context.Context,
-	text, language, voice string,
-) (io.ReadCloser, error) {
+// synthesizeText performs the synthesis and returns a streaming reader for 16kHz PCM audio.
+func synthesizeText(ctx context.Context, client sdk.Client, service *config.ServiceConfig, text, language, voice string) (io.ReadCloser, error) {
 	text = strings.TrimSpace(text)
 	if text == "" {
 		return nil, fmt.Errorf("text is required")
 	}
 
-	model := c.service.GetOptionsString("model", sdk.SpeechModelGPT4oMiniTTS)
+	model := service.GetOptionsString("model", sdk.SpeechModelGPT4oMiniTTS)
 	if voice == "" {
-		voice = c.service.GetOptionsString("default_voice", "alloy")
+		voice = service.GetOptionsString("default_voice", "alloy")
 	}
 
 	params := sdk.AudioSpeechNewParams{
-		Model:          sdk.SpeechModel(model),
+		Model:          model,
 		Input:          text,
 		ResponseFormat: sdk.AudioSpeechNewParamsResponseFormatPCM,
 		Voice: sdk.AudioSpeechNewParamsVoiceUnion{
@@ -62,7 +39,7 @@ func (c *ttsClient) SynthesizeText(
 		))
 	}
 
-	res, err := c.client.Audio.Speech.New(ctx, params)
+	res, err := client.Audio.Speech.New(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute tts request: %w", err)
 	}

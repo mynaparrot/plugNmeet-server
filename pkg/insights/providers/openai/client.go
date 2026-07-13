@@ -80,12 +80,7 @@ func (p *OpenAIProvider) SynthesizeText(ctx context.Context, options []byte) (io
 		return nil, fmt.Errorf("failed to unmarshal synthesis options: %w", err)
 	}
 
-	ttsClient, err := newTTSClient(p.openAiClient, p.service, p.logger)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create tts client: %w", err)
-	}
-
-	return ttsClient.SynthesizeText(ctx, opts.Text, opts.Language, opts.Voice)
+	return synthesizeText(ctx, p.openAiClient, p.service, opts.Text, opts.Language, opts.Voice)
 }
 
 // GetSupportedLanguages implements the insights.Provider interface.
@@ -103,7 +98,7 @@ func (p *OpenAIProvider) GetSupportedLanguages(serviceType insights.ServiceType)
 
 // AITextChatStream sends a prompt with history and streams back the AI's response.
 func (p *OpenAIProvider) AITextChatStream(ctx context.Context, chatModel string, history []*plugnmeet.InsightsAITextChatContent) (<-chan *plugnmeet.InsightsAITextChatStreamResult, error) {
-	return newChatStream(ctx, p.openAiClient, p.service, chatModel, history, p.logger)
+	return chatStream(ctx, p.openAiClient, p.service, chatModel, history, p.logger)
 }
 
 // AIChatTextSummarize summarizes a conversation history.

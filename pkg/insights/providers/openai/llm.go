@@ -13,15 +13,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// newChatStream handles the real-time streaming chat with OpenAI SDK.
-func newChatStream(
-	ctx context.Context,
-	client sdk.Client,
-	service *config.ServiceConfig,
-	model string,
-	history []*plugnmeet.InsightsAITextChatContent,
-	logger *logrus.Entry,
-) (<-chan *plugnmeet.InsightsAITextChatStreamResult, error) {
+// chatStream handles the real-time streaming chat with OpenAI SDK.
+func chatStream(ctx context.Context, client sdk.Client, service *config.ServiceConfig, model string, history []*plugnmeet.InsightsAITextChatContent, logger *logrus.Entry) (<-chan *plugnmeet.InsightsAITextChatStreamResult, error) {
 	resultChan := make(chan *plugnmeet.InsightsAITextChatStreamResult)
 	streamId := uuid.NewString()
 
@@ -75,13 +68,7 @@ func newChatStream(
 }
 
 // summarize uses the non-streaming SDK call to get a summary of a conversation.
-func summarize(
-	ctx context.Context,
-	client sdk.Client,
-	service *config.ServiceConfig,
-	model string,
-	history []*plugnmeet.InsightsAITextChatContent,
-) (summaryText string, promptTokens uint32, completionTokens uint32, err error) {
+func summarize(ctx context.Context, client sdk.Client, service *config.ServiceConfig, model string, history []*plugnmeet.InsightsAITextChatContent) (summaryText string, promptTokens uint32, completionTokens uint32, err error) {
 	if model == "" {
 		model = service.GetOptionsString("summarize_model", sdk.ChatModelGPT5_4Mini)
 	}
@@ -109,9 +96,7 @@ func summarize(
 		nil
 }
 
-func toOpenAIMessageParams(
-	history []*plugnmeet.InsightsAITextChatContent,
-) []sdk.ChatCompletionMessageParamUnion {
+func toOpenAIMessageParams(history []*plugnmeet.InsightsAITextChatContent) []sdk.ChatCompletionMessageParamUnion {
 	messages := make([]sdk.ChatCompletionMessageParamUnion, 0, len(history))
 
 	for _, item := range history {

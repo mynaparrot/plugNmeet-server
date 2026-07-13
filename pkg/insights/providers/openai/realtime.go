@@ -45,12 +45,7 @@ type realtimeClient struct {
 	llmProvider *OpenAIProvider
 }
 
-func newRealtimeClient(
-	account *config.ProviderAccount,
-	service *config.ServiceConfig,
-	log *logrus.Entry,
-	llmProvider *OpenAIProvider,
-) (*realtimeClient, error) {
+func newRealtimeClient(account *config.ProviderAccount, service *config.ServiceConfig, log *logrus.Entry, llmProvider *OpenAIProvider) (*realtimeClient, error) {
 	return &realtimeClient{
 		account:     account,
 		service:     service,
@@ -59,11 +54,7 @@ func newRealtimeClient(
 	}, nil
 }
 
-func (c *realtimeClient) CreateTranscription(
-	mainCtx context.Context,
-	roomId, userId string,
-	opts *insights.TranscriptionOptions,
-) (insights.TranscriptionStream, error) {
+func (c *realtimeClient) CreateTranscription(mainCtx context.Context, roomId, userId string, opts *insights.TranscriptionOptions) (insights.TranscriptionStream, error) {
 	log := c.log.WithFields(logrus.Fields{
 		"method":     "CreateTranscription",
 		"roomId":     roomId,
@@ -99,11 +90,7 @@ func (c *realtimeClient) CreateTranscription(
 	return stream, nil
 }
 
-func (c *realtimeClient) createTranscriptionSession(
-	wsURL string,
-	stream *openaiRealtimeStream,
-	opts *insights.TranscriptionOptions,
-) error {
+func (c *realtimeClient) createTranscriptionSession(wsURL string, stream *openaiRealtimeStream, opts *insights.TranscriptionOptions) error {
 	transcriptionModel := c.service.GetOptionsString(
 		"realtime_transcription_model",
 		defaultRealtimeTranscriptionModel,

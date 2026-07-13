@@ -15,13 +15,7 @@ import (
 )
 
 // translateText performs stateless translation using the OpenAI SDK.
-func translateText(
-	ctx context.Context,
-	client sdk.Client,
-	service *config.ServiceConfig,
-	text, sourceLang string,
-	targetLangs []string,
-) (*plugnmeet.InsightsTextTranslationResult, error) {
+func translateText(ctx context.Context, client sdk.Client, service *config.ServiceConfig, text, sourceLang string, targetLangs []string) (*plugnmeet.InsightsTextTranslationResult, error) {
 	text = strings.TrimSpace(text)
 	sourceLang = strings.TrimSpace(sourceLang)
 

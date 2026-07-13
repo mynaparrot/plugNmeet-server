@@ -213,21 +213,10 @@ func (p *OpenAIProvider) transcribeLargeWavInChunks(ctx context.Context, filePat
 
 	outputPattern := filepath.Join(tmpDir, "chunk_%03d.wav")
 
-	cmd := exec.CommandContext(
-		ctx,
-		"ffmpeg",
-		"-hide_banner",
-		"-nostdin",
-		"-y",
-		"-i", filePath,
-		"-map", "0:a:0",
-		"-vn",
-		"-sn",
-		"-dn",
-		"-f", "segment",
+	cmd := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-nostdin", "-y", "-i", filePath,
+		"-map", "0:a:0", "-vn", "-sn", "-dn", "-f", "segment",
 		"-segment_time", fmt.Sprintf("%d", segmentTimeSeconds),
-		"-reset_timestamps", "1",
-		"-c", "copy",
+		"-reset_timestamps", "1", "-c", "copy",
 		outputPattern,
 	)
 
@@ -291,14 +280,8 @@ func (p *OpenAIProvider) transcribeLargeWavInChunks(ctx context.Context, filePat
 }
 
 func getAudioDuration(ctx context.Context, filePath string) (float64, error) {
-	cmd := exec.CommandContext(
-		ctx,
-		"ffprobe",
-		"-v", "error",
-		"-show_entries", "format=duration",
-		"-of", "default=noprint_wrappers=1:nokey=1",
-		filePath,
-	)
+	cmd := exec.CommandContext(ctx, "ffprobe", "-v", "error", "-show_entries", "format=duration",
+		"-of", "default=noprint_wrappers=1:nokey=1", filePath)
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {

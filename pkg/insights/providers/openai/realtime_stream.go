@@ -84,13 +84,7 @@ type openaiRealtimeStream struct {
 	partialTranscriptBuilder strings.Builder
 }
 
-func newOpenAIRealtimeStream(
-	ctx context.Context,
-	cancel context.CancelFunc,
-	log *logrus.Entry,
-	opts *insights.TranscriptionOptions,
-	llmProvider *OpenAIProvider,
-) *openaiRealtimeStream {
+func newOpenAIRealtimeStream(ctx context.Context, cancel context.CancelFunc, log *logrus.Entry, opts *insights.TranscriptionOptions, llmProvider *OpenAIProvider) *openaiRealtimeStream {
 	return &openaiRealtimeStream{
 		ctx:         ctx,
 		cancel:      cancel,
