@@ -39,3 +39,7 @@ func New(args Args) *RedisService {
 		logger:           args.Logger.WithField("service", "redis"),
 	}
 }
+
+func (s *RedisService) GetRedisClient() *redis.Client {
+	return s.rc
+}

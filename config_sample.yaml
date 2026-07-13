@@ -265,6 +265,13 @@ insights:
         credentials:
           api_key: "YOUR_GEMINI_API_KEY_HERE"
 
+    openai:
+      - id: "default-openai"
+        credentials:
+          api_key: "YOUR_OPENAI_API_KEY"
+        options:
+          endpoint: "https://api.openai.com/v1" # Optional: Override default endpoint
+
   # 2. Define the services that USE the providers.
   # The key ("transcription", "translation", "ai_text_chat", "meeting_summarizing") is the service name.
   services:

@@ -2,9 +2,18 @@ package config
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
+)
+
+type ProviderType string
+
+const (
+	ProviderAzure  ProviderType = "azure"
+	ProviderGoogle ProviderType = "google"
+	ProviderOpenAI ProviderType = "openai"
 )
 
 // ModelPricing holds pricing information for a service.
@@ -19,9 +28,9 @@ type ModelPricing struct {
 // InsightsConfig is the main config block for the insights feature.
 type InsightsConfig struct {
 	Enabled bool `yaml:"enabled"`
-	// The key is the provider type ("azure", "google"), the value is a list of accounts.
-	Providers map[string][]ProviderAccount           `yaml:"providers"`
-	Services  map[insights.ServiceType]ServiceConfig `yaml:"services"`
+	// The key is the provider type ("azure", "google", "openai"), the value is a list of accounts.
+	Providers map[ProviderType][]ProviderAccount      `yaml:"providers"`
+	Services  map[insights.ServiceType]*ServiceConfig `yaml:"services"`
 }
 
 // ProviderAccount defines a single, uniquely identified set of credentials for a provider.
@@ -31,12 +40,50 @@ type ProviderAccount struct {
 	Options     map[string]interface{} `yaml:"options"` // Generic options for the provider
 }
 
+// GetOptionsString is a helper to safely get a string value from the generic options map.
+func (pa *ProviderAccount) GetOptionsString(key, defaultValue string) string {
+	if pa.Options != nil {
+		if val, ok := pa.Options[key].(string); ok {
+			return val
+		}
+	}
+	return defaultValue
+}
+
 // ServiceConfig now references a provider type and a specific account ID.
 type ServiceConfig struct {
-	Provider string                  `yaml:"provider"`
+	Provider ProviderType            `yaml:"provider"`
 	ID       string                  `yaml:"id"`
 	Options  map[string]interface{}  `yaml:"options"` // Generic options, e.g., model
 	Pricing  map[string]ModelPricing `yaml:"pricing"`
+}
+
+// GetOptionsString is a helper to safely get a string value from the generic options map.
+func (sc *ServiceConfig) GetOptionsString(key, defaultValue string) string {
+	if sc.Options != nil {
+		if val, ok := sc.Options[key].(string); ok {
+			return val
+		}
+	}
+	return defaultValue
+}
+
+func (sc *ServiceConfig) GetIntOption(key string, fallback int) int {
+	if sc.Options == nil {
+		return fallback
+	}
+
+	raw := strings.TrimSpace(sc.GetOptionsString(key, fmt.Sprintf("%d", fallback)))
+	if raw == "" {
+		return fallback
+	}
+
+	value, err := strconv.Atoi(raw)
+	if err != nil || value <= 0 {
+		return fallback
+	}
+
+	return value
 }
 
 // GetVoiceMappings safely extracts the voice mappings from the generic options map.
@@ -79,9 +126,9 @@ func (c *InsightsConfig) GetProviderAccountForService(serviceType insights.Servi
 	}
 
 	// 3. Find the specific account within the list by its ID.
-	for _, acc := range providerAccounts {
-		if acc.ID == serviceConfig.ID {
-			return new(acc), &serviceConfig, nil
+	for i := range providerAccounts {
+		if providerAccounts[i].ID == serviceConfig.ID {
+			return &providerAccounts[i], serviceConfig, nil
 		}
 	}
 
@@ -104,12 +151,13 @@ func (c *InsightsConfig) GetServiceModelPricing(serviceType insights.ServiceType
 
 	// 3. Find the pricing for the specific model.
 	if pricing, ok := serviceConfig.Pricing[modelName]; ok {
-		return &pricing, nil
+		// Make a safe copy to return to avoid returning a pointer to local range/map temporary copy
+		return new(pricing), nil
 	}
 
 	// 4. If a specific model price is not found, fall back to "default".
 	if pricing, ok := serviceConfig.Pricing["default"]; ok {
-		return &pricing, nil
+		return new(pricing), nil
 	}
 
 	return nil, fmt.Errorf("pricing config not found for model '%s' (or default) in service '%s'", modelName, serviceType)

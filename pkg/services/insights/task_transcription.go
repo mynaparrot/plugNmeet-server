@@ -47,6 +47,7 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 		ProviderType:    t.service.Provider,
 		ProviderAccount: t.account,
 		ServiceConfig:   t.service,
+		RDS:             t.redisService.GetRedisClient(),
 		Logger:          t.logger,
 	}
 	provider, err := NewProvider(args)

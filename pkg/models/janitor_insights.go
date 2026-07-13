@@ -34,6 +34,7 @@ func (m *JanitorModel) CheckInsightsPendingSummarizeJobs() {
 		ProviderType:    serviceConfig.Provider,
 		ProviderAccount: targetAccount,
 		ServiceConfig:   serviceConfig,
+		RDS:             m.rds,
 		Logger:          log,
 	}
 	provider, err := insightsservice.NewProvider(args)

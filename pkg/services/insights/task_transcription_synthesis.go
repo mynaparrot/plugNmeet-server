@@ -31,6 +31,7 @@ type TranscriptionSynthesisTask struct {
 	natsConn      *nats.Conn
 	logger        *logrus.Entry
 	provider      insights.Provider
+	serviceConfig *config.ServiceConfig
 	roomId        string
 	e2eeKey       *string
 	natsService   *natsservice.NatsService
@@ -57,6 +58,7 @@ func NewTranscriptionSynthesisTask(ctx context.Context, appCnf *config.AppConfig
 		natsService:   natsService,
 		redisService:  redisService,
 		transLangs:    transLangs,
+		serviceConfig: serviceConfig,
 		voiceMappings: serviceConfig.GetVoiceMappings(),
 		workers:       make(map[string]*ttsWorker),
 		logger:        logger.WithField("sub-task", "transcription-synthesis"),
@@ -163,9 +165,16 @@ func (t *TranscriptionSynthesisTask) createAgentWorker(language string) (*ttsWor
 			return nil, err
 		}
 
+		sampleRate := 16000
+		if t.serviceConfig.Provider == config.ProviderOpenAI {
+			sampleRate = 24000
+		}
+		// get if any custom value was configured
+		sampleRate = t.serviceConfig.GetIntOption("tts_sample_rate", sampleRate)
+
 		// wait before publishing
 		time.Sleep(time.Second * 2)
-		publisher, err := inMedia.NewAudioPublisher(workerRoom, language, 16000, 1, t.e2eeKey)
+		publisher, err := inMedia.NewAudioPublisher(workerRoom, language, sampleRate, 1, t.e2eeKey)
 		if err != nil {
 			workerRoom.Disconnect() // Clean up
 			return nil, err

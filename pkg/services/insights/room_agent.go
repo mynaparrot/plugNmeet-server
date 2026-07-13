@@ -172,6 +172,7 @@ func (a *RoomAgent) startSynthesisTask() error {
 		ProviderType:    synthServiceConfig.Provider,
 		ProviderAccount: synthAccount,
 		ServiceConfig:   synthServiceConfig,
+		RDS:             a.redisService.GetRedisClient(),
 		Logger:          a.logger,
 	}
 	synthProvider, err := NewProvider(args)
