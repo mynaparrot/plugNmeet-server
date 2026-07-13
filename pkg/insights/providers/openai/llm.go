@@ -90,10 +90,7 @@ func summarize(ctx context.Context, client sdk.Client, service *config.ServiceCo
 		return "", 0, 0, fmt.Errorf("no summary content found in response")
 	}
 
-	return resp.Choices[0].Message.Content,
-		uint32(resp.Usage.PromptTokens),
-		uint32(resp.Usage.CompletionTokens),
-		nil
+	return resp.Choices[0].Message.Content, uint32(resp.Usage.PromptTokens), uint32(resp.Usage.CompletionTokens), nil
 }
 
 func toOpenAIMessageParams(history []*plugnmeet.InsightsAITextChatContent) []sdk.ChatCompletionMessageParamUnion {
