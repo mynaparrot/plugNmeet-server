@@ -29,8 +29,8 @@ type ModelPricing struct {
 type InsightsConfig struct {
 	Enabled bool `yaml:"enabled"`
 	// The key is the provider type ("azure", "google", "openai"), the value is a list of accounts.
-	Providers map[ProviderType][]ProviderAccount     `yaml:"providers"`
-	Services  map[insights.ServiceType]ServiceConfig `yaml:"services"`
+	Providers map[ProviderType][]ProviderAccount      `yaml:"providers"`
+	Services  map[insights.ServiceType]*ServiceConfig `yaml:"services"`
 }
 
 // ProviderAccount defines a single, uniquely identified set of credentials for a provider.
@@ -126,9 +126,9 @@ func (c *InsightsConfig) GetProviderAccountForService(serviceType insights.Servi
 	}
 
 	// 3. Find the specific account within the list by its ID.
-	for _, acc := range providerAccounts {
-		if acc.ID == serviceConfig.ID {
-			return &acc, &serviceConfig, nil
+	for i := range providerAccounts {
+		if providerAccounts[i].ID == serviceConfig.ID {
+			return &providerAccounts[i], serviceConfig, nil
 		}
 	}
 
@@ -151,12 +151,13 @@ func (c *InsightsConfig) GetServiceModelPricing(serviceType insights.ServiceType
 
 	// 3. Find the pricing for the specific model.
 	if pricing, ok := serviceConfig.Pricing[modelName]; ok {
-		return &pricing, nil
+		// Make a safe copy to return to avoid returning a pointer to local range/map temporary copy
+		return new(pricing), nil
 	}
 
 	// 4. If a specific model price is not found, fall back to "default".
 	if pricing, ok := serviceConfig.Pricing["default"]; ok {
-		return &pricing, nil
+		return new(pricing), nil
 	}
 
 	return nil, fmt.Errorf("pricing config not found for model '%s' (or default) in service '%s'", modelName, serviceType)
