@@ -20,7 +20,7 @@ require (
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/media-sdk v0.0.0-20260605212526-4c11a51d3c97
 	github.com/livekit/protocol v1.49.0
-	github.com/livekit/server-sdk-go/v2 v2.18.0
+	github.com/livekit/server-sdk-go/v2 v2.18.1
 	github.com/mynaparrot/plugnmeet-protocol v1.4.1-0.20260716081002-619d3785e191
 	github.com/nats-io/jwt/v2 v2.8.2
 	github.com/nats-io/nats.go v1.52.0
