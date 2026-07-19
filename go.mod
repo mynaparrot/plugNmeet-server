@@ -25,7 +25,7 @@ require (
 	github.com/nats-io/jwt/v2 v2.8.2
 	github.com/nats-io/nats.go v1.52.0
 	github.com/nats-io/nkeys v0.4.16
-	github.com/openai/openai-go/v3 v3.43.0
+	github.com/openai/openai-go/v3 v3.44.0
 	github.com/pion/webrtc/v4 v4.2.15
 	github.com/prometheus/client_golang v1.23.2
 	github.com/redis/go-redis/v9 v9.21.0
