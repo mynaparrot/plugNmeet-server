@@ -75,7 +75,7 @@ func translateText(ctx context.Context, client sdk.Client, service *config.Servi
 		return nil, fmt.Errorf("no translation content found in response")
 	}
 
-	content := strings.TrimSpace(completion.Choices[0].Message.Content)
+	content := cleanJSONResponse(completion.Choices[0].Message.Content)
 	if content == "" {
 		return nil, fmt.Errorf("empty translation content in response")
 	}

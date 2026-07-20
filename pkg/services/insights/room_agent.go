@@ -53,6 +53,9 @@ type RoomAgent struct {
 	payload         *insights.InsightsTaskPayload
 
 	synthesisTask *TranscriptionSynthesisTask
+
+	wg        sync.WaitGroup // Tracks running task goroutines.
+	closeOnce sync.Once      // Ensures shutdown runs exactly once.
 }
 
 type RoomAgentArgs struct {
@@ -184,7 +187,11 @@ func (a *RoomAgent) startSynthesisTask() error {
 	a.synthesisTask = NewTranscriptionSynthesisTask(a.Ctx, a.conf, a.natsConn, a.logger, synthProvider, synthServiceConfig, a.redisService, a.natsService, a.Room.Name(), a.payload.AllowedTransLangs, a.payload.RoomE2EEKey)
 
 	// 4. Run the task in a goroutine.
-	go a.synthesisTask.Run()
+	a.wg.Add(1)
+	go func() {
+		defer a.wg.Done()
+		a.synthesisTask.Run()
+	}()
 	a.logger.Info("synthesis task started")
 
 	return nil
@@ -226,15 +233,17 @@ func (a *RoomAgent) ActivateRoomWideTask() {
 	}
 	a.logger.Info("activating room-wide track capture")
 
-	// Subscribe to all existing participants' audio tracks.
+	// Subscribe to all existing participants' microphone tracks only.
 	for _, p := range a.Room.GetRemoteParticipants() {
 		if a.isSystemAgent(p.Identity()) {
 			continue
 		}
 		for _, pub := range p.TrackPublications() {
-			if pub.Kind() == lksdk.TrackKindAudio {
-				_ = pub.(*lksdk.RemoteTrackPublication).SetSubscribed(true)
+			rt, ok := pub.(*lksdk.RemoteTrackPublication)
+			if !ok || rt.Source() != livekit.TrackSource_MICROPHONE {
+				continue
 			}
+			_ = rt.SetSubscribed(true)
 		}
 	}
 }
@@ -248,9 +257,10 @@ func (a *RoomAgent) ActivateTaskForUser(userId string, options []byte) error {
 
 	a.lock.Lock()
 
-	if _, isAllowed := a.allowedUsers[userId]; !isAllowed {
-		// If the allowed list is not empty and the user is not in it.
-		if len(a.allowedUsers) > 0 {
+	// An empty allowedUsers map means "no restriction" (open to all users in the room).
+	// A non-empty map is an explicit allow-list: only listed users may start tasks.
+	if len(a.allowedUsers) > 0 {
+		if _, isAllowed := a.allowedUsers[userId]; !isAllowed {
 			a.lock.Unlock()
 			return fmt.Errorf("user %s is not allowed to perform this task", userId)
 		}
@@ -266,17 +276,20 @@ func (a *RoomAgent) ActivateTaskForUser(userId string, options []byte) error {
 
 	a.logger.Infof("activated task for participant %s", userId)
 
-	// Attempt to subscribe immediately if the track is already available.
+	// Attempt to subscribe immediately if the microphone track is already available.
 	for _, p := range a.Room.GetRemoteParticipants() {
 		if a.isSystemAgent(p.Identity()) {
 			continue
 		}
-		if p.Identity() == userId {
-			for _, pub := range p.TrackPublications() {
-				if pub.Kind() == lksdk.TrackKindAudio {
-					return pub.(*lksdk.RemoteTrackPublication).SetSubscribed(true)
-				}
+		if p.Identity() != userId {
+			continue
+		}
+		for _, pub := range p.TrackPublications() {
+			rt, ok := pub.(*lksdk.RemoteTrackPublication)
+			if !ok || rt.Source() != livekit.TrackSource_MICROPHONE {
+				continue
 			}
+			return rt.SetSubscribed(true)
 		}
 	}
 	return nil
@@ -325,6 +338,10 @@ func (a *RoomAgent) onTrackPublished(publication *lksdk.RemoteTrackPublication, 
 	if publication.Kind() != lksdk.TrackKindAudio {
 		return
 	}
+	// We only transcribe the microphone track; ignore screen-share or other audio sources.
+	if publication.Source() != livekit.TrackSource_MICROPHONE {
+		return
+	}
 	log := a.logger.WithFields(logrus.Fields{
 		"userId": rp.Identity(),
 		"kind":   publication.Kind(),
@@ -364,26 +381,19 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 		"encryption": publication.TrackInfo().Encryption,
 	}).Infoln("onTrackSubscribed fired")
 
-	var options []byte
-	var ok bool
-
-	// No lock needed to read the immutable payload.
-	if a.payload.CaptureAllParticipantsTracks {
-		options = a.payload.Options
-		ok = true
-	} else {
-		// A lock is still needed here to safely access the mutable activeUserTasks map.
-		a.lock.RLock()
-		options, ok = a.activeUserTasks[rp.Identity()]
-		a.lock.RUnlock()
-	}
-
-	if !ok {
-		return
-	}
-
 	a.lock.Lock()
 	defer a.lock.Unlock()
+
+	var options []byte
+	if a.payload.CaptureAllParticipantsTracks {
+		options = a.payload.Options
+	} else {
+		var ok bool
+		options, ok = a.activeUserTasks[rp.Identity()]
+		if !ok {
+			return
+		}
+	}
 
 	var decryptor lkmedia.Decryptor
 	if publication.TrackInfo().GetEncryption() != livekit.Encryption_NONE {
@@ -411,14 +421,24 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 		return
 	}
 
+	// If a pipeline already exists for this participant (e.g. track re-negotiation),
+	// cancel the previous one before replacing it to avoid a goroutine leak.
+	if prev, exists := a.activePipelines[rp.Identity()]; exists {
+		a.logger.WithField("userId", rp.Identity()).Warn("replacing existing insights pipeline for participant")
+		prev.cancel()
+	}
+
 	a.activePipelines[rp.Identity()] = &activePipeline{
 		transcoder: transcoder,
 		cancel:     cancel,
 		identity:   rp.Identity(),
 	}
 
-	// Launch the agent's single, pre-created task.
+	// Launch the agent's single, pre-created task and it's non-blocking call
+	// but use go just for safety
+	a.wg.Add(1)
 	go func() {
+		defer a.wg.Done()
 		err := a.task.RunAudioStream(ctx, transcoder.AudioStream(), a.payload.RoomTableId, a.Room.Name(), rp.Identity(), options)
 		if err != nil && !errors.Is(err, context.Canceled) {
 			a.logger.WithError(err).Errorf("insights task %s failed", a.payload.ServiceType)
@@ -455,20 +475,30 @@ func (a *RoomAgent) onTrackUnsubscribed(track *webrtc.TrackRemote, publication *
 
 // Shutdown gracefully disconnects the agent from the LiveKit room and cancels all running tasks.
 func (a *RoomAgent) Shutdown() {
-	a.logger.Infoln("received shutdown signal, disconnecting room agent")
-	if a.synthesisTask != nil {
-		a.synthesisTask.Shutdown()
-	}
-	a.cancel()
-	if a.Room != nil {
-		a.Room.Disconnect()
-	}
+	a.shutdownOnce()
+}
+
+// shutdownOnce performs the teardown exactly once, regardless of whether it is
+// triggered by an explicit Shutdown or by an unexpected room disconnection.
+func (a *RoomAgent) shutdownOnce() {
+	a.closeOnce.Do(func() {
+		a.logger.Infoln("received shutdown signal, disconnecting room agent")
+		if a.synthesisTask != nil {
+			a.synthesisTask.Shutdown()
+		}
+		a.cancel()
+		// Wait for task goroutines to finish before tearing down the room connection.
+		a.wg.Wait()
+		if a.Room != nil {
+			a.Room.Disconnect()
+		}
+	})
 }
 
 // onDisconnected is a LiveKit callback that triggers when the agent is disconnected from the room.
 func (a *RoomAgent) onDisconnected() {
 	a.logger.Infoln("agent disconnected from room")
-	a.cancel()
+	a.shutdownOnce()
 }
 
 // isSystemAgent can use to ignore user's track to consider

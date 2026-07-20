@@ -133,7 +133,7 @@ func (p *OpenAIProvider) transcribeFile(ctx context.Context, filePath string) (s
 
 	model := p.service.GetOptionsString("transcription_model", sdk.AudioModelGPT4oTranscribe)
 
-	if fileInfo.Size() <= maxOpenAIPayloadBytes {
+	if fileInfo.Size() <= safeChunkSizeBytes {
 		return p.executeSingleTranscription(ctx, filePath, model, false)
 	}
 
@@ -180,30 +180,17 @@ func (p *OpenAIProvider) executeSingleTranscription(ctx context.Context, filePat
 }
 
 // transcribeLargeWavInChunks splits files larger than 25 MB into smaller WAV chunks and transcribes each chunk.
+// Chunks are re-encoded to a fixed 16 kHz mono PCM WAV format so the output
+// bitrate is deterministic and chunk sizes are predictable regardless of the
+// source codec or bitrate.
 func (p *OpenAIProvider) transcribeLargeWavInChunks(ctx context.Context, filePath, model string) (string, int64, error) {
-	fileInfo, err := os.Stat(filePath)
-	if err != nil {
-		return "", 0, fmt.Errorf("failed to stat file: %w", err)
-	}
+	const (
+		targetSampleRate     = 16000
+		targetChannels       = 1
+		targetBytesPerSecond = targetSampleRate * 2 * targetChannels // 16-bit samples
+	)
 
-	duration, err := getAudioDuration(ctx, filePath)
-	if err != nil {
-		return "", 0, err
-	}
-
-	if duration <= 0 {
-		return "", 0, fmt.Errorf("invalid audio duration detected: %f", duration)
-	}
-
-	bytesPerSecond := float64(fileInfo.Size()) / duration
-	if bytesPerSecond <= 0 {
-		return "", 0, fmt.Errorf("invalid calculated audio byte rate: %f bytes/sec", bytesPerSecond)
-	}
-
-	segmentTimeSeconds := int(float64(safeChunkSizeBytes) / bytesPerSecond)
-	if segmentTimeSeconds < 1 {
-		segmentTimeSeconds = 1
-	}
+	segmentTimeSeconds := safeChunkSizeBytes / targetBytesPerSecond
 
 	tmpDir, err := os.MkdirTemp("", "pnm-wav-split-*")
 	if err != nil {
@@ -215,8 +202,8 @@ func (p *OpenAIProvider) transcribeLargeWavInChunks(ctx context.Context, filePat
 
 	cmd := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-nostdin", "-y", "-i", filePath,
 		"-map", "0:a:0", "-vn", "-sn", "-dn", "-f", "segment",
-		"-segment_time", fmt.Sprintf("%d", segmentTimeSeconds),
-		"-reset_timestamps", "1", "-c", "copy",
+		"-segment_time", fmt.Sprintf("%d", segmentTimeSeconds), "-reset_timestamps", "1",
+		"-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le",
 		outputPattern,
 	)
 
@@ -277,27 +264,6 @@ func (p *OpenAIProvider) transcribeLargeWavInChunks(ctx context.Context, filePat
 	}
 
 	return strings.Join(transcripts, " "), totalTokens, nil
-}
-
-func getAudioDuration(ctx context.Context, filePath string) (float64, error) {
-	cmd := exec.CommandContext(ctx, "ffprobe", "-v", "error", "-show_entries", "format=duration",
-		"-of", "default=noprint_wrappers=1:nokey=1", filePath)
-
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return 0, fmt.Errorf(
-			"ffprobe failed to read duration: %w: %s",
-			err,
-			strings.TrimSpace(string(out)),
-		)
-	}
-
-	var duration float64
-	if _, err := fmt.Sscanf(strings.TrimSpace(string(out)), "%f", &duration); err != nil {
-		return 0, fmt.Errorf("failed to parse audio duration from ffprobe: %w", err)
-	}
-
-	return duration, nil
 }
 
 func listChunkPaths(tmpDir string) ([]string, error) {

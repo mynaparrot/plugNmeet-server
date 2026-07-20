@@ -42,6 +42,7 @@ type TranscriptionSynthesisTask struct {
 	lock    sync.RWMutex
 	workers map[string]*ttsWorker // map[language] -> ttsWorker
 	sf      singleflight.Group
+	wg      sync.WaitGroup // tracks running ttsWorker goroutines
 }
 
 func NewTranscriptionSynthesisTask(ctx context.Context, appCnf *config.AppConfig, natsConn *nats.Conn, logger *logrus.Entry, provider insights.Provider, serviceConfig *config.ServiceConfig, redisService *redisservice.RedisService, natsService *natsservice.NatsService, roomId string, transLangs []string, e2eeKey *string) *TranscriptionSynthesisTask {
@@ -127,8 +128,15 @@ func (t *TranscriptionSynthesisTask) dispatch(fromUserId string, translations ma
 		if err := t.redisService.UpdateTTSServiceUsage(t.ctx, t.roomId, fromUserId, lang, len(text)); err != nil {
 			t.logger.WithError(err).Error("failed to update TTS service usage")
 		}
-		// Send text to the worker's queue. This is non-blocking.
-		worker.workQueue <- text
+		// Send text to the worker's queue. Drop the text (rather than block the
+		// NATS subscriber) if the worker is saturated.
+		select {
+		case worker.workQueue <- text:
+		case <-t.ctx.Done():
+			return
+		default:
+			t.logger.WithField("language", lang).Warn("tts work queue full, dropping text")
+		}
 	}
 }
 
@@ -198,7 +206,11 @@ func (t *TranscriptionSynthesisTask) createAgentWorker(language string) (*ttsWor
 		t.workers[language] = worker
 		t.lock.Unlock()
 
-		go worker.run(log)
+		t.wg.Add(1)
+		go func() {
+			defer t.wg.Done()
+			worker.run(log)
+		}()
 		log.Infof("created new tts agent participant for language %s with voice %s", language, voice)
 
 		return worker, nil
@@ -269,6 +281,9 @@ func (t *TranscriptionSynthesisTask) Shutdown() {
 	for _, worker := range workersToClose {
 		worker.cancel()
 	}
+
+	// Wait for all worker goroutines to finish disconnecting their rooms.
+	t.wg.Wait()
 
 	t.logger.Info("transcription synthesis task shut down")
 }

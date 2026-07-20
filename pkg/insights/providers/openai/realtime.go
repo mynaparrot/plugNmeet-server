@@ -79,6 +79,8 @@ func (c *realtimeClient) CreateTranscription(mainCtx context.Context, roomId, us
 
 	stream.safeSend(&insights.TranscriptionEvent{Type: insights.EventTypeSessionStarted})
 
+	// this block should be placed always after sending the session started event
+	// never before otherwise channel will be close
 	go func() {
 		stream.writeWg.Wait()
 		stream.readWg.Wait()

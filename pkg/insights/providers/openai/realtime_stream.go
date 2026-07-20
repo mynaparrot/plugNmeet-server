@@ -500,12 +500,6 @@ func (s *openaiRealtimeStream) resetPendingTranscriptionLocked() {
 	s.transcriptionHasSpeech = false
 }
 
-func (s *openaiRealtimeStream) closeAllConns() {
-	if s.transcriptionSession != nil && s.transcriptionSession.conn != nil {
-		_ = s.transcriptionSession.conn.Close()
-	}
-}
-
 func (s *openaiRealtimeStream) safeSend(event *insights.TranscriptionEvent) {
 	defer func() {
 		if r := recover(); r != nil {

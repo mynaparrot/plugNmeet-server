@@ -76,8 +76,10 @@ func (p *OpenAIProvider) TranslateText(ctx context.Context, text, sourceLang str
 // SynthesizeText performs stateless text-to-speech synthesis.
 func (p *OpenAIProvider) SynthesizeText(ctx context.Context, options []byte) (io.ReadCloser, error) {
 	opts := &insights.SynthesisTaskOptions{}
-	if err := json.Unmarshal(options, opts); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal synthesis options: %w", err)
+	if len(options) > 0 {
+		if err := json.Unmarshal(options, opts); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal synthesis options: %w", err)
+		}
 	}
 
 	return synthesizeText(ctx, p.openAiClient, p.service, opts.Text, opts.Language, opts.Voice)
@@ -86,10 +88,16 @@ func (p *OpenAIProvider) SynthesizeText(ctx context.Context, options []byte) (io
 // GetSupportedLanguages implements the insights.Provider interface.
 func (p *OpenAIProvider) GetSupportedLanguages(serviceType insights.ServiceType) []*plugnmeet.InsightsSupportedLangInfo {
 	if langs, ok := supportedLanguages[serviceType]; ok {
-		// Create a new slice and copy pointers to avoid modifying the original map
+		// Return a new slice with freshly allocated messages so callers cannot
+		// mutate the shared map entries and we avoid copying protobuf internal
+		// state.
 		serviceLangs := make([]*plugnmeet.InsightsSupportedLangInfo, len(langs))
 		for i := range langs {
-			serviceLangs[i] = &langs[i]
+			serviceLangs[i] = &plugnmeet.InsightsSupportedLangInfo{
+				Code:   langs[i].Code,
+				Name:   langs[i].Name,
+				Locale: langs[i].Locale,
+			}
 		}
 		return serviceLangs
 	}

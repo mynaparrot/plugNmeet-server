@@ -15,7 +15,7 @@ import (
 
 // chatStream handles the real-time streaming chat with OpenAI SDK.
 func chatStream(ctx context.Context, client sdk.Client, service *config.ServiceConfig, model string, history []*plugnmeet.InsightsAITextChatContent, logger *logrus.Entry) (<-chan *plugnmeet.InsightsAITextChatStreamResult, error) {
-	resultChan := make(chan *plugnmeet.InsightsAITextChatStreamResult)
+	resultChan := make(chan *plugnmeet.InsightsAITextChatStreamResult, 50)
 	streamId := uuid.NewString()
 
 	if model == "" {
@@ -53,7 +53,6 @@ func chatStream(ctx context.Context, client sdk.Client, service *config.ServiceC
 
 		if err := stream.Err(); err != nil {
 			logger.WithError(err).Error("failed to execute openai chat stream request")
-			return
 		}
 
 		// Signal the end of the stream.
