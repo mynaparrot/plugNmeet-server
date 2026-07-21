@@ -255,10 +255,13 @@ func (t *TranscriptionSynthesisTask) connectAgentToRoom(agentIdentity, agentName
 		},
 	})
 
-	if err = workerRoom.JoinWithToken(t.appCnf.LivekitInfo.Host, token, lksdk.WithAutoSubscribe(false)); err != nil {
+	joinErr := workerRoom.JoinWithToken(t.appCnf.LivekitInfo.Host, token, lksdk.WithAutoSubscribe(false))
+	if joinErr != nil {
 		// make user offline
-		err = t.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_DISCONNECTED, t.roomId, userInfo, agentIdentity)
-		return nil, fmt.Errorf("tts worker failed to join room: %w", err)
+		if broadcastErr := t.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_DISCONNECTED, t.roomId, userInfo, agentIdentity); broadcastErr != nil {
+			log.WithError(broadcastErr).Error("failed to broadcast tts worker disconnect after join failure")
+		}
+		return nil, fmt.Errorf("tts worker failed to join room: %w", joinErr)
 	}
 	log.Info("tts agent joining completed successfully")
 

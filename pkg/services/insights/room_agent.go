@@ -31,6 +31,7 @@ type activePipeline struct {
 	transcoder *media.Transcoder
 	cancel     context.CancelFunc
 	identity   string
+	trackID    string
 }
 
 // RoomAgent is a LiveKit client that acts on behalf of a specific insights service for a single room.
@@ -51,6 +52,7 @@ type RoomAgent struct {
 	redisService    *redisservice.RedisService
 	natsService     *natsservice.NatsService
 	payload         *insights.InsightsTaskPayload
+	derivedE2EEKey  []byte // Stores the derived E2EE key for the room
 
 	synthesisTask *TranscriptionSynthesisTask
 
@@ -116,6 +118,16 @@ func NewRoomAgent(args *RoomAgentArgs) (*RoomAgent, error) {
 		redisService:    args.RedisService,
 	}
 
+	// Derive E2EE key once if provided
+	if args.Payload.RoomE2EEKey != nil && *args.Payload.RoomE2EEKey != "" {
+		derivedKey, err := lksdk.DeriveKeyFromString(*args.Payload.RoomE2EEKey)
+		if err != nil {
+			cancel()
+			return nil, fmt.Errorf("failed to derive E2EE key: %w", err)
+		}
+		agent.derivedE2EEKey = derivedKey
+	}
+
 	c := &plugnmeet.PlugNmeetTokenClaims{
 		RoomId:   args.Payload.RoomId,
 		UserId:   fmt.Sprintf("%s%s-%s", config.AgentUserUserIdPrefix, args.Payload.ServiceType, uuid.NewString()),
@@ -126,8 +138,10 @@ func NewRoomAgent(args *RoomAgentArgs) (*RoomAgent, error) {
 		c.Name = *args.Payload.AgentName
 	}
 
+	// token validity can be short to 5~10 minutes as SDK will renew it periodically
 	token, err := auth.GenerateLivekitAccessToken(agent.conf.LivekitInfo.ApiKey, agent.conf.LivekitInfo.Secret, time.Minute*5, c)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
@@ -213,7 +227,11 @@ func (a *RoomAgent) UpdateAllowedUsers(allowed map[string]bool) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	a.allowedUsers = allowed
+	copiedAllowedUsers := make(map[string]bool, len(allowed))
+	for userId, isAllowed := range allowed {
+		copiedAllowedUsers[userId] = isAllowed
+	}
+	a.allowedUsers = copiedAllowedUsers
 
 	// Reconciliation: check if any currently active users need to be removed.
 	for userId := range a.activeUserTasks {
@@ -240,10 +258,12 @@ func (a *RoomAgent) ActivateRoomWideTask() {
 		}
 		for _, pub := range p.TrackPublications() {
 			rt, ok := pub.(*lksdk.RemoteTrackPublication)
-			if !ok || rt.Source() != livekit.TrackSource_MICROPHONE {
+			if !ok || !a.isMicrophoneOpusTrack(rt) {
 				continue
 			}
-			_ = rt.SetSubscribed(true)
+			if err := rt.SetSubscribed(true); err != nil {
+				a.logger.WithError(err).WithField("userId", p.Identity()).Warn("failed to subscribe to microphone track")
+			}
 		}
 	}
 }
@@ -271,7 +291,8 @@ func (a *RoomAgent) ActivateTaskForUser(userId string, options []byte) error {
 		a.lock.Unlock()
 		return nil
 	}
-	a.activeUserTasks[userId] = options
+
+	a.activeUserTasks[userId] = copyBytes(options)
 	a.lock.Unlock()
 
 	a.logger.Infof("activated task for participant %s", userId)
@@ -286,10 +307,17 @@ func (a *RoomAgent) ActivateTaskForUser(userId string, options []byte) error {
 		}
 		for _, pub := range p.TrackPublications() {
 			rt, ok := pub.(*lksdk.RemoteTrackPublication)
-			if !ok || rt.Source() != livekit.TrackSource_MICROPHONE {
+			if !ok || !a.isMicrophoneOpusTrack(rt) {
 				continue
 			}
-			return rt.SetSubscribed(true)
+
+			if err := rt.SetSubscribed(true); err != nil {
+				a.lock.Lock()
+				delete(a.activeUserTasks, userId)
+				a.lock.Unlock()
+				return err
+			}
+			return nil
 		}
 	}
 	return nil
@@ -299,8 +327,13 @@ func (a *RoomAgent) ActivateTaskForUser(userId string, options []byte) error {
 func (a *RoomAgent) GetUserTaskOptions(userId string) (insights.ServiceType, []byte, bool) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
+
 	options, ok := a.activeUserTasks[userId]
-	return a.payload.ServiceType, options, ok
+	if !ok {
+		return a.payload.ServiceType, nil, false
+	}
+
+	return a.payload.ServiceType, copyBytes(options), true
 }
 
 // EndTasksForUser stops all processing pipelines for a specific user.
@@ -325,7 +358,9 @@ func (a *RoomAgent) endTasksForUser(userId string) {
 				if tp := rp.GetTrackPublication(livekit.TrackSource_MICROPHONE); tp != nil {
 					if rt, ok := tp.(*lksdk.RemoteTrackPublication); ok {
 						// we'll need to unsubscribe the track
-						_ = rt.SetSubscribed(false)
+						if err := rt.SetSubscribed(false); err != nil {
+							a.logger.WithError(err).WithField("userId", uId).Warn("failed to unsubscribe microphone track")
+						}
 					}
 				}
 			}
@@ -335,13 +370,11 @@ func (a *RoomAgent) endTasksForUser(userId string) {
 
 // onTrackPublished is a LiveKit callback that triggers when a remote participant publishes a track.
 func (a *RoomAgent) onTrackPublished(publication *lksdk.RemoteTrackPublication, rp *lksdk.RemoteParticipant) {
-	if publication.Kind() != lksdk.TrackKindAudio {
-		return
-	}
 	// We only transcribe the microphone track; ignore screen-share or other audio sources.
-	if publication.Source() != livekit.TrackSource_MICROPHONE {
+	if !a.isMicrophoneOpusTrack(publication) {
 		return
 	}
+
 	log := a.logger.WithFields(logrus.Fields{
 		"userId": rp.Identity(),
 		"kind":   publication.Kind(),
@@ -355,7 +388,9 @@ func (a *RoomAgent) onTrackPublished(publication *lksdk.RemoteTrackPublication, 
 	}
 
 	if a.payload.CaptureAllParticipantsTracks {
-		_ = publication.SetSubscribed(true)
+		if err := publication.SetSubscribed(true); err != nil {
+			log.WithError(err).Warn("failed to subscribe to microphone track")
+		}
 		return
 	}
 
@@ -364,14 +399,16 @@ func (a *RoomAgent) onTrackPublished(publication *lksdk.RemoteTrackPublication, 
 	a.lock.RUnlock()
 
 	if ok {
-		_ = publication.SetSubscribed(true)
+		if err := publication.SetSubscribed(true); err != nil {
+			log.WithError(err).Warn("failed to subscribe to microphone track")
+		}
 	}
 }
 
 // onTrackSubscribed is a LiveKit callback that triggers when the agent successfully subscribes to a track.
 // It creates the audio processing pipeline and starts the insights.Task.
 func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lksdk.RemoteTrackPublication, rp *lksdk.RemoteParticipant) {
-	if track.Codec().MimeType != webrtc.MimeTypeOpus {
+	if !a.isMicrophoneOpusTrack(publication) {
 		return
 	}
 	a.logger.WithFields(logrus.Fields{
@@ -381,32 +418,30 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 		"encryption": publication.TrackInfo().Encryption,
 	}).Infoln("onTrackSubscribed fired")
 
-	a.lock.Lock()
-	defer a.lock.Unlock()
-
+	a.lock.RLock()
 	var options []byte
 	if a.payload.CaptureAllParticipantsTracks {
-		options = a.payload.Options
+		options = copyBytes(a.payload.Options)
 	} else {
-		var ok bool
-		options, ok = a.activeUserTasks[rp.Identity()]
+		userOptions, ok := a.activeUserTasks[rp.Identity()]
 		if !ok {
+			a.lock.RUnlock()
 			return
 		}
+
+		options = copyBytes(userOptions)
 	}
+	a.lock.RUnlock()
 
 	var decryptor lkmedia.Decryptor
 	if publication.TrackInfo().GetEncryption() != livekit.Encryption_NONE {
-		if a.payload.RoomE2EEKey == nil || *a.payload.RoomE2EEKey == "" {
-			a.logger.Errorln("received an encrypted track but no key was provided, so not continuing")
+		// Use the pre-derived key stored during agent initialization
+		if a.derivedE2EEKey == nil {
+			a.logger.Errorln("received an encrypted track but no derived E2EE key was available, so not continuing")
 			return
 		}
-		key, err := lksdk.DeriveKeyFromString(*a.payload.RoomE2EEKey)
-		if err != nil {
-			a.logger.WithError(err).Error("failed to derive key")
-			return
-		}
-		decryptor, err = lkmedia.NewGCMDecryptor(key, a.Room.SifTrailer())
+		var err error
+		decryptor, err = lkmedia.NewGCMDecryptor(a.derivedE2EEKey, a.Room.SifTrailer())
 		if err != nil {
 			a.logger.WithError(err).Error("failed to create decryptor")
 			return
@@ -421,6 +456,9 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 		return
 	}
 
+	a.lock.Lock()
+	trackID := publication.SID()
+
 	// If a pipeline already exists for this participant (e.g. track re-negotiation),
 	// cancel the previous one before replacing it to avoid a goroutine leak.
 	if prev, exists := a.activePipelines[rp.Identity()]; exists {
@@ -432,11 +470,14 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 		transcoder: transcoder,
 		cancel:     cancel,
 		identity:   rp.Identity(),
+		trackID:    trackID,
 	}
 
 	// Launch the agent's single, pre-created task and it's non-blocking call
 	// but use go just for safety
 	a.wg.Add(1)
+	a.lock.Unlock()
+
 	go func() {
 		defer a.wg.Done()
 		err := a.task.RunAudioStream(ctx, transcoder.AudioStream(), a.payload.RoomTableId, a.Room.Name(), rp.Identity(), options)
@@ -458,9 +499,15 @@ func (a *RoomAgent) onTrackUnsubscribed(track *webrtc.TrackRemote, publication *
 	}).Infoln("onTrackUnsubscribed fired, closing related pipeline if exists")
 
 	a.lock.Lock()
+	trackID := publication.SID()
+
 	pipeline, ok := a.activePipelines[rp.Identity()]
-	// Remove from the map of active pipelines.
-	delete(a.activePipelines, rp.Identity())
+	if ok && pipeline.trackID == trackID {
+		// Remove from the map of active pipelines.
+		delete(a.activePipelines, rp.Identity())
+	} else {
+		ok = false
+	}
 	a.lock.Unlock()
 
 	if !ok {
@@ -482,16 +529,20 @@ func (a *RoomAgent) Shutdown() {
 // triggered by an explicit Shutdown or by an unexpected room disconnection.
 func (a *RoomAgent) shutdownOnce() {
 	a.closeOnce.Do(func() {
-		a.logger.Infoln("received shutdown signal, disconnecting room agent")
-		if a.synthesisTask != nil {
-			a.synthesisTask.Shutdown()
-		}
-		a.cancel()
-		// Wait for task goroutines to finish before tearing down the room connection.
-		a.wg.Wait()
+		a.logger.Infoln("received shutdown signal, cleaning up room agent")
+
 		if a.Room != nil {
 			a.Room.Disconnect()
 		}
+
+		if a.synthesisTask != nil {
+			a.synthesisTask.Shutdown()
+		}
+
+		a.cancel()
+
+		// Wait for task goroutines to finish before tearing down the room connection.
+		a.wg.Wait()
 	})
 }
 
@@ -510,4 +561,25 @@ func (a *RoomAgent) isSystemAgent(userId string) bool {
 	}
 
 	return false
+}
+
+// isMicrophoneOpusTrack checks if the given track publication is a microphone source and of Opus codec.
+func (a *RoomAgent) isMicrophoneOpusTrack(pub lksdk.TrackPublication) bool {
+	if pub == nil {
+		return false
+	}
+	return pub.Kind() == lksdk.TrackKindAudio &&
+		pub.Source() == livekit.TrackSource_MICROPHONE &&
+		strings.EqualFold(pub.MimeType(), webrtc.MimeTypeOpus)
+}
+
+func copyBytes(src []byte) []byte {
+	if src == nil {
+		return nil
+	}
+
+	dst := make([]byte, len(src))
+	copy(dst, src)
+
+	return dst
 }

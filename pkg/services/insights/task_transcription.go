@@ -61,6 +61,7 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 		"method":      "RunAudioStream",
 		"roomId":      roomId,
 		"roomTableId": roomTableId,
+		"userId":      userId,
 	})
 
 	stream, err := provider.CreateTranscription(ctx, roomId, userId, options)
