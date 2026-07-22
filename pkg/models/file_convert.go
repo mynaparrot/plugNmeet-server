@@ -2,8 +2,11 @@ package models
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	_ "image/png"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -50,6 +53,20 @@ type ConvertWhiteboardFileRes struct {
 	FileId     string `json:"fileId"`
 	FilePath   string `json:"filePath"`
 	TotalPages int    `json:"totalPages"`
+}
+
+const (
+	pageOrientationPortrait  = "portrait"
+	pageOrientationLandscape = "landscape"
+)
+
+// whiteboardPageMeta is stored next to each converted page image as page_N_meta.json.
+// It is uploaded with the converted images directory (local disk or storage hooks).
+type whiteboardPageMeta struct {
+	Page        int    `json:"page"`
+	Orientation string `json:"orientation"`
+	Width       int    `json:"width"`
+	Height      int    `json:"height"`
 }
 
 // conversionResult is a private struct to pass results over a channel.
@@ -175,7 +192,15 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 		return nil, fmt.Errorf("failed to count pages")
 	}
 
-	// If hooks are enabled, upload the entire directory of converted images.
+	// Write page_N_meta.json beside each PNG before directory upload/hooks.
+	// Client always loads orientation from these sidecars (not NATS/proto).
+	if err := writePageMetaFiles(outputDir, totalPages, log); err != nil {
+		log.WithError(err).Error("failed to write page meta files")
+		return nil, fmt.Errorf("failed to write page meta files")
+	}
+
+	// If hooks are enabled, upload the entire directory of converted images
+	// (page_N.png + page_N_meta.json).
 	if m.app.Hooks != nil {
 		req := hooks.UploadHookData{
 			InputDirectoryPath: outputDir,
@@ -293,9 +318,10 @@ func (m *FileModel) MergeWhiteboardPdfExport(req *plugnmeet.UploadedFileMergeReq
 	finalPdfFileName := helpers.MakeSafeFilename("exported_"+baseFileName, true) + ".pdf"
 	finalPdfPath := filepath.Join(finalPdfOutputDir, finalPdfFileName)
 
+	// Do not force a fixed pagesize. Exported slices are already portrait or
+	// landscape A4 pixel dimensions, so img2pdf should keep each image's size.
 	args := []string{
 		"--output", finalPdfPath,
-		"--pagesize", "A4",
 		"--creator", "plugNmeet",
 		"--title", finalPdfFileName,
 		"--subject", req.ResumableFilename,
@@ -546,6 +572,56 @@ func countPages(outputDir string) (int, error) {
 		return 0, fmt.Errorf("failed to count pages: %w", err)
 	}
 	return len(files), nil
+}
+
+// writePageMetaFiles inspects each rendered page image and writes
+// page_N_meta.json next to page_N.png so multi-cluster storage hooks pick them up.
+func writePageMetaFiles(outputDir string, totalPages int, log *logrus.Entry) error {
+	for page := 1; page <= totalPages; page++ {
+		imgPath := filepath.Join(outputDir, fmt.Sprintf("page_%d.png", page))
+		width, height, err := getImageDimensions(imgPath)
+		if err != nil {
+			log.WithError(err).WithField("page", page).Error("failed to read page image dimensions")
+			return err
+		}
+
+		orientation := pageOrientationPortrait
+		if width > height {
+			orientation = pageOrientationLandscape
+		}
+
+		meta := whiteboardPageMeta{
+			Page:        page,
+			Orientation: orientation,
+			Width:       width,
+			Height:      height,
+		}
+		metaBytes, err := json.Marshal(meta)
+		if err != nil {
+			return fmt.Errorf("failed to marshal page %d meta: %w", page, err)
+		}
+		metaPath := filepath.Join(outputDir, fmt.Sprintf("page_%d_meta.json", page))
+		if err := os.WriteFile(metaPath, metaBytes, 0644); err != nil {
+			return fmt.Errorf("failed to write page %d meta: %w", page, err)
+		}
+	}
+
+	return nil
+}
+
+// getImageDimensions returns width/height without decoding full pixel data.
+func getImageDimensions(path string) (int, int, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer f.Close()
+
+	cfg, _, err := image.DecodeConfig(f)
+	if err != nil {
+		return 0, 0, err
+	}
+	return cfg.Width, cfg.Height, nil
 }
 
 // getFileExtension is a helper to normalize and return the file extension.
