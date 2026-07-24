@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/nats-io/nats.go/jetstream"
 )
 
@@ -80,4 +81,13 @@ func ParseUserKey(key string) (userId, field string, ok bool) {
 		return parts[0], parts[1], true
 	}
 	return "", "", false
+}
+
+// clientTypeFromString converts the stored KV value back to plugnmeet.ClientType.
+// Defaults to WEB for empty/unknown values (backward compatible with older sessions).
+func clientTypeFromString(v string) plugnmeet.ClientType {
+	if ct, ok := plugnmeet.ClientType_value[v]; ok {
+		return plugnmeet.ClientType(ct)
+	}
+	return plugnmeet.ClientType_WEB
 }

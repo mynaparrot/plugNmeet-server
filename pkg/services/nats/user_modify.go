@@ -290,12 +290,3 @@ func (s *NatsService) AddUserManuallyAndBroadcast(roomId, userId, name string, i
 	}
 	return userInfo, nil
 }
-
-// clientTypeFromString converts the stored KV value back to plugnmeet.ClientType.
-// Defaults to WEB for empty/unknown values (backward compatible with older sessions).
-func clientTypeFromString(v string) plugnmeet.ClientType {
-	if ct, ok := plugnmeet.ClientType_value[v]; ok {
-		return plugnmeet.ClientType(ct)
-	}
-	return plugnmeet.ClientType_WEB
-}
