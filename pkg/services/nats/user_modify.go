@@ -30,6 +30,7 @@ const (
 	UserStatusKey          = "status" // Note: This is different from RoomStatusKey
 	UserIsBlacklistedKey   = "is_blacklisted"
 	UserTurnCredentialsKey = "turn_credentials"
+	UserClientTypeKey      = "client_type" // persist client type for hybrid/web sessions
 
 	UserStatusAdded        = "added"
 	UserStatusOnline       = "online"
@@ -38,7 +39,7 @@ const (
 )
 
 // AddUser adds a new user to a room and stores their metadata in the consolidated bucket
-func (s *NatsService) AddUser(roomId, userId, name string, isAdmin, isPresenter bool, metadata *plugnmeet.UserMetadata) error {
+func (s *NatsService) AddUser(roomId, userId, name string, isAdmin, isPresenter bool, metadata *plugnmeet.UserMetadata, clientType plugnmeet.ClientType) error {
 	// Get the consolidated room bucket
 	kv, err := s.js.KeyValue(s.ctx, s.formatConsolidatedRoomBucket(roomId))
 	if err != nil {
@@ -65,6 +66,7 @@ func (s *NatsService) AddUser(roomId, userId, name string, isAdmin, isPresenter 
 		UserStatusKey:          UserStatusAdded,
 		UserIsBlacklistedKey:   "false",
 		UserTurnCredentialsKey: "",
+		UserClientTypeKey:      clientType.String(),
 	}
 
 	// Store user data in the key-value store using the user-specific prefix
@@ -262,7 +264,7 @@ func (s *NatsService) AddUserManuallyAndBroadcast(roomId, userId, name string, i
 			LockMicrophone: new(false),
 		},
 	}
-	err := s.AddUser(roomId, userId, name, isAdmin, false, &mt)
+	err := s.AddUser(roomId, userId, name, isAdmin, false, &mt, plugnmeet.ClientType_WEB)
 	if err != nil {
 		log.WithError(err).Errorln("failed to add ingress user to NATS")
 		return nil, err
@@ -287,4 +289,13 @@ func (s *NatsService) AddUserManuallyAndBroadcast(roomId, userId, name string, i
 		return nil, err
 	}
 	return userInfo, nil
+}
+
+// clientTypeFromString converts the stored KV value back to plugnmeet.ClientType.
+// Defaults to WEB for empty/unknown values (backward compatible with older sessions).
+func clientTypeFromString(v string) plugnmeet.ClientType {
+	if ct, ok := plugnmeet.ClientType_value[v]; ok {
+		return plugnmeet.ClientType(ct)
+	}
+	return plugnmeet.ClientType_WEB
 }

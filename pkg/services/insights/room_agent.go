@@ -139,7 +139,7 @@ func NewRoomAgent(args *RoomAgentArgs) (*RoomAgent, error) {
 	}
 
 	// token validity can be short to 5~10 minutes as SDK will renew it periodically
-	token, err := auth.GenerateLivekitAccessToken(agent.conf.LivekitInfo.ApiKey, agent.conf.LivekitInfo.Secret, time.Minute*5, c)
+	token, err := auth.GenerateLivekitAccessToken(agent.conf.LivekitInfo.ApiKey, agent.conf.LivekitInfo.Secret, time.Minute*5, c, true, true, "")
 	if err != nil {
 		cancel()
 		return nil, err

@@ -197,6 +197,7 @@ func (r *Router) registerBBBRoutes() {
 func (r *Router) registerAPIRoutes() {
 	api := r.fiberApp.Group("/api", r.ctrl.AuthController.HandleVerifyHeaderToken)
 	api.Post("/verifyToken", r.ctrl.AuthController.HandleVerifyToken)
+	api.Post("/getClientFiles", r.ctrl.FileController.HandleGetClientFiles)
 
 	api.Post("/recording", r.ctrl.RecordingController.HandleRecorderTasks)
 	api.Post("/rtmp", r.ctrl.RecordingController.HandleRecorderTasks)

@@ -231,7 +231,7 @@ func (t *TranscriptionSynthesisTask) connectAgentToRoom(agentIdentity, agentName
 		IsHidden: false,
 		Name:     agentName,
 	}
-	token, err := auth.GenerateLivekitAccessToken(t.appCnf.LivekitInfo.ApiKey, t.appCnf.LivekitInfo.Secret, time.Minute*5, claims)
+	token, err := auth.GenerateLivekitAccessToken(t.appCnf.LivekitInfo.ApiKey, t.appCnf.LivekitInfo.Secret, time.Minute*5, claims, true, true, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate token for tts worker: %w", err)
 	}

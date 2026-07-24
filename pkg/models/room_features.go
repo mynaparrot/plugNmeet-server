@@ -145,7 +145,7 @@ func (m *RoomModel) CreateIngress(r *plugnmeet.CreateIngressReq) (*livekit.Ingre
 			LockMicrophone: new(false),
 		},
 	}
-	err = m.natsService.AddUser(r.RoomId, req.ParticipantIdentity, r.ParticipantName, true, false, &mt)
+	err = m.natsService.AddUser(r.RoomId, req.ParticipantIdentity, r.ParticipantName, true, false, &mt, plugnmeet.ClientType_WEB)
 	if err != nil {
 		log.WithError(err).Errorln("failed to add ingress user to NATS")
 		return nil, err

@@ -65,6 +65,32 @@ func (m *UserModel) MuteUnMuteTrack(ctx context.Context, r *plugnmeet.MuteUnMute
 		return err
 	}
 
+	// When this is a mute request and the user is in a hybrid session, the user's
+	// actual microphone is published by a second LiveKit participant whose identity
+	// is [userID]-native. The admin-forced mute must also be applied to that twin's
+	// microphone track so that the user is fully muted on the LiveKit server side.
+	if r.Muted {
+		twinIdentity := config.GetNativeTwinIdentity(r.UserId)
+		participants, loadErr := m.lk.LoadParticipants(ctx, r.RoomId)
+		if loadErr != nil {
+			log.WithError(loadErr).Warn("failed to load room participants for native twin mute")
+		} else {
+			for _, p := range participants {
+				if p.Identity != twinIdentity || p.State != livekit.ParticipantInfo_ACTIVE {
+					continue
+				}
+				for _, t := range p.Tracks {
+					if t.Source == livekit.TrackSource_MICROPHONE {
+						if _, muteErr := m.lk.MuteUnMuteTrack(ctx, r.RoomId, twinIdentity, t.Sid, true); muteErr != nil {
+							log.WithError(muteErr).Warnf("failed to mute native twin microphone track %s", t.Sid)
+						}
+					}
+				}
+				break // only one twin participant expected
+			}
+		}
+	}
+
 	log.Infoln("Successfully muted/unmuted track")
 	return nil
 }

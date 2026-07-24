@@ -61,6 +61,8 @@ func (ncs *NatsCacheService) setUserInfoCache(roomId, userId, field, value strin
 		user.Status = value
 	case UserTurnCredentialsKey:
 		user.TurnCredentials = value
+	case UserClientTypeKey:
+		user.UserInfo.ClientType = clientTypeFromString(value)
 	}
 
 	user.LastRevision = revision
