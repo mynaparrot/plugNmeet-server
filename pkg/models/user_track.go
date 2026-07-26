@@ -31,8 +31,8 @@ func (m *UserModel) MuteUnMuteTrack(ctx context.Context, r *plugnmeet.MuteUnMute
 
 	p, err := m.lk.LoadParticipantInfo(r.RoomId, r.UserId)
 	if err != nil {
-		log.WithError(err).Errorln("failed to load participant info")
-		return err
+		log.WithError(err).Error("failed to load participant info")
+		return fmt.Errorf("footer.notice.failed-to-load-participant-info")
 	}
 
 	if p == nil || p.State != livekit.ParticipantInfo_ACTIVE {
@@ -40,7 +40,9 @@ func (m *UserModel) MuteUnMuteTrack(ctx context.Context, r *plugnmeet.MuteUnMute
 		log.WithError(err).Warnln("participant not active")
 		return err
 	}
+
 	trackSid := r.TrackSid
+	targetUserId := r.UserId
 
 	if trackSid == "" {
 		log.Infoln("no trackSid provided, searching for microphone track")
@@ -54,41 +56,42 @@ func (m *UserModel) MuteUnMuteTrack(ctx context.Context, r *plugnmeet.MuteUnMute
 	}
 
 	if trackSid == "" {
-		err = fmt.Errorf("no suitable track found to mute/unmute")
-		log.WithError(err).Warnln()
-		return err
-	}
-
-	_, err = m.lk.MuteUnMuteTrack(ctx, r.RoomId, r.UserId, trackSid, r.Muted)
-	if err != nil {
-		log.WithError(err).Errorln("failed to mute/unmute track in livekit")
-		return err
-	}
-
-	// When this is a mute request and the user is in a hybrid session, the user's
-	// actual microphone is published by a second LiveKit participant whose identity
-	// is [userID]-native. The admin-forced mute must also be applied to that twin's
-	// microphone track so that the user is fully muted on the LiveKit server side.
-	if r.Muted {
+		// The primary participant has no mic track (e.g., hybrid web twin).
+		// Redirect to the [userID]-native publisher participant.
 		twinIdentity := config.GetNativeTwinIdentity(r.UserId)
 		participants, loadErr := m.lk.LoadParticipants(ctx, r.RoomId)
 		if loadErr != nil {
-			log.WithError(loadErr).Warn("failed to load room participants for native twin mute")
+			log.WithError(loadErr).Warn("failed to load room participants for native twin lookup")
 		} else {
-			for _, p := range participants {
-				if p.Identity != twinIdentity || p.State != livekit.ParticipantInfo_ACTIVE {
+			for _, tp := range participants {
+				if tp.Identity != twinIdentity || tp.State != livekit.ParticipantInfo_ACTIVE {
 					continue
 				}
-				for _, t := range p.Tracks {
+				for _, t := range tp.Tracks {
 					if t.Source == livekit.TrackSource_MICROPHONE {
-						if _, muteErr := m.lk.MuteUnMuteTrack(ctx, r.RoomId, twinIdentity, t.Sid, true); muteErr != nil {
-							log.WithError(muteErr).Warnf("failed to mute native twin microphone track %s", t.Sid)
-						}
+						trackSid = t.Sid
+						targetUserId = twinIdentity
+						log.WithFields(logrus.Fields{
+							"twinIdentity": twinIdentity,
+							"trackSid":     trackSid,
+						}).Infoln("redirecting mute/unmute to native twin")
+						break
 					}
 				}
-				break // only one twin participant expected
+				break
 			}
 		}
+	}
+
+	if trackSid == "" {
+		log.Warnln("No suitable track found to mute/unmute")
+		return fmt.Errorf("footer.notice.no-suitable-track-found")
+	}
+
+	_, err = m.lk.MuteUnMuteTrack(ctx, r.RoomId, targetUserId, trackSid, r.Muted)
+	if err != nil {
+		log.WithError(err).Error("failed to mute/unmute track in livekit")
+		return fmt.Errorf("footer.notice.failed-to-mute-unmute-track")
 	}
 
 	log.Infoln("Successfully muted/unmuted track")
