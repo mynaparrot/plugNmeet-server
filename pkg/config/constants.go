@@ -1,6 +1,9 @@
 package config
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 const (
 	RecorderBot           = "RECORDER_BOT"
@@ -23,7 +26,18 @@ const (
 )
 
 // GetNativeTwinIdentity returns the LiveKit identity of the hybrid native twin
-// for the given primary userId ("[userID]-native").
+// for the given primary userId ("[userID]-native"). Returns the userId unchanged
+// if the "-native" suffix is already present.
 func GetNativeTwinIdentity(userId string) string {
+	if strings.HasSuffix(userId, NativeTwinIdentitySuffix) {
+		return userId
+	}
 	return userId + NativeTwinIdentitySuffix
+}
+
+// PrimaryIdentityFromNative strips the native twin suffix if present, returning
+// the primary user id ("[userID]-native" -> "[userID]"). If the suffix is not
+// present the identity is returned unchanged.
+func PrimaryIdentityFromNative(identity string) string {
+	return strings.TrimSuffix(identity, NativeTwinIdentitySuffix)
 }

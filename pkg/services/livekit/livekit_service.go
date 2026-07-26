@@ -79,7 +79,9 @@ func (s *LivekitService) MuteUnMuteTrack(ctx context.Context, roomId string, use
 	return res, err
 }
 
-// LoadParticipants will load all the participant info from livekit
+// LoadParticipants will load all the participant info from livekit.
+// Native twin identities are mapped to their primary user identity and
+// duplicates are removed (the primary participant takes precedence).
 func (s *LivekitService) LoadParticipants(ctx context.Context, roomId string) ([]*livekit.ParticipantInfo, error) {
 	req := livekit.ListParticipantsRequest{
 		Room: roomId,
@@ -94,11 +96,49 @@ func (s *LivekitService) LoadParticipants(ctx context.Context, roomId string) ([
 	if res == nil {
 		return nil, nil
 	}
-	return res.Participants, nil
+
+	seen := make(map[string]*livekit.ParticipantInfo, len(res.Participants))
+
+	for _, p := range res.Participants {
+		primaryId := config.PrimaryIdentityFromNative(p.Identity)
+		if primaryId != p.Identity {
+			// native twin — always keep (has the media tracks)
+			p.Identity = primaryId
+			seen[primaryId] = p
+		} else if seen[primaryId] == nil {
+			// primary user — only add if twin hasn't already claimed this slot
+			seen[primaryId] = p
+		}
+	}
+
+	result := make([]*livekit.ParticipantInfo, 0, len(seen))
+	for _, p := range seen {
+		result = append(result, p)
+	}
+
+	return result, nil
 }
 
-// LoadParticipantInfo will load single participant info by identity
+// LoadParticipantInfo will load single participant info by identity.
+// In hybrid mode the web twin is a subscriber-only participant without media
+// tracks. The native twin always takes precedence when present since it
+// carries the actual media tracks.
 func (s *LivekitService) LoadParticipantInfo(roomId string, identity string) (*livekit.ParticipantInfo, error) {
+	// Try the native twin first — it carries the real media tracks.
+	twinIdentity := config.GetNativeTwinIdentity(identity)
+	if twinIdentity != identity {
+		twinReq := livekit.RoomParticipantIdentity{
+			Room:     roomId,
+			Identity: twinIdentity,
+		}
+		twinCtx, twinCancel := context.WithTimeout(s.ctx, time.Second*10)
+		defer twinCancel()
+		if twinParticipant, twinErr := s.lkc.GetParticipant(twinCtx, &twinReq); twinErr == nil && twinParticipant != nil {
+			return twinParticipant, nil
+		}
+	}
+
+	// Fall back to the primary participant.
 	req := livekit.RoomParticipantIdentity{
 		Room:     roomId,
 		Identity: identity,
@@ -117,7 +157,7 @@ func (s *LivekitService) LoadParticipantInfo(roomId string, identity string) (*l
 	return participant, nil
 }
 
-// RemoveParticipant will send a request to livekit to remove user
+// RemoveParticipant will send a request to livekit to remove user and its native twin if one exists.
 func (s *LivekitService) RemoveParticipant(roomId string, userId string) (*livekit.RemoveParticipantResponse, error) {
 	data := livekit.RoomParticipantIdentity{
 		Room:     roomId,
@@ -129,6 +169,24 @@ func (s *LivekitService) RemoveParticipant(roomId string, userId string) (*livek
 	res, err := s.lkc.RemoveParticipant(ctx, &data)
 	if err != nil {
 		return nil, err
+	}
+
+	// Also remove the native twin in hybrid mode.
+	twinIdentity := config.GetNativeTwinIdentity(userId)
+	if twinIdentity != userId {
+		twinData := livekit.RoomParticipantIdentity{
+			Room:     roomId,
+			Identity: twinIdentity,
+		}
+		twinCtx, twinCancel := context.WithTimeout(s.ctx, time.Second*10)
+		defer twinCancel()
+		if _, twinErr := s.lkc.RemoveParticipant(twinCtx, &twinData); twinErr != nil {
+			s.logger.WithError(twinErr).WithFields(logrus.Fields{
+				"roomId":       roomId,
+				"userId":       userId,
+				"twinIdentity": twinIdentity,
+			}).Warn("failed to remove native twin from livekit")
+		}
 	}
 
 	return res, err

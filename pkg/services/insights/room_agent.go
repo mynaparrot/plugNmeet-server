@@ -302,7 +302,8 @@ func (a *RoomAgent) ActivateTaskForUser(userId string, options []byte) error {
 		if a.isSystemAgent(p.Identity()) {
 			continue
 		}
-		if p.Identity() != userId {
+		primaryId := config.PrimaryIdentityFromNative(p.Identity())
+		if primaryId != userId {
 			continue
 		}
 		for _, pub := range p.TrackPublications() {
@@ -354,8 +355,20 @@ func (a *RoomAgent) endTasksForUser(userId string) {
 		a.logger.WithField("userId", userId).Infoln("stopped insights task for participant")
 
 		go func(uId string) {
-			if rp := a.Room.GetParticipantByIdentity(uId); rp != nil {
-				if tp := rp.GetTrackPublication(livekit.TrackSource_MICROPHONE); tp != nil {
+			// Native twin carries the mic track in hybrid mode — search it first.
+			var participant *lksdk.RemoteParticipant
+			if twinId := config.GetNativeTwinIdentity(uId); twinId != uId {
+				if rp := a.Room.GetParticipantByIdentity(twinId); rp != nil {
+					participant = rp
+				}
+			}
+			if participant == nil {
+				if rp := a.Room.GetParticipantByIdentity(uId); rp != nil {
+					participant = rp
+				}
+			}
+			if participant != nil {
+				if tp := participant.GetTrackPublication(livekit.TrackSource_MICROPHONE); tp != nil {
 					if rt, ok := tp.(*lksdk.RemoteTrackPublication); ok {
 						// we'll need to unsubscribe the track
 						if err := rt.SetSubscribed(false); err != nil {
@@ -395,7 +408,8 @@ func (a *RoomAgent) onTrackPublished(publication *lksdk.RemoteTrackPublication, 
 	}
 
 	a.lock.RLock()
-	_, ok := a.activeUserTasks[rp.Identity()]
+	primaryId := config.PrimaryIdentityFromNative(rp.Identity())
+	_, ok := a.activeUserTasks[primaryId]
 	a.lock.RUnlock()
 
 	if ok {
@@ -418,12 +432,14 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 		"encryption": publication.TrackInfo().Encryption,
 	}).Infoln("onTrackSubscribed fired")
 
+	primaryId := config.PrimaryIdentityFromNative(rp.Identity())
+
 	a.lock.RLock()
 	var options []byte
 	if a.payload.CaptureAllParticipantsTracks {
 		options = copyBytes(a.payload.Options)
 	} else {
-		userOptions, ok := a.activeUserTasks[rp.Identity()]
+		userOptions, ok := a.activeUserTasks[primaryId]
 		if !ok {
 			a.lock.RUnlock()
 			return
@@ -461,15 +477,15 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 
 	// If a pipeline already exists for this participant (e.g. track re-negotiation),
 	// cancel the previous one before replacing it to avoid a goroutine leak.
-	if prev, exists := a.activePipelines[rp.Identity()]; exists {
-		a.logger.WithField("userId", rp.Identity()).Warn("replacing existing insights pipeline for participant")
+	if prev, exists := a.activePipelines[primaryId]; exists {
+		a.logger.WithField("userId", primaryId).Warn("replacing existing insights pipeline for participant")
 		prev.cancel()
 	}
 
-	a.activePipelines[rp.Identity()] = &activePipeline{
+	a.activePipelines[primaryId] = &activePipeline{
 		transcoder: transcoder,
 		cancel:     cancel,
-		identity:   rp.Identity(),
+		identity:   primaryId,
 		trackID:    trackID,
 	}
 
@@ -480,7 +496,7 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 
 	go func() {
 		defer a.wg.Done()
-		err := a.task.RunAudioStream(ctx, transcoder.AudioStream(), a.payload.RoomTableId, a.Room.Name(), rp.Identity(), options)
+		err := a.task.RunAudioStream(ctx, transcoder.AudioStream(), a.payload.RoomTableId, a.Room.Name(), primaryId, options)
 		if err != nil && !errors.Is(err, context.Canceled) {
 			a.logger.WithError(err).Errorf("insights task %s failed", a.payload.ServiceType)
 		}
@@ -500,11 +516,12 @@ func (a *RoomAgent) onTrackUnsubscribed(track *webrtc.TrackRemote, publication *
 
 	a.lock.Lock()
 	trackID := publication.SID()
+	primaryId := config.PrimaryIdentityFromNative(rp.Identity())
 
-	pipeline, ok := a.activePipelines[rp.Identity()]
+	pipeline, ok := a.activePipelines[primaryId]
 	if ok && pipeline.trackID == trackID {
 		// Remove from the map of active pipelines.
-		delete(a.activePipelines, rp.Identity())
+		delete(a.activePipelines, primaryId)
 	} else {
 		ok = false
 	}

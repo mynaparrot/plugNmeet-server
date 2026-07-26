@@ -29,6 +29,9 @@ func (m *UserModel) MuteUnMuteTrack(ctx context.Context, r *plugnmeet.MuteUnMute
 		return m.muteUnmuteAllMic(ctx, r, log)
 	}
 
+	// In hybrid mode the web twin has no published tracks — the native twin does.
+	// LoadParticipantInfo tries the native twin first and returns its info (with
+	// the twin's identity intact) when the primary user has no media tracks.
 	p, err := m.lk.LoadParticipantInfo(r.RoomId, r.UserId)
 	if err != nil {
 		log.WithError(err).Error("failed to load participant info")
@@ -43,6 +46,11 @@ func (m *UserModel) MuteUnMuteTrack(ctx context.Context, r *plugnmeet.MuteUnMute
 
 	trackSid := r.TrackSid
 	targetUserId := r.UserId
+	// If LoadParticipantInfo returned the native twin, switch to its identity
+	// so the LiveKit mute call targets the right publisher.
+	if p.Identity != r.UserId {
+		targetUserId = p.Identity
+	}
 
 	if trackSid == "" {
 		log.Infoln("no trackSid provided, searching for microphone track")
@@ -50,34 +58,6 @@ func (m *UserModel) MuteUnMuteTrack(ctx context.Context, r *plugnmeet.MuteUnMute
 			if t.Source == livekit.TrackSource_MICROPHONE {
 				trackSid = t.Sid
 				log.WithField("foundTrackSid", trackSid).Infoln("found microphone track")
-				break
-			}
-		}
-	}
-
-	if trackSid == "" {
-		// The primary participant has no mic track (e.g., hybrid web twin).
-		// Redirect to the [userID]-native publisher participant.
-		twinIdentity := config.GetNativeTwinIdentity(r.UserId)
-		participants, loadErr := m.lk.LoadParticipants(ctx, r.RoomId)
-		if loadErr != nil {
-			log.WithError(loadErr).Warn("failed to load room participants for native twin lookup")
-		} else {
-			for _, tp := range participants {
-				if tp.Identity != twinIdentity || tp.State != livekit.ParticipantInfo_ACTIVE {
-					continue
-				}
-				for _, t := range tp.Tracks {
-					if t.Source == livekit.TrackSource_MICROPHONE {
-						trackSid = t.Sid
-						targetUserId = twinIdentity
-						log.WithFields(logrus.Fields{
-							"twinIdentity": twinIdentity,
-							"trackSid":     trackSid,
-						}).Infoln("redirecting mute/unmute to native twin")
-						break
-					}
-				}
 				break
 			}
 		}
