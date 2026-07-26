@@ -53,6 +53,8 @@ func (s *NatsService) GetUserInfo(roomId, userId string) (*plugnmeet.NatsKvUserI
 	info.JoinedAt, _ = s.getUint64Value(kv, s.formatUserKey(userId, UserJoinedAt))
 	info.ReconnectedAt, _ = s.getUint64Value(kv, s.formatUserKey(userId, UserReconnectedAt))
 	info.DisconnectedAt, _ = s.getUint64Value(kv, s.formatUserKey(userId, UserDisconnectedAt))
+	ctStr, _ := s.getStringValue(kv, s.formatUserKey(userId, UserClientTypeKey))
+	info.ClientType = clientTypeFromString(ctStr)
 
 	// so, the room may not be started to watching yet, trigger here
 	// don't call watching directly from here, just call GetRoomInfo

@@ -11,6 +11,10 @@ func (m *WebhookModel) trackPublished(event *livekit.WebhookEvent) {
 		m.logger.Warnln("received track_published webhook with nil room, track, or participant info")
 		return
 	}
+	if primaryId, isTwin := nativeTwinPrimaryId(event.Participant); isTwin {
+		// attribute the twin's track events to the primary user
+		event.Participant.Identity = primaryId
+	}
 
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId":        event.Room.Name,
@@ -68,6 +72,10 @@ func (m *WebhookModel) trackUnpublished(event *livekit.WebhookEvent) {
 	if event.Room == nil || event.Track == nil || event.Participant == nil {
 		m.logger.Warnln("received track_unpublished webhook with nil room, track, or participant info")
 		return
+	}
+	if primaryId, isTwin := nativeTwinPrimaryId(event.Participant); isTwin {
+		// attribute the twin's track events to the primary user
+		event.Participant.Identity = primaryId
 	}
 
 	log := m.logger.WithFields(logrus.Fields{

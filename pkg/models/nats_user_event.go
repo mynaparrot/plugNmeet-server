@@ -8,6 +8,7 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -101,14 +102,25 @@ func (m *NatsModel) HandleMediaServerInfo(roomId, userId string, broadcast bool)
 		return nil
 	}
 
+	// client type comes from the user's NATS KV record (via GetUserInfo); WEB when unset
+	clientType := userInfo.GetClientType()
+
 	c := &plugnmeet.PlugNmeetTokenClaims{
-		RoomId:  roomId,
-		Name:    userInfo.Name,
-		UserId:  userInfo.UserId,
-		IsAdmin: userInfo.IsAdmin,
+		RoomId:     roomId,
+		Name:       userInfo.Name,
+		UserId:     userInfo.UserId,
+		IsAdmin:    userInfo.IsAdmin,
+		ClientType: clientType,
 	}
 
-	token, err := auth.GenerateLivekitAccessToken(m.app.LivekitInfo.ApiKey, m.app.LivekitInfo.Secret, *m.app.Client.TokenValidity, c)
+	canPublish := true
+	canSubscribe := true
+	if clientType == plugnmeet.ClientType_HYBRID_WEB {
+		canPublish = false
+		canSubscribe = true
+	}
+
+	token, err := auth.GenerateLivekitAccessToken(m.app.LivekitInfo.ApiKey, m.app.LivekitInfo.Secret, *m.app.Client.TokenValidity, c, canPublish, canSubscribe, "")
 	if err != nil {
 		log.WithError(err).Errorln("failed to generate livekit token")
 		_ = m.natsService.NotifyErrorMsg(roomId, err.Error(), &userId)
@@ -119,6 +131,23 @@ func (m *NatsModel) HandleMediaServerInfo(roomId, userId string, broadcast bool)
 	data := &plugnmeet.MediaServerConnInfo{
 		Url:   lkHost,
 		Token: token,
+	}
+
+	// Only mint the native publish-only twin token for hybrid sessions
+	if clientType == plugnmeet.ClientType_HYBRID_WEB {
+		nativeClaims := &plugnmeet.PlugNmeetTokenClaims{
+			RoomId:  roomId,
+			Name:    userInfo.Name,
+			UserId:  config.GetNativeTwinIdentity(userInfo.UserId),
+			IsAdmin: userInfo.IsAdmin,
+		}
+		nativeToken, err := auth.GenerateLivekitAccessToken(m.app.LivekitInfo.ApiKey, m.app.LivekitInfo.Secret, *m.app.Client.TokenValidity, nativeClaims, true, false, userInfo.UserId)
+		if err != nil {
+			log.WithError(err).Errorln("failed to generate native livekit token")
+			_ = m.natsService.NotifyErrorMsg(roomId, err.Error(), &userId)
+			return nil
+		}
+		data.NativeToken = nativeToken
 	}
 
 	// get turn credentials

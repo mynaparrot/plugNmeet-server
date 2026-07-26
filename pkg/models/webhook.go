@@ -74,8 +74,16 @@ func (m *WebhookModel) HandleWebhookEvents(e *livekit.WebhookEvent) {
 		m.roomFinished(e)
 
 	case "participant_joined":
+		if _, isTwin := nativeTwinPrimaryId(e.Participant); isTwin {
+			m.logger.Infof("skipping participant_joined webhook for native twin %s", e.Participant.GetIdentity())
+			return
+		}
 		m.participantJoined(e)
 	case "participant_left":
+		if _, isTwin := nativeTwinPrimaryId(e.Participant); isTwin {
+			m.logger.Infof("skipping participant_left webhook for native twin %s", e.Participant.GetIdentity())
+			return
+		}
 		m.participantLeft(e)
 
 	case "track_published":
@@ -120,6 +128,25 @@ func (m *WebhookModel) sendCustomTypeWebhook(event *livekit.WebhookEvent, eventN
 
 func (m *WebhookModel) isRequireManualTrigger(userId string) bool {
 	return strings.HasPrefix(userId, config.IngressUserIdPrefix) || strings.HasPrefix(userId, config.TTSAgentUserIdPrefix) || strings.HasPrefix(userId, config.SipUserIdPrefix)
+}
+
+// nativeTwinPrimaryId reports whether the given LiveKit participant is a hybrid
+// "native twin" (identity "[userID]-native") and returns the primary user id.
+// Detection prefers the `original_user_id` participant attribute (set at token
+// mint time); the twin identity suffix is the fallback.
+func nativeTwinPrimaryId(p *livekit.ParticipantInfo) (string, bool) {
+	if p == nil {
+		return "", false
+	}
+	if p.Attributes != nil {
+		if orig := p.Attributes["original_user_id"]; orig != "" {
+			return orig, true
+		}
+	}
+	if strings.HasSuffix(p.Identity, config.NativeTwinIdentitySuffix) {
+		return strings.TrimSuffix(p.Identity, config.NativeTwinIdentitySuffix), true
+	}
+	return "", false
 }
 
 // getRoomInfoFromNatsOrRedis attempts to retrieve room info from NATS,

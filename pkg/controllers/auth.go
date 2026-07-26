@@ -135,6 +135,7 @@ func (ac *AuthController) HandleVerifyHeaderToken(c fiber.Ctx) error {
 	c.Locals("roomSid", rf.RoomSid)
 	c.Locals("roomDbTableId", rf.DbTableId)
 	c.Locals("requestedUserId", claims.UserId)
+	c.Locals("clientType", claims.ClientType)
 
 	return c.Next()
 }
@@ -151,6 +152,7 @@ func (ac *AuthController) sendVerificationRes(c fiber.Ctx, s bool, m string, sta
 func (ac *AuthController) HandleVerifyToken(c fiber.Ctx) error {
 	roomId := fiber.Locals[string](c, "roomId")
 	requestedUserId := fiber.Locals[string](c, "requestedUserId")
+	clientType := fiber.Locals[plugnmeet.ClientType](c, "clientType")
 
 	req := new(plugnmeet.VerifyTokenReq)
 	if err := proto.Unmarshal(c.Body(), req); err != nil {
@@ -217,6 +219,7 @@ func (ac *AuthController) HandleVerifyToken(c fiber.Ctx) error {
 			DataChannel:      natsSubjs.DataChannel,
 		},
 		EnabledSelfInsertEncryptionKey: &enabledSelfInsertEncryptionKey,
+		ClientType:                     clientType,
 	}
 
 	return utils.SendProtobufResponse(c, res)

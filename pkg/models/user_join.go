@@ -40,6 +40,11 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 		log.WithError(err).Warnln()
 		return "", err
 	}
+	if strings.HasSuffix(g.GetUserInfo().GetUserId(), config.NativeTwinIdentitySuffix) {
+		err := fmt.Errorf("user_id: suffix %s is reserved for internal use only", config.NativeTwinIdentitySuffix)
+		log.WithError(err).Warnln()
+		return "", err
+	}
 
 	// Step 3: Fetch the current room information and metadata from NATS.
 	rInfo, meta, err := m.natsService.GetRoomInfoWithMetadata(g.GetRoomId())
@@ -157,7 +162,7 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 	}
 
 	// Step 9: Add the user's information to the NATS key-value store for the room.
-	err = m.natsService.AddUser(g.RoomId, g.UserInfo.UserId, g.UserInfo.Name, g.UserInfo.IsAdmin, g.UserInfo.UserMetadata.IsPresenter, g.UserInfo.UserMetadata)
+	err = m.natsService.AddUser(g.RoomId, g.UserInfo.UserId, g.UserInfo.Name, g.UserInfo.IsAdmin, g.UserInfo.UserMetadata.IsPresenter, g.UserInfo.UserMetadata, g.UserInfo.ClientType)
 	if err != nil {
 		log.WithError(err).Errorln("failed to add user to nats")
 		return "", err
@@ -165,11 +170,12 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 
 	// Step 10: Generate and return the final JWT for the client to use.
 	c := &plugnmeet.PlugNmeetTokenClaims{
-		Name:     g.UserInfo.Name,
-		UserId:   g.UserInfo.UserId,
-		RoomId:   g.RoomId,
-		IsAdmin:  g.UserInfo.IsAdmin,
-		IsHidden: g.UserInfo.IsHidden,
+		Name:       g.UserInfo.Name,
+		UserId:     g.UserInfo.UserId,
+		RoomId:     g.RoomId,
+		IsAdmin:    g.UserInfo.IsAdmin,
+		IsHidden:   g.UserInfo.IsHidden,
+		ClientType: g.UserInfo.ClientType,
 	}
 
 	log.Infoln("Successfully generated pnm join token")
