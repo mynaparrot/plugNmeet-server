@@ -18,6 +18,7 @@ Have questions or ideas? [Join our developer community on Discord](https://disco
 *   **Deep Customization**: Easily customize the UI, features, branding, and URLs to match your application's look and feel without modifying core code.
 *   **Advanced Broadcasting & Recording**: Includes reliable MP4 recording, RTMP/RTMPS broadcasting to services like YouTube, and RTMP/WHIP ingress for professional production tools like OBS.
 *   **Cross-Device Compatibility**: Works on all modern browsers, including Chrome, Firefox, and Safari for iOS, with no downloads required.
+*   **Native Mobile App Integration**: Build a custom video conferencing app for iOS, Android, Flutter, React Native, or desktop using the hybrid integration model — combine a native media layer with the full plugNmeet web client UI.
 
 And many more!
 
@@ -49,6 +50,7 @@ We've created a simple installation script to deploy all necessary components in
 *   [**Moodle** Plugin](https://github.com/mynaparrot/moodle-mod_plugnmeet)
 *   [**WordPress** Plugin](https://github.com/mynaparrot/plugNmeet-wordpress)
 *   [**LTI**](https://www.plugnmeet.org/docs/user-guide/lti) for any compatible LMS
+*   [**Native Mobile App Integration**](https://www.plugnmeet.org/docs/developer-guide/mobile-app-integration) — build custom iOS, Android, Flutter, React Native, or desktop apps
 
 ### Docker Images
 
