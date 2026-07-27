@@ -102,11 +102,14 @@ func (m *UserModel) updateAndBroadcastUserLock(roomId, userId, service, directio
 		return errors.New("user's metadata not found")
 	}
 
-	// when we'll do lock for all user then we should not lock admin except for whiteboard
-	// but for individual no restriction even for admin
-	if direction == "lock" && forAllUserTask && mt.IsAdmin && service != "whiteboard" {
-		// no lock when setting global locking
-		return nil
+	// when target user is admin, we should not allow lock/unlock except for whiteboard
+	if mt.IsAdmin && service != "whiteboard" {
+		if forAllUserTask {
+			// silently skip when setting global locking for all users
+			return nil
+		}
+		// return error for individual user updates
+		return errors.New("notifications.cannot-lock-admin")
 	}
 
 	// Apply the new setting to the struct.
