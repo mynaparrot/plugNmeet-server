@@ -28,7 +28,7 @@ require (
 	github.com/openai/openai-go/v3 v3.49.0
 	github.com/pion/webrtc/v4 v4.2.15
 	github.com/prometheus/client_golang v1.24.1
-	github.com/redis/go-redis/v9 v9.21.0
+	github.com/redis/go-redis/v9 v9.22.0
 	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/cast v1.10.0
 	go.uber.org/fx v1.24.0
