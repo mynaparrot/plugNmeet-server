@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -56,8 +57,8 @@ type RoomAgent struct {
 
 	synthesisTask *TranscriptionSynthesisTask
 
-	wg        sync.WaitGroup // Tracks running task goroutines.
-	closeOnce sync.Once      // Ensures shutdown runs exactly once.
+	wg           sync.WaitGroup // Tracks running task goroutines.
+	shuttingDown atomic.Bool    // Set before wg.Wait() so no new goroutines are registered.
 }
 
 type RoomAgentArgs struct {
@@ -145,7 +146,7 @@ func NewRoomAgent(args *RoomAgentArgs) (*RoomAgent, error) {
 		return nil, err
 	}
 
-	room := lksdk.NewRoom(&lksdk.RoomCallback{
+	agent.Room = lksdk.NewRoom(&lksdk.RoomCallback{
 		ParticipantCallback: lksdk.ParticipantCallback{
 			OnTrackPublished:    agent.onTrackPublished,
 			OnTrackSubscribed:   agent.onTrackSubscribed,
@@ -154,13 +155,11 @@ func NewRoomAgent(args *RoomAgentArgs) (*RoomAgent, error) {
 		OnDisconnected: agent.onDisconnected,
 	})
 
-	err = room.JoinWithToken(agent.conf.LivekitInfo.Host, token, lksdk.WithAutoSubscribe(false))
-	if err != nil {
+	if err := agent.Room.JoinWithToken(agent.conf.LivekitInfo.Host, token, lksdk.WithAutoSubscribe(false)); err != nil {
 		cancel()
 		return nil, err
 	}
 
-	agent.Room = room
 	log.Infof("Successfully connected with room %s", args.Payload.RoomId)
 
 	// Start the synthesis task if enabled
@@ -201,6 +200,10 @@ func (a *RoomAgent) startSynthesisTask() error {
 	a.synthesisTask = NewTranscriptionSynthesisTask(a.Ctx, a.conf, a.natsConn, a.logger, synthProvider, synthServiceConfig, a.redisService, a.natsService, a.Room.Name(), a.payload.AllowedTransLangs, a.payload.RoomE2EEKey)
 
 	// 4. Run the task in a goroutine.
+	if a.shuttingDown.Load() {
+		a.logger.Warn("agent is shutting down, not starting synthesis task")
+		return nil
+	}
 	a.wg.Add(1)
 	go func() {
 		defer a.wg.Done()
@@ -491,6 +494,11 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 
 	// Launch the agent's single, pre-created task and it's non-blocking call
 	// but use go just for safety
+	if a.shuttingDown.Load() {
+		a.lock.Unlock()
+		a.logger.Warn("agent is shutting down, not starting task for participant")
+		return
+	}
 	a.wg.Add(1)
 	a.lock.Unlock()
 
@@ -545,22 +553,23 @@ func (a *RoomAgent) Shutdown() {
 // shutdownOnce performs the teardown exactly once, regardless of whether it is
 // triggered by an explicit Shutdown or by an unexpected room disconnection.
 func (a *RoomAgent) shutdownOnce() {
-	a.closeOnce.Do(func() {
-		a.logger.Infoln("received shutdown signal, cleaning up room agent")
+	if !a.shuttingDown.CompareAndSwap(false, true) {
+		// already shutting
+		return
+	}
+	a.logger.Infoln("received shutdown signal, cleaning up room agent")
 
-		if a.Room != nil {
-			a.Room.Disconnect()
-		}
+	if a.Room != nil {
+		a.Room.Disconnect()
+	}
 
-		if a.synthesisTask != nil {
-			a.synthesisTask.Shutdown()
-		}
+	if a.synthesisTask != nil {
+		a.synthesisTask.Shutdown()
+	}
+	a.cancel()
 
-		a.cancel()
-
-		// Wait for task goroutines to finish before tearing down the room connection.
-		a.wg.Wait()
-	})
+	// Wait for task goroutines to finish before tearing down the room connection.
+	a.wg.Wait()
 }
 
 // onDisconnected is a LiveKit callback that triggers when the agent is disconnected from the room.

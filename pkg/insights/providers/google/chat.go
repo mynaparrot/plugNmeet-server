@@ -55,10 +55,14 @@ func newChatStream(ctx context.Context, client *genai.Client, model string, hist
 					streamUsageMetadata = chunk.UsageMetadata
 				}
 
-				resultChan <- &plugnmeet.InsightsAITextChatStreamResult{
+				select {
+				case resultChan <- &plugnmeet.InsightsAITextChatStreamResult{
 					Id:        streamId,
 					Text:      textContent.String(),
 					CreatedAt: fmt.Sprintf("%d", time.Now().UnixMilli()),
+				}:
+				case <-ctx.Done():
+					return
 				}
 			}
 		}
@@ -71,13 +75,17 @@ func newChatStream(ctx context.Context, client *genai.Client, model string, hist
 		}
 
 		// Signal the end of the stream with final token counts
-		resultChan <- &plugnmeet.InsightsAITextChatStreamResult{
+		select {
+		case resultChan <- &plugnmeet.InsightsAITextChatStreamResult{
 			Id:               streamId,
 			IsLastChunk:      true,
 			PromptTokens:     promptTokens,
 			CompletionTokens: completionTokens,
 			TotalTokens:      totalTokens,
 			CreatedAt:        fmt.Sprintf("%d", time.Now().UnixMilli()),
+		}:
+		case <-ctx.Done():
+			return
 		}
 	}()
 

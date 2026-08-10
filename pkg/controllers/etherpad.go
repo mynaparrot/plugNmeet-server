@@ -82,6 +82,9 @@ func (ec *EtherpadController) HandleCleanPad(c fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
+	roomId := fiber.Locals[string](c, "roomId")
+	req.RoomId = roomId
+
 	if err := ec.EtherpadModel.CleanPad(req.RoomId, req.NodeId, req.PadId); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -100,6 +103,9 @@ func (ec *EtherpadController) HandleChangeEtherpadStatus(c fiber.Ctx) error {
 	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
+
+	roomId := fiber.Locals[string](c, "roomId")
+	req.RoomId = roomId
 
 	if err := ec.EtherpadModel.ChangeEtherpadStatus(req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())

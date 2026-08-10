@@ -1,6 +1,7 @@
 package app
 
 import (
+	"crypto/subtle"
 	"io"
 	"path"
 	"runtime"
@@ -79,7 +80,10 @@ func NewRouter(appConfig *config.AppConfig, ctrl ApplicationControllers, ll *log
 		if prometheusConf.Username != "" && prometheusConf.Password != "" {
 			app.Use(p, basicauth.New(basicauth.Config{
 				Authorizer: func(user, pass string, c fiber.Ctx) bool {
-					return user == prometheusConf.Username && pass == prometheusConf.Password
+					if subtle.ConstantTimeCompare([]byte(user), []byte(prometheusConf.Username)) != 1 {
+						return false
+					}
+					return subtle.ConstantTimeCompare([]byte(pass), []byte(prometheusConf.Password)) == 1
 				},
 			}))
 		}

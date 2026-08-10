@@ -146,11 +146,18 @@ func (pc *PollsController) HandleUserSelectedOption(c fiber.Ctx) error {
 	roomId := fiber.Locals[string](c, "roomId")
 	pollId := c.Params("pollId")
 	userId := c.Params("userId")
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	requestedUserId := fiber.Locals[string](c, "requestedUserId")
 	res := new(plugnmeet.PollResponse)
 	res.Status = false
 
 	if pollId == "" || userId == "" {
 		res.Msg = "both userId & pollId required"
+		return sendPollResponse(c, res)
+	}
+
+	if !isAdmin && userId != requestedUserId {
+		res.Msg = "only admin can view other user's selection"
 		return sendPollResponse(c, res)
 	}
 

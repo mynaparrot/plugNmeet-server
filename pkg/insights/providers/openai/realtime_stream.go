@@ -282,6 +282,7 @@ func (s *openaiRealtimeStream) writeLoop() {
 		}
 
 		s.transcriptionSession.writeMu.Lock()
+		_ = s.transcriptionSession.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 		err := s.transcriptionSession.conn.WriteMessage(websocket.TextMessage, msg)
 		s.transcriptionSession.writeMu.Unlock()
 
@@ -322,12 +323,13 @@ func (s *openaiRealtimeStream) Close() error {
 		// Protected by writeQueueMu, so no send-on-closed-channel race.
 		s.closeWriteQueue()
 
-		// Drain all queued outbound messages before closing socket.
-		s.writeWg.Wait()
-
+		// Close the socket first so any stalled WriteMessage unblocks,
+		// then wait for the writer to drain and exit.
 		if s.transcriptionSession != nil && s.transcriptionSession.conn != nil {
 			_ = s.transcriptionSession.conn.Close()
 		}
+
+		s.writeWg.Wait()
 
 		s.readWg.Wait()
 		s.eventWg.Wait()
@@ -359,6 +361,8 @@ func (s *openaiRealtimeStream) readTranscriptionLoop() {
 				s.safeSend(&insights.TranscriptionEvent{Type: insights.EventTypeSessionStopped})
 				return
 			}
+
+			_ = s.transcriptionSession.conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 
 			_, data, err := s.transcriptionSession.conn.ReadMessage()
 			if err != nil {

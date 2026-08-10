@@ -208,6 +208,15 @@ func (fc *FileController) HandleConvertWhiteboardFile(c fiber.Ctx) error {
 	}
 	log := fc.logger.WithField("method", "HandleConvertWhiteboardFile")
 
+	_, _, err := helpers.ValidateAndGetAbsFilePath(fc.AppConfig.UploadFileSettings.Path, req.FilePath)
+	if err != nil {
+		log.WithError(err).Warn("file path validation failed")
+		if errors.Is(err, config.ErrFileNotFound) {
+			return commonFileErrorResponse(c, "file not found", fiber.StatusNotFound, plugnmeet.StatusCode_NOT_FOUND)
+		}
+		return commonFileErrorResponse(c, "invalid file path", fiber.StatusBadRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
+	}
+
 	// We'll give 50 seconds to complete the task
 	ctx, cancel := context.WithTimeout(c.RequestCtx(), 50*time.Second)
 	defer cancel()
@@ -276,6 +285,8 @@ func (fc *FileController) HandleGetRoomFilesByType(c fiber.Ctx) error {
 	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
+
+	req.RoomId = fiber.Locals[string](c, "roomId")
 
 	res, err := fc.FileModel.GetRoomFilesByType(req.RoomId, req.FileType)
 	if err != nil {

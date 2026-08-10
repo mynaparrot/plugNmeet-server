@@ -81,7 +81,7 @@ func (c *transcribeClient) CreateTranscription(mainCtx context.Context, roomId, 
 		return nil, err
 	}
 
-	resultsChan := make(chan *insights.TranscriptionEvent)
+	resultsChan := make(chan *insights.TranscriptionEvent, 64)
 	var closeOnce sync.Once
 	safeClose := func() {
 		closeOnce.Do(func() {
@@ -89,14 +89,13 @@ func (c *transcribeClient) CreateTranscription(mainCtx context.Context, roomId, 
 		})
 	}
 
-	// safeSend prevents a panic when sending to a closed channel by using recover.
+	// safeSend is non-blocking; if the consumer is not keeping up the event is dropped.
 	safeSend := func(event *insights.TranscriptionEvent) {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Warnln("could not send to resultsChan, likely closed:", r)
-			}
-		}()
-		resultsChan <- event
+		select {
+		case resultsChan <- event:
+		default:
+			log.Warnf("resultsChan full, dropping event type=%s", event.Type)
+		}
 	}
 
 	recognizer.SessionStarted(func(e speech.SessionEventArgs) {
@@ -160,12 +159,16 @@ func (c *transcribeClient) CreateTranscription(mainCtx context.Context, roomId, 
 	if err != nil {
 		log.WithError(err).Errorln("Error starting Azure recognition")
 		safeClose()
+		recognizer.Close()
+		audioConfig.Close()
+		return nil, err
 	}
 
 	ctx, cancel := context.WithCancel(mainCtx)
 	go func() {
 		<-ctx.Done()
-		recognizer.StopContinuousRecognitionAsync()
+		<-recognizer.StopContinuousRecognitionAsync()
+		recognizer.Close()
 	}()
 
 	stream := &azureTranscribeStream{

@@ -144,8 +144,13 @@ func (s *InsightsModel) HandleIncomingAgentTask(msg *nats.Msg) {
 			}
 
 			s.lock.RLock()
-			newAgent, _ := s.roomAgents[key]
+			newAgent, ok := s.roomAgents[key]
 			s.lock.RUnlock()
+			if !ok || newAgent == nil {
+				s.logger.Warnf("agent '%s' disappeared before activation", key)
+				reply(false, "agent not available")
+				return
+			}
 			if payload.CaptureAllParticipantsTracks {
 				newAgent.ActivateRoomWideTask()
 			} else {
@@ -180,12 +185,12 @@ func (s *InsightsModel) manageLocalAgent(payload *insights.InsightsTaskPayload, 
 	key := getAgentKey(payload.RoomId, payload.ServiceType)
 
 	s.lock.Lock()
-	defer s.lock.Unlock()
-
 	if _, ok := s.roomAgents[key]; ok {
 		// Agent already exists, nothing to do.
+		s.lock.Unlock()
 		return nil
 	}
+	s.lock.Unlock()
 
 	s.logger.Infof("no agent found for service '%s' in room %s, creating a new one", payload.ServiceType, payload.RoomId)
 
@@ -209,12 +214,24 @@ func (s *InsightsModel) manageLocalAgent(payload *insights.InsightsTaskPayload, 
 		Payload:         payload,
 	}
 
+	// NOTE: no lock is held here on purpose. NewRoomAgent performs token generation
+	// and a blocking LiveKit room join, which must not stall other agent operations.
 	agent, err := insightsservice.NewRoomAgent(args)
 	if err != nil {
 		_ = redisLock.Unlock(s.ctx)
 		return fmt.Errorf("failed to create insights agent: %w", err)
 	}
+
+	s.lock.Lock()
+	if _, ok := s.roomAgents[key]; ok {
+		// Another goroutine created the agent while we were working.
+		// Shut down the one we just created to avoid leaking it.
+		s.lock.Unlock()
+		agent.Shutdown()
+		return nil
+	}
 	s.roomAgents[key] = agent
+	s.lock.Unlock()
 
 	go s.superviseAgent(agent, redisLock)
 	return nil

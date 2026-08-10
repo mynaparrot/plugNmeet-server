@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	lksdk "github.com/livekit/server-sdk-go/v2"
@@ -39,10 +40,11 @@ type TranscriptionSynthesisTask struct {
 	transLangs    []string
 	voiceMappings map[string]string
 
-	lock    sync.RWMutex
-	workers map[string]*ttsWorker // map[language] -> ttsWorker
-	sf      singleflight.Group
-	wg      sync.WaitGroup // tracks running ttsWorker goroutines
+	lock         sync.RWMutex
+	workers      map[string]*ttsWorker // map[language] -> ttsWorker
+	sf           singleflight.Group
+	wg           sync.WaitGroup // tracks running ttsWorker goroutines
+	shuttingDown atomic.Bool
 }
 
 func NewTranscriptionSynthesisTask(ctx context.Context, appCnf *config.AppConfig, natsConn *nats.Conn, logger *logrus.Entry, provider insights.Provider, serviceConfig *config.ServiceConfig, redisService *redisservice.RedisService, natsService *natsservice.NatsService, roomId string, transLangs []string, e2eeKey *string) *TranscriptionSynthesisTask {
@@ -206,6 +208,12 @@ func (t *TranscriptionSynthesisTask) createAgentWorker(language string) (*ttsWor
 		t.workers[language] = worker
 		t.lock.Unlock()
 
+		// Never Add to the WaitGroup once Shutdown has started waiting on it.
+		if t.shuttingDown.Load() {
+			workerRoom.Disconnect()
+			cancel()
+			return nil, fmt.Errorf("synthesis task is shutting down")
+		}
 		t.wg.Add(1)
 		go func() {
 			defer t.wg.Done()
@@ -270,6 +278,10 @@ func (t *TranscriptionSynthesisTask) connectAgentToRoom(agentIdentity, agentName
 
 // Shutdown gracefully stops the TranscriptionSynthesisTask and all its workers.
 func (t *TranscriptionSynthesisTask) Shutdown() {
+	if !t.shuttingDown.CompareAndSwap(false, true) {
+		return
+	}
+
 	t.cancel() // This will stop the NATS subscription and all worker contexts
 
 	// Collect workers first to avoid holding lock during disconnect

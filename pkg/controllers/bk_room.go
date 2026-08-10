@@ -125,6 +125,7 @@ func (brc *BreakoutRoomController) HandleGetMyBreakoutRooms(c fiber.Ctx) error {
 
 // HandleIncreaseBreakoutRoomDuration increases the duration of a breakout room.
 func (brc *BreakoutRoomController) HandleIncreaseBreakoutRoomDuration(c fiber.Ctx) error {
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
 	roomId := fiber.Locals[string](c, "roomId")
 	res := new(plugnmeet.BreakoutRoomRes)
 	res.Status = false
@@ -133,6 +134,11 @@ func (brc *BreakoutRoomController) HandleIncreaseBreakoutRoomDuration(c fiber.Ct
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		res.Msg = err.Error()
+		return sendBreakoutRoomResponse(c, res)
+	}
+
+	if isAdmin != true {
+		res.Msg = "only admin can perform this task"
 		return sendBreakoutRoomResponse(c, res)
 	}
 
@@ -150,6 +156,7 @@ func (brc *BreakoutRoomController) HandleIncreaseBreakoutRoomDuration(c fiber.Ct
 
 // HandleSendBreakoutRoomMsg broadcasts a message to all breakout rooms.
 func (brc *BreakoutRoomController) HandleSendBreakoutRoomMsg(c fiber.Ctx) error {
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
 	roomId := fiber.Locals[string](c, "roomId")
 	res := new(plugnmeet.BreakoutRoomRes)
 	res.Status = false
@@ -158,6 +165,11 @@ func (brc *BreakoutRoomController) HandleSendBreakoutRoomMsg(c fiber.Ctx) error 
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
 		res.Msg = err.Error()
+		return sendBreakoutRoomResponse(c, res)
+	}
+
+	if isAdmin != true {
+		res.Msg = "only admin can perform this task"
 		return sendBreakoutRoomResponse(c, res)
 	}
 
@@ -174,6 +186,7 @@ func (brc *BreakoutRoomController) HandleSendBreakoutRoomMsg(c fiber.Ctx) error 
 
 // HandleEndBreakoutRoom ends a specific breakout room.
 func (brc *BreakoutRoomController) HandleEndBreakoutRoom(c fiber.Ctx) error {
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
 	roomId := fiber.Locals[string](c, "roomId")
 	res := new(plugnmeet.BreakoutRoomRes)
 	res.Status = false
@@ -181,6 +194,11 @@ func (brc *BreakoutRoomController) HandleEndBreakoutRoom(c fiber.Ctx) error {
 	req := new(plugnmeet.EndBreakoutRoomReq)
 	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		res.Msg = err.Error()
+		return sendBreakoutRoomResponse(c, res)
+	}
+
+	if isAdmin != true {
+		res.Msg = "only admin can perform this task"
 		return sendBreakoutRoomResponse(c, res)
 	}
 
