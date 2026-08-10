@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -57,7 +58,7 @@ func (m *FileModel) UploadBase64EncodedData(req *plugnmeet.UploadBase64EncodedDa
 	meta := &plugnmeet.RoomUploadedFileMetadata{
 		FileId:   fileId,
 		FileName: safeFilename,
-		FilePath: filepath.Join(roomSid, safeFilename),
+		FilePath: path.Join(roomSid, safeFilename),
 		FileType: req.FileType,
 		MimeType: mimeType.String(),
 	}
@@ -70,7 +71,7 @@ func (m *FileModel) UploadBase64EncodedData(req *plugnmeet.UploadBase64EncodedDa
 		Status:        true,
 		Msg:           "file uploaded successfully",
 		FileMimeType:  mimeType.String(),
-		FilePath:      filepath.Join(roomSid, safeFilename),
+		FilePath:      path.Join(roomSid, safeFilename),
 		FileName:      safeFilename,
 		FileExtension: strings.TrimPrefix(mimeType.Extension(), "."),
 	}, nil

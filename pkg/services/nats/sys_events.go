@@ -2,9 +2,9 @@ package natsservice
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
-	"github.com/gammazero/workerpool"
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -105,20 +105,25 @@ func (s *NatsService) BroadcastSystemEventToEveryoneExceptUserId(event plugnmeet
 		return config.NoOnlineUserFound
 	}
 
-	wp := workerpool.New(32)
+	sem := make(chan struct{}, 32)
+	var wg sync.WaitGroup
 	for _, id := range ids {
 		if id != exceptUserId {
-			id := id // capture
-			wp.Submit(func() {
+			sem <- struct{}{}
+			wg.Add(1)
+			go func(id string) {
+				defer func() {
+					<-sem
+					wg.Done()
+				}()
 				err := s.BroadcastSystemEventToRoom(event, roomId, data, &id)
 				if err != nil {
 					s.logger.WithError(err).Errorln("failed to broadcast system event")
 				}
-			})
+			}(id)
 		}
 	}
-	// Wait for all broadcasts to complete before returning.
-	wp.StopWait()
+	wg.Wait()
 
 	return nil
 }

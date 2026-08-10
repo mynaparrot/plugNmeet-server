@@ -91,6 +91,11 @@ func (c *transcribeClient) CreateTranscription(mainCtx context.Context, roomId, 
 
 	// safeSend is non-blocking; if the consumer is not keeping up the event is dropped.
 	safeSend := func(event *insights.TranscriptionEvent) {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Warnln("could not send to resultsChan, likely closed:", r)
+			}
+		}()
 		select {
 		case resultsChan <- event:
 		default:
