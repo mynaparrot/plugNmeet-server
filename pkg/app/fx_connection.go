@@ -168,11 +168,18 @@ func provideNATSConnection(lc fx.Lifecycle, appCnf *config.AppConfig, ll *logrus
 
 	lc.Append(fx.Hook{
 		OnStop: func(ctx context.Context) error {
-			log.Info("Closing NATS connection")
+			log.Info("Draining NATS connection")
 			if err := nc.Drain(); err != nil {
 				return err
 			}
-			nc.Close()
+			// Drain is asynchronous — wait for graceful close or context timeout.
+			select {
+			case <-nc.StatusChanged(nats.CLOSED):
+				log.Info("NATS connection drained gracefully")
+			case <-ctx.Done():
+				log.Warn("NATS drain timed out, forcing close")
+				nc.Close()
+			}
 			return nil
 		},
 	})

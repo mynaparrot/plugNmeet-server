@@ -44,10 +44,14 @@ func chatStream(ctx context.Context, client sdk.Client, service *config.ServiceC
 				continue
 			}
 
-			resultChan <- &plugnmeet.InsightsAITextChatStreamResult{
+			select {
+			case resultChan <- &plugnmeet.InsightsAITextChatStreamResult{
 				Id:        streamId,
 				Text:      content,
 				CreatedAt: fmt.Sprintf("%d", time.Now().UnixMilli()),
+			}:
+			case <-ctx.Done():
+				return
 			}
 		}
 
@@ -56,10 +60,14 @@ func chatStream(ctx context.Context, client sdk.Client, service *config.ServiceC
 		}
 
 		// Signal the end of the stream.
-		resultChan <- &plugnmeet.InsightsAITextChatStreamResult{
+		select {
+		case resultChan <- &plugnmeet.InsightsAITextChatStreamResult{
 			Id:          streamId,
 			IsLastChunk: true,
 			CreatedAt:   fmt.Sprintf("%d", time.Now().UnixMilli()),
+		}:
+		case <-ctx.Done():
+			return
 		}
 	}()
 

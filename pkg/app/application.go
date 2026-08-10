@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
@@ -44,6 +46,7 @@ type Application struct {
 	janitorModel  *models.JanitorModel
 	artifactModel *models.ArtifactModel
 	lkServices    *livekitservice.LivekitService
+	appWg         sync.WaitGroup
 }
 
 // NewApplication creates a new Application instance.
@@ -92,9 +95,17 @@ func (a *Application) Start(_ context.Context) error {
 	}
 
 	// Start the janitor in a separate goroutine.
-	go a.janitorModel.StartJanitor()
+	a.appWg.Add(1)
+	go func() {
+		defer a.appWg.Done()
+		a.janitorModel.StartJanitor()
+	}()
 	// TODO: will remove in future
-	go a.artifactModel.MigrateAnalyticsToArtifacts()
+	a.appWg.Add(1)
+	go func() {
+		defer a.appWg.Done()
+		a.artifactModel.MigrateAnalyticsToArtifacts()
+	}()
 
 	// Initialize NATS controller.
 	if err := a.router.ctrl.NatsController.Initialize(); err != nil {
@@ -135,10 +146,34 @@ func (a *Application) Stop(ctx context.Context) error {
 		a.log.WithError(err).Warn("Graceful shutdown failed, forcing exit.")
 	}
 
-	a.router.ctrl.NatsController.Stop()
-	a.router.ctrl.InsightsController.Shutdown()
-	a.router.ctrl.WebhookController.Shutdown()
-	a.janitorModel.Shutdown()
+	// Run subsystem shutdowns bounded by the context deadline.
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		a.router.ctrl.NatsController.Stop()
+		a.router.ctrl.InsightsController.Shutdown()
+		a.router.ctrl.WebhookController.Shutdown()
+		a.janitorModel.Shutdown()
+	}()
+
+	select {
+	case <-done:
+		a.log.Info("All subsystems shut down gracefully")
+	case <-ctx.Done():
+		a.log.Warn("Subsystem shutdown timed out, proceeding")
+	}
+
+	// Wait for background goroutines started in Start() with a hard timeout.
+	appDone := make(chan struct{})
+	go func() {
+		a.appWg.Wait()
+		close(appDone)
+	}()
+	select {
+	case <-appDone:
+	case <-time.After(5 * time.Second):
+		a.log.Warn("Background goroutines did not finish within 5s, forcing exit")
+	}
 
 	return nil
 }

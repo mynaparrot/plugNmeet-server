@@ -2,6 +2,7 @@ package natsservice
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -104,9 +105,17 @@ func (s *NatsService) BroadcastSystemEventToEveryoneExceptUserId(event plugnmeet
 		return config.NoOnlineUserFound
 	}
 
+	sem := make(chan struct{}, 32)
+	var wg sync.WaitGroup
 	for _, id := range ids {
 		if id != exceptUserId {
+			sem <- struct{}{}
+			wg.Add(1)
 			go func(id string) {
+				defer func() {
+					<-sem
+					wg.Done()
+				}()
 				err := s.BroadcastSystemEventToRoom(event, roomId, data, &id)
 				if err != nil {
 					s.logger.WithError(err).Errorln("failed to broadcast system event")
@@ -114,6 +123,7 @@ func (s *NatsService) BroadcastSystemEventToEveryoneExceptUserId(event plugnmeet
 			}(id)
 		}
 	}
+	wg.Wait()
 
 	return nil
 }

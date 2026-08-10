@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -44,12 +45,12 @@ func (m *FileModel) UploadBase64EncodedData(req *plugnmeet.UploadBase64EncodedDa
 
 	if err := os.MkdirAll(saveDir, 0755); err != nil {
 		log.WithError(err).Error("failed to create upload directory")
-		return nil, fmt.Errorf("failed to create upload directory: %w", err)
+		return nil, fmt.Errorf("failed to save file")
 	}
 
 	if err := os.WriteFile(filePath, data, 0644); err != nil {
 		log.WithError(err).Error("failed to write file to disk")
-		return nil, fmt.Errorf("failed to write file: %w", err)
+		return nil, fmt.Errorf("failed to save file")
 	}
 
 	// at present format ${file.id}.png
@@ -57,7 +58,7 @@ func (m *FileModel) UploadBase64EncodedData(req *plugnmeet.UploadBase64EncodedDa
 	meta := &plugnmeet.RoomUploadedFileMetadata{
 		FileId:   fileId,
 		FileName: safeFilename,
-		FilePath: filePath,
+		FilePath: path.Join(roomSid, safeFilename),
 		FileType: req.FileType,
 		MimeType: mimeType.String(),
 	}
@@ -70,7 +71,7 @@ func (m *FileModel) UploadBase64EncodedData(req *plugnmeet.UploadBase64EncodedDa
 		Status:        true,
 		Msg:           "file uploaded successfully",
 		FileMimeType:  mimeType.String(),
-		FilePath:      filepath.Join(roomSid, safeFilename),
+		FilePath:      path.Join(roomSid, safeFilename),
 		FileName:      safeFilename,
 		FileExtension: strings.TrimPrefix(mimeType.Extension(), "."),
 	}, nil

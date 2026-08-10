@@ -57,6 +57,11 @@ func newNatsCacheService(ctx context.Context, log *logrus.Entry) *NatsCacheServi
 	}
 }
 
+// Shutdown cancels the service context, stopping all active KV watchers.
+func (ncs *NatsCacheService) Shutdown() {
+	ncs.serviceCancel()
+}
+
 func (ncs *NatsCacheService) convertTextToUint64(text string) uint64 {
 	value, _ := strconv.ParseUint(text, 10, 64)
 	return value

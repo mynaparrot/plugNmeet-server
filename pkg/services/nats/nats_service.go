@@ -67,7 +67,7 @@ func New(args Args) *NatsService {
 		app:    args.App,
 		nc:     args.Nc,
 		js:     args.Js,
-		cs:     newNatsCacheService(args.Ctx, log),
+		cs:     newNatsCacheService(ctx, log),
 		logger: log,
 	}
 }
@@ -87,6 +87,7 @@ func (s *NatsService) Initialized(lc fx.Lifecycle) error {
 		},
 		OnStop: func(_ context.Context) error {
 			s.logger.Info("NatsService closing..")
+			s.cs.Shutdown()
 			s.cancel()
 			return nil
 		},
