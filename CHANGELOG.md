@@ -1,5 +1,28 @@
 # Changelog
 
+## [2.4.0](https://github.com/mynaparrot/plugNmeet-server/compare/v2.3.0...v2.4.0) (2026-08-11)
+
+
+### Features
+
+* hybrid integration (nativeBridge) ([#889](https://github.com/mynaparrot/plugNmeet-server/issues/889)) ([ccf01db](https://github.com/mynaparrot/plugNmeet-server/commit/ccf01db3da5839a8ba8b8c66ae18704131d23da6))
+
+
+### Bug Fixes
+
+* bump `MuPDF` ([996ca4b](https://github.com/mynaparrot/plugNmeet-server/commit/996ca4b25a5558cf52867c11f9732c6ea5d670e4))
+* bump deps ([9344da6](https://github.com/mynaparrot/plugNmeet-server/commit/9344da6a57c5af3205a0f9025fd7f5ed3c560ea4))
+* copy `options` properly + clean up code ([e5d87e0](https://github.com/mynaparrot/plugNmeet-server/commit/e5d87e016edcf9b1d1d1a6f2113caca0a7f554be))
+* dynamically calculated A4 page orientation e.g. landscape or  portrait based on converted image file ([1968e26](https://github.com/mynaparrot/plugNmeet-server/commit/1968e26fb6051a454e49e5a1d435073cb7df677e))
+* few improvements in openAI + agent ([e1d8b86](https://github.com/mynaparrot/plugNmeet-server/commit/e1d8b86fc8fa8f0ef61dd90a373cf94bc1f8df5d))
+* get correct user in different LK related services ([d63e712](https://github.com/mynaparrot/plugNmeet-server/commit/d63e71258f12b465b697b4dd6fb3545f810d1a81))
+* **insights:** added new provider `OpenAI` ([#883](https://github.com/mynaparrot/plugNmeet-server/issues/883)) ([3ab03cf](https://github.com/mynaparrot/plugNmeet-server/commit/3ab03cfe67f6cc0e631d4e44530d17cd748772ed))
+* missed to add latest tag, fixed: https://github.com/mynaparrot/plugNmeet-install/issues/43 ([2b2e32f](https://github.com/mynaparrot/plugNmeet-server/commit/2b2e32f275cb6a301e36ab58806c621671e8ea7a))
+* missing checks for admin + cleanup ([#895](https://github.com/mynaparrot/plugNmeet-server/issues/895)) ([951d0a6](https://github.com/mynaparrot/plugNmeet-server/commit/951d0a6a934b46ec461abd68fa367da1c0f22284))
+* prevent to change lock setting for admin ([ff6e9e9](https://github.com/mynaparrot/plugNmeet-server/commit/ff6e9e950509625f53e58a6166c50b17d15f3e74))
+* use multiple worker in case too many pages during converting PDF to image ([1c9d99e](https://github.com/mynaparrot/plugNmeet-server/commit/1c9d99e787c28b557d8ceda2a43271dc750b29cc))
+* we should not verify it like that way ([ceabfa4](https://github.com/mynaparrot/plugNmeet-server/commit/ceabfa4acec4ab515cb428c758cc0eea4272ef88))
+
 ## [2.3.0](https://github.com/mynaparrot/plugNmeet-server/compare/v2.2.0...v2.3.0) (2026-07-06)
 
 
