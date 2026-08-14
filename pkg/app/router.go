@@ -225,9 +225,7 @@ func (r *Router) registerAPIRoutes() {
 	api.Post("/switchPresenter", r.ctrl.UserController.HandleSwitchPresenter)
 
 	etherpad := api.Group("/etherpad")
-	etherpad.Post("/create", r.ctrl.EtherpadController.HandleCreateEtherpad)
-	etherpad.Post("/cleanPad", r.ctrl.EtherpadController.HandleCleanPad)
-	etherpad.Post("/changeStatus", r.ctrl.EtherpadController.HandleChangeEtherpadStatus)
+	etherpad.Post("/changeStatus", r.ctrl.NotepadController.HandleChangeEtherpadStatus)
 
 	polls := api.Group("/polls")
 	polls.Post("/activate", r.ctrl.PollsController.HandleActivatePolls)

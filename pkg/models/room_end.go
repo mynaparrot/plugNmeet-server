@@ -194,9 +194,6 @@ func (m *RoomModel) onAfterRoomEnded(p *onAfterRoomEndedParams) {
 		log.WithError(err).Error("Error deleting room duration")
 	}
 
-	// Clean up any associated Etherpad (shared notepad) pads.
-	_ = m.etherpadModel.CleanAfterRoomEnd(p.roomId, p.metadata)
-
 	// Clean up any polls created during the session.
 	if err := m.pollModel.CleanUpPolls(p.roomId); err != nil {
 		log.WithError(err).Error("Error cleaning polls")

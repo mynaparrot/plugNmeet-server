@@ -30,7 +30,6 @@ type AppConfig struct {
 	DatabaseInfo        DatabaseInfo               `yaml:"database_info"`
 	UploadFileSettings  UploadFileSettings         `yaml:"upload_file_settings"`
 	RecorderInfo        RecorderInfo               `yaml:"recorder_info"`
-	SharedNotePad       SharedNotePad              `yaml:"shared_notepad"`
 	AnalyticsSettings   *AnalyticsSettings         `yaml:"analytics_settings"`
 	ArtifactsSettings   *ArtifactsSettings         `yaml:"artifacts_settings"`
 	NatsInfo            NatsInfo                   `yaml:"nats_info"`
@@ -107,18 +106,6 @@ type RecorderInfo struct {
 	EnableDelRecordingBackup   bool          `yaml:"enable_del_recording_backup"`
 	DelRecordingBackupPath     string        `yaml:"del_recording_backup_path"`
 	DelRecordingBackupDuration time.Duration `yaml:"del_recording_backup_duration"`
-}
-
-type SharedNotePad struct {
-	Enabled       bool           `yaml:"enabled"`
-	EtherpadHosts []EtherpadInfo `yaml:"etherpad_hosts"`
-}
-
-type EtherpadInfo struct {
-	Id           string `yaml:"id"`
-	Host         string `yaml:"host"`
-	ClientId     string `yaml:"client_id"`
-	ClientSecret string `yaml:"client_secret"`
 }
 
 type AnalyticsSettings struct {

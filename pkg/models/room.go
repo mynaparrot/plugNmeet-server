@@ -47,7 +47,6 @@ type RoomModel struct {
 	userModel       *UserModel
 	recordingModel  *RecordingModel
 	fileModel       *FileModel
-	etherpadModel   *EtherpadModel
 	pollModel       *PollModel
 	analyticsModel  *AnalyticsModel
 	breakoutModel   *BreakoutRoomModel
@@ -72,7 +71,6 @@ type RoomModelArgs struct {
 	UserModel       *UserModel
 	RecordingModel  *RecordingModel
 	FileModel       *FileModel
-	EtherpadModel   *EtherpadModel
 	PollModel       *PollModel
 	AnalyticsModel  *AnalyticsModel
 	InsightsModel   *InsightsModel
@@ -91,7 +89,6 @@ func NewRoomModel(args RoomModelArgs) *RoomModel {
 		userModel:       args.UserModel,
 		recordingModel:  args.RecordingModel,
 		fileModel:       args.FileModel,
-		etherpadModel:   args.EtherpadModel,
 		pollModel:       args.PollModel,
 		analyticsModel:  args.AnalyticsModel,
 		insightsModel:   args.InsightsModel,

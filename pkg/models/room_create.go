@@ -189,7 +189,7 @@ func (m *RoomModel) setRoomDefaults(r *plugnmeet.CreateRoomReq) {
 	utils.PrepareDefaultRoomFeatures(r)
 
 	// set default values
-	utils.SetCreateRoomDefaultValues(r, m.app.UploadFileSettings.MaxSize, m.app.UploadFileSettings.MaxSizeWhiteboardFile, m.app.UploadFileSettings.AllowedTypes, m.app.SharedNotePad.Enabled)
+	utils.SetCreateRoomDefaultValues(r, m.app.UploadFileSettings.MaxSize, m.app.UploadFileSettings.MaxSizeWhiteboardFile, m.app.UploadFileSettings.AllowedTypes)
 
 	// set default lock settings
 	utils.SetRoomDefaultLockSettings(r)

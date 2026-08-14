@@ -116,17 +116,7 @@ recorder_info:
   # this value should be same as recorder's copy_to_dir path
   recording_files_path: "/app/recording_files"
   token_validity: 30m
-shared_notepad:
-  enabled: true
-  # multiple hosts can be added here
-  # server will be selected based on load
-  # the value of id should be unique
-  etherpad_hosts:
-    -
-      id: "node_01"
-      host: "http://host.docker.internal:9001"
-      client_id: "plugNmeet"
-      client_secret: "lmpGEH0MxrBg7ymsbSh9TU1d6VHRMk"
+
 azure_cognitive_services_speech:
   enabled: false
   # The Maximum number of translation languages allows selecting. Default: 2
