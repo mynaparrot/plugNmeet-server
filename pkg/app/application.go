@@ -22,7 +22,7 @@ type ApplicationControllers struct {
 	AuthController         *controllers.AuthController
 	BBBController          *controllers.BBBController
 	BreakoutRoomController *controllers.BreakoutRoomController
-	EtherpadController     *controllers.EtherpadController
+	NotepadController      *controllers.NotepadController
 	FileController         *controllers.FileController
 	LtiV1Controller        *controllers.LtiV1Controller
 	PollsController        *controllers.PollsController

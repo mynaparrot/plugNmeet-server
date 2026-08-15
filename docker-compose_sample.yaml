@@ -57,19 +57,6 @@ services:
       - livekit
     extra_hosts:
       - "host.docker.internal:host-gateway"
-  etherpad:
-    image: mynaparrot/plugnmeet-etherpad
-    ports:
-      - "9001:9001/tcp"
-    volumes:
-      - ./etc/etherpad/settings.json:/opt/etherpad-lite/settings.json
-      # mount fonts as read only mood
-#      - /usr/share/fonts/:/usr/share/fonts/:ro
-#      - /etc/fonts/:/etc/fonts/:ro
-#      - /usr/share/fontconfig/:/usr/share/fontconfig/:ro
-#      - /var/cache/fontconfig/:/var/cache/fontconfig/:ro
-    depends_on:
-      - redis
   plugnmeet-api:
     build:
       context: .

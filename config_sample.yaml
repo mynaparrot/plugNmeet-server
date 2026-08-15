@@ -207,18 +207,6 @@ recorder_info:
   # Duration to retain deleted recordings in backup, in hours. Default is 72 hours (3 days).
   del_recording_backup_duration: 72h
 
-shared_notepad:
-  enabled: true
-  # Multiple Etherpad hosts can be listed. Load balancing is based on server load.
-  # Each host ID must be unique.
-  etherpad_hosts:
-    -
-      # Refer to the note at the top of this file regarding valid IDs.
-      id: "node_01"
-      host: "http://host.docker.internal:9001"
-      client_id: "plugNmeet"
-      client_secret: "lmpGEH0MxrBg7ymsbSh9TU1d6VHRMk"
-
 analytics_settings:
   # Enable to generate a detailed analytics file after each session.
   # This file contains valuable metadata about user engagement, such as join/leave times,

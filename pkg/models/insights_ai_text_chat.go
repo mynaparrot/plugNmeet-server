@@ -17,7 +17,7 @@ const (
 	defaultAIContextWindow = 5
 )
 
-func (s *InsightsModel) AITextChatRequest(roomId, userId, prompt string) error {
+func (s *InsightsModel) AITextChatRequest(roomId, userId, prompt, streamId string, requestFrom plugnmeet.InsightsAIRequestSource) error {
 	ctx := s.ctx
 	logger := s.logger.WithField("roomId", roomId).WithField("userId", userId)
 
@@ -41,11 +41,25 @@ func (s *InsightsModel) AITextChatRequest(roomId, userId, prompt string) error {
 		return err
 	}
 
-	// 2. Build history (SYNC) - now fetches only the necessary window
-	history, err := s.buildHistoryWithUserPrompt(ctx, roomId, userId, prompt)
-	if err != nil {
-		logger.WithError(err).Error("failed to build history")
-		return err
+	// 2. Build history (SYNC) - now fetches only the necessary window.
+	// Notepad AI requests use a fresh, ephemeral history and never touch
+	// the per-user chat conversation context.
+	isNotepad := requestFrom == plugnmeet.InsightsAIRequestSource_INSIGHTS_AI_REQUEST_SOURCE_NOTEPAD
+	var history []*plugnmeet.InsightsAITextChatContent
+	if isNotepad {
+		history = []*plugnmeet.InsightsAITextChatContent{
+			{
+				Role:     plugnmeet.InsightsAITextChatRole_INSIGHTS_AI_TEXT_CHAT_ROLE_USER,
+				Text:     prompt,
+				StreamId: &streamId,
+			},
+		}
+	} else {
+		history, err = s.buildHistoryWithUserPrompt(ctx, roomId, userId, prompt)
+		if err != nil {
+			logger.WithError(err).Error("failed to build history")
+			return err
+		}
 	}
 
 	// 3. Get stream from provider
@@ -75,12 +89,21 @@ func (s *InsightsModel) AITextChatRequest(roomId, userId, prompt string) error {
 			}
 			fullResponse.WriteString(res.Text)
 
+			if streamId != "" {
+				res.Id = streamId
+			}
+			res.RequestFrom = &requestFrom
+
 			if marshal, err := protojson.Marshal(res); err == nil {
 				err := s.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_RESP_INSIGHTS_AI_TEXT_CHAT, roomId, string(marshal), &userId)
 				if err != nil {
 					s.logger.WithError(err).Error("failed to broadcast system event")
 				}
 			}
+		}
+
+		if isNotepad {
+			return
 		}
 
 		// Append AI response to history
