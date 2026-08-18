@@ -42,11 +42,12 @@ func (s *InsightsModel) AITextChatRequest(roomId, userId, prompt, streamId strin
 	}
 
 	// 2. Build history (SYNC) - now fetches only the necessary window.
-	// Notepad AI requests use a fresh, ephemeral history and never touch
-	// the per-user chat conversation context.
-	isNotepad := requestFrom == plugnmeet.InsightsAIRequestSource_INSIGHTS_AI_REQUEST_SOURCE_NOTEPAD
+	// Notepad/Whiteboard AI requests use a fresh, ephemeral history and never
+	// touch the per-user chat conversation context.
+	isEphemeral := requestFrom == plugnmeet.InsightsAIRequestSource_INSIGHTS_AI_REQUEST_SOURCE_NOTEPAD ||
+		requestFrom == plugnmeet.InsightsAIRequestSource_INSIGHTS_AI_REQUEST_SOURCE_WHITEBOARD
 	var history []*plugnmeet.InsightsAITextChatContent
-	if isNotepad {
+	if isEphemeral {
 		history = []*plugnmeet.InsightsAITextChatContent{
 			{
 				Role:     plugnmeet.InsightsAITextChatRole_INSIGHTS_AI_TEXT_CHAT_ROLE_USER,
@@ -102,7 +103,7 @@ func (s *InsightsModel) AITextChatRequest(roomId, userId, prompt, streamId strin
 			}
 		}
 
-		if isNotepad {
+		if isEphemeral {
 			return
 		}
 

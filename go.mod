@@ -21,11 +21,11 @@ require (
 	github.com/livekit/media-sdk v0.0.0-20260605212526-4c11a51d3c97
 	github.com/livekit/protocol v1.50.4
 	github.com/livekit/server-sdk-go/v2 v2.18.1
-	github.com/mynaparrot/plugnmeet-protocol v1.5.1-0.20260815030515-4d0bff979664
+	github.com/mynaparrot/plugnmeet-protocol v1.5.1-0.20260818151653-6fa0dd9647e4
 	github.com/nats-io/jwt/v2 v2.8.2
 	github.com/nats-io/nats.go v1.53.1
 	github.com/nats-io/nkeys v0.4.16
-	github.com/openai/openai-go/v3 v3.51.0
+	github.com/openai/openai-go/v3 v3.52.0
 	github.com/pion/webrtc/v4 v4.2.18
 	github.com/prometheus/client_golang v1.24.1
 	github.com/redis/go-redis/v9 v9.22.0

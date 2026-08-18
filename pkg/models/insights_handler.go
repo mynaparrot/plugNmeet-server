@@ -295,6 +295,7 @@ func (s *InsightsModel) AITextChatConfigure(req *plugnmeet.InsightsAITextChatCon
 	aiTextChatFeatures.IsAllowedEveryone = req.IsAllowedEveryone
 	aiTextChatFeatures.AllowedUserIds = req.AllowedUserIds
 	aiTextChatFeatures.IsNotepadAiDisabled = req.IsNotepadAiDisabled
+	aiTextChatFeatures.IsWhiteboardAiDisabled = req.IsWhiteboardAiDisabled
 
 	// analytics
 	s.artifactModel.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_AI_TEXT_CHAT_STATUS, new(plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()), nil)
@@ -338,6 +339,10 @@ func (s *InsightsModel) ExecuteAITextChat(req *plugnmeet.InsightsAITextChatConte
 	if requestFrom == plugnmeet.InsightsAIRequestSource_INSIGHTS_AI_REQUEST_SOURCE_NOTEPAD &&
 		aiTextChatFeatures.IsNotepadAiDisabled {
 		return fmt.Errorf("notepad AI is disabled")
+	}
+	if requestFrom == plugnmeet.InsightsAIRequestSource_INSIGHTS_AI_REQUEST_SOURCE_WHITEBOARD &&
+		aiTextChatFeatures.IsWhiteboardAiDisabled {
+		return fmt.Errorf("whiteboard AI is disabled")
 	}
 
 	var streamId string
