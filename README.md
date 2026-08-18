@@ -55,7 +55,6 @@ We've created a simple installation script to deploy all necessary components in
 ### Docker Images
 
 *   [plugnmeet-server](https://hub.docker.com/r/mynaparrot/plugnmeet-server)
-*   [plugnmeet-etherpad](https://hub.docker.com/r/mynaparrot/plugnmeet-etherpad)
 *   [plugnmeet-recorder](https://hub.docker.com/r/mynaparrot/plugnmeet-recorder)
 
 Full server API documentation is available in the [API Docs](https://www.plugnmeet.org/docs/api/intro).
