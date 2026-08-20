@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.5.0](https://github.com/mynaparrot/plugNmeet-server/compare/v2.4.0...v2.5.0) (2026-08-20)
+
+
+### Features
+
+* **refactor:** renamed to `Shared Notepad` ([ff3c4ac](https://github.com/mynaparrot/plugNmeet-server/commit/ff3c4ac2ce2358f4e313bd08050e017ea4eb994e))
+* replaced `Etherpad` with `BlockNote` + `AI` ([#896](https://github.com/mynaparrot/plugNmeet-server/issues/896)) ([cef0de7](https://github.com/mynaparrot/plugNmeet-server/commit/cef0de7c7dac520aea52513530c40453ba08a9b5))
+* **whiteboard:** add `AI Text-to-Diagram` support to the whiteboard ([5a42aca](https://github.com/mynaparrot/plugNmeet-server/commit/5a42aca866ea72744530dcaf514c7014acd30be1))
+
+
+### Bug Fixes
+
+* bump `MUPDF` to `1.28.2` ([2995ef0](https://github.com/mynaparrot/plugNmeet-server/commit/2995ef0ecd24c7dc3e1a41d8a9b3a602458e9e3e))
+* removed etherpad as we're no longer using it ([c270154](https://github.com/mynaparrot/plugNmeet-server/commit/c27015450936f0de8820d1b7efc4716e6af40bd7))
+
 ## [2.4.0](https://github.com/mynaparrot/plugNmeet-server/compare/v2.3.0...v2.4.0) (2026-08-11)
 
 
