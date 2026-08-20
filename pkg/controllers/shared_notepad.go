@@ -9,38 +9,37 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// NotepadController holds dependencies for shared notepad handlers.
-type NotepadController struct {
-	NotepadModel *models.NotepadModel
+// SharedNotepadController holds dependencies for shared notepad handlers.
+type SharedNotepadController struct {
+	NotepadModel *models.SharedNotepadModel
 }
 
-type NotepadControllerArgs struct {
+type SharedNotepadControllerArgs struct {
 	fx.In
-	NotepadModel *models.NotepadModel
+	NotepadModel *models.SharedNotepadModel
 }
 
-func NewNotepadController(args NotepadControllerArgs) *NotepadController {
-	return &NotepadController{
+func NewSharedNotepadController(args SharedNotepadControllerArgs) *SharedNotepadController {
+	return &SharedNotepadController{
 		NotepadModel: args.NotepadModel,
 	}
 }
 
-// HandleChangeEtherpadStatus handles enabling/disabling the shared notepad.
+// HandleChangeSharedNotepadStatus handles enabling/disabling the shared notepad.
 // The route/message names are kept for API compatibility with the previous Etherpad notepad.
-func (nc *NotepadController) HandleChangeEtherpadStatus(c fiber.Ctx) error {
+func (nc *SharedNotepadController) HandleChangeSharedNotepadStatus(c fiber.Ctx) error {
 	isAdmin := fiber.Locals[bool](c, "isAdmin")
 	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
 	}
 
-	req := new(plugnmeet.ChangeEtherpadStatusReq)
+	req := new(plugnmeet.ChangeSharedNotepadStatusReq)
 	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
 	req.RoomId = fiber.Locals[string](c, "roomId")
-
-	if err := nc.NotepadModel.ChangeEtherpadStatus(req); err != nil {
+	if err := nc.NotepadModel.ChangeSharedNotepadStatus(req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 

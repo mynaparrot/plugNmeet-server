@@ -9,31 +9,31 @@ import (
 	"go.uber.org/fx"
 )
 
-type NotepadModel struct {
+type SharedNotepadModel struct {
 	analyticsModel *AnalyticsModel
 	natsService    *natsservice.NatsService
 	logger         *logrus.Entry
 }
 
-type NotepadModelArgs struct {
+type SharedNotepadModelArgs struct {
 	fx.In
 	NatsService    *natsservice.NatsService
 	AnalyticsModel *AnalyticsModel
 	Logger         *logrus.Logger
 }
 
-func NewNotepadModel(args NotepadModelArgs) *NotepadModel {
-	return &NotepadModel{
+func NewSharedNotepadModel(args SharedNotepadModelArgs) *SharedNotepadModel {
+	return &SharedNotepadModel{
 		analyticsModel: args.AnalyticsModel,
 		natsService:    args.NatsService,
 		logger:         args.Logger.WithField("model", "notepad"),
 	}
 }
 
-// ChangeEtherpadStatus toggles the shared notepad active state. On first
+// ChangeSharedNotepadStatus toggles the shared notepad active state. On first
 // activation it generates the BlockNote document id (note_pad_id). The method
 // name is kept for API compatibility with the previous Etherpad notepad.
-func (m *NotepadModel) ChangeEtherpadStatus(r *plugnmeet.ChangeEtherpadStatusReq) error {
+func (m *SharedNotepadModel) ChangeSharedNotepadStatus(r *plugnmeet.ChangeSharedNotepadStatusReq) error {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId":   r.RoomId,
 		"isActive": r.IsActive,
@@ -73,7 +73,7 @@ func (m *NotepadModel) ChangeEtherpadStatus(r *plugnmeet.ChangeEtherpadStatusReq
 	}
 	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
-		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_ETHERPAD_STATUS,
+		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_SHARED_NOTEPAD_STATUS,
 		RoomId:    r.RoomId,
 		HsetValue: &val,
 	})

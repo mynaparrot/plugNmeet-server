@@ -224,8 +224,8 @@ func (r *Router) registerAPIRoutes() {
 	api.Post("/removeParticipant", r.ctrl.UserController.HandleRemoveParticipant)
 	api.Post("/switchPresenter", r.ctrl.UserController.HandleSwitchPresenter)
 
-	etherpad := api.Group("/etherpad")
-	etherpad.Post("/changeStatus", r.ctrl.NotepadController.HandleChangeEtherpadStatus)
+	sharedNotepad := api.Group("/sharedNotepad")
+	sharedNotepad.Post("/changeStatus", r.ctrl.NotepadController.HandleChangeSharedNotepadStatus)
 
 	polls := api.Group("/polls")
 	polls.Post("/activate", r.ctrl.PollsController.HandleActivatePolls)
