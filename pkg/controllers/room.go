@@ -349,3 +349,23 @@ func (rc *RoomController) HandleUpdateWaitingRoomMessage(c fiber.Ctx) error {
 
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
+
+// HandleChangeSharedNotepadStatus handles enabling/disabling the shared notepad.
+func (rc *RoomController) HandleChangeSharedNotepadStatus(c fiber.Ctx) error {
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	if !isAdmin {
+		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
+	}
+
+	req := new(plugnmeet.ChangeSharedNotepadStatusReq)
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	req.RoomId = fiber.Locals[string](c, "roomId")
+	if err := rc.RoomModel.ChangeSharedNotepadStatus(req); err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	return utils.SendCommonProtobufResponse(c, true, "success")
+}

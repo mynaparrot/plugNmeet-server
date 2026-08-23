@@ -219,13 +219,13 @@ func (r *Router) registerAPIRoutes() {
 	waitingRoom.Post("/approveUsers", r.ctrl.RoomController.HandleApproveUsers)
 	waitingRoom.Post("/updateMsg", r.ctrl.RoomController.HandleUpdateWaitingRoomMessage)
 
+	sharedNotepad := api.Group("/sharedNotepad")
+	sharedNotepad.Post("/changeStatus", r.ctrl.RoomController.HandleChangeSharedNotepadStatus)
+
 	api.Post("/updateLockSettings", r.ctrl.UserController.HandleUpdateUserLockSetting)
 	api.Post("/muteUnmuteTrack", r.ctrl.UserController.HandleMuteUnMuteTrack)
 	api.Post("/removeParticipant", r.ctrl.UserController.HandleRemoveParticipant)
 	api.Post("/switchPresenter", r.ctrl.UserController.HandleSwitchPresenter)
-
-	sharedNotepad := api.Group("/sharedNotepad")
-	sharedNotepad.Post("/changeStatus", r.ctrl.NotepadController.HandleChangeSharedNotepadStatus)
 
 	polls := api.Group("/polls")
 	polls.Post("/activate", r.ctrl.PollsController.HandleActivatePolls)
