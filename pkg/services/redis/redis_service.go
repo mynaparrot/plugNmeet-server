@@ -43,3 +43,29 @@ func New(args Args) *RedisService {
 func (s *RedisService) GetRedisClient() *redis.Client {
 	return s.rc
 }
+
+func (s *RedisService) DeleteKeys(allKeys []string) error {
+	_, err := s.rc.Del(s.ctx, allKeys...).Result()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *RedisService) ScanKeys(pattern string) ([]string, error) {
+	var cursor uint64
+	var allKeys []string
+
+	for {
+		keys, nextCursor, err := s.rc.Scan(s.ctx, cursor, pattern, 0).Result()
+		if err != nil {
+			return nil, err
+		}
+		allKeys = append(allKeys, keys...)
+		if nextCursor == 0 {
+			break
+		}
+		cursor = nextCursor
+	}
+	return allKeys, nil
+}

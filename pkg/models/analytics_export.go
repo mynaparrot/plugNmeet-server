@@ -116,7 +116,7 @@ func (m *AnalyticsModel) exportAnalyticsToJSON(room *dbmodels.RoomInfo, metadata
 
 	// Use SCAN (via Keys) to find all analytics keys for this room
 	scanPattern := fmt.Sprintf(analyticsRoomKey, room.RoomId) + ":*"
-	allKeys, err := m.rs.AnalyticsScanKeys(scanPattern)
+	allKeys, err := m.rs.ScanKeys(scanPattern)
 	if err != nil {
 		log.WithError(err).Error("failed to scan analytics keys for room")
 		return nil, err
@@ -201,7 +201,7 @@ func (m *AnalyticsModel) exportAnalyticsToJSON(room *dbmodels.RoomInfo, metadata
 	usersKey := fmt.Sprintf(analyticsRoomKey+":room:users", room.RoomId)
 	allKeys = append(allKeys, usersKey)
 
-	if err = m.rs.AnalyticsDeleteKeys(allKeys); err != nil {
+	if err = m.rs.DeleteKeys(allKeys); err != nil {
 		log.WithError(err).Error("Failed to delete analytics keys from redis")
 	}
 

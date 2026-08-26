@@ -199,6 +199,11 @@ func (m *RoomModel) onAfterRoomEnded(p *onAfterRoomEndedParams) {
 		log.WithError(err).Error("Error cleaning polls")
 	}
 
+	// Clean up session-scoped temporary data (whiteboard/notepad snapshots).
+	if err := m.rs.DeleteSessionRoomData(p.roomId); err != nil {
+		log.WithError(err).Error("Error deleting session data")
+	}
+
 	// Perform post-end tasks for breakout rooms, if any.
 	if err := m.breakoutModel.PostTaskAfterRoomEndWebhook(m.ctx, p.roomId, p.metadata); err != nil {
 		log.WithError(err).Error("Error in breakout room post-end task")
