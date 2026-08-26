@@ -93,5 +93,9 @@ func (m *NatsModel) HandleFromClientToServerReq(roomId, userId string, req *plug
 		m.HandleSendUsersList(roomId, userId, new(plugnmeet.NatsMsgServerToClientEvents_RESP_ONLINE_USERS_LIST))
 	case plugnmeet.NatsMsgClientToServerEvents_REQ_PRIVATE_DATA_DELIVERY:
 		m.HandleToDeliveryPrivateData(roomId, userId, req)
+	case plugnmeet.NatsMsgClientToServerEvents_SESSION_DATA_SAVE:
+		m.HandleSessionDataSave(roomId, userId, req)
+	case plugnmeet.NatsMsgClientToServerEvents_SESSION_DATA_FETCH_REQUEST:
+		m.HandleSessionDataFetchRequest(roomId, userId, req)
 	}
 }

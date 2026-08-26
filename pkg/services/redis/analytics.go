@@ -67,29 +67,3 @@ func (s *RedisService) AnalyticsGetAllUsers(key string) (map[string]string, erro
 	}
 	return result, nil
 }
-
-func (s *RedisService) AnalyticsDeleteKeys(allKeys []string) error {
-	_, err := s.rc.Del(s.ctx, allKeys...).Result()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *RedisService) AnalyticsScanKeys(pattern string) ([]string, error) {
-	var cursor uint64
-	var allKeys []string
-
-	for {
-		keys, nextCursor, err := s.rc.Scan(s.ctx, cursor, pattern, 0).Result()
-		if err != nil {
-			return nil, err
-		}
-		allKeys = append(allKeys, keys...)
-		if nextCursor == 0 {
-			break
-		}
-		cursor = nextCursor
-	}
-	return allKeys, nil
-}
