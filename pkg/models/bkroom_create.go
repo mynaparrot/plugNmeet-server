@@ -86,6 +86,10 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	if meta.RoomFeatures.BreakoutRoomFeatures != nil {
 		meta.RoomFeatures.BreakoutRoomFeatures.IsActive = false
 		meta.RoomFeatures.BreakoutRoomFeatures.IsAllow = false
+		// propagate the return-to-main-room permission from the request onto the
+		// (shared) child template metadata. The parent's own broadcast is updated
+		// separately via origMeta below, so both parent and children carry it.
+		meta.RoomFeatures.BreakoutRoomFeatures.AllowReturnToMainRoom = r.AllowReturnToMainRoom
 	}
 
 	// disable few features
@@ -132,6 +136,30 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 
 	// get all parent room files metadata into the breakout room bucket.
 	parentFiles, _ := m.natsService.GetAllRoomFiles(r.RoomId)
+
+	// When sharing polls, the shared definitions must be reachable in the child
+	// rooms: a-client gates the polls menu/panel on PollsFeatures.isAllow and the
+	// active toggle on PollsFeatures.isActive. Flip both on so the copied polls
+	// are usable. This only touches the (shared) child template metadata; the
+	// parent keeps its own PollsFeatures via the origMeta update below.
+	if r.SharePolls {
+		if meta.RoomFeatures.PollsFeatures == nil {
+			meta.RoomFeatures.PollsFeatures = &plugnmeet.PollsFeatures{}
+		}
+		meta.RoomFeatures.PollsFeatures.IsAllow = true
+		meta.RoomFeatures.PollsFeatures.IsActive = true
+	}
+
+	// fetch the parent's polls once (only when sharing) so we can copy them into
+	// each child room. A fetch failure is non-fatal: we simply skip poll sharing.
+	var parentPolls map[string]string
+	if r.SharePolls {
+		parentPolls, err = m.rs.GetAllRoomPolls(r.RoomId)
+		if err != nil {
+			log.WithError(err).Error("failed to fetch parent room polls for sharing")
+			parentPolls = nil
+		}
+	}
 
 	e := make(map[string]bool)
 	createdRooms := make([]*plugnmeet.BreakoutRoom, 0, len(r.Rooms))
@@ -189,6 +217,34 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 			}
 		}
 
+		// copy the parent's poll definitions into the child room, when sharing.
+		// Each stored value is a PollInfo JSON; we mark it running in the child
+		// and re-marshal. Per-room vote/response keys are deliberately NOT copied
+		// (they start empty in every room). A single bad entry is skipped rather
+		// than aborting breakout creation.
+		if r.SharePolls && len(parentPolls) > 0 {
+			copied := make(map[string]string)
+			for pollId, raw := range parentPolls {
+				info := new(plugnmeet.PollInfo)
+				if uErr := protojson.Unmarshal([]byte(raw), info); uErr != nil {
+					roomLog.WithError(uErr).Warn("failed to unmarshal parent poll for copy; skipping")
+					continue
+				}
+				info.IsRunning = true
+				m, mErr := protojson.Marshal(info)
+				if mErr != nil {
+					roomLog.WithError(mErr).Warn("failed to marshal child poll; skipping")
+					continue
+				}
+				copied[pollId] = string(m)
+			}
+			if len(copied) > 0 {
+				if cErr := m.rs.CreateRoomPoll(bRoomId, copied); cErr != nil {
+					roomLog.WithError(cErr).Error("failed to write shared polls into breakout room")
+				}
+			}
+		}
+
 		// now send invitation notification
 		for _, u := range room.Users {
 			err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_JOIN_BREAKOUT_ROOM, r.RoomId, bRoom.RoomId, &u.Id)
@@ -212,6 +268,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 		return createdRooms, err
 	}
 	origMeta.RoomFeatures.BreakoutRoomFeatures.IsActive = true
+	origMeta.RoomFeatures.BreakoutRoomFeatures.AllowReturnToMainRoom = r.AllowReturnToMainRoom
 	err = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, origMeta)
 	if err != nil {
 		log.WithError(err).Error("Failed to update parent room metadata")
