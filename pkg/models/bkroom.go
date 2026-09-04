@@ -1,6 +1,8 @@
 package models
 
 import (
+	"errors"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
@@ -54,7 +56,7 @@ func (m *BreakoutRoomModel) SendBreakoutRoomMsg(r *plugnmeet.BroadcastBreakoutRo
 	rooms, err := m.fetchBreakoutRooms(r.RoomId)
 	if err != nil {
 		log.WithError(err).Error("Failed to fetch breakout rooms")
-		return err
+		return errors.New("breakout-room.notifications.unexpected-error")
 	}
 
 	if rooms == nil || len(rooms) == 0 {
@@ -83,7 +85,7 @@ func (m *BreakoutRoomModel) IncreaseBreakoutRoomDuration(r *plugnmeet.IncreaseBr
 
 	room, err := m.fetchBreakoutRoom(r.RoomId, r.BreakoutRoomId)
 	if err != nil {
-		log.WithError(err).Error("Failed to fetch breakout room info")
+		log.Error("Failed to fetch breakout room info")
 		return err
 	}
 
@@ -92,7 +94,7 @@ func (m *BreakoutRoomModel) IncreaseBreakoutRoomDuration(r *plugnmeet.IncreaseBr
 	newDuration, err := m.rm.IncreaseRoomDuration(r.BreakoutRoomId, r.Duration)
 	if err != nil {
 		log.WithError(err).Error("Failed to increase room duration")
-		return err
+		return errors.New("breakout-room.notifications.unexpected-error")
 	}
 
 	// now update nats
@@ -101,12 +103,12 @@ func (m *BreakoutRoomModel) IncreaseBreakoutRoomDuration(r *plugnmeet.IncreaseBr
 	marshal, err := protojson.Marshal(room)
 	if err != nil {
 		log.WithError(err).Error("Failed to marshal breakout room data")
-		return err
+		return errors.New("breakout-room.notifications.unexpected-error")
 	}
 
 	if err = m.rs.InsertOrUpdateBreakoutRoom(r.RoomId, r.BreakoutRoomId, marshal); err != nil {
 		log.WithError(err).Error("Failed to update breakout room in nats")
-		return err
+		return errors.New("breakout-room.notifications.unexpected-error")
 	}
 
 	log.WithField("new_duration", newDuration).Info("Successfully increased breakout room duration")

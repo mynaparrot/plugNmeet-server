@@ -35,13 +35,13 @@ func (brc *BreakoutRoomController) HandleCreateBreakoutRooms(c fiber.Ctx) error 
 	res.Status = false
 
 	if isAdmin != true {
-		res.Msg = "only admin can perform this task"
+		res.Msg = "breakout-room.notifications.only-admin"
 		return utils.SendProtobufResponse(c, res)
 	}
 
 	req := new(plugnmeet.CreateBreakoutRoomsReq)
 	if err := proto.Unmarshal(c.Body(), req); err != nil {
-		res.Msg = err.Error()
+		res.Msg = "breakout-room.notifications.unexpected-error"
 		return utils.SendProtobufResponse(c, res)
 	}
 
@@ -73,7 +73,7 @@ func (brc *BreakoutRoomController) HandleJoinBreakoutRoom(c fiber.Ctx) error {
 	req := new(plugnmeet.JoinBreakoutRoomReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		res.Msg = err.Error()
+		res.Msg = "breakout-room.notifications.unexpected-error"
 		return utils.SendProtobufResponse(c, res)
 	}
 
@@ -107,6 +107,11 @@ func (brc *BreakoutRoomController) HandleGetBreakoutRooms(c fiber.Ctx) error {
 	res.Status = true
 	res.Msg = "success"
 	res.Rooms = rooms
+	// Admins-only surface: late-joining main-room users not assigned to any
+	// breakout room. Never populated for non-admins (server-side filtering).
+	if isAdmin && len(rooms) > 0 {
+		res.UnassignedUsers = brc.BreakoutRoomModel.GetUnassignedBreakoutRoomUsers(roomId, rooms)
+	}
 	return utils.SendProtobufResponse(c, res)
 }
 
@@ -139,12 +144,12 @@ func (brc *BreakoutRoomController) HandleIncreaseBreakoutRoomDuration(c fiber.Ct
 	req := new(plugnmeet.IncreaseBreakoutRoomDurationReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		res.Msg = err.Error()
+		res.Msg = "breakout-room.notifications.unexpected-error"
 		return utils.SendProtobufResponse(c, res)
 	}
 
 	if isAdmin != true {
-		res.Msg = "only admin can perform this task"
+		res.Msg = "breakout-room.notifications.only-admin"
 		return utils.SendProtobufResponse(c, res)
 	}
 
@@ -170,12 +175,12 @@ func (brc *BreakoutRoomController) HandleSendBreakoutRoomMsg(c fiber.Ctx) error 
 	req := new(plugnmeet.BroadcastBreakoutRoomMsgReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		res.Msg = err.Error()
+		res.Msg = "breakout-room.notifications.unexpected-error"
 		return utils.SendProtobufResponse(c, res)
 	}
 
 	if isAdmin != true {
-		res.Msg = "only admin can perform this task"
+		res.Msg = "breakout-room.notifications.only-admin"
 		return utils.SendProtobufResponse(c, res)
 	}
 
@@ -199,12 +204,12 @@ func (brc *BreakoutRoomController) HandleEndBreakoutRoom(c fiber.Ctx) error {
 
 	req := new(plugnmeet.EndBreakoutRoomReq)
 	if err := proto.Unmarshal(c.Body(), req); err != nil {
-		res.Msg = err.Error()
+		res.Msg = "breakout-room.notifications.unexpected-error"
 		return utils.SendProtobufResponse(c, res)
 	}
 
 	if isAdmin != true {
-		res.Msg = "only admin can perform this task"
+		res.Msg = "breakout-room.notifications.only-admin"
 		return utils.SendProtobufResponse(c, res)
 	}
 
@@ -230,7 +235,7 @@ func (brc *BreakoutRoomController) HandleBackToMainRoom(c fiber.Ctx) error {
 
 	req := new(plugnmeet.BackToMainRoomReq)
 	if err := proto.Unmarshal(c.Body(), req); err != nil {
-		res.Msg = err.Error()
+		res.Msg = "breakout-room.notifications.unexpected-error"
 		return utils.SendProtobufResponse(c, res)
 	}
 
@@ -258,7 +263,7 @@ func (brc *BreakoutRoomController) HandleEndBreakoutRooms(c fiber.Ctx) error {
 	res.Status = false
 
 	if isAdmin != true {
-		res.Msg = "only admin can perform this task"
+		res.Msg = "breakout-room.notifications.only-admin"
 		return utils.SendProtobufResponse(c, res)
 	}
 
@@ -282,18 +287,53 @@ func (brc *BreakoutRoomController) HandleReInviteBreakoutRoom(c fiber.Ctx) error
 	res.Status = false
 
 	if isAdmin != true {
-		res.Msg = "only admin can perform this task"
+		res.Msg = "breakout-room.notifications.only-admin"
 		return utils.SendProtobufResponse(c, res)
 	}
 
 	req := new(plugnmeet.ReInviteBreakoutRoomReq)
 	if err := proto.Unmarshal(c.Body(), req); err != nil {
-		res.Msg = err.Error()
+		res.Msg = "breakout-room.notifications.unexpected-error"
 		return utils.SendProtobufResponse(c, res)
 	}
 
 	req.RoomId = roomId
 	if err := brc.BreakoutRoomModel.ReInviteBreakoutRoom(c.RequestCtx(), req); err != nil {
+		res.Msg = err.Error()
+		return utils.SendProtobufResponse(c, res)
+	}
+
+	res.Status = true
+	res.Msg = "success"
+	return utils.SendProtobufResponse(c, res)
+}
+
+// HandleMoveBreakoutRoomUser moves a user to another breakout room (or to the
+// main room when breakout_room_id is empty) while the session is in progress.
+// The move is instant: the target client auto-redirects to the new room.
+func (brc *BreakoutRoomController) HandleMoveBreakoutRoomUser(c fiber.Ctx) error {
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	roomId := brc.BreakoutRoomModel.ResolveParentRoomId(fiber.Locals[string](c, "roomId"))
+
+	res := new(plugnmeet.BreakoutRoomRes)
+	res.Status = false
+
+	if isAdmin != true {
+		res.Msg = "breakout-room.notifications.only-admin"
+		return utils.SendProtobufResponse(c, res)
+	}
+
+	req := new(plugnmeet.MoveBreakoutRoomUserReq)
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
+		res.Msg = "breakout-room.notifications.unexpected-error"
+		return utils.SendProtobufResponse(c, res)
+	}
+
+	// req.RoomId is the parent room; req.UserId is the user TO MOVE (from the
+	// body) and must NOT be overwritten with the requesting admin's id.
+	req.RoomId = roomId
+
+	if err := brc.BreakoutRoomModel.MoveBreakoutRoomUser(c.RequestCtx(), req); err != nil {
 		res.Msg = err.Error()
 		return utils.SendProtobufResponse(c, res)
 	}

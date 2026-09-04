@@ -39,20 +39,18 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	mainRoom, meta, err := m.natsService.GetRoomInfoWithMetadata(r.RoomId)
 	if err != nil {
 		log.WithError(err).Error("Failed to get parent room info")
-		return nil, fmt.Errorf("failed to get parent room info")
+		return nil, errors.New("breakout-room.notifications.unexpected-error")
 	}
 
 	if mainRoom == nil || meta == nil {
-		err = errors.New("invalid empty parent room information")
-		log.WithError(err).Error()
-		return nil, err
+		log.Error("invalid empty parent room information")
+		return nil, errors.New("breakout-room.notifications.unexpected-error")
 	}
 
 	// do not allow nesting breakout rooms inside a breakout room.
 	if meta.IsBreakoutRoom {
-		err = errors.New("breakout rooms cannot be created inside another breakout room")
-		log.WithError(err).Error()
-		return nil, err
+		log.Error("breakout rooms cannot be created inside another breakout room")
+		return nil, errors.New("breakout-room.notifications.cannot-create-inside-breakout")
 	}
 
 	// enforce the allowed number of breakout rooms for this parent room.
@@ -61,9 +59,8 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	if meta.RoomFeatures != nil && meta.RoomFeatures.BreakoutRoomFeatures != nil {
 		allowedRooms := meta.RoomFeatures.BreakoutRoomFeatures.AllowedNumberRooms
 		if allowedRooms > 0 && uint32(len(r.Rooms)) > allowedRooms {
-			err = fmt.Errorf("number of breakout rooms exceeds the allowed limit of %d", allowedRooms)
-			log.WithError(err).Error()
-			return nil, err
+			log.WithField("allowedRooms", allowedRooms).Error("number of breakout rooms exceeds the allowed limit")
+			return nil, errors.New("breakout-room.notifications.max-rooms-exceeded")
 		}
 	}
 
@@ -71,7 +68,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	if meta.RoomFeatures.RoomDuration != nil && *meta.RoomFeatures.RoomDuration > 0 {
 		if err := m.rm.CompareDurationWithParentRoom(r.RoomId, r.Duration); err != nil {
 			log.WithError(err).Error("Duration comparison with parent room failed")
-			return nil, fmt.Errorf("duration comparison with parent room failed")
+			return nil, errors.New("breakout-room.notifications.duration-exceeds-parent")
 		}
 	}
 
@@ -85,7 +82,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 		})
 		if switchErr != nil {
 			log.WithError(switchErr).Error("failed to make requesting user presenter for whiteboard share")
-			return nil, fmt.Errorf("failed to make requesting user presenter for whiteboard share")
+			return nil, errors.New("breakout-room.notifications.unexpected-error")
 		}
 	}
 
@@ -120,7 +117,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	_, childWbf, err := m.normalizeBreakoutWhiteboardShare(r, meta, log)
 	if err != nil {
 		log.WithError(err).Error("Failed to validate whiteboard share")
-		return nil, err
+		return nil, errors.New("breakout-room.notifications.unexpected-error")
 	}
 	meta.RoomFeatures.WhiteboardFeatures = childWbf
 
@@ -237,16 +234,15 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	}
 
 	if len(e) == len(r.Rooms) {
-		err = errors.New("breakout room creation wasn't successful for any room")
-		log.WithError(err).Error()
-		return nil, err
+		log.Error("breakout room creation wasn't successful for any room")
+		return nil, errors.New("breakout-room.notifications.creation-failed")
 	}
 
 	// again here for update
 	origMeta, err := m.natsService.UnmarshalRoomMetadata(mainRoom.Metadata)
 	if err != nil {
 		log.WithError(err).Error("Failed to unmarshal original parent room metadata")
-		return createdRooms, err
+		return createdRooms, errors.New("breakout-room.notifications.unexpected-error")
 	}
 	origMeta.RoomFeatures.BreakoutRoomFeatures.IsActive = true
 	origMeta.RoomFeatures.BreakoutRoomFeatures.AllowReturnToMainRoom = r.AllowReturnToMainRoom
@@ -254,7 +250,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 
 	if err := m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, origMeta); err != nil {
 		log.WithError(err).Error("Failed to update parent room metadata")
-		return createdRooms, err
+		return createdRooms, errors.New("breakout-room.notifications.unexpected-error")
 	}
 
 	// send analytics
@@ -439,7 +435,7 @@ func (m *BreakoutRoomModel) PostTaskAfterRoomStartWebhook(roomId string, metadat
 
 	room, err := m.fetchBreakoutRoom(metadata.ParentRoomId, roomId)
 	if err != nil {
-		log.WithError(err).Error("Failed to fetch breakout room info")
+		log.Error("Failed to fetch breakout room info")
 		return err
 	}
 	room.Created = metadata.StartedAt

@@ -22,17 +22,16 @@ func (m *BreakoutRoomModel) JoinBreakoutRoom(ctx context.Context, r *plugnmeet.J
 	status, err := m.natsService.GetRoomUserStatus(r.BreakoutRoomId, r.UserId)
 	if err != nil {
 		log.WithError(err).Error("failed to get user status for breakout room")
-		return "", err
+		return "", errors.New("breakout-room.notifications.unexpected-error")
 	}
 	if status == natsservice.UserStatusOnline {
-		err = errors.New("user has already been joined")
-		log.WithError(err).Warn()
-		return "", err
+		log.Warn("user has already been joined")
+		return "", errors.New("breakout-room.notifications.user-already-joined")
 	}
 
 	room, err := m.fetchBreakoutRoom(r.RoomId, r.BreakoutRoomId)
 	if err != nil {
-		log.WithError(err).Error("failed to fetch breakout room info")
+		log.Error("failed to fetch breakout room info")
 		return "", err
 	}
 
@@ -59,20 +58,20 @@ func (m *BreakoutRoomModel) JoinBreakoutRoom(ctx context.Context, r *plugnmeet.J
 			}
 		}
 		if !canJoin {
-			err = errors.New("user is not allowed to join this breakout room")
-			log.WithError(err).Warn("user not in the list of allowed users for this breakout room")
-			return "", err
+			log.Warn("user not in the list of allowed users for this breakout room")
+			return "", errors.New("breakout-room.notifications.user-not-allowed-join")
 		}
 	}
 
 	p, meta, err := m.natsService.GetUserWithMetadata(r.RoomId, r.UserId)
 	if err != nil {
 		log.WithError(err).Error("failed to get user info from parent room")
-		return "", err
+		return "", errors.New("breakout-room.notifications.unexpected-error")
 	}
 
 	if p == nil || meta == nil {
-		return "", errors.New("failed to get user info from parent room")
+		log.Error("failed to get user info from parent room")
+		return "", errors.New("breakout-room.notifications.unexpected-error")
 	}
 	// let GetPNMJoinToken to set IsPresenter value
 	meta.IsPresenter = false
@@ -89,7 +88,7 @@ func (m *BreakoutRoomModel) JoinBreakoutRoom(ctx context.Context, r *plugnmeet.J
 	token, err := m.um.GetPNMJoinToken(ctx, req, false)
 	if err != nil {
 		log.WithError(err).Error("failed to generate join token for breakout room")
-		return "", err
+		return "", errors.New("breakout-room.notifications.unexpected-error")
 	}
 
 	log.Info("successfully generated join token for breakout room")
@@ -106,8 +105,9 @@ func (m *BreakoutRoomModel) JoinBreakoutRoom(ctx context.Context, r *plugnmeet.J
 }
 
 // reassignUserToBreakoutRoom keeps the Redis breakout-room assignments accurate
-// for self-select joins: the user is removed from any other breakout room's
-// user list and added to the target room's user list (if not already present).
+// for both self-select joins AND admin moves: the user is removed from any other
+// breakout room's user list and added to the target room's user list (if not
+// already present).
 // Errors are non-fatal — the caller has already minted the join token and the
 // join must not fail because of a Redis update problem.
 func (m *BreakoutRoomModel) reassignUserToBreakoutRoom(parentRoomId, breakoutRoomId, userId, name string) {
@@ -117,6 +117,47 @@ func (m *BreakoutRoomModel) reassignUserToBreakoutRoom(parentRoomId, breakoutRoo
 		"userId":         userId,
 		"method":         "reassignUserToBreakoutRoom",
 	})
+
+	// Move-to-main case (used by MoveBreakoutRoomUser): remove the user from
+	// EVERY breakout room's user list and add them to none. The join flow never
+	// passes an empty breakoutRoomId, so this branch is exclusive to moves.
+	if breakoutRoomId == "" {
+		allRooms, err := m.rs.GetAllBreakoutRoomsByParentRoomId(parentRoomId)
+		if err != nil {
+			log.WithError(err).Warn("failed to load breakout rooms for move-to-main reassignment")
+			return
+		}
+		for _, raw := range allRooms {
+			br := new(plugnmeet.BreakoutRoom)
+			if uErr := protojson.Unmarshal([]byte(raw), br); uErr != nil {
+				log.WithError(uErr).Warn("failed to unmarshal breakout room during reassignment; skipping")
+				continue
+			}
+			found := false
+			idx := -1
+			for i, u := range br.Users {
+				if u.Id == userId {
+					found = true
+					idx = i
+					break
+				}
+			}
+			if !found {
+				continue
+			}
+			br.Users = append(br.Users[:idx], br.Users[idx+1:]...)
+			marshal, mErr := protojson.Marshal(br)
+			if mErr != nil {
+				log.WithError(mErr).Warn("failed to marshal breakout room during reassignment; skipping")
+				continue
+			}
+			if iErr := m.rs.InsertOrUpdateBreakoutRoom(parentRoomId, br.Id, marshal); iErr != nil {
+				log.WithError(iErr).Warn("failed to update breakout room assignment during reassignment; skipping")
+				continue
+			}
+		}
+		return
+	}
 
 	allRooms, err := m.rs.GetAllBreakoutRoomsByParentRoomId(parentRoomId)
 	if err != nil {

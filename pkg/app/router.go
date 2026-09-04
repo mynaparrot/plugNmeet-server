@@ -250,6 +250,7 @@ func (r *Router) registerAPIRoutes() {
 	breakoutRoom.Post("/endAllRooms", r.ctrl.BreakoutRoomController.HandleEndBreakoutRooms)
 	breakoutRoom.Post("/reInvite", r.ctrl.BreakoutRoomController.HandleReInviteBreakoutRoom)
 	breakoutRoom.Post("/backToMain", r.ctrl.BreakoutRoomController.HandleBackToMainRoom)
+	breakoutRoom.Post("/moveUser", r.ctrl.BreakoutRoomController.HandleMoveBreakoutRoomUser)
 
 	// TODO: remove in next release
 	// deprecated
