@@ -256,7 +256,7 @@ func (bc *BBBController) HandleBBBJoin(c fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", "this user is blocked to join this session"))
 	}
 
-	token, err := bc.UserModel.GetPNMJoinToken(c.RequestCtx(), req)
+	token, err := bc.UserModel.GetPNMJoinToken(c.RequestCtx(), req, false)
 	if err != nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
 	}

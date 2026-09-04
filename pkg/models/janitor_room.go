@@ -72,6 +72,13 @@ func (m *JanitorModel) activeRoomChecker() {
 			// no user online
 			valid := rInfo.CreatedAt + rInfo.EmptyTimeout
 			if uint64(time.Now().UTC().Unix()) > valid {
+				// Parent rooms with active breakout rooms must not be
+				// empty-closed by the janitor
+				if meta, mErr := m.natsService.GetRoomMetadataStruct(room.RoomId); mErr == nil && isParentWithActiveBreakouts(meta) {
+					log.Info("skipping empty-close of parent room with active breakout rooms — pausing, session data preserved")
+					continue
+				}
+
 				log.WithFields(logrus.Fields{
 					"emptyTimeout": rInfo.EmptyTimeout,
 					"createdAt":    rInfo.CreatedAt,

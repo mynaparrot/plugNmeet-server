@@ -69,13 +69,12 @@ func (m *BreakoutRoomModel) fetchBreakoutRooms(roomId string) ([]*plugnmeet.Brea
 	}
 
 	var breakoutRooms []*plugnmeet.BreakoutRoom
-	for i, r := range rooms {
+	for _, r := range rooms {
 		room := new(plugnmeet.BreakoutRoom)
 		err := protojson.Unmarshal([]byte(r), room)
 		if err != nil {
 			continue
 		}
-		room.Id = i
 		for _, u := range room.Users {
 			if room.Started {
 				status, err := m.natsService.GetRoomUserStatus(room.Id, u.Id)
@@ -88,4 +87,20 @@ func (m *BreakoutRoomModel) fetchBreakoutRooms(roomId string) ([]*plugnmeet.Brea
 	}
 
 	return breakoutRooms, nil
+}
+
+func (m *BreakoutRoomModel) ResolveParentRoomId(roomId string) string {
+	meta, err := m.natsService.GetRoomMetadataStruct(roomId)
+	if err != nil {
+		m.logger.WithError(err).WithField("roomId", roomId).
+			Warn("failed to load room metadata for parent resolution; falling back to token roomId")
+		return roomId
+	}
+	if meta == nil {
+		return roomId
+	}
+	if meta.IsBreakoutRoom && meta.ParentRoomId != "" {
+		return meta.ParentRoomId
+	}
+	return roomId
 }

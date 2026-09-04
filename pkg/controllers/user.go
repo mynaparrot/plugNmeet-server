@@ -67,7 +67,7 @@ func (uc *UserController) HandleGenerateJoinToken(c fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, "room is not active", plugnmeet.StatusCode_ROOM_NOT_FOUND)
 	}
 
-	token, err := uc.UserModel.GetPNMJoinToken(c.RequestCtx(), req)
+	token, err := uc.UserModel.GetPNMJoinToken(c.RequestCtx(), req, false)
 	if err != nil {
 		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}

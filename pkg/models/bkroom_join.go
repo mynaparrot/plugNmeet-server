@@ -9,7 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (m *BreakoutRoomModel) JoinBreakoutRoom(ctx context.Context, r *plugnmeet.JoinBreakoutRoomReq) (string, error) {
+func (m *BreakoutRoomModel) JoinBreakoutRoom(ctx context.Context, r *plugnmeet.JoinBreakoutRoomReq, isAdmin bool) (string, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"parentRoomId":   r.RoomId,
 		"breakoutRoomId": r.BreakoutRoomId,
@@ -35,7 +35,7 @@ func (m *BreakoutRoomModel) JoinBreakoutRoom(ctx context.Context, r *plugnmeet.J
 		return "", err
 	}
 
-	if !r.IsAdmin {
+	if !isAdmin {
 		canJoin := false
 		for _, u := range room.Users {
 			if u.Id == r.UserId {
@@ -59,6 +59,8 @@ func (m *BreakoutRoomModel) JoinBreakoutRoom(ctx context.Context, r *plugnmeet.J
 	if p == nil || meta == nil {
 		return "", errors.New("failed to get user info from parent room")
 	}
+	// let GetPNMJoinToken to set IsPresenter value
+	meta.IsPresenter = false
 
 	req := &plugnmeet.GenerateTokenReq{
 		RoomId: r.BreakoutRoomId,
@@ -69,7 +71,7 @@ func (m *BreakoutRoomModel) JoinBreakoutRoom(ctx context.Context, r *plugnmeet.J
 			UserMetadata: meta,
 		},
 	}
-	token, err := m.um.GetPNMJoinToken(ctx, req)
+	token, err := m.um.GetPNMJoinToken(ctx, req, false)
 	if err != nil {
 		log.WithError(err).Error("failed to generate join token for breakout room")
 		return "", err
