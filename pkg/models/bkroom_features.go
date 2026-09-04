@@ -147,10 +147,15 @@ func (m *BreakoutRoomModel) MoveBreakoutRoomUser(ctx context.Context, r *plugnme
 
 	// Validate the target breakout room (only when moving to a breakout room;
 	// an empty id means move to the main room, which needs no validation).
+	targetTitle := ""
 	if r.BreakoutRoomId != "" {
-		if _, fErr := m.fetchBreakoutRoom(r.RoomId, r.BreakoutRoomId); fErr != nil {
+		room, fErr := m.fetchBreakoutRoom(r.RoomId, r.BreakoutRoomId)
+		if fErr != nil {
 			log.Error("failed to fetch target breakout room info")
 			return fErr
+		}
+		if room != nil {
+			targetTitle = room.Title
 		}
 	}
 
@@ -230,7 +235,11 @@ func (m *BreakoutRoomModel) MoveBreakoutRoomUser(ctx context.Context, r *plugnme
 
 	log.Info("successfully generated token for target room")
 
-	j, mErr := json.Marshal(map[string]string{"token": token})
+	j, mErr := json.Marshal(map[string]string{
+		"token":        token,
+		"targetRoomId": r.BreakoutRoomId,
+		"title":        targetTitle,
+	})
 	if mErr != nil {
 		log.WithError(mErr).Warn("failed to marshal move payload; assignment updated without push")
 		return nil
