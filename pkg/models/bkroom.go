@@ -112,3 +112,32 @@ func (m *BreakoutRoomModel) IncreaseBreakoutRoomDuration(r *plugnmeet.IncreaseBr
 	log.WithField("new_duration", newDuration).Info("Successfully increased breakout room duration")
 	return nil
 }
+
+// isParentWithActiveBreakouts reports whether the given room metadata describes
+// a parent (non-breakout) room whose breakout rooms are currently active.
+// Such rooms must not be terminated by an empty-close/pause, because their
+// breakout rooms are still running and govern the parent's lifecycle.
+func isParentWithActiveBreakouts(meta *plugnmeet.RoomMetadata) bool {
+	if meta == nil {
+		return false
+	}
+	return !meta.IsBreakoutRoom &&
+		meta.RoomFeatures != nil &&
+		meta.RoomFeatures.BreakoutRoomFeatures != nil &&
+		meta.RoomFeatures.BreakoutRoomFeatures.IsActive
+}
+
+// breakoutChildOfActiveParent reports whether meta belongs to a breakout child
+// room whose parent still has active breakout rooms. Such rooms may
+// legitimately sit empty (self-select) and must not be empty-closed or ended
+// while the parent's breakout session is still running.
+func breakoutChildOfActiveParent(ns *natsservice.NatsService, meta *plugnmeet.RoomMetadata) bool {
+	if meta == nil || !meta.IsBreakoutRoom || meta.ParentRoomId == "" {
+		return false
+	}
+	parentMeta, err := ns.GetRoomMetadataStruct(meta.ParentRoomId)
+	if err != nil || parentMeta == nil {
+		return false
+	}
+	return isParentWithActiveBreakouts(parentMeta)
+}

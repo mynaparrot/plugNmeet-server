@@ -101,6 +101,8 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	meta.RoomFeatures.BreakoutRoomFeatures.IsAllow = false
 	// this value is necessary for our case to disable back button
 	meta.RoomFeatures.BreakoutRoomFeatures.AllowReturnToMainRoom = r.AllowReturnToMainRoom
+	// participants may join any breakout room they choose (self-select mode).
+	meta.RoomFeatures.BreakoutRoomFeatures.AllowSelfSelect = r.AllowSelfSelect
 
 	// we'll disable now. in the future, we can think about those
 	meta.RoomFeatures.RecordingFeatures.IsAllow = false
@@ -247,6 +249,8 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 		return createdRooms, err
 	}
 	origMeta.RoomFeatures.BreakoutRoomFeatures.IsActive = true
+	origMeta.RoomFeatures.BreakoutRoomFeatures.AllowReturnToMainRoom = r.AllowReturnToMainRoom
+	origMeta.RoomFeatures.BreakoutRoomFeatures.AllowSelfSelect = r.AllowSelfSelect
 
 	if err := m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, origMeta); err != nil {
 		log.WithError(err).Error("Failed to update parent room metadata")

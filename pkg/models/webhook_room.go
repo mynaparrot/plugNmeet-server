@@ -123,9 +123,20 @@ func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 		// room status Active, preserve all session data, and suppress the
 		// external webhook notification. The parent LK room will be recreated
 		// automatically when a user rejoins (handled as a restart in roomStarted).
-		if meta, mErr := m.natsService.GetRoomMetadataStruct(rInfo.RoomId); mErr == nil && isParentWithActiveBreakouts(meta) {
-			log.Infoln("parent room closed by LiveKit while breakout rooms are active — pausing, session data preserved")
-			return
+		if meta, mErr := m.natsService.GetRoomMetadataStruct(rInfo.RoomId); mErr == nil && meta != nil {
+			if isParentWithActiveBreakouts(meta) {
+				log.Infoln("parent room closed by LiveKit while breakout rooms are active — pausing, session data preserved")
+				return
+			}
+			// A breakout child room may be empty-closed by LiveKit while the
+			// parent's breakout session is still active (self-select rooms can
+			// sit empty). We skip the end/cleanup flow and the external
+			// webhook so the room stays re-joinable; LiveKit recreates the LK
+			// room when the next participant joins.
+			if breakoutChildOfActiveParent(m.natsService, meta) {
+				log.Infoln("breakout child room closed by LiveKit while parent breakouts are active — skipping end cleanup, room will be recreated on next join")
+				return
+			}
 		}
 
 		// This means the room was ended directly by LiveKit (e.g., empty timeout),

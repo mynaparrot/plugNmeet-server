@@ -93,10 +93,12 @@ func (brc *BreakoutRoomController) HandleJoinBreakoutRoom(c fiber.Ctx) error {
 // HandleGetBreakoutRooms lists all breakout rooms for a parent room.
 func (brc *BreakoutRoomController) HandleGetBreakoutRooms(c fiber.Ctx) error {
 	roomId := brc.BreakoutRoomModel.ResolveParentRoomId(fiber.Locals[string](c, "roomId"))
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	userId := fiber.Locals[string](c, "requestedUserId")
 	res := new(plugnmeet.BreakoutRoomRes)
 	res.Status = false
 
-	rooms, err := brc.BreakoutRoomModel.GetBreakoutRooms(roomId)
+	rooms, err := brc.BreakoutRoomModel.GetBreakoutRooms(roomId, userId, isAdmin)
 	if err != nil {
 		res.Msg = err.Error()
 		return utils.SendProtobufResponse(c, res)

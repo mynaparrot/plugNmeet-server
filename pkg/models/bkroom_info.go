@@ -7,7 +7,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-func (m *BreakoutRoomModel) GetBreakoutRooms(roomId string) ([]*plugnmeet.BreakoutRoom, error) {
+func (m *BreakoutRoomModel) GetBreakoutRooms(roomId, userId string, isAdmin bool) ([]*plugnmeet.BreakoutRoom, error) {
 	breakoutRooms, err := m.fetchBreakoutRooms(roomId)
 	if err != nil {
 		return nil, err
@@ -17,7 +17,33 @@ func (m *BreakoutRoomModel) GetBreakoutRooms(roomId string) ([]*plugnmeet.Breako
 		return nil, config.NoBreakoutRoomsFound
 	}
 
-	return breakoutRooms, nil
+	if isAdmin {
+		return breakoutRooms, nil
+	}
+
+	// Server-side filtering: non-admin callers receive all rooms only when
+	// self-select is enabled on the parent room; otherwise they receive only
+	// the room they are assigned to. A metadata fetch failure fails closed
+	// (assigned room only), consistent with the join gate.
+	allowSelfSelect := false
+	if meta, mErr := m.natsService.GetRoomMetadataStruct(roomId); mErr == nil && meta != nil &&
+		meta.RoomFeatures != nil && meta.RoomFeatures.BreakoutRoomFeatures != nil {
+		allowSelfSelect = meta.RoomFeatures.BreakoutRoomFeatures.AllowSelfSelect
+	}
+	if allowSelfSelect {
+		return breakoutRooms, nil
+	}
+
+	var filtered []*plugnmeet.BreakoutRoom
+	for _, r := range breakoutRooms {
+		for _, u := range r.Users {
+			if u.Id == userId {
+				filtered = append(filtered, r)
+				break
+			}
+		}
+	}
+	return filtered, nil
 }
 
 func (m *BreakoutRoomModel) GetMyBreakoutRooms(roomId, userId string) (*plugnmeet.BreakoutRoom, error) {

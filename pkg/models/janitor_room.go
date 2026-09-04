@@ -73,10 +73,18 @@ func (m *JanitorModel) activeRoomChecker() {
 			valid := rInfo.CreatedAt + rInfo.EmptyTimeout
 			if uint64(time.Now().UTC().Unix()) > valid {
 				// Parent rooms with active breakout rooms must not be
-				// empty-closed by the janitor
-				if meta, mErr := m.natsService.GetRoomMetadataStruct(room.RoomId); mErr == nil && isParentWithActiveBreakouts(meta) {
-					log.Info("skipping empty-close of parent room with active breakout rooms — pausing, session data preserved")
-					continue
+				// empty-closed by the janitor. The same applies to breakout
+				// child rooms whose parent still has active breakouts (they may
+				// legitimately sit empty under self-select).
+				if meta, mErr := m.natsService.GetRoomMetadataStruct(room.RoomId); mErr == nil && meta != nil {
+					if isParentWithActiveBreakouts(meta) {
+						log.Info("skipping empty-close of parent room with active breakout rooms — pausing, session data preserved")
+						continue
+					}
+					if breakoutChildOfActiveParent(m.natsService, meta) {
+						log.Info("skipping empty-close of breakout child room with active parent breakouts")
+						continue
+					}
 				}
 
 				log.WithFields(logrus.Fields{

@@ -167,17 +167,3 @@ func (m *WebhookModel) getRoomInfoFromNatsOrRedis(roomId string, log *logrus.Ent
 	}
 	return rInfo, nil
 }
-
-// isParentWithActiveBreakouts reports whether the given room metadata describes
-// a parent (non-breakout) room whose breakout rooms are currently active.
-// Such rooms must not be terminated by an empty-close/pause, because their
-// breakout rooms are still running and govern the parent's lifecycle.
-func isParentWithActiveBreakouts(meta *plugnmeet.RoomMetadata) bool {
-	if meta == nil {
-		return false
-	}
-	return !meta.IsBreakoutRoom &&
-		meta.RoomFeatures != nil &&
-		meta.RoomFeatures.BreakoutRoomFeatures != nil &&
-		meta.RoomFeatures.BreakoutRoomFeatures.IsActive
-}

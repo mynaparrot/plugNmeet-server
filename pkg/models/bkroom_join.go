@@ -7,6 +7,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func (m *BreakoutRoomModel) JoinBreakoutRoom(ctx context.Context, r *plugnmeet.JoinBreakoutRoomReq, isAdmin bool) (string, error) {
@@ -35,7 +36,21 @@ func (m *BreakoutRoomModel) JoinBreakoutRoom(ctx context.Context, r *plugnmeet.J
 		return "", err
 	}
 
-	if !isAdmin {
+	// Fetch the parent room metadata to know whether self-select is enabled.
+	// A metadata fetch failure must fail CLOSED: the membership gate stays
+	// enforced and the join proceeds only for assigned users. We never abort
+	// the join on a metadata error — just log a warning.
+	parentMeta, pmErr := m.natsService.GetRoomMetadataStruct(r.RoomId)
+	allowSelfSelect := false
+	if pmErr != nil {
+		log.WithError(pmErr).Warn("failed to load parent room metadata; self-select disabled for this join")
+	} else if parentMeta != nil &&
+		parentMeta.RoomFeatures != nil &&
+		parentMeta.RoomFeatures.BreakoutRoomFeatures != nil {
+		allowSelfSelect = parentMeta.RoomFeatures.BreakoutRoomFeatures.AllowSelfSelect
+	}
+
+	if !isAdmin && !allowSelfSelect {
 		canJoin := false
 		for _, u := range room.Users {
 			if u.Id == r.UserId {
@@ -78,5 +93,85 @@ func (m *BreakoutRoomModel) JoinBreakoutRoom(ctx context.Context, r *plugnmeet.J
 	}
 
 	log.Info("successfully generated join token for breakout room")
+
+	// Under self-select the user may join any breakout room, so keep the Redis
+	// room assignment accurate: remove them from any other room's user list and
+	// add them to the target room. This is best-effort — the token is already
+	// minted and the join must not fail because of a Redis update problem.
+	if allowSelfSelect {
+		m.reassignUserToBreakoutRoom(r.RoomId, r.BreakoutRoomId, r.UserId, p.Name)
+	}
+
 	return token, nil
+}
+
+// reassignUserToBreakoutRoom keeps the Redis breakout-room assignments accurate
+// for self-select joins: the user is removed from any other breakout room's
+// user list and added to the target room's user list (if not already present).
+// Errors are non-fatal — the caller has already minted the join token and the
+// join must not fail because of a Redis update problem.
+func (m *BreakoutRoomModel) reassignUserToBreakoutRoom(parentRoomId, breakoutRoomId, userId, name string) {
+	log := m.logger.WithFields(logrus.Fields{
+		"parentRoomId":   parentRoomId,
+		"breakoutRoomId": breakoutRoomId,
+		"userId":         userId,
+		"method":         "reassignUserToBreakoutRoom",
+	})
+
+	allRooms, err := m.rs.GetAllBreakoutRoomsByParentRoomId(parentRoomId)
+	if err != nil {
+		log.WithError(err).Warn("failed to load breakout rooms for reassignment")
+		return
+	}
+
+	for _, raw := range allRooms {
+		br := new(plugnmeet.BreakoutRoom)
+		if uErr := protojson.Unmarshal([]byte(raw), br); uErr != nil {
+			log.WithError(uErr).Warn("failed to unmarshal breakout room during reassignment; skipping")
+			continue
+		}
+
+		if br.Id == breakoutRoomId {
+			// target room: ensure the user appears in its user list.
+			already := false
+			for _, u := range br.Users {
+				if u.Id == userId {
+					already = true
+					break
+				}
+			}
+			if already {
+				continue
+			}
+			br.Users = append(br.Users, &plugnmeet.BreakoutRoomUser{
+				Id:   userId,
+				Name: name,
+			})
+		} else {
+			// a different room: if the user was listed here, remove them.
+			found := false
+			idx := -1
+			for i, u := range br.Users {
+				if u.Id == userId {
+					found = true
+					idx = i
+					break
+				}
+			}
+			if !found {
+				continue
+			}
+			br.Users = append(br.Users[:idx], br.Users[idx+1:]...)
+		}
+
+		marshal, mErr := protojson.Marshal(br)
+		if mErr != nil {
+			log.WithError(mErr).Warn("failed to marshal breakout room during reassignment; skipping")
+			continue
+		}
+		if iErr := m.rs.InsertOrUpdateBreakoutRoom(parentRoomId, br.Id, marshal); iErr != nil {
+			log.WithError(iErr).Warn("failed to update breakout room assignment during reassignment; skipping")
+			continue
+		}
+	}
 }
