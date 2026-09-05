@@ -122,7 +122,7 @@ func (ac *AuthController) HandleVerifyHeaderToken(c fiber.Ctx) error {
 
 	// Let the "return to main room" route reach the handler even for an ended
 	// breakout: the token is verified and the handler re-validates the parent.
-	if strings.Contains(path, "backToMain") {
+	if strings.HasSuffix(path, "/backToMain") {
 		c.Locals("isAdmin", claims.IsAdmin)
 		c.Locals("roomId", claims.RoomId)
 		c.Locals("requestedUserId", claims.UserId)
