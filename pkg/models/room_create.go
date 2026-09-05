@@ -81,6 +81,11 @@ func (m *RoomModel) CreateRoom(userCtx context.Context, r *plugnmeet.CreateRoomR
 	// initialize room defaults
 	m.setRoomDefaults(r)
 
+	// reject pre-assignments that could never be created
+	if err := m.validatePreassignedBreakoutRooms(r, log); err != nil {
+		return nil, err
+	}
+
 	// prepare DB model
 	roomDbInfo, sid := m.prepareRoomDbInfo(r, roomDbInfo)
 
@@ -252,6 +257,50 @@ func (m *RoomModel) setRoomDefaults(r *plugnmeet.CreateRoomReq) {
 			r.Metadata.RoomFeatures.SipDialInFeatures.IsAllow = false
 		}
 	}
+}
+
+// validatePreassignedBreakoutRooms rejects pre-assignment lists that can never
+// be created: the count must fit both the server-wide maximum breakout rooms
+// and the room's own allowed_number_rooms, and a user may not be pre-assigned
+// to more than one room. It must run after setRoomDefaults so the implicit
+// allowed_number_rooms default (6) is accounted for. Breakout rooms themselves
+// clear pre-assigned rooms, so this is a no-op for them.
+func (m *RoomModel) validatePreassignedBreakoutRooms(r *plugnmeet.CreateRoomReq, log *logrus.Entry) error {
+	features := r.Metadata.RoomFeatures.BreakoutRoomFeatures
+	if features == nil || len(features.PreassignedRooms) == 0 {
+		return nil
+	}
+	count := uint32(len(features.PreassignedRooms))
+
+	if s := m.app.RoomDefaultSettings; s != nil && s.MaxNumBreakoutRooms != nil {
+		serverMax := *s.MaxNumBreakoutRooms
+		if serverMax > 0 && count > serverMax {
+			err := fmt.Errorf("preassigned_rooms count (%d) exceeds the server maximum breakout rooms (%d)", count, serverMax)
+			log.WithError(err).Errorln()
+			return err
+		}
+	}
+	if allowedRooms := features.AllowedNumberRooms; allowedRooms > 0 && count > allowedRooms {
+		err := fmt.Errorf("preassigned_rooms count (%d) exceeds allowed_number_rooms (%d)", count, allowedRooms)
+		log.WithError(err).Errorln()
+		return err
+	}
+
+	// a user can only be pre-assigned to a single room; crossed assignments
+	// would be rejected at breakout-room creation time, so reject them here
+	// so API callers get an immediate error.
+	assignedUsers := make(map[string]struct{})
+	for _, room := range features.PreassignedRooms {
+		for _, u := range room.UserIds {
+			if _, ok := assignedUsers[u]; ok {
+				err := fmt.Errorf("user (%s) is pre-assigned to multiple breakout rooms", u)
+				log.WithError(err).Errorln()
+				return err
+			}
+			assignedUsers[u] = struct{}{}
+		}
+	}
+	return nil
 }
 
 // prepareRoomDbInfo Prepares DB model for room

@@ -64,6 +64,25 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 		}
 	}
 
+	// validate cross-room entries: titles must be unique and a user may be
+	// assigned to only one room.
+	titles := make(map[string]struct{}, len(r.Rooms))
+	assignedUsers := make(map[string]struct{})
+	for _, room := range r.Rooms {
+		if _, ok := titles[room.Title]; ok {
+			log.WithField("title", room.Title).Error("duplicate breakout room title")
+			return nil, errors.New("breakout-room.notifications.duplicate-title")
+		}
+		titles[room.Title] = struct{}{}
+		for _, u := range room.Users {
+			if _, ok := assignedUsers[u.Id]; ok {
+				log.WithField("userId", u.Id).Error("user assigned to multiple breakout rooms")
+				return nil, errors.New("breakout-room.notifications.user-assigned-to-multiple-rooms")
+			}
+			assignedUsers[u.Id] = struct{}{}
+		}
+	}
+
 	// let's check if the parent room has a duration set or not
 	if meta.RoomFeatures.RoomDuration != nil && *meta.RoomFeatures.RoomDuration > 0 {
 		if err := m.rm.CompareDurationWithParentRoom(r.RoomId, r.Duration); err != nil {
@@ -95,12 +114,11 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	// disable few features
 	meta.RoomFeatures.WaitingRoomFeatures.IsActive = false
 	// children can never host their own breakouts.
-	meta.RoomFeatures.BreakoutRoomFeatures.IsAllow = false
-	// this value is necessary for our case to disable back button
-	meta.RoomFeatures.BreakoutRoomFeatures.AllowReturnToMainRoom = r.AllowReturnToMainRoom
-	// participants may join any breakout room they choose (self-select mode).
-	meta.RoomFeatures.BreakoutRoomFeatures.AllowSelfSelect = r.AllowSelfSelect
-
+	meta.RoomFeatures.BreakoutRoomFeatures = &plugnmeet.BreakoutRoomFeatures{
+		IsAllow:               false,
+		AllowReturnToMainRoom: r.AllowReturnToMainRoom,
+		AllowSelfSelect:       r.AllowSelfSelect,
+	}
 	// we'll disable now. in the future, we can think about those
 	meta.RoomFeatures.RecordingFeatures.IsAllow = false
 	meta.RoomFeatures.AllowRtmp = new(false)
@@ -164,6 +182,9 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 
 	e := make(map[string]bool)
 	createdRooms := make([]*plugnmeet.BreakoutRoom, 0, len(r.Rooms))
+	// creation-time snapshot of the pre-assignments that were actually created;
+	// written to the parent's metadata below, superseding the API-seeded list.
+	createdPreassigned := make([]*plugnmeet.PreassignedBreakoutRoom, 0, len(r.Rooms))
 
 	for _, room := range r.Rooms {
 		bRoomId := fmt.Sprintf(BreakoutRoomFormat, r.RoomId, room.Id)
@@ -208,6 +229,18 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 
 		createdRooms = append(createdRooms, room)
 
+		// snapshot this created room for the parent's metadata: its full id
+		// (<parentRoomId>-<n>), title and the assigned user ids (may be empty).
+		assignedUserIds := make([]string, 0, len(room.Users))
+		for _, u := range room.Users {
+			assignedUserIds = append(assignedUserIds, u.Id)
+		}
+		createdPreassigned = append(createdPreassigned, &plugnmeet.PreassignedBreakoutRoom{
+			RoomId:  bRoomId,
+			Title:   room.Title,
+			UserIds: assignedUserIds,
+		})
+
 		// copy all parent room files metadata into the breakout room bucket.
 		if parentFiles != nil {
 			for _, pf := range parentFiles {
@@ -247,6 +280,13 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	origMeta.RoomFeatures.BreakoutRoomFeatures.IsActive = true
 	origMeta.RoomFeatures.BreakoutRoomFeatures.AllowReturnToMainRoom = r.AllowReturnToMainRoom
 	origMeta.RoomFeatures.BreakoutRoomFeatures.AllowSelfSelect = r.AllowSelfSelect
+
+	// persist the creation-time pre-assignment snapshot on the parent so the
+	// client prefill reflects the rooms that were actually created; it replaces
+	// any API-seeded entries and rides the metadata broadcast below.
+	if origMeta.RoomFeatures.BreakoutRoomFeatures != nil {
+		origMeta.RoomFeatures.BreakoutRoomFeatures.PreassignedRooms = createdPreassigned
+	}
 
 	if err := m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, origMeta); err != nil {
 		log.WithError(err).Error("Failed to update parent room metadata")

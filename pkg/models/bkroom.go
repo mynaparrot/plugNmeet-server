@@ -94,7 +94,7 @@ func (m *BreakoutRoomModel) IncreaseBreakoutRoomDuration(r *plugnmeet.IncreaseBr
 	newDuration, err := m.rm.IncreaseRoomDuration(r.BreakoutRoomId, r.Duration)
 	if err != nil {
 		log.WithError(err).Error("Failed to increase room duration")
-		return errors.New("breakout-room.notifications.unexpected-error")
+		return err
 	}
 
 	// now update nats

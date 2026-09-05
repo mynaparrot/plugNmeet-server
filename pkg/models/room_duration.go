@@ -2,7 +2,6 @@ package models
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 	"strings"
 	"time"
@@ -85,27 +84,27 @@ func (m *RoomModel) IncreaseRoomDuration(roomId string, duration uint64) (uint64
 	if !ok {
 		err := errors.New("duration field not found in RoomDurationInfo struct")
 		log.WithError(err).Error()
-		return 0, err
+		return 0, errors.New("breakout-room.notifications.unexpected-error")
 	}
 	durationField := field.Tag.Get("redis")
 
 	info, err := m.GetRoomDurationInfo(roomId)
 	if err != nil {
 		log.WithError(err).Error("failed to get room duration info")
-		return 0, err
+		return 0, errors.New("breakout-room.notifications.unexpected-error")
 	}
 
 	// increase room duration
 	meta, err := m.natsService.GetRoomMetadataStruct(roomId)
 	if err != nil {
 		log.WithError(err).Error("failed to get room metadata")
-		return 0, err
+		return 0, errors.New("breakout-room.notifications.unexpected-error")
 	}
 
 	if meta == nil {
 		err = errors.New("invalid nil room metadata information")
 		log.WithError(err).Error()
-		return 0, err
+		return 0, errors.New("breakout-room.notifications.unexpected-error")
 	}
 
 	// check if this is a breakout room
@@ -114,12 +113,12 @@ func (m *RoomModel) IncreaseRoomDuration(roomId string, duration uint64) (uint64
 		if info.StartedAt == 0 {
 			err = errors.New("can't increase duration as breakout room is not running")
 			log.WithError(err).Warn()
-			return 0, err
+			return 0, errors.New("breakout-room.notifications.breakout-room-not-running")
 		}
 		if info.Duration == 0 {
 			err = errors.New("can't increase duration as breakout room has unlimited duration")
 			log.WithError(err).Warn()
-			return 0, err
+			return 0, errors.New("breakout-room.notifications.breakout-room-unlimited-duration")
 		}
 
 		log.Info(
@@ -140,7 +139,7 @@ func (m *RoomModel) IncreaseRoomDuration(roomId string, duration uint64) (uint64
 	result, err := m.rs.UpdateRoomDuration(roomId, durationField, duration)
 	if err != nil {
 		log.WithError(err).Error("failed to update room duration in redis")
-		return 0, err
+		return 0, errors.New("breakout-room.notifications.unexpected-error")
 	}
 	d := uint64(result)
 
@@ -151,7 +150,7 @@ func (m *RoomModel) IncreaseRoomDuration(roomId string, duration uint64) (uint64
 		// if error then we'll fall back to set previous duration
 		log.WithError(err).Error("failed to update and broadcast room metadata, rolling back redis change")
 		_ = m.rs.SetRoomDuration(roomId, durationField, d-duration)
-		return 0, err
+		return 0, errors.New("breakout-room.notifications.unexpected-error")
 	}
 
 	log.WithField("new_duration", d).Info("successfully increased room duration")
@@ -169,7 +168,7 @@ func (m *RoomModel) CompareDurationWithParentRoom(mainRoomId string, duration ui
 	info, err := m.GetRoomDurationInfo(mainRoomId)
 	if err != nil {
 		log.WithError(err).Error("failed to get parent room duration info")
-		return err
+		return errors.New("breakout-room.notifications.unexpected-error")
 	}
 	if info == nil {
 		// this is indicating that the no info found
@@ -189,9 +188,11 @@ func (m *RoomModel) CompareDurationWithParentRoom(mainRoomId string, duration ui
 	log.WithField("minutes_left", left).Info("parent room duration check")
 
 	if left < duration {
-		err = fmt.Errorf("breakout room's duration (%d) can't be more than parent room's remaining duration (%d)", duration, left)
-		log.WithError(err).Warn()
-		return err
+		log.WithFields(logrus.Fields{
+			"requested_duration": duration,
+			"parent_remaining":   left,
+		}).Warn("breakout room duration exceeds parent room remaining duration")
+		return errors.New("breakout-room.notifications.duration-exceeds-parent")
 	}
 
 	return nil
