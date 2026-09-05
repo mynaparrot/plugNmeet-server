@@ -1,6 +1,8 @@
 package models
 
 import (
+	"errors"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
@@ -54,7 +56,7 @@ func (m *BreakoutRoomModel) SendBreakoutRoomMsg(r *plugnmeet.BroadcastBreakoutRo
 	rooms, err := m.fetchBreakoutRooms(r.RoomId)
 	if err != nil {
 		log.WithError(err).Error("Failed to fetch breakout rooms")
-		return err
+		return errors.New("breakout-room.notifications.unexpected-error")
 	}
 
 	if rooms == nil || len(rooms) == 0 {
@@ -83,7 +85,7 @@ func (m *BreakoutRoomModel) IncreaseBreakoutRoomDuration(r *plugnmeet.IncreaseBr
 
 	room, err := m.fetchBreakoutRoom(r.RoomId, r.BreakoutRoomId)
 	if err != nil {
-		log.WithError(err).Error("Failed to fetch breakout room info")
+		log.Error("Failed to fetch breakout room info")
 		return err
 	}
 
@@ -101,14 +103,43 @@ func (m *BreakoutRoomModel) IncreaseBreakoutRoomDuration(r *plugnmeet.IncreaseBr
 	marshal, err := protojson.Marshal(room)
 	if err != nil {
 		log.WithError(err).Error("Failed to marshal breakout room data")
-		return err
+		return errors.New("breakout-room.notifications.unexpected-error")
 	}
 
 	if err = m.rs.InsertOrUpdateBreakoutRoom(r.RoomId, r.BreakoutRoomId, marshal); err != nil {
 		log.WithError(err).Error("Failed to update breakout room in nats")
-		return err
+		return errors.New("breakout-room.notifications.unexpected-error")
 	}
 
 	log.WithField("new_duration", newDuration).Info("Successfully increased breakout room duration")
 	return nil
+}
+
+// isParentWithActiveBreakouts reports whether the given room metadata describes
+// a parent (non-breakout) room whose breakout rooms are currently active.
+// Such rooms must not be terminated by an empty-close/pause, because their
+// breakout rooms are still running and govern the parent's lifecycle.
+func isParentWithActiveBreakouts(meta *plugnmeet.RoomMetadata) bool {
+	if meta == nil {
+		return false
+	}
+	return !meta.IsBreakoutRoom &&
+		meta.RoomFeatures != nil &&
+		meta.RoomFeatures.BreakoutRoomFeatures != nil &&
+		meta.RoomFeatures.BreakoutRoomFeatures.IsActive
+}
+
+// breakoutChildOfActiveParent reports whether meta belongs to a breakout child
+// room whose parent still has active breakout rooms. Such rooms may
+// legitimately sit empty (self-select) and must not be empty-closed or ended
+// while the parent's breakout session is still running.
+func breakoutChildOfActiveParent(ns *natsservice.NatsService, meta *plugnmeet.RoomMetadata) bool {
+	if meta == nil || !meta.IsBreakoutRoom || meta.ParentRoomId == "" {
+		return false
+	}
+	parentMeta, err := ns.GetRoomMetadataStruct(meta.ParentRoomId)
+	if err != nil || parentMeta == nil {
+		return false
+	}
+	return isParentWithActiveBreakouts(parentMeta)
 }

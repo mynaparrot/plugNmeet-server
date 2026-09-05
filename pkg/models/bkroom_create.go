@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -12,9 +13,22 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-const BreakoutRoomFormat = "%s-%s"
+const (
+	BreakoutRoomFormat = "%s-%s"
+	// DefaultWhiteboardFileId is the whiteboard file id a room gets when no
+	// office file is shared. Breakout rooms that don't inherit shared content
+	// reset to this value so they start with a blank board, identical to a
+	// normal room created without a file.
+	DefaultWhiteboardFileId = ""
+	// DefaultOfficeFileSentinel is the a-client store value for the built-in
+	// blank whiteboard board (whiteboard slice's currentWhiteboardOfficeFileId
+	// defaults to "default"). It is a valid breakout share target: it carries no
+	// uploaded-file KV entry (unlike a real office file), so the create flow
+	// seeds child rooms with file_id "default" and skips the room-file lookup.
+	DefaultOfficeFileSentinel = "default"
+)
 
-func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plugnmeet.CreateBreakoutRoomsReq) error {
+func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plugnmeet.CreateBreakoutRoomsReq) ([]*plugnmeet.BreakoutRoom, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId":   r.RoomId,
 		"method":   "CreateBreakoutRooms",
@@ -25,21 +39,69 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	mainRoom, meta, err := m.natsService.GetRoomInfoWithMetadata(r.RoomId)
 	if err != nil {
 		log.WithError(err).Error("Failed to get parent room info")
-		return err
+		return nil, errors.New("breakout-room.notifications.unexpected-error")
 	}
 
 	if mainRoom == nil || meta == nil {
-		err = errors.New("invalid empty parent room information")
-		log.WithError(err).Error()
-		return err
+		log.Error("invalid empty parent room information")
+		return nil, errors.New("breakout-room.notifications.unexpected-error")
+	}
+
+	// do not allow nesting breakout rooms inside a breakout room.
+	if meta.IsBreakoutRoom {
+		log.Error("breakout rooms cannot be created inside another breakout room")
+		return nil, errors.New("breakout-room.notifications.cannot-create-inside-breakout")
+	}
+
+	// enforce the allowed number of breakout rooms for this parent room.
+	// AllowedNumberRooms == 0 means "not explicitly limited" (unlimited), so we
+	// only reject when a positive limit is set and the request exceeds it.
+	if meta.RoomFeatures != nil && meta.RoomFeatures.BreakoutRoomFeatures != nil {
+		allowedRooms := meta.RoomFeatures.BreakoutRoomFeatures.AllowedNumberRooms
+		if allowedRooms > 0 && uint32(len(r.Rooms)) > allowedRooms {
+			log.WithField("allowedRooms", allowedRooms).Error("number of breakout rooms exceeds the allowed limit")
+			return nil, errors.New("breakout-room.notifications.max-rooms-exceeded")
+		}
+	}
+
+	// validate cross-room entries: titles must be unique and a user may be
+	// assigned to only one room.
+	titles := make(map[string]struct{}, len(r.Rooms))
+	assignedUsers := make(map[string]struct{})
+	for _, room := range r.Rooms {
+		if _, ok := titles[room.Title]; ok {
+			log.WithField("title", room.Title).Error("duplicate breakout room title")
+			return nil, errors.New("breakout-room.notifications.duplicate-title")
+		}
+		titles[room.Title] = struct{}{}
+		for _, u := range room.Users {
+			if _, ok := assignedUsers[u.Id]; ok {
+				log.WithField("userId", u.Id).Error("user assigned to multiple breakout rooms")
+				return nil, errors.New("breakout-room.notifications.user-assigned-to-multiple-rooms")
+			}
+			assignedUsers[u.Id] = struct{}{}
+		}
 	}
 
 	// let's check if the parent room has a duration set or not
 	if meta.RoomFeatures.RoomDuration != nil && *meta.RoomFeatures.RoomDuration > 0 {
-		err = m.rm.CompareDurationWithParentRoom(r.RoomId, r.Duration)
-		if err != nil {
+		if err := m.rm.CompareDurationWithParentRoom(r.RoomId, r.Duration); err != nil {
 			log.WithError(err).Error("Duration comparison with parent room failed")
-			return err
+			return nil, errors.New("breakout-room.notifications.duration-exceeds-parent")
+		}
+	}
+
+	// auto-switch presenter because the later seeding flow needs presenter role
+	if !m.natsService.IsUserPresenter(r.RoomId, r.RequestedUserId) {
+		switchErr := m.um.SwitchPresenter(&plugnmeet.SwitchPresenterReq{
+			Task:            plugnmeet.SwitchPresenterTask_PROMOTE,
+			RoomId:          r.RoomId,
+			UserId:          r.RequestedUserId,
+			RequestedUserId: r.RequestedUserId,
+		})
+		if switchErr != nil {
+			log.WithError(switchErr).Error("failed to make requesting user presenter for whiteboard share")
+			return nil, errors.New("breakout-room.notifications.unexpected-error")
 		}
 	}
 
@@ -50,19 +112,79 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	meta.ParentRoomId = r.RoomId
 
 	// disable few features
-	meta.RoomFeatures.BreakoutRoomFeatures.IsAllow = false
 	meta.RoomFeatures.WaitingRoomFeatures.IsActive = false
-
+	// children can never host their own breakouts.
+	meta.RoomFeatures.BreakoutRoomFeatures = &plugnmeet.BreakoutRoomFeatures{
+		IsAllow:               false,
+		AllowReturnToMainRoom: r.AllowReturnToMainRoom,
+		AllowSelfSelect:       r.AllowSelfSelect,
+	}
 	// we'll disable now. in the future, we can think about those
 	meta.RoomFeatures.RecordingFeatures.IsAllow = false
 	meta.RoomFeatures.AllowRtmp = new(false)
 	meta.RoomFeatures.ExternalBroadcastingFeatures.IsAllow = false
+	meta.WebhookUrl = nil
+	meta.LogoutUrl = nil
+	meta.RoomFeatures.EnableAnalytics = false
 
 	// clear few main room data
 	meta.RoomFeatures.DisplayExternalLinkFeatures.IsActive = false
 	meta.RoomFeatures.ExternalMediaPlayerFeatures.IsActive = false
 
+	// validate/normalize the optional whiteboard share request.
+	_, childWbf, err := m.normalizeBreakoutWhiteboardShare(r, meta, log)
+	if err != nil {
+		log.WithError(err).Error("Failed to validate whiteboard share")
+		return nil, errors.New("breakout-room.notifications.unexpected-error")
+	}
+	meta.RoomFeatures.WhiteboardFeatures = childWbf
+
+	// get all parent room files metadata into the breakout room bucket.
+	parentFiles, _ := m.natsService.GetAllRoomFiles(r.RoomId)
+
+	// copy the parent's poll definitions into the child room, when sharing.
+	copiedPolls := make(map[string]string)
+	if r.PollShare != nil && len(r.PollShare.PollIds) > 0 {
+		meta.RoomFeatures.PollsFeatures = &plugnmeet.PollsFeatures{
+			IsAllow:  true,
+			IsActive: true,
+		}
+
+		parentPolls, err := m.rs.GetAllRoomPolls(r.RoomId)
+		if err != nil {
+			log.WithError(err).Error("failed to fetch parent room polls for sharing")
+			parentPolls = nil
+		}
+
+		selectedPollIds := make(map[string]struct{})
+		for _, id := range r.PollShare.PollIds {
+			selectedPollIds[id] = struct{}{}
+		}
+
+		for pollId, raw := range parentPolls {
+			if _, ok := selectedPollIds[pollId]; !ok {
+				continue
+			}
+			info := new(plugnmeet.PollInfo)
+			if uErr := protojson.Unmarshal([]byte(raw), info); uErr != nil {
+				log.WithError(uErr).Warn("failed to unmarshal parent poll for copy; skipping")
+				continue
+			}
+			info.IsRunning = true
+			m, mErr := protojson.Marshal(info)
+			if mErr != nil {
+				log.WithError(mErr).Warn("failed to marshal child poll; skipping")
+				continue
+			}
+			copiedPolls[pollId] = string(m)
+		}
+	}
+
 	e := make(map[string]bool)
+	createdRooms := make([]*plugnmeet.BreakoutRoom, 0, len(r.Rooms))
+	// creation-time snapshot of the pre-assignments that were actually created;
+	// written to the parent's metadata below, superseding the API-seeded list.
+	createdPreassigned := make([]*plugnmeet.PreassignedBreakoutRoom, 0, len(r.Rooms))
 
 	for _, room := range r.Rooms {
 		bRoomId := fmt.Sprintf(BreakoutRoomFormat, r.RoomId, room.Id)
@@ -75,7 +197,9 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 		bRoom.RoomId = bRoomId
 		meta.RoomTitle = room.Title
 		bRoom.Metadata = meta
-		_, err := m.rm.CreateRoom(userCtx, bRoom)
+		// Step 6: capture the returned roomSid so it flows into the Redis hash,
+		// the create response, and downstream listRooms/myRooms consumers.
+		ari, err := m.rm.CreateRoom(userCtx, bRoom)
 
 		if err != nil {
 			roomLog.WithError(err).Error("Failed to create breakout room")
@@ -83,6 +207,10 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 			continue
 		}
 
+		// store the canonical full breakout room id (<parentRoomId>-<n>) so the
+		// stored proto and the Redis hash field agree; no client-side id rebuild needed.
+		room.Id = bRoomId
+		room.RoomSid = ari.GetSid()
 		room.Duration = r.Duration
 		room.Created = uint64(time.Now().Unix())
 
@@ -93,11 +221,39 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 			continue
 		}
 
-		err = m.rs.InsertOrUpdateBreakoutRoom(r.RoomId, bRoom.RoomId, marshal)
-		if err != nil {
+		if err := m.rs.InsertOrUpdateBreakoutRoom(r.RoomId, bRoom.RoomId, marshal); err != nil {
 			roomLog.WithError(err).Error("Failed to insert breakout room in nats")
 			e[bRoom.RoomId] = true
 			continue
+		}
+
+		createdRooms = append(createdRooms, room)
+
+		// snapshot this created room for the parent's metadata: its full id
+		// (<parentRoomId>-<n>), title and the assigned user ids (may be empty).
+		assignedUserIds := make([]string, 0, len(room.Users))
+		for _, u := range room.Users {
+			assignedUserIds = append(assignedUserIds, u.Id)
+		}
+		createdPreassigned = append(createdPreassigned, &plugnmeet.PreassignedBreakoutRoom{
+			RoomId:  bRoomId,
+			Title:   room.Title,
+			UserIds: assignedUserIds,
+		})
+
+		// copy all parent room files metadata into the breakout room bucket.
+		if parentFiles != nil {
+			for _, pf := range parentFiles {
+				if cErr := m.natsService.AddRoomFile(bRoomId, pf); cErr != nil {
+					roomLog.WithError(cErr).Warn("failed to copy parent room file into breakout room")
+				}
+			}
+		}
+
+		if len(copiedPolls) > 0 {
+			if cErr := m.rs.CreateRoomPoll(bRoomId, copiedPolls); cErr != nil {
+				roomLog.WithError(cErr).Error("failed to write shared polls into breakout room")
+			}
 		}
 
 		// now send invitation notification
@@ -111,21 +267,25 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	}
 
 	if len(e) == len(r.Rooms) {
-		err = errors.New("breakout room creation wasn't successful for any room")
-		log.WithError(err).Error()
-		return err
+		log.Error("breakout room creation wasn't successful for any room")
+		return nil, errors.New("breakout-room.notifications.creation-failed")
 	}
 
 	// again here for update
 	origMeta, err := m.natsService.UnmarshalRoomMetadata(mainRoom.Metadata)
 	if err != nil {
 		log.WithError(err).Error("Failed to unmarshal original parent room metadata")
-		return err
+		return createdRooms, errors.New("breakout-room.notifications.unexpected-error")
 	}
 	origMeta.RoomFeatures.BreakoutRoomFeatures.IsActive = true
-	err = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, origMeta)
-	if err != nil {
+	// save create-time snapshot so that can be populated again
+	origMeta.RoomFeatures.BreakoutRoomFeatures.AllowReturnToMainRoom = r.AllowReturnToMainRoom
+	origMeta.RoomFeatures.BreakoutRoomFeatures.AllowSelfSelect = r.AllowSelfSelect
+	origMeta.RoomFeatures.BreakoutRoomFeatures.PreassignedRooms = createdPreassigned
+
+	if err := m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, origMeta); err != nil {
 		log.WithError(err).Error("Failed to update parent room metadata")
+		return createdRooms, errors.New("breakout-room.notifications.unexpected-error")
 	}
 
 	// send analytics
@@ -136,7 +296,164 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	})
 
 	log.Info("Finished breakout rooms creation")
-	return err
+	return createdRooms, err
+}
+
+// normalizeBreakoutWhiteboardShare validates the optional whiteboard share
+// request and returns whether a share is active plus the WhiteboardFeatures the
+// child rooms should use. Shared files are referenced by id (NOT copied): the
+// parent's uploaded-file metadata supplies the path/pages, and the download
+// endpoint serves those paths without a room-membership check. share_notepad is
+// NOT handled here (later phase).
+func (m *BreakoutRoomModel) normalizeBreakoutWhiteboardShare(r *plugnmeet.CreateBreakoutRoomsReq, meta *plugnmeet.RoomMetadata, log *logrus.Entry) (bool, *plugnmeet.WhiteboardFeatures, error) {
+	parentWbf := meta.GetRoomFeatures().GetWhiteboardFeatures()
+	childWbf := &plugnmeet.WhiteboardFeatures{
+		IsAllow: parentWbf.GetIsAllow(),
+	}
+
+	share := r.GetWhiteboardShare()
+	if share == nil {
+		// No share requested: blank whiteboard (same defaults as a normal room
+		// created without a file).
+		childWbf.WhiteboardFileId = DefaultWhiteboardFileId
+		return false, childWbf, nil
+	}
+
+	// Self-insert E2EE: each participant types their own secret locally and it
+	// is cleared immediately so we'll never do cross sharing
+	if meta.GetRoomFeatures().GetEndToEndEncryptionFeatures().GetIsEnabled() &&
+		meta.GetRoomFeatures().GetEndToEndEncryptionFeatures().GetEnabledSelfInsertEncryptionKey() {
+		log.Infoln("whiteboard share ignored: self-insert E2EE is enabled")
+		childWbf.WhiteboardFileId = DefaultWhiteboardFileId
+		return false, childWbf, nil
+	}
+
+	if share.FileId == "" {
+		log.Infoln("whiteboard share has no file id, treating as a blank whiteboard create")
+		childWbf.WhiteboardFileId = DefaultWhiteboardFileId
+		return false, childWbf, nil
+	}
+
+	// The built-in "default" board is a valid share target. It is the blank
+	// board every room starts with and carries NO uploaded-file KV entry, so
+	// there is nothing to look up in the parent's room-file bucket. Seed the
+	// child directly with file_id "default" and the requested page range. A
+	// default-board share counts as a validated share (presenter auto-switch +
+	// content seeding) exactly like a real office file.
+	if share.FileId == DefaultOfficeFileSentinel {
+		// filePageCount=0 disables the per-file page clamp: the client already
+		// scopes the selected pages to the default board's total, and the server
+		// has no separate page-count source for the built-in board.
+		pages := normalizeSelectedPages(share.Pages, 0)
+		maxPage := uint32(0)
+		for _, p := range pages {
+			if p > maxPage {
+				maxPage = p
+			}
+		}
+		// A board always has at least one page; never leave the child with a
+		// 0-page whiteboard when no explicit page was selected.
+		if maxPage == 0 {
+			maxPage = 1
+		}
+		// Clamp current_page into the selected range (same as the office path;
+		// no persistence/response field for it yet — kept for the response/echo).
+		if share.CurrentPage > maxPage {
+			share.CurrentPage = maxPage
+		}
+		if share.CurrentPage < 1 {
+			share.CurrentPage = 1
+		}
+		childWbf.WhiteboardFileId = DefaultOfficeFileSentinel
+		childWbf.FileName = ""
+		childWbf.FilePath = ""
+		// The breakout shows only the shared page range, so total_pages is the
+		// highest selected page (1 when nothing is explicitly selected).
+		childWbf.TotalPages = maxPage
+		return true, childWbf, nil
+	}
+
+	// The shared file must exist in the PARENT room's file KV bucket.
+	fileMeta, err := m.natsService.GetRoomFile(r.RoomId, share.FileId)
+	if err != nil {
+		return false, nil, fmt.Errorf("failed to read shared whiteboard file from parent room: %w", err)
+	}
+	if fileMeta == nil {
+		return false, nil, fmt.Errorf("shared whiteboard file %q not found in parent room", share.FileId)
+	}
+
+	// Normalize the requested page range: drop values < 1, dedupe, sort ascending,
+	// and drop any page beyond the file's known page count. Keep ORIGINAL page
+	// numbering (never remap indices).
+	pages := normalizeSelectedPages(share.Pages, fileMeta.GetTotalPages())
+	if len(pages) == 0 {
+		// treat as all pages
+		if fileMeta.TotalPages != nil && *fileMeta.TotalPages > 0 {
+			pages = make([]uint32, *fileMeta.TotalPages)
+			for i := range pages {
+				pages[i] = uint32(i + 1)
+			}
+		}
+	}
+
+	maxPage := uint32(0)
+	for _, p := range pages {
+		if p > maxPage {
+			maxPage = p
+		}
+	}
+	if fileMeta.TotalPages != nil && *fileMeta.TotalPages > 0 && maxPage == 0 {
+		maxPage = uint32(*fileMeta.TotalPages)
+	}
+
+	// A file always has at least one page; never leave the child with a 0-page
+	// whiteboard (unknown page count + no explicit selection).
+	if maxPage == 0 {
+		maxPage = 1
+	}
+
+	// Clamp current_page into the selected range. There is no persistence/response
+	// field for it yet (later seeding phase); just keep the normalized value
+	// available on the request for the response/echo.
+	if share.CurrentPage > maxPage {
+		share.CurrentPage = maxPage
+	}
+	if share.CurrentPage < 1 {
+		share.CurrentPage = 1
+	}
+
+	childWbf.WhiteboardFileId = fileMeta.FileId
+	childWbf.FileName = fileMeta.FileName
+	childWbf.FilePath = fileMeta.FilePath
+	// The breakout shows only the shared page range, so total_pages is the highest
+	// selected page (max page count if all pages are shared), NOT the parent's full total.
+	childWbf.TotalPages = maxPage
+
+	return true, childWbf, nil
+}
+
+// normalizeSelectedPages returns the requested page numbers cleaned up for use by
+// a breakout room: values < 1 dropped, duplicates removed, sorted ascending, and
+// any page beyond filePageCount (when > 0) dropped. Original page numbering is
+// preserved (never remapped).
+func normalizeSelectedPages(requested []uint32, filePageCount int32) []uint32 {
+	seen := make(map[uint32]struct{})
+	result := make([]uint32, 0, len(requested))
+	for _, p := range requested {
+		if p < 1 {
+			continue
+		}
+		if filePageCount > 0 && int32(p) > filePageCount {
+			continue
+		}
+		if _, ok := seen[p]; ok {
+			continue
+		}
+		seen[p] = struct{}{}
+		result = append(result, p)
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
+	return result
 }
 
 func (m *BreakoutRoomModel) PostTaskAfterRoomStartWebhook(roomId string, metadata *plugnmeet.RoomMetadata) error {
@@ -153,7 +470,7 @@ func (m *BreakoutRoomModel) PostTaskAfterRoomStartWebhook(roomId string, metadat
 
 	room, err := m.fetchBreakoutRoom(metadata.ParentRoomId, roomId)
 	if err != nil {
-		log.WithError(err).Error("Failed to fetch breakout room info")
+		log.Error("Failed to fetch breakout room info")
 		return err
 	}
 	room.Created = metadata.StartedAt

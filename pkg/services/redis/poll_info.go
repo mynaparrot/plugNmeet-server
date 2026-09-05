@@ -7,6 +7,19 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+func (s *RedisService) GetAllRoomPolls(roomId string) (map[string]string, error) {
+	// e.g. key: pnm:polls:{roomId}
+	result, err := s.rc.HGetAll(s.ctx, pollsKey+roomId).Result()
+	switch {
+	case errors.Is(err, redis.Nil):
+		return nil, nil
+	case err != nil:
+		return nil, err
+	}
+
+	return result, nil
+}
+
 func (s *RedisService) GetPollsListByRoomId(roomId string) ([]string, error) {
 	// e.g. key: pnm:polls:{roomId}
 	result, err := s.rc.HVals(s.ctx, pollsKey+roomId).Result()

@@ -89,7 +89,7 @@ func (m *RecordingModel) addRecordingInfoToDB(r *plugnmeet.RecorderToPlugNmeet, 
 		Title: &roomInfo.RoomTitle,
 		ExtraData: map[string]string{
 			"meeting-title":   roomInfo.RoomTitle,
-			"meeting-created": fmt.Sprintf(roomInfo.Created.Format(time.RFC3339)),
+			"meeting-created": roomInfo.Created.Format(time.RFC3339),
 			"meeting-ended":   fmt.Sprint(roomInfo.Ended.Format(time.RFC3339)),
 		},
 	}

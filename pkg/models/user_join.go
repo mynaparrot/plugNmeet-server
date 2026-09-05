@@ -16,7 +16,7 @@ import (
 
 var validUserIDRegex = regexp.MustCompile("^[a-zA-Z0-9-_]+$")
 
-func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTokenReq) (string, error) {
+func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTokenReq, backToMainRoom bool) (string, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"room_id":  g.GetRoomId(),
 		"user_id":  g.GetUserInfo().GetUserId(),
@@ -152,7 +152,7 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 		m.AssignLockSettingsToUser(meta, g)
 
 		// if waiting room features active then we won't allow direct access
-		if meta.RoomFeatures.WaitingRoomFeatures.IsActive {
+		if meta.RoomFeatures.WaitingRoomFeatures.IsActive && !backToMainRoom {
 			g.UserInfo.UserMetadata.WaitForApproval = true
 		}
 	}

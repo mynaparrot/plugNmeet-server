@@ -38,6 +38,12 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 		return
 	}
 
+	// Restart detection: a paused parent room's LK room was recreated after an
+	// empty-close while breakout rooms were active. In that case the status was
+	// kept Active and the session start/duration state preserved, so we must not
+	// reset the start clock, re-arm duration, or re-notify external webhooks.
+	isRestart := rInfo.Status == natsservice.RoomStatusActive && meta.StartedAt > 0
+
 	if rInfo.Status != natsservice.RoomStatusActive {
 		log.WithField("current_status", rInfo.Status).Info("updating room status to active")
 		if err := m.natsService.UpdateRoomStatus(rInfo.RoomId, natsservice.RoomStatusActive); err != nil {
@@ -46,17 +52,21 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 		}
 	}
 
-	meta.StartedAt = uint64(time.Now().UTC().Unix())
-	if meta.RoomFeatures.GetRoomDuration() > 0 {
-		log.WithField("duration", meta.RoomFeatures.GetRoomDuration()).Info("adding room to duration checker")
-		// we'll add room info in map
-		err := m.rm.AddRoomWithDurationInfo(rInfo.RoomId, &RoomDurationInfo{
-			Duration:  meta.RoomFeatures.GetRoomDuration(),
-			StartedAt: meta.StartedAt,
-		})
-		if err != nil {
-			log.WithError(err).Errorln("failed to add room duration info")
+	if !isRestart {
+		meta.StartedAt = uint64(time.Now().UTC().Unix())
+		if meta.RoomFeatures.GetRoomDuration() > 0 {
+			log.WithField("duration", meta.RoomFeatures.GetRoomDuration()).Info("adding room to duration checker")
+			// we'll add room info in map
+			err := m.rm.AddRoomWithDurationInfo(rInfo.RoomId, &RoomDurationInfo{
+				Duration:  meta.RoomFeatures.GetRoomDuration(),
+				StartedAt: meta.StartedAt,
+			})
+			if err != nil {
+				log.WithError(err).Errorln("failed to add room duration info")
+			}
 		}
+	} else {
+		log.Info("room restart after pause detected — preserving original session start time and duration info")
 	}
 
 	if meta.IsBreakoutRoom {
@@ -71,13 +81,15 @@ func (m *WebhookModel) roomStarted(event *livekit.WebhookEvent) {
 
 	// for room_started event we should send webhook at the end
 	// otherwise some services may not be ready
-	event.Room.Metadata = rInfo.Metadata
-	event.Room.Sid = rInfo.RoomSid
-	event.Room.MaxParticipants = uint32(rInfo.MaxParticipants)
-	event.Room.EmptyTimeout = uint32(rInfo.EmptyTimeout)
+	if !isRestart {
+		event.Room.Metadata = rInfo.Metadata
+		event.Room.Sid = rInfo.RoomSid
+		event.Room.MaxParticipants = uint32(rInfo.MaxParticipants)
+		event.Room.EmptyTimeout = uint32(rInfo.EmptyTimeout)
 
-	// webhook notification
-	m.sendToWebhookNotifier(event)
+		// webhook notification
+		m.sendToWebhookNotifier(event)
+	}
 	log.Info("Successfully processed room_started webhook")
 }
 
@@ -106,6 +118,27 @@ func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 	event.Room.EmptyTimeout = uint32(rInfo.EmptyTimeout)
 
 	if rInfo.Status != natsservice.RoomStatusEnded {
+		// Pause guard: a natural LiveKit empty-close of a PARENT room while its
+		// breakout rooms are still active is a PAUSE, not an end. We keep the
+		// room status Active, preserve all session data, and suppress the
+		// external webhook notification. The parent LK room will be recreated
+		// automatically when a user rejoins (handled as a restart in roomStarted).
+		if meta, mErr := m.natsService.GetRoomMetadataStruct(rInfo.RoomId); mErr == nil && meta != nil {
+			if isParentWithActiveBreakouts(meta) {
+				log.Infoln("parent room closed by LiveKit while breakout rooms are active — pausing, session data preserved")
+				return
+			}
+			// A breakout child room may be empty-closed by LiveKit while the
+			// parent's breakout session is still active (self-select rooms can
+			// sit empty). We skip the end/cleanup flow and the external
+			// webhook so the room stays re-joinable; LiveKit recreates the LK
+			// room when the next participant joins.
+			if breakoutChildOfActiveParent(m.natsService, meta) {
+				log.Infoln("breakout child room closed by LiveKit while parent breakouts are active — skipping end cleanup, room will be recreated on next join")
+				return
+			}
+		}
+
 		// This means the room was ended directly by LiveKit (e.g., empty timeout),
 		// not through the plugNmeet API. We need to trigger our cleanup flow.
 		log.Warnln("room was not ended via API, triggering plugNmeet EndRoom flow")

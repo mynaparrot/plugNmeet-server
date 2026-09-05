@@ -120,6 +120,16 @@ func (ac *AuthController) HandleVerifyHeaderToken(c fiber.Ctx) error {
 		return ac.sendVerificationRes(c, false, errMsg, plugnmeet.StatusCode_INVALID_TOKEN_OR_SIGNATURE)
 	}
 
+	// Let the "return to main room" route reach the handler even for an ended
+	// breakout: the token is verified and the handler re-validates the parent.
+	if strings.HasSuffix(path, "/backToMain") {
+		c.Locals("isAdmin", claims.IsAdmin)
+		c.Locals("roomId", claims.RoomId)
+		c.Locals("requestedUserId", claims.UserId)
+		c.Locals("clientType", claims.ClientType)
+		return c.Next()
+	}
+
 	rf, err := ac.NatsService.GetRoomInfo(claims.RoomId)
 	if err != nil {
 		_ = c.SendStatus(errStatus)
