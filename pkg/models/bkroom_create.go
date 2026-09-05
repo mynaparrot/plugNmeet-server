@@ -278,15 +278,10 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 		return createdRooms, errors.New("breakout-room.notifications.unexpected-error")
 	}
 	origMeta.RoomFeatures.BreakoutRoomFeatures.IsActive = true
+	// save create-time snapshot so that can be populated again
 	origMeta.RoomFeatures.BreakoutRoomFeatures.AllowReturnToMainRoom = r.AllowReturnToMainRoom
 	origMeta.RoomFeatures.BreakoutRoomFeatures.AllowSelfSelect = r.AllowSelfSelect
-
-	// persist the creation-time pre-assignment snapshot on the parent so the
-	// client prefill reflects the rooms that were actually created; it replaces
-	// any API-seeded entries and rides the metadata broadcast below.
-	if origMeta.RoomFeatures.BreakoutRoomFeatures != nil {
-		origMeta.RoomFeatures.BreakoutRoomFeatures.PreassignedRooms = createdPreassigned
-	}
+	origMeta.RoomFeatures.BreakoutRoomFeatures.PreassignedRooms = createdPreassigned
 
 	if err := m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, origMeta); err != nil {
 		log.WithError(err).Error("Failed to update parent room metadata")
