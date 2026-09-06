@@ -43,6 +43,8 @@ func (s *RedisService) ClosePoll(r *plugnmeet.ClosePollReq) error {
 
 		_, err = tx.TxPipelined(s.ctx, func(pipe redis.Pipeliner) error {
 			pipe.HSet(s.ctx, key, r.PollId, string(marshal))
+			// every close path must purge the duration index hint
+			pipe.HDel(s.ctx, pollsWithDurationKey, pollDurationIndexField(r.RoomId, r.PollId))
 			return nil
 		})
 
@@ -65,6 +67,8 @@ func (s *RedisService) CleanUpPolls(roomId string, pollIds []string) error {
 		pp.Del(s.ctx, respondentsKey)
 		pp.Del(s.ctx, votedUsersKey)
 		pp.Del(s.ctx, allRespondentsKey)
+		// purge the room's duration index entries along with the polls
+		pp.HDel(s.ctx, pollsWithDurationKey, pollDurationIndexField(roomId, id))
 	}
 
 	// e.g. pnm:polls:{roomId}
@@ -116,6 +120,8 @@ func (s *RedisService) ClosePollIfRunning(roomId, pollId, closedBy string) (bool
 
 		_, err = tx.TxPipelined(s.ctx, func(pipe redis.Pipeliner) error {
 			pipe.HSet(s.ctx, key, pollId, string(marshal))
+			// every close path must purge the duration index hint
+			pipe.HDel(s.ctx, pollsWithDurationKey, pollDurationIndexField(roomId, pollId))
 			return nil
 		})
 		if err != nil {

@@ -30,6 +30,7 @@ type JanitorModel struct {
 	natsService *natsservice.NatsService
 	lk          *livekitservice.LivekitService
 	rm          *RoomModel
+	pm          *PollModel
 
 	artifactModel *ArtifactModel
 	logger        *logrus.Entry
@@ -51,6 +52,7 @@ type JanitorModelArgs struct {
 	NatsService   *natsservice.NatsService
 	Lk            *livekitservice.LivekitService
 	Rm            *RoomModel
+	Pm            *PollModel
 	ArtifactModel *ArtifactModel
 	Logger        *logrus.Logger
 }
@@ -69,6 +71,7 @@ func NewJanitorModel(args JanitorModelArgs) *JanitorModel {
 		rs:            args.Rs,
 		lk:            args.Lk,
 		rm:            args.Rm,
+		pm:            args.Pm,
 		artifactModel: args.ArtifactModel,
 		natsService:   args.NatsService,
 		logger:        args.Logger.WithField("model", "janitor"),
@@ -155,6 +158,7 @@ func (m *JanitorModel) runJanitorTasks() {
 			// These tasks run on their own schedule.
 			// The individual locks inside each task ensure safety if the leader changes mid-operation.
 			m.checkRoomWithDuration()
+			m.pm.CloseExpiredPolls()
 
 			if now.After(nextUserCheck) {
 				m.checkOnlineUsersStatus()

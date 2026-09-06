@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	pollsKey              = "pnm:polls:"
+	pollsKey              = Prefix + "polls:"
+	pollsWithDurationKey  = Prefix + "pollsWithDuration"
 	pollRespondentsSubKey = ":respondents:"
 	pollVotedUsersSubKey  = ":voted_users"
 	pollAllResSubKey      = ":all_respondents"
@@ -30,6 +31,49 @@ func (s *RedisService) CreateRoomPoll(roomId string, val map[string]string) erro
 		return err
 	}
 	return nil
+}
+
+// pollDurationIndexField returns the field used to index a poll in the
+// pollsWithDuration hash: "{roomId}:{pollId}".
+func pollDurationIndexField(roomId, pollId string) string {
+	return fmt.Sprintf("%s:%s", roomId, pollId)
+}
+
+// AddPollWithDuration registers a fixed-duration poll in the
+// pollsWithDuration index (value: the poll's expires_at as unix seconds) so
+// the janitor can sweep for expired polls. The hash is only a hint; the
+// poll's ExpiresAt remains the source of truth.
+func (s *RedisService) AddPollWithDuration(roomId, pollId string, expiresAt int64) error {
+	pipe := s.rc.Pipeline()
+	pipe.HSet(s.ctx, pollsWithDurationKey, pollDurationIndexField(roomId, pollId), expiresAt)
+	pipe.Expire(s.ctx, pollsWithDurationKey, time.Hour*24)
+
+	_, err := pipe.Exec(s.ctx)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// RemovePollWithDuration drops a poll's entry from the pollsWithDuration index.
+func (s *RedisService) RemovePollWithDuration(roomId, pollId string) error {
+	_, err := s.rc.HDel(s.ctx, pollsWithDurationKey, pollDurationIndexField(roomId, pollId)).Result()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// GetPollsWithDuration returns every entry of the pollsWithDuration index.
+func (s *RedisService) GetPollsWithDuration() (map[string]string, error) {
+	result, err := s.rc.HGetAll(s.ctx, pollsWithDurationKey).Result()
+	switch {
+	case errors.Is(err, redis.Nil):
+		return nil, nil
+	case err != nil:
+		return nil, err
+	}
+	return result, nil
 }
 
 // AddPollResponse records one vote: increments total_resp once per voter and
@@ -126,9 +170,10 @@ func (s *RedisService) ReopenPollIfClosed(r *plugnmeet.ReopenPollReq) (uint32, b
 		info.IsRunning = true
 		info.ClosedBy = ""
 		// restart the expiry from now; 0 means no limit
+		now := time.Now().Unix()
 		info.ExpiresAt = 0
 		if info.Duration > 0 {
-			info.ExpiresAt = time.Now().Unix() + int64(info.Duration)
+			info.ExpiresAt = now + int64(info.Duration)
 		}
 		marshal, err := protojson.Marshal(info)
 		if err != nil {
@@ -137,6 +182,10 @@ func (s *RedisService) ReopenPollIfClosed(r *plugnmeet.ReopenPollReq) (uint32, b
 
 		_, err = tx.TxPipelined(s.ctx, func(pipe redis.Pipeliner) error {
 			pipe.HSet(s.ctx, key, r.PollId, string(marshal))
+			// keep the duration index in sync with the restarted expiry
+			if info.Duration > 0 {
+				pipe.HSet(s.ctx, pollsWithDurationKey, pollDurationIndexField(r.RoomId, r.PollId), info.ExpiresAt)
+			}
 			return nil
 		})
 		if err != nil {

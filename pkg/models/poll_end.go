@@ -2,6 +2,8 @@ package models
 
 import (
 	"errors"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -72,7 +74,12 @@ func (m *PollModel) AutoClosePoll(roomId, pollId string) error {
 		return err
 	}
 	if pi == "" {
-		return nil // poll gone (e.g. room ended); nothing to close
+		// poll gone (e.g. room ended): purge any leaked duration-index hint;
+		// a missing poll can never be reopened
+		if err := m.rs.RemovePollWithDuration(roomId, pollId); err != nil {
+			log.WithError(err).Errorln("failed to purge duration index entry for missing poll")
+		}
+		return nil
 	}
 	info := new(plugnmeet.PollInfo)
 	if err = protojson.Unmarshal([]byte(pi), info); err != nil {
@@ -81,6 +88,12 @@ func (m *PollModel) AutoClosePoll(roomId, pollId string) error {
 	}
 	if !info.IsRunning {
 		return nil // already closed
+	}
+	// the janitor's index is only a hint of what to check; re-validate against
+	// the poll's current expiry so a just-reopened poll (which restarts its
+	// expires_at) isn't closed early. ExpiresAt == 0 means no limit.
+	if info.ExpiresAt > 0 && time.Now().Unix() < info.ExpiresAt {
+		return nil // not due yet
 	}
 
 	closed, err := m.rs.ClosePollIfRunning(roomId, pollId, config.PollAutoClosedBy)
@@ -93,6 +106,54 @@ func (m *PollModel) AutoClosePoll(roomId, pollId string) error {
 		m.afterPollClosed(roomId, pollId)
 	}
 	return nil
+}
+
+// CloseExpiredPolls sweeps the duration index and auto-closes polls past
+// their expires_at. Called by the janitor on every tick. The
+// pnm:pollsWithDuration hash is only a HINT of what to check; AutoClosePoll
+// re-validates against the poll's current ExpiresAt, which is the truth.
+func (m *PollModel) CloseExpiredPolls() {
+	log := m.logger.WithField("task", "close-expired-polls")
+
+	entries, err := m.rs.GetPollsWithDuration()
+	if err != nil {
+		log.WithError(err).Errorln("failed to fetch polls with duration from redis")
+		return
+	}
+
+	now := time.Now().Unix()
+	for field, val := range entries {
+		// pollIds are UUIDs and never contain ":"; roomIds may, so split on
+		// the last colon only
+		idx := strings.LastIndex(field, ":")
+		if idx <= 0 {
+			log.WithField("field", field).Warn("malformed duration index field; skipping")
+			continue
+		}
+		roomId, pollId := field[:idx], field[idx+1:]
+
+		// value is the poll's expires_at as a unix-seconds decimal string
+		expiresAt, err := strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			// the field parsed fine, so the entry itself is garbage: self-heal it
+			log.WithField("field", field).WithField("value", val).WithError(err).Warn("malformed duration index value; removing entry")
+			if rmErr := m.rs.RemovePollWithDuration(roomId, pollId); rmErr != nil {
+				log.WithError(rmErr).Errorln("failed to remove malformed duration index entry")
+			}
+			continue
+		}
+
+		if now < expiresAt {
+			continue // not due yet
+		}
+
+		if err := m.AutoClosePoll(roomId, pollId); err != nil {
+			log.WithFields(logrus.Fields{
+				"roomId": roomId,
+				"pollId": pollId,
+			}).WithError(err).Errorln("failed to auto close expired poll")
+		}
+	}
 }
 
 // maybeAutoCloseExpired lazily auto-closes a running poll past its expires_at;

@@ -35,13 +35,6 @@ func (m *PollModel) CreatePoll(r *plugnmeet.CreatePollReq) (string, error) {
 		return "", config.ErrPollGeneric
 	}
 
-	// schedule server-side auto-close at expiry; lazy check covers restarts
-	if r.Duration > 0 {
-		time.AfterFunc(time.Duration(r.Duration)*time.Second, func() {
-			_ = m.AutoClosePoll(r.RoomId, r.PollId)
-		})
-	}
-
 	err = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_POLL_CREATED, r.RoomId, r.PollId, r.UserId)
 	if err != nil {
 		log.WithError(err).Errorln("error sending POLL_CREATED event")
@@ -127,7 +120,18 @@ func (m *PollModel) createRoomPollHash(r *plugnmeet.CreatePollReq) error {
 	pollVal := map[string]string{
 		r.PollId: string(marshal),
 	}
-	return m.rs.CreateRoomPoll(r.RoomId, pollVal)
+	// the poll hash must be written BEFORE the duration index entry: an index
+	// entry without its poll would be self-healed (removed) by the janitor's
+	// sweep and the poll would never be auto-closed
+	if err := m.rs.CreateRoomPoll(r.RoomId, pollVal); err != nil {
+		return err
+	}
+
+	// register the duration hint for the janitor's expiry sweep
+	if r.Duration > 0 {
+		return m.rs.AddPollWithDuration(r.RoomId, r.PollId, p.ExpiresAt)
+	}
+	return nil
 }
 
 func (m *PollModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq) error {
@@ -227,7 +231,7 @@ func (m *PollModel) ReopenPoll(r *plugnmeet.ReopenPollReq) error {
 	})
 	log.Infoln("request to reopen poll")
 
-	duration, reopened, err := m.rs.ReopenPollIfClosed(r)
+	_, reopened, err := m.rs.ReopenPollIfClosed(r)
 	if err != nil {
 		// not-found is an expected user error; don't spam the log with it
 		if errors.Is(err, config.ErrPollNotFound) {
@@ -240,13 +244,6 @@ func (m *PollModel) ReopenPoll(r *plugnmeet.ReopenPollReq) error {
 		// idempotent: already running — no side effects, no events
 		log.Info("poll already running; nothing to reopen")
 		return nil
-	}
-
-	// schedule server-side auto-close at expiry; lazy check covers restarts
-	if duration > 0 {
-		time.AfterFunc(time.Duration(duration)*time.Second, func() {
-			_ = m.AutoClosePoll(r.RoomId, r.PollId)
-		})
 	}
 
 	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_POLL_REOPENED, r.RoomId, r.PollId, nil)
