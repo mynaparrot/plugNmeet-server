@@ -80,7 +80,8 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 	}
 
 	// Step 6: Handle user ID generation and duplicate user checks.
-	if meta.RoomFeatures.AutoGenUserId != nil && *meta.RoomFeatures.AutoGenUserId {
+	// during backToMainRoom we'll not generate user id
+	if !backToMainRoom && meta.RoomFeatures.AutoGenUserId != nil && *meta.RoomFeatures.AutoGenUserId {
 		if g.UserInfo.UserId != config.RecorderBot && g.UserInfo.UserId != config.RtmpBot {
 			// we'll auto generate user id no matter what sent
 			g.UserInfo.UserId = uuid.NewString()
