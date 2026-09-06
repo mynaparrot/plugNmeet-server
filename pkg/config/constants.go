@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strconv"
 	"strings"
 	"time"
 )
@@ -23,6 +24,19 @@ const (
 	WaitBeforeTriggerOnAfterRoomEnded      = 10 * time.Second
 	WaitBeforeAnalyticsStartProcessing     = 50 * time.Second
 	WaitBeforeBreakoutRoomOnAfterRoomStart = 2 * time.Second
+
+	// separator for comma-joined selected option ids ("1,2,3") in poll storage & analytics
+	PollOptionIdsSeparator = ","
+
+	// MaxPollDurationSeconds caps poll auto-close duration at 60 minutes.
+	MaxPollDurationSeconds = 3600
+	// PollAutoClosedBy is the closed_by marker for polls auto-closed at expiry.
+	PollAutoClosedBy = "pnm_poll_auto_close"
+
+	// MsgRoomIdRequired is the plain error text when an Auth API request omits room_id.
+	MsgRoomIdRequired = "missing required field room_id"
+	// ExternalApiUserId is the created_by marker for polls pushed via the Auth API without a user_id.
+	ExternalApiUserId = "external-api"
 )
 
 // GetNativeTwinIdentity returns the LiveKit identity of the hybrid native twin
@@ -40,4 +54,27 @@ func GetNativeTwinIdentity(userId string) string {
 // present the identity is returned unchanged.
 func PrimaryIdentityFromNative(identity string) string {
 	return strings.TrimSuffix(identity, NativeTwinIdentitySuffix)
+}
+
+// JoinPollOptionIds joins selected option ids into a comma-joined string ("1,2,3").
+func JoinPollOptionIds(ids []uint64) string {
+	out := make([]string, len(ids))
+	for i, id := range ids {
+		out[i] = strconv.FormatUint(id, 10)
+	}
+	return strings.Join(out, PollOptionIdsSeparator)
+}
+
+// SplitPollOptionIds splits a comma-joined option-id string back into ids.
+func SplitPollOptionIds(s string) ([]uint64, error) {
+	parts := strings.Split(s, PollOptionIdsSeparator)
+	ids := make([]uint64, 0, len(parts))
+	for _, p := range parts {
+		id, err := strconv.ParseUint(p, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
 }

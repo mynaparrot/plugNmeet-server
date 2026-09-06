@@ -3,11 +3,11 @@ package models
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 )
@@ -27,29 +27,29 @@ func (m *BreakoutRoomModel) BackToMainRoom(ctx context.Context, r *plugnmeet.Bac
 	// breakout ids are <parentRoomId>-<n>, so the caller's room must be a child of it.
 	if !strings.HasPrefix(r.RoomId, fmt.Sprintf(BreakoutRoomFormat, r.ParentRoomId, "")) {
 		log.Warn("parent room id does not match the caller's breakout room")
-		return "", errors.New("breakout-room.notifications.unexpected-error")
+		return "", config.ErrBkRoomUnexpectedError
 	}
 
 	// Verify the parent room is still alive (a paused parent passes this check).
 	mainRoom, mainMeta, err := m.natsService.GetRoomInfoWithMetadata(r.ParentRoomId)
 	if err != nil {
 		log.WithError(err).Error("failed to get main room info")
-		return "", errors.New("breakout-room.notifications.unexpected-error")
+		return "", config.ErrBkRoomUnexpectedError
 	}
 	if mainRoom == nil || mainMeta == nil || !m.natsService.IsRoomStatusActive(mainRoom.Status) {
 		log.Warn("main room not found or not active")
-		return "", errors.New("breakout-room.notifications.main-room-not-active")
+		return "", config.ErrBkRoomMainRoomNotActive
 	}
 
 	// User info comes from the main room's kv; breakout entries carry breakout-only state (e.g. isPresenter).
 	p, pmeta, err := m.natsService.GetUserWithMetadata(r.ParentRoomId, r.UserId)
 	if err != nil {
 		log.WithError(err).Error("failed to get user info from main room")
-		return "", errors.New("breakout-room.notifications.unexpected-error")
+		return "", config.ErrBkRoomUnexpectedError
 	}
 	if p == nil || pmeta == nil {
 		log.Error("failed to get user info from main room")
-		return "", errors.New("breakout-room.notifications.unexpected-error")
+		return "", config.ErrBkRoomUnexpectedError
 	}
 	// let GetPNMJoinToken to set IsPresenter value
 	pmeta.IsPresenter = false
@@ -67,7 +67,7 @@ func (m *BreakoutRoomModel) BackToMainRoom(ctx context.Context, r *plugnmeet.Bac
 	token, err := m.um.GetPNMJoinToken(ctx, req, true)
 	if err != nil {
 		log.WithError(err).Error("failed to generate join token for main room")
-		return "", errors.New("breakout-room.notifications.unexpected-error")
+		return "", config.ErrBkRoomUnexpectedError
 	}
 
 	log.Info("successfully generated join token for main room")
@@ -101,14 +101,14 @@ func (m *BreakoutRoomModel) ReInviteBreakoutRoom(ctx context.Context, r *plugnme
 	}
 	if !assigned {
 		log.Warn("user is not assigned to this breakout room")
-		return errors.New("breakout-room.notifications.user-not-assigned")
+		return config.ErrBkRoomUserNotAssigned
 	}
 
 	// re-send the JOIN_BREAKOUT_ROOM invitation, exactly like CreateBreakoutRooms.
 	err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_JOIN_BREAKOUT_ROOM, r.RoomId, r.BreakoutRoomId, &r.UserId)
 	if err != nil {
 		log.WithError(err).WithField("userId", r.UserId).Error("failed to re-send breakout room invitation")
-		return errors.New("breakout-room.notifications.unexpected-error")
+		return config.ErrBkRoomUnexpectedError
 	}
 
 	log.Info("successfully re-sent breakout room invitation")
@@ -138,11 +138,11 @@ func (m *BreakoutRoomModel) MoveBreakoutRoomUser(ctx context.Context, r *plugnme
 	p, meta, err := m.natsService.GetUserWithMetadata(r.RoomId, r.UserId)
 	if err != nil {
 		log.WithError(err).Error("failed to get user info from parent room")
-		return errors.New("breakout-room.notifications.unexpected-error")
+		return config.ErrBkRoomUnexpectedError
 	}
 	if p == nil || meta == nil {
 		log.Error("failed to get user info from parent room")
-		return errors.New("breakout-room.notifications.unexpected-error")
+		return config.ErrBkRoomUnexpectedError
 	}
 
 	// Validate the target breakout room (only when moving to a breakout room;
@@ -184,7 +184,7 @@ func (m *BreakoutRoomModel) MoveBreakoutRoomUser(ctx context.Context, r *plugnme
 	// not pushed and a same-room "move" would just reload and disconnect them).
 	if currentRoomId == "" {
 		log.Warn("user is not online in any room; rejecting move")
-		return errors.New("breakout-room.notifications.user-not-online")
+		return config.ErrBkRoomUserNotOnline
 	}
 
 	// Compute the target room id. breakout ids are always "<parentRoomId>-<n>"
@@ -200,10 +200,10 @@ func (m *BreakoutRoomModel) MoveBreakoutRoomUser(ctx context.Context, r *plugnme
 	if currentRoomId == targetRoomId {
 		if r.BreakoutRoomId == "" {
 			log.Warn("user is already in the main room; rejecting move")
-			return errors.New("breakout-room.notifications.user-already-in-main")
+			return config.ErrBkRoomUserAlreadyInMain
 		}
 		log.Warn("user is already in this breakout room; rejecting move")
-		return errors.New("breakout-room.notifications.user-already-in-room")
+		return config.ErrBkRoomUserAlreadyInRoom
 	}
 
 	// Reassign in Redis: removing from every other room (and, for a move to the
@@ -230,7 +230,7 @@ func (m *BreakoutRoomModel) MoveBreakoutRoomUser(ctx context.Context, r *plugnme
 	token, err := m.um.GetPNMJoinToken(ctx, req, r.BreakoutRoomId == "")
 	if err != nil {
 		log.WithError(err).Error("failed to generate token for target room")
-		return errors.New("breakout-room.notifications.unexpected-error")
+		return config.ErrBkRoomUnexpectedError
 	}
 
 	log.Info("successfully generated token for target room")

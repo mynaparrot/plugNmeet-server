@@ -2,9 +2,9 @@ package models
 
 import (
 	"context"
-	"errors"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -22,11 +22,11 @@ func (m *BreakoutRoomModel) JoinBreakoutRoom(ctx context.Context, r *plugnmeet.J
 	status, err := m.natsService.GetRoomUserStatus(r.BreakoutRoomId, r.UserId)
 	if err != nil {
 		log.WithError(err).Error("failed to get user status for breakout room")
-		return "", errors.New("breakout-room.notifications.unexpected-error")
+		return "", config.ErrBkRoomUnexpectedError
 	}
 	if status == natsservice.UserStatusOnline {
 		log.Warn("user has already been joined")
-		return "", errors.New("breakout-room.notifications.user-already-joined")
+		return "", config.ErrBkRoomAlreadyJoined
 	}
 
 	room, err := m.fetchBreakoutRoom(r.RoomId, r.BreakoutRoomId)
@@ -59,19 +59,19 @@ func (m *BreakoutRoomModel) JoinBreakoutRoom(ctx context.Context, r *plugnmeet.J
 		}
 		if !canJoin {
 			log.Warn("user not in the list of allowed users for this breakout room")
-			return "", errors.New("breakout-room.notifications.user-not-allowed-join")
+			return "", config.ErrBkRoomUserNotAllowedJoin
 		}
 	}
 
 	p, meta, err := m.natsService.GetUserWithMetadata(r.RoomId, r.UserId)
 	if err != nil {
 		log.WithError(err).Error("failed to get user info from parent room")
-		return "", errors.New("breakout-room.notifications.unexpected-error")
+		return "", config.ErrBkRoomUnexpectedError
 	}
 
 	if p == nil || meta == nil {
 		log.Error("failed to get user info from parent room")
-		return "", errors.New("breakout-room.notifications.unexpected-error")
+		return "", config.ErrBkRoomUnexpectedError
 	}
 	// let GetPNMJoinToken to set IsPresenter value
 	meta.IsPresenter = false
@@ -88,7 +88,7 @@ func (m *BreakoutRoomModel) JoinBreakoutRoom(ctx context.Context, r *plugnmeet.J
 	token, err := m.um.GetPNMJoinToken(ctx, req, false)
 	if err != nil {
 		log.WithError(err).Error("failed to generate join token for breakout room")
-		return "", errors.New("breakout-room.notifications.unexpected-error")
+		return "", config.ErrBkRoomUnexpectedError
 	}
 
 	log.Info("successfully generated join token for breakout room")

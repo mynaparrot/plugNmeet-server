@@ -287,7 +287,9 @@ func (s *InsightsModel) AITextChatConfigure(req *plugnmeet.InsightsAITextChatCon
 
 	insightsFeatures := metadata.RoomFeatures.InsightsFeatures
 	if !insightsFeatures.IsAllow || !insightsFeatures.AiFeatures.IsAllow || !insightsFeatures.AiFeatures.AiTextChatFeatures.IsAllow {
-		return fmt.Errorf("insights feature wasn't enabled")
+		// The client translates the sentinel key; log the full sentence here.
+		s.logger.WithField("roomId", roomId).Warn("AI text chat features are not enabled for this room")
+		return fmt.Errorf("insights.ai-text-chat.feature-disabled")
 	}
 	aiTextChatFeatures := insightsFeatures.AiFeatures.AiTextChatFeatures
 
@@ -296,6 +298,7 @@ func (s *InsightsModel) AITextChatConfigure(req *plugnmeet.InsightsAITextChatCon
 	aiTextChatFeatures.AllowedUserIds = req.AllowedUserIds
 	aiTextChatFeatures.IsNotepadAiDisabled = req.IsNotepadAiDisabled
 	aiTextChatFeatures.IsWhiteboardAiDisabled = req.IsWhiteboardAiDisabled
+	aiTextChatFeatures.IsPollAiDisabled = req.IsPollAiDisabled
 
 	// analytics
 	s.artifactModel.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_AI_TEXT_CHAT_STATUS, new(plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()), nil)
@@ -314,7 +317,9 @@ func (s *InsightsModel) ExecuteAITextChat(req *plugnmeet.InsightsAITextChatConte
 
 	insightsFeatures := metadata.RoomFeatures.InsightsFeatures
 	if !insightsFeatures.IsAllow || !insightsFeatures.AiFeatures.IsAllow || !insightsFeatures.AiFeatures.AiTextChatFeatures.IsAllow {
-		return fmt.Errorf("insights feature wasn't enabled")
+		// The client translates the sentinel key; log the full sentence here.
+		s.logger.WithField("roomId", roomId).WithField("userId", userId).Warn("AI text chat features are not enabled for this room")
+		return fmt.Errorf("insights.ai-text-chat.feature-disabled")
 	}
 	aiTextChatFeatures := insightsFeatures.AiFeatures.AiTextChatFeatures
 	foundUser := aiTextChatFeatures.IsAllowedEveryone
@@ -329,7 +334,9 @@ func (s *InsightsModel) ExecuteAITextChat(req *plugnmeet.InsightsAITextChatConte
 	}
 
 	if !foundUser {
-		return fmt.Errorf("you're not allowed to use this service")
+		// The client translates the sentinel key; log the full sentence here.
+		s.logger.WithField("roomId", roomId).WithField("userId", userId).Warn("user is not allowed to use AI text chat")
+		return fmt.Errorf("insights.ai-text-chat.not-allowed")
 	}
 
 	requestFrom := plugnmeet.InsightsAIRequestSource_INSIGHTS_AI_REQUEST_SOURCE_CHAT
@@ -338,11 +345,21 @@ func (s *InsightsModel) ExecuteAITextChat(req *plugnmeet.InsightsAITextChatConte
 	}
 	if requestFrom == plugnmeet.InsightsAIRequestSource_INSIGHTS_AI_REQUEST_SOURCE_NOTEPAD &&
 		aiTextChatFeatures.IsNotepadAiDisabled {
-		return fmt.Errorf("notepad AI is disabled")
+		// The client translates the sentinel key; log the full sentence here.
+		s.logger.WithField("roomId", roomId).WithField("userId", userId).Warn("notepad AI is disabled")
+		return fmt.Errorf("insights.notepad-ai.errors.ai-disabled")
 	}
 	if requestFrom == plugnmeet.InsightsAIRequestSource_INSIGHTS_AI_REQUEST_SOURCE_WHITEBOARD &&
 		aiTextChatFeatures.IsWhiteboardAiDisabled {
-		return fmt.Errorf("whiteboard AI is disabled")
+		// The client translates the sentinel key; log the full sentence here.
+		s.logger.WithField("roomId", roomId).WithField("userId", userId).Warn("whiteboard AI is disabled")
+		return fmt.Errorf("insights.whiteboard-ai.errors.ai-disabled")
+	}
+	if requestFrom == plugnmeet.InsightsAIRequestSource_INSIGHTS_AI_REQUEST_SOURCE_POLL &&
+		aiTextChatFeatures.IsPollAiDisabled {
+		// The client translates the sentinel key; log the full sentence here.
+		s.logger.WithField("roomId", roomId).WithField("userId", userId).Warn("poll AI is disabled")
+		return fmt.Errorf("polls.errors.ai-disabled")
 	}
 
 	var streamId string

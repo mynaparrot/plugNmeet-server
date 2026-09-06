@@ -1,8 +1,6 @@
 package models
 
 import (
-	"errors"
-
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
@@ -17,7 +15,7 @@ func (m *BreakoutRoomModel) GetBreakoutRooms(roomId, userId string, isAdmin bool
 	}
 
 	if breakoutRooms == nil || len(breakoutRooms) == 0 {
-		return nil, errors.New("breakout-room.notifications.room-not-found")
+		return nil, config.ErrBkRoomNotFound
 	}
 
 	if isAdmin {
@@ -56,7 +54,7 @@ func (m *BreakoutRoomModel) GetMyBreakoutRooms(roomId, userId string) (*plugnmee
 	}
 
 	if breakoutRooms == nil || len(breakoutRooms) == 0 {
-		return nil, errors.New("breakout-room.notifications.room-not-found")
+		return nil, config.ErrBkRoomNotFound
 	}
 
 	for _, rr := range breakoutRooms {
@@ -67,7 +65,7 @@ func (m *BreakoutRoomModel) GetMyBreakoutRooms(roomId, userId string) (*plugnmee
 		}
 	}
 
-	return nil, errors.New("breakout-room.notifications.room-not-found")
+	return nil, config.ErrBkRoomNotFound
 }
 
 func (m *BreakoutRoomModel) fetchBreakoutRoom(roomId, breakoutRoomId string) (*plugnmeet.BreakoutRoom, error) {
@@ -80,18 +78,18 @@ func (m *BreakoutRoomModel) fetchBreakoutRoom(roomId, breakoutRoomId string) (*p
 	result, err := m.rs.GetBreakoutRoom(roomId, breakoutRoomId)
 	if err != nil {
 		log.WithError(err).Error("failed to read breakout room from redis")
-		return nil, errors.New("breakout-room.notifications.unexpected-error")
+		return nil, config.ErrBkRoomUnexpectedError
 	}
 	if result == "" {
 		log.Warn("breakout room not found")
-		return nil, errors.New("breakout-room.notifications.room-not-found")
+		return nil, config.ErrBkRoomNotFound
 	}
 
 	room := new(plugnmeet.BreakoutRoom)
 	err = protojson.Unmarshal([]byte(result), room)
 	if err != nil {
 		log.WithError(err).Error("failed to unmarshal breakout room")
-		return nil, errors.New("breakout-room.notifications.unexpected-error")
+		return nil, config.ErrBkRoomUnexpectedError
 	}
 
 	return room, nil
@@ -106,7 +104,7 @@ func (m *BreakoutRoomModel) fetchBreakoutRooms(roomId string) ([]*plugnmeet.Brea
 	rooms, err := m.rs.GetAllBreakoutRoomsByParentRoomId(roomId)
 	if err != nil {
 		log.WithError(err).Error("failed to read breakout rooms from redis")
-		return nil, errors.New("breakout-room.notifications.unexpected-error")
+		return nil, config.ErrBkRoomUnexpectedError
 	}
 	if rooms == nil || len(rooms) == 0 {
 		return nil, nil

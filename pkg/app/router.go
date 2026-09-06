@@ -157,6 +157,7 @@ func (r *Router) registerAuthRoutes() {
 	room.Post("/fetchPastRooms", r.ctrl.RoomController.HandleFetchPastRooms)
 	room.Post("/broadcastToRoom", r.ctrl.RoomController.HandleBroadcastToRoom)
 	room.Post("/uploadWhiteboardFile", r.ctrl.FileController.HandleUploadWhiteboardFile)
+	room.Post("/createPoll", r.ctrl.PollsController.HandleCreatePollAuth)
 
 	recording := auth.Group("/recording")
 	recording.Post("/fetch", r.ctrl.RecordingController.HandleFetchRecordings)
@@ -238,6 +239,7 @@ func (r *Router) registerAPIRoutes() {
 	polls.Get("/pollResponsesResult/:pollId", r.ctrl.PollsController.HandleGetResponsesResult)
 	polls.Post("/submitResponse", r.ctrl.PollsController.HandleUserSubmitResponse)
 	polls.Post("/closePoll", r.ctrl.PollsController.HandleClosePoll)
+	polls.Post("/reopen", r.ctrl.PollsController.HandleReopenPoll)
 
 	breakoutRoom := api.Group("/breakoutRoom")
 	breakoutRoom.Post("/create", r.ctrl.BreakoutRoomController.HandleCreateBreakoutRooms)

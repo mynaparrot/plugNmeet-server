@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/redis/go-redis/v9"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 const (
@@ -30,7 +32,9 @@ func (s *RedisService) CreateRoomPoll(roomId string, val map[string]string) erro
 	return nil
 }
 
-func (s *RedisService) AddPollResponse(r *plugnmeet.SubmitPollResponseReq) error {
+// AddPollResponse records one vote: increments total_resp once per voter and
+// each selected option counter once. Anonymous polls never touch all_respondents.
+func (s *RedisService) AddPollResponse(r *plugnmeet.SubmitPollResponseReq, isAnonymous bool) error {
 	// respondentsKey is the base key for a specific poll's responses.
 	// It's a HASH that stores counters like total_resp, 1_count, etc.
 	// e.g. pnm:polls:room_id:respondents:poll_id
@@ -52,28 +56,97 @@ func (s *RedisService) AddPollResponse(r *plugnmeet.SubmitPollResponseReq) error
 			return err
 		}
 		if voted {
-			return fmt.Errorf("user already voted")
+			return config.ErrPollAlreadyVoted
 		}
 
-		// format userId:option_id:name
-		voteData := fmt.Sprintf("%s:%d:%s", r.UserId, r.SelectedOption, r.Name)
+		// All writes run in MULTI/EXEC so the WATCH above aborts on concurrent votes.
+		_, err = tx.TxPipelined(s.ctx, func(pipe redis.Pipeliner) error {
+			// Add user to the set of voters (keeps one-shot protection for anonymous polls too).
+			pipe.SAdd(s.ctx, votedUsersKey, r.UserId)
+			pipe.Expire(s.ctx, votedUsersKey, time.Hour*24)
 
-		// Queue commands directly on the transaction object.
-		// Add user to the set of voters.
-		tx.SAdd(s.ctx, votedUsersKey, r.UserId)
-		tx.Expire(s.ctx, votedUsersKey, time.Hour*24)
+			// Anonymous polls: no per-user attribution anywhere, counters only.
+			if !isAnonymous {
+				// format userId:option_id(:option_id...):name — comma-joined ids for multi-select
+				voteData := fmt.Sprintf("%s:%s:%s", r.UserId, config.JoinPollOptionIds(r.SelectedOptions), r.Name)
 
-		// Add the vote details to a list.
-		tx.RPush(s.ctx, allRespondentsKey, voteData)
-		tx.Expire(s.ctx, allRespondentsKey, time.Hour*24)
+				// Add the vote details to a list.
+				pipe.RPush(s.ctx, allRespondentsKey, voteData)
+				pipe.Expire(s.ctx, allRespondentsKey, time.Hour*24)
+			}
 
-		// Increment the total response counter.
-		tx.HIncrBy(s.ctx, respondentsKey, PollTotalRespField, 1)
-		// Increment the specific option counter.
-		tx.HIncrBy(s.ctx, respondentsKey, fmt.Sprintf("%d%s", r.SelectedOption, PollCountSuffix), 1)
-		tx.Expire(s.ctx, respondentsKey, time.Hour*24)
-		// The commands will be executed when the function returns.
+			// total_resp counts distinct voters; each selected option counts once.
+			pipe.HIncrBy(s.ctx, respondentsKey, PollTotalRespField, 1)
+			for _, id := range r.SelectedOptions {
+				pipe.HIncrBy(s.ctx, respondentsKey, fmt.Sprintf("%d%s", id, PollCountSuffix), 1)
+			}
+			pipe.Expire(s.ctx, respondentsKey, time.Hour*24)
+
+			return nil
+		})
+
+		return err
+	}, votedUsersKey)
+}
+
+// ReopenPollIfClosed atomically flips a closed poll back to running, keeping
+// all responses/counters/voted_users; returns the duration and whether the
+// closed->running flip actually happened.
+func (s *RedisService) ReopenPollIfClosed(r *plugnmeet.ReopenPollReq) (uint32, bool, error) {
+	// e.g. key: pnm:polls:{roomId}
+	key := pollsKey + r.RoomId
+	reopened := false
+	duration := uint32(0)
+
+	err := s.rc.Watch(s.ctx, func(tx *redis.Tx) error {
+		reopened = false // reset: the tx may be retried on conflicts
+		duration = 0
+
+		result, err := tx.HGet(s.ctx, key, r.PollId).Result()
+		switch {
+		case errors.Is(err, redis.Nil):
+			return config.ErrPollNotFound
+		case err != nil:
+			return err
+		}
+		if result == "" {
+			return config.ErrPollNotFound
+		}
+
+		info := new(plugnmeet.PollInfo)
+		err = protojson.Unmarshal([]byte(result), info)
+		if err != nil {
+			return err
+		}
+		// idempotent: already running — keep everything untouched
+		if info.IsRunning {
+			return nil
+		}
+
+		info.IsRunning = true
+		info.ClosedBy = ""
+		// restart the expiry from now; 0 means no limit
+		info.ExpiresAt = 0
+		if info.Duration > 0 {
+			info.ExpiresAt = time.Now().Unix() + int64(info.Duration)
+		}
+		marshal, err := protojson.Marshal(info)
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.TxPipelined(s.ctx, func(pipe redis.Pipeliner) error {
+			pipe.HSet(s.ctx, key, r.PollId, string(marshal))
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		reopened = true
+		duration = info.Duration
 
 		return nil
-	}, votedUsersKey)
+	}, key)
+
+	return duration, reopened, err
 }

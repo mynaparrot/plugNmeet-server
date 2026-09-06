@@ -61,6 +61,23 @@ func (s *RedisService) GetPollAllRespondents(roomId, pollId string) ([]string, e
 	return result, nil
 }
 
+// IsUserVotedPoll checks voted_users SET membership without touching all_respondents
+// (safe for anonymous polls where no per-user attribution exists).
+func (s *RedisService) IsUserVotedPoll(roomId, pollId, userId string) (bool, error) {
+	// e.g. pnm:polls:{roomId}:respondents:{pollId}:voted_users
+	key := fmt.Sprintf("%s%s%s%s%s", pollsKey, roomId, pollRespondentsSubKey, pollId, pollVotedUsersSubKey)
+	result, err := s.rc.SIsMember(s.ctx, key, userId).Result()
+
+	switch {
+	case errors.Is(err, redis.Nil):
+		return false, nil
+	case err != nil:
+		return false, err
+	}
+
+	return result, nil
+}
+
 func (s *RedisService) GetPollCountersByPollId(roomId, pollId string) (map[string]string, error) {
 	// e.g. key: pnm:polls:{roomId}:respondents:{pollId}
 	key := fmt.Sprintf("%s%s%s%s", pollsKey, roomId, pollRespondentsSubKey, pollId)

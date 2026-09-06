@@ -21,7 +21,7 @@ require (
 	github.com/livekit/media-sdk v0.0.0-20260605212526-4c11a51d3c97
 	github.com/livekit/protocol v1.49.0
 	github.com/livekit/server-sdk-go/v2 v2.18.1
-	github.com/mynaparrot/plugnmeet-protocol v1.6.1-0.20260905063629-a7ef1d46237b
+	github.com/mynaparrot/plugnmeet-protocol v1.6.1-0.20260906070347-8d2b34b178e6
 	github.com/nats-io/jwt/v2 v2.8.2
 	github.com/nats-io/nats.go v1.53.1
 	github.com/nats-io/nkeys v0.4.16
@@ -143,3 +143,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	mvdan.cc/sh/v3 v3.14.0 // indirect
 )
+
+// temporary: build against local protocol module until next release (remove on version bump)
+replace github.com/mynaparrot/plugnmeet-protocol => ../protocol
