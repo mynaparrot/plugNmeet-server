@@ -109,6 +109,8 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	meta.IsBreakoutRoom = true
 	meta.WelcomeMessage = r.WelcomeMsg
 	meta.ParentRoomId = r.RoomId
+	// this is crucial as breakout room should not generate userID
+	meta.RoomFeatures.AutoGenUserId = new(false)
 
 	// disable few features
 	meta.RoomFeatures.WaitingRoomFeatures.IsActive = false
