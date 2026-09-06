@@ -143,6 +143,3 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	mvdan.cc/sh/v3 v3.14.0 // indirect
 )
-
-// temporary: build against local protocol module until next release (remove on version bump)
-replace github.com/mynaparrot/plugnmeet-protocol => ../protocol
