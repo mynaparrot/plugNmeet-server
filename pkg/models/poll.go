@@ -1,8 +1,6 @@
 package models
 
 import (
-	"errors"
-
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
@@ -43,14 +41,23 @@ func NewPollModel(args PollModelArgs) *PollModel {
 }
 
 func (m *PollModel) ManageActivation(req *plugnmeet.ActivatePollsReq) error {
+	log := m.logger.WithField("roomId", req.GetRoomId())
+
 	roomMeta, err := m.natsService.GetRoomMetadataStruct(req.GetRoomId())
 	if err != nil {
-		return err
+		log.WithError(err).Errorln("failed to get room metadata for polls activation")
+		return config.ErrPollGeneric
 	}
 	if roomMeta == nil {
-		return errors.New("invalid nil room metadata information")
+		log.Errorln("invalid nil room metadata information")
+		return config.ErrPollGeneric
 	}
 
 	roomMeta.RoomFeatures.PollsFeatures.IsActive = req.GetIsActive()
-	return m.natsService.UpdateAndBroadcastRoomMetadata(req.GetRoomId(), roomMeta)
+	err = m.natsService.UpdateAndBroadcastRoomMetadata(req.GetRoomId(), roomMeta)
+	if err != nil {
+		log.WithError(err).Errorln("failed to update room metadata for polls activation")
+		return config.ErrPollGeneric
+	}
+	return nil
 }

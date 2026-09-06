@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
 )
@@ -84,27 +85,27 @@ func (m *RoomModel) IncreaseRoomDuration(roomId string, duration uint64) (uint64
 	if !ok {
 		err := errors.New("duration field not found in RoomDurationInfo struct")
 		log.WithError(err).Error()
-		return 0, errors.New("breakout-room.notifications.unexpected-error")
+		return 0, config.ErrBkRoomUnexpectedError
 	}
 	durationField := field.Tag.Get("redis")
 
 	info, err := m.GetRoomDurationInfo(roomId)
 	if err != nil {
 		log.WithError(err).Error("failed to get room duration info")
-		return 0, errors.New("breakout-room.notifications.unexpected-error")
+		return 0, config.ErrBkRoomUnexpectedError
 	}
 
 	// increase room duration
 	meta, err := m.natsService.GetRoomMetadataStruct(roomId)
 	if err != nil {
 		log.WithError(err).Error("failed to get room metadata")
-		return 0, errors.New("breakout-room.notifications.unexpected-error")
+		return 0, config.ErrBkRoomUnexpectedError
 	}
 
 	if meta == nil {
 		err = errors.New("invalid nil room metadata information")
 		log.WithError(err).Error()
-		return 0, errors.New("breakout-room.notifications.unexpected-error")
+		return 0, config.ErrBkRoomUnexpectedError
 	}
 
 	// check if this is a breakout room
@@ -113,12 +114,12 @@ func (m *RoomModel) IncreaseRoomDuration(roomId string, duration uint64) (uint64
 		if info.StartedAt == 0 {
 			err = errors.New("can't increase duration as breakout room is not running")
 			log.WithError(err).Warn()
-			return 0, errors.New("breakout-room.notifications.breakout-room-not-running")
+			return 0, config.ErrBkRoomNotRunning
 		}
 		if info.Duration == 0 {
 			err = errors.New("can't increase duration as breakout room has unlimited duration")
 			log.WithError(err).Warn()
-			return 0, errors.New("breakout-room.notifications.breakout-room-unlimited-duration")
+			return 0, config.ErrBkRoomUnlimitedDuration
 		}
 
 		log.Info(
@@ -139,7 +140,7 @@ func (m *RoomModel) IncreaseRoomDuration(roomId string, duration uint64) (uint64
 	result, err := m.rs.UpdateRoomDuration(roomId, durationField, duration)
 	if err != nil {
 		log.WithError(err).Error("failed to update room duration in redis")
-		return 0, errors.New("breakout-room.notifications.unexpected-error")
+		return 0, config.ErrBkRoomUnexpectedError
 	}
 	d := uint64(result)
 
@@ -150,7 +151,7 @@ func (m *RoomModel) IncreaseRoomDuration(roomId string, duration uint64) (uint64
 		// if error then we'll fall back to set previous duration
 		log.WithError(err).Error("failed to update and broadcast room metadata, rolling back redis change")
 		_ = m.rs.SetRoomDuration(roomId, durationField, d-duration)
-		return 0, errors.New("breakout-room.notifications.unexpected-error")
+		return 0, config.ErrBkRoomUnexpectedError
 	}
 
 	log.WithField("new_duration", d).Info("successfully increased room duration")
@@ -168,7 +169,7 @@ func (m *RoomModel) CompareDurationWithParentRoom(mainRoomId string, duration ui
 	info, err := m.GetRoomDurationInfo(mainRoomId)
 	if err != nil {
 		log.WithError(err).Error("failed to get parent room duration info")
-		return errors.New("breakout-room.notifications.unexpected-error")
+		return config.ErrBkRoomUnexpectedError
 	}
 	if info == nil {
 		// this is indicating that the no info found
@@ -192,7 +193,7 @@ func (m *RoomModel) CompareDurationWithParentRoom(mainRoomId string, duration ui
 			"requested_duration": duration,
 			"parent_remaining":   left,
 		}).Warn("breakout room duration exceeds parent room remaining duration")
-		return errors.New("breakout-room.notifications.duration-exceeds-parent")
+		return config.ErrBkRoomDurationExceedsParent
 	}
 
 	return nil

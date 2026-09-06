@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -39,18 +38,18 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	mainRoom, meta, err := m.natsService.GetRoomInfoWithMetadata(r.RoomId)
 	if err != nil {
 		log.WithError(err).Error("Failed to get parent room info")
-		return nil, errors.New("breakout-room.notifications.unexpected-error")
+		return nil, config.ErrBkRoomUnexpectedError
 	}
 
 	if mainRoom == nil || meta == nil {
 		log.Error("invalid empty parent room information")
-		return nil, errors.New("breakout-room.notifications.unexpected-error")
+		return nil, config.ErrBkRoomUnexpectedError
 	}
 
 	// do not allow nesting breakout rooms inside a breakout room.
 	if meta.IsBreakoutRoom {
 		log.Error("breakout rooms cannot be created inside another breakout room")
-		return nil, errors.New("breakout-room.notifications.cannot-create-inside-breakout")
+		return nil, config.ErrBkRoomCannotCreateInsideBreakout
 	}
 
 	// enforce the allowed number of breakout rooms for this parent room.
@@ -60,7 +59,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 		allowedRooms := meta.RoomFeatures.BreakoutRoomFeatures.AllowedNumberRooms
 		if allowedRooms > 0 && uint32(len(r.Rooms)) > allowedRooms {
 			log.WithField("allowedRooms", allowedRooms).Error("number of breakout rooms exceeds the allowed limit")
-			return nil, errors.New("breakout-room.notifications.max-rooms-exceeded")
+			return nil, config.ErrBkRoomMaxRoomsExceeded
 		}
 	}
 
@@ -71,13 +70,13 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	for _, room := range r.Rooms {
 		if _, ok := titles[room.Title]; ok {
 			log.WithField("title", room.Title).Error("duplicate breakout room title")
-			return nil, errors.New("breakout-room.notifications.duplicate-title")
+			return nil, config.ErrBkRoomDuplicateTitle
 		}
 		titles[room.Title] = struct{}{}
 		for _, u := range room.Users {
 			if _, ok := assignedUsers[u.Id]; ok {
 				log.WithField("userId", u.Id).Error("user assigned to multiple breakout rooms")
-				return nil, errors.New("breakout-room.notifications.user-assigned-to-multiple-rooms")
+				return nil, config.ErrBkRoomUserAssignedToMultipleRooms
 			}
 			assignedUsers[u.Id] = struct{}{}
 		}
@@ -87,7 +86,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	if meta.RoomFeatures.RoomDuration != nil && *meta.RoomFeatures.RoomDuration > 0 {
 		if err := m.rm.CompareDurationWithParentRoom(r.RoomId, r.Duration); err != nil {
 			log.WithError(err).Error("Duration comparison with parent room failed")
-			return nil, errors.New("breakout-room.notifications.duration-exceeds-parent")
+			return nil, config.ErrBkRoomDurationExceedsParent
 		}
 	}
 
@@ -101,7 +100,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 		})
 		if switchErr != nil {
 			log.WithError(switchErr).Error("failed to make requesting user presenter for whiteboard share")
-			return nil, errors.New("breakout-room.notifications.unexpected-error")
+			return nil, config.ErrBkRoomUnexpectedError
 		}
 	}
 
@@ -135,7 +134,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	_, childWbf, err := m.normalizeBreakoutWhiteboardShare(r, meta, log)
 	if err != nil {
 		log.WithError(err).Error("Failed to validate whiteboard share")
-		return nil, errors.New("breakout-room.notifications.unexpected-error")
+		return nil, config.ErrBkRoomUnexpectedError
 	}
 	meta.RoomFeatures.WhiteboardFeatures = childWbf
 
@@ -268,14 +267,14 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 
 	if len(e) == len(r.Rooms) {
 		log.Error("breakout room creation wasn't successful for any room")
-		return nil, errors.New("breakout-room.notifications.creation-failed")
+		return nil, config.ErrBkRoomCreationFailed
 	}
 
 	// again here for update
 	origMeta, err := m.natsService.UnmarshalRoomMetadata(mainRoom.Metadata)
 	if err != nil {
 		log.WithError(err).Error("Failed to unmarshal original parent room metadata")
-		return createdRooms, errors.New("breakout-room.notifications.unexpected-error")
+		return createdRooms, config.ErrBkRoomUnexpectedError
 	}
 	origMeta.RoomFeatures.BreakoutRoomFeatures.IsActive = true
 	// save create-time snapshot so that can be populated again
@@ -285,7 +284,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 
 	if err := m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, origMeta); err != nil {
 		log.WithError(err).Error("Failed to update parent room metadata")
-		return createdRooms, errors.New("breakout-room.notifications.unexpected-error")
+		return createdRooms, config.ErrBkRoomUnexpectedError
 	}
 
 	// send analytics

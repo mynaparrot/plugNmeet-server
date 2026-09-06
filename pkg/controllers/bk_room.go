@@ -4,6 +4,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"go.uber.org/fx"
 	"google.golang.org/protobuf/proto"
@@ -35,13 +36,13 @@ func (brc *BreakoutRoomController) HandleCreateBreakoutRooms(c fiber.Ctx) error 
 	res.Status = false
 
 	if isAdmin != true {
-		res.Msg = "breakout-room.notifications.only-admin"
+		res.Msg = config.ErrBkRoomOnlyAdmin.Error()
 		return utils.SendProtobufResponse(c, res)
 	}
 
 	req := new(plugnmeet.CreateBreakoutRoomsReq)
 	if err := proto.Unmarshal(c.Body(), req); err != nil {
-		res.Msg = "breakout-room.notifications.unexpected-error"
+		res.Msg = config.ErrBkRoomUnexpectedError.Error()
 		return utils.SendProtobufResponse(c, res)
 	}
 
@@ -73,7 +74,7 @@ func (brc *BreakoutRoomController) HandleJoinBreakoutRoom(c fiber.Ctx) error {
 	req := new(plugnmeet.JoinBreakoutRoomReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		res.Msg = "breakout-room.notifications.unexpected-error"
+		res.Msg = config.ErrBkRoomUnexpectedError.Error()
 		return utils.SendProtobufResponse(c, res)
 	}
 
@@ -144,12 +145,12 @@ func (brc *BreakoutRoomController) HandleIncreaseBreakoutRoomDuration(c fiber.Ct
 	req := new(plugnmeet.IncreaseBreakoutRoomDurationReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		res.Msg = "breakout-room.notifications.unexpected-error"
+		res.Msg = config.ErrBkRoomUnexpectedError.Error()
 		return utils.SendProtobufResponse(c, res)
 	}
 
 	if isAdmin != true {
-		res.Msg = "breakout-room.notifications.only-admin"
+		res.Msg = config.ErrBkRoomOnlyAdmin.Error()
 		return utils.SendProtobufResponse(c, res)
 	}
 
@@ -175,12 +176,12 @@ func (brc *BreakoutRoomController) HandleSendBreakoutRoomMsg(c fiber.Ctx) error 
 	req := new(plugnmeet.BroadcastBreakoutRoomMsgReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		res.Msg = "breakout-room.notifications.unexpected-error"
+		res.Msg = config.ErrBkRoomUnexpectedError.Error()
 		return utils.SendProtobufResponse(c, res)
 	}
 
 	if isAdmin != true {
-		res.Msg = "breakout-room.notifications.only-admin"
+		res.Msg = config.ErrBkRoomOnlyAdmin.Error()
 		return utils.SendProtobufResponse(c, res)
 	}
 
@@ -204,12 +205,12 @@ func (brc *BreakoutRoomController) HandleEndBreakoutRoom(c fiber.Ctx) error {
 
 	req := new(plugnmeet.EndBreakoutRoomReq)
 	if err := proto.Unmarshal(c.Body(), req); err != nil {
-		res.Msg = "breakout-room.notifications.unexpected-error"
+		res.Msg = config.ErrBkRoomUnexpectedError.Error()
 		return utils.SendProtobufResponse(c, res)
 	}
 
 	if isAdmin != true {
-		res.Msg = "breakout-room.notifications.only-admin"
+		res.Msg = config.ErrBkRoomOnlyAdmin.Error()
 		return utils.SendProtobufResponse(c, res)
 	}
 
@@ -235,7 +236,7 @@ func (brc *BreakoutRoomController) HandleBackToMainRoom(c fiber.Ctx) error {
 
 	req := new(plugnmeet.BackToMainRoomReq)
 	if err := proto.Unmarshal(c.Body(), req); err != nil {
-		res.Msg = "breakout-room.notifications.unexpected-error"
+		res.Msg = config.ErrBkRoomUnexpectedError.Error()
 		return utils.SendProtobufResponse(c, res)
 	}
 
@@ -263,7 +264,7 @@ func (brc *BreakoutRoomController) HandleEndBreakoutRooms(c fiber.Ctx) error {
 	res.Status = false
 
 	if isAdmin != true {
-		res.Msg = "breakout-room.notifications.only-admin"
+		res.Msg = config.ErrBkRoomOnlyAdmin.Error()
 		return utils.SendProtobufResponse(c, res)
 	}
 
@@ -287,13 +288,13 @@ func (brc *BreakoutRoomController) HandleReInviteBreakoutRoom(c fiber.Ctx) error
 	res.Status = false
 
 	if isAdmin != true {
-		res.Msg = "breakout-room.notifications.only-admin"
+		res.Msg = config.ErrBkRoomOnlyAdmin.Error()
 		return utils.SendProtobufResponse(c, res)
 	}
 
 	req := new(plugnmeet.ReInviteBreakoutRoomReq)
 	if err := proto.Unmarshal(c.Body(), req); err != nil {
-		res.Msg = "breakout-room.notifications.unexpected-error"
+		res.Msg = config.ErrBkRoomUnexpectedError.Error()
 		return utils.SendProtobufResponse(c, res)
 	}
 
@@ -319,13 +320,13 @@ func (brc *BreakoutRoomController) HandleMoveBreakoutRoomUser(c fiber.Ctx) error
 	res.Status = false
 
 	if isAdmin != true {
-		res.Msg = "breakout-room.notifications.only-admin"
+		res.Msg = config.ErrBkRoomOnlyAdmin.Error()
 		return utils.SendProtobufResponse(c, res)
 	}
 
 	req := new(plugnmeet.MoveBreakoutRoomUserReq)
 	if err := proto.Unmarshal(c.Body(), req); err != nil {
-		res.Msg = "breakout-room.notifications.unexpected-error"
+		res.Msg = config.ErrBkRoomUnexpectedError.Error()
 		return utils.SendProtobufResponse(c, res)
 	}
 

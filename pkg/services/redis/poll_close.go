@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -17,11 +18,14 @@ func (s *RedisService) ClosePoll(r *plugnmeet.ClosePollReq) error {
 		g := tx.HGet(s.ctx, key, r.PollId)
 
 		result, err := g.Result()
-		if err != nil {
+		switch {
+		case errors.Is(err, redis.Nil):
+			return config.ErrPollNotFound
+		case err != nil:
 			return err
 		}
 		if result == "" {
-			return errors.New("not found")
+			return config.ErrPollNotFound
 		}
 
 		info := new(plugnmeet.PollInfo)
@@ -70,4 +74,48 @@ func (s *RedisService) CleanUpPolls(roomId string, pollIds []string) error {
 	}
 
 	return nil
+}
+
+// ClosePollIfRunning atomically flips a running poll to closed with the given
+// closed_by marker; returns true only when it made the running->closed flip.
+func (s *RedisService) ClosePollIfRunning(roomId, pollId, closedBy string) (bool, error) {
+	// e.g. key: pnm:polls:{roomId}
+	key := pollsKey + roomId
+	closed := false
+
+	err := s.rc.Watch(s.ctx, func(tx *redis.Tx) error {
+		closed = false // reset: the tx may be retried on conflicts
+
+		result, err := tx.HGet(s.ctx, key, pollId).Result()
+		switch {
+		case errors.Is(err, redis.Nil):
+			return nil // poll gone (e.g. room ended); nothing to close
+		case err != nil:
+			return err
+		}
+
+		info := new(plugnmeet.PollInfo)
+		err = protojson.Unmarshal([]byte(result), info)
+		if err != nil {
+			return err
+		}
+		// already closed; keep the original closed_by untouched
+		if !info.IsRunning {
+			return nil
+		}
+
+		info.IsRunning = false
+		info.ClosedBy = closedBy
+		marshal, err := protojson.Marshal(info)
+		if err != nil {
+			return err
+		}
+
+		tx.HSet(s.ctx, key, pollId, string(marshal))
+		closed = true
+
+		return nil
+	}, key)
+
+	return closed, err
 }
