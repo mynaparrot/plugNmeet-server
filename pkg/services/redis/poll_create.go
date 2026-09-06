@@ -59,30 +59,33 @@ func (s *RedisService) AddPollResponse(r *plugnmeet.SubmitPollResponseReq, isAno
 			return config.ErrPollAlreadyVoted
 		}
 
-		// Queue commands directly on the transaction object.
-		// Add user to the set of voters (keeps one-shot protection for anonymous polls too).
-		tx.SAdd(s.ctx, votedUsersKey, r.UserId)
-		tx.Expire(s.ctx, votedUsersKey, time.Hour*24)
+		// All writes run in MULTI/EXEC so the WATCH above aborts on concurrent votes.
+		_, err = tx.TxPipelined(s.ctx, func(pipe redis.Pipeliner) error {
+			// Add user to the set of voters (keeps one-shot protection for anonymous polls too).
+			pipe.SAdd(s.ctx, votedUsersKey, r.UserId)
+			pipe.Expire(s.ctx, votedUsersKey, time.Hour*24)
 
-		// Anonymous polls: no per-user attribution anywhere, counters only.
-		if !isAnonymous {
-			// format userId:option_id(:option_id...):name — comma-joined ids for multi-select
-			voteData := fmt.Sprintf("%s:%s:%s", r.UserId, config.JoinPollOptionIds(r.SelectedOptions), r.Name)
+			// Anonymous polls: no per-user attribution anywhere, counters only.
+			if !isAnonymous {
+				// format userId:option_id(:option_id...):name — comma-joined ids for multi-select
+				voteData := fmt.Sprintf("%s:%s:%s", r.UserId, config.JoinPollOptionIds(r.SelectedOptions), r.Name)
 
-			// Add the vote details to a list.
-			tx.RPush(s.ctx, allRespondentsKey, voteData)
-			tx.Expire(s.ctx, allRespondentsKey, time.Hour*24)
-		}
+				// Add the vote details to a list.
+				pipe.RPush(s.ctx, allRespondentsKey, voteData)
+				pipe.Expire(s.ctx, allRespondentsKey, time.Hour*24)
+			}
 
-		// total_resp counts distinct voters; each selected option counts once.
-		tx.HIncrBy(s.ctx, respondentsKey, PollTotalRespField, 1)
-		for _, id := range r.SelectedOptions {
-			tx.HIncrBy(s.ctx, respondentsKey, fmt.Sprintf("%d%s", id, PollCountSuffix), 1)
-		}
-		tx.Expire(s.ctx, respondentsKey, time.Hour*24)
-		// The commands will be executed when the function returns.
+			// total_resp counts distinct voters; each selected option counts once.
+			pipe.HIncrBy(s.ctx, respondentsKey, PollTotalRespField, 1)
+			for _, id := range r.SelectedOptions {
+				pipe.HIncrBy(s.ctx, respondentsKey, fmt.Sprintf("%d%s", id, PollCountSuffix), 1)
+			}
+			pipe.Expire(s.ctx, respondentsKey, time.Hour*24)
 
-		return nil
+			return nil
+		})
+
+		return err
 	}, votedUsersKey)
 }
 
@@ -132,7 +135,13 @@ func (s *RedisService) ReopenPollIfClosed(r *plugnmeet.ReopenPollReq) (uint32, b
 			return err
 		}
 
-		tx.HSet(s.ctx, key, r.PollId, string(marshal))
+		_, err = tx.TxPipelined(s.ctx, func(pipe redis.Pipeliner) error {
+			pipe.HSet(s.ctx, key, r.PollId, string(marshal))
+			return nil
+		})
+		if err != nil {
+			return err
+		}
 		reopened = true
 		duration = info.Duration
 

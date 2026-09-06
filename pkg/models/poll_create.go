@@ -167,6 +167,21 @@ func (m *PollModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq) error
 	// drop duplicate selections while preserving order
 	r.SelectedOptions = dedupeSelectedOptions(r.SelectedOptions)
 
+	// single-choice polls accept exactly one option
+	if !info.IsMultiple && len(r.SelectedOptions) > 1 {
+		return config.ErrPollGeneric
+	}
+	// reject option ids that don't belong to this poll
+	validIds := make(map[uint64]struct{}, len(info.Options))
+	for _, opt := range info.Options {
+		validIds[uint64(opt.Id)] = struct{}{}
+	}
+	for _, id := range r.SelectedOptions {
+		if _, ok := validIds[id]; !ok {
+			return config.ErrPollGeneric
+		}
+	}
+
 	err = m.rs.AddPollResponse(r, info.IsAnonymous)
 	if err != nil {
 		// double-voting is an expected user error; don't spam the log with it

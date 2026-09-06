@@ -41,9 +41,12 @@ func (s *RedisService) ClosePoll(r *plugnmeet.ClosePollReq) error {
 			return err
 		}
 
-		tx.HSet(s.ctx, key, r.PollId, string(marshal))
+		_, err = tx.TxPipelined(s.ctx, func(pipe redis.Pipeliner) error {
+			pipe.HSet(s.ctx, key, r.PollId, string(marshal))
+			return nil
+		})
 
-		return nil
+		return err
 	}, key)
 
 	return err
@@ -111,7 +114,13 @@ func (s *RedisService) ClosePollIfRunning(roomId, pollId, closedBy string) (bool
 			return err
 		}
 
-		tx.HSet(s.ctx, key, pollId, string(marshal))
+		_, err = tx.TxPipelined(s.ctx, func(pipe redis.Pipeliner) error {
+			pipe.HSet(s.ctx, key, pollId, string(marshal))
+			return nil
+		})
+		if err != nil {
+			return err
+		}
 		closed = true
 
 		return nil
