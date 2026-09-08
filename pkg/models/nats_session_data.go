@@ -108,10 +108,7 @@ func (m *NatsModel) canSeedSessionDataTo(parentRoomId, targetRoomId, userId stri
 // the request is valid and authorized.
 //
 // isFetch indicates whether the request is a fetch (read) or a save (write).
-// For fetch requests, authorization is relaxed for breakout rooms: a breakout room
-// may never get an admin/presenter (no admin ever joined), yet its members must be
-// able to hydrate seeded content, so any in-room member is allowed to FETCH. Saving
-// new session data remains presenter/admin-gated to match normal rooms.
+// Any in-room member may fetch; saves remain presenter/admin-gated.
 func (m *NatsModel) parseAndAuthorizeSessionData(roomId, userId string, req *plugnmeet.NatsMsgClientToServer, isFetch bool) (*plugnmeet.SessionDataHeader, plugnmeet.SessionDataType, bool) {
 	header := new(plugnmeet.SessionDataHeader)
 	if err := protojson.Unmarshal([]byte(req.Msg), header); err != nil {
@@ -119,32 +116,18 @@ func (m *NatsModel) parseAndAuthorizeSessionData(roomId, userId string, req *plu
 		return nil, plugnmeet.SessionDataType_SESSION_DATA_TYPE_UNSPECIFIED, false
 	}
 
-	// Relax fetch authorization for breakout rooms: members must be able to read
-	// seeded content even though the room may have no presenter/admin.
-	relaxForBreakout := false
-	if isFetch {
-		if meta, err := m.natsService.GetRoomMetadataStruct(roomId); err == nil && meta != nil {
-			relaxForBreakout = meta.GetIsBreakoutRoom()
-		}
-	}
-
 	authorized := false
 	switch header.GetDataType() {
 	case plugnmeet.SessionDataType_SESSION_DATA_TYPE_WHITEBOARD:
 		authorized = m.natsService.IsUserPresenter(roomId, userId)
-		if !authorized && relaxForBreakout {
+		if !authorized && isFetch {
 			if userInfo, err := m.natsService.GetUserInfo(roomId, userId); err == nil && userInfo != nil {
 				authorized = true
 			}
 		}
 	case plugnmeet.SessionDataType_SESSION_DATA_TYPE_NOTEPAD:
 		if userInfo, err := m.natsService.GetUserInfo(roomId, userId); err == nil && userInfo != nil {
-			authorized = userInfo.GetIsPresenter() || userInfo.GetIsAdmin()
-		}
-		if !authorized && relaxForBreakout {
-			if userInfo, err := m.natsService.GetUserInfo(roomId, userId); err == nil && userInfo != nil {
-				authorized = true
-			}
+			authorized = userInfo.GetIsPresenter() || userInfo.GetIsAdmin() || isFetch
 		}
 	default:
 		m.logger.Warnf("invalid session data type from user %s", userId)
