@@ -25,14 +25,14 @@ require (
 	github.com/nats-io/jwt/v2 v2.8.2
 	github.com/nats-io/nats.go v1.53.1
 	github.com/nats-io/nkeys v0.4.16
-	github.com/openai/openai-go/v3 v3.57.0
+	github.com/openai/openai-go/v3 v3.59.0
 	github.com/pion/webrtc/v4 v4.2.18
 	github.com/prometheus/client_golang v1.24.1
 	github.com/redis/go-redis/v9 v9.22.0
 	github.com/sirupsen/logrus v1.10.2
 	github.com/spf13/cast v1.10.0
 	go.uber.org/fx v1.24.0
-	golang.org/x/sync v0.22.0
+	golang.org/x/sync v0.23.0
 	google.golang.org/genai v1.71.0
 	google.golang.org/protobuf v1.36.12
 	gorm.io/driver/mysql v1.6.0
