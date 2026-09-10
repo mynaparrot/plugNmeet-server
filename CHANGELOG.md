@@ -1,5 +1,29 @@
 # Changelog
 
+## [2.5.0](https://github.com/mynaparrot/plugNmeet-server/compare/v2.4.0...v2.5.0) (2026-09-10)
+
+
+### Features
+
+* add server-first session data store for whiteboard and notepad sync ([5d15d97](https://github.com/mynaparrot/plugNmeet-server/commit/5d15d97a336091bfc50a961354961f02c9d8acfa))
+* **breakout-room:** completly redesigned breakout room's architecture ([#905](https://github.com/mynaparrot/plugNmeet-server/issues/905)) ([56a95f0](https://github.com/mynaparrot/plugNmeet-server/commit/56a95f0ddc1358c5d57cf4a200bc316712152bfb))
+* **polls:** redesigned + AI integration ([#908](https://github.com/mynaparrot/plugNmeet-server/issues/908)) ([a4f532c](https://github.com/mynaparrot/plugNmeet-server/commit/a4f532c254d8e44adb16ee2187dc72a3267ae31e))
+* **refactor:** renamed to `Shared Notepad` ([ff3c4ac](https://github.com/mynaparrot/plugNmeet-server/commit/ff3c4ac2ce2358f4e313bd08050e017ea4eb994e))
+* replaced `Etherpad` with `BlockNote` + `AI` ([#896](https://github.com/mynaparrot/plugNmeet-server/issues/896)) ([cef0de7](https://github.com/mynaparrot/plugNmeet-server/commit/cef0de7c7dac520aea52513530c40453ba08a9b5))
+* **whiteboard:** add `AI Text-to-Diagram` support to the whiteboard ([5a42aca](https://github.com/mynaparrot/plugNmeet-server/commit/5a42aca866ea72744530dcaf514c7014acd30be1))
+
+
+### Bug Fixes
+
+* breakout room should not generate userID ([f478466](https://github.com/mynaparrot/plugNmeet-server/commit/f478466b01b5580e3cede4317b1459f107802605))
+* breakout room should not generate userID ([5e37a89](https://github.com/mynaparrot/plugNmeet-server/commit/5e37a89a71b00685227d8ac5f93b7e1ab7cb7c58))
+* bump `MUPDF` to `1.28.2` ([2995ef0](https://github.com/mynaparrot/plugNmeet-server/commit/2995ef0ecd24c7dc3e1a41d8a9b3a602458e9e3e))
+* bump proto ([6bf3b3c](https://github.com/mynaparrot/plugNmeet-server/commit/6bf3b3cdcd16b98a0c67aa4b490923c526602a0e))
+* if no presenter online then initial sync can be done with redis ([3e01d73](https://github.com/mynaparrot/plugNmeet-server/commit/3e01d73ef1ebed550fa21f0a3c173557bf87b393))
+* poll expiry checker moved to janitor ([0b11b8b](https://github.com/mynaparrot/plugNmeet-server/commit/0b11b8b9be71b8eca53824cb8cd663e3e862e099))
+* removed etherpad as we're no longer using it ([c270154](https://github.com/mynaparrot/plugNmeet-server/commit/c27015450936f0de8820d1b7efc4716e6af40bd7))
+* SharedNotepad merged into room features + clean up ([a67ec14](https://github.com/mynaparrot/plugNmeet-server/commit/a67ec149fc120ae31327f00469a097eefccf22fa))
+
 ## [2.4.0](https://github.com/mynaparrot/plugNmeet-server/compare/v2.3.0...v2.4.0) (2026-08-11)
 
 
