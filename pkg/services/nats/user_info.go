@@ -152,23 +152,42 @@ func (s *NatsService) GetOnlineUsersList(roomId string) ([]*plugnmeet.NatsKvUser
 	return users, nil
 }
 
-// GetOnlineUsersListAsJson retrieves detailed information about all online users in a specific room as JSON.
+// GetOnlineUsersListAsJsonChunks retrieves the online users list as chunked JSON envelopes,
+// so each NATS message stays below the max payload limit.
+// Each envelope: {"chunk":<0-based index>,"total":<number of chunks>,"users":[<protojson NatsKvUserInfo strings>]}.
 // Returns nil if the room is not found or no users are online.
-func (s *NatsService) GetOnlineUsersListAsJson(roomId string) ([]byte, error) {
+func (s *NatsService) GetOnlineUsersListAsJsonChunks(roomId string, chunkSize int) ([][]byte, error) {
 	users, err := s.GetOnlineUsersList(roomId)
 	if err != nil || len(users) == 0 {
 		return nil, err
 	}
 
-	raw := make([]json.RawMessage, len(users))
-	for i, u := range users {
-		r, err := protoJsonOpts.Marshal(u)
+	total := (len(users) + chunkSize - 1) / chunkSize
+	chunks := make([][]byte, 0, total)
+	for i := 0; i < len(users); i += chunkSize {
+		end := i + chunkSize
+		if end > len(users) {
+			end = len(users)
+		}
+		raw := make([]json.RawMessage, 0, end-i)
+		for _, u := range users[i:end] {
+			r, err := protoJsonOpts.Marshal(u)
+			if err != nil {
+				return nil, err
+			}
+			raw = append(raw, r)
+		}
+		envelope, err := json.Marshal(struct {
+			Chunk int               `json:"chunk"`
+			Total int               `json:"total"`
+			Users []json.RawMessage `json:"users"`
+		}{Chunk: len(chunks), Total: total, Users: raw})
 		if err != nil {
 			return nil, err
 		}
-		raw[i] = r
+		chunks = append(chunks, envelope)
 	}
-	return json.Marshal(raw)
+	return chunks, nil
 }
 
 // GetUserKeyValue retrieves a specific key-value entry for a user in a specific room.

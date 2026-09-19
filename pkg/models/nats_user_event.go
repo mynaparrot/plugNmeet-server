@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -13,6 +14,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 )
+
+const usersListChunkSize = 50
 
 func (m *NatsModel) HandleInitialData(roomId, userId string) {
 	log := m.logger.WithFields(logrus.Fields{
@@ -66,21 +69,56 @@ func (m *NatsModel) HandleSendUsersList(roomId, userId string, event *plugnmeet.
 		"method": "HandleSendUsersList",
 	})
 
-	// Default to the original event if none is provided, for backward compatibility.
 	if event == nil {
 		event = new(plugnmeet.NatsMsgServerToClientEvents_RES_JOINED_USERS_LIST)
 	}
 
-	users, err := m.natsService.GetOnlineUsersListAsJson(roomId)
-	if err != nil {
-		log.WithError(err).Errorln("failed to get online users list as json")
+	// lightweight periodic sync: ids only, always small enough for a single message
+	if *event == plugnmeet.NatsMsgServerToClientEvents_RESP_ONLINE_USERS_LIST {
+		ids, err := m.natsService.GetOnlineUsersId(roomId)
+		if err != nil {
+			log.WithError(err).Errorln("failed to get online users ids")
+			return
+		}
+		// hidden users (recorder/RTMP bots, internal ids like TTS agents) are not
+		// real participants, but they may legitimately be in clients' stores while
+		// active (e.g. a TTS agent publishing audio). They must never trigger a
+		// resync (not in ids) nor be ghost-removed by client reconcile (listed in
+		// hiddenIds so clients skip them); their cleanup is handled exclusively by
+		// the webhook-driven USER_DISCONNECTED / USER_OFFLINE broadcasts.
+		visible := make([]string, 0, len(ids))
+		hidden := make([]string, 0)
+		for _, id := range ids {
+			if id == config.RecorderBot || id == config.RtmpBot || config.IsUserIdInternal(id) {
+				hidden = append(hidden, id)
+				continue
+			}
+			visible = append(visible, id)
+		}
+		idsJson, err := json.Marshal(struct {
+			Ids       []string `json:"ids"`
+			HiddenIds []string `json:"hiddenIds"`
+		}{Ids: visible, HiddenIds: hidden})
+		if err != nil {
+			log.WithError(err).Errorln("failed to marshal online users ids")
+			return
+		}
+		if err := m.natsService.BroadcastSystemEventToRoom(*event, roomId, idsJson, &userId); err != nil {
+			log.WithError(err).Warnf("error sending event %s", event.String())
+		}
 		return
 	}
 
-	if users != nil {
-		err = m.natsService.BroadcastSystemEventToRoom(*event, roomId, users, &userId)
-		if err != nil {
+	// full list: send as chunks to stay below the NATS max payload limit
+	chunks, err := m.natsService.GetOnlineUsersListAsJsonChunks(roomId, usersListChunkSize)
+	if err != nil {
+		log.WithError(err).Errorln("failed to get online users list as json chunks")
+		return
+	}
+	for _, chunk := range chunks {
+		if err := m.natsService.BroadcastSystemEventToRoom(*event, roomId, chunk, &userId); err != nil {
 			log.WithError(err).Warnf("error sending event %s", event.String())
+			return
 		}
 	}
 }
