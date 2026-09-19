@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.5.1](https://github.com/mynaparrot/plugNmeet-server/compare/v2.5.0...v2.5.1) (2026-09-19)
+
+
+### Bug Fixes
+
+* broadcast online/offline events to everyone as single event ([75ff088](https://github.com/mynaparrot/plugNmeet-server/commit/75ff0889a413eb9fb5477075a00bb4298d63dbca))
+* send users' list more efficiently ([12eb2dd](https://github.com/mynaparrot/plugNmeet-server/commit/12eb2dd37002a04cd6228a09dac07fed002e9887))
+
 ## [2.5.0](https://github.com/mynaparrot/plugNmeet-server/compare/v2.4.0...v2.5.0) (2026-09-10)
 
 
