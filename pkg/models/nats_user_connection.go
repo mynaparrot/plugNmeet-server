@@ -41,8 +41,9 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId, calledFrom string) {
 
 		userInfo, err := m.natsService.GetUserInfo(roomId, userId)
 		if err == nil && userInfo != nil {
-			// broadcast this user to everyone
-			if err = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_JOINED, roomId, userInfo, userId); err != nil {
+			// broadcast as public event with a single JetStream publish;
+			// clients handle their own echo idempotently via addRemoteParticipant
+			if err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_USER_JOINED, roomId, userInfo, nil); err != nil {
 				log.WithError(err).Error("Failed to broadcast USER_JOINED event")
 			}
 
@@ -103,11 +104,11 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId, calledFrom string) {
 		userInfo, err := m.natsService.GetUserInfo(roomId, userId)
 		if err != nil || userInfo == nil {
 			// If we can't get user info, send a basic event and update analytics.
-			if err = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_DISCONNECTED, roomId, &plugnmeet.NatsKvUserInfo{UserId: userId, RoomId: roomId}, userId); err != nil {
+			if err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_USER_DISCONNECTED, roomId, &plugnmeet.NatsKvUserInfo{UserId: userId, RoomId: roomId}, nil); err != nil {
 				log.WithError(err).Error("Failed to broadcast basic USER_DISCONNECTED event")
 			}
 		} else {
-			_ = m.natsService.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_DISCONNECTED, roomId, userInfo, userId)
+			_ = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_USER_DISCONNECTED, roomId, userInfo, nil)
 		}
 
 		// Start a non-blocking background task to handle the full offline/cleanup lifecycle.

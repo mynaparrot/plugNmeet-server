@@ -284,7 +284,7 @@ func (s *NatsService) AddUserManuallyAndBroadcast(roomId, userId, name string, i
 		return nil, err
 	}
 
-	err = s.BroadcastSystemEventToEveryoneExceptUserId(plugnmeet.NatsMsgServerToClientEvents_USER_JOINED, roomId, userInfo, userId)
+	err = s.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_USER_JOINED, roomId, userInfo, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -55,6 +55,8 @@ func (s *NatsService) createRoomNatsStream() error {
 		Description: "plugNmeet room stream",
 		Replicas:    s.app.NatsInfo.NumReplicas,
 		Retention:   jetstream.InterestPolicy,
+		MaxAge:      5 * time.Minute,
+		Discard:     jetstream.DiscardOld,
 		Subjects: []string{
 			fmt.Sprintf("%s.>", s.app.NatsInfo.Subjects.SystemPublic),
 			fmt.Sprintf("%s.>", s.app.NatsInfo.Subjects.SystemPrivate),
@@ -88,6 +90,10 @@ func (s *NatsService) CreateUserConsumer(roomId, userId string) (stream string, 
 	_, err = s.js.CreateOrUpdateConsumer(s.ctx, s.app.NatsInfo.RoomStreamName, jetstream.ConsumerConfig{
 		Durable:       durableName,
 		DeliverPolicy: jetstream.DeliverNewPolicy,
+		AckPolicy:     jetstream.AckExplicitPolicy,
+		AckWait:       30 * time.Second,
+		MaxDeliver:    5,
+		MaxAckPending: 1000,
 		FilterSubjects: []string{
 			// e.g., "sysPublic.room123.>"
 			fmt.Sprintf("%s.%s.>", s.app.NatsInfo.Subjects.SystemPublic, roomId),
