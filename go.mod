@@ -11,21 +11,21 @@ require (
 	github.com/gammazero/workerpool v1.2.1
 	github.com/go-jose/go-jose/v4 v4.1.5
 	github.com/go-sql-driver/mysql v1.10.1
-	github.com/goccy/go-json v0.10.6
+	github.com/goccy/go-json v0.11.1
 	github.com/goccy/go-yaml v1.19.2
 	github.com/gofiber/fiber/v3 v3.5.0
-	github.com/gofiber/template/html/v3 v3.0.8
+	github.com/gofiber/template/html/v3 v3.0.9
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/media-sdk v0.0.0-20260605212526-4c11a51d3c97
 	github.com/livekit/protocol v1.49.0
 	github.com/livekit/server-sdk-go/v2 v2.18.1
-	github.com/mynaparrot/plugnmeet-protocol v1.6.1
+	github.com/mynaparrot/plugnmeet-protocol v1.6.2
 	github.com/nats-io/jwt/v2 v2.8.2
-	github.com/nats-io/nats.go v1.53.1
+	github.com/nats-io/nats.go v1.54.0
 	github.com/nats-io/nkeys v0.4.16
-	github.com/openai/openai-go/v3 v3.59.0
+	github.com/openai/openai-go/v3 v3.66.0
 	github.com/pion/webrtc/v4 v4.2.18
 	github.com/prometheus/client_golang v1.24.1
 	github.com/redis/go-redis/v9 v9.22.0
@@ -57,6 +57,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/coder/websocket v1.8.15 // indirect
 	github.com/dennwc/iters v1.2.2 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/frostbyte73/core v0.1.1 // indirect
@@ -65,8 +66,8 @@ require (
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gofiber/schema v1.8.4 // indirect
-	github.com/gofiber/template/v2 v2.1.1 // indirect
-	github.com/gofiber/utils/v2 v2.4.2 // indirect
+	github.com/gofiber/template/v2 v2.1.2 // indirect
+	github.com/gofiber/utils/v2 v2.5.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
@@ -77,7 +78,7 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/jxskiss/base62 v1.1.0 // indirect
-	github.com/klauspost/compress v1.19.2 // indirect
+	github.com/klauspost/compress v1.20.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/lithammer/shortuuid/v4 v4.2.0 // indirect
 	github.com/livekit/mageutil v0.0.0-20250511045019-0f1ff63f7731 // indirect
@@ -130,11 +131,11 @@ require (
 	go.uber.org/zap v1.28.0 // indirect
 	go.uber.org/zap/exp v0.3.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/crypto v0.55.0 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
 	golang.org/x/exp v0.0.0-20260820142414-ca536658362e // indirect
 	golang.org/x/net v0.58.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260819154853-08b0e4226688 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260819154853-08b0e4226688 // indirect
