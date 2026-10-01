@@ -152,15 +152,16 @@ type ReplicaDBInfo struct {
 }
 
 type RedisInfo struct {
-	Host              string   `yaml:"host"`
-	Username          string   `yaml:"username"`
-	Password          string   `yaml:"password"`
-	DBName            int      `yaml:"db"`
-	UseTLS            bool     `yaml:"use_tls"`
-	MasterName        string   `yaml:"sentinel_master_name"`
-	SentinelUsername  string   `yaml:"sentinel_username"`
-	SentinelPassword  string   `yaml:"sentinel_password"`
-	SentinelAddresses []string `yaml:"sentinel_addresses"`
+	Host              string         `yaml:"host"`
+	Username          string         `yaml:"username"`
+	Password          string         `yaml:"password"`
+	DBName            int            `yaml:"db"`
+	DefaultTTL        *time.Duration `yaml:"default_ttl"`
+	UseTLS            bool           `yaml:"use_tls"`
+	MasterName        string         `yaml:"sentinel_master_name"`
+	SentinelUsername  string         `yaml:"sentinel_username"`
+	SentinelPassword  string         `yaml:"sentinel_password"`
+	SentinelAddresses []string       `yaml:"sentinel_addresses"`
 }
 
 type NatsInfo struct {
@@ -173,6 +174,7 @@ type NatsInfo struct {
 	AuthCalloutIssuerPrivate string           `yaml:"auth_callout_issuer_private"`
 	AuthCalloutXkeyPrivate   *string          `yaml:"auth_callout_xkey_private"`
 	NumReplicas              int              `yaml:"num_replicas"`
+	DefaultTTL               *time.Duration   `yaml:"default_ttl"`
 	RoomStreamName           string           `yaml:"room_stream_name"`
 	Subjects                 NatsSubjects     `yaml:"subjects"`
 	Recorder                 NatsInfoRecorder `yaml:"recorder"`
@@ -199,6 +201,13 @@ func InitAppConfig(appCnf *AppConfig) (*AppConfig, error) {
 	// default validation of token is 10 minutes
 	if appCnf.Client.TokenValidity == nil || *appCnf.Client.TokenValidity < 0 {
 		appCnf.Client.TokenValidity = new(10 * time.Minute)
+	}
+
+	if appCnf.RedisInfo.DefaultTTL == nil {
+		appCnf.RedisInfo.DefaultTTL = new(24 * time.Hour)
+	}
+	if appCnf.NatsInfo.DefaultTTL == nil {
+		appCnf.NatsInfo.DefaultTTL = new(24 * time.Hour)
 	}
 
 	if appCnf.NatsInfo.RoomStreamName == "" {

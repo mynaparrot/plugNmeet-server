@@ -20,7 +20,7 @@ func (s *RedisService) InsertOrUpdateBreakoutRoom(parentRoomId, bkRoomId string,
 	key := s.formatBreakoutRoomHashKey(parentRoomId)
 	pipe := s.rc.Pipeline()
 	pipe.HSet(s.ctx, key, bkRoomId, val)
-	pipe.Expire(s.ctx, key, DefaultTTL)
+	pipe.Expire(s.ctx, key, s.defaultTTL)
 	_, err := pipe.Exec(s.ctx)
 	return err
 }

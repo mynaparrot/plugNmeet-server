@@ -23,7 +23,7 @@ func (s *RedisService) HandleTranscriptionUsage(roomId, userId string, isStarted
 	if isStarted {
 		pipe := s.rc.TxPipeline()
 		pipe.HSet(s.ctx, sessionsKey, userId, time.Now().Unix())
-		pipe.Expire(s.ctx, sessionsKey, 24*time.Hour)
+		pipe.Expire(s.ctx, sessionsKey, s.defaultTTL)
 		_, err := pipe.Exec(s.ctx)
 		if err != nil {
 			return 0, err
@@ -56,7 +56,7 @@ func (s *RedisService) HandleTranscriptionUsage(roomId, userId string, isStarted
 	pipe := s.rc.TxPipeline()
 	pipe.HIncrBy(s.ctx, usageKey, userId, duration)
 	pipe.HIncrBy(s.ctx, usageKey, TotalUsageField, duration)
-	pipe.Expire(s.ctx, usageKey, 24*time.Hour)
+	pipe.Expire(s.ctx, usageKey, s.defaultTTL)
 	_, err = pipe.Exec(s.ctx)
 
 	if err != nil {

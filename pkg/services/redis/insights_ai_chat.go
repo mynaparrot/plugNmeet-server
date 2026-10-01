@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
@@ -53,7 +52,7 @@ func (s *RedisService) GetAITextChatContext(ctx context.Context, roomId, userId 
 
 func (s *RedisService) SetAITextChatSummary(ctx context.Context, roomId, userId, summary string) error {
 	key := fmt.Sprintf(aiTextChatSummaryKey, roomId, userId)
-	return s.rc.Set(ctx, key, summary, 24*time.Hour).Err()
+	return s.rc.Set(ctx, key, summary, s.defaultTTL).Err()
 }
 
 func (s *RedisService) AppendToAITextChatContext(ctx context.Context, roomId, userId string, messages ...*plugnmeet.InsightsAITextChatContent) error {
@@ -67,7 +66,7 @@ func (s *RedisService) AppendToAITextChatContext(ctx context.Context, roomId, us
 		}
 		pipe.RPush(ctx, key, val)
 	}
-	pipe.Expire(ctx, key, 24*time.Hour)
+	pipe.Expire(ctx, key, s.defaultTTL)
 	_, err := pipe.Exec(ctx)
 	return err
 }
@@ -104,7 +103,7 @@ func (s *RedisService) UpdateAITextChatUsage(ctx context.Context, roomId, userId
 	pipe.HIncrBy(ctx, key, totalCompletionKey, int64(completionTokens))
 	pipe.HIncrBy(ctx, key, totalTokensKey, int64(totalTokens))
 
-	pipe.Expire(ctx, key, 24*time.Hour)
+	pipe.Expire(ctx, key, s.defaultTTL)
 	_, err := pipe.Exec(ctx)
 	return err
 }

@@ -3,7 +3,6 @@ package redisservice
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -17,7 +16,7 @@ func (s *RedisService) AddRoomWithDurationInfo(roomId string, vals interface{}) 
 
 	pipe := s.rc.Pipeline()
 	pipe.HSet(s.ctx, key, vals)
-	pipe.Expire(s.ctx, key, time.Hour*24)
+	pipe.Expire(s.ctx, key, s.defaultTTL)
 	_, err := pipe.Exec(s.ctx)
 	if err != nil {
 		return err
@@ -30,7 +29,7 @@ func (s *RedisService) SetRoomDuration(roomId, durationField string, val uint64)
 
 	pipe := s.rc.Pipeline()
 	pipe.HSet(s.ctx, key, durationField, val)
-	pipe.Expire(s.ctx, key, time.Hour*24)
+	pipe.Expire(s.ctx, key, s.defaultTTL)
 	_, err := pipe.Exec(s.ctx)
 	if err != nil {
 		return err

@@ -16,8 +16,7 @@ import (
 )
 
 const (
-	Prefix     = "pnm-"
-	DefaultTTL = time.Hour * 24
+	Prefix = "pnm-"
 
 	// ConsolidatedRoomBucketPrefix is the prefix for the new single bucket for all room-related data.
 	ConsolidatedRoomBucketPrefix = Prefix + "room-"
@@ -39,13 +38,14 @@ var protoJsonOpts = protojson.MarshalOptions{
 }
 
 type NatsService struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-	app    *config.AppConfig
-	nc     *nats.Conn
-	js     jetstream.JetStream
-	cs     *NatsCacheService
-	logger *logrus.Entry
+	ctx        context.Context
+	cancel     context.CancelFunc
+	app        *config.AppConfig
+	defaultTTL time.Duration
+	nc         *nats.Conn
+	js         jetstream.JetStream
+	cs         *NatsCacheService
+	logger     *logrus.Entry
 }
 
 type Args struct {
@@ -62,13 +62,14 @@ func New(args Args) *NatsService {
 	ctx, cancel := context.WithCancel(args.Ctx)
 
 	return &NatsService{
-		ctx:    ctx,
-		cancel: cancel,
-		app:    args.App,
-		nc:     args.Nc,
-		js:     args.Js,
-		cs:     newNatsCacheService(ctx, log),
-		logger: log,
+		ctx:        ctx,
+		cancel:     cancel,
+		app:        args.App,
+		defaultTTL: *args.App.NatsInfo.DefaultTTL,
+		nc:         args.Nc,
+		js:         args.Js,
+		cs:         newNatsCacheService(ctx, log),
+		logger:     log,
 	}
 }
 

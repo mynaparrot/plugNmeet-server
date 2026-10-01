@@ -1,9 +1,5 @@
 package redisservice
 
-import (
-	"time"
-)
-
 func (s *RedisService) AnalyticsGetKeyType(key string) (string, error) {
 	return s.rc.Type(s.ctx, key).Result()
 }
@@ -11,7 +7,7 @@ func (s *RedisService) AnalyticsGetKeyType(key string) (string, error) {
 func (s *RedisService) AddAnalyticsHSETType(key string, val map[string]string) error {
 	pipe := s.rc.Pipeline()
 	pipe.HSet(s.ctx, key, val)
-	pipe.Expire(s.ctx, key, time.Hour*24)
+	pipe.Expire(s.ctx, key, s.defaultTTL)
 
 	_, err := pipe.Exec(s.ctx)
 	if err != nil {
@@ -27,7 +23,7 @@ func (s *RedisService) GetAnalyticsAllHashTypeVals(key string) (map[string]strin
 func (s *RedisService) IncrementAnalyticsVal(key string, val int64) error {
 	pipe := s.rc.Pipeline()
 	pipe.IncrBy(s.ctx, key, val)
-	pipe.Expire(s.ctx, key, time.Hour*24)
+	pipe.Expire(s.ctx, key, s.defaultTTL)
 
 	_, err := pipe.Exec(s.ctx)
 	if err != nil {
@@ -37,7 +33,7 @@ func (s *RedisService) IncrementAnalyticsVal(key string, val int64) error {
 }
 
 func (s *RedisService) AddAnalyticsStringType(key, val string) error {
-	_, err := s.rc.Set(s.ctx, key, val, time.Hour*24).Result()
+	_, err := s.rc.Set(s.ctx, key, val, s.defaultTTL).Result()
 	if err != nil {
 		return err
 	}
@@ -51,7 +47,7 @@ func (s *RedisService) GetAnalyticsStringTypeVal(key string) (string, error) {
 func (s *RedisService) AddAnalyticsUser(key string, val map[string]string) error {
 	pipe := s.rc.Pipeline()
 	pipe.HSet(s.ctx, key, val)
-	pipe.Expire(s.ctx, key, time.Hour*24)
+	pipe.Expire(s.ctx, key, s.defaultTTL)
 
 	_, err := pipe.Exec(s.ctx)
 	if err != nil {

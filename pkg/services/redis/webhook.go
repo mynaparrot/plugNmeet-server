@@ -17,7 +17,7 @@ func (s *RedisService) AddWebhookData(roomId string, val []byte) error {
 	pipe := s.rc.Pipeline()
 	// Set the roomId as a field in the hash
 	pipe.HSet(s.ctx, key, roomId, val)
-	pipe.HExpire(s.ctx, key, DefaultTTL, roomId)
+	pipe.HExpire(s.ctx, key, s.defaultTTL, roomId)
 	_, err := pipe.Exec(s.ctx)
 	return err
 }

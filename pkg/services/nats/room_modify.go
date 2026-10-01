@@ -37,7 +37,7 @@ func (s *NatsService) AddRoom(tableId uint64, roomId, roomSid string, emptyTimeo
 	kv, err := s.js.CreateOrUpdateKeyValue(s.ctx, jetstream.KeyValueConfig{
 		Replicas:    s.app.NatsInfo.NumReplicas,
 		Bucket:      bucket,
-		TTL:         DefaultTTL,
+		TTL:         s.defaultTTL,
 		Description: roomTitle,
 	})
 	if err != nil {

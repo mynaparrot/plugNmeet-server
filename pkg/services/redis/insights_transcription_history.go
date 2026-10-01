@@ -40,7 +40,7 @@ func (s *RedisService) AddTranscriptionToHistory(roomId, userId, name, lang, tex
 
 	pipe := s.rc.Pipeline()
 	pipe.HSet(s.ctx, key, field, jsonData)
-	pipe.Expire(s.ctx, key, DefaultTTL)
+	pipe.Expire(s.ctx, key, s.defaultTTL)
 
 	_, err = pipe.Exec(s.ctx)
 	return err

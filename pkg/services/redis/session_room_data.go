@@ -18,7 +18,7 @@ func (s *RedisService) SaveSessionData(roomId string, dataType plugnmeet.Session
 
 	pipe := s.rc.Pipeline()
 	pipe.HSet(s.ctx, hashKey, key, value)
-	pipe.Expire(s.ctx, hashKey, DefaultTTL)
+	pipe.Expire(s.ctx, hashKey, s.defaultTTL)
 
 	_, err := pipe.Exec(s.ctx)
 	return err

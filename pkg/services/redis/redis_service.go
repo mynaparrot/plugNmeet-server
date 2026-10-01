@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/fx"
@@ -11,13 +12,13 @@ import (
 
 const (
 	Prefix          = "pnm:"
-	DefaultTTL      = time.Hour * 24
 	TotalUsageField = "total_usage"
 )
 
 type RedisService struct {
 	ctx              context.Context
 	rc               *redis.Client
+	defaultTTL       time.Duration
 	unlockScriptExec *redis.Script
 	renewScriptExec  *redis.Script
 	logger           *logrus.Entry
@@ -27,6 +28,7 @@ type Args struct {
 	fx.In
 	Ctx    context.Context
 	Rc     *redis.Client
+	App    *config.AppConfig
 	Logger *logrus.Logger
 }
 
@@ -34,6 +36,7 @@ func New(args Args) *RedisService {
 	return &RedisService{
 		ctx:              args.Ctx,
 		rc:               args.Rc,
+		defaultTTL:       *args.App.RedisInfo.DefaultTTL,
 		unlockScriptExec: redis.NewScript(unlockScript),
 		renewScriptExec:  redis.NewScript(renewScript),
 		logger:           args.Logger.WithField("service", "redis"),

@@ -4,14 +4,14 @@ go 1.26.7
 
 require (
 	buf.build/go/protovalidate v1.4.0
-	github.com/Microsoft/cognitive-services-speech-sdk-go v1.51.2
+	github.com/Microsoft/cognitive-services-speech-sdk-go v1.52.0
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/facette/natsort v0.0.0-20181210072756-2cd4dd1e2dcb
 	github.com/gabriel-vasile/mimetype v1.4.15
 	github.com/gammazero/workerpool v1.2.1
 	github.com/go-jose/go-jose/v4 v4.1.5
 	github.com/go-sql-driver/mysql v1.10.1
-	github.com/goccy/go-json v0.11.1
+	github.com/goccy/go-json v0.11.2
 	github.com/goccy/go-yaml v1.19.2
 	github.com/gofiber/fiber/v3 v3.5.0
 	github.com/gofiber/template/html/v3 v3.0.9

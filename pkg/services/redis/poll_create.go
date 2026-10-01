@@ -24,7 +24,7 @@ const (
 func (s *RedisService) CreateRoomPoll(roomId string, val map[string]string) error {
 	pipe := s.rc.Pipeline()
 	pipe.HSet(s.ctx, pollsKey+roomId, val)
-	pipe.Expire(s.ctx, pollsKey+roomId, time.Hour*24)
+	pipe.Expire(s.ctx, pollsKey+roomId, s.defaultTTL)
 
 	_, err := pipe.Exec(s.ctx)
 	if err != nil {
@@ -46,7 +46,7 @@ func pollDurationIndexField(roomId, pollId string) string {
 func (s *RedisService) AddPollWithDuration(roomId, pollId string, expiresAt int64) error {
 	pipe := s.rc.Pipeline()
 	pipe.HSet(s.ctx, pollsWithDurationKey, pollDurationIndexField(roomId, pollId), expiresAt)
-	pipe.Expire(s.ctx, pollsWithDurationKey, time.Hour*24)
+	pipe.Expire(s.ctx, pollsWithDurationKey, s.defaultTTL)
 
 	_, err := pipe.Exec(s.ctx)
 	if err != nil {
@@ -107,7 +107,7 @@ func (s *RedisService) AddPollResponse(r *plugnmeet.SubmitPollResponseReq, isAno
 		_, err = tx.TxPipelined(s.ctx, func(pipe redis.Pipeliner) error {
 			// Add user to the set of voters (keeps one-shot protection for anonymous polls too).
 			pipe.SAdd(s.ctx, votedUsersKey, r.UserId)
-			pipe.Expire(s.ctx, votedUsersKey, time.Hour*24)
+			pipe.Expire(s.ctx, votedUsersKey, s.defaultTTL)
 
 			// Anonymous polls: no per-user attribution anywhere, counters only.
 			if !isAnonymous {
@@ -116,7 +116,7 @@ func (s *RedisService) AddPollResponse(r *plugnmeet.SubmitPollResponseReq, isAno
 
 				// Add the vote details to a list.
 				pipe.RPush(s.ctx, allRespondentsKey, voteData)
-				pipe.Expire(s.ctx, allRespondentsKey, time.Hour*24)
+				pipe.Expire(s.ctx, allRespondentsKey, s.defaultTTL)
 			}
 
 			// total_resp counts distinct voters; each selected option counts once.
@@ -124,7 +124,7 @@ func (s *RedisService) AddPollResponse(r *plugnmeet.SubmitPollResponseReq, isAno
 			for _, id := range r.SelectedOptions {
 				pipe.HIncrBy(s.ctx, respondentsKey, fmt.Sprintf("%d%s", id, PollCountSuffix), 1)
 			}
-			pipe.Expire(s.ctx, respondentsKey, time.Hour*24)
+			pipe.Expire(s.ctx, respondentsKey, s.defaultTTL)
 
 			return nil
 		})

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -20,7 +19,7 @@ func (s *RedisService) UpdateTTSServiceUsage(ctx context.Context, roomId, userId
 	pipe.HIncrBy(ctx, key, userId, int64(incBy))
 	pipe.HIncrBy(ctx, key, fmt.Sprintf("lang:%s", language), int64(incBy))
 	pipe.HIncrBy(ctx, key, TotalUsageField, int64(incBy))
-	pipe.Expire(ctx, key, time.Hour*24)
+	pipe.Expire(ctx, key, s.defaultTTL)
 	_, err := pipe.Exec(ctx)
 	return err
 }
