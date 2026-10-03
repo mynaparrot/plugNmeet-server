@@ -223,13 +223,13 @@ func (m *RoomModel) onAfterRoomEnded(p *onAfterRoomEndedParams) {
 	// Final NATS cleanup: deletes all consumers, messages, and the KV store for this room.
 	m.natsService.OnAfterSessionEndCleanup(p.roomId)
 
-	log.Infof("Room has been ended properly after %s", time.Since(p.started))
-
 	// buffer for late webhook analytics events
 	time.Sleep(config.WaitBeforeAnalyticsExport)
 
 	// export while still holding the lock
 	m.analyticsModel.ExportAnalytics(p.roomId, p.roomSid, p.metadata, p.started)
+
+	log.Infof("Room has been ended properly after %s", time.Since(p.started))
 }
 
 // waitForAllUsersToDisconnect waits for all users to disconnect, polling every second up to totalWait.
