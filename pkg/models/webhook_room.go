@@ -155,5 +155,5 @@ func (m *WebhookModel) roomFinished(event *livekit.WebhookEvent) {
 	m.sendToWebhookNotifier(event)
 
 	log.Info("Successfully processed room_finished webhook")
-	// webhook data will be clean after analytics export method call e.g. PrepareToExportAnalytics
+	// webhook data will be clean after analytics export method call e.g. ExportAnalytics
 }

@@ -21,8 +21,12 @@ const (
 	NativeTwinIdentitySuffix = "-native"
 
 	// all the time.Sleep() values
-	WaitBeforeTriggerOnAfterRoomEnded      = 10 * time.Second
-	WaitBeforeAnalyticsStartProcessing     = 50 * time.Second
+	WaitBeforeTriggerOnAfterRoomEnded = 10 * time.Second
+	// max wait for all users to disconnect before final NATS cleanup
+	WaitForAllUsersToDisconnect = 30 * time.Second
+	// buffer for late webhook analytics events before the inline export
+	WaitBeforeAnalyticsExport = 10 * time.Second
+
 	WaitBeforeBreakoutRoomOnAfterRoomStart = 2 * time.Second
 
 	// separator for comma-joined selected option ids ("1,2,3") in poll storage & analytics

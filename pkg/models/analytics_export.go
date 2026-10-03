@@ -1,7 +1,6 @@
 package models
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"strconv"
@@ -15,9 +14,8 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-// PrepareToExportAnalytics will export analytics data and create file
-// this method is the final call after proper delay
-func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
+// ExportAnalytics exports analytics for an ended session. The caller must already hold the room-creation lock.
+func (m *AnalyticsModel) ExportAnalytics(roomId, sid, meta string, endedAt time.Time) {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId":    roomId,
 		"roomSid":   sid,
@@ -44,33 +42,6 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 		return
 	}
 
-	// lock to prevent this room re-creation until process finish
-	// otherwise will give an unexpected result
-	lockValue, err := acquireRoomCreationLockWithRetry(m.ctx, m.rs, roomId, log)
-	if err != nil {
-		// Error is already logged by the helper.
-		// We can't proceed without the lock.
-		return
-	}
-	defer func() {
-		unlockCtx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
-		defer cancel()
-		if unlockErr := m.rs.UnlockRoomCreation(unlockCtx, roomId, lockValue); unlockErr != nil {
-			// UnlockRoomCreation in RedisService should log details
-			log.WithError(unlockErr).Error("error trying to clean up room creation lock")
-		} else {
-			log.Info("room creation lock released")
-		}
-	}()
-
-	// Ensure the room is still active. This situation can occur when a room is closed and re-created instantly.
-	// We must stop here, as the process would delete all records, since data is keyed by roomId instead of SID.
-	exist, err := m.natsService.GetRoomInfo(roomId)
-	if err == nil && exist != nil && exist.RoomSid != sid {
-		log.Info("room was likely re-created, skipping analytics export for the previous session")
-		return // The lock will be released by the deferred function.
-	}
-
 	room, err := m.ds.GetRoomInfoBySid(sid, new(0))
 	if err != nil {
 		log.WithError(err).Error("failed to get room info from db")
@@ -79,6 +50,9 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 		log.Warn("could not find ended room in db, skipping analytics export")
 		return
 	}
+
+	// synthesize a left event for users still connected at room end
+	m.markStillConnectedUsersAsLeft(room, endedAt, log)
 
 	jsonData, err := m.exportAnalyticsToJSON(room, metadata, log)
 	if err != nil {
@@ -101,6 +75,80 @@ func (m *AnalyticsModel) PrepareToExportAnalytics(roomId, sid, meta string) {
 		}
 	} else {
 		log.Debug("analytics feature was not enabled for this room, file not saved to DB")
+	}
+
+	// remove keys a late event wrote after the export deleted them (lock still held)
+	if staleKeys, err := m.rs.ScanKeys(fmt.Sprintf(analyticsRoomKey, roomId) + ":*"); err == nil && len(staleKeys) > 0 {
+		if err = m.rs.DeleteKeys(staleKeys); err != nil {
+			log.WithError(err).Warn("failed to delete late-arriving analytics keys; TTL will clean them")
+		}
+	}
+}
+
+// markStillConnectedUsersAsLeft adds a synthetic USER_LEFT event (room end time) for users with no left event or whose last join is newer than their last left.
+func (m *AnalyticsModel) markStillConnectedUsersAsLeft(room *dbmodels.RoomInfo, endedAt time.Time, log *logrus.Entry) {
+	endedMs := endedAt.UnixMilli()
+	source := "endedAt parameter"
+	if !room.Ended.IsZero() {
+		endedMs = room.Ended.UnixMilli()
+		source = "db recorded room end time"
+	}
+	log.WithField("source", source).Debugf("using room end time %d for synthetic participant_left events", endedMs)
+
+	k := fmt.Sprintf(analyticsRoomKey+":room:users", room.RoomId)
+	users, err := m.rs.AnalyticsGetAllUsers(k)
+	if err != nil {
+		log.WithError(err).Warn("failed to get analytics users from redis, skipping synthetic participant_left insertion")
+		return
+	}
+	if len(users) == 0 {
+		return
+	}
+
+	var inserted int
+	for userId := range users {
+		userKey := fmt.Sprintf(analyticsUserKey, room.RoomId, userId)
+		leftKey := fmt.Sprintf("%s:%s", userKey, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_LEFT.String())
+		joinKey := fmt.Sprintf("%s:%s", userKey, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_JOINED.String())
+
+		leftTimes, err := m.rs.GetAnalyticsAllHashTypeVals(leftKey)
+		if err != nil {
+			// treat read errors as no left events
+			log.WithError(err).WithField("user_id", userId).Warn("failed to read participant_left events, treating as empty")
+			leftTimes = map[string]string{}
+		}
+		joinTimes, err := m.rs.GetAnalyticsAllHashTypeVals(joinKey)
+		if err != nil {
+			log.WithError(err).WithField("user_id", userId).Warn("failed to read participant_joined events, treating as empty")
+			joinTimes = map[string]string{}
+		}
+
+		var maxLeft, maxJoin int64
+		for field := range leftTimes {
+			if t, perr := strconv.ParseInt(field, 10, 64); perr == nil && t > maxLeft {
+				maxLeft = t
+			}
+		}
+		for field := range joinTimes {
+			if t, perr := strconv.ParseInt(field, 10, 64); perr == nil && t > maxJoin {
+				maxJoin = t
+			}
+		}
+
+		if len(leftTimes) == 0 || maxJoin > maxLeft {
+			val := map[string]string{
+				fmt.Sprintf("%d", endedMs): fmt.Sprintf("%d", endedMs),
+			}
+			if err = m.rs.AddAnalyticsHSETType(leftKey, val); err != nil {
+				log.WithError(err).WithField("user_id", userId).Errorln("AddAnalyticsHSETType failed")
+				continue
+			}
+			inserted++
+		}
+	}
+
+	if inserted > 0 {
+		log.Infof("inserted synthetic left event for %d still-connected user(s) at room end time", inserted)
 	}
 }
 

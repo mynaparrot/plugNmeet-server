@@ -26,7 +26,8 @@ func (s *RedisService) HoldTemporaryRoomData(info *plugnmeet.NatsKvRoomInfo) {
 	}
 
 	key := fmt.Sprintf(temporaryRoomData, info.RoomId)
-	if err = s.rc.SetNX(s.ctx, key, marshal, time.Minute*1).Err(); err != nil {
+	// 2 min: trailing webhooks use this fallback during the end + export pipeline
+	if err = s.rc.SetNX(s.ctx, key, marshal, time.Minute*2).Err(); err != nil {
 		log.WithError(err).Errorln("SetNX failed")
 	}
 }

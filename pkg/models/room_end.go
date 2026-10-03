@@ -38,8 +38,9 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 		return false, "failed to end room, it may be starting", plugnmeet.StatusCode_INTERNAL_SERVER_ERROR
 	}
 
-	// Acquire a distributed lock to prevent multiple end-room processes from running simultaneously.
-	roomEndLockTTL := config.WaitBeforeTriggerOnAfterRoomEnded + (time.Second * 10)
+	// The lock spans the whole end + analytics pipeline, blocking re-creation until
+	// this session's data is exported. The TTL is the crash-safety expiry.
+	roomEndLockTTL := config.WaitBeforeTriggerOnAfterRoomEnded + config.WaitForAllUsersToDisconnect + config.WaitBeforeAnalyticsExport + (time.Second * 70)
 	lockAcquired, lockVal, errLock := m.rs.LockRoomCreation(m.ctx, roomID, roomEndLockTTL)
 
 	if errLock != nil {
@@ -142,7 +143,7 @@ func (m *RoomModel) onAfterRoomEnded(p *onAfterRoomEndedParams) {
 	}
 
 	// Wait for all users to disconnect before proceeding.
-	m.waitForAllUsersToDisconnect(p.roomId)
+	m.waitForAllUsersToDisconnect(p.roomId, config.WaitBeforeTriggerOnAfterRoomEnded)
 
 	// send session_ended webhook before ending room in livekit
 	m.sendSessionEndedWebhook(p.roomId, p.roomSid, p.metadata, p.createdAt)
@@ -215,25 +216,27 @@ func (m *RoomModel) onAfterRoomEnded(p *onAfterRoomEndedParams) {
 	// clean any SIP DispatchRule
 	m.lk.DeleteSIPDispatchRule(p.roomId, log)
 
+	// make sure all users are disconnected before NATS cleanup deletes presence data
+	m.waitForAllUsersToDisconnect(p.roomId, config.WaitForAllUsersToDisconnect)
+
 	// CRITICAL: ==> THIS WILL BE THE LAST <==
 	// Final NATS cleanup: deletes all consumers, messages, and the KV store for this room.
 	m.natsService.OnAfterSessionEndCleanup(p.roomId)
 
 	log.Infof("Room has been ended properly after %s", time.Since(p.started))
 
-	// Schedule the analytics export to run after a delay.
-	// This is done asynchronously to allow the current room-end lock to be released.
-	time.AfterFunc(config.WaitBeforeAnalyticsStartProcessing, func() {
-		// PrepareToExportAnalytics has it's own room creation locking logic
-		m.analyticsModel.PrepareToExportAnalytics(p.roomId, p.roomSid, p.metadata)
-	})
+	// buffer for late webhook analytics events
+	time.Sleep(config.WaitBeforeAnalyticsExport)
+
+	// export while still holding the lock
+	m.analyticsModel.ExportAnalytics(p.roomId, p.roomSid, p.metadata, p.started)
 }
 
-// waitForAllUsersToDisconnect waits for all users in a room to disconnect.
-// It checks periodically and times out after a configured duration.
-func (m *RoomModel) waitForAllUsersToDisconnect(roomID string) {
-	log := m.logger.WithField("room_id", roomID)
-	totalWait := config.WaitBeforeTriggerOnAfterRoomEnded
+// waitForAllUsersToDisconnect waits for all users to disconnect, polling every second up to totalWait.
+func (m *RoomModel) waitForAllUsersToDisconnect(roomID string, totalWait time.Duration) {
+	log := m.logger.WithFields(logrus.Fields{
+		"room_id": roomID,
+	})
 	interval := 1 * time.Second // Check every second
 
 	timeout := time.After(totalWait)
@@ -245,7 +248,7 @@ func (m *RoomModel) waitForAllUsersToDisconnect(roomID string) {
 	for {
 		select {
 		case <-timeout:
-			log.Warn("Timed out waiting for all users to disconnect. Proceeding with room-end process.")
+			log.Warnf("Timed out waiting for all users to disconnect. Proceeding with room-end process.")
 			return
 		case <-ticker.C:
 			onlineUsers, err := m.natsService.GetOnlineUsersId(roomID)
@@ -255,7 +258,7 @@ func (m *RoomModel) waitForAllUsersToDisconnect(roomID string) {
 			}
 
 			if onlineUsers == nil || len(onlineUsers) == 0 {
-				log.Info("All users have disconnected. Proceeding with room-end process.")
+				log.Infof("All users have disconnected. Proceeding with room-end process.")
 				return // All users are gone, exit loop
 			}
 			log.Infof("Waiting for %d user(s) to disconnect...", len(onlineUsers))
