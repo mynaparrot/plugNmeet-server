@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.5.2](https://github.com/mynaparrot/plugNmeet-server/compare/v2.5.1...v2.5.2) (2026-10-03)
+
+
+### Bug Fixes
+
+* added config option to set ttl. fixed issue: [#915](https://github.com/mynaparrot/plugNmeet-server/issues/915) ([95d5bbc](https://github.com/mynaparrot/plugNmeet-server/commit/95d5bbce718f55c1e03cb0a8f9cbbc4c9828bb60))
+* analytics export should always perform as soon as room end ([507ec9a](https://github.com/mynaparrot/plugNmeet-server/commit/507ec9a99bd3c2f2e122cb5a1ee0b4090442d815))
+* bump mupdf to `1.28.5` ([d2248c6](https://github.com/mynaparrot/plugNmeet-server/commit/d2248c6adfda11c6d6928d200f52d43daa4fd1df))
+* wrong placement of log ([644554d](https://github.com/mynaparrot/plugNmeet-server/commit/644554dba786bc8d5ef242e7b8b65c6ff4dbffd8))
+
 ## [2.5.1](https://github.com/mynaparrot/plugNmeet-server/compare/v2.5.0...v2.5.1) (2026-09-20)
 
 
