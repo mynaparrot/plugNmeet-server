@@ -333,8 +333,8 @@ insights:
 #  # (This has no effect if force_turn is true).
 #  fallback_turn: false
 #  # The duration to wait with a poor connection before triggering the fallback.
-#  # Examples: "30s", "1m". Default: "60s"
-#  fallback_timer_duration: "60s"
+#  # Examples: "30s", "1m". Default: "30s" (client mirrors the same default)
+#  fallback_timer_duration: "30s"
 #  # Fallback on flapping connection
 #  fallback_on_flapping:
 #    enabled: false

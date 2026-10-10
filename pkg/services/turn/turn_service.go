@@ -12,6 +12,10 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/turn/coturn"
 )
 
+// defaultFallbackTimerDuration is the UX-first default consolidation window
+// (30 seconds) that the client mirrors when no valid timer value is provided.
+const defaultFallbackTimerDuration = 30 * time.Second
+
 // TurnService is the main entry point for interacting with the TURN framework.
 type TurnService struct {
 	config   *config.TurnConfig
@@ -69,10 +73,12 @@ func (s *TurnService) GetCredentials(ctx context.Context, roomId, userId string)
 	if !s.config.ForceTurn && s.config.FallbackTurn {
 		credentials.FallbackTurn = true
 
-		// Add the duration logic here
+		// Add the duration logic here. Only a valid positive duration is
+		// sent to the client; the value must be milliseconds on the wire
+		// (the client honors it only when > 0 as well).
 		duration := s.config.FallbackTimerDuration
 		if duration <= 0 {
-			duration = time.Second * 60 // default 60s
+			duration = defaultFallbackTimerDuration // default 30s, mirrors the client
 		}
 		credentials.FallbackTimerDuration = duration.Milliseconds()
 	}
