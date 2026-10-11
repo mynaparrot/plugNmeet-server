@@ -232,6 +232,7 @@ func (pc *PollsController) HandleUserSelectedOption(c fiber.Ctx) error {
 // HandleUserSubmitResponse handles a user's poll submission.
 func (pc *PollsController) HandleUserSubmitResponse(c fiber.Ctx) error {
 	roomId := fiber.Locals[string](c, "roomId")
+	requestedUserId := fiber.Locals[string](c, "requestedUserId")
 	res := new(plugnmeet.PollResponse)
 	res.Status = false
 
@@ -244,6 +245,7 @@ func (pc *PollsController) HandleUserSubmitResponse(c fiber.Ctx) error {
 	}
 
 	req.RoomId = roomId
+	req.UserId = requestedUserId
 	err = pc.PollModel.UserSubmitResponse(req)
 	if err != nil {
 		res.Msg = err.Error()
