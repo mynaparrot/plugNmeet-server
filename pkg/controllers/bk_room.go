@@ -67,6 +67,7 @@ func (brc *BreakoutRoomController) HandleCreateBreakoutRooms(c fiber.Ctx) error 
 func (brc *BreakoutRoomController) HandleJoinBreakoutRoom(c fiber.Ctx) error {
 	roomId := brc.BreakoutRoomModel.ResolveParentRoomId(fiber.Locals[string](c, "roomId"))
 	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	requestedUserId := fiber.Locals[string](c, "requestedUserId")
 
 	res := new(plugnmeet.BreakoutRoomRes)
 	res.Status = false
@@ -79,6 +80,7 @@ func (brc *BreakoutRoomController) HandleJoinBreakoutRoom(c fiber.Ctx) error {
 	}
 
 	req.RoomId = roomId
+	req.UserId = requestedUserId
 	token, err := brc.BreakoutRoomModel.JoinBreakoutRoom(c.RequestCtx(), req, isAdmin)
 	if err != nil {
 		res.Msg = err.Error()
