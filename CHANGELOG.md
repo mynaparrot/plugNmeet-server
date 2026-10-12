@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.5.3](https://github.com/mynaparrot/plugNmeet-server/compare/v2.5.2...v2.5.3) (2026-10-11)
+
+
+### Bug Fixes
+
+* **breakout-room:** enforce server-verified user identity in join room ([1b558c1](https://github.com/mynaparrot/plugNmeet-server/commit/1b558c1da47d2cdb47be28b46acfc16c85c2afe1))
+* **polls:** enforce server-authoritative user identity in submit response ([d7039ce](https://github.com/mynaparrot/plugNmeet-server/commit/d7039ceda7a8b9fbf9a202f5aaacbdf99819ae70))
+* **turn:** fallback now requires meaningful, measured evidence that the current connection is struggling, rather than simply waiting for a timer ([c5eabef](https://github.com/mynaparrot/plugNmeet-server/commit/c5eabef225d0ec55766ffe39112b15b1c8b0a9d1))
+
 ## [2.5.2](https://github.com/mynaparrot/plugNmeet-server/compare/v2.5.1...v2.5.2) (2026-10-04)
 
 
