@@ -8,7 +8,7 @@ require (
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/facette/natsort v0.0.0-20181210072756-2cd4dd1e2dcb
 	github.com/gabriel-vasile/mimetype v1.4.16
-	github.com/gammazero/workerpool v1.2.1
+	github.com/gammazero/workerpool v1.2.2
 	github.com/go-jose/go-jose/v4 v4.1.5
 	github.com/go-sql-driver/mysql v1.10.1
 	github.com/goccy/go-json v0.11.2
@@ -62,7 +62,7 @@ require (
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/frostbyte73/core v0.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
-	github.com/gammazero/deque v1.2.1 // indirect
+	github.com/gammazero/deque v1.2.2 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gofiber/schema v1.8.4 // indirect
