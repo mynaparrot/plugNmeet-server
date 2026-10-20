@@ -22,6 +22,12 @@ import (
 
 var _ insights.TranscriptionStream = (*openaiRealtimeStream)(nil)
 
+// Keepalive for the realtime socket; variables so tests can shorten them.
+var (
+	realtimePingInterval = 20 * time.Second
+	realtimeReadWindow   = 60 * time.Second
+)
+
 type openaiTranscriptionSession struct {
 	conn    *websocket.Conn
 	writeMu sync.Mutex
@@ -48,6 +54,8 @@ type openaiRealtimeStream struct {
 	closeOnce sync.Once
 	closed    atomic.Bool
 
+	ready atomic.Bool
+
 	writeWg  sync.WaitGroup
 	readWg   sync.WaitGroup
 	commitWg sync.WaitGroup
@@ -57,11 +65,11 @@ type openaiRealtimeStream struct {
 
 	transcriptionSession *openaiTranscriptionSession
 
+	// wsWriteChan is created once; closing is guarded by writeQueueMu.
 	wsWriteChan chan []byte
 
-	// Protects wsWriteChan sends and close.
-	// This prevents send-on-closed-channel panics.
-	writeQueueMu sync.Mutex
+	writeQueueMu     sync.Mutex
+	writeQueueClosed bool
 
 	// Guards transcription state.
 	mu sync.Mutex
@@ -226,11 +234,7 @@ func (s *openaiRealtimeStream) queueWebSocketMessage(payload []byte) error {
 	s.writeQueueMu.Lock()
 	defer s.writeQueueMu.Unlock()
 
-	if s.closed.Load() {
-		return nil
-	}
-
-	if s.wsWriteChan == nil {
+	if s.closed.Load() || s.writeQueueClosed {
 		return nil
 	}
 
@@ -250,7 +254,7 @@ func (s *openaiRealtimeStream) queueWebSocketMessageDuringClose(payload []byte) 
 	s.writeQueueMu.Lock()
 	defer s.writeQueueMu.Unlock()
 
-	if s.wsWriteChan == nil {
+	if s.writeQueueClosed {
 		return nil
 	}
 
@@ -267,31 +271,63 @@ func (s *openaiRealtimeStream) closeWriteQueue() {
 	s.writeQueueMu.Lock()
 	defer s.writeQueueMu.Unlock()
 
-	if s.wsWriteChan != nil {
-		close(s.wsWriteChan)
-		s.wsWriteChan = nil
+	if s.writeQueueClosed {
+		return
+	}
+	s.writeQueueClosed = true
+	close(s.wsWriteChan)
+}
+
+func (s *openaiRealtimeStream) writeLoop(writeCh chan []byte) {
+	defer s.writeWg.Done()
+
+	ticker := time.NewTicker(realtimePingInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case msg, ok := <-writeCh:
+			if !ok {
+				return
+			}
+			if err := s.writeWebSocketMessage(websocket.TextMessage, msg); err != nil {
+				s.failWrite(err)
+				return
+			}
+
+		case <-ticker.C:
+			if err := s.writeWebSocketMessage(websocket.PingMessage, nil); err != nil {
+				s.failWrite(err)
+				return
+			}
+		}
 	}
 }
 
-func (s *openaiRealtimeStream) writeLoop() {
-	defer s.writeWg.Done()
+func (s *openaiRealtimeStream) writeWebSocketMessage(messageType int, payload []byte) error {
+	if s.transcriptionSession == nil || s.transcriptionSession.conn == nil {
+		return fmt.Errorf("openai transcription session is not initialized")
+	}
 
-	for msg := range s.wsWriteChan {
-		if s.transcriptionSession == nil || s.transcriptionSession.conn == nil {
-			return
-		}
+	s.transcriptionSession.writeMu.Lock()
+	defer s.transcriptionSession.writeMu.Unlock()
 
-		s.transcriptionSession.writeMu.Lock()
-		_ = s.transcriptionSession.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-		err := s.transcriptionSession.conn.WriteMessage(websocket.TextMessage, msg)
-		s.transcriptionSession.writeMu.Unlock()
+	_ = s.transcriptionSession.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+	return s.transcriptionSession.conn.WriteMessage(messageType, payload)
+}
 
-		if err != nil {
-			if s.ctx.Err() == nil && !s.closed.Load() {
-				s.log.WithError(err).Error("failed to write openai realtime websocket message")
-			}
-			return
-		}
+func (s *openaiRealtimeStream) failWrite(err error) {
+	if s.ctx.Err() == nil && !s.closed.Load() {
+		s.log.WithError(err).Error("failed to write openai realtime websocket message")
+		s.safeSend(&insights.TranscriptionEvent{
+			Type:  insights.EventTypeSessionStopped,
+			Error: err.Error(),
+		})
+	}
+
+	s.closeWriteQueue()
+	if s.transcriptionSession != nil && s.transcriptionSession.conn != nil {
+		_ = s.transcriptionSession.conn.Close()
 	}
 }
 
@@ -349,6 +385,15 @@ func (s *openaiRealtimeStream) Results() <-chan *insights.TranscriptionEvent {
 func (s *openaiRealtimeStream) readTranscriptionLoop() {
 	defer s.readWg.Done()
 
+	if s.transcriptionSession != nil && s.transcriptionSession.conn != nil {
+		// Every pong (reply to our ping) extends the read window, so an idle but
+		// healthy session is not mistaken for a dead one.
+		conn := s.transcriptionSession.conn
+		conn.SetPongHandler(func(string) error {
+			return conn.SetReadDeadline(time.Now().Add(realtimeReadWindow))
+		})
+	}
+
 	for {
 		select {
 		case <-s.ctx.Done():
@@ -362,7 +407,7 @@ func (s *openaiRealtimeStream) readTranscriptionLoop() {
 				return
 			}
 
-			_ = s.transcriptionSession.conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+			_ = s.transcriptionSession.conn.SetReadDeadline(time.Now().Add(realtimeReadWindow))
 
 			_, data, err := s.transcriptionSession.conn.ReadMessage()
 			if err != nil {
@@ -402,6 +447,14 @@ func (s *openaiRealtimeStream) handleTranscriptionMessage(data []byte) {
 	}
 
 	switch msg.Type {
+	case string(constant.ValueOf[constant.SessionUpdated]()),
+		string(constant.ValueOf[constant.TranscriptionSessionUpdated]()):
+		// The server accepted the session; the task may start usage accounting.
+		if s.ready.CompareAndSwap(false, true) {
+			s.log.Infoln("openai realtime transcription session acknowledged")
+			s.safeSend(&insights.TranscriptionEvent{Type: insights.EventTypeSessionStarted})
+		}
+
 	case string(constant.ValueOf[constant.ConversationItemInputAudioTranscriptionDelta]()):
 		if msg.Delta == "" {
 			return
@@ -451,6 +504,13 @@ func (s *openaiRealtimeStream) handleTranscriptionMessage(data []byte) {
 			Type:  insights.EventTypeError,
 			Error: msg.Error.Message,
 		})
+
+		if !s.ready.Load() {
+			// Never acknowledged (bad model/auth/config): close so the caller retries.
+			if s.transcriptionSession != nil && s.transcriptionSession.conn != nil {
+				_ = s.transcriptionSession.conn.Close()
+			}
+		}
 
 	default:
 		return

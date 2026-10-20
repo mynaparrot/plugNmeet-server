@@ -3,7 +3,6 @@ package azure
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/Microsoft/cognitive-services-speech-sdk-go/audio"
 	"github.com/Microsoft/cognitive-services-speech-sdk-go/speech"
@@ -44,76 +43,102 @@ func (c *transcribeClient) CreateTranscription(mainCtx context.Context, roomId, 
 	})
 	log.Infoln("starting transcription")
 
+	var (
+		inputStream *audio.PushAudioInputStream
+		audioConfig *audio.AudioConfig
+		cnf         *speech.SpeechTranslationConfig
+		recognizer  *speech.TranslationRecognizer
+		releaseAll  = func() {
+			if recognizer != nil {
+				recognizer.Close()
+			}
+			if audioConfig != nil {
+				audioConfig.Close()
+			}
+			if cnf != nil {
+				cnf.Close()
+			}
+			if inputStream != nil {
+				inputStream.Close()
+			}
+		}
+	)
+
 	audioFormat, err := audio.GetWaveFormatPCM(16000, 16, 1)
 	if err != nil {
 		return nil, fmt.Errorf("could not create audio format: %v", err)
 	}
 
-	inputStream, err := audio.CreatePushAudioInputStreamFromFormat(audioFormat)
+	inputStream, err = audio.CreatePushAudioInputStreamFromFormat(audioFormat)
+	// The push stream copies the format, so it can be released here.
+	audioFormat.Close()
 	if err != nil {
 		return nil, fmt.Errorf("could not create audio config from custom inputStream: %v", err)
 	}
 
-	audioConfig, err := audio.NewAudioConfigFromStreamInput(inputStream)
+	audioConfig, err = audio.NewAudioConfigFromStreamInput(inputStream)
 	if err != nil {
+		releaseAll()
 		return nil, err
 	}
 
-	cnf, err := speech.NewSpeechTranslationConfigFromSubscription(c.creds.APIKey, c.creds.Region)
+	cnf, err = speech.NewSpeechTranslationConfigFromSubscription(c.creds.APIKey, c.creds.Region)
 	if err != nil {
+		releaseAll()
 		return nil, err
 	}
 
-	err = cnf.SetSpeechRecognitionLanguage(opts.SpokenLang)
-	if err != nil {
+	if err = cnf.SetSpeechRecognitionLanguage(opts.SpokenLang); err != nil {
+		releaseAll()
 		return nil, err
 	}
 
 	for _, lang := range opts.TransLangs {
-		err := cnf.AddTargetLanguage(lang)
-		if err != nil {
+		if err = cnf.AddTargetLanguage(lang); err != nil {
+			releaseAll()
 			return nil, err
 		}
 	}
 
-	recognizer, err := speech.NewTranslationRecognizerFromConfig(cnf, audioConfig)
+	recognizer, err = speech.NewTranslationRecognizerFromConfig(cnf, audioConfig)
 	if err != nil {
+		releaseAll()
 		return nil, err
 	}
 
-	resultsChan := make(chan *insights.TranscriptionEvent, 64)
-	var closeOnce sync.Once
-	safeClose := func() {
-		closeOnce.Do(func() {
-			close(resultsChan)
-		})
-	}
+	stream := newAzureTranscribeStream(mainCtx, inputStream, audioConfig, cnf, recognizer, log)
+	stream.registerHandlers(userId, opts)
 
-	// safeSend is non-blocking; if the consumer is not keeping up the event is dropped.
-	safeSend := func(event *insights.TranscriptionEvent) {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Warnln("could not send to resultsChan, likely closed:", r)
-			}
-		}()
-		select {
-		case resultsChan <- event:
-		default:
-			log.Warnf("resultsChan full, dropping event type=%s", event.Type)
+	if err = <-recognizer.StartContinuousRecognitionAsync(); err != nil {
+		log.WithError(err).Errorln("Error starting Azure recognition")
+		// Open the gate without a running recognizer, then let teardown release.
+		stream.startFinished(false)
+		_ = stream.Close()
+		return nil, err
+	}
+	stream.startFinished(true)
+
+	return stream, nil
+}
+
+// registerHandlers forwards SDK callbacks; teardown owns all SDK resources.
+func (s *azureTranscribeStream) registerHandlers(userId string, opts *insights.TranscriptionOptions) {
+	s.recognizer.SessionStarted(func(e speech.SessionEventArgs) {
+		s.log.Infoln("azure transcription started")
+		s.send(&insights.TranscriptionEvent{Type: insights.EventTypeSessionStarted})
+	})
+
+	s.recognizer.SessionStopped(func(e speech.SessionEventArgs) {
+		s.log.Infoln("azure transcription stopped")
+		s.sendTerminal()
+		s.requestStop()
+	})
+
+	s.recognizer.Recognizing(func(e speech.TranslationRecognitionEventArgs) {
+		if e.Result == nil || !hasText(e.Result.Text) {
+			return
 		}
-	}
 
-	recognizer.SessionStarted(func(e speech.SessionEventArgs) {
-		log.Infoln("azure transcription started")
-		safeSend(&insights.TranscriptionEvent{Type: insights.EventTypeSessionStarted})
-	})
-	recognizer.SessionStopped(func(e speech.SessionEventArgs) {
-		log.Infoln("azure transcription stopped")
-		safeSend(&insights.TranscriptionEvent{Type: insights.EventTypeSessionStopped})
-		safeClose()
-	})
-
-	recognizer.Recognizing(func(e speech.TranslationRecognitionEventArgs) {
 		result := &plugnmeet.InsightsTranscriptionResult{
 			FromUserId:                  userId,
 			FromUserName:                opts.UserName,
@@ -126,13 +151,18 @@ func (c *transcribeClient) CreateTranscription(mainCtx context.Context, roomId, 
 		for lang, text := range e.Result.GetTranslations() {
 			result.Translations[GetLocaleFromCode(lang)] = text
 		}
-		safeSend(&insights.TranscriptionEvent{
+		s.send(&insights.TranscriptionEvent{
 			Type:   insights.EventTypePartialResult,
 			Result: result,
 		})
 	})
 
-	recognizer.Recognized(func(e speech.TranslationRecognitionEventArgs) {
+	s.recognizer.Recognized(func(e speech.TranslationRecognitionEventArgs) {
+		if e.Result == nil || !hasText(e.Result.Text) {
+			// NoMatch results carry no text and must not be published.
+			return
+		}
+
 		result := &plugnmeet.InsightsTranscriptionResult{
 			FromUserId:                  userId,
 			FromUserName:                opts.UserName,
@@ -145,42 +175,20 @@ func (c *transcribeClient) CreateTranscription(mainCtx context.Context, roomId, 
 		for lang, text := range e.Result.GetTranslations() {
 			result.Translations[GetLocaleFromCode(lang)] = text
 		}
-		safeSend(&insights.TranscriptionEvent{
+		s.send(&insights.TranscriptionEvent{
 			Type:   insights.EventTypeFinalResult,
 			Result: result,
 		})
 	})
 
-	recognizer.Canceled(func(e speech.TranslationRecognitionCanceledEventArgs) {
-		log.Infof("Azure transcription with translation canceled: %v\n", e.ErrorDetails)
-		safeSend(&insights.TranscriptionEvent{
+	s.recognizer.Canceled(func(e speech.TranslationRecognitionCanceledEventArgs) {
+		s.log.Infof("Azure transcription with translation canceled: %v\n", e.ErrorDetails)
+		s.send(&insights.TranscriptionEvent{
 			Type:  insights.EventTypeError,
 			Error: e.ErrorDetails,
 		})
-		safeClose()
+		// Report stopped before the blocking teardown so usage can end first.
+		s.sendTerminal()
+		s.requestStop()
 	})
-
-	err = <-recognizer.StartContinuousRecognitionAsync()
-	if err != nil {
-		log.WithError(err).Errorln("Error starting Azure recognition")
-		safeClose()
-		recognizer.Close()
-		audioConfig.Close()
-		return nil, err
-	}
-
-	ctx, cancel := context.WithCancel(mainCtx)
-	go func() {
-		<-ctx.Done()
-		<-recognizer.StopContinuousRecognitionAsync()
-		recognizer.Close()
-	}()
-
-	stream := &azureTranscribeStream{
-		pushStream: inputStream,
-		cancel:     cancel,
-		results:    resultsChan,
-	}
-
-	return stream, nil
 }

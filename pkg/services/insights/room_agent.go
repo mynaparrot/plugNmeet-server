@@ -28,11 +28,18 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights/media"
 )
 
+// trackSubscription is the publication method the agent needs (fakeable in tests).
+type trackSubscription interface {
+	SetSubscribed(subscribed bool) error
+}
+
 type activePipeline struct {
-	transcoder *media.Transcoder
-	cancel     context.CancelFunc
-	identity   string
-	trackID    string
+	transcoder  *media.Transcoder
+	cancel      context.CancelFunc
+	identity    string
+	trackID     string
+	publication trackSubscription
+	muted       chan bool
 }
 
 // RoomAgent is a LiveKit client that acts on behalf of a specific insights service for a single room.
@@ -151,6 +158,8 @@ func NewRoomAgent(args *RoomAgentArgs) (*RoomAgent, error) {
 			OnTrackPublished:    agent.onTrackPublished,
 			OnTrackSubscribed:   agent.onTrackSubscribed,
 			OnTrackUnsubscribed: agent.onTrackUnsubscribed,
+			OnTrackMuted:        agent.onTrackMuted,
+			OnTrackUnmuted:      agent.onTrackUnmuted,
 		},
 		OnDisconnected: agent.onDisconnected,
 	})
@@ -279,34 +288,26 @@ func (a *RoomAgent) ActivateTaskForUser(userId string, options []byte) error {
 	}
 
 	a.lock.Lock()
+	defer a.lock.Unlock()
 
-	// An empty allowedUsers map means "no restriction" (open to all users in the room).
-	// A non-empty map is an explicit allow-list: only listed users may start tasks.
+	// An empty allowedUsers map means "no restriction"; otherwise it is an allow-list.
 	if len(a.allowedUsers) > 0 {
 		if _, isAllowed := a.allowedUsers[userId]; !isAllowed {
-			a.lock.Unlock()
 			return fmt.Errorf("user %s is not allowed to perform this task", userId)
 		}
 	}
 
 	if _, ok := a.activeUserTasks[userId]; ok {
 		a.logger.Infof("task is already active for participant %s", userId)
-		a.lock.Unlock()
 		return nil
 	}
 
 	a.activeUserTasks[userId] = copyBytes(options)
-	a.lock.Unlock()
-
 	a.logger.Infof("activated task for participant %s", userId)
 
-	// Attempt to subscribe immediately if the microphone track is already available.
+	// Subscribe while the intent is still locked, so an end cannot interleave.
 	for _, p := range a.Room.GetRemoteParticipants() {
-		if a.isSystemAgent(p.Identity()) {
-			continue
-		}
-		primaryId := config.PrimaryIdentityFromNative(p.Identity())
-		if primaryId != userId {
+		if a.isSystemAgent(p.Identity()) || config.PrimaryIdentityFromNative(p.Identity()) != userId {
 			continue
 		}
 		for _, pub := range p.TrackPublications() {
@@ -314,11 +315,8 @@ func (a *RoomAgent) ActivateTaskForUser(userId string, options []byte) error {
 			if !ok || !a.isMicrophoneOpusTrack(rt) {
 				continue
 			}
-
 			if err := rt.SetSubscribed(true); err != nil {
-				a.lock.Lock()
 				delete(a.activeUserTasks, userId)
-				a.lock.Unlock()
 				return err
 			}
 			return nil
@@ -357,31 +355,58 @@ func (a *RoomAgent) endTasksForUser(userId string) {
 		pipeline.cancel()
 		a.logger.WithField("userId", userId).Infoln("stopped insights task for participant")
 
-		go func(uId string) {
-			// Native twin carries the mic track in hybrid mode — search it first.
-			var participant *lksdk.RemoteParticipant
-			if twinId := config.GetNativeTwinIdentity(uId); twinId != uId {
-				if rp := a.Room.GetParticipantByIdentity(twinId); rp != nil {
-					participant = rp
-				}
-			}
-			if participant == nil {
-				if rp := a.Room.GetParticipantByIdentity(uId); rp != nil {
-					participant = rp
-				}
-			}
-			if participant != nil {
-				if tp := participant.GetTrackPublication(livekit.TrackSource_MICROPHONE); tp != nil {
-					if rt, ok := tp.(*lksdk.RemoteTrackPublication); ok {
-						// we'll need to unsubscribe the track
-						if err := rt.SetSubscribed(false); err != nil {
-							a.logger.WithError(err).WithField("userId", uId).Warn("failed to unsubscribe microphone track")
-						}
-					}
-				}
-			}
-		}(userId)
+		go a.unsubscribePipelineTrack(userId, pipeline)
 	}
+}
+
+// unsubscribePipelineTrack releases the track unless a newer pipeline or an
+// in-flight activation owns it; SetSubscribed never invokes callbacks synchronously.
+func (a *RoomAgent) unsubscribePipelineTrack(primaryId string, pipeline *activePipeline) {
+	if pipeline == nil || pipeline.publication == nil {
+		return
+	}
+
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	if _, ok := a.activePipelines[primaryId]; ok {
+		return
+	}
+	// ActivateTaskForUser has intent but no pipeline until the subscribe callback.
+	if _, ok := a.activeUserTasks[primaryId]; ok {
+		return
+	}
+
+	if err := pipeline.publication.SetSubscribed(false); err != nil {
+		a.logger.WithError(err).WithField("userId", primaryId).Warn("failed to unsubscribe microphone track")
+	}
+}
+
+// cleanupFailedPipeline matches by pointer so a newer activation is never killed.
+func (a *RoomAgent) cleanupFailedPipeline(primaryId string, pipeline *activePipeline) {
+	a.lock.Lock()
+	current, ok := a.activePipelines[primaryId]
+	if !ok || current != pipeline {
+		a.lock.Unlock()
+		return
+	}
+	delete(a.activePipelines, primaryId)
+	perUser := !a.payload.CaptureAllParticipantsTracks
+	if perUser {
+		// The user must enable the service again; nothing restarts it for them.
+		delete(a.activeUserTasks, primaryId)
+	}
+	a.lock.Unlock()
+
+	pipeline.cancel()
+	go a.unsubscribePipelineTrack(primaryId, pipeline)
+
+	if perUser {
+		a.logger.WithField("userId", primaryId).Warnln("insights task failed permanently; stopped pipeline for participant")
+		return
+	}
+	// Room-wide capture cannot silently resume this participant's transcription.
+	a.logger.WithField("userId", primaryId).Errorln("insights task failed permanently in room-wide capture mode; transcription for this participant stopped until the track is published again")
 }
 
 // onTrackPublished is a LiveKit callback that triggers when a remote participant publishes a track.
@@ -411,14 +436,15 @@ func (a *RoomAgent) onTrackPublished(publication *lksdk.RemoteTrackPublication, 
 	}
 
 	a.lock.RLock()
-	primaryId := config.PrimaryIdentityFromNative(rp.Identity())
-	_, ok := a.activeUserTasks[primaryId]
-	a.lock.RUnlock()
+	defer a.lock.RUnlock()
 
-	if ok {
-		if err := publication.SetSubscribed(true); err != nil {
-			log.WithError(err).Warn("failed to subscribe to microphone track")
-		}
+	primaryId := config.PrimaryIdentityFromNative(rp.Identity())
+	if _, ok := a.activeUserTasks[primaryId]; !ok {
+		return
+	}
+	// Intent and action share the lock, so an end cannot interleave.
+	if err := publication.SetSubscribed(true); err != nil {
+		log.WithError(err).Warn("failed to subscribe to microphone track")
 	}
 }
 
@@ -478,6 +504,19 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 	a.lock.Lock()
 	trackID := publication.SID()
 
+	// The task may have ended while the transcoder was built; drop the stale
+	// subscription instead of installing an orphan pipeline.
+	if !a.payload.CaptureAllParticipantsTracks {
+		if _, ok := a.activeUserTasks[primaryId]; !ok {
+			if err := publication.SetSubscribed(false); err != nil {
+				a.logger.WithError(err).WithField("userId", primaryId).Warn("failed to unsubscribe microphone track")
+			}
+			a.lock.Unlock()
+			cancel()
+			return
+		}
+	}
+
 	// If a pipeline already exists for this participant (e.g. track re-negotiation),
 	// cancel the previous one before replacing it to avoid a goroutine leak.
 	if prev, exists := a.activePipelines[primaryId]; exists {
@@ -485,12 +524,19 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 		prev.cancel()
 	}
 
-	a.activePipelines[primaryId] = &activePipeline{
-		transcoder: transcoder,
-		cancel:     cancel,
-		identity:   primaryId,
-		trackID:    trackID,
+	muted := make(chan bool, 1)
+	if publication.IsMuted() {
+		muted <- true
 	}
+	pipeline := &activePipeline{
+		transcoder:  transcoder,
+		cancel:      cancel,
+		identity:    primaryId,
+		trackID:     trackID,
+		publication: publication,
+		muted:       muted,
+	}
+	a.activePipelines[primaryId] = pipeline
 
 	// Launch the agent's single, pre-created task and it's non-blocking call
 	// but use go just for safety
@@ -504,13 +550,53 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 
 	go func() {
 		defer a.wg.Done()
-		err := a.task.RunAudioStream(ctx, transcoder.AudioStream(), a.payload.RoomTableId, a.Room.Name(), primaryId, options)
-		if err != nil && !errors.Is(err, context.Canceled) {
-			a.logger.WithError(err).Errorf("insights task %s failed", a.payload.ServiceType)
+
+		err := a.task.RunAudioStream(ctx, transcoder.AudioStream(), muted, a.payload.RoomTableId, a.Room.Name(), primaryId, options)
+
+		if err == nil || errors.Is(err, context.Canceled) {
+			return
+		}
+		a.logger.WithError(err).Errorf("insights task %s failed", a.payload.ServiceType)
+		if errors.Is(err, insights.ErrTranscriptionUnrecoverable) {
+			a.cleanupFailedPipeline(primaryId, pipeline)
 		}
 	}()
 
 	a.logger.Infof("activated task for participant %s", rp.Identity())
+}
+
+func (a *RoomAgent) onTrackMuted(pub lksdk.TrackPublication, p lksdk.Participant) {
+	a.sendMuteState(pub, p, true)
+}
+
+func (a *RoomAgent) onTrackUnmuted(pub lksdk.TrackPublication, p lksdk.Participant) {
+	a.sendMuteState(pub, p, false)
+}
+
+// sendMuteState hands the latest mute state to the participant's pipeline.
+func (a *RoomAgent) sendMuteState(pub lksdk.TrackPublication, p lksdk.Participant, muted bool) {
+	if p == nil || !a.isMicrophoneOpusTrack(pub) {
+		return
+	}
+	primaryId := config.PrimaryIdentityFromNative(p.Identity())
+
+	// The lock is held while sending so a replaced pipeline cannot receive a stale state.
+	a.lock.RLock()
+	defer a.lock.RUnlock()
+
+	pipeline, ok := a.activePipelines[primaryId]
+	if !ok || pipeline == nil || pipeline.muted == nil {
+		return
+	}
+
+	select {
+	case <-pipeline.muted:
+	default:
+	}
+	select {
+	case pipeline.muted <- muted:
+	default:
+	}
 }
 
 // onTrackUnsubscribed is a LiveKit callback that triggers when a track is unsubscribed.
