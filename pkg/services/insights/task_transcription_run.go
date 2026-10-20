@@ -326,7 +326,7 @@ func (r *transcriptionRun) retryOrFail(reason string) error {
 		return fmt.Errorf("%w: %s after %d attempts", insights.ErrTranscriptionUnrecoverable, reason, r.attempts)
 	}
 
-	delay := r.retryBaseDelay << (r.attempts - 1)
+	delay := time.Duration(int64(r.retryBaseDelay) << (r.attempts - 1))
 	r.log.WithField("delay", delay.String()).Warnln("retrying transcription connection")
 	r.retryTimer = time.NewTimer(delay)
 	r.retryC = r.retryTimer.C
