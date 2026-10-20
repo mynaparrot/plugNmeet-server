@@ -38,8 +38,8 @@ func NewTranscriptionTask(appConf *config.AppConfig, natsConn *nats.Conn, servic
 	}, nil
 }
 
-// RunAudioStream implements the insights.Task interface; wake may be nil.
-func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-chan media.PCM16Sample, wake <-chan struct{}, roomTableId uint64, roomId, userId string, options []byte) error {
+// RunAudioStream implements the insights.Task interface; muted may be nil.
+func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-chan media.PCM16Sample, muted <-chan bool, roomTableId uint64, roomId, userId string, options []byte) error {
 	log := t.logger.WithFields(logrus.Fields{
 		"method":      "RunAudioStream",
 		"roomId":      roomId,
@@ -64,7 +64,7 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 
 	synthesisChannel := fmt.Sprintf(insights.SynthesisNatsChannel, roomId)
 
-	run := newTranscriptionRun(log, audioStream, wake, func(ctx context.Context) (insights.TranscriptionStream, error) {
+	run := newTranscriptionRun(log, audioStream, muted, func(ctx context.Context) (insights.TranscriptionStream, error) {
 		return provider.CreateTranscription(ctx, roomId, userId, options)
 	})
 	run.handleEvent = func(event *insights.TranscriptionEvent) {
@@ -78,11 +78,12 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 	run.notifyReady = func() {
 		t.notifyRoom(roomId, userId, "speech-services.speech-to-text-ready", plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_INFO, log)
 	}
-	run.notifyStopped = func() {
-		t.notifyRoom(roomId, userId, "speech-services.service-stopped", plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_INFO, log)
-	}
-	run.notifyFailed = func() {
-		t.notifyRoom(roomId, userId, "speech-services.service-stopped", plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_ERROR, log)
+	run.notifyStopped = func(failed bool) {
+		level := plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_INFO
+		if failed {
+			level = plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_ERROR
+		}
+		t.notifyRoom(roomId, userId, "speech-services.service-stopped", level, log)
 	}
 
 	return run.run(ctx)

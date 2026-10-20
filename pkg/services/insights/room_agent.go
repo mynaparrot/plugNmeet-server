@@ -39,7 +39,7 @@ type activePipeline struct {
 	identity    string
 	trackID     string
 	publication trackSubscription
-	wake        chan struct{}
+	muted       chan bool
 }
 
 // RoomAgent is a LiveKit client that acts on behalf of a specific insights service for a single room.
@@ -158,6 +158,7 @@ func NewRoomAgent(args *RoomAgentArgs) (*RoomAgent, error) {
 			OnTrackPublished:    agent.onTrackPublished,
 			OnTrackSubscribed:   agent.onTrackSubscribed,
 			OnTrackUnsubscribed: agent.onTrackUnsubscribed,
+			OnTrackMuted:        agent.onTrackMuted,
 			OnTrackUnmuted:      agent.onTrackUnmuted,
 		},
 		OnDisconnected: agent.onDisconnected,
@@ -523,14 +524,17 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 		prev.cancel()
 	}
 
-	wake := make(chan struct{}, 1)
+	muted := make(chan bool, 1)
+	if publication.IsMuted() {
+		muted <- true
+	}
 	pipeline := &activePipeline{
 		transcoder:  transcoder,
 		cancel:      cancel,
 		identity:    primaryId,
 		trackID:     trackID,
 		publication: publication,
-		wake:        wake,
+		muted:       muted,
 	}
 	a.activePipelines[primaryId] = pipeline
 
@@ -547,7 +551,7 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 	go func() {
 		defer a.wg.Done()
 
-		err := a.task.RunAudioStream(ctx, transcoder.AudioStream(), wake, a.payload.RoomTableId, a.Room.Name(), primaryId, options)
+		err := a.task.RunAudioStream(ctx, transcoder.AudioStream(), muted, a.payload.RoomTableId, a.Room.Name(), primaryId, options)
 
 		if err == nil || errors.Is(err, context.Canceled) {
 			return
@@ -561,22 +565,36 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 	a.logger.Infof("activated task for participant %s", rp.Identity())
 }
 
+func (a *RoomAgent) onTrackMuted(pub lksdk.TrackPublication, p lksdk.Participant) {
+	a.sendMuteState(pub, p, true)
+}
+
 func (a *RoomAgent) onTrackUnmuted(pub lksdk.TrackPublication, p lksdk.Participant) {
+	a.sendMuteState(pub, p, false)
+}
+
+// sendMuteState hands the latest mute state to the participant's pipeline.
+func (a *RoomAgent) sendMuteState(pub lksdk.TrackPublication, p lksdk.Participant, muted bool) {
 	if p == nil || !a.isMicrophoneOpusTrack(pub) {
 		return
 	}
 	primaryId := config.PrimaryIdentityFromNative(p.Identity())
 
+	// The lock is held while sending so a replaced pipeline cannot receive a stale state.
 	a.lock.RLock()
-	pipeline, ok := a.activePipelines[primaryId]
-	a.lock.RUnlock()
+	defer a.lock.RUnlock()
 
-	if !ok || pipeline == nil || pipeline.wake == nil {
+	pipeline, ok := a.activePipelines[primaryId]
+	if !ok || pipeline == nil || pipeline.muted == nil {
 		return
 	}
 
 	select {
-	case pipeline.wake <- struct{}{}:
+	case <-pipeline.muted:
+	default:
+	}
+	select {
+	case pipeline.muted <- muted:
 	default:
 	}
 }

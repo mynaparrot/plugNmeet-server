@@ -123,14 +123,14 @@ func (s *signalLog) waitFor(t *testing.T, event string, minCount int) {
 	t.Fatalf("timed out waiting for %q (have %v)", event, s.events)
 }
 
-func newTestRun(t *testing.T, dial func(context.Context) (insights.TranscriptionStream, error)) (*transcriptionRun, chan media.PCM16Sample, chan struct{}, *signalLog) {
+func newTestRun(t *testing.T, dial func(context.Context) (insights.TranscriptionStream, error)) (*transcriptionRun, chan media.PCM16Sample, chan bool, *signalLog) {
 	t.Helper()
 
 	audio := make(chan media.PCM16Sample, 16)
-	wake := make(chan struct{}, 1)
+	muted := make(chan bool, 1)
 	log := testLogger()
 
-	run := newTranscriptionRun(log, audio, wake, dial)
+	run := newTranscriptionRun(log, audio, muted, dial)
 	run.retryBaseDelay = 5 * time.Millisecond
 	run.readyTimeout = 2 * time.Second
 	run.healthyAfter = time.Second
@@ -145,10 +145,15 @@ func newTestRun(t *testing.T, dial func(context.Context) (insights.Transcription
 		signals.add("usage:false")
 	}
 	run.notifyReady = func() { signals.add("ready") }
-	run.notifyStopped = func() { signals.add("stopped") }
-	run.notifyFailed = func() { signals.add("failed") }
+	run.notifyStopped = func(failed bool) {
+		if failed {
+			signals.add("failed")
+			return
+		}
+		signals.add("stopped")
+	}
 
-	return run, audio, wake, signals
+	return run, audio, muted, signals
 }
 
 func speechSamples(n int) media.PCM16Sample {
@@ -160,7 +165,7 @@ func speechSamples(n int) media.PCM16Sample {
 }
 
 // A provider disconnect must stop usage immediately, keep the task alive and
-// resume usage on the next wake without a second "ready" notice.
+// resume usage on the next unmute without a second "ready" notice.
 func TestTranscriptionRunRecoversAfterDisconnect(t *testing.T) {
 	streams := make(chan *fakeTranscriptionStream, 4)
 	dial := func(context.Context) (insights.TranscriptionStream, error) {
@@ -169,7 +174,7 @@ func TestTranscriptionRunRecoversAfterDisconnect(t *testing.T) {
 		return s, nil
 	}
 
-	run, audio, wake, signals := newTestRun(t, dial)
+	run, audio, muted, signals := newTestRun(t, dial)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -188,18 +193,18 @@ func TestTranscriptionRunRecoversAfterDisconnect(t *testing.T) {
 	s1.send(&insights.TranscriptionEvent{Type: insights.EventTypeSessionStopped})
 	signals.waitFor(t, "usage:false", 1)
 
-	// No automatic retry without audio or wake, and no stop notice.
+	// No automatic retry without audio or unmute, and no stop notice.
 	select {
 	case s := <-streams:
-		t.Fatalf("unexpected reconnect without audio or wake: %v", s)
+		t.Fatalf("unexpected reconnect without audio or unmute: %v", s)
 	case <-time.After(50 * time.Millisecond):
 	}
 	if got := signals.count("stopped"); got != 0 {
 		t.Fatalf("recoverable disconnect must not notify stopped, got %d", got)
 	}
 
-	// Unmute wake reconnects and usage resumes on the new ready stream.
-	wake <- struct{}{}
+	// Unmute reconnects and usage resumes on the new ready stream.
+	muted <- false
 	s2 := receiveStream(t, streams)
 	s2.send(&insights.TranscriptionEvent{Type: insights.EventTypeSessionStarted})
 	signals.waitFor(t, "usage:true", 2)
@@ -227,7 +232,7 @@ func TestTranscriptionRunDisconnectBeforeToastCancelsNotice(t *testing.T) {
 		return s, nil
 	}
 
-	run, _, wake, signals := newTestRun(t, dial)
+	run, _, muted, signals := newTestRun(t, dial)
 	run.toastDelay = 200 * time.Millisecond
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -246,7 +251,7 @@ func TestTranscriptionRunDisconnectBeforeToastCancelsNotice(t *testing.T) {
 		t.Fatalf("ready notice fired after the stream disconnected, got %d", got)
 	}
 
-	wake <- struct{}{}
+	muted <- false
 	s2 := receiveStream(t, streams)
 	s2.send(&insights.TranscriptionEvent{Type: insights.EventTypeSessionStarted})
 	signals.waitFor(t, "ready", 1)
@@ -264,7 +269,7 @@ func TestTranscriptionRunDisconnectBeforeToastCancelsNotice(t *testing.T) {
 	}
 }
 
-// Without a wake channel, the next audio sample must still recover the stream
+// Without a mute channel, the next audio sample must still recover the stream
 // and audio buffered during the dial must be flushed to the new stream.
 func TestTranscriptionRunRecoversOnAudioAndFlushesBuffer(t *testing.T) {
 	streams := make(chan *fakeTranscriptionStream, 4)
@@ -501,7 +506,7 @@ func TestTranscriptionRunConnectsWhileIdle(t *testing.T) {
 	select {
 	case <-dialed:
 	case <-time.After(2 * time.Second):
-		t.Fatal("initial dial must start without audio or wake")
+		t.Fatal("initial dial must start without audio or unmute")
 	}
 
 	// The idle connection is only torn down when the run stops.
@@ -509,6 +514,119 @@ func TestTranscriptionRunConnectsWhileIdle(t *testing.T) {
 	case <-stream.closedCh:
 		t.Fatal("idle initial connection must stay open")
 	case <-time.After(20 * time.Millisecond):
+	}
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("run did not stop after cancellation")
+	}
+}
+
+// A muted participant keeps the stream for a grace period, then the stream is
+// closed and usage stops; unmuting reconnects without a second "ready" notice.
+func TestTranscriptionRunMuteClosesStreamAfterIdle(t *testing.T) {
+	streams := make(chan *fakeTranscriptionStream, 4)
+	dial := func(context.Context) (insights.TranscriptionStream, error) {
+		s := newFakeStream()
+		streams <- s
+		return s, nil
+	}
+
+	run, _, muted, signals := newTestRun(t, dial)
+	run.idleTimeout = 20 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() { done <- run.run(ctx) }()
+
+	s1 := receiveStream(t, streams)
+	s1.send(&insights.TranscriptionEvent{Type: insights.EventTypeSessionStarted})
+	signals.waitFor(t, "usage:true", 1)
+	signals.waitFor(t, "ready", 1)
+
+	muted <- true
+	waitClosed(t, s1)
+	signals.waitFor(t, "usage:false", 1)
+
+	select {
+	case err := <-done:
+		t.Fatalf("a mute teardown must not end the run: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+	if got := signals.count("stopped"); got != 0 {
+		t.Fatalf("a mute teardown must not notify stopped, got %d", got)
+	}
+
+	muted <- false
+	s2 := receiveStream(t, streams)
+	s2.send(&insights.TranscriptionEvent{Type: insights.EventTypeSessionStarted})
+	signals.waitFor(t, "usage:true", 2)
+
+	time.Sleep(30 * time.Millisecond)
+	if got := signals.count("ready"); got != 1 {
+		t.Fatalf("ready notice must be sent once per task, got %d", got)
+	}
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("run did not stop after cancellation")
+	}
+}
+
+// RTP after unmute can arrive before the unmute signal, so audio sent while
+// muted with no ready stream must be buffered rather than dropped; muting alone
+// must never trigger a dial, and the buffer is flushed to the new stream.
+func TestTranscriptionRunMutedAudioIsBufferedUntilUnmute(t *testing.T) {
+	streams := make(chan *fakeTranscriptionStream, 4)
+	dial := func(context.Context) (insights.TranscriptionStream, error) {
+		s := newFakeStream()
+		streams <- s
+		return s, nil
+	}
+
+	run, audio, muted, signals := newTestRun(t, dial)
+	run.idleTimeout = 20 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() { done <- run.run(ctx) }()
+
+	s1 := receiveStream(t, streams)
+	s1.send(&insights.TranscriptionEvent{Type: insights.EventTypeSessionStarted})
+	signals.waitFor(t, "usage:true", 1)
+
+	// Mute until the idle teardown drops the stream.
+	muted <- true
+	waitClosed(t, s1)
+
+	// Early samples arrive while muted and no stream exists: no dial, no drop.
+	audio <- speechSamples(320)
+	select {
+	case s := <-streams:
+		t.Fatalf("audio while muted must not dial: %v", s)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	muted <- false
+	s2 := receiveStream(t, streams)
+	s2.send(&insights.TranscriptionEvent{Type: insights.EventTypeSessionStarted})
+	signals.waitFor(t, "usage:true", 2)
+
+	select {
+	case got := <-s2.writes:
+		if len(got) != 320 {
+			t.Fatalf("expected the 320 buffered samples to be flushed, got %d", len(got))
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("audio buffered while muted was never flushed to the new stream")
 	}
 
 	cancel()

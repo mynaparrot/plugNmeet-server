@@ -221,8 +221,8 @@ type Provider interface {
 // Task defines the interface for any runnable, self-contained AI task.
 type Task interface {
 	// RunAudioStream starts the task's processing pipeline for a continuous audio stream.
-	// wake may be nil; when it fires, tasks that wait for audio may retry immediately.
-	RunAudioStream(ctx context.Context, audioStream <-chan media.PCM16Sample, wake <-chan struct{}, roomTableId uint64, roomId, userId string, options []byte) error
+	// muted may be nil; it reports the participant's microphone mute state.
+	RunAudioStream(ctx context.Context, audioStream <-chan media.PCM16Sample, muted <-chan bool, roomTableId uint64, roomId, userId string, options []byte) error
 
 	// RunStateless executes a single, stateless task (e.g., text translation).
 	RunStateless(ctx context.Context, options []byte) (interface{}, error)
