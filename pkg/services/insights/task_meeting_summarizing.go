@@ -47,7 +47,7 @@ func NewMeetingSummarizingTask(ctx context.Context, appConf *config.AppConfig, j
 }
 
 // RunAudioStream now correctly handles the per-participant context.
-func (t *MeetingSummarizingTask) RunAudioStream(participantCtx context.Context, audioStream <-chan lkMedia.PCM16Sample, roomTableId uint64, roomId, userId string, options []byte) error {
+func (t *MeetingSummarizingTask) RunAudioStream(participantCtx context.Context, audioStream <-chan lkMedia.PCM16Sample, _ <-chan struct{}, roomTableId uint64, roomId, userId string, options []byte) error {
 	log := t.logger.WithFields(logrus.Fields{
 		"method":      "RunAudioStream",
 		"roomId":      roomId,

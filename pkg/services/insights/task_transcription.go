@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
-	"time"
 
 	"github.com/livekit/media-sdk"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -17,8 +15,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 )
-
-const maxConsecutiveErrors = 30
 
 type TranscriptionTask struct {
 	appConf      *config.AppConfig
@@ -42,9 +38,15 @@ func NewTranscriptionTask(appConf *config.AppConfig, natsConn *nats.Conn, servic
 	}, nil
 }
 
-// RunAudioStream implements the insights.Task interface.
-func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-chan media.PCM16Sample, roomTableId uint64, roomId, userId string, options []byte) error {
-	// Use the factory to create a provider instance.
+// RunAudioStream implements the insights.Task interface; wake may be nil.
+func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-chan media.PCM16Sample, wake <-chan struct{}, roomTableId uint64, roomId, userId string, options []byte) error {
+	log := t.logger.WithFields(logrus.Fields{
+		"method":      "RunAudioStream",
+		"roomId":      roomId,
+		"roomTableId": roomTableId,
+		"userId":      userId,
+	})
+
 	args := &ProviderArgs{
 		Ctx:             ctx,
 		ProviderType:    t.service.Provider,
@@ -55,104 +57,37 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 	}
 	provider, err := NewProvider(args)
 	if err != nil {
-		return err
+		// Bad credentials/config cannot be retried; report it as terminal.
+		t.notifyRoom(roomId, userId, "speech-services.service-stopped", plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_ERROR, log)
+		return fmt.Errorf("%w: could not create provider: %w", insights.ErrTranscriptionUnrecoverable, err)
 	}
-	log := t.logger.WithFields(logrus.Fields{
-		"method":      "RunAudioStream",
-		"roomId":      roomId,
-		"roomTableId": roomTableId,
-		"userId":      userId,
+
+	synthesisChannel := fmt.Sprintf(insights.SynthesisNatsChannel, roomId)
+
+	run := newTranscriptionRun(log, audioStream, wake, func(ctx context.Context) (insights.TranscriptionStream, error) {
+		return provider.CreateTranscription(ctx, roomId, userId, options)
 	})
-
-	stream, err := provider.CreateTranscription(ctx, roomId, userId, options)
-	if err != nil {
-		return err
+	run.handleEvent = func(event *insights.TranscriptionEvent) {
+		t.handleTranscriptionEvent(event, roomId, userId, synthesisChannel, log)
+	}
+	run.setUsage = func(active bool) {
+		if _, err := t.redisService.HandleTranscriptionUsage(roomId, userId, active); err != nil {
+			log.WithError(err).Errorln("update user usage failed")
+		}
+	}
+	run.notifyReady = func() {
+		t.notifyRoom(roomId, userId, "speech-services.speech-to-text-ready", plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_INFO, log)
+	}
+	run.notifyStopped = func() {
+		t.notifyRoom(roomId, userId, "speech-services.service-stopped", plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_INFO, log)
+	}
+	run.notifyFailed = func() {
+		t.notifyRoom(roomId, userId, "speech-services.service-stopped", plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_ERROR, log)
 	}
 
-	// Derive a task-local context so either goroutine can signal the other to
-	// stop without affecting the caller's context.
-	taskCtx, cancel := context.WithCancel(ctx)
-
-	var wg sync.WaitGroup
-	wg.Add(2)
-
-	// Goroutine to pipe audio to the provider.
-	go func() {
-		defer wg.Done()
-		defer cancel()       // notify the results goroutine that audio is done
-		defer stream.Close() // close the stream (closes the results channel)
-
-		// Tolerate transient WriteSample failures (e.g. brief provider hiccups)
-		// but bail when the provider is clearly broken for a sustained period.
-		var consecutiveErrors int
-
-		for {
-			select {
-			case <-taskCtx.Done():
-				return
-			case pcmSample, ok := <-audioStream:
-				if !ok {
-					log.Infoln("audio stream closed")
-					return
-				}
-				if err := stream.WriteSample(pcmSample); err != nil {
-					consecutiveErrors++
-					// A nil ctx error here means the stream is done for good.
-					if errors.Is(err, context.Canceled) || consecutiveErrors >= maxConsecutiveErrors {
-						log.WithError(err).Errorf("stopping audio pipe after %d consecutive write failures", consecutiveErrors)
-						return
-					}
-					log.WithError(err).Warnf("transient audio write failure (%d/%d)", consecutiveErrors, maxConsecutiveErrors)
-					continue
-				}
-				consecutiveErrors = 0
-			}
-		}
-	}()
-
-	// Goroutine to process results.
-	go func() {
-		defer wg.Done()
-		defer cancel() // notify the audio goroutine that results are done
-		defer func() {
-			if _, err := t.redisService.HandleTranscriptionUsage(roomId, userId, false); err != nil {
-				log.WithError(err).Errorln("update user usage failed")
-			}
-
-			if err := t.natsService.BroadcastSystemNotificationToRoom(roomId, "speech-services.service-stopped", plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_INFO, false, &userId); err != nil {
-				log.WithError(err).Errorln("error broadcasting system notification")
-			}
-		}()
-
-		synthesisChannel := fmt.Sprintf(insights.SynthesisNatsChannel, roomId)
-
-		// The loop breaks when the stream is closed or the task context is cancelled.
-		resultsCh := stream.Results()
-		for {
-			select {
-			case <-taskCtx.Done():
-				// Drain any buffered results that the provider emitted before
-				// Close() takes effect; exit when the channel closes.
-				for event := range resultsCh {
-					t.handleTranscriptionEvent(event, roomId, userId, synthesisChannel, log)
-				}
-				return
-			case event, ok := <-resultsCh:
-				if !ok {
-					return
-				}
-				t.handleTranscriptionEvent(event, roomId, userId, synthesisChannel, log)
-			}
-		}
-	}()
-
-	// Block until both goroutines finish so the caller (e.g. room_agent) can
-	// properly wait for the full task lifecycle via its own WaitGroup.
-	wg.Wait()
-	return nil
+	return run.run(ctx)
 }
 
-// handleTranscriptionEvent processes a single transcription event.
 func (t *TranscriptionTask) handleTranscriptionEvent(event *insights.TranscriptionEvent, roomId, userId, synthesisChannel string, log *logrus.Entry) {
 	switch event.Type {
 	case insights.EventTypePartialResult, insights.EventTypeFinalResult:
@@ -177,22 +112,12 @@ func (t *TranscriptionTask) handleTranscriptionEvent(event *insights.Transcripti
 				}
 			}
 		}
+	}
+}
 
-	case insights.EventTypeSessionStarted:
-		if _, err := t.redisService.HandleTranscriptionUsage(roomId, userId, true); err != nil {
-			log.WithError(err).Errorln("update user usage failed")
-		}
-
-		time.AfterFunc(time.Second*5, func() {
-			if err := t.natsService.BroadcastSystemNotificationToRoom(roomId, "speech-services.speech-to-text-ready", plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_INFO, false, &userId); err != nil {
-				log.WithError(err).Errorln("error broadcasting system notification")
-			}
-		})
-
-	case insights.EventTypeSessionStopped:
-		log.Infoln("transcription session stopped")
-	case insights.EventTypeError:
-		log.Errorln("insights provider error: ", event.Error)
+func (t *TranscriptionTask) notifyRoom(roomId, userId, message string, level plugnmeet.NatsSystemNotificationTypes, log *logrus.Entry) {
+	if err := t.natsService.BroadcastSystemNotificationToRoom(roomId, message, level, false, &userId); err != nil {
+		log.WithError(err).Errorln("error broadcasting system notification")
 	}
 }
 

@@ -77,10 +77,7 @@ func (c *realtimeClient) CreateTranscription(mainCtx context.Context, roomId, us
 		return nil, err
 	}
 
-	stream.safeSend(&insights.TranscriptionEvent{Type: insights.EventTypeSessionStarted})
-
-	// this block should be placed always after sending the session started event
-	// never before otherwise channel will be close
+	// This goroutine is the only place closing the results channel.
 	go func() {
 		stream.writeWg.Wait()
 		stream.readWg.Wait()
@@ -125,7 +122,8 @@ func (c *realtimeClient) createTranscriptionSession(wsURL string, stream *openai
 		HandshakeTimeout: 10 * time.Second,
 	}
 
-	conn, _, err := dialer.Dial(endpoint, header)
+	// Dial with the stream context so a canceled task never leaves a dial behind.
+	conn, _, err := dialer.DialContext(stream.ctx, endpoint, header)
 	if err != nil {
 		return fmt.Errorf("failed to dial openai realtime transcription: %w", err)
 	}
@@ -183,15 +181,16 @@ func (c *realtimeClient) createTranscriptionSession(wsURL string, stream *openai
 		"session": session,
 	})
 	if err != nil {
-		_ = conn.Close()
+		_ = stream.Close()
 		return fmt.Errorf("failed to marshal transcription session config: %w", err)
 	}
 
 	stream.writeWg.Add(1)
-	go stream.writeLoop()
+	go stream.writeLoop(stream.wsWriteChan)
 
 	if err := stream.queueWebSocketMessage(configBytes); err != nil {
-		_ = conn.Close()
+		// Close the queue and the socket so the writer cannot outlive the error.
+		_ = stream.Close()
 		return fmt.Errorf("failed to queue transcription session configuration payload: %w", err)
 	}
 
