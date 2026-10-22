@@ -144,14 +144,14 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	parentFiles, _ := m.natsService.GetAllRoomFiles(r.RoomId)
 
 	// copy the parent's poll definitions into the child room, when sharing.
-	copiedPolls := make(map[string]string)
+	copiedPolls := make([]*plugnmeet.PollInfo, 0, len(r.PollShare.GetPollIds()))
 	if r.PollShare != nil && len(r.PollShare.PollIds) > 0 {
 		meta.RoomFeatures.PollsFeatures = &plugnmeet.PollsFeatures{
 			IsAllow:  true,
 			IsActive: true,
 		}
 
-		parentPolls, err := m.rs.GetAllRoomPolls(r.RoomId)
+		parentPolls, err := m.rs.GetRoomPolls(r.RoomId)
 		if err != nil {
 			log.WithError(err).Error("failed to fetch parent room polls for sharing")
 			parentPolls = nil
@@ -162,22 +162,12 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 			selectedPollIds[id] = struct{}{}
 		}
 
-		for pollId, raw := range parentPolls {
-			if _, ok := selectedPollIds[pollId]; !ok {
-				continue
-			}
-			info := new(plugnmeet.PollInfo)
-			if uErr := protojson.Unmarshal([]byte(raw), info); uErr != nil {
-				log.WithError(uErr).Warn("failed to unmarshal parent poll for copy; skipping")
+		for _, info := range parentPolls {
+			if _, ok := selectedPollIds[info.GetId()]; !ok {
 				continue
 			}
 			info.IsRunning = true
-			m, mErr := protojson.Marshal(info)
-			if mErr != nil {
-				log.WithError(mErr).Warn("failed to marshal child poll; skipping")
-				continue
-			}
-			copiedPolls[pollId] = string(m)
+			copiedPolls = append(copiedPolls, info)
 		}
 	}
 
@@ -252,7 +242,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 		}
 
 		if len(copiedPolls) > 0 {
-			if cErr := m.rs.CreateRoomPoll(bRoomId, copiedPolls); cErr != nil {
+			if cErr := m.rs.CreateRoomPolls(bRoomId, copiedPolls); cErr != nil {
 				roomLog.WithError(cErr).Error("failed to write shared polls into breakout room")
 			}
 		}

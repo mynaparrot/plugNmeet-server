@@ -3,20 +3,15 @@ package models
 import (
 	"fmt"
 	"strconv"
-	"strings"
 
-	"github.com/goccy/go-json"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func (m *PollModel) ListPolls(roomId string) ([]*plugnmeet.PollInfo, error) {
-	var polls []*plugnmeet.PollInfo
-
-	result, err := m.rs.GetPollsListByRoomId(roomId)
+	polls, err := m.rs.GetRoomPolls(roomId)
 	if err != nil {
 		m.logger.WithError(err).WithFields(logrus.Fields{
 			"roomId": roomId,
@@ -25,29 +20,14 @@ func (m *PollModel) ListPolls(roomId string) ([]*plugnmeet.PollInfo, error) {
 		return nil, config.ErrPollGeneric
 	}
 
-	if result == nil || len(result) == 0 {
-		// no polls
-		return polls, err
-	}
-
-	for _, pi := range result {
-		info := new(plugnmeet.PollInfo)
-		err = protojson.Unmarshal([]byte(pi), info)
-		if err != nil {
-			m.logger.WithError(err).WithFields(logrus.Fields{
-				"roomId": roomId,
-				"method": "ListPolls",
-			}).Warnln("failed to unmarshal stored poll info")
-			continue
-		}
-
+	out := make([]*plugnmeet.PollInfo, 0, len(polls))
+	for _, info := range polls {
 		// lazy expiry check so restart-lost timers still close expired polls
 		m.maybeAutoCloseExpired(info)
-
-		polls = append(polls, sanitizePollInfoForClient(info))
+		out = append(out, sanitizePollInfoForClient(info))
 	}
 
-	return polls, nil
+	return out, nil
 }
 
 // sanitizePollInfoForClient strips correct-answer flags from any PollInfo leaving
@@ -69,19 +49,13 @@ func (m *PollModel) UserSelectedOption(roomId, pollId, userId string) ([]uint64,
 		"method": "UserSelectedOption",
 	})
 
-	pi, err := m.rs.GetPollInfoByPollId(roomId, pollId)
+	info, err := m.rs.GetPollInfoByPollId(roomId, pollId)
 	if err != nil {
 		log.WithError(err).Errorln("failed to fetch poll info")
 		return nil, nil, config.ErrPollGeneric
 	}
-	if pi == "" {
+	if info == nil {
 		return nil, nil, config.ErrPollNotFound
-	}
-
-	info := new(plugnmeet.PollInfo)
-	if err = protojson.Unmarshal([]byte(pi), info); err != nil {
-		log.WithError(err).Errorln("failed to unmarshal stored poll info")
-		return nil, nil, config.ErrPollGeneric
 	}
 
 	// anonymous polls: participation only, never the choice
@@ -94,36 +68,20 @@ func (m *PollModel) UserSelectedOption(roomId, pollId, userId string) ([]uint64,
 		return nil, &voted, nil
 	}
 
-	allRespondents, err := m.rs.GetPollAllRespondents(roomId, pollId)
+	respondent, err := m.rs.GetPollRespondent(roomId, pollId, userId)
 	if err != nil {
-		log.WithError(err).Errorln("failed to fetch poll respondents")
+		log.WithError(err).Errorln("failed to fetch poll respondent")
 		return nil, nil, config.ErrPollGeneric
 	}
-
-	var voted []uint64
-	for i := 0; i < len(allRespondents); i++ {
-		// format userId:option_id(:option_id...):name
-		p := strings.Split(allRespondents[i], ":")
-		if len(p) < 2 || p[0] != userId {
-			continue
-		}
-		ids, err := config.SplitPollOptionIds(p[1])
-		if err != nil {
-			m.logger.WithError(err).WithFields(logrus.Fields{
-				"roomId": roomId,
-				"pollId": pollId,
-				"method": "UserSelectedOption",
-			}).Errorln("failed to parse stored poll option ids")
-			return nil, nil, config.ErrPollGeneric
-		}
-		voted = append(voted, ids...)
+	if respondent == nil {
+		return nil, new(bool), nil
 	}
 
-	hasVoted := len(voted) > 0
-	return voted, &hasVoted, nil
+	hasVoted := true
+	return respondent.OptionIds, &hasVoted, nil
 }
 
-func (m *PollModel) GetPollResponsesDetails(roomId, pollId string) (map[string]string, error) {
+func (m *PollModel) GetPollResponsesDetails(roomId, pollId string) (*plugnmeet.PollResponsesDetails, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId": roomId,
 		"pollId": pollId,
@@ -131,54 +89,21 @@ func (m *PollModel) GetPollResponsesDetails(roomId, pollId string) (map[string]s
 	})
 
 	// poll info is required to respect anonymity rules
-	pi, err := m.rs.GetPollInfoByPollId(roomId, pollId)
+	info, err := m.rs.GetPollInfoByPollId(roomId, pollId)
 	if err != nil {
 		log.WithError(err).Errorln("failed to fetch poll info")
 		return nil, config.ErrPollGeneric
 	}
-	if pi == "" {
+	if info == nil {
 		return nil, config.ErrPollNotFound
 	}
-	info := new(plugnmeet.PollInfo)
-	if err = protojson.Unmarshal([]byte(pi), info); err != nil {
-		log.WithError(err).Errorln("failed to unmarshal stored poll info")
+
+	details, err := m.rs.GetPollResponsesDetails(roomId, pollId, info)
+	if err != nil {
+		log.WithError(err).Errorln("failed to fetch poll responses details")
 		return nil, config.ErrPollGeneric
 	}
-
-	// Get the counters first
-	result, err := m.rs.GetPollCountersByPollId(roomId, pollId)
-	if err != nil {
-		log.WithError(err).Errorln("failed to fetch poll counters")
-		return nil, config.ErrPollGeneric
-	}
-	if result == nil {
-		result = make(map[string]string)
-	}
-
-	// anonymous polls: aggregates only, never per-user responses
-	if info.IsAnonymous {
-		if _, ok := result[redisservice.PollTotalRespField]; !ok {
-			result[redisservice.PollTotalRespField] = "0"
-		}
-		return result, nil
-	}
-
-	// Now get the detailed list of respondents
-	allRespondents, err := m.rs.GetPollAllRespondents(roomId, pollId)
-	if err != nil {
-		// Log the error but continue, as we might still have the counters
-		m.logger.WithError(err).Warn("could not fetch all_respondents list")
-	}
-
-	// Marshal the list into a JSON string to match the original output format
-	jsonRespondents, _ := json.Marshal(allRespondents)
-	result["all_respondents"] = string(jsonRespondents)
-
-	// Ensure total_resp is always present for backward compatibility.
-	if _, ok := result[redisservice.PollTotalRespField]; !ok {
-		result[redisservice.PollTotalRespField] = "0"
-	}
-	return result, nil
+	return details, nil
 }
 
 func (m *PollModel) GetResponsesResult(roomId, pollId string) (*plugnmeet.PollResponsesResult, error) {
@@ -188,55 +113,41 @@ func (m *PollModel) GetResponsesResult(roomId, pollId string) (*plugnmeet.PollRe
 		"method": "GetResponsesResult",
 	})
 
-	pi, err := m.rs.GetPollInfoByPollId(roomId, pollId)
+	info, err := m.rs.GetPollInfoByPollId(roomId, pollId)
 	if err != nil {
 		log.WithError(err).Errorln("failed to fetch poll info")
 		return nil, config.ErrPollGeneric
 	}
-	if pi == "" {
+	if info == nil {
 		return nil, config.ErrPollNotFound
-	}
-
-	info := new(plugnmeet.PollInfo)
-	err = protojson.Unmarshal([]byte(pi), info)
-	if err != nil {
-		log.WithError(err).Errorln("failed to unmarshal stored poll info")
-		return nil, config.ErrPollGeneric
 	}
 	if info.IsRunning {
 		return nil, config.ErrPollWaitForClose
 	}
 
-	res := new(plugnmeet.PollResponsesResult)
-	res.Question = info.Question
-
-	result, err := m.rs.GetPollCountersByPollId(roomId, pollId)
+	counters, err := m.rs.GetPollResultsRaw(roomId, pollId)
 	if err != nil {
 		log.WithError(err).Errorln("failed to fetch poll counters")
 		return nil, config.ErrPollGeneric
 	}
-	if result == nil {
-		return nil, nil
-	}
 
-	var options []*plugnmeet.PollResponsesResultOptions
+	res := new(plugnmeet.PollResponsesResult)
+	res.Question = info.Question
+
+	options := make([]*plugnmeet.PollResponsesResultOptions, 0, len(info.GetOptions()))
 	var totalVotes uint64
-	for _, opt := range info.Options {
-		f := fmt.Sprintf("%d%s", opt.Id, redisservice.PollCountSuffix)
-		i, _ := strconv.Atoi(result[f])
-		totalVotes += uint64(i)
-		rr := &plugnmeet.PollResponsesResultOptions{
+	for _, opt := range info.GetOptions() {
+		count := countersU64(counters, fmt.Sprintf("%d%s", opt.Id, redisservice.PollCountSuffix))
+		totalVotes += count
+		options = append(options, &plugnmeet.PollResponsesResultOptions{
 			Id:        uint64(opt.Id),
 			Text:      opt.Text,
-			VoteCount: uint64(i),
+			VoteCount: count,
 			IsCorrect: opt.IsCorrect, // poll is closed here, so real values are revealed
-		}
-		options = append(options, rr)
+		})
 	}
-
 	res.Options = options
-	i, _ := strconv.Atoi(result[redisservice.PollTotalRespField])
-	res.TotalResponses = uint64(i)
+	res.TotalResponses = countersU64(counters, redisservice.PollTotalRespField)
 	// total_votes = all selections; equals total_responses for single-choice polls
 	res.TotalVotes = totalVotes
 
@@ -244,12 +155,7 @@ func (m *PollModel) GetResponsesResult(roomId, pollId string) (*plugnmeet.PollRe
 }
 
 func (m *PollModel) GetPollsStats(roomId string) (*plugnmeet.PollsStats, error) {
-	res := &plugnmeet.PollsStats{
-		TotalPolls:   0,
-		TotalRunning: 0,
-	}
-
-	result, err := m.rs.GetPollsListByRoomId(roomId)
+	polls, err := m.rs.GetRoomPolls(roomId)
 	if err != nil {
 		m.logger.WithError(err).WithFields(logrus.Fields{
 			"roomId": roomId,
@@ -257,28 +163,24 @@ func (m *PollModel) GetPollsStats(roomId string) (*plugnmeet.PollsStats, error) 
 		}).Errorln("failed to fetch polls list from redis")
 		return nil, config.ErrPollGeneric
 	}
-
-	if result == nil || len(result) == 0 {
+	if len(polls) == 0 {
 		// no polls
 		return nil, nil
 	}
-	res.TotalPolls = uint64(len(result))
 
-	for _, pi := range result {
-		info := new(plugnmeet.PollInfo)
-		err = protojson.Unmarshal([]byte(pi), info)
-		if err != nil {
-			m.logger.WithError(err).WithFields(logrus.Fields{
-				"roomId": roomId,
-				"method": "GetPollsStats",
-			}).Warnln("failed to unmarshal stored poll info")
-			continue
-		}
-
+	res := &plugnmeet.PollsStats{TotalPolls: uint64(len(polls))}
+	for _, info := range polls {
+		m.maybeAutoCloseExpired(info)
 		if info.IsRunning {
 			res.TotalRunning += 1
 		}
 	}
 
 	return res, nil
+}
+
+// countersU64 reads a uint counter from the stored results map.
+func countersU64(m map[string]string, field string) uint64 {
+	v, _ := strconv.ParseUint(m[field], 10, 64)
+	return v
 }

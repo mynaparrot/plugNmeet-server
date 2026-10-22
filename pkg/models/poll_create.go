@@ -9,7 +9,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func (m *PollModel) CreatePoll(r *plugnmeet.CreatePollReq) (string, error) {
@@ -112,18 +111,10 @@ func (m *PollModel) createRoomPollHash(r *plugnmeet.CreatePollReq) error {
 		p.ExpiresAt = created + int64(r.Duration)
 	}
 
-	marshal, err := protojson.Marshal(p)
-	if err != nil {
-		return err
-	}
-
-	pollVal := map[string]string{
-		r.PollId: string(marshal),
-	}
-	// the poll hash must be written BEFORE the duration index entry: an index
+	// the poll must be written BEFORE the duration index entry: an index
 	// entry without its poll would be self-healed (removed) by the janitor's
 	// sweep and the poll would never be auto-closed
-	if err := m.rs.CreateRoomPoll(r.RoomId, pollVal); err != nil {
+	if err := m.rs.CreateRoomPoll(r.RoomId, p); err != nil {
 		return err
 	}
 
@@ -144,19 +135,13 @@ func (m *PollModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq) error
 	log.Infoln("request to submit poll response")
 
 	// server-authoritative guard: poll must exist and still be running
-	pi, err := m.rs.GetPollInfoByPollId(r.RoomId, r.PollId)
+	info, err := m.rs.GetPollInfoByPollId(r.RoomId, r.PollId)
 	if err != nil {
 		log.WithError(err).Errorln("failed to fetch poll info")
 		return config.ErrPollGeneric
 	}
-	if pi == "" {
+	if info == nil {
 		return config.ErrPollNotFound
-	}
-
-	info := new(plugnmeet.PollInfo)
-	if err = protojson.Unmarshal([]byte(pi), info); err != nil {
-		log.WithError(err).Errorln("failed to unmarshal stored poll info")
-		return config.ErrPollGeneric
 	}
 
 	// lazy expiry check before accepting a vote (recovers restart-lost timers)
@@ -186,10 +171,14 @@ func (m *PollModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq) error
 		}
 	}
 
-	err = m.rs.AddPollResponse(r, info.IsAnonymous)
+	err = m.rs.AddPollResponse(r)
 	if err != nil {
-		// double-voting is an expected user error; don't spam the log with it
-		if errors.Is(err, config.ErrPollAlreadyVoted) {
+		// not-found (poll expired in the race window), closed and
+		// already-voted are expected user errors; don't spam the log with them
+		switch {
+		case errors.Is(err, config.ErrPollAlreadyVoted),
+			errors.Is(err, config.ErrPollNotFound),
+			errors.Is(err, config.ErrPollClosed):
 			return err
 		}
 		log.WithError(err).Errorln("failed to add poll response to redis")
