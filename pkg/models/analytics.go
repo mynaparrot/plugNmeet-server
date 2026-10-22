@@ -291,3 +291,18 @@ func (m *AnalyticsModel) FetchAnalytics(r *plugnmeet.FetchAnalyticsReq) (*plugnm
 
 	return result, nil
 }
+
+// analyticsRoomId returns the room that analytics events for roomId should be
+// attributed to. Breakout rooms have EnableAnalytics=false, so their analytics
+// are discarded at export; join/left events are attributed to the parent room
+// so breakout time counts toward the user's overall session duration.
+func (m *AnalyticsModel) analyticsRoomId(roomId string) string {
+	meta, err := m.natsService.GetRoomMetadataStruct(roomId)
+	if err != nil || meta == nil {
+		return roomId
+	}
+	if meta.IsBreakoutRoom && meta.ParentRoomId != "" {
+		return meta.ParentRoomId
+	}
+	return roomId
+}

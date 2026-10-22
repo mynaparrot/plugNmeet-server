@@ -48,7 +48,7 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId, calledFrom string) {
 			m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 				EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
 				EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_JOINED,
-				RoomId:    roomId,
+				RoomId:    m.analyticsModel.analyticsRoomId(roomId),
 				UserId:    &userId,
 				UserName:  &userInfo.Name,
 				ExtraData: &userInfo.Metadata,
@@ -241,7 +241,7 @@ func (m *NatsModel) updateUserLeftAnalytics(roomId, userId string, log *logrus.E
 	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
 		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_LEFT,
-		RoomId:    roomId,
+		RoomId:    m.analyticsModel.analyticsRoomId(roomId),
 		UserId:    &userId,
 		HsetValue: new(fmt.Sprintf("%d", time.Now().UnixMilli())),
 	})
