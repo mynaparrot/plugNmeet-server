@@ -91,7 +91,7 @@ local exp = 0
 if dur > 0 then
 	exp = tonumber(ARGV[3]) + dur
 	redis.call("HSET", KEYS[2], ARGV[4], exp)
-	redis.call("EXPIRE", KEYS[2], ARGV[5])
+	redis.call("HEXPIRE", KEYS[2], ARGV[5], "FIELDS", 1, ARGV[4])
 else
 	redis.call("HDEL", KEYS[2], ARGV[4])
 end

@@ -62,12 +62,11 @@ func (s *RedisService) CreateRoomPolls(roomId string, infos []*plugnmeet.PollInf
 
 // AddPollWithDuration registers a fixed-duration poll in the
 // pollsWithDuration index (value: the poll's expires_at as unix seconds) so
-// the janitor can sweep for expired polls. The hash is only a hint; the
-// poll's ExpiresAt remains the source of truth.
+// the janitor can sweep for expired polls.
 func (s *RedisService) AddPollWithDuration(roomId, pollId string, expiresAt int64) error {
 	pipe := s.rc.Pipeline()
 	pipe.HSet(s.ctx, pollsWithDurationKey, pollDurationIndexField(roomId, pollId), expiresAt)
-	pipe.Expire(s.ctx, pollsWithDurationKey, s.defaultTTL)
+	pipe.HExpire(s.ctx, pollsWithDurationKey, s.defaultTTL, pollDurationIndexField(roomId, pollId))
 
 	_, err := pipe.Exec(s.ctx)
 	return err
@@ -75,8 +74,7 @@ func (s *RedisService) AddPollWithDuration(roomId, pollId string, expiresAt int6
 
 // RemovePollWithDuration drops a poll's entry from the pollsWithDuration index.
 func (s *RedisService) RemovePollWithDuration(roomId, pollId string) error {
-	_, err := s.rc.HDel(s.ctx, pollsWithDurationKey, pollDurationIndexField(roomId, pollId)).Result()
-	return err
+	return s.rc.HDel(s.ctx, pollsWithDurationKey, pollDurationIndexField(roomId, pollId)).Err()
 }
 
 // GetPollsWithDuration returns every entry of the pollsWithDuration index.
