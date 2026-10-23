@@ -97,8 +97,33 @@ func (m *ArtifactModel) CreateMeetingSummaryArtifact(roomTableId uint64, summary
 		ReferenceArtifactId: &fileArtifact.ArtifactId,
 	}
 
+	// Extends the usage-artifact ownership contract: if the summarizing activity
+	// occurred in a breakout room, the usage artifact is owned by the parent room.
+	usageRoomId, usageRoomSid, usageTableId := roomInfo.RoomId, roomInfo.Sid, roomTableId
+	isBreakout := roomInfo.IsBreakoutRoom != 0
+	if isBreakout {
+		parentRoomId, parentTableId, perr := ParseBreakoutParentRoomRef(roomInfo.ParentRoomID)
+		if perr != nil {
+			return fmt.Errorf("failed to parse parent room reference of %s for meeting summary usage artifact: %w", roomInfo.RoomId, perr)
+		}
+
+		// Resolve by table id to target the exact parent session, never by the
+		// ambiguous roomId (which may have multiple room_info rows).
+		parentInfo, perr := m.ds.GetRoomInfoByTableId(parentTableId)
+		switch {
+		case perr != nil:
+			return fmt.Errorf("failed to resolve parent room of %s for meeting summary usage artifact: %w", roomInfo.RoomId, perr)
+		case parentInfo == nil:
+			return fmt.Errorf("parent room table id %d not found for meeting summary usage artifact", parentTableId)
+		case parentInfo.RoomId != parentRoomId:
+			return fmt.Errorf("parent room reference %s does not match resolved row %s for meeting summary usage artifact", parentRoomId, parentInfo.RoomId)
+		}
+		usageRoomId, usageRoomSid, usageTableId = parentInfo.RoomId, parentInfo.Sid, parentInfo.ID
+	}
+	m.setUsageArtifactProvenance(usageMetadata, roomInfo.ID, isBreakout)
+
 	// 3. Create the usage artifact.
-	_, err = m.createAndSaveArtifact(roomInfo.RoomId, roomInfo.Sid, roomTableId, plugnmeet.RoomArtifactType_MEETING_SUMMARY_USAGE, usageMetadata, true, log)
+	_, err = m.createAndSaveArtifact(usageRoomId, usageRoomSid, usageTableId, plugnmeet.RoomArtifactType_MEETING_SUMMARY_USAGE, usageMetadata, true, log)
 	if err != nil {
 		log.WithError(err).Error("failed to create meeting summary usage artifact")
 	}

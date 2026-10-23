@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS `pnm_room_info` (
   `rtmp_node_id` varchar(36) NOT NULL DEFAULT '',
   `webhook_url` varchar(255) NOT NULL DEFAULT '',
   `is_breakout_room` int(1) NOT NULL DEFAULT 0,
-  `parent_room_id` varchar(64) NOT NULL DEFAULT '',
+  `parent_room_id` varchar(128) NOT NULL DEFAULT '',
   `creation_time` int(10) NOT NULL DEFAULT 0,
   `created` datetime NOT NULL DEFAULT current_timestamp(),
   `ended` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',

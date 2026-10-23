@@ -81,7 +81,7 @@ func (m *RoomModel) GetActiveRoomInfo(ctx context.Context, r *plugnmeet.GetActiv
 		IsActiveRtmp:       int32(roomDbInfo.IsActiveRtmp),
 		WebhookUrl:         roomDbInfo.WebhookUrl,
 		IsBreakoutRoom:     int32(roomDbInfo.IsBreakoutRoom),
-		ParentRoomId:       roomDbInfo.ParentRoomID,
+		ParentRoomId:       plainParentRoomIdFromRef(roomDbInfo.ParentRoomID),
 		CreationTime:       roomDbInfo.CreationTime,
 		Metadata:           rrr.Metadata,
 	}
@@ -122,7 +122,7 @@ func (m *RoomModel) GetActiveRoomsInfo(userCtx context.Context) (bool, string, p
 				IsActiveRtmp:       int32(r.IsActiveRtmp),
 				WebhookUrl:         r.WebhookUrl,
 				IsBreakoutRoom:     int32(r.IsBreakoutRoom),
-				ParentRoomId:       r.ParentRoomID,
+				ParentRoomId:       plainParentRoomIdFromRef(r.ParentRoomID),
 				CreationTime:       r.CreationTime,
 			},
 		}

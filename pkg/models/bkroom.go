@@ -1,6 +1,10 @@
 package models
 
 import (
+	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
@@ -9,6 +13,12 @@ import (
 	"go.uber.org/fx"
 	"google.golang.org/protobuf/encoding/protojson"
 )
+
+// breakoutParentRoomRefFormat is the persisted form of
+// dbmodels.RoomInfo.ParentRoomID for breakout rooms. It stores both the parent
+// room id and the parent's DB table id so a parent row can be resolved exactly,
+// even when the same roomId has multiple sessions in room_info.
+const breakoutParentRoomRefFormat = "%s:%d"
 
 type BreakoutRoomModel struct {
 	rs             *redisservice.RedisService
@@ -114,6 +124,12 @@ func (m *BreakoutRoomModel) IncreaseBreakoutRoomDuration(r *plugnmeet.IncreaseBr
 	return nil
 }
 
+// FormatBreakoutParentRoomRef encodes a parent room reference for persistence
+// in dbmodels.RoomInfo.ParentRoomID. "<parent roomId>:<parent table id>"
+func FormatBreakoutParentRoomRef(parentRoomId string, parentTableId uint64) string {
+	return fmt.Sprintf(breakoutParentRoomRefFormat, parentRoomId, parentTableId)
+}
+
 // isParentWithActiveBreakouts reports whether the given room metadata describes
 // a parent (non-breakout) room whose breakout rooms are currently active.
 // Such rooms must not be terminated by an empty-close/pause, because their
@@ -136,9 +152,42 @@ func breakoutChildOfActiveParent(ns *natsservice.NatsService, meta *plugnmeet.Ro
 	if meta == nil || !meta.IsBreakoutRoom || meta.ParentRoomId == "" {
 		return false
 	}
-	parentMeta, err := ns.GetRoomMetadataStruct(meta.ParentRoomId)
+	// metadata stores "<parent roomId>:<parent table id>"; only the plain room
+	// id can be used as a parent lookup key.
+	parentRoomId, _, err := ParseBreakoutParentRoomRef(meta.ParentRoomId)
+	if err != nil {
+		return false
+	}
+	parentMeta, err := ns.GetRoomMetadataStruct(parentRoomId)
 	if err != nil || parentMeta == nil {
 		return false
 	}
 	return isParentWithActiveBreakouts(parentMeta)
+}
+
+// ParseBreakoutParentRoomRef decodes a persisted parent room reference. A
+// reference must contain a non-empty room id followed by a colon (:) and a positive
+// uint64 table id e.g. "<parent roomId>:<parent table id>" ; malformed values are rejected.
+func ParseBreakoutParentRoomRef(ref string) (string, uint64, error) {
+	sep := strings.LastIndexByte(ref, ':')
+	if sep <= 0 || sep == len(ref)-1 {
+		return "", 0, fmt.Errorf("invalid parent room reference %q", ref)
+	}
+
+	parentTableId, err := strconv.ParseUint(ref[sep+1:], 10, 64)
+	if err != nil || parentTableId == 0 {
+		return "", 0, fmt.Errorf("invalid parent room reference %q", ref)
+	}
+
+	return ref[:sep], parentTableId, nil
+}
+
+// plainParentRoomIdFromRef returns only the room id part of a persisted parent
+// room reference, for API responses that expose the plain parent room id.
+func plainParentRoomIdFromRef(ref string) string {
+	roomId, _, err := ParseBreakoutParentRoomRef(ref)
+	if err != nil {
+		return ""
+	}
+	return roomId
 }

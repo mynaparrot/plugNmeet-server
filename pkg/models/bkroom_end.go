@@ -135,9 +135,16 @@ func (m *BreakoutRoomModel) PostTaskAfterRoomEndWebhook(ctx context.Context, roo
 	}
 
 	if meta.IsBreakoutRoom {
+		// the metadata reference is "<parent roomId>:<parent table id>"; the
+		// plain room id is required as the Redis hash key.
+		parentRoomId, _, perr := ParseBreakoutParentRoomRef(meta.ParentRoomId)
+		if perr != nil {
+			log.WithError(perr).Error("Failed to parse parent room reference, skipping breakout room cleanup")
+			return perr
+		}
 		log.Info("Breakout room ended, cleaning up its records")
-		_ = m.rs.DeleteBreakoutRoom(meta.ParentRoomId, roomId)
-		m.onAfterBkRoomEnded(meta.ParentRoomId, roomId, log)
+		_ = m.rs.DeleteBreakoutRoom(parentRoomId, roomId)
+		m.onAfterBkRoomEnded(parentRoomId, roomId, log)
 	} else {
 		log.Info("Parent room ended, ending all associated breakout rooms")
 		if err = m.EndAllBreakoutRoomsByParentRoomId(ctx, roomId); err != nil {

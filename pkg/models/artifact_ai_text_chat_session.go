@@ -12,9 +12,12 @@ import (
 
 // createAITextChatUsageArtifacts creates artifact records for AI text chat usage.
 // It now creates separate artifacts for 'chat' and 'summarize' tasks with cost calculation.
-func (m *ArtifactModel) createAITextChatUsageArtifacts(roomId, roomSid string, roomTableId uint64, log *logrus.Entry) error {
+// sourceRoomId is the room where the usage occurred (usage hash is harvested
+// from its Redis keys), while ownerRoomId/ownerRoomSid/ownerTableId identify
+// the room that owns the resulting artifacts (parent room for breakout activity).
+func (m *ArtifactModel) createAITextChatUsageArtifacts(sourceRoomId, ownerRoomId, ownerRoomSid string, sourceTableId, ownerTableId uint64, isBreakout bool, log *logrus.Entry) error {
 	// 1. Atomically get all usage data from Redis and clean up the key.
-	usageMap, err := m.rs.GetAITextChatRoomUsage(m.ctx, roomId, true)
+	usageMap, err := m.rs.GetAITextChatRoomUsage(m.ctx, sourceRoomId, true)
 	if err != nil {
 		return err
 	}
@@ -74,11 +77,12 @@ func (m *ArtifactModel) createAITextChatUsageArtifacts(roomId, roomSid string, r
 				},
 			},
 		}
-		_, err = m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_AI_TEXT_CHAT_INTERACTION_USAGE, metadata, false, log)
+		m.setUsageArtifactProvenance(metadata, sourceTableId, isBreakout)
+		_, err = m.createAndSaveArtifact(ownerRoomId, ownerRoomSid, ownerTableId, plugnmeet.RoomArtifactType_AI_TEXT_CHAT_INTERACTION_USAGE, metadata, false, log)
 		if err != nil {
 			log.WithError(err).Error("failed to create AI text chat interaction artifact")
 		}
-		m.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_AI_TEXT_CHAT_INTERACTION_TOTAL_USAGE, nil, &totalChatTokens)
+		m.HandleAnalyticsEvent(ownerRoomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_AI_TEXT_CHAT_INTERACTION_TOTAL_USAGE, nil, &totalChatTokens)
 	}
 
 	// 3. Handle the 'summarize' interaction artifact.
@@ -126,11 +130,12 @@ func (m *ArtifactModel) createAITextChatUsageArtifacts(roomId, roomSid string, r
 				},
 			},
 		}
-		_, err = m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_AI_TEXT_CHAT_SUMMARIZATION_USAGE, metadata, false, log)
+		m.setUsageArtifactProvenance(metadata, sourceTableId, isBreakout)
+		_, err = m.createAndSaveArtifact(ownerRoomId, ownerRoomSid, ownerTableId, plugnmeet.RoomArtifactType_AI_TEXT_CHAT_SUMMARIZATION_USAGE, metadata, false, log)
 		if err != nil {
 			log.WithError(err).Error("failed to create AI text chat summarization artifact")
 		}
-		m.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_AI_TEXT_CHAT_SUMMARIZATION_TOTAL_USAGE, nil, &totalSummarizeTokens)
+		m.HandleAnalyticsEvent(ownerRoomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_AI_TEXT_CHAT_SUMMARIZATION_TOTAL_USAGE, nil, &totalSummarizeTokens)
 	}
 
 	return nil

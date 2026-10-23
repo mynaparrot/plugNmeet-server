@@ -124,13 +124,20 @@ func (m *RoomModel) IncreaseRoomDuration(roomId string, duration uint64) (uint64
 
 		log.Info(
 			"breakout room has duration, will compare with parent room")
+		// metadata stores "<parent roomId>:<parent table id>"; only the plain
+		// room id can be used as a duration key.
+		parentRoomId, _, pErr := ParseBreakoutParentRoomRef(meta.ParentRoomId)
+		if pErr != nil {
+			log.WithError(pErr).Error("failed to parse parent room reference")
+			return 0, config.ErrBkRoomUnexpectedError
+		}
 		// need to check how long time left for this room
 		now := uint64(time.Now().Unix())
 		valid := info.StartedAt + (info.Duration * 60)
 		d := ((valid - now) / 60) + duration
 
 		// we'll need to make sure that breakout room duration isn't bigger than main room duration
-		err = m.CompareDurationWithParentRoom(meta.ParentRoomId, d)
+		err = m.CompareDurationWithParentRoom(parentRoomId, d)
 		if err != nil {
 			log.WithError(err).Error("duration comparison with parent room failed")
 			return 0, err

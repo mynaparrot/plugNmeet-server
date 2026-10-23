@@ -156,31 +156,83 @@ func (m *ArtifactModel) CreateAllRoomUsageArtifacts(roomId, roomSid string, room
 		"method": "CreateAllRoomUsageArtifacts",
 	})
 
-	// Speech Transcription file
+	// Speech Transcription file (content artifact; always child-owned)
 	transFileArtifactId, err := m.createSpeechTranscriptionFileArtifact(roomId, roomSid, roomTableId, log)
 	if err != nil {
 		log.WithError(err).Error("failed to create speech transcription artifact")
 	}
 
+	// Resolve the usage-artifact owner: cost usage artifacts originating in a
+	// breakout room are owned by the parent room. Usage hashes are still
+	// harvested from the source (roomId) keys. This resolution MUST happen
+	// before any cleanup-enabled usage hash is consumed: on failure we leave the
+	// source cost data untouched.
+	roomInfo, err := m.ds.GetRoomInfoByTableId(roomTableId)
+	if err != nil || roomInfo == nil {
+		log.WithError(err).Error("failed to resolve room info for usage artifacts, skipping cost usage harvest")
+		return
+	}
+
+	sourceTableId := roomInfo.ID
+	ownerRoomId, ownerRoomSid, ownerTableId := roomInfo.RoomId, roomInfo.Sid, roomInfo.ID
+	isBreakout := roomInfo.IsBreakoutRoom != 0
+
+	if isBreakout {
+		parentRoomId, parentTableId, perr := ParseBreakoutParentRoomRef(roomInfo.ParentRoomID)
+		if perr != nil {
+			log.WithError(perr).Error("failed to parse parent room reference for usage artifacts, skipping cost usage harvest")
+			return
+		}
+
+		// Resolve by table id, never by roomId: the same roomId can have many
+		// room_info sessions and only the encoded parent row is authoritative.
+		parentInfo, perr := m.ds.GetRoomInfoByTableId(parentTableId)
+		if perr != nil || parentInfo == nil {
+			log.WithError(perr).WithField("parentTableId", parentTableId).Error("failed to resolve parent room info for usage artifacts, skipping cost usage harvest")
+			return
+		}
+		if parentInfo.RoomId != parentRoomId {
+			log.WithFields(logrus.Fields{
+				"parentRoomId":    parentRoomId,
+				"parentRowRoomId": parentInfo.RoomId,
+				"parentTableId":   parentTableId,
+			}).Error("parent room reference does not match the resolved parent row, skipping cost usage harvest")
+			return
+		}
+
+		ownerRoomId, ownerRoomSid, ownerTableId = parentInfo.RoomId, parentInfo.Sid, parentInfo.ID
+	}
+
 	// Speech Transcription
-	if err := m.createSpeechTranscriptionUsageArtifact(roomId, roomSid, roomTableId, transFileArtifactId, log); err != nil {
+	if err := m.createSpeechTranscriptionUsageArtifact(roomId, ownerRoomId, ownerRoomSid, sourceTableId, ownerTableId, isBreakout, transFileArtifactId, log); err != nil {
 		log.WithError(err).Error("failed to create speech transcription usage artifact")
 	}
 
 	// Chat Translation
-	if err := m.createChatTranslationUsageArtifact(roomId, roomSid, roomTableId, log); err != nil {
+	if err := m.createChatTranslationUsageArtifact(roomId, ownerRoomId, ownerRoomSid, sourceTableId, ownerTableId, isBreakout, log); err != nil {
 		log.WithError(err).Error("failed to create chat translation usage artifact")
 	}
 
 	// Synthesized Speech
-	if err := m.createSynthesizedSpeechUsageArtifact(roomId, roomSid, roomTableId, log); err != nil {
+	if err := m.createSynthesizedSpeechUsageArtifact(roomId, ownerRoomId, ownerRoomSid, sourceTableId, ownerTableId, isBreakout, log); err != nil {
 		log.WithError(err).Error("failed to create synthesized speech usage artifact")
 	}
 
 	// AI Text Chat Usage (chat + summary)
-	if err := m.createAITextChatUsageArtifacts(roomId, roomSid, roomTableId, log); err != nil {
+	if err := m.createAITextChatUsageArtifacts(roomId, ownerRoomId, ownerRoomSid, sourceTableId, ownerTableId, isBreakout, log); err != nil {
 		log.WithError(err).Error("failed to create AI text chat session usage artifact")
 	}
+}
+
+// setUsageArtifactProvenance records where a usage artifact originated. The
+// boolean lets clients filter breakout activity, while the source table id pins
+// the exact source room session (which a roomId cannot do on its own).
+// occurred_in_breakout_room is an optional proto3 field so that both true and
+// false are present in the marshaled JSON; protojson omits unpopulated plain
+// scalar bools, which would hide main-room usage.
+func (m *ArtifactModel) setUsageArtifactProvenance(metadata *plugnmeet.RoomArtifactMetadata, sourceRoomTableId uint64, isBreakout bool) {
+	metadata.OccurredInBreakoutRoom = new(isBreakout)
+	metadata.SourceRoomTableId = sourceRoomTableId
 }
 
 func (m *ArtifactModel) sendWebhookNotification(eventName ArtifactEventName, roomSid string, artifact *dbmodels.RoomArtifact, metadata *plugnmeet.RoomArtifactMetadata, forceSend bool) {

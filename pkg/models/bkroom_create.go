@@ -46,6 +46,15 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 		return nil, config.ErrBkRoomUnexpectedError
 	}
 
+	// The parent's DB table id is required: it is the exact session reference
+	// persisted with each breakout room (see meta.ParentRoomId below). Without
+	// it we must not create children, otherwise their records would point to an
+	// unresolvable parent.
+	if mainRoom.DbTableId == 0 {
+		log.Error("parent room is missing a DB table id")
+		return nil, config.ErrBkRoomUnexpectedError
+	}
+
 	// do not allow nesting breakout rooms inside a breakout room.
 	if meta.IsBreakoutRoom {
 		log.Error("breakout rooms cannot be created inside another breakout room")
@@ -108,7 +117,11 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	meta.RoomFeatures.RoomDuration = &r.Duration
 	meta.IsBreakoutRoom = true
 	meta.WelcomeMessage = r.WelcomeMsg
-	meta.ParentRoomId = r.RoomId
+	// the child's metadata carries the parent reference as
+	// "<plain parent roomId>:<parent DB table id>" so metadata consumers can
+	// resolve the exact parent session. All parent Redis keys, ids and
+	// broadcasts keep using the plain r.RoomId.
+	meta.ParentRoomId = FormatBreakoutParentRoomRef(r.RoomId, mainRoom.DbTableId)
 	// this is crucial as breakout room should not generate userID
 	meta.RoomFeatures.AutoGenUserId = new(false)
 
@@ -127,6 +140,14 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	meta.WebhookUrl = nil
 	meta.LogoutUrl = nil
 	meta.RoomFeatures.EnableAnalytics = false
+
+	// force-disable meeting summarization for agent-based insights in breakout rooms
+	if meta.RoomFeatures.InsightsFeatures != nil && meta.RoomFeatures.InsightsFeatures.AiFeatures != nil {
+		meta.RoomFeatures.InsightsFeatures.AiFeatures.MeetingSummarizationFeatures = &plugnmeet.InsightsAIMeetingSummarizationFeatures{
+			IsAllow:   false,
+			IsEnabled: false,
+		}
+	}
 
 	// clear few main room data
 	meta.RoomFeatures.DisplayExternalLinkFeatures.IsActive = false
@@ -455,11 +476,19 @@ func (m *BreakoutRoomModel) PostTaskAfterRoomStartWebhook(roomId string, metadat
 	})
 	log.Info("Handling post-start tasks for breakout room")
 
+	// the metadata reference is "<parent roomId>:<parent table id>"; the plain
+	// room id is required as the Redis hash key.
+	parentRoomId, _, err := ParseBreakoutParentRoomRef(metadata.ParentRoomId)
+	if err != nil {
+		log.WithError(err).Error("Failed to parse parent room reference")
+		return err
+	}
+
 	// now in livekit rooms are created almost instantly & sending webhook response
 	// if this happened then we'll have to wait few seconds otherwise room info can't be found
 	time.Sleep(config.WaitBeforeBreakoutRoomOnAfterRoomStart)
 
-	room, err := m.fetchBreakoutRoom(metadata.ParentRoomId, roomId)
+	room, err := m.fetchBreakoutRoom(parentRoomId, roomId)
 	if err != nil {
 		log.Error("Failed to fetch breakout room info")
 		return err
@@ -473,7 +502,7 @@ func (m *BreakoutRoomModel) PostTaskAfterRoomStartWebhook(roomId string, metadat
 		return err
 	}
 
-	err = m.rs.InsertOrUpdateBreakoutRoom(metadata.ParentRoomId, roomId, marshal)
+	err = m.rs.InsertOrUpdateBreakoutRoom(parentRoomId, roomId, marshal)
 	if err != nil {
 		log.WithError(err).Error("Failed to update breakout room info in nats")
 		return err
