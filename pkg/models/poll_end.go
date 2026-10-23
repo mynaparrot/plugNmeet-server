@@ -9,7 +9,6 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func (m *PollModel) ClosePoll(r *plugnmeet.ClosePollReq) error {
@@ -21,7 +20,7 @@ func (m *PollModel) ClosePoll(r *plugnmeet.ClosePollReq) error {
 	})
 	log.Infoln("request to close poll")
 
-	err := m.rs.ClosePoll(r)
+	_, err := m.rs.ClosePollIfRunning(r.RoomId, r.PollId, r.UserId)
 	if err != nil {
 		// not-found is an expected user error; don't spam the log with it
 		if errors.Is(err, config.ErrPollNotFound) {
@@ -68,23 +67,18 @@ func (m *PollModel) AutoClosePoll(roomId, pollId string) error {
 		"method": "AutoClosePoll",
 	})
 
-	pi, err := m.rs.GetPollInfoByPollId(roomId, pollId)
+	info, err := m.rs.GetPollInfoByPollId(roomId, pollId)
 	if err != nil {
 		log.WithError(err).Errorln("failed to fetch poll info")
 		return err
 	}
-	if pi == "" {
+	if info == nil {
 		// poll gone (e.g. room ended): purge any leaked duration-index hint;
 		// a missing poll can never be reopened
-		if err := m.rs.RemovePollWithDuration(roomId, pollId); err != nil {
-			log.WithError(err).Errorln("failed to purge duration index entry for missing poll")
+		if rmErr := m.rs.RemovePollWithDuration(roomId, pollId); rmErr != nil {
+			log.WithError(rmErr).Errorln("failed to purge duration index entry for missing poll")
 		}
 		return nil
-	}
-	info := new(plugnmeet.PollInfo)
-	if err = protojson.Unmarshal([]byte(pi), info); err != nil {
-		log.WithError(err).Errorln("failed to unmarshal stored poll info")
-		return err
 	}
 	if !info.IsRunning {
 		return nil // already closed

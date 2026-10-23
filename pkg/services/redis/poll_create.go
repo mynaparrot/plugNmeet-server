@@ -1,8 +1,7 @@
 package redisservice
 
 import (
-	"errors"
-	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -11,191 +10,158 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-const (
-	pollsKey              = Prefix + "polls:"
-	pollsWithDurationKey  = Prefix + "pollsWithDuration"
-	pollRespondentsSubKey = ":respondents:"
-	pollVotedUsersSubKey  = ":voted_users"
-	pollAllResSubKey      = ":all_respondents"
-	PollTotalRespField    = "total_resp"
-	PollCountSuffix       = "_count"
-)
-
-func (s *RedisService) CreateRoomPoll(roomId string, val map[string]string) error {
-	pipe := s.rc.Pipeline()
-	pipe.HSet(s.ctx, pollsKey+roomId, val)
-	pipe.Expire(s.ctx, pollsKey+roomId, s.defaultTTL)
-
-	_, err := pipe.Exec(s.ctx)
+// CreateRoomPoll writes one poll's metadata hash, pre-creates its results hash
+// (so a zero counter is always readable), and registers the poll id in the
+// room's index.
+func (s *RedisService) CreateRoomPoll(roomId string, info *plugnmeet.PollInfo) error {
+	fields, err := pollToMetaFields(info)
 	if err != nil {
 		return err
 	}
-	return nil
+	metaKey, resultsKey, indexKey :=
+		pollMetaKey(roomId, info.GetId()), pollResultsKey(roomId, info.GetId()), pollRoomIndexKey(roomId)
+
+	pipe := s.rc.Pipeline()
+	pipe.HSet(s.ctx, metaKey, fields)
+	pipe.Expire(s.ctx, metaKey, s.defaultTTL)
+	pipe.HSet(s.ctx, resultsKey, PollTotalRespField, "0")
+	pipe.Expire(s.ctx, resultsKey, s.defaultTTL)
+	// the voters hash is created by the first vote; pre-expiring an empty key
+	// is a no-op so it is intentionally skipped
+	pipe.SAdd(s.ctx, indexKey, info.GetId())
+	pipe.Expire(s.ctx, indexKey, s.defaultTTL)
+
+	_, err = pipe.Exec(s.ctx)
+	return err
 }
 
-// pollDurationIndexField returns the field used to index a poll in the
-// pollsWithDuration hash: "{roomId}:{pollId}".
-func pollDurationIndexField(roomId, pollId string) string {
-	return fmt.Sprintf("%s:%s", roomId, pollId)
+// CreateRoomPolls registers several polls (e.g. shared parent polls copied into
+// a breakout room); per-poll failures are reported only through the returned
+// error to keep the API small.
+func (s *RedisService) CreateRoomPolls(roomId string, infos []*plugnmeet.PollInfo) error {
+	pipe := s.rc.Pipeline()
+	indexKey := pollRoomIndexKey(roomId)
+
+	for _, info := range infos {
+		fields, err := pollToMetaFields(info)
+		if err != nil {
+			return err
+		}
+		metaKey, resultsKey := pollMetaKey(roomId, info.GetId()), pollResultsKey(roomId, info.GetId())
+		pipe.HSet(s.ctx, metaKey, fields)
+		pipe.Expire(s.ctx, metaKey, s.defaultTTL)
+		pipe.HSet(s.ctx, resultsKey, PollTotalRespField, "0")
+		pipe.Expire(s.ctx, resultsKey, s.defaultTTL)
+		pipe.SAdd(s.ctx, indexKey, info.GetId())
+	}
+	pipe.Expire(s.ctx, indexKey, s.defaultTTL)
+
+	_, err := pipe.Exec(s.ctx)
+	return err
 }
 
 // AddPollWithDuration registers a fixed-duration poll in the
 // pollsWithDuration index (value: the poll's expires_at as unix seconds) so
-// the janitor can sweep for expired polls. The hash is only a hint; the
-// poll's ExpiresAt remains the source of truth.
+// the janitor can sweep for expired polls.
 func (s *RedisService) AddPollWithDuration(roomId, pollId string, expiresAt int64) error {
 	pipe := s.rc.Pipeline()
 	pipe.HSet(s.ctx, pollsWithDurationKey, pollDurationIndexField(roomId, pollId), expiresAt)
-	pipe.Expire(s.ctx, pollsWithDurationKey, s.defaultTTL)
+	pipe.HExpire(s.ctx, pollsWithDurationKey, s.defaultTTL, pollDurationIndexField(roomId, pollId))
 
 	_, err := pipe.Exec(s.ctx)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // RemovePollWithDuration drops a poll's entry from the pollsWithDuration index.
 func (s *RedisService) RemovePollWithDuration(roomId, pollId string) error {
-	_, err := s.rc.HDel(s.ctx, pollsWithDurationKey, pollDurationIndexField(roomId, pollId)).Result()
-	if err != nil {
-		return err
-	}
-	return nil
+	return s.rc.HDel(s.ctx, pollsWithDurationKey, pollDurationIndexField(roomId, pollId)).Err()
 }
 
 // GetPollsWithDuration returns every entry of the pollsWithDuration index.
 func (s *RedisService) GetPollsWithDuration() (map[string]string, error) {
-	result, err := s.rc.HGetAll(s.ctx, pollsWithDurationKey).Result()
-	switch {
-	case errors.Is(err, redis.Nil):
-		return nil, nil
-	case err != nil:
-		return nil, err
-	}
-	return result, nil
+	return s.rc.HGetAll(s.ctx, pollsWithDurationKey).Result()
 }
 
-// AddPollResponse records one vote: increments total_resp once per voter and
-// each selected option counter once. Anonymous polls never touch all_respondents.
-func (s *RedisService) AddPollResponse(r *plugnmeet.SubmitPollResponseReq, isAnonymous bool) error {
-	// respondentsKey is the base key for a specific poll's responses.
-	// It's a HASH that stores counters like total_resp, 1_count, etc.
-	// e.g. pnm:polls:room_id:respondents:poll_id
-	respondentsKey := fmt.Sprintf("%s%s%s%s", pollsKey, r.RoomId, pollRespondentsSubKey, r.PollId)
+// pollVoteScript atomically rejects closed/expired polls and duplicate voters,
+// then stores the respondent value, bumps the total and per-option counters,
+// and refreshes the related TTLs. No JSON is parsed and no keys are validated
+// here; Go owns option-id and structure validation.
+// ARGV[3] carries the marshalled non-anonymous PollRespondent record; the
+// script decides between it and the ARGV[4] anonymous marker based on the
+// authoritative is_anonymous metadata field.
+// Returns: 0=ok, 1=poll closed or expired, 2=already voted, 3=poll not found.
+var pollVoteScript = redis.NewScript(`
+local running = redis.call("HGET", KEYS[1], "` + PollIsRunningField + `")
+if running == false then
+	return 3
+end
+if running ~= "1" then
+	return 1
+end
+local exp = tonumber(redis.call("HGET", KEYS[1], "` + PollExpiresAtField + `") or "0")
+if exp and exp > 0 and tonumber(ARGV[2]) >= exp then
+	return 1
+end
+if redis.call("HEXISTS", KEYS[2], ARGV[1]) == 1 then
+	return 2
+end
+local val = ARGV[3]
+if redis.call("HGET", KEYS[1], "` + PollIsAnonymousField + `") == "1" then
+	val = ARGV[4]
+end
+redis.call("HSET", KEYS[2], ARGV[1], val)
+redis.call("HINCRBY", KEYS[3], "` + PollTotalRespField + `", 1)
+for i = 6, #ARGV do
+	redis.call("HINCRBY", KEYS[3], ARGV[i] .. "` + PollCountSuffix + `", 1)
+end
+local ttl = tonumber(ARGV[5])
+for i = 1, 4 do
+	redis.call("EXPIRE", KEYS[i], ttl)
+end
+return 0
+`)
 
-	// votedUsersKey is a SET that stores the user IDs of everyone who has voted.
-	// Used for O(1) check to see if a user has already voted.
-	// e.g. pnm:polls:room_id:respondents:poll_id:voted_users
-	votedUsersKey := fmt.Sprintf("%s%s", respondentsKey, pollVotedUsersSubKey)
-
-	// allRespondentsKey is a LIST that stores the detailed vote information for each user.
-	// e.g. pnm:polls:room_id:respondents:poll_id:all_respondents
-	allRespondentsKey := fmt.Sprintf("%s%s", respondentsKey, pollAllResSubKey)
-
-	return s.rc.Watch(s.ctx, func(tx *redis.Tx) error {
-		// Check if the user has already voted using a Set for O(1) lookup.
-		voted, err := tx.SIsMember(s.ctx, votedUsersKey, r.UserId).Result()
-		if err != nil && !errors.Is(err, redis.Nil) {
-			return err
-		}
-		if voted {
-			return config.ErrPollAlreadyVoted
-		}
-
-		// All writes run in MULTI/EXEC so the WATCH above aborts on concurrent votes.
-		_, err = tx.TxPipelined(s.ctx, func(pipe redis.Pipeliner) error {
-			// Add user to the set of voters (keeps one-shot protection for anonymous polls too).
-			pipe.SAdd(s.ctx, votedUsersKey, r.UserId)
-			pipe.Expire(s.ctx, votedUsersKey, s.defaultTTL)
-
-			// Anonymous polls: no per-user attribution anywhere, counters only.
-			if !isAnonymous {
-				// format userId:option_id(:option_id...):name — comma-joined ids for multi-select
-				voteData := fmt.Sprintf("%s:%s:%s", r.UserId, config.JoinPollOptionIds(r.SelectedOptions), r.Name)
-
-				// Add the vote details to a list.
-				pipe.RPush(s.ctx, allRespondentsKey, voteData)
-				pipe.Expire(s.ctx, allRespondentsKey, s.defaultTTL)
-			}
-
-			// total_resp counts distinct voters; each selected option counts once.
-			pipe.HIncrBy(s.ctx, respondentsKey, PollTotalRespField, 1)
-			for _, id := range r.SelectedOptions {
-				pipe.HIncrBy(s.ctx, respondentsKey, fmt.Sprintf("%d%s", id, PollCountSuffix), 1)
-			}
-			pipe.Expire(s.ctx, respondentsKey, s.defaultTTL)
-
-			return nil
-		})
-
+// AddPollResponse records one vote through pollVoteScript. Go has already
+// validated the selected option ids; the Lua script enforces is_running/
+// expires_at and the one-vote-per-voter rule atomically, choosing between the
+// marshalled respondent record and the anonymous marker via the metadata hash.
+func (s *RedisService) AddPollResponse(r *plugnmeet.SubmitPollResponseReq) error {
+	respondentValue := PollAnonymousMarker
+	marshalled, err := protojson.Marshal(&plugnmeet.PollRespondent{
+		UserId:    r.UserId,
+		Name:      r.Name,
+		OptionIds: r.SelectedOptions,
+	})
+	if err != nil {
 		return err
-	}, votedUsersKey)
-}
+	}
 
-// ReopenPollIfClosed atomically flips a closed poll back to running, keeping
-// all responses/counters/voted_users; returns the duration and whether the
-// closed->running flip actually happened.
-func (s *RedisService) ReopenPollIfClosed(r *plugnmeet.ReopenPollReq) (uint32, bool, error) {
-	// e.g. key: pnm:polls:{roomId}
-	key := pollsKey + r.RoomId
-	reopened := false
-	duration := uint32(0)
+	opts := make([]interface{}, 0, len(r.SelectedOptions)+5)
+	opts = append(opts, r.UserId, strconv.FormatInt(time.Now().Unix(), 10),
+		// ARGV[3]: non-anonymous record, ARGV[4]: anonymous marker
+		string(marshalled), respondentValue,
+		int(s.defaultTTL.Seconds()))
+	for _, id := range r.SelectedOptions {
+		opts = append(opts, strconv.FormatUint(id, 10))
+	}
 
-	err := s.rc.Watch(s.ctx, func(tx *redis.Tx) error {
-		reopened = false // reset: the tx may be retried on conflicts
-		duration = 0
-
-		result, err := tx.HGet(s.ctx, key, r.PollId).Result()
-		switch {
-		case errors.Is(err, redis.Nil):
-			return config.ErrPollNotFound
-		case err != nil:
-			return err
-		}
-		if result == "" {
-			return config.ErrPollNotFound
-		}
-
-		info := new(plugnmeet.PollInfo)
-		err = protojson.Unmarshal([]byte(result), info)
-		if err != nil {
-			return err
-		}
-		// idempotent: already running — keep everything untouched
-		if info.IsRunning {
-			return nil
-		}
-
-		info.IsRunning = true
-		info.ClosedBy = ""
-		// restart the expiry from now; 0 means no limit
-		now := time.Now().Unix()
-		info.ExpiresAt = 0
-		if info.Duration > 0 {
-			info.ExpiresAt = now + int64(info.Duration)
-		}
-		marshal, err := protojson.Marshal(info)
-		if err != nil {
-			return err
-		}
-
-		_, err = tx.TxPipelined(s.ctx, func(pipe redis.Pipeliner) error {
-			pipe.HSet(s.ctx, key, r.PollId, string(marshal))
-			// keep the duration index in sync with the restarted expiry
-			if info.Duration > 0 {
-				pipe.HSet(s.ctx, pollsWithDurationKey, pollDurationIndexField(r.RoomId, r.PollId), info.ExpiresAt)
-			}
-			return nil
-		})
-		if err != nil {
-			return err
-		}
-		reopened = true
-		duration = info.Duration
-
-		return nil
-	}, key)
-
-	return duration, reopened, err
+	roomId := r.RoomId
+	res, err := pollVoteScript.Run(s.ctx, s.rc, []string{
+		pollMetaKey(roomId, r.PollId),
+		pollVotersKey(roomId, r.PollId),
+		pollResultsKey(roomId, r.PollId),
+		pollRoomIndexKey(roomId),
+	}, opts...).Int64()
+	if err != nil {
+		return err
+	}
+	switch res {
+	case 1:
+		return config.ErrPollClosed
+	case 2:
+		return config.ErrPollAlreadyVoted
+	case 3:
+		return config.ErrPollNotFound
+	}
+	return nil
 }

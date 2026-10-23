@@ -1,8 +1,6 @@
 package controllers
 
 import (
-	"strconv"
-
 	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
@@ -177,21 +175,10 @@ func (pc *PollsController) HandleCountPollTotalResponses(c fiber.Ctx) error {
 		return utils.SendProtobufResponse(c, res)
 	}
 
-	rps, err := strconv.ParseUint(responses, 10, 64)
-	if err != nil {
-		pc.logger.WithError(err).WithFields(logrus.Fields{
-			"roomId":   roomId,
-			"pollId":   pollId,
-			"response": responses,
-		}).Errorln("failed to parse poll total responses counter")
-		res.Msg = config.ErrPollGeneric.Error()
-		return utils.SendProtobufResponse(c, res)
-	}
-
 	res.Status = true
 	res.Msg = "success"
 	res.PollId = &pollId
-	res.TotalResponses = &rps
+	res.TotalResponses = &responses
 	return utils.SendProtobufResponse(c, res)
 }
 
@@ -357,7 +344,7 @@ func (pc *PollsController) HandleGetPollResponsesDetails(c fiber.Ctx) error {
 	res.Status = true
 	res.Msg = "success"
 	res.PollId = &pollId
-	res.Responses = responses
+	res.ResponsesDetails = responses
 	return utils.SendProtobufResponse(c, res)
 }
 
