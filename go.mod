@@ -2,8 +2,6 @@ module github.com/mynaparrot/plugnmeet-server
 
 go 1.27.2
 
-replace github.com/mynaparrot/plugnmeet-protocol => ../protocol
-
 require (
 	buf.build/go/protovalidate v1.4.0
 	github.com/Microsoft/cognitive-services-speech-sdk-go v1.53.0
@@ -23,11 +21,11 @@ require (
 	github.com/livekit/media-sdk v0.1.1
 	github.com/livekit/protocol v1.51.1-0.20260910121219-271d9cde3897
 	github.com/livekit/server-sdk-go/v2 v2.19.0
-	github.com/mynaparrot/plugnmeet-protocol v1.6.2
+	github.com/mynaparrot/plugnmeet-protocol v1.6.3-0.20261022165513-9a028a91ba30
 	github.com/nats-io/jwt/v2 v2.8.2
 	github.com/nats-io/nats.go v1.54.0
 	github.com/nats-io/nkeys v0.4.16
-	github.com/openai/openai-go/v3 v3.85.1
+	github.com/openai/openai-go/v3 v3.86.0
 	github.com/pion/webrtc/v4 v4.2.19
 	github.com/prometheus/client_golang v1.25.0
 	github.com/redis/go-redis/v9 v9.23.0
@@ -35,7 +33,7 @@ require (
 	github.com/spf13/cast v1.10.0
 	go.uber.org/fx v1.24.0
 	golang.org/x/sync v0.24.0
-	google.golang.org/genai v1.75.0
+	google.golang.org/genai v1.76.0
 	google.golang.org/protobuf v1.36.12
 	gorm.io/driver/mysql v1.6.0
 	gorm.io/gorm v1.31.2
