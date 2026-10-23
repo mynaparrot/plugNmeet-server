@@ -307,8 +307,10 @@ func (m *RoomModel) validatePreassignedBreakoutRooms(r *plugnmeet.CreateRoomReq,
 func (m *RoomModel) prepareRoomDbInfo(r *plugnmeet.CreateRoomReq, existing *dbmodels.RoomInfo) (*dbmodels.RoomInfo, string) {
 	sId := uuid.New().String()
 	isBreakoutRoom := 0
+	parentRoomID := ""
 	if r.Metadata.IsBreakoutRoom {
 		isBreakoutRoom = 1
+		parentRoomID = r.Metadata.ParentRoomId
 	}
 
 	if existing == nil {
@@ -320,10 +322,12 @@ func (m *RoomModel) prepareRoomDbInfo(r *plugnmeet.CreateRoomReq, existing *dbmo
 			IsRunning:          1,
 			WebhookUrl:         "",
 			IsBreakoutRoom:     isBreakoutRoom,
-			ParentRoomID:       r.Metadata.ParentRoomId,
+			ParentRoomID:       parentRoomID,
 		}
 	} else {
 		existing.Sid = sId
+		existing.IsBreakoutRoom = isBreakoutRoom
+		existing.ParentRoomID = parentRoomID
 	}
 	if r.Metadata.WebhookUrl != nil {
 		existing.WebhookUrl = *r.Metadata.WebhookUrl

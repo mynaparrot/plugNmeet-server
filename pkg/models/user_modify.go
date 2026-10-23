@@ -156,7 +156,12 @@ func (m *UserModel) notifyAdminsOutsideBreakoutRoom(roomId, userId string) {
 		return
 	}
 
-	parentRoomId := metadata.ParentRoomId
+	// metadata stores "<parent roomId>:<parent table id>"; only the plain room id can be used as a room key.
+	parentRoomId, _, err := ParseBreakoutParentRoomRef(metadata.ParentRoomId)
+	if err != nil {
+		log.WithError(err).Warnln("failed to parse parent room reference, skipping breakout raise-hand notice")
+		return
+	}
 	roomTitle := metadata.RoomTitle
 
 	// resolve the raiser's display name; fall back to userId if unavailable.

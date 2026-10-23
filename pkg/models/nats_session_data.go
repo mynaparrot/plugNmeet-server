@@ -94,7 +94,15 @@ func (m *NatsModel) canSeedSessionDataTo(parentRoomId, targetRoomId, userId stri
 	}
 
 	meta, err := m.natsService.GetRoomMetadataStruct(targetRoomId)
-	if err != nil || meta == nil || !meta.GetIsBreakoutRoom() || meta.GetParentRoomId() != parentRoomId {
+	if err != nil || meta == nil || !meta.GetIsBreakoutRoom() {
+		m.logger.Warnf("rejected session data seeding to room %s from user %s; not a breakout room of %s", targetRoomId, userId, parentRoomId)
+		return false
+	}
+
+	// metadata stores "<parent roomId>:<parent table id>"; compare only the
+	// plain parent room id against the room the message arrived on.
+	targetParentRoomId, _, pErr := ParseBreakoutParentRoomRef(meta.GetParentRoomId())
+	if pErr != nil || targetParentRoomId != parentRoomId {
 		m.logger.Warnf("rejected session data seeding to room %s from user %s; not a breakout room of %s", targetRoomId, userId, parentRoomId)
 		return false
 	}

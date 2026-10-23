@@ -16,9 +16,12 @@ import (
 )
 
 // createSpeechTranscriptionUsageArtifact creates an artifact record for a speech transcription session.
-func (m *ArtifactModel) createSpeechTranscriptionUsageArtifact(roomId, roomSid string, roomTableId uint64, fileArtifactId *string, log *logrus.Entry) error {
+// sourceRoomId is the room where the usage occurred (usage hash is harvested
+// from its Redis keys), while ownerRoomId/ownerRoomSid/ownerTableId identify
+// the room that owns the resulting artifact (parent room for breakout activity).
+func (m *ArtifactModel) createSpeechTranscriptionUsageArtifact(sourceRoomId, ownerRoomId, ownerRoomSid string, sourceTableId, ownerTableId uint64, isBreakout bool, fileArtifactId *string, log *logrus.Entry) error {
 	// 1. Atomically get usage data from Redis and clean up the key.
-	usageMap, err := m.rs.GetTranscriptionRoomUsage(m.ctx, roomId, true)
+	usageMap, err := m.rs.GetTranscriptionRoomUsage(m.ctx, sourceRoomId, true)
 	if err != nil {
 		return err
 	}
@@ -53,17 +56,18 @@ func (m *ArtifactModel) createSpeechTranscriptionUsageArtifact(roomId, roomSid s
 		// Link this usage artifact back to the file artifact.
 		ReferenceArtifactId: fileArtifactId,
 	}
+	m.setUsageArtifactProvenance(metadata, sourceTableId, isBreakout)
 
 	// Create and save the artifact for chat interactions.
-	_, err = m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_SPEECH_TRANSCRIPTION_USAGE, metadata, false, log)
+	_, err = m.createAndSaveArtifact(ownerRoomId, ownerRoomSid, ownerTableId, plugnmeet.RoomArtifactType_SPEECH_TRANSCRIPTION_USAGE, metadata, false, log)
 	if err != nil {
 		log.WithError(err).Error("failed to create speech transcription usage artifact")
 	}
 
 	// 6. Add to analytics
-	m.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_TRANSCRIPTION_TOTAL_USAGE, nil, &total)
+	m.HandleAnalyticsEvent(ownerRoomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_TRANSCRIPTION_TOTAL_USAGE, nil, &total)
 
-	log.Infof("successfully created speech transcription usage artifact for room %s", roomId)
+	log.Infof("successfully created speech transcription usage artifact for room %s", sourceRoomId)
 
 	return nil
 }

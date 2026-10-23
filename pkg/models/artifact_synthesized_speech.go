@@ -9,9 +9,12 @@ import (
 
 // createSynthesizedSpeechUsageArtifact creates an artifact record for synthesized speech usage.
 // It's designed to be called when a room ends.
-func (m *ArtifactModel) createSynthesizedSpeechUsageArtifact(roomId, roomSid string, roomTableId uint64, log *logrus.Entry) error {
+// sourceRoomId is the room where the usage occurred (usage hash is harvested
+// from its Redis keys), while ownerRoomId/ownerRoomSid/ownerTableId identify
+// the room that owns the resulting artifact (parent room for breakout activity).
+func (m *ArtifactModel) createSynthesizedSpeechUsageArtifact(sourceRoomId, ownerRoomId, ownerRoomSid string, sourceTableId, ownerTableId uint64, isBreakout bool, log *logrus.Entry) error {
 	// 1. Atomically get usage data from Redis and clean up the key.
-	usageMap, err := m.rs.GetTTSServiceRoomUsage(m.ctx, roomId, true)
+	usageMap, err := m.rs.GetTTSServiceRoomUsage(m.ctx, sourceRoomId, true)
 	if err != nil {
 		return err
 	}
@@ -43,9 +46,10 @@ func (m *ArtifactModel) createSynthesizedSpeechUsageArtifact(roomId, roomSid str
 			},
 		},
 	}
+	m.setUsageArtifactProvenance(metadata, sourceTableId, isBreakout)
 
-	m.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_SYNTHESIZED_SPEECH_TOTAL_USAGE, nil, &total)
+	m.HandleAnalyticsEvent(ownerRoomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_SYNTHESIZED_SPEECH_TOTAL_USAGE, nil, &total)
 
-	_, err = m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_SYNTHESIZED_SPEECH_USAGE, metadata, false, log)
+	_, err = m.createAndSaveArtifact(ownerRoomId, ownerRoomSid, ownerTableId, plugnmeet.RoomArtifactType_SYNTHESIZED_SPEECH_USAGE, metadata, false, log)
 	return err
 }

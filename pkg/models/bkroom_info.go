@@ -131,6 +131,10 @@ func (m *BreakoutRoomModel) fetchBreakoutRooms(roomId string) ([]*plugnmeet.Brea
 	return breakoutRooms, nil
 }
 
+// ResolveParentRoomId returns the plain parent room id for a breakout room.
+// A child's metadata stores the parent reference as
+// "<plain parent roomId>:<parent DB table id>", so it must be parsed before it
+// can be used as a room key. Non-breakout rooms resolve to themselves.
 func (m *BreakoutRoomModel) ResolveParentRoomId(roomId string) string {
 	meta, err := m.natsService.GetRoomMetadataStruct(roomId)
 	if err != nil {
@@ -142,7 +146,13 @@ func (m *BreakoutRoomModel) ResolveParentRoomId(roomId string) string {
 		return roomId
 	}
 	if meta.IsBreakoutRoom && meta.ParentRoomId != "" {
-		return meta.ParentRoomId
+		parentRoomId, _, err := ParseBreakoutParentRoomRef(meta.ParentRoomId)
+		if err != nil {
+			m.logger.WithError(err).WithField("roomId", roomId).
+				Warn("failed to parse parent room reference; falling back to token roomId")
+			return roomId
+		}
+		return parentRoomId
 	}
 	return roomId
 }

@@ -302,7 +302,16 @@ func (m *AnalyticsModel) analyticsRoomId(roomId string) string {
 		return roomId
 	}
 	if meta.IsBreakoutRoom && meta.ParentRoomId != "" {
-		return meta.ParentRoomId
+		// metadata stores "<parent roomId>:<parent table id>"; only the plain
+		// room id is a valid analytics key. On parse failure we keep the
+		// event on the breakout room, which never exports analytics.
+		parentRoomId, _, pErr := ParseBreakoutParentRoomRef(meta.ParentRoomId)
+		if pErr != nil {
+			m.logger.WithError(pErr).WithField("roomId", roomId).
+				Warn("failed to parse parent room reference; keeping analytics on the breakout room")
+			return roomId
+		}
+		return parentRoomId
 	}
 	return roomId
 }
