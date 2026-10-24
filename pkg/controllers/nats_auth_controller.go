@@ -114,6 +114,8 @@ func (s *NatsAuthController) setPermissionForRecorder(claims *jwt.UserClaims) {
 		"$JS.API.INFO",
 		"_INBOX.>", // otherwise won't be able to send respond msg
 		fmt.Sprintf("$JS.API.STREAM.INFO.KV_%s", s.app.NatsInfo.Recorder.RecorderInfoKv),
+		// KV create/update on an existing bucket resolves to a stream update request
+		fmt.Sprintf("$JS.API.STREAM.UPDATE.KV_%s", s.app.NatsInfo.Recorder.RecorderInfoKv),
 		fmt.Sprintf("$KV.%s.>", s.app.NatsInfo.Recorder.RecorderInfoKv),
 		fmt.Sprintf("$JS.API.DIRECT.GET.KV_%s.>", s.app.NatsInfo.Recorder.RecorderInfoKv),
 		// Allow publishing the job to the stream
