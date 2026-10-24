@@ -357,12 +357,27 @@ func (m *RoomModel) prepareWhiteboardPreloadFile(meta *plugnmeet.RoomMetadata, r
 		}
 	}
 
-	meta.RoomFeatures.WhiteboardFeatures.PreloadFile = nil
-	if updateErr := m.natsService.UpdateAndBroadcastRoomMetadata(roomId, meta); updateErr != nil {
-		log.WithError(updateErr).Error("failed to update room metadata after whiteboard processing error")
+	// Read the latest metadata from NATS instead of broadcasting the creation-time
+	// snapshot, which would revert any metadata change made while the file was
+	// processing (e.g. whiteboardFileId from the conversion above).
+	latestMeta, err := m.natsService.GetRoomMetadataStruct(roomId)
+	if err != nil {
+		log.WithError(err).Error("failed to get room metadata to clear preload file")
+		return
+	}
+	if latestMeta == nil || latestMeta.RoomFeatures == nil || latestMeta.RoomFeatures.WhiteboardFeatures == nil {
+		log.Warn("room metadata not found, skipping clearing of preload file")
+		return
 	}
 
-	log.Info("Preloaded whiteboard file processed successfully")
+	// clear only the preload file, keep the rest of the metadata untouched
+	latestMeta.RoomFeatures.WhiteboardFeatures.PreloadFile = nil
+	if updateErr := m.natsService.UpdateAndBroadcastRoomMetadata(roomId, latestMeta); updateErr != nil {
+		log.WithError(updateErr).Error("failed to update room metadata to clear preload file")
+		return
+	}
+
+	log.Info("Successfully proceeded preload file and cleared from room metadata")
 }
 
 // sendRoomCreatedWebhook to send webhook
