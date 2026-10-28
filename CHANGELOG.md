@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.5.4](https://github.com/mynaparrot/plugNmeet-server/compare/v2.5.3...v2.5.4) (2026-10-28)
+
+
+### Bug Fixes
+
+* added response signal back when session save confirm ([aca20e1](https://github.com/mynaparrot/plugNmeet-server/commit/aca20e1d50cda499a2a32ba9e7e7d3cc3c2796fc))
+* after proceeded preload file use latest metadata to clean PreloadFile value only ([a594041](https://github.com/mynaparrot/plugNmeet-server/commit/a5940411fdde701efab12647afccef650d8e4a99))
+* breakout room connection event merged with parent room ([d26b87f](https://github.com/mynaparrot/plugNmeet-server/commit/d26b87f18fd39133a6784afe68594821a6d12604))
+* **breakout-room:** attribute breakout-room usage costs to the parent room ([#933](https://github.com/mynaparrot/plugNmeet-server/issues/933)) ([7f34fe3](https://github.com/mynaparrot/plugNmeet-server/commit/7f34fe346914156e13abc84cf2877df9b93bfedc))
+* bump go to `1.27.3` ([c3a9a1c](https://github.com/mynaparrot/plugNmeet-server/commit/c3a9a1c923aa273ee6c17df8f4c95d788859468b))
+* **deps:** update module github.com/gabriel-vasile/mimetype to v1.4.16 ([3e924c2](https://github.com/mynaparrot/plugNmeet-server/commit/3e924c2388d3c5ceeb24e8e8b80c686e77a10c4a))
+* **deps:** update module github.com/gammazero/workerpool to v1.2.2 ([4485a0e](https://github.com/mynaparrot/plugNmeet-server/commit/4485a0e9839b9e683d55b8745dfeceae19af935f))
+* IDE was displaying error ([076e36a](https://github.com/mynaparrot/plugNmeet-server/commit/076e36a5963156b30fd5e22009fa9911c272fd53))
+* **insights:** recover transcription after provider disconnects and stop billing while muted ([#930](https://github.com/mynaparrot/plugNmeet-server/issues/930)) ([d9fa8b0](https://github.com/mynaparrot/plugNmeet-server/commit/d9fa8b0a50556f456488999af4e2eba05f6d89f4))
+* missed to add `.>` for any suffix e.g. recorder id ([97c321e](https://github.com/mynaparrot/plugNmeet-server/commit/97c321ee33d88fc4f153de22943f7bedebd1dca2))
+* **poll:** refactor poll storage and make concurrent voting atomic ([#931](https://github.com/mynaparrot/plugNmeet-server/issues/931)) ([463eaa2](https://github.com/mynaparrot/plugNmeet-server/commit/463eaa29e049f57211f6275271e34555374a1c8f))
+* **recorder:** added new permission STREAM.UPDATE for KV ([7a6613e](https://github.com/mynaparrot/plugNmeet-server/commit/7a6613e6cdacdb4bcddbde77dcda8151ae48ea10))
+* reverted back the permission ([d53296d](https://github.com/mynaparrot/plugNmeet-server/commit/d53296db7e94445a87fcdfe36709f6f419f39a48))
+
 ## [2.5.3](https://github.com/mynaparrot/plugNmeet-server/compare/v2.5.2...v2.5.3) (2026-10-11)
 
 
