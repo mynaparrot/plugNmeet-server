@@ -2,9 +2,6 @@ module github.com/mynaparrot/plugnmeet-server
 
 go 1.27.3
 
-// temporary: use the local protocol during development
-replace github.com/mynaparrot/plugnmeet-protocol => ../protocol
-
 require (
 	buf.build/go/protovalidate v1.4.0
 	github.com/Microsoft/cognitive-services-speech-sdk-go v1.53.0
@@ -13,22 +10,21 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.16
 	github.com/gammazero/workerpool v1.3.0
 	github.com/go-jose/go-jose/v4 v4.1.6
-	github.com/go-sql-driver/mysql v1.10.1
-	github.com/goccy/go-json v0.11.2
+	github.com/goccy/go-json v0.12.0
 	github.com/goccy/go-yaml v1.19.2
 	github.com/gofiber/fiber/v3 v3.6.1
-	github.com/gofiber/template/html/v3 v3.0.11
+	github.com/gofiber/template/html/v3 v3.0.12
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
 	github.com/livekit/media-sdk v0.1.1
 	github.com/livekit/protocol v1.51.1-0.20260910121219-271d9cde3897
 	github.com/livekit/server-sdk-go/v2 v2.19.0
-	github.com/mynaparrot/plugnmeet-protocol v1.6.3
+	github.com/mynaparrot/plugnmeet-protocol v1.6.4-0.20261030150628-718ba2ab985a
 	github.com/nats-io/jwt/v2 v2.8.2
 	github.com/nats-io/nats.go v1.55.0
 	github.com/nats-io/nkeys v0.4.16
-	github.com/openai/openai-go/v3 v3.89.0
+	github.com/openai/openai-go/v3 v3.90.0
 	github.com/pion/webrtc/v4 v4.2.19
 	github.com/prometheus/client_golang v1.25.0
 	github.com/redis/go-redis/v9 v9.23.0
@@ -36,7 +32,7 @@ require (
 	github.com/spf13/cast v1.10.0
 	go.uber.org/fx v1.24.0
 	golang.org/x/sync v0.24.0
-	google.golang.org/genai v1.76.0
+	google.golang.org/genai v1.77.0
 	google.golang.org/protobuf v1.36.12
 	gorm.io/driver/mysql v1.6.0
 	gorm.io/driver/sqlite v1.6.0
@@ -68,9 +64,10 @@ require (
 	github.com/gammazero/deque v1.2.2 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/go-sql-driver/mysql v1.10.1 // indirect
 	github.com/gofiber/schema v1.8.8 // indirect
-	github.com/gofiber/template/v2 v2.1.4 // indirect
-	github.com/gofiber/utils/v2 v2.6.2 // indirect
+	github.com/gofiber/template/v2 v2.1.5 // indirect
+	github.com/gofiber/utils/v2 v2.6.3 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
@@ -139,7 +136,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/exp v0.0.0-20260820142414-ca536658362e // indirect
-	golang.org/x/net v0.61.0 // indirect
+	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
