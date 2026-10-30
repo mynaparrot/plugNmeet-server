@@ -33,10 +33,9 @@ func TestApplyCountdownTimerChangeStatus(t *testing.T) {
 	cf.RemainingSeconds = 42
 	cf.StartedBy = "user-1"
 
-	active := true
 	if err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
 		Task:     plugnmeet.CountdownTimerTask_CHANGE_STATUS,
-		IsActive: &active,
+		IsActive: new(true),
 	}, testNowMs); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -47,10 +46,9 @@ func TestApplyCountdownTimerChangeStatus(t *testing.T) {
 		t.Fatalf("runtime fields not reset: %+v", cf)
 	}
 
-	inactive := false
 	if err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
 		Task:     plugnmeet.CountdownTimerTask_CHANGE_STATUS,
-		IsActive: &inactive,
+		IsActive: new(false),
 	}, testNowMs); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

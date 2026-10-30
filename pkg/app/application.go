@@ -99,12 +99,6 @@ func (a *Application) Start(_ context.Context) error {
 		defer a.appWg.Done()
 		a.janitorModel.StartJanitor()
 	}()
-	// TODO: will remove in future
-	a.appWg.Add(1)
-	go func() {
-		defer a.appWg.Done()
-		a.artifactModel.MigrateAnalyticsToArtifacts()
-	}()
 
 	// Initialize NATS controller.
 	if err := a.router.ctrl.NatsController.Initialize(); err != nil {

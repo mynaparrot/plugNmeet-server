@@ -135,7 +135,6 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	}
 	// we'll disable now. in the future, we can think about those
 	meta.RoomFeatures.RecordingFeatures.IsAllow = false
-	meta.RoomFeatures.AllowRtmp = new(false)
 	meta.RoomFeatures.ExternalBroadcastingFeatures.IsAllow = false
 	meta.WebhookUrl = nil
 	meta.LogoutUrl = nil
@@ -153,7 +152,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	meta.RoomFeatures.DisplayExternalLinkFeatures.IsActive = false
 	meta.RoomFeatures.ExternalMediaPlayerFeatures.IsActive = false
 	meta.RoomFeatures.CountdownTimerFeatures = &plugnmeet.CountdownTimerFeatures{
-		IsAllow: true,
+		IsAllow: meta.RoomFeatures.CountdownTimerFeatures.GetIsAllow(),
 	}
 
 	// validate/normalize the optional whiteboard share request.
