@@ -2,6 +2,9 @@ module github.com/mynaparrot/plugnmeet-server
 
 go 1.27.3
 
+// temporary: use the local protocol during development
+replace github.com/mynaparrot/plugnmeet-protocol => ../protocol
+
 require (
 	buf.build/go/protovalidate v1.4.0
 	github.com/Microsoft/cognitive-services-speech-sdk-go v1.53.0

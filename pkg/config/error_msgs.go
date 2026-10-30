@@ -41,6 +41,18 @@ var (
 	ErrPollGeneric                = errors.New("polls.errors.generic")
 )
 
+// Countdown-timer errors are returned to clients; their values are i18n keys
+// the client resolves via t(), never raw operational error text.
+var (
+	ErrCountdownTimerOnlyAdmin       = errors.New("countdown-timer.errors.only-admin")
+	ErrCountdownTimerNotAllowed      = errors.New("countdown-timer.errors.not-allowed")
+	ErrCountdownTimerNotActive       = errors.New("countdown-timer.errors.not-active")
+	ErrCountdownTimerInvalidDuration = errors.New("countdown-timer.errors.invalid-duration")
+	ErrCountdownTimerNotRunning      = errors.New("countdown-timer.errors.not-running")
+	ErrCountdownTimerNotPaused       = errors.New("countdown-timer.errors.not-paused")
+	ErrCountdownTimerGeneric         = errors.New("countdown-timer.errors.generic")
+)
+
 // Breakout-room errors are returned to clients; their values are i18n keys the
 // client resolves via t(), never raw operational error text. Models log
 // operational errors and return ErrBkRoomUnexpectedError for them.

@@ -212,6 +212,7 @@ func (r *Router) registerAPIRoutes() {
 	api.Post("/enableSipDialIn", r.ctrl.RoomController.HandleEnableRoomSipDialIn)
 	api.Post("/externalDisplayLink", r.ctrl.RoomController.HandleExternalDisplayLink)
 	api.Post("/externalMediaPlayer", r.ctrl.RoomController.HandleExternalMediaPlayer)
+	api.Post("/countdownTimer", r.ctrl.RoomController.HandleCountdownTimer)
 
 	ingress := api.Group("/ingress")
 	ingress.Post("/create", r.ctrl.RoomController.HandleCreateIngress)

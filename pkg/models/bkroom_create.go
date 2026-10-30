@@ -152,6 +152,9 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	// clear few main room data
 	meta.RoomFeatures.DisplayExternalLinkFeatures.IsActive = false
 	meta.RoomFeatures.ExternalMediaPlayerFeatures.IsActive = false
+	meta.RoomFeatures.CountdownTimerFeatures = &plugnmeet.CountdownTimerFeatures{
+		IsAllow: true,
+	}
 
 	// validate/normalize the optional whiteboard share request.
 	_, childWbf, err := m.normalizeBreakoutWhiteboardShare(r, meta, log)
