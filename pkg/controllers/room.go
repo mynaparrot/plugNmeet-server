@@ -278,6 +278,34 @@ func (rc *RoomController) HandleExternalDisplayLink(c fiber.Ctx) error {
 	return utils.SendCommonProtobufResponse(c, true, "success")
 }
 
+// HandleCountdownTimer handles the room's shared countdown timer tasks.
+func (rc *RoomController) HandleCountdownTimer(c fiber.Ctx) error {
+	isAdmin := fiber.Locals[bool](c, "isAdmin")
+	roomId := fiber.Locals[string](c, "roomId")
+	requestedUserId := fiber.Locals[string](c, "requestedUserId")
+
+	if !isAdmin {
+		return utils.SendCommonProtobufResponse(c, false, config.ErrCountdownTimerOnlyAdmin.Error())
+	}
+
+	if roomId == "" {
+		return utils.SendCommonProtobufResponse(c, false, config.ErrCountdownTimerGeneric.Error())
+	}
+
+	req := new(plugnmeet.CountdownTimerReq)
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
+		return utils.SendCommonProtobufResponse(c, false, config.ErrCountdownTimerGeneric.Error())
+	}
+
+	req.RoomId = roomId
+	req.UserId = requestedUserId
+	if err := rc.RoomModel.HandleCountdownTimerTask(req); err != nil {
+		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	}
+
+	return utils.SendCommonProtobufResponse(c, true, "success")
+}
+
 // HandleExternalMediaPlayer handles external media player actions.
 func (rc *RoomController) HandleExternalMediaPlayer(c fiber.Ctx) error {
 	isAdmin := fiber.Locals[bool](c, "isAdmin")

@@ -110,8 +110,6 @@ type RecorderInfo struct {
 
 type AnalyticsSettings struct {
 	Enabled bool `yaml:"enabled"`
-	// Deprecated: Use ArtifactsSettings instead.
-	FilesStorePath *string `yaml:"files_store_path"`
 }
 
 type ArtifactsSettings struct {
@@ -215,14 +213,6 @@ func InitAppConfig(appCnf *AppConfig) (*AppConfig, error) {
 	}
 	if appCnf.NatsInfo.Subjects.SystemCoreWorker == "" {
 		appCnf.NatsInfo.Subjects.SystemCoreWorker = "sysCoreWorker"
-	}
-
-	// set default values
-	if appCnf.AnalyticsSettings != nil {
-		// TODO: deprecated, will remove in future
-		if appCnf.AnalyticsSettings.FilesStorePath == nil {
-			appCnf.AnalyticsSettings.FilesStorePath = new("./analytics")
-		}
 	}
 
 	if appCnf.RoomDefaultSettings == nil {

@@ -1,18 +1,13 @@
 package models
 
 import (
-	"errors"
 	"fmt"
-	"io"
 	"os"
-	"path/filepath"
 	"time"
 
-	"github.com/go-sql-driver/mysql"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // CreateAnalyticsArtifact creates a new artifact record for a generated analytics file.
@@ -66,120 +61,4 @@ func (m *ArtifactModel) CreateAnalyticsArtifact(roomTableId uint64, jsonData []b
 	}
 
 	return artifact, nil
-}
-
-//-- Migration logic here--
-// TODO: will remove in future
-
-// copyFile performs a copy of a file from a source to a destination.
-func copyFile(src, dst string) error {
-	sourceFile, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer sourceFile.Close()
-
-	destFile, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer destFile.Close()
-
-	_, err = io.Copy(destFile, sourceFile)
-	if err != nil {
-		return err
-	}
-
-	return destFile.Sync()
-}
-
-// MigrateAnalyticsToArtifacts performs a one-time migration of old analytics files
-// to the new room artifacts structure.
-func (m *ArtifactModel) MigrateAnalyticsToArtifacts() {
-	log := m.log.WithField("method", "MigrateAnalyticsToArtifacts")
-	log.Info("starting analytics to artifacts migration...")
-
-	oldAnalytics, err := m.ds.GetAllAnalyticsFiles()
-	if err != nil {
-		log.WithError(err).Error("failed to get old analytics files from db")
-		return
-	}
-
-	if len(oldAnalytics) == 0 {
-		log.Info("no old analytics files found to migrate")
-		return
-	}
-
-	log.Infof("found %d old analytics records to process", len(oldAnalytics))
-	var migratedCount, skippedCount int
-
-	for _, analytic := range oldAnalytics {
-		oldPath := filepath.Join(*m.app.AnalyticsSettings.FilesStorePath, analytic.FileName)
-		oldStat, err := os.Stat(oldPath)
-		if os.IsNotExist(err) {
-			log.Warnf("source analytics file not found, skipping: %s", oldPath)
-			skippedCount++
-			continue
-		}
-
-		roomInfo, err := m.ds.GetRoomInfoByTableId(analytic.RoomTableID)
-		if err != nil || roomInfo == nil {
-			log.WithError(err).Errorf("failed to get room info for room_table_id %d, skipping", analytic.RoomTableID)
-			continue
-		}
-
-		relativePath, absolutePath, err := m.buildPath(analytic.FileName, roomInfo.RoomId, plugnmeet.RoomArtifactType_MEETING_ANALYTICS)
-		if err != nil {
-			log.WithError(err).Errorf("failed to build new artifact path for file %s", analytic.FileName)
-			continue
-		}
-
-		// Use copy then delete for robustness across filesystems.
-		err = copyFile(oldPath, absolutePath)
-		if err != nil {
-			log.WithError(err).Errorf("failed to copy file from %s to %s", oldPath, absolutePath)
-			continue
-		}
-
-		metadataBytes, err := protojson.Marshal(&plugnmeet.RoomArtifactMetadata{
-			FileInfo: &plugnmeet.RoomArtifactFileInfo{
-				FilePath: relativePath,
-				FileSize: oldStat.Size(),
-				MimeType: "application/json",
-			},
-		})
-		if err != nil {
-			log.WithError(err).Error("failed to marshal metadata")
-			continue
-		}
-
-		artifact := &dbmodels.RoomArtifact{
-			ArtifactId:  analytic.FileID, // Use old file_id as the new unique artifact_id
-			RoomTableID: analytic.RoomTableID,
-			RoomId:      roomInfo.RoomId,
-			Type:        dbmodels.RoomArtifactType(plugnmeet.RoomArtifactType_MEETING_ANALYTICS),
-			Metadata:    string(metadataBytes),
-		}
-
-		// Use the existing DB method, which doesn't trigger webhooks.
-		_, err = m.ds.CreateRoomArtifact(artifact)
-		if err != nil {
-			// Clean up the copied file if DB insert fails.
-			_ = os.Remove(absolutePath)
-
-			if mysqlErr, ok := errors.AsType[*mysql.MySQLError](err); ok && mysqlErr.Number == 1062 { // 1062 is the error number for duplicate entry
-				log.Warnf("artifact for file_id %s already exists, skipping.", analytic.FileID)
-				skippedCount++
-			} else {
-				log.WithError(err).Errorf("failed to create artifact record for file %s", analytic.FileName)
-			}
-			continue
-		}
-
-		// If DB insert is successful, delete the original file.
-		_ = os.Remove(oldPath)
-		migratedCount++
-	}
-
-	log.Infof("analytics migration finished. Migrated: %d, Skipped: %d", migratedCount, skippedCount)
 }
