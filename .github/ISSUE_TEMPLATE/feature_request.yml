@@ -1,0 +1,55 @@
+name: Feature request
+description: Suggest an improvement for plugNmeet
+title: '[FEATURE] '
+labels:
+  - enhancement
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Please start with a Discussion
+
+        Before submitting a feature request, please discuss it in
+        [plugNmeet Discussions](https://github.com/mynaparrot/plugNmeet-server/discussions).
+
+        Describe the actual problem or limitation you are facing and explain
+        why the requested feature is needed.
+
+        **Do not submit AI-generated feature ideas, technical designs, or implementation suggestions.**
+
+        We need to understand your real use case, not an AI-generated solution.
+        Feature requests containing fabricated use cases or content the reporter
+        cannot explain may be closed without further review.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you facing?
+      description: Describe the actual problem or limitation in your workflow.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What would you like plugNmeet to do?
+      description: Describe the expected behavior without providing a technical implementation.
+    validations:
+      required: true
+
+  - type: input
+    id: client-version
+    attributes:
+      label: Client version
+      placeholder: vX.Y.Z
+    validations:
+      required: true
+
+  - type: input
+    id: server-version
+    attributes:
+      label: Server version
+      placeholder: vX.Y.Z
+    validations:
+      required: true

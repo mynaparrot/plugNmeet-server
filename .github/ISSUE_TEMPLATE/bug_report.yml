@@ -1,0 +1,76 @@
+name: Bug report
+description: Report a confirmed and reproducible problem with plugNmeet
+title: '[BUG] '
+labels:
+  - bug
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Please start with a Discussion
+
+        Before opening an issue, please describe your problem in
+        [plugNmeet Discussions](https://github.com/mynaparrot/plugNmeet-server/discussions).
+
+        Discussions allow maintainers and the community to request missing
+        information and determine whether the reported behavior is actually
+        a plugNmeet bug.
+
+        Please describe what you actually experienced. Focus on observable facts:
+        what you did, what happened, and what you expected to happen.
+
+        **Do not submit AI-generated diagnoses, technical explanations, root-cause analysis, or suggested fixes.**
+
+        Incorrect technical speculation creates confusion and delays investigation.
+        We need an accurate description of your problem, not an unverified solution.
+
+        You may use AI to improve grammar or organize information, but you must
+        verify every statement before submitting it. You must be able to explain
+        and answer questions about everything included in your report.
+
+        Issues containing fabricated details, unverified AI-generated analysis,
+        or content the reporter cannot explain may be closed without investigation.
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: What happened?
+      description: Describe the actual behavior you experienced.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: What did you expect?
+      description: Describe what you expected to happen instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: input
+    id: client-version
+    attributes:
+      label: Client version
+      placeholder: vX.Y.Z
+    validations:
+      required: true
+
+  - type: input
+    id: server-version
+    attributes:
+      label: Server version
+      placeholder: vX.Y.Z
+    validations:
+      required: true
