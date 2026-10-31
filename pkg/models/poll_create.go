@@ -43,13 +43,15 @@ func (m *PollModel) CreatePoll(r *plugnmeet.CreatePollReq) (string, error) {
 
 	// send analytics
 	toRecord := struct {
-		PollId   string                         `json:"poll_id"`
-		Question string                         `json:"question"`
-		Options  []*plugnmeet.CreatePollOptions `json:"options"`
+		PollId       string                         `json:"poll_id"`
+		Question     string                         `json:"question"`
+		Options      []*plugnmeet.CreatePollOptions `json:"options,omitempty"`
+		IsTextAnswer bool                           `json:"is_text_answer,omitempty"`
 	}{
-		PollId:   r.PollId,
-		Question: r.Question,
-		Options:  r.Options,
+		PollId:       r.PollId,
+		Question:     r.Question,
+		Options:      r.Options,
+		IsTextAnswer: r.IsTextAnswer,
 	}
 	marshal, err := json.Marshal(toRecord)
 	if err != nil {
