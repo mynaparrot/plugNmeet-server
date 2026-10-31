@@ -1,8 +1,11 @@
 package redisservice
 
 import (
+	"cmp"
 	"fmt"
+	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -16,7 +19,10 @@ import (
 //	                                      is_running/expires_at/is_anonymous
 //	pnm:polls:{roomId}:voters:{pollId}    HASH userId -> PollRespondent protojson
 //	                                      (anonymous polls store the marker)
-//	pnm:polls:{roomId}:results:{pollId}   HASH total_resp + "{optionId}_count"
+//	pnm:polls:{roomId}:results:{pollId}   HASH total_resp plus "{optionId}_count"
+//	                                      for choice polls or
+//	                                      "txt_count:{normKey}"/"txt_disp:{normKey}"
+//	                                      for text-answer polls
 //
 // plus the shared pnm:pollsWithDuration janitor-hint HASH.
 const (
@@ -34,6 +40,11 @@ const (
 
 	PollTotalRespField = "total_resp"
 	PollCountSuffix    = "_count"
+
+	// PollTextCountPrefix keys the aggregated counter of one normalized text
+	// answer; PollTextDisplayPrefix stores the first submitted display text.
+	PollTextCountPrefix   = "txt_count:"
+	PollTextDisplayPrefix = "txt_disp:"
 
 	// PollAnonymousMarker is the opaque voters-hash value stored for anonymous
 	// polls; no names or choices are ever stored for them.
@@ -121,6 +132,34 @@ func u64String(v uint64) string {
 
 func pollOptionCountField(optionId uint64) string {
 	return u64String(optionId) + PollCountSuffix
+}
+
+// ExtractTextAnswerResults aggregates raw results-hash counters into a sorted
+// text-answer list: highest count first, then case-insensitive text ascending.
+func ExtractTextAnswerResults(counters map[string]string) []*plugnmeet.PollTextAnswerResult {
+	res := make([]*plugnmeet.PollTextAnswerResult, 0, len(counters))
+	for k, raw := range counters {
+		if !strings.HasPrefix(k, PollTextCountPrefix) {
+			continue
+		}
+		count, err := parseUint64(raw)
+		if err != nil || count == 0 {
+			continue
+		}
+		normKey := strings.TrimPrefix(k, PollTextCountPrefix)
+		text := counters[PollTextDisplayPrefix+normKey]
+		if text == "" {
+			text = normKey
+		}
+		res = append(res, &plugnmeet.PollTextAnswerResult{Text: text, Count: count})
+	}
+	slices.SortFunc(res, func(a, b *plugnmeet.PollTextAnswerResult) int {
+		if c := cmp.Compare(b.GetCount(), a.GetCount()); c != 0 {
+			return c
+		}
+		return strings.Compare(strings.ToLower(a.GetText()), strings.ToLower(b.GetText()))
+	})
+	return res
 }
 
 func countersU64(m map[string]string, field string) uint64 {

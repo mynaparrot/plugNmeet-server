@@ -42,7 +42,7 @@ func sanitizePollInfoForClient(info *plugnmeet.PollInfo) *plugnmeet.PollInfo {
 	return info
 }
 
-func (m *PollModel) UserSelectedOption(roomId, pollId, userId string) ([]uint64, *bool, error) {
+func (m *PollModel) UserSelectedOption(roomId, pollId, userId string) ([]uint64, *string, *bool, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId": roomId,
 		"pollId": pollId,
@@ -52,33 +52,37 @@ func (m *PollModel) UserSelectedOption(roomId, pollId, userId string) ([]uint64,
 	info, err := m.rs.GetPollInfoByPollId(roomId, pollId)
 	if err != nil {
 		log.WithError(err).Errorln("failed to fetch poll info")
-		return nil, nil, config.ErrPollGeneric
+		return nil, nil, nil, config.ErrPollGeneric
 	}
 	if info == nil {
-		return nil, nil, config.ErrPollNotFound
+		return nil, nil, nil, config.ErrPollNotFound
 	}
 
-	// anonymous polls: participation only, never the choice
+	// anonymous polls: participation only, never the answer
 	if info.IsAnonymous {
 		voted, err := m.rs.IsUserVotedPoll(roomId, pollId, userId)
 		if err != nil {
 			log.WithError(err).Errorln("failed to check voted users set")
-			return nil, nil, config.ErrPollGeneric
+			return nil, nil, nil, config.ErrPollGeneric
 		}
-		return nil, &voted, nil
+		return nil, nil, &voted, nil
 	}
 
 	respondent, err := m.rs.GetPollRespondent(roomId, pollId, userId)
 	if err != nil {
 		log.WithError(err).Errorln("failed to fetch poll respondent")
-		return nil, nil, config.ErrPollGeneric
+		return nil, nil, nil, config.ErrPollGeneric
 	}
 	if respondent == nil {
-		return nil, new(bool), nil
+		return nil, nil, new(bool), nil
 	}
 
 	hasVoted := true
-	return respondent.OptionIds, &hasVoted, nil
+	var votedText *string
+	if respondent.TextAnswer != "" {
+		votedText = &respondent.TextAnswer
+	}
+	return respondent.OptionIds, votedText, &hasVoted, nil
 }
 
 func (m *PollModel) GetPollResponsesDetails(roomId, pollId string) (*plugnmeet.PollResponsesDetails, error) {
@@ -133,6 +137,14 @@ func (m *PollModel) GetResponsesResult(roomId, pollId string) (*plugnmeet.PollRe
 
 	res := new(plugnmeet.PollResponsesResult)
 	res.Question = info.Question
+
+	if info.IsTextAnswer {
+		res.TextAnswers = redisservice.ExtractTextAnswerResults(counters)
+		res.TotalResponses = countersU64(counters, redisservice.PollTotalRespField)
+		// text answers are single-answer votes, one per respondent
+		res.TotalVotes = res.TotalResponses
+		return res, nil
+	}
 
 	options := make([]*plugnmeet.PollResponsesResultOptions, 0, len(info.GetOptions()))
 	var totalVotes uint64

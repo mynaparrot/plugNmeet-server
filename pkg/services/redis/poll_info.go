@@ -93,9 +93,10 @@ func (s *RedisService) IsUserVotedPoll(roomId, pollId, userId string) (bool, err
 }
 
 // GetPollResponsesDetails builds the typed responses detail: aggregate counts
-// from the results hash plus the stored respondents. Anonymous polls keep
-// counts but their respondents are never exposed (only the marker is stored,
-// keyed by user id — the list is skipped to avoid leaking even user ids).
+// from the results hash (option counts or grouped text answers) plus the stored
+// respondents. Anonymous polls keep counts but their respondents are never
+// exposed (only the marker is stored, keyed by user id — the list is skipped
+// to avoid leaking even user ids).
 func (s *RedisService) GetPollResponsesDetails(roomId, pollId string, info *plugnmeet.PollInfo) (*plugnmeet.PollResponsesDetails, error) {
 	counters, err := s.GetPollResultsRaw(roomId, pollId)
 	if err != nil {
@@ -105,14 +106,18 @@ func (s *RedisService) GetPollResponsesDetails(roomId, pollId string, info *plug
 	details := new(plugnmeet.PollResponsesDetails)
 	details.TotalRespondents = countersU64(counters, PollTotalRespField)
 
-	options := make([]*plugnmeet.PollResponsesResultOptions, 0, len(info.GetOptions()))
-	for _, opt := range info.GetOptions() {
-		options = append(options, &plugnmeet.PollResponsesResultOptions{
-			Id:        uint64(opt.GetId()),
-			VoteCount: countersU64(counters, pollOptionCountField(uint64(opt.GetId()))),
-		})
+	if info.GetIsTextAnswer() {
+		details.TextAnswers = ExtractTextAnswerResults(counters)
+	} else {
+		options := make([]*plugnmeet.PollResponsesResultOptions, 0, len(info.GetOptions()))
+		for _, opt := range info.GetOptions() {
+			options = append(options, &plugnmeet.PollResponsesResultOptions{
+				Id:        uint64(opt.GetId()),
+				VoteCount: countersU64(counters, pollOptionCountField(uint64(opt.GetId()))),
+			})
+		}
+		details.Options = options
 	}
-	details.Options = options
 
 	if info.GetIsAnonymous() {
 		return details, nil

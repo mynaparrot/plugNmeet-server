@@ -34,6 +34,8 @@ const (
 
 	// MaxPollDurationSeconds caps poll auto-close duration at 60 minutes.
 	MaxPollDurationSeconds = 3600
+	// MaxPollTextAnswerLength caps free-text poll answers at 500 characters (runes).
+	MaxPollTextAnswerLength = 500
 	// PollAutoClosedBy is the closed_by marker for polls auto-closed at expiry.
 	PollAutoClosedBy = "pnm_poll_auto_close"
 
