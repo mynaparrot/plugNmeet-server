@@ -2,7 +2,9 @@ package models
 
 import (
 	"errors"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/goccy/go-json"
 	"github.com/google/uuid"
@@ -41,13 +43,15 @@ func (m *PollModel) CreatePoll(r *plugnmeet.CreatePollReq) (string, error) {
 
 	// send analytics
 	toRecord := struct {
-		PollId   string                         `json:"poll_id"`
-		Question string                         `json:"question"`
-		Options  []*plugnmeet.CreatePollOptions `json:"options"`
+		PollId       string                         `json:"poll_id"`
+		Question     string                         `json:"question"`
+		Options      []*plugnmeet.CreatePollOptions `json:"options,omitempty"`
+		IsTextAnswer bool                           `json:"is_text_answer,omitempty"`
 	}{
-		PollId:   r.PollId,
-		Question: r.Question,
-		Options:  r.Options,
+		PollId:       r.PollId,
+		Question:     r.Question,
+		Options:      r.Options,
+		IsTextAnswer: r.IsTextAnswer,
 	}
 	marshal, err := json.Marshal(toRecord)
 	if err != nil {
@@ -66,23 +70,31 @@ func (m *PollModel) CreatePoll(r *plugnmeet.CreatePollReq) (string, error) {
 
 // validateCreatePollReq enforces the server-side creation rules.
 func validateCreatePollReq(r *plugnmeet.CreatePollReq) error {
+	r.Question = strings.TrimSpace(r.Question)
 	if r.Question == "" {
 		return config.ErrPollQuestionRequired
 	}
-	if len(r.Options) < 2 {
-		return config.ErrPollMinOptions
-	}
-	hasCorrect := false
-	for _, opt := range r.Options {
-		if opt.Text == "" {
-			return config.ErrPollOptionRequired
+	if r.IsTextAnswer {
+		// free-text polls carry no options and cannot be quizzes or multi-select
+		r.IsMultiple = false
+		r.IsQuiz = false
+		r.Options = nil
+	} else {
+		if len(r.Options) < 2 {
+			return config.ErrPollMinOptions
 		}
-		if opt.IsCorrect {
-			hasCorrect = true
+		hasCorrect := false
+		for _, opt := range r.Options {
+			if opt.Text == "" {
+				return config.ErrPollOptionRequired
+			}
+			if opt.IsCorrect {
+				hasCorrect = true
+			}
 		}
-	}
-	if r.IsQuiz && !hasCorrect {
-		return config.ErrPollQuizNeedsCorrect
+		if r.IsQuiz && !hasCorrect {
+			return config.ErrPollQuizNeedsCorrect
+		}
 	}
 	if r.Duration > config.MaxPollDurationSeconds {
 		return config.ErrPollDurationCap
@@ -94,16 +106,17 @@ func validateCreatePollReq(r *plugnmeet.CreatePollReq) error {
 func (m *PollModel) createRoomPollHash(r *plugnmeet.CreatePollReq) error {
 	created := time.Now().Unix()
 	p := &plugnmeet.PollInfo{
-		Id:          r.PollId,
-		RoomId:      r.RoomId,
-		Question:    r.Question,
-		Options:     r.Options,
-		IsRunning:   true,
-		Created:     created,
-		CreatedBy:   r.UserId,
-		IsAnonymous: r.IsAnonymous,
-		IsMultiple:  r.IsMultiple,
-		IsQuiz:      r.IsQuiz,
+		Id:           r.PollId,
+		RoomId:       r.RoomId,
+		Question:     r.Question,
+		Options:      r.Options,
+		IsRunning:    true,
+		Created:      created,
+		CreatedBy:    r.UserId,
+		IsAnonymous:  r.IsAnonymous,
+		IsMultiple:   r.IsMultiple,
+		IsQuiz:       r.IsQuiz,
+		IsTextAnswer: r.IsTextAnswer,
 	}
 	// fixed duration polls get a hard expiry; 0 means no limit
 	if r.Duration > 0 {
@@ -150,24 +163,32 @@ func (m *PollModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq) error
 	if !info.IsRunning {
 		return config.ErrPollClosed
 	}
-	if len(r.SelectedOptions) == 0 {
-		return config.ErrPollNoOptionSelected
-	}
-	// drop duplicate selections while preserving order
-	r.SelectedOptions = dedupeSelectedOptions(r.SelectedOptions)
 
-	// single-choice polls accept exactly one option
-	if !info.IsMultiple && len(r.SelectedOptions) > 1 {
-		return config.ErrPollGeneric
-	}
-	// reject option ids that don't belong to this poll
-	validIds := make(map[uint64]struct{}, len(info.Options))
-	for _, opt := range info.Options {
-		validIds[uint64(opt.Id)] = struct{}{}
-	}
-	for _, id := range r.SelectedOptions {
-		if _, ok := validIds[id]; !ok {
+	if info.IsTextAnswer {
+		if err = normalizeTextAnswer(r); err != nil {
+			return err
+		}
+	} else {
+		r.TextAnswer = ""
+		if len(r.SelectedOptions) == 0 {
+			return config.ErrPollNoOptionSelected
+		}
+		// drop duplicate selections while preserving order
+		r.SelectedOptions = dedupeSelectedOptions(r.SelectedOptions)
+
+		// single-choice polls accept exactly one option
+		if !info.IsMultiple && len(r.SelectedOptions) > 1 {
 			return config.ErrPollGeneric
+		}
+		// reject option ids that don't belong to this poll
+		validIds := make(map[uint64]struct{}, len(info.Options))
+		for _, opt := range info.Options {
+			validIds[uint64(opt.Id)] = struct{}{}
+		}
+		for _, id := range r.SelectedOptions {
+			if _, ok := validIds[id]; !ok {
+				return config.ErrPollGeneric
+			}
 		}
 	}
 
@@ -185,15 +206,20 @@ func (m *PollModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq) error
 		return config.ErrPollGeneric
 	}
 
-	// send analytics; anonymous polls record participation only — never the choice
+	// send analytics; anonymous polls record participation only — never the answer
 	toRecord := struct {
 		PollId          string `json:"poll_id"`
 		SelectedOptions string `json:"selected_options,omitempty"`
+		TextAnswer      string `json:"text_answer,omitempty"`
 	}{
 		PollId: r.PollId,
 	}
 	if !info.IsAnonymous {
-		toRecord.SelectedOptions = config.JoinPollOptionIds(r.SelectedOptions)
+		if info.IsTextAnswer {
+			toRecord.TextAnswer = r.TextAnswer
+		} else {
+			toRecord.SelectedOptions = config.JoinPollOptionIds(r.SelectedOptions)
+		}
 	}
 	marshal, err := json.Marshal(toRecord)
 	if err != nil {
@@ -249,6 +275,19 @@ func (m *PollModel) ReopenPoll(r *plugnmeet.ReopenPollReq) error {
 	})
 
 	log.Info("successfully reopened poll")
+	return nil
+}
+
+// normalizeTextAnswer trims and validates a free-text answer, dropping option ids.
+func normalizeTextAnswer(r *plugnmeet.SubmitPollResponseReq) error {
+	r.TextAnswer = strings.TrimSpace(r.TextAnswer)
+	if r.TextAnswer == "" {
+		return config.ErrPollTextAnswerRequired
+	}
+	if utf8.RuneCountInString(r.TextAnswer) > config.MaxPollTextAnswerLength {
+		return config.ErrPollTextAnswerTooLong
+	}
+	r.SelectedOptions = nil
 	return nil
 }
 

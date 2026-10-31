@@ -202,7 +202,7 @@ func (pc *PollsController) HandleUserSelectedOption(c fiber.Ctx) error {
 		return utils.SendProtobufResponse(c, res)
 	}
 
-	voted, hasVoted, err := pc.PollModel.UserSelectedOption(roomId, pollId, userId)
+	voted, votedText, hasVoted, err := pc.PollModel.UserSelectedOption(roomId, pollId, userId)
 	if err != nil {
 		res.Msg = err.Error()
 		return utils.SendProtobufResponse(c, res)
@@ -212,6 +212,7 @@ func (pc *PollsController) HandleUserSelectedOption(c fiber.Ctx) error {
 	res.Msg = "success"
 	res.PollId = &pollId
 	res.Voted = voted
+	res.VotedText = votedText
 	res.HasVoted = hasVoted
 	return utils.SendProtobufResponse(c, res)
 }

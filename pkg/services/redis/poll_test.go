@@ -3,6 +3,7 @@ package redisservice
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"sync"
 	"testing"
@@ -178,6 +179,101 @@ func TestPollAnonymousStoresNoChoiceOrName(t *testing.T) {
 	}
 	if details.TotalRespondents != 1 || len(details.Respondents) != 0 {
 		t.Fatalf("anonymous details must keep counts only: %+v", details)
+	}
+}
+
+func TestPollTextAnswerGroupingAndDisplay(t *testing.T) {
+	s := newTestService(t)
+	info := newPoll(testRoomId, true)
+	info.Id = "poll-text-nonanon"
+	info.IsTextAnswer = true
+	info.Options = nil
+	if err := s.CreateRoomPoll(testRoomId, info); err != nil {
+		t.Fatal(err)
+	}
+
+	for i, answer := range []string{"  Yes  ", "yes", "No"} {
+		req := &plugnmeet.SubmitPollResponseReq{
+			RoomId: testRoomId, PollId: info.Id,
+			UserId: fmt.Sprintf("user%d", i), Name: fmt.Sprintf("U %d", i),
+			TextAnswer: answer,
+		}
+		if err := s.AddPollResponse(req); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// case-insensitive grouping keeps the first display text
+	counters, err := s.GetPollResultsRaw(testRoomId, info.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if counters["total_resp"] != "3" ||
+		counters[PollTextCountPrefix+"yes"] != "2" || counters[PollTextDisplayPrefix+"yes"] != "Yes" ||
+		counters[PollTextCountPrefix+"no"] != "1" || counters[PollTextDisplayPrefix+"no"] != "No" {
+		t.Fatalf("wrong text counters: %v", counters)
+	}
+
+	respondent, err := s.GetPollRespondent(testRoomId, info.Id, "user0")
+	if err != nil || respondent.TextAnswer != "Yes" {
+		t.Fatalf("respondent text answer not stored: %+v err=%v", respondent, err)
+	}
+
+	details, err := s.GetPollResponsesDetails(testRoomId, info.Id, info)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if details.TotalRespondents != 3 || len(details.Respondents) != 3 || len(details.Options) != 0 {
+		t.Fatalf("unexpected text details: %+v", details)
+	}
+	if len(details.TextAnswers) != 2 ||
+		details.TextAnswers[0].Text != "Yes" || details.TextAnswers[0].Count != 2 ||
+		details.TextAnswers[1].Text != "No" || details.TextAnswers[1].Count != 1 {
+		t.Fatalf("text answers not aggregated/sorted: %+v", details.TextAnswers)
+	}
+}
+
+func TestPollTextAnswerAnonymous(t *testing.T) {
+	s := newTestService(t)
+	info := newPoll(testRoomId, true)
+	info.Id = "poll-text-anon"
+	info.IsTextAnswer = true
+	info.IsAnonymous = true
+	info.Options = nil
+	if err := s.CreateRoomPoll(testRoomId, info); err != nil {
+		t.Fatal(err)
+	}
+
+	for i, answer := range []string{"Maybe", "maybe"} {
+		req := &plugnmeet.SubmitPollResponseReq{
+			RoomId: testRoomId, PollId: info.Id,
+			UserId: fmt.Sprintf("anon%d", i), Name: "Secret Name",
+			TextAnswer: answer,
+		}
+		if err := s.AddPollResponse(req); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	voters, err := s.rc.HGetAll(s.ctx, pollVotersKey(testRoomId, info.Id)).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for id, raw := range voters {
+		if raw != PollAnonymousMarker {
+			t.Fatalf("anonymous vote stored undisclosed data for %s: %q", id, raw)
+		}
+	}
+
+	details, err := s.GetPollResponsesDetails(testRoomId, info.Id, info)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if details.TotalRespondents != 2 || len(details.Respondents) != 0 {
+		t.Fatalf("anonymous details must keep counts only: %+v", details)
+	}
+	if len(details.TextAnswers) != 1 || details.TextAnswers[0].Text != "Maybe" || details.TextAnswers[0].Count != 2 {
+		t.Fatalf("anonymous text answers not aggregated: %+v", details.TextAnswers)
 	}
 }
 

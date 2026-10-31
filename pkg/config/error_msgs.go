@@ -31,6 +31,8 @@ var (
 	ErrPollQuizNeedsCorrect       = errors.New("polls.errors.quiz-needs-correct")
 	ErrPollDurationCap            = errors.New("polls.errors.duration-cap")
 	ErrPollNoOptionSelected       = errors.New("polls.errors.no-option-selected")
+	ErrPollTextAnswerRequired     = errors.New("polls.errors.text-answer-required")
+	ErrPollTextAnswerTooLong      = errors.New("polls.errors.text-answer-too-long")
 	ErrPollAlreadyVoted           = errors.New("polls.errors.already-voted")
 	ErrPollWaitForClose           = errors.New("polls.errors.wait-for-close")
 	ErrPollOnlyAdmin              = errors.New("polls.errors.only-admin")
