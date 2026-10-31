@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.6.0](https://github.com/mynaparrot/plugNmeet-server/compare/v2.5.4...v2.6.0) (2026-10-31)
+
+
+### Features
+
+* **countdown-timer:** host-controlled meeting countdown timer ([#936](https://github.com/mynaparrot/plugNmeet-server/issues/936)) ([2844bd8](https://github.com/mynaparrot/plugNmeet-server/commit/2844bd8257cba9bf51ad3edc3c6221973e47bb17))
+* **polls:** support text-answer polls with atomic Redis grouping and validation ([#938](https://github.com/mynaparrot/plugNmeet-server/issues/938)) ([cbddb88](https://github.com/mynaparrot/plugNmeet-server/commit/cbddb8883b99948c97ba0f57a9a3e253750b1804))
+
 ## [2.5.4](https://github.com/mynaparrot/plugNmeet-server/compare/v2.5.3...v2.5.4) (2026-10-28)
 
 
