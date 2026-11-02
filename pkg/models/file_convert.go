@@ -9,6 +9,7 @@ import (
 	_ "image/png"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -109,6 +110,54 @@ func (m *FileModel) ConvertAndBroadcastWhiteboardFile(ctx context.Context, roomI
 	}
 }
 
+// sanitizeRelativeFilePath normalizes a client supplied path and blocks anything that
+// could escape the storage root. It deliberately does not require the first segment to
+// be the roomSid: when storage hooks are enabled the path is produced by the third-party
+// hook (e.g. room-files/<roomSid>/<file> or <custom-prefix>/<file>).
+func sanitizeRelativeFilePath(filePath string) (string, error) {
+	if filePath == "" {
+		return "", config.ErrInvalidFilePath
+	}
+	if strings.HasPrefix(filePath, "/") || strings.Contains(filePath, "\\") || strings.Contains(filePath, "..") {
+		return "", config.ErrInvalidFilePath
+	}
+
+	cleanPath := path.Clean(filepath.ToSlash(filePath))
+	if cleanPath == "." || cleanPath == "/" || strings.HasPrefix(cleanPath, "/") {
+		return "", config.ErrInvalidFilePath
+	}
+
+	// require at least a prefix directory + a file name
+	segments := strings.Split(cleanPath, "/")
+	if len(segments) < 2 {
+		return "", config.ErrInvalidFilePath
+	}
+
+	for _, segment := range segments {
+		// never allow parent/current dir markers or the resumable upload temp dir
+		if segment == ".." || segment == "." || segment == config.UploadFileTempDir {
+			return "", config.ErrInvalidFilePath
+		}
+	}
+
+	return cleanPath, nil
+}
+
+// validateLocalRoomFilePath is used for the local (no storage hooks) fallback, where the
+// file must live inside the upload directory of the requested room (roomSid/...).
+func validateLocalRoomFilePath(roomSid, filePath string) (string, error) {
+	cleanPath, err := sanitizeRelativeFilePath(filePath)
+	if err != nil {
+		return "", err
+	}
+
+	if strings.Split(cleanPath, "/")[0] != roomSid {
+		return "", config.ErrInvalidFilePath
+	}
+
+	return cleanPath, nil
+}
+
 // processAndBroadcastWhiteboardFile contains the original, unmodified conversion logic.
 func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath string, requestedUserId *string, log *logrus.Entry) (res *ConvertWhiteboardFileRes, err error) {
 	log = m.logger.WithField("sub-method", "processAndBroadcastWhiteboardFile")
@@ -120,12 +169,19 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 		return nil, err
 	}
 
+	cleanPath, err := sanitizeRelativeFilePath(filePath)
+	if err != nil {
+		log.WithError(err).Warn("whiteboard file path validation failed")
+		return nil, err
+	}
+
 	var fullPath string
+	var mType *mimetype.MIME
 
 	// If hooks are enabled, we need to download the file first.
 	if m.app.Hooks != nil {
 		req := hooks.DownloadHookData{
-			InputPath:    filePath,
+			InputPath:    cleanPath,
 			HookFileType: hooks.HookFileTypeRoomFile,
 		}
 		outputDir := filepath.Join(m.app.UploadFileSettings.Path, roomSid)
@@ -139,16 +195,29 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 	}
 
 	if fullPath == "" {
-		// fallback to default
-		fullPath = filepath.Join(m.app.UploadFileSettings.Path, filePath)
+		// without hooks the file must stay inside the upload directory of the room
+		localPath, err := validateLocalRoomFilePath(roomSid, cleanPath)
+		if err != nil {
+			log.WithError(err).Warn("whiteboard file path validation failed")
+			return nil, err
+		}
+		fullPath, mType, err = helpers.ValidateAndGetAbsFilePath(m.app.UploadFileSettings.Path, localPath)
+		if err != nil {
+			log.WithError(err).Warn("file path validation failed")
+			if errors.Is(err, config.ErrFileNotFound) {
+				return nil, err
+			}
+			return nil, config.ErrInvalidFilePath
+		}
+	} else {
+		mType, err = mimetype.DetectFile(fullPath)
+		if err != nil {
+			log.WithError(err).Error("mime detection failed")
+			return nil, fmt.Errorf("mime detection failed")
+		}
 	}
 
 	fileName := filepath.Base(fullPath)
-	mType, err := mimetype.DetectFile(fullPath)
-	if err != nil {
-		log.WithError(err).Error("mime detection failed")
-		return nil, fmt.Errorf("mime detection failed")
-	}
 
 	if err := m.ValidateMimeType(mType); err != nil {
 		log.WithError(err).Error("mime type validation failed")
@@ -325,6 +394,7 @@ func (m *FileModel) MergeWhiteboardPdfExport(req *plugnmeet.UploadedFileMergeReq
 		"--creator", "plugNmeet",
 		"--title", finalPdfFileName,
 		"--subject", req.ResumableFilename,
+		"--",
 	}
 	args = append(args, imageFiles...)
 

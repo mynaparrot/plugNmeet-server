@@ -140,6 +140,23 @@ func (ac *AuthController) HandleVerifyHeaderToken(c fiber.Ctx) error {
 		return ac.sendVerificationRes(c, false, "notifications.room-not-active", plugnmeet.StatusCode_ROOM_NOT_FOUND)
 	}
 
+	if ac.NatsService.IsUserExistInBlockList(claims.RoomId, claims.UserId) {
+		_ = c.SendStatus(errStatus)
+		return ac.sendVerificationRes(c, false, "notifications.you-are-blocked", plugnmeet.StatusCode_USER_BLOCKED)
+	}
+
+	if !strings.HasSuffix(path, "/verifyToken") && !strings.HasSuffix(path, "/getClientFiles") {
+		status, err := ac.NatsService.GetRoomUserStatus(claims.RoomId, claims.UserId)
+		if err != nil {
+			_ = c.SendStatus(errStatus)
+			return ac.sendVerificationRes(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
+		}
+		if status != natsservice.UserStatusOnline {
+			_ = c.SendStatus(errStatus)
+			return ac.sendVerificationRes(c, false, "notifications.user-not-active", plugnmeet.StatusCode_USER_NOT_ACTIVE)
+		}
+	}
+
 	c.Locals("isAdmin", claims.IsAdmin)
 	c.Locals("roomId", claims.RoomId)
 	c.Locals("roomSid", rf.RoomSid)
