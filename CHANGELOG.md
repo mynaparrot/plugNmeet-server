@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.5.6](https://github.com/mynaparrot/plugNmeet-server/compare/v2.5.5...v2.5.6) (2026-11-02)
+
+
+### Bug Fixes
+
+* **analytics:** preserve defaults for invalid metadata ([17b8747](https://github.com/mynaparrot/plugNmeet-server/commit/17b8747465c1284915ac4a8cad30fc349eaea376))
+* **lti:** enforce recording room ownership, isolate LTI JWT issuer, and harden OAuth verification ([35f9a48](https://github.com/mynaparrot/plugNmeet-server/commit/35f9a4847be52eb1accdf10208a488aa4a83f1f5))
+* **security:** isolate download token issuers, bind NATS events to authenticated identity, and harden remaining API surfaces ([6aad197](https://github.com/mynaparrot/plugNmeet-server/commit/6aad197a3c3bf35afa1d07d287cf36e5a6bfd3d2))
+* validate remote url before download + few more validation added ([5d513aa](https://github.com/mynaparrot/plugNmeet-server/commit/5d513aab12a1f0cd13adf0d7603b13c069bc5d15))
+
 ## [2.5.5](https://github.com/mynaparrot/plugNmeet-server/compare/v2.5.4...v2.5.5) (2026-11-02)
 
 
