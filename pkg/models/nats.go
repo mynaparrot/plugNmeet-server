@@ -64,6 +64,10 @@ func NewNatsModel(args NatsModelArgs) *NatsModel {
 }
 
 func (m *NatsModel) HandleFromClientToServerReq(roomId, userId string, req *plugnmeet.NatsMsgClientToServer) {
+	if m.natsService.IsUserExistInBlockList(roomId, userId) {
+		return
+	}
+
 	switch req.Event {
 	case plugnmeet.NatsMsgClientToServerEvents_REQ_RENEW_PNM_TOKEN:
 		m.RenewPNMToken(roomId, userId, req.Msg)
