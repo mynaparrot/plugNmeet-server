@@ -141,6 +141,10 @@ func (s *NatsAuthController) setPermissionForClient(data *plugnmeet.PlugNmeetTok
 	roomId := data.GetRoomId()
 	userId := data.GetUserId()
 
+	if s.natsService.IsUserExistInBlockList(roomId, userId) {
+		return fmt.Errorf("user %s is in block list", userId)
+	}
+
 	userInfo, err := s.natsService.GetUserInfo(roomId, userId)
 	if err != nil {
 		return err
@@ -176,7 +180,7 @@ func (s *NatsAuthController) setPermissionForClient(data *plugnmeet.PlugNmeetTok
 		},
 		Sub: jwt.Permission{
 			Allow: jwt.StringList{
-				"_INBOX.>", // otherwise break request-reply patterns
+				fmt.Sprintf("_INBOX.%s.>", userId), // otherwise break request-reply patterns
 				// allow to subscribe in pub/sub channel system public which is different from JetStream
 				fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.SystemPublic, roomId),
 				// other pub/sub channels

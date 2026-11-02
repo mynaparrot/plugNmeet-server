@@ -140,6 +140,17 @@ func (m *NatsModel) HandleMediaServerInfo(roomId, userId string, broadcast bool)
 		return nil
 	}
 
+	metadata, err := m.natsService.GetUserMetadataStruct(roomId, userId)
+	if err != nil {
+		log.WithError(err).Warnln("failed to get user metadata")
+	}
+
+	if metadata.GetWaitForApproval() {
+		log.Warn("user is waiting for approval")
+		_ = m.natsService.NotifyErrorMsg(roomId, "user is waiting for approval", &userId)
+		return nil
+	}
+
 	// client type comes from the user's NATS KV record (via GetUserInfo); WEB when unset
 	clientType := userInfo.GetClientType()
 
@@ -231,7 +242,8 @@ func (m *NatsModel) RenewPNMToken(roomId, userId, token string) {
 	// the client was not able to renew token
 	// as renew request is coming from nats, so it should be secure
 	gracefulPeriod := time.Hour * 3
-	token, err := m.authModel.RenewPNMToken(token, gracefulPeriod)
+	// the token must belong to the nats caller, so a user can't renew someone else's token
+	token, err := m.authModel.RenewPNMToken(token, roomId, userId, gracefulPeriod)
 	if err != nil {
 		m.logger.Errorln(fmt.Errorf("error renewing pnm token for %s; roomId: %s; msg: %s", userId, roomId, err.Error()))
 		return

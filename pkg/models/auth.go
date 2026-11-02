@@ -60,10 +60,14 @@ func (m *AuthModel) UnsafeClaimsWithoutVerification(token string) (*plugnmeet.Pl
 }
 
 // RenewPNMToken we'll renew token
-func (m *AuthModel) RenewPNMToken(token string, gracefulPeriod time.Duration) (string, error) {
+func (m *AuthModel) RenewPNMToken(token string, roomId, userId string, gracefulPeriod time.Duration) (string, error) {
 	claims, err := m.VerifyPlugNmeetAccessToken(token, gracefulPeriod)
 	if err != nil {
 		return "", err
+	}
+
+	if claims.RoomId != roomId || claims.UserId != userId {
+		return "", errors.New("token does not belong to this user")
 	}
 
 	status, err := m.natsService.GetRoomUserStatus(claims.RoomId, claims.UserId)
