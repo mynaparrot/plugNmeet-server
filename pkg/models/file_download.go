@@ -2,10 +2,15 @@ package models
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"net/netip"
+	"net/url"
 	"os"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/cavaliergopher/grab/v3"
@@ -76,6 +81,7 @@ func (m *FileModel) downloadFile(ctx context.Context, fileUrl, roomSid string, m
 			"size":     stat.Size(),
 			"max_size": maxSize,
 		}).Errorln("downloaded file is too large")
+		_ = os.Remove(fileFullPath)
 		return "", fmt.Errorf("downloaded file is too large: allowed %d bytes, got %d", maxSize, stat.Size())
 	}
 
@@ -83,10 +89,12 @@ func (m *FileModel) downloadFile(ctx context.Context, fileUrl, roomSid string, m
 	mType, err := mimetype.DetectFile(fileFullPath)
 	if err != nil {
 		log.WithError(err).Errorln("failed to detect file type")
+		_ = os.Remove(fileFullPath)
 		return "", fmt.Errorf("failed to detect file type: %w", err)
 	}
 	if err := m.ValidateMimeType(mType); err != nil {
 		log.WithError(err).Errorln("downloaded file mime type is not allowed")
+		_ = os.Remove(fileFullPath)
 		return "", err
 	}
 
@@ -102,9 +110,13 @@ func (m *FileModel) downloadFile(ctx context.Context, fileUrl, roomSid string, m
 	return newPath, nil
 }
 
-// validateRemoteFile checks the file's headers for size and MIME type.
+// validateRemoteFile checks the file's url and headers for size and MIME type.
 func (m *FileModel) validateRemoteFile(fileUrl string, maxSize uint64) error {
-	client := &http.Client{Timeout: 5 * time.Second}
+	if err := validateRemoteFileUrl(fileUrl); err != nil {
+		return err
+	}
+
+	client := remoteFileHTTPClient(5 * time.Second)
 	resp, err := client.Head(fileUrl)
 	if err != nil {
 		return fmt.Errorf("failed to fetch file headers: %w", err)
@@ -133,6 +145,9 @@ func (m *FileModel) downloadFileToDest(ctx context.Context, fileUrl, dstDir stri
 	log = log.WithField("sub-method", "downloadFileToDest")
 
 	client := grab.NewClient()
+	// no client timeout here, the request context controls the download duration
+	client.HTTPClient = remoteFileHTTPClient(0)
+
 	req, err := grab.NewRequest(dstDir, fileUrl)
 	if err != nil {
 		log.WithError(err).Error("failed to create download request")
@@ -151,4 +166,70 @@ func (m *FileModel) downloadFileToDest(ctx context.Context, fileUrl, dstDir stri
 	}
 
 	return resp.Filename, nil
+}
+
+// validateRemoteFileUrl only accepts absolute http(s) urls with a host.
+func validateRemoteFileUrl(fileUrl string) error {
+	u, err := url.Parse(fileUrl)
+	if err != nil {
+		return fmt.Errorf("invalid file url: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("invalid file url scheme: %q", u.Scheme)
+	}
+	if u.Hostname() == "" {
+		return fmt.Errorf("invalid file url: missing host")
+	}
+	return nil
+}
+
+// remoteFileHTTPClient returns a client that refuses to connect to non-public
+// addresses so remote file urls cannot be used for SSRF.
+func remoteFileHTTPClient(timeout time.Duration) *http.Client {
+	dialer := &net.Dialer{
+		Timeout: 30 * time.Second,
+		Control: func(network, address string, _ syscall.RawConn) error {
+			host, _, err := net.SplitHostPort(address)
+			if err != nil {
+				return err
+			}
+			ip, err := netip.ParseAddr(host)
+			if err != nil {
+				return fmt.Errorf("invalid remote address %q", host)
+			}
+			if isBlockedRemoteIP(ip) {
+				return fmt.Errorf("remote address %q is not allowed", host)
+			}
+			return nil
+		},
+	}
+
+	return &http.Client{
+		Timeout: timeout,
+		Transport: &http.Transport{
+			DialContext:        dialer.DialContext,
+			DisableCompression: true,
+		},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 5 {
+				return errors.New("too many redirects")
+			}
+			if req.URL.Scheme != "http" && req.URL.Scheme != "https" {
+				return fmt.Errorf("invalid redirect scheme: %q", req.URL.Scheme)
+			}
+			return nil
+		},
+	}
+}
+
+// isBlockedRemoteIP reports whether the address must not be dialed for remote
+// file downloads.
+func isBlockedRemoteIP(ip netip.Addr) bool {
+	if !ip.IsValid() {
+		return true
+	}
+	ip = ip.Unmap()
+
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() ||
+		ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast()
 }

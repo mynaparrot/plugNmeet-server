@@ -26,6 +26,7 @@ type ResumableUploadReq struct {
 	RoomId                    string `json:"roomId" query:"roomId"`
 	UserId                    string `json:"userId" query:"userId"`
 	ResumableChunkNumber      int    `query:"resumableChunkNumber"`
+	ResumableChunkSize        int64  `query:"resumableChunkSize"`
 	ResumableTotalChunks      int    `query:"resumableTotalChunks"`
 	ResumableTotalSize        int64  `query:"resumableTotalSize"`
 	ResumableIdentifier       string `query:"resumableIdentifier"`
@@ -43,6 +44,11 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx, req *ResumableUploadReq) (*
 	safeIdentifier := helpers.MakeSafeFilename(req.ResumableIdentifier, false)
 	if safeIdentifier == "" {
 		return nil, fiber.NewError(fiber.StatusBadRequest, "invalid resumableIdentifier")
+	}
+
+	maxSize := int64(m.app.UploadFileSettings.MaxSize) * 1024 * 1024
+	if req.ResumableChunkNumber < 1 || req.ResumableTotalChunks < 1 || req.ResumableChunkNumber > req.ResumableTotalChunks {
+		return nil, fiber.NewError(fiber.StatusBadRequest, "invalid chunk number")
 	}
 
 	// Create a logger with more context for this specific upload operation.
@@ -112,17 +118,18 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx, req *ResumableUploadReq) (*
 				return nil, fiber.NewError(fiber.StatusBadRequest, "missing 'file' in form-data")
 			}
 
-			// for hook system we'll need to ensure dir exists
-			if err := os.MkdirAll(chunkDir, 0755); err != nil {
-				log.WithError(err).Errorln("failed to create chunk directory")
-				return nil, fiber.NewError(fiber.StatusInternalServerError, "failed to create chunk directory")
+			if req.ResumableTotalSize <= 0 {
+				return nil, fiber.NewError(fiber.StatusBadRequest, "invalid file size")
+			}
+			// check the declared size as well as the actual chunk on every part
+			if req.ResumableTotalSize > maxSize ||
+				reqFile.Size > maxSize ||
+				(req.ResumableChunkSize > 0 && int64(req.ResumableChunkNumber-1)*req.ResumableChunkSize+reqFile.Size > maxSize) {
+				log.Warnln("uploaded chunk exceeds the configured maximum file size")
+				return nil, fiber.NewError(fiber.StatusBadRequest, fmt.Sprintf("file too large: max allowed is %dMB", m.app.UploadFileSettings.MaxSize))
 			}
 
 			if req.ResumableChunkNumber == 1 {
-				if req.ResumableTotalSize > int64(m.app.UploadFileSettings.MaxSize*1024*1024) {
-					return nil, fiber.NewError(fiber.StatusBadRequest, fmt.Sprintf("file too large: max allowed is %dMB", m.app.UploadFileSettings.MaxSize))
-				}
-
 				file, err := reqFile.Open()
 				if err != nil {
 					log.WithError(err).Errorln("failed to open multipart file header")
@@ -132,6 +139,12 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx, req *ResumableUploadReq) (*
 				if err := m.detectMimeTypeForValidation(file); err != nil {
 					return nil, fiber.NewError(fiber.StatusUnsupportedMediaType, err.Error())
 				}
+			}
+
+			// for hook system we'll need to ensure dir exists
+			if err := os.MkdirAll(chunkDir, 0755); err != nil {
+				log.WithError(err).Errorln("failed to create chunk directory")
+				return nil, fiber.NewError(fiber.StatusInternalServerError, "failed to create chunk directory")
 			}
 
 			// Always save the file to the local chunk path first.
