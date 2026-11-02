@@ -174,7 +174,7 @@ func (lc *LtiV1Controller) HandleLTIV1EndRoom(c fiber.Ctx) error {
 	}
 
 	roomId, ok := c.Locals(ctxKeyRoomID).(string)
-	if !ok {
+	if !ok || roomId == "" {
 		return sendErrorResponse(c, fiber.StatusBadRequest, errRoomIdMissing)
 	}
 	status, msg, _ := lc.RoomModel.EndRoom(c.RequestCtx(), &plugnmeet.RoomEndReq{
@@ -195,7 +195,7 @@ func (lc *LtiV1Controller) HandleLTIV1FetchRecordings(c fiber.Ctx) error {
 	}
 
 	roomId, ok := c.Locals(ctxKeyRoomID).(string)
-	if !ok {
+	if !ok || roomId == "" {
 		return sendErrorResponse(c, fiber.StatusBadRequest, errRoomIdMissing)
 	}
 	req.RoomIds = []string{roomId}
@@ -216,16 +216,29 @@ func (lc *LtiV1Controller) HandleLTIV1FetchRecordings(c fiber.Ctx) error {
 
 // HandleLTIV1GetRecordingDownloadToken gets a download token for a recording.
 func (lc *LtiV1Controller) HandleLTIV1GetRecordingDownloadToken(c fiber.Ctx) error {
+	roomId, ok := c.Locals(ctxKeyRoomID).(string)
+	if !ok || roomId == "" {
+		return sendErrorResponse(c, fiber.StatusBadRequest, errRoomIdMissing)
+	}
+
 	req := new(plugnmeet.GetDownloadTokenReq)
 	if err := c.Bind().Body(req); err != nil {
 		return sendErrorResponse(c, fiber.StatusBadRequest, err.Error())
 	}
 
-	token, err := lc.RecordingModel.GetDownloadToken(req)
+	recording, err := lc.RecordingModel.FetchRecording(req.RecordId)
 	if err != nil {
 		if errors.Is(err, config.NotFoundErr) {
 			return sendErrorResponse(c, fiber.StatusNotFound, "recording not found")
 		}
+		return sendErrorResponse(c, fiber.StatusInternalServerError, err.Error())
+	}
+	if recording.RoomId != roomId {
+		return sendErrorResponse(c, fiber.StatusNotFound, "recording not found")
+	}
+
+	token, err := lc.RecordingModel.CreateTokenForDownload(recording.FilePath)
+	if err != nil {
 		return sendErrorResponse(c, fiber.StatusInternalServerError, err.Error())
 	}
 
@@ -242,9 +255,25 @@ func (lc *LtiV1Controller) HandleLTIV1DeleteRecordings(c fiber.Ctx) error {
 		return sendErrorResponse(c, fiber.StatusForbidden, errOnlyAdminCanPerform)
 	}
 
+	roomId, ok := c.Locals(ctxKeyRoomID).(string)
+	if !ok || roomId == "" {
+		return sendErrorResponse(c, fiber.StatusBadRequest, errRoomIdMissing)
+	}
+
 	req := new(plugnmeet.DeleteRecordingReq)
 	if err := c.Bind().Body(req); err != nil {
 		return sendErrorResponse(c, fiber.StatusBadRequest, err.Error())
+	}
+
+	recording, err := lc.RecordingModel.FetchRecording(req.RecordId)
+	if err != nil {
+		if errors.Is(err, config.NotFoundErr) {
+			return sendErrorResponse(c, fiber.StatusNotFound, "recording not found")
+		}
+		return sendErrorResponse(c, fiber.StatusInternalServerError, err.Error())
+	}
+	if recording.RoomId != roomId {
+		return sendErrorResponse(c, fiber.StatusNotFound, "recording not found")
 	}
 
 	if err := lc.RecordingModel.DeleteRecording(req); err != nil {

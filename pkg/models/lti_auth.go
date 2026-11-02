@@ -2,6 +2,7 @@ package models
 
 import (
 	"crypto/sha1"
+	"crypto/subtle"
 	"encoding/hex"
 	"net/url"
 	"strings"
@@ -15,6 +16,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// ltiJWTIssuerSuffix distinguishes LTI tokens from regular room access tokens,
+// which are issued by the same api key.
+const ltiJWTIssuerSuffix = "-lti"
+
+func (m *LtiV1Model) jwtIssuer() string {
+	return m.app.Client.ApiKey + ltiJWTIssuerSuffix
+}
+
 func (m *LtiV1Model) VerifyAuth(requests, signingURL string) (*url.Values, error) {
 	r := strings.Split(requests, "&")
 	p := lti.NewProvider(m.app.Client.Secret, signingURL)
@@ -23,7 +32,10 @@ func (m *LtiV1Model) VerifyAuth(requests, signingURL string) (*url.Values, error
 	var providedSignature string
 
 	for _, f := range r {
-		t := strings.Split(f, "=")
+		t := strings.SplitN(f, "=", 2)
+		if len(t) != 2 {
+			continue
+		}
 		b, _ := url.QueryUnescape(t[1])
 		if t[0] == "oauth_signature" {
 			providedSignature = b
@@ -32,7 +44,7 @@ func (m *LtiV1Model) VerifyAuth(requests, signingURL string) (*url.Values, error
 		}
 	}
 
-	if p.Get("oauth_consumer_key") != p.ConsumerKey {
+	if subtle.ConstantTimeCompare([]byte(p.Get("oauth_consumer_key")), []byte(p.ConsumerKey)) != 1 {
 		return nil, config.InvalidConsumerKey
 	}
 
@@ -40,11 +52,13 @@ func (m *LtiV1Model) VerifyAuth(requests, signingURL string) (*url.Values, error
 	if err != nil {
 		return nil, err
 	}
-	if sign != providedSignature {
-		m.logger.WithFields(logrus.Fields{
-			"calculated": sign,
-			"provided":   providedSignature,
-		}).WithError(err).Errorln("signature verification failed")
+	if subtle.ConstantTimeCompare([]byte(sign), []byte(providedSignature)) != 1 {
+		if m.logger != nil {
+			m.logger.WithFields(logrus.Fields{
+				"calculated": sign,
+				"provided":   providedSignature,
+			}).Errorln("signature verification failed")
+		}
 		return nil, config.VerificationFailed
 	}
 
@@ -67,7 +81,7 @@ func (m *LtiV1Model) ToJWT(c *plugnmeet.LtiClaims) (string, error) {
 	}
 
 	cl := jwt.Claims{
-		Issuer:    m.app.Client.ApiKey,
+		Issuer:    m.jwtIssuer(),
 		NotBefore: jwt.NewNumericDate(time.Now().UTC()),
 		Expiry:    jwt.NewNumericDate(time.Now().UTC().Add(time.Hour * 2)), // valid for 2 hours
 		Subject:   c.UserId,
@@ -76,18 +90,18 @@ func (m *LtiV1Model) ToJWT(c *plugnmeet.LtiClaims) (string, error) {
 	return jwt.Signed(sig).Claims(cl).Claims(c).Serialize()
 }
 
-func (m *LtiV1Model) LTIV1VerifyHeaderToken(token string) (*LtiClaims, error) {
+func (m *LtiV1Model) LTIV1VerifyHeaderToken(token string) (*plugnmeet.LtiClaims, error) {
 	tok, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.HS256})
 	if err != nil {
 		return nil, err
 	}
 
 	out := jwt.Claims{}
-	claims := &LtiClaims{}
+	claims := &plugnmeet.LtiClaims{}
 	if err = tok.Claims([]byte(m.app.Client.Secret), &out, claims); err != nil {
 		return nil, err
 	}
-	if err = out.Validate(jwt.Expected{Issuer: m.app.Client.ApiKey, Time: time.Now().UTC()}); err != nil {
+	if err = out.Validate(jwt.Expected{Issuer: m.jwtIssuer(), Subject: claims.UserId, Time: time.Now().UTC()}); err != nil {
 		return nil, err
 	}
 
