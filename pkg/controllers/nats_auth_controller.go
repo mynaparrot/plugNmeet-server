@@ -180,7 +180,7 @@ func (s *NatsAuthController) setPermissionForClient(data *plugnmeet.PlugNmeetTok
 		},
 		Sub: jwt.Permission{
 			Allow: jwt.StringList{
-				fmt.Sprintf("_INBOX.%s.>", userId), // otherwise break request-reply patterns
+				fmt.Sprintf("_INBOX.%s.>", userId),
 				// allow to subscribe in pub/sub channel system public which is different from JetStream
 				fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.SystemPublic, roomId),
 				// other pub/sub channels
