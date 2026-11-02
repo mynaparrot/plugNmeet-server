@@ -3,7 +3,6 @@ package models
 import (
 	"errors"
 	"fmt"
-	"net/url"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/sirupsen/logrus"
@@ -34,7 +33,8 @@ func (m *RoomModel) startExternalMediaPlayBack(req *plugnmeet.ExternalMediaPlaye
 		log.WithError(err).Warnln()
 		return err
 	}
-	if _, err := url.ParseRequestURI(*req.Url); err != nil {
+	if err := validateExternalUrl(*req.Url); err != nil {
+		log.WithError(err).Warnln()
 		return err
 	}
 

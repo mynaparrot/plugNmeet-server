@@ -132,6 +132,27 @@ func (m *UserModel) LowerHand(roomId, userId string) {
 	}
 }
 
+// LowerOtherUserHand lowers the hand of another participant; only a room admin may do that.
+func (m *UserModel) LowerOtherUserHand(roomId, requesterUserId, targetUserId string) {
+	log := m.logger.WithFields(logrus.Fields{
+		"roomId":       roomId,
+		"userId":       requesterUserId,
+		"targetUserId": targetUserId,
+		"method":       "LowerOtherUserHand",
+	})
+
+	metadata, err := m.natsService.GetUserMetadataStruct(roomId, requesterUserId)
+	if err != nil {
+		log.WithError(err).Errorln("error getting user metadata")
+	}
+	if metadata == nil || !metadata.IsAdmin {
+		log.Warnln("requester is not an admin, cannot lower another user's hand")
+		return
+	}
+
+	m.LowerHand(roomId, targetUserId)
+}
+
 // notifyAdminsOutsideBreakoutRoom fans a raised-hand notice out to admins who
 // are NOT in the given breakout room: when a participant raises their hand
 // inside a breakout room, the in-room admin loop in RaisedHand cannot reach

@@ -4,10 +4,25 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/sirupsen/logrus"
 )
+
+// validateExternalUrl accepts only absolute http(s) urls for external links,
+// media playback, so schemes like javascript:, data: or file: are refused.
+func validateExternalUrl(rawUrl string) error {
+	parsedURL, err := url.ParseRequestURI(rawUrl)
+	if err != nil {
+		return err
+	}
+	scheme := strings.ToLower(parsedURL.Scheme)
+	if (scheme != "http" && scheme != "https") || parsedURL.Host == "" {
+		return errors.New("only http and https URLs are allowed")
+	}
+	return nil
+}
 
 func (m *RoomModel) HandleExternalDisplayTask(req *plugnmeet.ExternalDisplayLinkReq) error {
 	switch req.Task {
@@ -34,7 +49,8 @@ func (m *RoomModel) startExternalDisplay(req *plugnmeet.ExternalDisplayLinkReq) 
 		log.WithError(err).Warnln()
 		return err
 	}
-	if _, err := url.ParseRequestURI(*req.Url); err != nil {
+	if err := validateExternalUrl(*req.Url); err != nil {
+		log.WithError(err).Warnln()
 		return err
 	}
 
