@@ -109,10 +109,12 @@ func (m *AnalyticsModel) handleFirstTimeUserJoined(d *plugnmeet.AnalyticsDataMsg
 	umeta := new(plugnmeet.UserMetadata)
 	// Use getter for safety and log potential errors.
 	if d.GetExtraData() != "" {
-		var err error
-		umeta, err = m.natsService.UnmarshalUserMetadata(d.GetExtraData())
+		v, err := m.natsService.UnmarshalUserMetadata(d.GetExtraData())
 		if err != nil {
+			// keep the default metadata so the join event is still recorded
 			m.logger.WithError(err).Warn("failed to unmarshal user metadata for analytics")
+		} else {
+			umeta = v
 		}
 	}
 
