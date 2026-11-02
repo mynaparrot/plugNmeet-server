@@ -87,6 +87,7 @@ func (uc *UserController) HandleUpdateUserLockSetting(c fiber.Ctx) error {
 	isAdmin := fiber.Locals[bool](c, "isAdmin")
 	roomId := fiber.Locals[string](c, "roomId")
 	requestedUserId := fiber.Locals[string](c, "requestedUserId")
+	roomSid := fiber.Locals[string](c, "roomSid")
 
 	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
@@ -100,10 +101,12 @@ func (uc *UserController) HandleUpdateUserLockSetting(c fiber.Ctx) error {
 	if roomId != req.RoomId {
 		return utils.SendCommonProtobufResponse(c, false, "requested roomId & token roomId mismatched")
 	}
+	if req.RoomSid != roomSid {
+		return utils.SendCommonProtobufResponse(c, false, "roomSid in token mismatched")
+	}
 
 	// now need to check if meeting is running or not
-	room, _ := uc.ds.GetRoomInfoBySid(req.RoomSid, new(1))
-
+	room, _ := uc.ds.GetRoomInfoBySid(roomSid, new(1))
 	if room == nil || room.ID == 0 {
 		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
 	}
@@ -135,6 +138,9 @@ func (uc *UserController) HandleMuteUnMuteTrack(c fiber.Ctx) error {
 	if roomId != req.RoomId {
 		return utils.SendCommonProtobufResponse(c, false, "requested roomId & token roomId mismatched")
 	}
+
+	// always trust the token scope over any client-supplied value
+	req.Sid = fiber.Locals[string](c, "roomSid")
 
 	// now need to check if meeting is running or not
 	room, _ := uc.ds.GetRoomInfoBySid(req.Sid, new(1))
@@ -172,6 +178,9 @@ func (uc *UserController) HandleRemoveParticipant(c fiber.Ctx) error {
 	if requestedUserId == req.UserId {
 		return utils.SendCommonProtobufResponse(c, false, "you can't remove yourself\"")
 	}
+
+	// always trust the token scope over any client-supplied value
+	req.Sid = fiber.Locals[string](c, "roomSid")
 
 	// now need to check if meeting is running or not
 	room, _ := uc.ds.GetRoomInfoBySid(req.Sid, new(1))

@@ -87,13 +87,13 @@ func (m *RecordingModel) DispatchRecorderTask(req *plugnmeet.RecordingReq) error
 	case plugnmeet.RecordingTasks_START_RECORDING:
 		if err := m.addTokenAndRecorder(context.Background(), req, toSend, config.RecorderBot, log); err != nil {
 			log.WithError(err).Error("failed to add token for recording bot")
-			return fmt.Errorf("Failed to add token for recording bot")
+			return err
 		}
 	case plugnmeet.RecordingTasks_START_RTMP:
 		toSend.RtmpUrl = req.RtmpUrl
 		if err := m.addTokenAndRecorder(context.Background(), req, toSend, config.RtmpBot, log); err != nil {
 			log.WithError(err).Error("Failed to add token for rtmp bot")
-			return fmt.Errorf("Failed to add token for rtmp bot")
+			return err
 		}
 	}
 
@@ -176,7 +176,7 @@ func (m *RecordingModel) addTokenAndRecorder(ctx context.Context, req *plugnmeet
 	token, err := m.um.GetPNMJoinToken(ctx, gt, false)
 	if err != nil {
 		log.WithError(err).Errorln("error getting pnm token")
-		return err
+		return fmt.Errorf("Error getting token")
 	}
 
 	rq.RecorderId = recorderId

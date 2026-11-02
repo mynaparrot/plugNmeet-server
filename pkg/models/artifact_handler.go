@@ -99,6 +99,14 @@ func (m *ArtifactModel) GetArtifactInfoByArtifactId(artifactId string) (*plugnme
 	return res, nil
 }
 
+// artifactDownloadJWTIssuerSuffix separates artifact download tokens from room
+// access, LTI, and recording download tokens.
+const artifactDownloadJWTIssuerSuffix = "-artifact"
+
+func (m *ArtifactModel) downloadJWTIssuer() string {
+	return m.app.Client.ApiKey + artifactDownloadJWTIssuerSuffix
+}
+
 // generateToken now generates a JWT with a file path.
 func (m *ArtifactModel) generateToken(filePath string) (string, error) {
 	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.HS256, Key: []byte(m.app.Client.Secret)}, (&jose.SignerOptions{}).WithType("JWT"))
@@ -108,7 +116,7 @@ func (m *ArtifactModel) generateToken(filePath string) (string, error) {
 	}
 
 	cl := jwt.Claims{
-		Issuer:    m.app.Client.ApiKey,
+		Issuer:    m.downloadJWTIssuer(),
 		NotBefore: jwt.NewNumericDate(time.Now().UTC()),
 		Expiry:    jwt.NewNumericDate(time.Now().UTC().Add(*m.app.ArtifactsSettings.TokenValidity)),
 		Subject:   filePath,
@@ -155,7 +163,7 @@ func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (*hooks.Download
 	}
 
 	if err = out.Validate(jwt.Expected{
-		Issuer: m.app.Client.ApiKey,
+		Issuer: m.downloadJWTIssuer(),
 		Time:   time.Now().UTC(),
 	}); err != nil {
 		if errors.Is(err, jwt.ErrExpired) {
@@ -164,9 +172,10 @@ func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (*hooks.Download
 		return nil, fiber.StatusUnauthorized, err
 	}
 
-	inputPath := out.Subject
-	if inputPath == "" {
-		return nil, fiber.StatusBadRequest, errors.New("invalid file path in token")
+	// validate before handing the path to hooks, which may act on it
+	inputPath, err := sanitizeRelativeFilePath(out.Subject)
+	if err != nil {
+		return nil, fiber.StatusBadRequest, err
 	}
 
 	if m.app.Hooks != nil {

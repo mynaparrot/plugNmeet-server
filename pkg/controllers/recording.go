@@ -2,7 +2,9 @@ package controllers
 
 import (
 	"errors"
+	"net/url"
 	"path/filepath"
+	"strings"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/hooks"
@@ -190,10 +192,21 @@ func (rc *RecordingController) HandleDownloadRecording(c fiber.Ctx) error {
 	}
 }
 
+// isValidRtmpUrl allows only absolute rtmp/rtmps urls.
+func isValidRtmpUrl(rawUrl string) bool {
+	parsedURL, err := url.ParseRequestURI(rawUrl)
+	if err != nil || parsedURL.Host == "" {
+		return false
+	}
+	scheme := strings.ToLower(parsedURL.Scheme)
+	return scheme == "rtmp" || scheme == "rtmps"
+}
+
 // HandleRecorderTasks handles start/stop recording & RTMP requests.
 func (rc *RecordingController) HandleRecorderTasks(c fiber.Ctx) error {
 	isAdmin := fiber.Locals[bool](c, "isAdmin")
 	roomId := fiber.Locals[string](c, "roomId")
+	roomSid := fiber.Locals[string](c, "roomSid")
 
 	if !isAdmin {
 		return utils.SendCommonProtobufResponse(c, false, "only admin can start recording")
@@ -209,8 +222,12 @@ func (rc *RecordingController) HandleRecorderTasks(c fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
+	if req.Sid != roomSid {
+		return utils.SendCommonProtobufResponse(c, false, "roomSid in token mismatched")
+	}
+
 	// now need to check if meeting is running or not
-	room, err := rc.ds.GetRoomInfoBySid(req.Sid, new(1))
+	room, err := rc.ds.GetRoomInfoBySid(roomSid, new(1))
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -233,8 +250,11 @@ func (rc *RecordingController) HandleRecorderTasks(c fiber.Ctx) error {
 			return utils.SendCommonProtobufResponse(c, false, "notifications.recording-not-running")
 		}
 	case plugnmeet.RecordingTasks_START_RTMP:
-		if req.RtmpUrl == nil {
+		if req.RtmpUrl == nil || *req.RtmpUrl == "" {
 			return utils.SendCommonProtobufResponse(c, false, "rtmpUrl required")
+		}
+		if !isValidRtmpUrl(*req.RtmpUrl) {
+			return utils.SendCommonProtobufResponse(c, false, "invalid rtmpUrl: only rtmp and rtmps schemes are allowed")
 		}
 		if room.IsActiveRtmp == 1 {
 			return utils.SendCommonProtobufResponse(c, false, "notifications.rtmp-already-running")

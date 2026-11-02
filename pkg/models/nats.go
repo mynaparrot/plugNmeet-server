@@ -80,7 +80,7 @@ func (m *NatsModel) HandleFromClientToServerReq(roomId, userId string, req *plug
 	case plugnmeet.NatsMsgClientToServerEvents_REQ_LOWER_HAND:
 		m.userModel.LowerHand(roomId, userId)
 	case plugnmeet.NatsMsgClientToServerEvents_REQ_LOWER_OTHER_USER_HAND:
-		m.userModel.LowerHand(roomId, req.Msg)
+		m.userModel.LowerOtherUserHand(roomId, userId, req.Msg)
 	case plugnmeet.NatsMsgClientToServerEvents_PUSH_ANALYTICS_DATA:
 		ad := new(plugnmeet.AnalyticsDataMsg)
 		err := protojson.Unmarshal([]byte(req.Msg), ad)
@@ -88,6 +88,9 @@ func (m *NatsModel) HandleFromClientToServerReq(roomId, userId string, req *plug
 			m.logger.Errorln(err)
 			return
 		}
+		// bind to the authenticated identity
+		ad.RoomId = roomId
+		ad.UserId = &userId
 		m.analyticsModel.HandleEvent(ad)
 	case plugnmeet.NatsMsgClientToServerEvents_REQ_ONLINE_USERS_LIST:
 		m.HandleSendUsersList(roomId, userId, new(plugnmeet.NatsMsgServerToClientEvents_RESP_ONLINE_USERS_LIST))

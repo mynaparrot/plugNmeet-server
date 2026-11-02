@@ -54,7 +54,7 @@ func NewBBBController(args BBBControllerArgs) *BBBController {
 // HandleVerifyApiRequest is a middleware to verify BBB API requests.
 func (bc *BBBController) HandleVerifyApiRequest(c fiber.Ctx) error {
 	apiKey := c.Params("apiKey")
-	if apiKey == "" || apiKey != bc.AppConfig.Client.ApiKey {
+	if apiKey == "" || subtle.ConstantTimeCompare([]byte(apiKey), []byte(bc.AppConfig.Client.ApiKey)) != 1 {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "apiKeyError", "invalid api key"))
 	}
 
@@ -94,14 +94,18 @@ func (bc *BBBController) HandleVerifyApiRequest(c fiber.Ctx) error {
 		method = s2[len(s2)-1]
 		data = string(c.Body())
 	} else {
-		s1 := strings.Split(c.OriginalURL(), "?")
+		s1 := strings.SplitN(c.OriginalURL(), "?", 2)
+		if len(s1) != 2 {
+			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "checksumError", "Checksums do not match"))
+		}
 		s2 := strings.Split(c.Path(), "/")
 		method = s2[len(s2)-1]
 		data = s1[1]
 	}
 
 	s3 := strings.Split(data, "checksum=")
-	if len(s3) < 1 {
+	// more than one checksum= parameter is never a valid signed request
+	if len(s3) > 2 {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "checksumError", "Checksums do not match"))
 	}
 
@@ -113,6 +117,10 @@ func (bc *BBBController) HandleVerifyApiRequest(c fiber.Ctx) error {
 	} else {
 		checksum = s3[1]
 		queries = strings.TrimSuffix(s3[0], "&")
+	}
+	// checksum must be the last parameter, otherwise the signature covers too little
+	if strings.Contains(checksum, "&") {
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "checksumError", "Checksums do not match"))
 	}
 
 	ourSum := bbbapiwrapper.CalculateCheckSum(bc.AppConfig.Client.Secret, method, queries)

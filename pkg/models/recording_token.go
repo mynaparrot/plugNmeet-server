@@ -14,6 +14,14 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 )
 
+// recordingDownloadJWTIssuerSuffix separates recording download tokens from room
+// access, LTI, and artifact download tokens.
+const recordingDownloadJWTIssuerSuffix = "-recording"
+
+func (m *RecordingModel) downloadJWTIssuer() string {
+	return m.app.Client.ApiKey + recordingDownloadJWTIssuerSuffix
+}
+
 // GetDownloadToken will use the same JWT token generator as plugNmeet is using
 func (m *RecordingModel) GetDownloadToken(r *plugnmeet.GetDownloadTokenReq) (string, error) {
 	recording, err := m.FetchRecording(r.RecordId)
@@ -27,7 +35,7 @@ func (m *RecordingModel) GetDownloadToken(r *plugnmeet.GetDownloadTokenReq) (str
 // CreateTokenForDownload will generate token
 // path format: sub_path/roomSid/filename
 func (m *RecordingModel) CreateTokenForDownload(path string) (string, error) {
-	return auth.GenerateTokenForDownloadRecording(path, m.app.Client.ApiKey, m.app.Client.Secret, m.app.RecorderInfo.TokenValidity)
+	return auth.GenerateTokenForDownloadRecording(path, m.downloadJWTIssuer(), m.app.Client.Secret, m.app.RecorderInfo.TokenValidity)
 }
 
 // VerifyRecordingToken verify token & provide file path
@@ -44,16 +52,17 @@ func (m *RecordingModel) VerifyRecordingToken(token string) (*hooks.DownloadHook
 		return nil, fiber.StatusUnauthorized, err
 	}
 
-	if err = out.Validate(jwt.Expected{Issuer: m.app.Client.ApiKey, Time: time.Now().UTC()}); err != nil {
+	if err = out.Validate(jwt.Expected{Issuer: m.downloadJWTIssuer(), Time: time.Now().UTC()}); err != nil {
 		if errors.Is(err, jwt.ErrExpired) {
 			return nil, fiber.StatusUnauthorized, errors.New("token expired")
 		}
 		return nil, fiber.StatusUnauthorized, err
 	}
 
-	inputPath := out.Subject
-	if inputPath == "" {
-		return nil, fiber.StatusBadRequest, errors.New("invalid file path")
+	// validate before handing the path to hooks, which may act on it
+	inputPath, err := sanitizeRelativeFilePath(out.Subject)
+	if err != nil {
+		return nil, fiber.StatusBadRequest, err
 	}
 
 	if m.app.Hooks != nil {

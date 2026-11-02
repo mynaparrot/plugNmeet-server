@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -45,6 +46,12 @@ func (m *BreakoutRoomModel) BackToMainRoom(ctx context.Context, r *plugnmeet.Bac
 	if !isBreakoutChildRoomId(r.RoomId, r.ParentRoomId) {
 		log.Warn("parent room id does not match the caller's breakout room")
 		return "", config.ErrBkRoomUnexpectedError
+	}
+
+	// A blocked user must not be able to obtain a fresh token for the main room.
+	if m.natsService.IsUserExistInBlockList(r.ParentRoomId, r.UserId) {
+		log.Warn("user is blocked and cannot return to main room")
+		return "", errors.New("notifications.you-are-blocked")
 	}
 
 	// Verify the parent room is still alive (a paused parent passes this check).
