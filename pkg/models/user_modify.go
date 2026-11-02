@@ -46,6 +46,10 @@ func (m *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 		log.WithError(err).Errorln("error removing user from livekit, keep continuing")
 	}
 
+	if err = m.natsService.UpdateUserStatus(r.RoomId, r.UserId, natsservice.UserStatusOffline); err != nil {
+		log.WithError(err).Warnln("error updating user status to offline")
+	}
+
 	// finally, check if requested to block as well as
 	if r.BlockUser {
 		log.Infoln("blocking user")

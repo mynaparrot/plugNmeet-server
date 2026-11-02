@@ -15,6 +15,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/fx"
 	"google.golang.org/protobuf/proto"
@@ -22,27 +23,30 @@ import (
 
 // FileController holds dependencies for file-related handlers.
 type FileController struct {
-	AppConfig *config.AppConfig
-	FileModel *models.FileModel
-	RoomModel *models.RoomModel
-	logger    *logrus.Entry
+	AppConfig   *config.AppConfig
+	FileModel   *models.FileModel
+	RoomModel   *models.RoomModel
+	NatsService *natsservice.NatsService
+	logger      *logrus.Entry
 }
 
 type FileControllerArgs struct {
 	fx.In
-	AppConfig *config.AppConfig
-	FileModel *models.FileModel
-	RoomModel *models.RoomModel
-	Logger    *logrus.Logger
+	AppConfig   *config.AppConfig
+	FileModel   *models.FileModel
+	RoomModel   *models.RoomModel
+	NatsService *natsservice.NatsService
+	Logger      *logrus.Logger
 }
 
 // NewFileController creates a new FileController.
 func NewFileController(args FileControllerArgs) *FileController {
 	return &FileController{
-		AppConfig: args.AppConfig,
-		FileModel: args.FileModel,
-		RoomModel: args.RoomModel,
-		logger:    args.Logger.WithField("controller", "file"),
+		AppConfig:   args.AppConfig,
+		FileModel:   args.FileModel,
+		RoomModel:   args.RoomModel,
+		NatsService: args.NatsService,
+		logger:      args.Logger.WithField("controller", "file"),
 	}
 }
 
@@ -196,11 +200,16 @@ func (fc *FileController) HandleConvertWhiteboardFile(c fiber.Ctx) error {
 	}
 	req.RoomId = fiber.Locals[string](c, "roomId")
 	req.RoomSid = fiber.Locals[string](c, "roomSid")
-	requestedUserId := new(fiber.Locals[string](c, "requestedUserId"))
+	requestedUserId := fiber.Locals[string](c, "requestedUserId")
 
 	acState, _, _ := fc.RoomModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{RoomId: req.RoomId})
 	if !acState.GetIsActive() {
 		return commonFileErrorResponse(c, acState.GetMsg(), fiber.StatusBadRequest, acState.GetStatusCode())
+	}
+
+	// only the presenter can convert whiteboard files
+	if requestedUserId == "" || !fc.NatsService.IsUserPresenter(req.RoomId, requestedUserId) {
+		return commonFileErrorResponse(c, "only presenter can perform this task", fiber.StatusForbidden, plugnmeet.StatusCode_PERMISSION_DENIED)
 	}
 
 	if req.FilePath == "" {
@@ -212,7 +221,7 @@ func (fc *FileController) HandleConvertWhiteboardFile(c fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.RequestCtx(), 50*time.Second)
 	defer cancel()
 
-	res, err := fc.FileModel.ConvertAndBroadcastWhiteboardFile(ctx, req.RoomId, req.RoomSid, req.FilePath, requestedUserId, nil, log)
+	res, err := fc.FileModel.ConvertAndBroadcastWhiteboardFile(ctx, req.RoomId, req.RoomSid, req.FilePath, &requestedUserId, nil, log)
 	if err != nil {
 		if errors.Is(err, config.ErrConversionTimeout) {
 			// process will continue in background
@@ -220,6 +229,9 @@ func (fc *FileController) HandleConvertWhiteboardFile(c fiber.Ctx) error {
 				"status": true,
 				"msg":    "File conversion started. It will be available soon.",
 			})
+		}
+		if errors.Is(err, config.ErrInvalidFilePath) || errors.Is(err, config.ErrFileNotFound) {
+			return commonFileErrorResponse(c, err.Error(), fiber.StatusBadRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
 		}
 		return commonFileErrorResponse(c, err.Error(), fiber.StatusInternalServerError, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
@@ -242,6 +254,11 @@ func (fc *FileController) HandleWhiteboardPdfExportSliceUpload(c fiber.Ctx) erro
 		return commonFileErrorResponse(c, acState.GetMsg(), fiber.StatusBadRequest, acState.GetStatusCode())
 	}
 
+	// only the presenter can upload whiteboard PDF export slices
+	if req.UserId == "" || !fc.NatsService.IsUserPresenter(req.RoomId, req.UserId) {
+		return commonFileErrorResponse(c, "only presenter can perform this task", fiber.StatusForbidden, plugnmeet.StatusCode_PERMISSION_DENIED)
+	}
+
 	if fErr := fc.FileModel.WhiteboardPdfExportSliceUpload(c, req); fErr != nil {
 		return commonFileErrorResponse(c, fErr.Message, fErr.Code, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
@@ -262,6 +279,11 @@ func (fc *FileController) HandleWhiteboardPdfExportMerge(c fiber.Ctx) error {
 	acState, _, _ := fc.RoomModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{RoomId: req.RoomId})
 	if !acState.GetIsActive() {
 		return utils.SendCommonProtobufResponse(c, false, acState.GetMsg())
+	}
+
+	// only the presenter can merge whiteboard PDF export
+	if requestedUserId == "" || !fc.NatsService.IsUserPresenter(req.RoomId, requestedUserId) {
+		return utils.SendCommonProtobufResponse(c, false, "only presenter can perform this task")
 	}
 
 	res, err := fc.FileModel.MergeWhiteboardPdfExport(req, requestedUserId)

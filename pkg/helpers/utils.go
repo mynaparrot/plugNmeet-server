@@ -76,7 +76,9 @@ func MakeSafeFilename(name string, fallbackToUUID bool) string {
 	safeName := minimalIllegalChars.ReplaceAllString(name, "_")
 
 	// 3. Trim leading/trailing dots and spaces, which can cause issues on Windows.
-	safeName = strings.Trim(safeName, " .")
+	// Leading dashes are also trimmed so the result is never read as a CLI flag.
+	safeName = strings.TrimLeft(safeName, " .-")
+	safeName = strings.TrimRight(safeName, " .")
 
 	// 4. Provide a fallback if the sanitization results in an empty string.
 	if safeName == "" && fallbackToUUID {
@@ -95,6 +97,13 @@ func MakeSafeFilename(name string, fallbackToUUID bool) string {
 	}
 
 	return safeName
+}
+
+// isPathInsideBase reports whether absPath is strictly inside absBasePath.
+// The separator suffix prevents sibling directories such as /upload-evil
+// from being accepted for the base /upload.
+func isPathInsideBase(absBasePath, absPath string) bool {
+	return strings.HasPrefix(absPath, absBasePath+string(filepath.Separator))
 }
 
 // ValidateAndGetAbsFilePath performs security checks on a file path and detects its MIME type.
@@ -121,7 +130,7 @@ func ValidateAndGetAbsFilePath(basePath, relativePath string) (string, *mimetype
 	}
 
 	// The crucial security check: ensure the final path is within the base directory.
-	if !strings.HasPrefix(absJoinedPath, absBasePath) || absJoinedPath == absBasePath {
+	if !isPathInsideBase(absBasePath, absJoinedPath) {
 		return "", nil, errors.New("invalid file path: path is outside the allowed directory")
 	}
 

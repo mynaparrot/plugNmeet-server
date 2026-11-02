@@ -14,6 +14,7 @@ var (
 	ErrRecordingNotFound           = errors.New("recording not found")
 	ErrFileNotFound                = errors.New("file not found")
 	ErrConversionTimeout           = errors.New("file conversion timeout reached, process will continue in background")
+	ErrInvalidFilePath             = errors.New("invalid file path")
 	NoBreakoutRoomsFound           = errors.New("no breakout rooms found")
 	InvalidNilRoomMetadata         = errors.New("invalid nil room metadata information")
 	ErrRequestedRecordingsNotFound = errors.New("one or more of the requested recordings were not found or did not match the room_id")
