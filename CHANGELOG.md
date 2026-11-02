@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.5](https://github.com/mynaparrot/plugNmeet-server/compare/v2.5.4...v2.5.5) (2026-11-02)
+
+
+### Bug Fixes
+
+* **security:** harden whiteboard file handling and API session validation (GHSA-9px7-66rq-fv45) ([2fd9fc4](https://github.com/mynaparrot/plugNmeet-server/commit/2fd9fc46ebeeef87581685330fc03566c2b4a3f7))
+
 ## [2.5.4](https://github.com/mynaparrot/plugNmeet-server/compare/v2.5.3...v2.5.4) (2026-10-28)
 
 
