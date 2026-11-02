@@ -77,6 +77,7 @@ func TestApplyCountdownTimerStart(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cf := newTestCountdownFeatures()
+			cf.IsActive = true
 			err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
 				Task:            plugnmeet.CountdownTimerTask_START_TIMER,
 				DurationSeconds: &tt.duration,
@@ -101,6 +102,16 @@ func TestApplyCountdownTimerStart(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("feature not active", func(t *testing.T) {
+		duration := uint32(300)
+		err := applyCountdownTimerTask(newTestCountdownFeatures(), &plugnmeet.CountdownTimerReq{
+			Task:            plugnmeet.CountdownTimerTask_START_TIMER,
+			DurationSeconds: &duration,
+			UserId:          "user-1",
+		}, testNowMs)
+		assertCountdownErr(t, err, config.ErrCountdownTimerNotActive)
+	})
 }
 
 func TestApplyCountdownTimerPause(t *testing.T) {
