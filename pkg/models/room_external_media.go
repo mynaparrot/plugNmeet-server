@@ -29,7 +29,7 @@ func (m *RoomModel) startExternalMediaPlayBack(req *plugnmeet.ExternalMediaPlaye
 	})
 	log.Infoln("request to start external media playback")
 
-	if req.Url == nil && *req.Url == "" {
+	if req.Url == nil || *req.Url == "" {
 		err := errors.New("valid url required")
 		log.WithError(err).Warnln()
 		return err

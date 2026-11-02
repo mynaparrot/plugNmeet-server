@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -11,6 +12,22 @@ import (
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 )
+
+// isBreakoutChildRoomId reports whether breakoutRoomId is a direct child of
+// parentRoomId. Child ids are "<parentRoomId>-<n>" where n is a positive
+// integer, so a hyphenated id like "room-1-2" is not a child of "room".
+func isBreakoutChildRoomId(breakoutRoomId, parentRoomId string) bool {
+	if parentRoomId == "" {
+		return false
+	}
+	prefix := fmt.Sprintf(BreakoutRoomFormat, parentRoomId, "")
+	if !strings.HasPrefix(breakoutRoomId, prefix) {
+		return false
+	}
+
+	idx, err := strconv.ParseUint(strings.TrimPrefix(breakoutRoomId, prefix), 10, 64)
+	return err == nil && idx > 0
+}
 
 // BackToMainRoom issues a fresh parent-room join token for a participant
 // returning from a breakout room. The parent comes from the client-supplied parent_room_id.
@@ -25,7 +42,7 @@ func (m *BreakoutRoomModel) BackToMainRoom(ctx context.Context, r *plugnmeet.Bac
 
 	// Bind the client-supplied parent room id to the caller's actual breakout:
 	// breakout ids are <parentRoomId>-<n>, so the caller's room must be a child of it.
-	if !strings.HasPrefix(r.RoomId, fmt.Sprintf(BreakoutRoomFormat, r.ParentRoomId, "")) {
+	if !isBreakoutChildRoomId(r.RoomId, r.ParentRoomId) {
 		log.Warn("parent room id does not match the caller's breakout room")
 		return "", config.ErrBkRoomUnexpectedError
 	}

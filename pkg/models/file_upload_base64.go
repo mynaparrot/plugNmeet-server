@@ -54,7 +54,7 @@ func (m *FileModel) UploadBase64EncodedData(req *plugnmeet.UploadBase64EncodedDa
 	}
 
 	// at present format ${file.id}.png
-	fileId := strings.TrimSuffix(req.FileName, ".png")
+	fileId := strings.TrimSuffix(safeFilename, filepath.Ext(safeFilename))
 	meta := &plugnmeet.RoomUploadedFileMetadata{
 		FileId:   fileId,
 		FileName: safeFilename,
