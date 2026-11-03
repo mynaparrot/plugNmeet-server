@@ -24,6 +24,7 @@ type CachedUserInfoEntry struct {
 	LastPingAt      uint64
 	IsBlacklisted   bool
 	TurnCredentials string
+	ConnId          string
 	LastRevision    uint64
 }
 

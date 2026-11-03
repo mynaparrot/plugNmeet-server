@@ -48,10 +48,14 @@ func (m *BreakoutRoomModel) BackToMainRoom(ctx context.Context, r *plugnmeet.Bac
 		return "", config.ErrBkRoomUnexpectedError
 	}
 
-	// A blocked user must not be able to obtain a fresh token for the main room.
+	// A blocked or removed user must not be able to obtain a fresh token for the main room.
 	if m.natsService.IsUserExistInBlockList(r.ParentRoomId, r.UserId) {
 		log.Warn("user is blocked and cannot return to main room")
 		return "", errors.New("notifications.you-are-blocked")
+	}
+	if status, sErr := m.natsService.GetRoomUserStatus(r.ParentRoomId, r.UserId); sErr == nil && status == natsservice.UserStatusRemoved {
+		log.Warn("user was removed from the main room and cannot return")
+		return "", errors.New("notifications.room-disconnected-participant-removed")
 	}
 
 	// Verify the parent room is still alive (a paused parent passes this check).

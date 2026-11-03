@@ -46,8 +46,8 @@ func (m *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 		log.WithError(err).Errorln("error removing user from livekit, keep continuing")
 	}
 
-	if err = m.natsService.UpdateUserStatus(r.RoomId, r.UserId, natsservice.UserStatusOffline); err != nil {
-		log.WithError(err).Warnln("error updating user status to offline")
+	if err = m.natsService.UpdateUserStatus(r.RoomId, r.UserId, natsservice.UserStatusRemoved); err != nil {
+		log.WithError(err).Warnln("error updating user status to removed")
 	}
 
 	// finally, check if requested to block as well as
@@ -58,6 +58,15 @@ func (m *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 			log.WithError(err).Errorln("error adding user to block list")
 		}
 	}
+
+	// clean up the consumer & drop the NATS connection after the session ended event is delivered
+	roomId := r.GetRoomId()
+	userId := r.GetUserId()
+	go func() {
+		time.Sleep(time.Second)
+		m.natsService.DeleteConsumer(roomId, userId)
+		m.natsService.KickUserConnection(roomId, userId)
+	}()
 
 	log.Infoln("Participant removed successfully")
 	return nil

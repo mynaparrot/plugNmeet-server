@@ -31,6 +31,11 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId, calledFrom string) {
 			// This is a frequent case due to pings, so we don't log it to avoid noise.
 			return nil, nil
 		}
+		// the user may be blocked or never added properly (e.g. a stale connection event)
+		if m.natsService.IsUserExistInBlockList(roomId, userId) || status == natsservice.UserStatusRemoved || status == "" {
+			log.Debug("Skipping user joined event for blocked or inactive user")
+			return nil, nil
+		}
 
 		log.Info("Handling user joined event")
 		if err = m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusOnline); err != nil {
@@ -91,8 +96,12 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId, calledFrom string) {
 	key := fmt.Sprintf("user-disconnected-%s-%s", roomId, userId)
 	_, _, shared := m.sfGroup.Do(key, func() (interface{}, error) {
 		// Immediately set status to disconnected and notify clients.
-		if err := m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusDisconnected); err != nil {
-			log.WithError(err).WithField("status", natsservice.UserStatusDisconnected).Warn("Failed to update user status")
+		// A removed user must keep the `removed` status; otherwise the NATS SDK would
+		// auto-reconnect after we kicked the connection.
+		if status, _ := m.natsService.GetRoomUserStatus(roomId, userId); status != natsservice.UserStatusRemoved {
+			if err := m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusDisconnected); err != nil {
+				log.WithError(err).WithField("status", natsservice.UserStatusDisconnected).Warn("Failed to update user status")
+			}
 		}
 
 		// update analytics & db for the user leaving.
@@ -137,8 +146,11 @@ func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, userInfo *p
 
 	// User is still disconnected, so mark as offline.
 	// We only log an error if the room hasn't ended, as the user's KV will be deleted soon anyway.
-	if err := m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusOffline); err != nil && !roomEnded {
-		log.WithError(err).Warn("Failed to update user status to offline")
+	// A removed user must stay in `removed` status.
+	if currentStatus, _ := m.natsService.GetRoomUserStatus(roomId, userId); currentStatus != natsservice.UserStatusRemoved {
+		if err := m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusOffline); err != nil && !roomEnded {
+			log.WithError(err).Warn("Failed to update user status to offline")
+		}
 	}
 
 	// Broadcast the final offline status as a single public event;

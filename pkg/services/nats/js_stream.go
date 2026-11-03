@@ -84,22 +84,33 @@ func (s *NatsService) PurgeRoomMessagesFromStream(roomId string) error {
 	)
 }
 
-// CreateUserConsumer creates a single consumer per user for chat, public, and private system messages.
-func (s *NatsService) CreateUserConsumer(roomId, userId string) (stream string, durableName string, err error) {
+// CreateUserConsumer creates a single consumer per user.
+// A user waiting for approval only receives private system messages.
+func (s *NatsService) CreateUserConsumer(roomId, userId string, waitForApproval bool) (stream string, durableName string, err error) {
 	durableName = fmt.Sprintf(DurableNameTpl, roomId, userId)
-	_, err = s.js.CreateOrUpdateConsumer(s.ctx, s.app.NatsInfo.RoomStreamName, jetstream.ConsumerConfig{
-		Durable:       durableName,
-		DeliverPolicy: jetstream.DeliverNewPolicy,
-		AckPolicy:     jetstream.AckExplicitPolicy,
-		AckWait:       30 * time.Second,
-		MaxDeliver:    5,
-		MaxAckPending: 1000,
-		FilterSubjects: []string{
+
+	var filterSubjects []string
+	if waitForApproval {
+		filterSubjects = []string{
+			fmt.Sprintf("%s.%s.%s.>", s.app.NatsInfo.Subjects.SystemPrivate, roomId, userId),
+		}
+	} else {
+		filterSubjects = []string{
 			// e.g., "sysPublic.room123.>"
 			fmt.Sprintf("%s.%s.>", s.app.NatsInfo.Subjects.SystemPublic, roomId),
 			// e.g., "sysPrivate.room123.user456.>"
 			fmt.Sprintf("%s.%s.%s.>", s.app.NatsInfo.Subjects.SystemPrivate, roomId, userId),
-		},
+		}
+	}
+
+	_, err = s.js.CreateOrUpdateConsumer(s.ctx, s.app.NatsInfo.RoomStreamName, jetstream.ConsumerConfig{
+		Durable:        durableName,
+		DeliverPolicy:  jetstream.DeliverNewPolicy,
+		AckPolicy:      jetstream.AckExplicitPolicy,
+		AckWait:        30 * time.Second,
+		MaxDeliver:     5,
+		MaxAckPending:  1000,
+		FilterSubjects: filterSubjects,
 	})
 	if err != nil {
 		return "", "", err

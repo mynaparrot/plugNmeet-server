@@ -99,6 +99,15 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 		log.WithError(err).Error("Error sending session ended notification message")
 	}
 
+	// waiting users' consumers only listen to the private subject, so notify them directly
+	if participants, err := m.natsService.GetOnlineUsersList(roomID); err == nil {
+		for _, p := range participants {
+			if mt, err := m.natsService.UnmarshalUserMetadata(p.Metadata); err == nil && mt != nil && mt.GetWaitForApproval() {
+				_ = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SESSION_ENDED, roomID, "notifications.room-disconnected-room-ended", new(p.UserId))
+			}
+		}
+	}
+
 	// Trigger the main asynchronous room-end process.
 	go m.onAfterRoomEnded(&onAfterRoomEndedParams{
 		dbTableId:  info.DbTableId,
