@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.7](https://github.com/mynaparrot/plugNmeet-server/compare/v2.5.6...v2.5.7) (2026-11-03)
+
+
+### Bug Fixes
+
+* **nats:** scope client inboxPrefix and ACL by roomId and userId ([e068f85](https://github.com/mynaparrot/plugNmeet-server/commit/e068f85351f6761b38bf83b41996898dc375cd09))
+
 ## [2.5.6](https://github.com/mynaparrot/plugNmeet-server/compare/v2.5.5...v2.5.6) (2026-11-02)
 
 
