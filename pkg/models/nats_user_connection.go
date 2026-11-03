@@ -50,26 +50,32 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId, calledFrom string) {
 				log.WithError(err).Error("Failed to broadcast USER_JOINED event")
 			}
 
-			m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
-				EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
-				EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_JOINED,
-				RoomId:    m.analyticsModel.analyticsRoomId(roomId),
-				UserId:    &userId,
-				UserName:  &userInfo.Name,
-				ExtraData: &userInfo.Metadata,
-				HsetValue: new(fmt.Sprintf("%d", time.Now().UnixMilli())),
-			})
-			log.Info("Successfully processed user joined event")
+			// `status` is the state before this join: "added" on first join, "offline" on
+			// rejoin after the 5s grace period, or "disconnected" on a quick reconnect.
+			// A quick reconnect means USER_LEFT was never recorded, so the USER_JOINED
+			// analytics event and the DB participant increment are skipped.
+			if status != natsservice.UserStatusDisconnected {
+				m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
+					EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM,
+					EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_JOINED,
+					RoomId:    m.analyticsModel.analyticsRoomId(roomId),
+					UserId:    &userId,
+					UserName:  &userInfo.Name,
+					ExtraData: &userInfo.Metadata,
+					HsetValue: new(fmt.Sprintf("%d", time.Now().UnixMilli())),
+				})
 
-			roomInfo, err := m.natsService.GetRoomInfo(roomId)
-			if err != nil {
-				log.WithError(err).Error("Failed to get room info")
-			}
-			if roomInfo != nil {
-				if _, err := m.ds.IncrementOrDecrementNumParticipants(roomInfo.GetRoomSid(), "+"); err != nil {
-					log.WithError(err).Error("Failed to increment num participants")
+				roomInfo, err := m.natsService.GetRoomInfo(roomId)
+				if err != nil {
+					log.WithError(err).Error("Failed to get room info")
+				}
+				if roomInfo != nil {
+					if _, err := m.ds.IncrementOrDecrementNumParticipants(roomInfo.GetRoomSid(), "+"); err != nil {
+						log.WithError(err).Error("Failed to increment num participants")
+					}
 				}
 			}
+			log.Info("Successfully processed user joined event")
 		} else if err != nil {
 			log.WithError(err).Warn("Could not get user info after join")
 		}
@@ -95,6 +101,9 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId, calledFrom string) {
 
 	key := fmt.Sprintf("user-disconnected-%s-%s", roomId, userId)
 	_, _, shared := m.sfGroup.Do(key, func() (interface{}, error) {
+		// The left analytics are recorded only if the user stays offline after the grace period.
+		disconnectedAt := time.Now().UnixMilli()
+
 		// Immediately set status to disconnected and notify clients.
 		// A removed user must keep the `removed` status; otherwise the NATS SDK would
 		// auto-reconnect after we kicked the connection.
@@ -104,13 +113,10 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId, calledFrom string) {
 			}
 		}
 
-		// update analytics & db for the user leaving.
-		m.updateUserLeftAnalytics(roomId, userId, log)
-
 		// Try to get user info for a richer disconnect message.
 		userInfo, err := m.natsService.GetUserInfo(roomId, userId)
 		if err != nil || userInfo == nil {
-			// If we can't get user info, send a basic event and update analytics.
+			// If we can't get user info, send a basic event.
 			if err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_USER_DISCONNECTED, roomId, &plugnmeet.NatsKvUserInfo{UserId: userId, RoomId: roomId}, nil); err != nil {
 				log.WithError(err).Error("Failed to broadcast basic USER_DISCONNECTED event")
 			}
@@ -119,7 +125,7 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId, calledFrom string) {
 		}
 
 		// Start a non-blocking background task to handle the full offline/cleanup lifecycle.
-		go m.handleDelayedOfflineTasks(roomId, userId, userInfo, log)
+		go m.handleDelayedOfflineTasks(roomId, userId, disconnectedAt, userInfo, log)
 		return nil, nil
 	})
 
@@ -129,7 +135,7 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId, calledFrom string) {
 }
 
 // handleDelayedOfflineTasks manages the grace period for user reconnection and subsequent cleanup using periodic checks.
-func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, userInfo *plugnmeet.NatsKvUserInfo, log *logrus.Entry) {
+func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, disconnectedAt int64, userInfo *plugnmeet.NatsKvUserInfo, log *logrus.Entry) {
 	log = log.WithField("subMethod", "handleDelayedOfflineTasks")
 	log.Info("Starting delayed offline tasks with periodic checks")
 	started := time.Now()
@@ -152,6 +158,9 @@ func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, userInfo *p
 			log.WithError(err).Warn("Failed to update user status to offline")
 		}
 	}
+
+	// The user is really gone, so record the leave for analytics and the DB counter.
+	m.updateUserLeftAnalytics(roomId, userId, disconnectedAt, log)
 
 	// Broadcast the final offline status as a single public event;
 	// clients ignore the echo of their own event (same pattern as USER_JOINED/USER_DISCONNECTED).
@@ -249,13 +258,14 @@ func (m *NatsModel) revokeTurnCredentials(creds *turn.Credentials, log *logrus.E
 	}
 }
 
-func (m *NatsModel) updateUserLeftAnalytics(roomId, userId string, log *logrus.Entry) {
+func (m *NatsModel) updateUserLeftAnalytics(roomId, userId string, leftAt int64, log *logrus.Entry) {
 	m.analyticsModel.HandleEvent(&plugnmeet.AnalyticsDataMsg{
 		EventType: plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER,
 		EventName: plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_LEFT,
 		RoomId:    m.analyticsModel.analyticsRoomId(roomId),
 		UserId:    &userId,
-		HsetValue: new(fmt.Sprintf("%d", time.Now().UnixMilli())),
+		Time:      leftAt,
+		HsetValue: new(fmt.Sprintf("%d", leftAt)),
 	})
 
 	roomInfo, err := m.natsService.GetRoomInfo(roomId)
@@ -264,7 +274,7 @@ func (m *NatsModel) updateUserLeftAnalytics(roomId, userId string, log *logrus.E
 	}
 	if roomInfo != nil {
 		if _, err := m.ds.IncrementOrDecrementNumParticipants(roomInfo.GetRoomSid(), "-"); err != nil {
-			log.WithError(err).Error("Failed to increment num participants")
+			log.WithError(err).Error("Failed to decrement num participants")
 		}
 	}
 }

@@ -53,8 +53,7 @@ func (m *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 	// finally, check if requested to block as well as
 	if r.BlockUser {
 		log.Infoln("blocking user")
-		err = m.natsService.AddUserToBlockList(r.RoomId, r.UserId)
-		if err != nil {
+		if err := m.natsService.AddUserToBlockList(r.RoomId, r.UserId); err != nil {
 			log.WithError(err).Errorln("error adding user to block list")
 		}
 	}

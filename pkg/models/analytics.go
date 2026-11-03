@@ -156,8 +156,11 @@ func (m *AnalyticsModel) HandleEvent(d *plugnmeet.AnalyticsDataMsg) {
 		!m.app.AnalyticsSettings.Enabled {
 		return
 	}
-	// we'll use unix milliseconds to make sure fields are unique
-	d.Time = time.Now().UnixMilli()
+	// we'll use unix milliseconds to make sure fields are unique;
+	// only default it, so callers can pass the exact time an event happened.
+	if d.Time == 0 {
+		d.Time = time.Now().UnixMilli()
+	}
 
 	switch d.EventType {
 	case plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM:
