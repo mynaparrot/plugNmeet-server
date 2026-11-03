@@ -62,11 +62,10 @@ func (m *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 	// clean up the consumer & drop the NATS connection after the session ended event is delivered
 	roomId := r.GetRoomId()
 	userId := r.GetUserId()
-	go func() {
-		time.Sleep(time.Second)
+	time.AfterFunc(time.Second, func() {
 		m.natsService.DeleteConsumer(roomId, userId)
 		m.natsService.KickUserConnection(roomId, userId)
-	}()
+	})
 
 	log.Infoln("Participant removed successfully")
 	return nil
