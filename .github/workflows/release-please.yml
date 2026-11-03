@@ -3,8 +3,7 @@ on:
   push:
     branches:
       - main
-      - release/2.5
-      - security-release/2.5.6
+      - security-release/2.5.7
 
 permissions:
   contents: write
