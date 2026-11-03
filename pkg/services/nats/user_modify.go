@@ -1,8 +1,10 @@
 package natsservice
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,11 +33,13 @@ const (
 	UserIsBlacklistedKey   = "is_blacklisted"
 	UserTurnCredentialsKey = "turn_credentials"
 	UserClientTypeKey      = "client_type" // persist client type for hybrid/web sessions
+	UserConnIdKey          = "conn_id"     // stores "<serverId>:<cid>" of the NATS client connection
 
 	UserStatusAdded        = "added"
 	UserStatusOnline       = "online"
 	UserStatusDisconnected = "disconnected"
 	UserStatusOffline      = "offline"
+	UserStatusRemoved      = "removed"
 )
 
 // AddUser adds a new user to a room and stores their metadata in the consolidated bucket
@@ -67,6 +71,7 @@ func (s *NatsService) AddUser(roomId, userId, name string, isAdmin, isPresenter 
 		UserIsBlacklistedKey:   "false",
 		UserTurnCredentialsKey: "",
 		UserClientTypeKey:      clientType.String(),
+		UserConnIdKey:          "",
 	}
 
 	// Store user data in the key-value store using the user-specific prefix
@@ -123,7 +128,7 @@ func (s *NatsService) UpdateUserStatus(roomId, userId string, status string) err
 			// Manually update the cache
 			s.cs.setUserInfoCache(roomId, userId, UserJoinedAt, now, rev)
 		}
-	case UserStatusDisconnected, UserStatusOffline:
+	case UserStatusDisconnected, UserStatusOffline, UserStatusRemoved:
 		rev, err := kv.PutString(s.ctx, s.formatUserKey(userId, UserDisconnectedAt), now)
 		if err != nil {
 			return fmt.Errorf("failed to update disconnected time: %w", err)
@@ -173,6 +178,45 @@ func (s *NatsService) UpdateUserMetadata(roomId, userId string, metadata interfa
 // Physical data deletion happens when the room bucket is deleted.
 func (s *NatsService) DeleteUser(roomId, userId string) {
 	_ = s.UpdateUserStatus(roomId, userId, UserStatusOffline)
+}
+
+// KickUserConnection kicks the user's NATS client connection from its server.
+func (s *NatsService) KickUserConnection(roomId, userId string) {
+	l := s.logger.WithFields(log.Fields{"roomId": roomId, "userId": userId, "method": "KickUserConnection"})
+
+	connId := s.cs.getCachedUserConnId(roomId, userId)
+	if connId == "" {
+		if kv, err := s.js.KeyValue(s.ctx, s.formatConsolidatedRoomBucket(roomId)); err == nil {
+			connId, _ = s.getStringValue(kv, s.formatUserKey(userId, UserConnIdKey))
+		}
+	}
+	if connId == "" {
+		return
+	}
+
+	parts := strings.SplitN(connId, ":", 2)
+	if len(parts) != 2 {
+		l.WithField("connId", connId).Warnln("invalid user connection id")
+		return
+	}
+
+	serverId := parts[0]
+	cid, err := strconv.ParseUint(parts[1], 10, 64)
+	if err != nil {
+		l.WithError(err).Warnln("invalid user connection client id")
+		return
+	}
+
+	payload, err := json.Marshal(map[string]uint64{"cid": cid})
+	if err != nil {
+		return
+	}
+
+	if _, err = s.nc.Request(fmt.Sprintf("$SYS.REQ.SERVER.%s.KICK", serverId), payload, 2*time.Second); err != nil {
+		l.WithError(err).Debugln("failed to kick user connection")
+		return
+	}
+	l.Infoln("kicked user connection")
 }
 
 // deleteAllUserConsumers deletes all NATS consumers associated with users in a room.

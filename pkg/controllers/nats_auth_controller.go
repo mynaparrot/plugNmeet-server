@@ -153,42 +153,62 @@ func (s *NatsAuthController) setPermissionForClient(data *plugnmeet.PlugNmeetTok
 		return fmt.Errorf("user info not found for userId: %s, roomId: %s", userId, roomId)
 	}
 
-	stream, durableName, err := s.natsService.CreateUserConsumer(roomId, userId)
+	status, err := s.natsService.GetRoomUserStatus(roomId, userId)
+	if err != nil {
+		return err
+	}
+	if status == natsservice.UserStatusRemoved || status == "" {
+		return fmt.Errorf("user %s is not active (status: %s)", userId, status)
+	}
+
+	meta, err := s.natsService.UnmarshalUserMetadata(userInfo.Metadata)
+	if err != nil {
+		return err
+	}
+	waitForApproval := meta.GetWaitForApproval()
+
+	stream, durableName, err := s.natsService.CreateUserConsumer(roomId, userId, waitForApproval)
 	if err != nil {
 		return err
 	}
 
-	// Assign Permissions
-	claims.Permissions = jwt.Permissions{
-		Pub: jwt.Permission{
-			Allow: jwt.StringList{
-				"$JS.API.INFO",
-				// permission for consumer (JetStream)
-				fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.%s", stream, durableName),
-				fmt.Sprintf("$JS.API.CONSUMER.MSG.NEXT.%s.%s", stream, durableName),
-				fmt.Sprintf("$JS.ACK.%s.%s.>", stream, durableName),
+	pubAllow := jwt.StringList{
+		"$JS.API.INFO",
+		// permission for consumer (JetStream)
+		fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.%s", stream, durableName),
+		fmt.Sprintf("$JS.API.CONSUMER.MSG.NEXT.%s.%s", stream, durableName),
+		fmt.Sprintf("$JS.ACK.%s.%s.>", stream, durableName),
 
-				// permission to publish messages to the system (JetStream)
-				fmt.Sprintf("%s.%s.%s", s.app.NatsInfo.Subjects.SystemJsWorker, roomId, userId),
-				// permission to publish messages to the system (core pub/sub)
-				fmt.Sprintf("%s.%s.%s", s.app.NatsInfo.Subjects.SystemCoreWorker, roomId, userId),
-				// permission to publish in core pub/sub
-				fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.Chat, roomId),
-				fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.Whiteboard, roomId),
-				fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.DataChannel, roomId),
-			},
-		},
-		Sub: jwt.Permission{
-			Allow: jwt.StringList{
-				fmt.Sprintf("_INBOX.%s.%s.>", roomId, userId),
-				// allow to subscribe in pub/sub channel system public which is different from JetStream
-				fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.SystemPublic, roomId),
-				// other pub/sub channels
-				fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.Chat, roomId),
-				fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.Whiteboard, roomId),
-				fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.DataChannel, roomId),
-			},
-		},
+		// permission to publish messages to the system (JetStream)
+		fmt.Sprintf("%s.%s.%s", s.app.NatsInfo.Subjects.SystemJsWorker, roomId, userId),
+		// permission to publish messages to the system (core pub/sub)
+		fmt.Sprintf("%s.%s.%s", s.app.NatsInfo.Subjects.SystemCoreWorker, roomId, userId),
+	}
+
+	subAllow := jwt.StringList{
+		fmt.Sprintf("_INBOX.%s.%s.>", roomId, userId),
+	}
+
+	// a user waiting for approval can't participate in the room channels
+	if !waitForApproval {
+		pubAllow = append(pubAllow,
+			fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.Chat, roomId),
+			fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.Whiteboard, roomId),
+			fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.DataChannel, roomId),
+		)
+		subAllow = append(subAllow,
+			// allow to subscribe in pub/sub channel system public which is different from JetStream
+			fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.SystemPublic, roomId),
+			// other pub/sub channels
+			fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.Chat, roomId),
+			fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.Whiteboard, roomId),
+			fmt.Sprintf("%s.%s", s.app.NatsInfo.Subjects.DataChannel, roomId),
+		)
+	}
+
+	claims.Permissions = jwt.Permissions{
+		Pub: jwt.Permission{Allow: pubAllow},
+		Sub: jwt.Permission{Allow: subAllow},
 	}
 
 	return nil

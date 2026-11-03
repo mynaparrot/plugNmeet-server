@@ -15,8 +15,13 @@ func (m *RoomModel) ApproveWaitingUsers(r *plugnmeet.ApproveWaitingUsersReq) err
 		}
 
 		for _, p := range participants {
-			err = m.approveUser(r.RoomId, r.UserId, p.Metadata)
-			m.logger.WithError(err).Errorln("error approving user")
+			mt, err := m.natsService.UnmarshalUserMetadata(p.Metadata)
+			if err != nil || mt == nil || !mt.WaitForApproval {
+				continue
+			}
+			if err = m.approveUser(r.RoomId, p.UserId, p.Metadata); err != nil {
+				m.logger.WithError(err).Errorln("error approving user")
+			}
 		}
 
 		return nil
@@ -44,6 +49,9 @@ func (m *RoomModel) approveUser(roomId, userId, metadata string) error {
 		return fmt.Errorf("can't approve user. try again")
 	}
 
+	// the waiting user's consumer only listens to the private subject, so notify it directly
+	_ = m.natsService.BroadcastUserMetadata(roomId, userId, nil, &userId)
+
 	return nil
 }
 
@@ -57,5 +65,22 @@ func (m *RoomModel) UpdateWaitingRoomMessage(r *plugnmeet.UpdateWaitingRoomMessa
 	}
 	roomMeta.RoomFeatures.WaitingRoomFeatures.WaitingRoomMsg = r.Msg
 
-	return m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, roomMeta)
+	if err := m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, roomMeta); err != nil {
+		return err
+	}
+
+	// waiting users only listen to the private subject, so notify them directly
+	participants, err := m.natsService.GetOnlineUsersList(r.RoomId)
+	if err != nil {
+		return nil
+	}
+	for _, p := range participants {
+		mt, err := m.natsService.UnmarshalUserMetadata(p.Metadata)
+		if err != nil || mt == nil || !mt.WaitForApproval {
+			continue
+		}
+		_ = m.natsService.BroadcastRoomMetadata(r.RoomId, nil, new(p.UserId))
+	}
+
+	return nil
 }

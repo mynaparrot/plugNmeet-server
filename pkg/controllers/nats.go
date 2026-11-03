@@ -197,6 +197,7 @@ func (c *NatsController) handleUserConnectionEvent(data []byte, isConnect bool) 
 	e := &struct {
 		Type   string                 `json:"type"`
 		Client map[string]interface{} `json:"client"`
+		Server map[string]interface{} `json:"server"`
 		Reason string                 `json:"reason"`
 	}{}
 	if err := json.Unmarshal(data, e); err != nil {
@@ -226,11 +227,33 @@ func (c *NatsController) handleUserConnectionEvent(data []byte, isConnect bool) 
 		}
 		if claims.GetName() != config.RecorderUserAuthName {
 			if isConnect {
+				c.storeUserConnId(claims.GetRoomId(), claims.GetUserId(), e.Server, e.Client, log)
 				c.natsModel.OnAfterUserJoined(claims.GetRoomId(), claims.GetUserId(), "handleUserConnectionEvent")
 			} else {
 				c.natsModel.OnAfterUserDisconnected(claims.GetRoomId(), claims.GetUserId(), "handleUserConnectionEvent")
 			}
 		}
+	}
+}
+
+// storeUserConnId persists "<serverId>:<cid>" of the client connection so it can be kicked later.
+func (c *NatsController) storeUserConnId(roomId, userId string, server, client map[string]interface{}, log *logrus.Entry) {
+	serverId, _ := server["id"].(string)
+
+	var cid string
+	switch v := client["id"].(type) {
+	case float64:
+		cid = fmt.Sprintf("%.0f", v)
+	case string:
+		cid = v
+	}
+	if serverId == "" || cid == "" {
+		return
+	}
+
+	connId := fmt.Sprintf("%s:%s", serverId, cid)
+	if err := c.natsService.UpdateUserKeyValue(roomId, userId, natsservice.UserConnIdKey, connId); err != nil {
+		log.WithError(err).Warn("failed to store user connection id")
 	}
 }
 

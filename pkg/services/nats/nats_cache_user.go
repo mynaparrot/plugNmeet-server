@@ -63,6 +63,8 @@ func (ncs *NatsCacheService) setUserInfoCache(roomId, userId, field, value strin
 		user.TurnCredentials = value
 	case UserClientTypeKey:
 		user.UserInfo.ClientType = clientTypeFromString(value)
+	case UserConnIdKey:
+		user.ConnId = value
 	}
 
 	user.LastRevision = revision
@@ -147,6 +149,18 @@ func (ncs *NatsCacheService) getCachedUserTurnCredentials(roomId, userId string)
 		}
 	}
 	return "", false
+}
+
+// getCachedUserConnId retrieves the user's NATS connection id from the cache.
+func (ncs *NatsCacheService) getCachedUserConnId(roomId, userId string) string {
+	ncs.roomLock.RLock()
+	defer ncs.roomLock.RUnlock()
+	if rm, found := ncs.roomUsersInfoStore[roomId]; found {
+		if entry, ok := rm[userId]; ok {
+			return entry.ConnId
+		}
+	}
+	return ""
 }
 
 // getUserLastPingAt is a simple reader for the cache.

@@ -68,6 +68,27 @@ func (m *NatsModel) HandleFromClientToServerReq(roomId, userId string, req *plug
 		return
 	}
 
+	status, err := m.natsService.GetRoomUserStatus(roomId, userId)
+	if err != nil || status == "" || status == natsservice.UserStatusRemoved {
+		return
+	}
+
+	meta, err := m.natsService.GetUserMetadataStruct(roomId, userId)
+	if err != nil || meta == nil {
+		return
+	}
+	// a user waiting for approval is only allowed to do the bare minimum
+	if meta.GetWaitForApproval() {
+		switch req.Event {
+		case plugnmeet.NatsMsgClientToServerEvents_REQ_INITIAL_DATA,
+			plugnmeet.NatsMsgClientToServerEvents_REQ_RENEW_PNM_TOKEN,
+			plugnmeet.NatsMsgClientToServerEvents_PING:
+			// allowed while waiting for approval
+		default:
+			return
+		}
+	}
+
 	switch req.Event {
 	case plugnmeet.NatsMsgClientToServerEvents_REQ_RENEW_PNM_TOKEN:
 		m.RenewPNMToken(roomId, userId, req.Msg)

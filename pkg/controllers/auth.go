@@ -155,6 +155,19 @@ func (ac *AuthController) HandleVerifyHeaderToken(c fiber.Ctx) error {
 			_ = c.SendStatus(errStatus)
 			return ac.sendVerificationRes(c, false, "notifications.user-not-active", plugnmeet.StatusCode_USER_NOT_ACTIVE)
 		}
+		meta, err := ac.NatsService.GetUserMetadataStruct(claims.RoomId, claims.UserId)
+		if err != nil {
+			_ = c.SendStatus(errStatus)
+			return ac.sendVerificationRes(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
+		}
+		if meta == nil {
+			_ = c.SendStatus(errStatus)
+			return ac.sendVerificationRes(c, false, "notifications.user-not-active", plugnmeet.StatusCode_USER_NOT_ACTIVE)
+		}
+		if meta.GetWaitForApproval() {
+			_ = c.SendStatus(errStatus)
+			return ac.sendVerificationRes(c, false, "notifications.user-waiting-for-approval", plugnmeet.StatusCode_PERMISSION_DENIED)
+		}
 	}
 
 	c.Locals("isAdmin", claims.IsAdmin)
@@ -195,6 +208,8 @@ func (ac *AuthController) HandleVerifyToken(c fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, "notifications.user-info-not-found")
 	} else if status == natsservice.UserStatusOnline {
 		return utils.SendCommonProtobufResponse(c, false, "notifications.room-disconnected-duplicate-entry")
+	} else if status == natsservice.UserStatusRemoved {
+		return utils.SendCommonProtobufResponse(c, false, "notifications.room-disconnected-participant-removed")
 	}
 
 	exist := ac.NatsService.IsUserExistInBlockList(roomId, requestedUserId)
