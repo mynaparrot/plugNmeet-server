@@ -9,7 +9,6 @@ import (
 	_ "image/png"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -110,37 +109,9 @@ func (m *FileModel) ConvertAndBroadcastWhiteboardFile(ctx context.Context, roomI
 	}
 }
 
-// sanitizeRelativeFilePath normalizes a client supplied path and blocks anything that
-// could escape the storage root. It deliberately does not require the first segment to
-// be the roomSid: when storage hooks are enabled the path is produced by the third-party
-// hook (e.g. room-files/<roomSid>/<file> or <custom-prefix>/<file>).
+// sanitizeRelativeFilePath delegates to helpers.SanitizeRelativeFilePath.
 func sanitizeRelativeFilePath(filePath string) (string, error) {
-	if filePath == "" {
-		return "", config.ErrInvalidFilePath
-	}
-	if strings.HasPrefix(filePath, "/") || strings.Contains(filePath, "\\") || strings.Contains(filePath, "..") {
-		return "", config.ErrInvalidFilePath
-	}
-
-	cleanPath := path.Clean(filepath.ToSlash(filePath))
-	if cleanPath == "." || cleanPath == "/" || strings.HasPrefix(cleanPath, "/") {
-		return "", config.ErrInvalidFilePath
-	}
-
-	// require at least a prefix directory + a file name
-	segments := strings.Split(cleanPath, "/")
-	if len(segments) < 2 {
-		return "", config.ErrInvalidFilePath
-	}
-
-	for _, segment := range segments {
-		// never allow parent/current dir markers or the resumable upload temp dir
-		if segment == ".." || segment == "." || segment == config.UploadFileTempDir {
-			return "", config.ErrInvalidFilePath
-		}
-	}
-
-	return cleanPath, nil
+	return helpers.SanitizeRelativeFilePath(filePath)
 }
 
 // validateLocalRoomFilePath is used for the local (no storage hooks) fallback, where the

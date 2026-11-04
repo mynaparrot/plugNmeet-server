@@ -15,7 +15,7 @@ func (s *InsightsModel) TranscriptionConfigure(req *plugnmeet.InsightsTranscript
 	if err != nil {
 		return err
 	}
-	if metadata == nil {
+	if roomInfo == nil || metadata == nil {
 		return fmt.Errorf("empty room medata")
 	}
 
@@ -28,19 +28,20 @@ func (s *InsightsModel) TranscriptionConfigure(req *plugnmeet.InsightsTranscript
 	if !insightsFeatures.IsAllow || !insightsFeatures.TranscriptionFeatures.IsAllow {
 		return fmt.Errorf("insights feature wasn't enabled")
 	}
+	transcriptionFeatures := insightsFeatures.TranscriptionFeatures
 
-	insightsFeatures.TranscriptionFeatures.IsEnabled = true
-	insightsFeatures.TranscriptionFeatures.AllowedSpokenLangs = req.AllowedSpokenLangs
-	insightsFeatures.TranscriptionFeatures.AllowedSpeechUsers = req.AllowedSpeechUsers
-	insightsFeatures.TranscriptionFeatures.DefaultSubtitleLang = req.DefaultSubtitleLang
+	transcriptionFeatures.IsEnabled = true
+	transcriptionFeatures.AllowedSpokenLangs = req.AllowedSpokenLangs
+	transcriptionFeatures.AllowedSpeechUsers = req.AllowedSpeechUsers
+	transcriptionFeatures.DefaultSubtitleLang = req.DefaultSubtitleLang
 
-	if insightsFeatures.TranscriptionFeatures.IsAllowTranslation {
-		insightsFeatures.TranscriptionFeatures.IsEnabledTranslation = req.IsEnabledTranslation
-		insightsFeatures.TranscriptionFeatures.AllowedTransLangs = req.AllowedTransLangs
+	if transcriptionFeatures.IsAllowTranslation {
+		transcriptionFeatures.IsEnabledTranslation = req.IsEnabledTranslation
+		transcriptionFeatures.AllowedTransLangs = req.AllowedTransLangs
 	}
 
-	if insightsFeatures.TranscriptionFeatures.IsAllowSpeechSynthesis {
-		insightsFeatures.TranscriptionFeatures.IsEnabledSpeechSynthesis = req.IsEnabledSpeechSynthesis
+	if transcriptionFeatures.IsAllowSpeechSynthesis {
+		transcriptionFeatures.IsEnabledSpeechSynthesis = req.IsEnabledSpeechSynthesis
 	}
 
 	usersMap := make(map[string]bool)
@@ -56,8 +57,8 @@ func (s *InsightsModel) TranscriptionConfigure(req *plugnmeet.InsightsTranscript
 		RoomE2EEKey:                        endToEndEncryptionFeatures.EncryptionKey,
 		TargetUsers:                        usersMap,
 		HiddenAgent:                        true,
-		AllowedTransLangs:                  insightsFeatures.TranscriptionFeatures.AllowedTransLangs,
-		EnabledTranscriptionTransSynthesis: insightsFeatures.TranscriptionFeatures.IsEnabledSpeechSynthesis,
+		AllowedTransLangs:                  transcriptionFeatures.AllowedTransLangs,
+		EnabledTranscriptionTransSynthesis: transcriptionFeatures.IsEnabledSpeechSynthesis,
 	}
 
 	err = s.ConfigureAgent(payload, 5*time.Second)
@@ -88,14 +89,20 @@ func (s *InsightsModel) broadcastEndTranscription(roomId string) error {
 	if err != nil {
 		return err
 	}
-	if metadata == nil || !metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.IsEnabled {
+	if metadata == nil {
 		// already ended or room closed
 		return nil
 	}
 
-	metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.IsEnabled = false
-	metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.IsEnabledTranslation = false
-	metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.IsEnabledSpeechSynthesis = false
+	tf := metadata.RoomFeatures.InsightsFeatures.GetTranscriptionFeatures()
+	if tf == nil || !tf.IsEnabled {
+		// already ended or room closed
+		return nil
+	}
+
+	tf.IsEnabled = false
+	tf.IsEnabledTranslation = false
+	tf.IsEnabledSpeechSynthesis = false
 
 	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
 }
@@ -113,7 +120,9 @@ func (s *InsightsModel) TranscriptionUserSession(req *plugnmeet.InsightsTranscri
 		if metadata == nil {
 			return fmt.Errorf("empty room medata")
 		}
-		if metadata.RoomFeatures.EndToEndEncryptionFeatures.EnabledSelfInsertEncryptionKey {
+
+		endToEndEncryptionFeatures := metadata.RoomFeatures.EndToEndEncryptionFeatures
+		if endToEndEncryptionFeatures.EnabledSelfInsertEncryptionKey {
 			return fmt.Errorf("insights.feature-disable-while-e2ee-self-key-enabled")
 		}
 
@@ -130,8 +139,10 @@ func (s *InsightsModel) TranscriptionUserSession(req *plugnmeet.InsightsTranscri
 			UserName:                    userInfo.Name,
 			AllowedTranscriptionStorage: req.AllowedTranscriptionStorage,
 		}
-		if metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.IsEnabledTranslation {
-			options.TransLangs = metadata.RoomFeatures.InsightsFeatures.TranscriptionFeatures.AllowedTransLangs
+
+		transcriptionFeatures := metadata.RoomFeatures.InsightsFeatures.GetTranscriptionFeatures()
+		if transcriptionFeatures.GetIsEnabledTranslation() {
+			options.TransLangs = transcriptionFeatures.GetAllowedTransLangs()
 		}
 		optionsBytes, err := json.Marshal(options)
 		if err != nil {
@@ -200,17 +211,18 @@ func (s *InsightsModel) ChatTranslationConfigure(req *plugnmeet.InsightsChatTran
 	}
 
 	insightsFeatures := metadata.RoomFeatures.InsightsFeatures
-	if !insightsFeatures.IsAllow || !insightsFeatures.ChatTranslationFeatures.IsAllow {
+	chatTranslationFeatures := insightsFeatures.GetChatTranslationFeatures()
+	if !insightsFeatures.IsAllow || !chatTranslationFeatures.GetIsAllow() {
 		return fmt.Errorf("insights feature wasn't enabled")
 	}
 
-	if len(req.AllowedTransLangs) > int(insightsFeatures.ChatTranslationFeatures.MaxSelectedTransLangs) {
+	if len(req.AllowedTransLangs) > int(chatTranslationFeatures.MaxSelectedTransLangs) {
 		return fmt.Errorf("max allowed selected languages exceeded")
 	}
 
-	insightsFeatures.ChatTranslationFeatures.IsEnabled = true
-	insightsFeatures.ChatTranslationFeatures.AllowedTransLangs = req.AllowedTransLangs
-	insightsFeatures.ChatTranslationFeatures.DefaultLang = req.DefaultLang
+	chatTranslationFeatures.IsEnabled = true
+	chatTranslationFeatures.AllowedTransLangs = req.AllowedTransLangs
+	chatTranslationFeatures.DefaultLang = req.DefaultLang
 
 	// analytics
 	s.artifactModel.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_CHAT_TRANSLATION_STATUS, new(plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()), nil)
@@ -228,7 +240,7 @@ func (s *InsightsModel) ExecuteChatTranslation(ctx context.Context, req *plugnme
 	}
 
 	insightsFeatures := metadata.RoomFeatures.InsightsFeatures
-	if !insightsFeatures.IsAllow || !insightsFeatures.ChatTranslationFeatures.IsAllow {
+	if !insightsFeatures.IsAllow || !insightsFeatures.ChatTranslationFeatures.IsAllow || !insightsFeatures.ChatTranslationFeatures.IsEnabled {
 		return nil, fmt.Errorf("feature wasn't enabled")
 	}
 
@@ -268,10 +280,15 @@ func (s *InsightsModel) ChatEndTranslation(roomId string) error {
 		return fmt.Errorf("empty room medata")
 	}
 
+	chatTranslationFeatures := metadata.RoomFeatures.InsightsFeatures.GetChatTranslationFeatures()
+	if chatTranslationFeatures == nil {
+		return nil
+	}
+
 	// analytics
 	s.artifactModel.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_CHAT_TRANSLATION_STATUS, new(plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()), nil)
 
-	metadata.RoomFeatures.InsightsFeatures.ChatTranslationFeatures.IsEnabled = false
+	chatTranslationFeatures.IsEnabled = false
 
 	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
 }
@@ -286,12 +303,12 @@ func (s *InsightsModel) AITextChatConfigure(req *plugnmeet.InsightsAITextChatCon
 	}
 
 	insightsFeatures := metadata.RoomFeatures.InsightsFeatures
-	if !insightsFeatures.IsAllow || !insightsFeatures.AiFeatures.IsAllow || !insightsFeatures.AiFeatures.AiTextChatFeatures.IsAllow {
+	aiTextChatFeatures := insightsFeatures.GetAiFeatures().GetAiTextChatFeatures()
+	if !insightsFeatures.IsAllow || !insightsFeatures.GetAiFeatures().GetIsAllow() || !aiTextChatFeatures.GetIsAllow() {
 		// The client translates the sentinel key; log the full sentence here.
 		s.logger.WithField("roomId", roomId).Warn("AI text chat features are not enabled for this room")
 		return fmt.Errorf("insights.ai-text-chat.feature-disabled")
 	}
-	aiTextChatFeatures := insightsFeatures.AiFeatures.AiTextChatFeatures
 
 	aiTextChatFeatures.IsEnabled = true
 	aiTextChatFeatures.IsAllowedEveryone = req.IsAllowedEveryone
@@ -316,7 +333,7 @@ func (s *InsightsModel) ExecuteAITextChat(req *plugnmeet.InsightsAITextChatConte
 	}
 
 	insightsFeatures := metadata.RoomFeatures.InsightsFeatures
-	if !insightsFeatures.IsAllow || !insightsFeatures.AiFeatures.IsAllow || !insightsFeatures.AiFeatures.AiTextChatFeatures.IsAllow {
+	if !insightsFeatures.IsAllow || !insightsFeatures.AiFeatures.IsAllow || !insightsFeatures.AiFeatures.AiTextChatFeatures.IsAllow || !insightsFeatures.AiFeatures.AiTextChatFeatures.IsEnabled {
 		// The client translates the sentinel key; log the full sentence here.
 		s.logger.WithField("roomId", roomId).WithField("userId", userId).Warn("AI text chat features are not enabled for this room")
 		return fmt.Errorf("insights.ai-text-chat.feature-disabled")
@@ -379,10 +396,15 @@ func (s *InsightsModel) EndAITextChat(roomId string) error {
 		return fmt.Errorf("empty room medata")
 	}
 
+	aiTextChatFeatures := metadata.RoomFeatures.InsightsFeatures.GetAiFeatures().GetAiTextChatFeatures()
+	if aiTextChatFeatures == nil {
+		return nil
+	}
+
 	// analytics
 	s.artifactModel.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_AI_TEXT_CHAT_STATUS, new(plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()), nil)
 
-	metadata.RoomFeatures.InsightsFeatures.AiFeatures.AiTextChatFeatures.IsEnabled = false
+	aiTextChatFeatures.IsEnabled = false
 
 	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
 }
@@ -392,7 +414,7 @@ func (s *InsightsModel) AIMeetingSummarizationConfig(req *plugnmeet.InsightsAIMe
 	if err != nil {
 		return err
 	}
-	if roomInfo == nil {
+	if roomInfo == nil || metadata == nil {
 		return fmt.Errorf("empty room medata")
 	}
 
@@ -400,7 +422,6 @@ func (s *InsightsModel) AIMeetingSummarizationConfig(req *plugnmeet.InsightsAIMe
 	if endToEndEncryptionFeatures.EnabledSelfInsertEncryptionKey {
 		return fmt.Errorf("insights.feature-disable-while-e2ee-self-key-enabled")
 	}
-
 	insightsFeatures := metadata.RoomFeatures.InsightsFeatures
 	if !insightsFeatures.IsAllow || !insightsFeatures.AiFeatures.IsAllow || !insightsFeatures.AiFeatures.MeetingSummarizationFeatures.IsAllow {
 		return fmt.Errorf("insights feature wasn't enabled")
@@ -447,6 +468,11 @@ func (s *InsightsModel) EndEndAIMeetingSummarization(roomId string) error {
 		return fmt.Errorf("empty room medata")
 	}
 
+	meetingSummarizationFeatures := metadata.RoomFeatures.InsightsFeatures.GetAiFeatures().GetMeetingSummarizationFeatures()
+	if meetingSummarizationFeatures == nil {
+		return nil
+	}
+
 	err = s.EndRoomAgentTaskByServiceName(insights.ServiceTypeMeetingSummarizing, roomId, 5*time.Second)
 	if err != nil {
 		return err
@@ -455,6 +481,6 @@ func (s *InsightsModel) EndEndAIMeetingSummarization(roomId string) error {
 	// analytics
 	s.artifactModel.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_AI_MEETING_SUMMARIZATION_STATUS, new(plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()), nil)
 
-	metadata.RoomFeatures.InsightsFeatures.AiFeatures.MeetingSummarizationFeatures.IsEnabled = false
+	meetingSummarizationFeatures.IsEnabled = false
 	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
 }

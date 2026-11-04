@@ -98,7 +98,7 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx, req *ResumableUploadReq) (*
 			}
 			// Original logic if no hook is configured.
 			stat, err := os.Stat(chunkPath)
-			if os.IsNotExist(err) {
+			if err != nil {
 				return res, fiber.NewError(fiber.StatusNoContent, "OK to upload")
 			}
 			if stat.Size() == req.ResumableCurrentChunkSize {
@@ -398,6 +398,12 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 
 		// Run download and conversion in the background
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					gLog.WithField("panic", r).Error("recovered from panic in background whiteboard file processing")
+				}
+			}()
+
 			_, err := m.DownloadAndProcessWhiteboardFile(rf.RoomId, rf.RoomSid, documentLink, maxSize, lock, gLog)
 			errChan <- err
 		}()

@@ -68,6 +68,10 @@ func (m *FileModel) detectMimeTypeForValidation(file multipart.File) error {
 }
 
 func (m *FileModel) ValidateMimeType(mtype *mimetype.MIME) error {
+	if mtype == nil {
+		return fmt.Errorf("invalid: can't determine file type")
+	}
+
 	ext := strings.TrimPrefix(mtype.Extension(), ".")
 	if ext == "" {
 		return fmt.Errorf("invalid: can't determine file type")

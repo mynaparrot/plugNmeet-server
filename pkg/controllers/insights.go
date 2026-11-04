@@ -216,6 +216,10 @@ func (i *InsightsController) HandleGetTranscriptionUserTaskStatus(c fiber.Ctx) e
 }
 
 func (i *InsightsController) HandleGetSupportedLangs(c fiber.Ctx) error {
+	if i.app.Insights == nil || !i.app.Insights.Enabled {
+		return utils.SendCommonProtobufResponse(c, false, "insights feature wasn't configured")
+	}
+
 	req := new(plugnmeet.InsightsGetSupportedLanguagesReq)
 	if err := proto.Unmarshal(c.Body(), req); err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())

@@ -113,6 +113,11 @@ func (m *NatsModel) HandleFromClientToServerReq(roomId, userId string, req *plug
 			m.logger.Errorln(err)
 			return
 		}
+		isUserEvent := ad.EventType == plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER && ad.EventName != plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_UNKNOWN
+		isAllowedRoomEvent := ad.EventType == plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_ROOM && ad.EventName == plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_WHITEBOARD_FILES
+		if !isUserEvent && !isAllowedRoomEvent {
+			return
+		}
 		// bind to the authenticated identity
 		ad.RoomId = roomId
 		ad.UserId = &userId

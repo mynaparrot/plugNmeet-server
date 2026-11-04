@@ -337,6 +337,12 @@ func (m *RoomModel) prepareRoomDbInfo(r *plugnmeet.CreateRoomReq, existing *dbmo
 
 // prepareWhiteboardPreloadFile preload whiteboard file
 func (m *RoomModel) prepareWhiteboardPreloadFile(meta *plugnmeet.RoomMetadata, roomId, roomSid string, log *logrus.Entry) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.WithField("panic", r).Error("recovered from panic in background whiteboard file processing")
+		}
+	}()
+
 	wbf := meta.RoomFeatures.WhiteboardFeatures
 	if wbf == nil || !wbf.IsAllow || wbf.PreloadFile == nil || *wbf.PreloadFile == "" {
 		return

@@ -55,7 +55,7 @@ func (ac *AuthController) HandleAuthHeaderCheck(c fiber.Ctx) error {
 		c.Status(fiber.StatusUnauthorized)
 		return ac.sendVerificationRes(c, false, "Missing API-KEY header.", plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER)
 	}
-	if apiKey != ac.AppConfig.Client.ApiKey {
+	if subtle.ConstantTimeCompare([]byte(apiKey), []byte(ac.AppConfig.Client.ApiKey)) != 1 {
 		c.Status(fiber.StatusUnauthorized)
 		return ac.sendVerificationRes(c, false, "Invalid API key provided.", plugnmeet.StatusCode_INVALID_API_KEY)
 	}

@@ -20,11 +20,11 @@ require (
 	github.com/livekit/media-sdk v0.1.1
 	github.com/livekit/protocol v1.51.1-0.20260910121219-271d9cde3897
 	github.com/livekit/server-sdk-go/v2 v2.19.0
-	github.com/mynaparrot/plugnmeet-protocol v1.6.4-0.20261031111043-322ca5c5df5b
+	github.com/mynaparrot/plugnmeet-protocol v1.6.4-0.20261104112659-0e6359726f97
 	github.com/nats-io/jwt/v2 v2.8.2
 	github.com/nats-io/nats.go v1.55.0
 	github.com/nats-io/nkeys v0.4.16
-	github.com/openai/openai-go/v3 v3.91.1
+	github.com/openai/openai-go/v3 v3.94.0
 	github.com/pion/webrtc/v4 v4.2.19
 	github.com/prometheus/client_golang v1.25.0
 	github.com/redis/go-redis/v9 v9.23.0
@@ -113,7 +113,7 @@ require (
 	github.com/prometheus/common v0.72.0 // indirect
 	github.com/prometheus/procfs v0.22.0 // indirect
 	github.com/puzpuzpuz/xsync/v4 v4.5.0 // indirect
-	github.com/tidwall/gjson v1.19.0 // indirect
+	github.com/tidwall/gjson v1.20.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect

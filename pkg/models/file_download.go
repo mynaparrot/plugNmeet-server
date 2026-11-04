@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"mime"
 	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -133,7 +135,11 @@ func (m *FileModel) validateRemoteFile(fileUrl string, maxSize uint64) error {
 		return fmt.Errorf("missing Content-Type header")
 	}
 
-	mType := mimetype.Lookup(contentType)
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		mediaType = strings.TrimSpace(strings.Split(contentType, ";")[0])
+	}
+	mType := mimetype.Lookup(mediaType)
 	if err := m.ValidateMimeType(mType); err != nil {
 		return fmt.Errorf("invalid MIME type: %w", err)
 	}

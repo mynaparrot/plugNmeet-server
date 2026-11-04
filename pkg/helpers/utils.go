@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/big"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -30,40 +31,51 @@ func ToFixed(num float32, precision int) float32 {
 }
 
 func GenerateSipPin(length int) string {
-	// Create a slice with all possible digits.
-	digits := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
-
-	// Fisher-Yates shuffle using crypto/rand for secure randomness.
-	for i := len(digits) - 1; i > 0; i-- {
-		// Generate a cryptographically secure random number j such that 0 <= j <= i.
-		num, err := rand.Int(rand.Reader, big.NewInt(int64(i+1)))
-		if err != nil {
-			// Fallback to a less secure but still random shuffle on error.
-			// This should ideally be logged as a critical failure.
-			return GenerateSipPin(length) // Simple recursion for fallback
-		}
-		j := int(num.Int64())
-		digits[i], digits[j] = digits[j], digits[i]
-	}
-
-	// Take the first "length" digits from the shuffled slice to guarantee uniqueness.
-	pinDigits := digits[:length]
-
-	// Use a strings.Builder for efficient string concatenation.
 	var builder strings.Builder
 	builder.Grow(length)
-	for _, d := range pinDigits {
-		builder.WriteRune(rune('0' + d))
+	for i := 0; i < length; i++ {
+		num, err := rand.Int(rand.Reader, big.NewInt(10))
+		if err != nil {
+			return builder.String()
+		}
+		builder.WriteByte(byte('0' + num.Int64()))
 	}
 	return builder.String()
 }
 
-var (
-	// A minimal regex to remove characters that are illegal in Windows filenames,
-	// plus the null byte which is a general security risk.
-	// We explicitly include / and \ even though filepath.Base handles them, for clarity.
-	minimalIllegalChars = regexp.MustCompile(`[<>:"/\\|?*\x00]`)
-)
+// SanitizeRelativeFilePath normalizes a client supplied path and blocks anything that
+// could escape the storage root.
+func SanitizeRelativeFilePath(filePath string) (string, error) {
+	if filePath == "" {
+		return "", config.ErrInvalidFilePath
+	}
+	if strings.HasPrefix(filePath, "/") || strings.Contains(filePath, "\\") || strings.Contains(filePath, "..") {
+		return "", config.ErrInvalidFilePath
+	}
+
+	cleanPath := path.Clean(filepath.ToSlash(filePath))
+	if cleanPath == "." || cleanPath == "/" || strings.HasPrefix(cleanPath, "/") {
+		return "", config.ErrInvalidFilePath
+	}
+
+	segments := strings.Split(cleanPath, "/")
+	if len(segments) < 2 {
+		return "", config.ErrInvalidFilePath
+	}
+
+	for _, segment := range segments {
+		if segment == ".." || segment == "." || segment == config.UploadFileTempDir {
+			return "", config.ErrInvalidFilePath
+		}
+	}
+
+	return cleanPath, nil
+}
+
+// A minimal regex to remove characters that are illegal in Windows filenames,
+// plus the null byte which is a general security risk.
+// We explicitly include / and \ even though filepath.Base handles them, for clarity.
+var minimalIllegalChars = regexp.MustCompile(`[<>:"/\\|?*\x00]`)
 
 // MakeSafeFilename sanitizes a string to be used as a safe filename.
 // It is designed to be as permissive as possible, only removing characters
@@ -134,13 +146,36 @@ func ValidateAndGetAbsFilePath(basePath, relativePath string) (string, *mimetype
 		return "", nil, errors.New("invalid file path: path is outside the allowed directory")
 	}
 
-	// Now that the path is validated, detect the MIME type.
-	mType, err := mimetype.DetectFile(absJoinedPath)
+	realBasePath, err := filepath.EvalSymlinks(absBasePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil, config.ErrFileNotFound
+		}
+		return "", nil, fmt.Errorf("could not resolve base directory symlinks: %w", err)
+	}
+
+	realJoinedPath, err := filepath.EvalSymlinks(absJoinedPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil, config.ErrFileNotFound
+		}
+		return "", nil, fmt.Errorf("could not resolve file symlinks: %w", err)
+	}
+
+	// Re-check after resolving symlinks so links cannot escape the base directory.
+	if !isPathInsideBase(realBasePath, realJoinedPath) {
+		return "", nil, errors.New("invalid file path: path is outside the allowed directory")
+	}
+
+	mType, err := mimetype.DetectFile(realJoinedPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return "", nil, config.ErrFileNotFound
 		}
 		return "", nil, fmt.Errorf("could not detect file type: %w", err)
+	}
+	if mType == nil {
+		return "", nil, errors.New("could not detect file type")
 	}
 
 	return absJoinedPath, mType, nil

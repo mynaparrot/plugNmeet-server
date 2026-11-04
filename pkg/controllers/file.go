@@ -144,19 +144,14 @@ func (fc *FileController) HandleDownloadUploadedFile(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).SendString("invalid file path")
 	}
 
-	relativePath := path.Clean(unescapedPath)
-	pathSegments := strings.Split(relativePath, "/")
-
-	// must have at least 2 segments e.g. roomSid/other parts
-	if len(pathSegments) < 2 {
-		return c.Status(fiber.StatusBadRequest).SendString("invalid url")
-	}
-
-	for _, segment := range pathSegments {
-		// prevent to download from temp dir by checking path segments
-		if segment == config.UploadFileTempDir {
-			return c.Status(fiber.StatusForbidden).SendString("access to temporary directory is forbidden")
+	relativePath, err := helpers.SanitizeRelativeFilePath(unescapedPath)
+	if err != nil {
+		for _, segment := range strings.Split(unescapedPath, "/") {
+			if segment == config.UploadFileTempDir {
+				return c.Status(fiber.StatusForbidden).SendString("access to temporary directory is forbidden")
+			}
 		}
+		return c.Status(fiber.StatusBadRequest).SendString("invalid file path")
 	}
 
 	if fc.AppConfig.Hooks != nil {
