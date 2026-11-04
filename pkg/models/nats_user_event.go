@@ -50,6 +50,23 @@ func (m *NatsModel) HandleInitialData(roomId, userId string) {
 		return
 	}
 
+	// waiting room users must never receive the full room metadata
+	userMeta, err := m.natsService.UnmarshalUserMetadata(userInfo.Metadata)
+	if err != nil {
+		log.WithError(err).Errorln("error getting user metadata")
+		_ = m.natsService.NotifyErrorMsg(roomId, err.Error(), &userId)
+		return
+	}
+	if userMeta.GetWaitForApproval() {
+		redactedMeta, err := m.natsService.PrepareRoomMetadataForWaitingUser(rInfo.Metadata)
+		if err != nil {
+			log.WithError(err).Errorln("error preparing room metadata for waiting user")
+			_ = m.natsService.NotifyErrorMsg(roomId, err.Error(), &userId)
+			return
+		}
+		rInfo.Metadata = redactedMeta
+	}
+
 	initial := &plugnmeet.NatsInitialData{
 		Room:      rInfo,
 		LocalUser: userInfo,

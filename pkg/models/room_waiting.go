@@ -49,6 +49,10 @@ func (m *RoomModel) approveUser(roomId, userId, metadata string) error {
 		return fmt.Errorf("can't approve user. try again")
 	}
 
+	// send the full room metadata before the user metadata, so on the user's
+	// ordered consumer ROOM_METADATA_UPDATE arrives before USER_METADATA_UPDATE
+	// (waitForApproval=false triggers the client to request the media server data)
+	_ = m.natsService.BroadcastRoomMetadata(roomId, nil, &userId)
 	// the waiting user's consumer only listens to the private subject, so notify it directly
 	_ = m.natsService.BroadcastUserMetadata(roomId, userId, nil, &userId)
 
@@ -69,17 +73,22 @@ func (m *RoomModel) UpdateWaitingRoomMessage(r *plugnmeet.UpdateWaitingRoomMessa
 		return err
 	}
 
-	// waiting users only listen to the private subject, so notify them directly
+	// waiting users only listen to the private subject, so notify them directly.
+	// they only get the redacted metadata, prepared once for all of them.
 	participants, err := m.natsService.GetOnlineUsersList(r.RoomId)
 	if err != nil {
 		return nil
+	}
+	redactedMeta, err := m.natsService.RedactRoomMetadataForWaitingUser(roomMeta)
+	if err != nil {
+		return err
 	}
 	for _, p := range participants {
 		mt, err := m.natsService.UnmarshalUserMetadata(p.Metadata)
 		if err != nil || mt == nil || !mt.WaitForApproval {
 			continue
 		}
-		_ = m.natsService.BroadcastRoomMetadata(r.RoomId, nil, new(p.UserId))
+		_ = m.natsService.BroadcastRoomMetadata(r.RoomId, &redactedMeta, new(p.UserId))
 	}
 
 	return nil

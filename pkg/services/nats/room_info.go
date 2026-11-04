@@ -91,6 +91,52 @@ func (s *NatsService) GetRoomMetadataStruct(roomId string) (*plugnmeet.RoomMetad
 	return s.UnmarshalRoomMetadata(string(entry.Value()))
 }
 
+// PrepareRoomMetadataForWaitingUser returns a minimal room metadata JSON for users
+// who are still waiting for approval. It strips sensitive data like the E2EE
+// encryption key and most room features.
+func (s *NatsService) PrepareRoomMetadataForWaitingUser(rawMetadata string) (string, error) {
+	meta, err := s.UnmarshalRoomMetadata(rawMetadata)
+	if err != nil {
+		return "", err
+	}
+
+	return s.RedactRoomMetadataForWaitingUser(meta)
+}
+
+// RedactRoomMetadataForWaitingUser builds a minimal metadata JSON out of the given
+// room metadata. See PrepareRoomMetadataForWaitingUser.
+func (s *NatsService) RedactRoomMetadataForWaitingUser(meta *plugnmeet.RoomMetadata) (string, error) {
+	if meta == nil {
+		return "", errors.New("metadata cannot be nil")
+	}
+
+	rf := meta.GetRoomFeatures()
+	redacted := &plugnmeet.RoomMetadata{
+		RoomTitle:           meta.GetRoomTitle(),
+		WelcomeMessage:      meta.WelcomeMessage,
+		LogoutUrl:           meta.LogoutUrl,
+		CopyrightConf:       meta.GetCopyrightConf(),
+		DefaultLockSettings: meta.GetDefaultLockSettings(),
+		RoomFeatures: &plugnmeet.RoomCreateFeatures{
+			AllowWebcams:        rf.GetAllowWebcams(),
+			MuteOnStart:         rf.GetMuteOnStart(),
+			AdminOnlyWebcams:    rf.GetAdminOnlyWebcams(),
+			AllowVirtualBg:      rf.AllowVirtualBg,
+			WaitingRoomFeatures: rf.GetWaitingRoomFeatures(),
+		},
+	}
+
+	// only expose the flags, never the encryption key or the included scopes
+	if e2ee := rf.GetEndToEndEncryptionFeatures(); e2ee != nil {
+		redacted.RoomFeatures.EndToEndEncryptionFeatures = &plugnmeet.EndToEndEncryptionFeatures{
+			IsEnabled:                      e2ee.GetIsEnabled(),
+			EnabledSelfInsertEncryptionKey: e2ee.GetEnabledSelfInsertEncryptionKey(),
+		}
+	}
+
+	return s.MarshalToProtoJson(redacted)
+}
+
 // IsRoomStatusActive determines if a given room status string represents
 // a state where the room is considered active (either newly created or actively running).
 func (s *NatsService) IsRoomStatusActive(status string) bool {
