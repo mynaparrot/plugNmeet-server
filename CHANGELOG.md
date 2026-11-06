@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.6.0](https://github.com/mynaparrot/plugNmeet-server/compare/v2.5.7...v2.6.0) (2026-11-06)
+
+
+### Features
+
+* **config:** add optional livekit_info.client_host for the client-facing URL ([7b2bf9c](https://github.com/mynaparrot/plugNmeet-server/commit/7b2bf9cc45acf1ce49c9155a0ab253a41eb32e45))
+* **countdown-timer:** host-controlled meeting countdown timer ([#936](https://github.com/mynaparrot/plugNmeet-server/issues/936)) ([d806361](https://github.com/mynaparrot/plugNmeet-server/commit/d806361671bafc54c6237b2e2517c26316dd4da5))
+* **polls:** support text-answer polls with atomic Redis grouping and validation ([#938](https://github.com/mynaparrot/plugNmeet-server/issues/938)) ([d806361](https://github.com/mynaparrot/plugNmeet-server/commit/d806361671bafc54c6237b2e2517c26316dd4da5))
+* strip sensitive room metadata for waiting users and defer media init until join ([a8c8439](https://github.com/mynaparrot/plugNmeet-server/commit/a8c8439254030b8bd5ca4e6247aebed01a4b15d2))
+
+
+### Bug Fixes
+
+* **analytics:** ignore transient NATS reconnects in user join/left events ([3f3ef73](https://github.com/mynaparrot/plugNmeet-server/commit/3f3ef73700c6e73e35dbd536dae3bf6b26926738))
+* harden path validation, nil safety, and input sanitization ([cb46b21](https://github.com/mynaparrot/plugNmeet-server/commit/cb46b218c48bdbe2181fd5e69a38136711999581))
+* **nats:** two-phase waiting-room permissions and hard-kick of removed users ([#947](https://github.com/mynaparrot/plugNmeet-server/issues/947)) ([07c4941](https://github.com/mynaparrot/plugNmeet-server/commit/07c4941fee6054be1798e186c379d58449f25f6d))
+* **recorder:** add support to connect by NATS websocket + CustomInboxPrefix ([1fc8260](https://github.com/mynaparrot/plugNmeet-server/commit/1fc826033bb26f0d95f5a138e5d8779d0f1c6d39))
+* use `time.AfterFunc` instated of plain goroutine ([d4aef74](https://github.com/mynaparrot/plugNmeet-server/commit/d4aef744305c84dbe6607f43f6965607eea41430))
+
 ## [2.5.7](https://github.com/mynaparrot/plugNmeet-server/compare/v2.5.6...v2.5.7) (2026-11-03)
 
 
