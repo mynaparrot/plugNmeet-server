@@ -77,6 +77,16 @@ type LivekitInfo struct {
 	Host   string `yaml:"host"`
 	ApiKey string `yaml:"api_key"`
 	Secret string `yaml:"secret"`
+	// ClientHost is the optional LiveKit URL delivered to clients.
+	ClientHost *string `yaml:"client_host"`
+}
+
+// GetClientHost returns the client-facing URL, falling back to Host.
+func (l *LivekitInfo) GetClientHost() string {
+	if l.ClientHost != nil && *l.ClientHost != "" {
+		return *l.ClientHost
+	}
+	return strings.Replace(l.Host, "host.docker.internal", "localhost", 1)
 }
 
 type LivekitSipInfo struct {
@@ -276,6 +286,9 @@ func InitAppConfig(appCnf *AppConfig) (*AppConfig, error) {
 	}
 	if appCnf.NatsInfo.Recorder.TranscodingJobs == "" {
 		appCnf.NatsInfo.Recorder.TranscodingJobs = "pnm-RecorderTranscoderJobs"
+	}
+	if err := validateAppConfig(appCnf); err != nil {
+		return nil, err
 	}
 	if appCnf.LivekitSipInfo != nil && appCnf.LivekitSipInfo.Enabled {
 		if len(appCnf.LivekitSipInfo.PhoneNumbers) == 0 {

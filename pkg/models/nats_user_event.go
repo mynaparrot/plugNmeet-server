@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/auth"
@@ -193,9 +192,8 @@ func (m *NatsModel) HandleMediaServerInfo(roomId, userId string, broadcast bool)
 		return nil
 	}
 
-	lkHost := strings.Replace(m.app.LivekitInfo.Host, "host.docker.internal", "localhost", 1) // without this you won't be able to connect
 	data := &plugnmeet.MediaServerConnInfo{
-		Url:   lkHost,
+		Url:   m.app.LivekitInfo.GetClientHost(),
 		Token: token,
 	}
 

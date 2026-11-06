@@ -88,6 +88,8 @@ log_settings:
 
 livekit_info:
   host: "http://host.docker.internal:7880"
+  # Optional client-facing URL; falls back to host when unset.
+  #client_host: "https://livekit.example.com"
   api_key: "APIiYAA5w37Cfo2"
   secret: "6aNur7qqupeZhFYNOJVUyeXxXhVw8f4lm13pEDUx8SgB"
 
