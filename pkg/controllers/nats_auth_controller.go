@@ -10,6 +10,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/nats-io/jwt/v2"
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/micro"
 	"github.com/nats-io/nkeys"
 	"github.com/sirupsen/logrus"
@@ -98,7 +99,7 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 	claims.Name = string(marshal)
 
 	if data.GetName() == config.RecorderUserAuthName {
-		s.setPermissionForRecorder(claims)
+		s.setPermissionForRecorder(data, claims)
 		return claims, nil
 	}
 
@@ -109,7 +110,7 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 	return claims, nil
 }
 
-func (s *NatsAuthController) setPermissionForRecorder(claims *jwt.UserClaims) {
+func (s *NatsAuthController) setPermissionForRecorder(data *plugnmeet.PlugNmeetTokenClaims, claims *jwt.UserClaims) {
 	pubAllow := jwt.StringList{
 		"$JS.API.INFO",
 		"_INBOX.>", // otherwise won't be able to send respond msg
@@ -131,7 +132,7 @@ func (s *NatsAuthController) setPermissionForRecorder(claims *jwt.UserClaims) {
 		Sub: jwt.Permission{
 			Allow: jwt.StringList{
 				s.app.NatsInfo.Recorder.RecorderChannel,
-				"_INBOX.>",
+				fmt.Sprintf("%srecorder.%s.>", nats.InboxPrefix, data.GetUserId()),
 			},
 		},
 	}
@@ -186,7 +187,7 @@ func (s *NatsAuthController) setPermissionForClient(data *plugnmeet.PlugNmeetTok
 	}
 
 	subAllow := jwt.StringList{
-		fmt.Sprintf("_INBOX.%s.%s.>", roomId, userId),
+		fmt.Sprintf("%s%s.%s.>", nats.InboxPrefix, roomId, userId),
 	}
 
 	// a user waiting for approval can't participate in the room channels

@@ -212,10 +212,16 @@ func (c *NatsController) handleUserConnectionEvent(data []byte, isConnect bool) 
 	})
 	log.Debug("Received NATS connection event")
 
-	if clientType, ok := e.Client["client_type"]; ok && clientType != websocketClientType {
+	clientType, _ := e.Client["client_type"].(string)
+	name, _ := e.Client["name"].(string)
+
+	if clientType != websocketClientType || strings.HasPrefix(name, "plugnmeet-recorder") {
 		// this feature only for websocket connections from frontend only
 		// for other client different ways, so preventing unnecessary errors
-		log.WithField("client_type", clientType).Warn("ignoring non-websocket connection event")
+		log.WithFields(logrus.Fields{
+			"client_type": clientType,
+			"name":        name,
+		}).Warn("ignoring non-user connection event")
 		return
 	}
 
