@@ -54,6 +54,8 @@ var (
 	ErrRoomIdRequired        = errors.New("room.errors.room-id-required")
 	ErrRoomIdMismatch        = errors.New("room.errors.room-id-mismatch")
 	ErrRoomNotFound          = errors.New("room.errors.room-not-found")
+	ErrNoRoomFound           = errors.New("room.errors.no-room-found")
+	ErrNoActiveRoomFound     = errors.New("room.errors.no-active-room-found")
 	ErrRoomNotActive         = errors.New("room.errors.room-not-active")
 	ErrRoomUnexpectedError   = errors.New("room.errors.unexpected")
 	ErrRoomEndFailed         = errors.New("room.errors.end-failed")

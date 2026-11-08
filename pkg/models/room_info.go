@@ -110,7 +110,7 @@ func (m *RoomModel) GetActiveRoomsInfo(userCtx context.Context) (bool, string, p
 		return false, config.ErrRoomUnexpectedError.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil
 	}
 	if roomsInfo == nil || len(roomsInfo) == 0 {
-		return false, config.ErrRoomNotFound.Error(), plugnmeet.StatusCode_NOT_FOUND, nil
+		return false, config.ErrNoActiveRoomFound.Error(), plugnmeet.StatusCode_NOT_FOUND, nil
 	}
 	res := make([]*plugnmeet.ActiveRoomWithParticipant, 0, len(roomsInfo))
 
@@ -171,7 +171,7 @@ func (m *RoomModel) FetchPastRooms(userCtx context.Context, r *plugnmeet.FetchPa
 		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil, config.ErrRoomUnexpectedError
 	}
 	if total == 0 {
-		return plugnmeet.StatusCode_NOT_FOUND, nil, config.ErrRoomNotFound
+		return plugnmeet.StatusCode_NOT_FOUND, nil, config.ErrNoRoomFound
 	}
 
 	list := make([]*plugnmeet.PastRoomInfo, 0, len(rooms))

@@ -83,6 +83,8 @@ const MsgIntegratorSuccess = "success"
 const (
 	MsgAuthInvalidRequest              = "Invalid request."
 	MsgAuthRoomNotFound                = "The room was not found."
+	MsgAuthNoRoomFound                 = "No room found."
+	MsgAuthRoomNoActiveRoomFound       = "No active room found."
 	MsgAuthRoomNotActive               = "The room is not active."
 	MsgAuthRoomIdNotAllowed            = "The room_id is not allowed."
 	MsgAuthRoomCreateFailed            = "The room could not be created."
@@ -171,6 +173,8 @@ var integratorMsgs = map[string]string{
 	ErrRoomInvalidRequest.Error():          MsgAuthInvalidRequest,
 	ErrRoomIdRequired.Error():              MsgRoomIdRequired,
 	ErrRoomNotFound.Error():                MsgAuthRoomNotFound,
+	ErrNoRoomFound.Error():                 MsgAuthNoRoomFound,
+	ErrNoActiveRoomFound.Error():           MsgAuthRoomNoActiveRoomFound,
 	ErrRoomNotActive.Error():               MsgAuthRoomNotActive,
 	ErrRoomUnexpectedError.Error():         MsgIntegratorUnexpected,
 	ErrRoomEndFailed.Error():               MsgAuthRoomEndFailed,
