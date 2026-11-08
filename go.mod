@@ -9,7 +9,7 @@ require (
 	github.com/facette/natsort v0.0.0-20181210072756-2cd4dd1e2dcb
 	github.com/gabriel-vasile/mimetype v1.4.16
 	github.com/gammazero/workerpool v1.3.0
-	github.com/go-jose/go-jose/v4 v4.1.8
+	github.com/go-jose/go-jose/v4 v4.1.9
 	github.com/goccy/go-json v0.12.0
 	github.com/goccy/go-yaml v1.19.2
 	github.com/gofiber/fiber/v3 v3.6.1
