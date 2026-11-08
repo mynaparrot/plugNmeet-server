@@ -45,17 +45,17 @@ func NewUserController(args UserControllerArgs) *UserController {
 func (uc *UserController) HandleGenerateJoinToken(c fiber.Ctx) error {
 	req := new(plugnmeet.GenerateTokenReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return utils.SendCommonErrorJsonResponse(c, callerMsg(c, config.ErrUserInvalidRequest.Error()), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	if req.UserInfo == nil {
-		return utils.SendCommonProtoJsonResponse(c, false, "UserInfo required", plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return utils.SendCommonErrorJsonResponse(c, callerMsg(c, config.ErrUserInfoRequired.Error()), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	// don't generate token if user is blocked
 	exist := uc.NatsService.IsUserExistInBlockList(req.RoomId, req.UserInfo.UserId)
 	if exist {
-		return utils.SendCommonProtoJsonResponse(c, false, "this user is blocked to join this session", plugnmeet.StatusCode_USER_BLOCKED)
+		return utils.SendCommonErrorJsonResponse(c, callerMsg(c, config.ErrAuthUserBlocked.Error()), plugnmeet.StatusCode_USER_BLOCKED)
 	}
 
 	// Use the single point of truth to check if the room is active.
@@ -64,17 +64,19 @@ func (uc *UserController) HandleGenerateJoinToken(c fiber.Ctx) error {
 	})
 
 	if !rr.GetIsActive() {
-		return utils.SendCommonProtoJsonResponse(c, false, "room is not active", plugnmeet.StatusCode_ROOM_NOT_FOUND)
+		// the room either does not exist or is not running; the status code
+		// stays accurate for both cases
+		return utils.SendCommonErrorJsonResponse(c, callerMsg(c, config.ErrRoomNotActive.Error()), rr.GetStatusCode())
 	}
 
-	token, err := uc.UserModel.GetPNMJoinToken(c.RequestCtx(), req, false)
+	statusCode, token, err := uc.UserModel.GetPNMJoinToken(c.RequestCtx(), req, false)
 	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
+		return utils.SendCommonErrorJsonResponse(c, callerMsg(c, err.Error()), statusCode)
 	}
 
 	r := &plugnmeet.GenerateTokenRes{
 		Status:     true,
-		Msg:        "success",
+		Msg:        callerMsg(c, config.MsgSuccess),
 		StatusCode: plugnmeet.StatusCode_SUCCESS,
 		Token:      &token,
 	}
@@ -90,33 +92,33 @@ func (uc *UserController) HandleUpdateUserLockSetting(c fiber.Ctx) error {
 	roomSid := fiber.Locals[string](c, "roomSid")
 
 	if !isAdmin {
-		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
+		return utils.SendCommonErrorProtobufResponse(c, config.ErrUserOnlyAdmin.Error(), plugnmeet.StatusCode_PERMISSION_DENIED)
 	}
 
 	req := new(plugnmeet.UpdateUserLockSettingsReq)
 	if err := proto.Unmarshal(c.Body(), req); err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
+		return utils.SendCommonErrorProtobufResponse(c, config.ErrUserInvalidRequest.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	if roomId != req.RoomId {
-		return utils.SendCommonProtobufResponse(c, false, "requested roomId & token roomId mismatched")
+		return utils.SendCommonErrorProtobufResponse(c, config.ErrUserRoomIdMismatch.Error(), plugnmeet.StatusCode_PERMISSION_DENIED)
 	}
 	if req.RoomSid != roomSid {
-		return utils.SendCommonProtobufResponse(c, false, "roomSid in token mismatched")
+		return utils.SendCommonErrorProtobufResponse(c, config.ErrUserRoomSidMismatch.Error(), plugnmeet.StatusCode_PERMISSION_DENIED)
 	}
 
 	// now need to check if meeting is running or not
 	room, _ := uc.ds.GetRoomInfoBySid(roomSid, new(1))
 	if room == nil || room.ID == 0 {
-		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
+		return utils.SendCommonErrorProtobufResponse(c, config.ErrUserRoomNotRunning.Error(), plugnmeet.StatusCode_ROOM_NOT_ACTIVE)
 	}
 
 	req.RequestedUserId = requestedUserId
-	if err := uc.UserModel.UpdateUserLockSettings(req); err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	if statusCode, err := uc.UserModel.UpdateUserLockSettings(req); err != nil {
+		return utils.SendCommonErrorProtobufResponse(c, err.Error(), statusCode)
 	}
 
-	return utils.SendCommonProtobufResponse(c, true, "success")
+	return utils.SendCommonProtobufResponse(c, true, config.MsgSuccess)
 }
 
 // HandleMuteUnMuteTrack handles muting or unmuting a user's track.
@@ -126,17 +128,16 @@ func (uc *UserController) HandleMuteUnMuteTrack(c fiber.Ctx) error {
 	requestedUserId := fiber.Locals[string](c, "requestedUserId")
 
 	if !isAdmin {
-		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
+		return utils.SendCommonErrorProtobufResponse(c, config.ErrUserOnlyAdmin.Error(), plugnmeet.StatusCode_PERMISSION_DENIED)
 	}
 
 	req := new(plugnmeet.MuteUnMuteTrackReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
+		return utils.SendCommonErrorProtobufResponse(c, config.ErrUserInvalidRequest.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	if roomId != req.RoomId {
-		return utils.SendCommonProtobufResponse(c, false, "requested roomId & token roomId mismatched")
+		return utils.SendCommonErrorProtobufResponse(c, config.ErrUserRoomIdMismatch.Error(), plugnmeet.StatusCode_PERMISSION_DENIED)
 	}
 
 	// always trust the token scope over any client-supplied value
@@ -145,15 +146,15 @@ func (uc *UserController) HandleMuteUnMuteTrack(c fiber.Ctx) error {
 	// now need to check if meeting is running or not
 	room, _ := uc.ds.GetRoomInfoBySid(req.Sid, new(1))
 	if room == nil || room.ID == 0 {
-		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
+		return utils.SendCommonErrorProtobufResponse(c, config.ErrUserRoomNotRunning.Error(), plugnmeet.StatusCode_ROOM_NOT_ACTIVE)
 	}
 
 	req.RequestedUserId = requestedUserId
-	if err = uc.UserModel.MuteUnMuteTrack(c.RequestCtx(), req); err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	if statusCode, err := uc.UserModel.MuteUnMuteTrack(c.RequestCtx(), req); err != nil {
+		return utils.SendCommonErrorProtobufResponse(c, err.Error(), statusCode)
 	}
 
-	return utils.SendCommonProtobufResponse(c, true, "success")
+	return utils.SendCommonProtobufResponse(c, true, config.MsgSuccess)
 }
 
 // HandleRemoveParticipant handles removing a participant from a room.
@@ -163,20 +164,19 @@ func (uc *UserController) HandleRemoveParticipant(c fiber.Ctx) error {
 	requestedUserId := fiber.Locals[string](c, "requestedUserId")
 
 	if !isAdmin {
-		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
+		return utils.SendCommonErrorProtobufResponse(c, config.ErrUserOnlyAdmin.Error(), plugnmeet.StatusCode_PERMISSION_DENIED)
 	}
 
 	req := new(plugnmeet.RemoveParticipantReq)
-	err := proto.Unmarshal(c.Body(), req)
-	if err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	if err := proto.Unmarshal(c.Body(), req); err != nil {
+		return utils.SendCommonErrorProtobufResponse(c, config.ErrUserInvalidRequest.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	if roomId != req.RoomId {
-		return utils.SendCommonProtobufResponse(c, false, "requested roomId & token roomId mismatched")
+		return utils.SendCommonErrorProtobufResponse(c, config.ErrUserRoomIdMismatch.Error(), plugnmeet.StatusCode_PERMISSION_DENIED)
 	}
 	if requestedUserId == req.UserId {
-		return utils.SendCommonProtobufResponse(c, false, "you can't remove yourself\"")
+		return utils.SendCommonErrorProtobufResponse(c, config.ErrUserCannotRemoveSelf.Error(), plugnmeet.StatusCode_PERMISSION_DENIED)
 	}
 
 	// always trust the token scope over any client-supplied value
@@ -185,14 +185,14 @@ func (uc *UserController) HandleRemoveParticipant(c fiber.Ctx) error {
 	// now need to check if meeting is running or not
 	room, _ := uc.ds.GetRoomInfoBySid(req.Sid, new(1))
 	if room == nil || room.ID == 0 {
-		return utils.SendCommonProtobufResponse(c, false, "room isn't running")
+		return utils.SendCommonErrorProtobufResponse(c, config.ErrUserRoomNotRunning.Error(), plugnmeet.StatusCode_ROOM_NOT_ACTIVE)
 	}
 
-	if err = uc.UserModel.RemoveParticipant(req); err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	if statusCode, err := uc.UserModel.RemoveParticipant(req); err != nil {
+		return utils.SendCommonErrorProtobufResponse(c, err.Error(), statusCode)
 	}
 
-	return utils.SendCommonProtobufResponse(c, true, "success")
+	return utils.SendCommonProtobufResponse(c, true, config.MsgSuccess)
 }
 
 // HandleSwitchPresenter handles switching the presenter in a room.
@@ -202,19 +202,19 @@ func (uc *UserController) HandleSwitchPresenter(c fiber.Ctx) error {
 	requestedUserId := fiber.Locals[string](c, "requestedUserId")
 
 	if !isAdmin {
-		return utils.SendCommonProtobufResponse(c, false, "only admin can perform this task")
+		return utils.SendCommonErrorProtobufResponse(c, config.ErrUserOnlyAdmin.Error(), plugnmeet.StatusCode_PERMISSION_DENIED)
 	}
 
 	req := new(plugnmeet.SwitchPresenterReq)
 	if err := proto.Unmarshal(c.Body(), req); err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
+		return utils.SendCommonErrorProtobufResponse(c, config.ErrUserInvalidRequest.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	req.RoomId = roomId
 	req.RequestedUserId = requestedUserId
-	if err := uc.UserModel.SwitchPresenter(req); err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
+	if statusCode, err := uc.UserModel.SwitchPresenter(req); err != nil {
+		return utils.SendCommonErrorProtobufResponse(c, err.Error(), statusCode)
 	}
 
-	return utils.SendCommonProtobufResponse(c, true, "success")
+	return utils.SendCommonProtobufResponse(c, true, config.MsgSuccess)
 }

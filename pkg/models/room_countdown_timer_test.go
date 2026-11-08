@@ -33,7 +33,7 @@ func TestApplyCountdownTimerChangeStatus(t *testing.T) {
 	cf.RemainingSeconds = 42
 	cf.StartedBy = "user-1"
 
-	if err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
+	if _, err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
 		Task:     plugnmeet.CountdownTimerTask_CHANGE_STATUS,
 		IsActive: new(true),
 	}, testNowMs); err != nil {
@@ -46,7 +46,7 @@ func TestApplyCountdownTimerChangeStatus(t *testing.T) {
 		t.Fatalf("runtime fields not reset: %+v", cf)
 	}
 
-	if err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
+	if _, err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
 		Task:     plugnmeet.CountdownTimerTask_CHANGE_STATUS,
 		IsActive: new(false),
 	}, testNowMs); err != nil {
@@ -56,10 +56,13 @@ func TestApplyCountdownTimerChangeStatus(t *testing.T) {
 		t.Fatalf("state = (active=%v, status=%q), want (false, \"\")", cf.IsActive, cf.Status)
 	}
 
-	err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
+	code, err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
 		Task: plugnmeet.CountdownTimerTask_CHANGE_STATUS,
 	}, testNowMs)
 	assertCountdownErr(t, err, config.ErrCountdownTimerGeneric)
+	if code != plugnmeet.StatusCode_INVALID_PARAMETERS {
+		t.Fatalf("status code = %v, want %v", code, plugnmeet.StatusCode_INVALID_PARAMETERS)
+	}
 }
 
 func TestApplyCountdownTimerStart(t *testing.T) {
@@ -78,7 +81,7 @@ func TestApplyCountdownTimerStart(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cf := newTestCountdownFeatures()
 			cf.IsActive = true
-			err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
+			_, err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
 				Task:            plugnmeet.CountdownTimerTask_START_TIMER,
 				DurationSeconds: &tt.duration,
 				UserId:          "user-1",
@@ -105,7 +108,7 @@ func TestApplyCountdownTimerStart(t *testing.T) {
 
 	t.Run("feature not active", func(t *testing.T) {
 		duration := uint32(300)
-		err := applyCountdownTimerTask(newTestCountdownFeatures(), &plugnmeet.CountdownTimerReq{
+		_, err := applyCountdownTimerTask(newTestCountdownFeatures(), &plugnmeet.CountdownTimerReq{
 			Task:            plugnmeet.CountdownTimerTask_START_TIMER,
 			DurationSeconds: &duration,
 			UserId:          "user-1",
@@ -122,7 +125,7 @@ func TestApplyCountdownTimerPause(t *testing.T) {
 	cf.EndTime = testNowMs + 300_000
 
 	// 60.8s have elapsed -> 239.2s left, rounded up to 240s.
-	if err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
+	if _, err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
 		Task: plugnmeet.CountdownTimerTask_PAUSE_TIMER,
 	}, testNowMs+60_800); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -135,7 +138,7 @@ func TestApplyCountdownTimerPause(t *testing.T) {
 	// Remaining time is capped at the original duration.
 	cf.Status = countdownTimerStatusRunning
 	cf.EndTime = testNowMs + 400_000
-	if err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
+	if _, err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
 		Task: plugnmeet.CountdownTimerTask_PAUSE_TIMER,
 	}, testNowMs); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -147,7 +150,7 @@ func TestApplyCountdownTimerPause(t *testing.T) {
 	// Expired timer pauses at zero instead of underflowing.
 	cf.Status = countdownTimerStatusRunning
 	cf.EndTime = testNowMs - 5000
-	if err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
+	if _, err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
 		Task: plugnmeet.CountdownTimerTask_PAUSE_TIMER,
 	}, testNowMs); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -158,7 +161,7 @@ func TestApplyCountdownTimerPause(t *testing.T) {
 
 	// Not running -> error.
 	cf.Status = countdownTimerStatusIdle
-	err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
+	_, err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
 		Task: plugnmeet.CountdownTimerTask_PAUSE_TIMER,
 	}, testNowMs)
 	assertCountdownErr(t, err, config.ErrCountdownTimerNotRunning)
@@ -171,7 +174,7 @@ func TestApplyCountdownTimerResume(t *testing.T) {
 	cf.DurationSeconds = 300
 	cf.RemainingSeconds = 120
 
-	if err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
+	if _, err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
 		Task: plugnmeet.CountdownTimerTask_RESUME_TIMER,
 	}, testNowMs); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -184,7 +187,7 @@ func TestApplyCountdownTimerResume(t *testing.T) {
 	// No remaining seconds -> error.
 	cf.Status = countdownTimerStatusPaused
 	cf.RemainingSeconds = 0
-	err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
+	_, err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
 		Task: plugnmeet.CountdownTimerTask_RESUME_TIMER,
 	}, testNowMs)
 	assertCountdownErr(t, err, config.ErrCountdownTimerNotPaused)
@@ -192,7 +195,7 @@ func TestApplyCountdownTimerResume(t *testing.T) {
 	// Not paused -> error.
 	cf.Status = countdownTimerStatusRunning
 	cf.RemainingSeconds = 60
-	err = applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
+	_, err = applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
 		Task: plugnmeet.CountdownTimerTask_RESUME_TIMER,
 	}, testNowMs)
 	assertCountdownErr(t, err, config.ErrCountdownTimerNotPaused)
@@ -206,7 +209,7 @@ func TestApplyCountdownTimerExtend(t *testing.T) {
 		cf.DurationSeconds = 300
 		cf.EndTime = testNowMs + 100_000
 
-		if err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
+		if _, err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
 			Task: plugnmeet.CountdownTimerTask_EXTEND_TIMER,
 		}, testNowMs); err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -227,7 +230,7 @@ func TestApplyCountdownTimerExtend(t *testing.T) {
 		cf.EndTime = testNowMs - 5000
 
 		extend := uint32(30)
-		if err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
+		if _, err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
 			Task:            plugnmeet.CountdownTimerTask_EXTEND_TIMER,
 			DurationSeconds: &extend,
 		}, testNowMs); err != nil {
@@ -249,7 +252,7 @@ func TestApplyCountdownTimerExtend(t *testing.T) {
 		cf.RemainingSeconds = 120
 
 		extend := uint32(90)
-		if err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
+		if _, err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
 			Task:            plugnmeet.CountdownTimerTask_EXTEND_TIMER,
 			DurationSeconds: &extend,
 		}, testNowMs); err != nil {
@@ -268,7 +271,7 @@ func TestApplyCountdownTimerExtend(t *testing.T) {
 		cf.IsActive = true
 		cf.Status = countdownTimerStatusIdle
 
-		err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
+		_, err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
 			Task: plugnmeet.CountdownTimerTask_EXTEND_TIMER,
 		}, testNowMs)
 		assertCountdownErr(t, err, config.ErrCountdownTimerNotRunning)
@@ -283,7 +286,7 @@ func TestApplyCountdownTimerStop(t *testing.T) {
 	cf.RemainingSeconds = 120
 	cf.StartedBy = "user-1"
 
-	if err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
+	if _, err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
 		Task: plugnmeet.CountdownTimerTask_STOP_TIMER,
 	}, testNowMs); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -296,14 +299,14 @@ func TestApplyCountdownTimerStop(t *testing.T) {
 	}
 
 	cf.IsActive = false
-	err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
+	_, err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
 		Task: plugnmeet.CountdownTimerTask_STOP_TIMER,
 	}, testNowMs)
 	assertCountdownErr(t, err, config.ErrCountdownTimerNotActive)
 }
 
 func TestApplyCountdownTimerUnknownTask(t *testing.T) {
-	err := applyCountdownTimerTask(newTestCountdownFeatures(), &plugnmeet.CountdownTimerReq{
+	_, err := applyCountdownTimerTask(newTestCountdownFeatures(), &plugnmeet.CountdownTimerReq{
 		Task: plugnmeet.CountdownTimerTask(99),
 	}, testNowMs)
 	assertCountdownErr(t, err, config.ErrCountdownTimerGeneric)

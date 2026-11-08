@@ -17,8 +17,9 @@ const (
 )
 
 // HandleCountdownTimerTask updates the room's shared countdown timer state.
-// Validation failures are returned as i18n keys the client resolves via t().
-func (m *RoomModel) HandleCountdownTimerTask(req *plugnmeet.CountdownTimerReq) error {
+// The returned error is always an i18n key the client resolves via t(); the
+// status code is resolved here so controllers stay free of error classification.
+func (m *RoomModel) HandleCountdownTimerTask(req *plugnmeet.CountdownTimerReq) (plugnmeet.StatusCode, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId": req.RoomId,
 		"userId": req.UserId,
@@ -29,42 +30,43 @@ func (m *RoomModel) HandleCountdownTimerTask(req *plugnmeet.CountdownTimerReq) e
 	roomMeta, err := m.natsService.GetRoomMetadataStruct(req.RoomId)
 	if err != nil {
 		log.WithError(err).Errorln("failed to get room metadata")
-		return config.ErrCountdownTimerGeneric
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrCountdownTimerGeneric
 	}
 	if roomMeta == nil {
 		log.Errorln("invalid nil room metadata information")
-		return config.ErrCountdownTimerGeneric
+		return plugnmeet.StatusCode_ROOM_NOT_FOUND, config.ErrCountdownTimerGeneric
 	}
 
 	cf := roomMeta.GetRoomFeatures().GetCountdownTimerFeatures()
 	if cf == nil || !cf.IsAllow {
 		log.Warnln("countdown timer feature is not allowed for this room")
-		return config.ErrCountdownTimerNotAllowed
+		return plugnmeet.StatusCode_PERMISSION_DENIED, config.ErrCountdownTimerNotAllowed
 	}
 
-	if err = applyCountdownTimerTask(cf, req, time.Now().UnixMilli()); err != nil {
-		return err
+	if statusCode, err := applyCountdownTimerTask(cf, req, time.Now().UnixMilli()); err != nil {
+		// invalid tasks are expected client errors, so nothing to log here
+		return statusCode, err
 	}
 
 	if err = m.natsService.UpdateAndBroadcastRoomMetadata(req.RoomId, roomMeta); err != nil {
 		log.WithError(err).Errorln("failed to update and broadcast room metadata")
-		return config.ErrCountdownTimerGeneric
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrCountdownTimerGeneric
 	}
 
 	if req.Task == plugnmeet.CountdownTimerTask_CHANGE_STATUS {
 		m.sendCountdownTimerAnalytics(req.RoomId, cf.IsActive)
 	}
 
-	return nil
+	return plugnmeet.StatusCode_SUCCESS, nil
 }
 
 // applyCountdownTimerTask applies a timer task to the feature state.
 // nowMs is the current unix time in milliseconds.
-func applyCountdownTimerTask(cf *plugnmeet.CountdownTimerFeatures, req *plugnmeet.CountdownTimerReq, nowMs int64) error {
+func applyCountdownTimerTask(cf *plugnmeet.CountdownTimerFeatures, req *plugnmeet.CountdownTimerReq, nowMs int64) (plugnmeet.StatusCode, error) {
 	switch req.Task {
 	case plugnmeet.CountdownTimerTask_CHANGE_STATUS:
 		if req.IsActive == nil {
-			return config.ErrCountdownTimerGeneric
+			return plugnmeet.StatusCode_INVALID_PARAMETERS, config.ErrCountdownTimerGeneric
 		}
 		cf.IsActive = *req.IsActive
 		cf.Status = ""
@@ -75,12 +77,12 @@ func applyCountdownTimerTask(cf *plugnmeet.CountdownTimerFeatures, req *plugnmee
 
 	case plugnmeet.CountdownTimerTask_START_TIMER:
 		if !cf.IsActive {
-			return config.ErrCountdownTimerNotActive
+			return plugnmeet.StatusCode_INVALID_PARAMETERS, config.ErrCountdownTimerNotActive
 		}
 
 		duration := req.GetDurationSeconds()
 		if duration == 0 || duration > countdownTimerMaxDurationSeconds {
-			return config.ErrCountdownTimerInvalidDuration
+			return plugnmeet.StatusCode_INVALID_PARAMETERS, config.ErrCountdownTimerInvalidDuration
 		}
 		cf.Status = countdownTimerStatusRunning
 		cf.DurationSeconds = duration
@@ -90,7 +92,7 @@ func applyCountdownTimerTask(cf *plugnmeet.CountdownTimerFeatures, req *plugnmee
 
 	case plugnmeet.CountdownTimerTask_PAUSE_TIMER:
 		if !cf.IsActive || cf.Status != countdownTimerStatusRunning {
-			return config.ErrCountdownTimerNotRunning
+			return plugnmeet.StatusCode_INVALID_PARAMETERS, config.ErrCountdownTimerNotRunning
 		}
 		remMs := cf.EndTime - nowMs
 		if remMs < 0 {
@@ -106,7 +108,7 @@ func applyCountdownTimerTask(cf *plugnmeet.CountdownTimerFeatures, req *plugnmee
 
 	case plugnmeet.CountdownTimerTask_RESUME_TIMER:
 		if !cf.IsActive || cf.Status != countdownTimerStatusPaused || cf.RemainingSeconds == 0 {
-			return config.ErrCountdownTimerNotPaused
+			return plugnmeet.StatusCode_INVALID_PARAMETERS, config.ErrCountdownTimerNotPaused
 		}
 		cf.Status = countdownTimerStatusRunning
 		cf.EndTime = nowMs + int64(cf.RemainingSeconds)*1000
@@ -114,7 +116,7 @@ func applyCountdownTimerTask(cf *plugnmeet.CountdownTimerFeatures, req *plugnmee
 
 	case plugnmeet.CountdownTimerTask_EXTEND_TIMER:
 		if !cf.IsActive || (cf.Status != countdownTimerStatusRunning && cf.Status != countdownTimerStatusPaused) {
-			return config.ErrCountdownTimerNotRunning
+			return plugnmeet.StatusCode_INVALID_PARAMETERS, config.ErrCountdownTimerNotRunning
 		}
 		extendSec := req.GetDurationSeconds()
 		if extendSec == 0 {
@@ -133,16 +135,16 @@ func applyCountdownTimerTask(cf *plugnmeet.CountdownTimerFeatures, req *plugnmee
 
 	case plugnmeet.CountdownTimerTask_STOP_TIMER:
 		if !cf.IsActive {
-			return config.ErrCountdownTimerNotActive
+			return plugnmeet.StatusCode_INVALID_PARAMETERS, config.ErrCountdownTimerNotActive
 		}
 		cf.Status = countdownTimerStatusIdle
 		resetCountdownTimerRuntime(cf)
 
 	default:
-		return config.ErrCountdownTimerGeneric
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, config.ErrCountdownTimerGeneric
 	}
 
-	return nil
+	return plugnmeet.StatusCode_SUCCESS, nil
 }
 
 func resetCountdownTimerRuntime(cf *plugnmeet.CountdownTimerFeatures) {

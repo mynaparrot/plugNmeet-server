@@ -199,7 +199,9 @@ func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (*hooks.Download
 	absolutePath, mType, err := helpers.ValidateAndGetAbsFilePath(*m.app.ArtifactsSettings.StoragePath, inputPath)
 	if err != nil {
 		if errors.Is(err, config.ErrFileNotFound) {
-			return nil, fiber.StatusNotFound, config.ErrFileNotFound
+			// the sanitized relative path lets the caller name the file, while the
+			// resolved path and the error text stay server-side
+			return &hooks.DownloadHookData{InputPath: inputPath}, fiber.StatusNotFound, config.ErrFileNotFound
 		}
 		return nil, fiber.StatusBadRequest, err
 	}

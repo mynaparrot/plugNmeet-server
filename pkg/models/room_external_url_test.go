@@ -45,7 +45,7 @@ func TestExternalMediaHandlersRejectUnsafeUrls(t *testing.T) {
 			UserId: "user-id",
 			Url:    &url,
 		}
-		if err := m.startExternalDisplay(linkReq); err == nil {
+		if _, err := m.startExternalDisplay(linkReq); err == nil {
 			t.Errorf("startExternalDisplay accepted unsafe url %q", url)
 		}
 
@@ -54,7 +54,7 @@ func TestExternalMediaHandlersRejectUnsafeUrls(t *testing.T) {
 			UserId: "user-id",
 			Url:    &url,
 		}
-		if err := m.startExternalMediaPlayBack(mediaReq); err == nil {
+		if _, err := m.startExternalMediaPlayBack(mediaReq); err == nil {
 			t.Errorf("startExternalMediaPlayBack accepted unsafe url %q", url)
 		}
 	}

@@ -11,13 +11,20 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (m *RoomModel) ChangeVisibility(r *plugnmeet.ChangeVisibilityRes) (bool, string) {
+func (m *RoomModel) ChangeVisibility(r *plugnmeet.ChangeVisibilityRes) (plugnmeet.StatusCode, error) {
+	log := m.logger.WithFields(logrus.Fields{
+		"roomId": r.RoomId,
+		"method": "ChangeVisibility",
+	})
+
 	roomMeta, err := m.natsService.GetRoomMetadataStruct(r.RoomId)
 	if err != nil {
-		return false, err.Error()
+		log.WithError(err).Errorln("failed to get room metadata")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrRoomUnexpectedError
 	}
 	if roomMeta == nil {
-		return false, "invalid nil room metadata information"
+		log.Warnln("room metadata not found")
+		return plugnmeet.StatusCode_ROOM_NOT_FOUND, config.ErrRoomNotFound
 	}
 
 	if r.VisibleWhiteBoard != nil {
@@ -28,51 +35,62 @@ func (m *RoomModel) ChangeVisibility(r *plugnmeet.ChangeVisibilityRes) (bool, st
 	}
 
 	if err := m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, roomMeta); err != nil {
-		return false, err.Error()
+		log.WithError(err).Errorln("failed to update and broadcast room metadata")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrRoomUnexpectedError
 	}
 
-	return true, "success"
+	return plugnmeet.StatusCode_SUCCESS, nil
 }
 
-func (m *RoomModel) EnableRoomSipDialIn(r *plugnmeet.EnableSipDialInReq) error {
-	roomMeta, err := m.natsService.GetRoomMetadataStruct(r.RoomId)
-	if err != nil {
-		return err
-	}
-
-	if roomMeta == nil {
-		return fmt.Errorf("invalid nil room metadata information")
-	}
-
-	sipDialInFeatures := roomMeta.RoomFeatures.SipDialInFeatures
-	if !sipDialInFeatures.IsAllow {
-		return fmt.Errorf("sip dial feature isn't allow for this room")
-	}
-
-	if sipDialInFeatures.IsActive {
-		return fmt.Errorf("sip dial in is already enabled")
-	}
+func (m *RoomModel) EnableRoomSipDialIn(r *plugnmeet.EnableSipDialInReq) (plugnmeet.StatusCode, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"room_id":           r.RoomId,
 		"method":            "EnableRoomSipDialIn",
 		"hide_phone_number": r.HidePhoneNumber,
 	})
+
+	roomMeta, err := m.natsService.GetRoomMetadataStruct(r.RoomId)
+	if err != nil {
+		log.WithError(err).Errorln("failed to get room metadata")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrRoomUnexpectedError
+	}
+
+	if roomMeta == nil {
+		log.Warnln("room metadata not found")
+		return plugnmeet.StatusCode_ROOM_NOT_FOUND, config.ErrRoomNotFound
+	}
+
+	sipDialInFeatures := roomMeta.RoomFeatures.SipDialInFeatures
+	if !sipDialInFeatures.IsAllow {
+		log.Warnln("sip dial in feature is not allowed for this room")
+		return plugnmeet.StatusCode_PERMISSION_DENIED, config.ErrRoomFeatureNotAllowed
+	}
+
+	if sipDialInFeatures.IsActive {
+		log.Warnln("sip dial in is already enabled")
+		return plugnmeet.StatusCode_CONFLICT, config.ErrRoomSipDialInEnabled
+	}
 	sipDialInFeatures.HidePhoneNumber = r.HidePhoneNumber
 
 	ruleId, pin, err := m.lk.CreateSIPDispatchRule(r.RoomId, sipDialInFeatures.HidePhoneNumber, log)
 	if err != nil {
 		log.WithError(err).Errorln("failed to create SIP dispatch rule")
-		return fmt.Errorf("failed to create SIP dispatch rule")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrRoomUnexpectedError
 	}
 	sipDialInFeatures.IsActive = true
 	sipDialInFeatures.DispatchRuleId = &ruleId
 	sipDialInFeatures.Pin = &pin
 	sipDialInFeatures.PhoneNumbers = m.app.LivekitSipInfo.PhoneNumbers
 
-	return m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, roomMeta)
+	if err = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, roomMeta); err != nil {
+		log.WithError(err).Errorln("failed to update and broadcast room metadata")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrRoomUnexpectedError
+	}
+
+	return plugnmeet.StatusCode_SUCCESS, nil
 }
 
-func (m *RoomModel) CreateIngress(r *plugnmeet.CreateIngressReq) (*livekit.IngressInfo, error) {
+func (m *RoomModel) CreateIngress(r *plugnmeet.CreateIngressReq) (plugnmeet.StatusCode, *livekit.IngressInfo, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId":    r.RoomId,
 		"inputType": r.InputType.String(),
@@ -84,24 +102,21 @@ func (m *RoomModel) CreateIngress(r *plugnmeet.CreateIngressReq) (*livekit.Ingre
 	metadata, err := m.natsService.GetRoomMetadataStruct(r.RoomId)
 	if err != nil {
 		log.WithError(err).Errorln("failed to get room metadata")
-		return nil, err
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil, config.ErrRoomUnexpectedError
 	}
 	if metadata == nil {
-		err = fmt.Errorf("invalid nil room metadata information")
-		log.WithError(err).Errorln()
-		return nil, err
+		log.Warnln("room metadata not found")
+		return plugnmeet.StatusCode_ROOM_NOT_FOUND, nil, config.ErrRoomNotFound
 	}
 
 	ingressFeatures := metadata.RoomFeatures.IngressFeatures
 	if !ingressFeatures.IsAllow {
-		err = fmt.Errorf("ingress feature isn't allowed for this room")
-		log.WithError(err).Warnln()
-		return nil, err
+		log.Warnln("ingress feature is not allowed for this room")
+		return plugnmeet.StatusCode_PERMISSION_DENIED, nil, config.ErrRoomFeatureNotAllowed
 	}
 	if ingressFeatures.StreamKey != "" {
-		err = fmt.Errorf("multiple ingress creation request not allowed")
-		log.WithError(err).Warnln()
-		return nil, err
+		log.Warnln("an ingress is already created for this room")
+		return plugnmeet.StatusCode_CONFLICT, nil, config.ErrRoomIngressExists
 	}
 
 	inputType := livekit.IngressInput_RTMP_INPUT
@@ -126,12 +141,11 @@ func (m *RoomModel) CreateIngress(r *plugnmeet.CreateIngressReq) (*livekit.Ingre
 	f, err := m.lk.CreateIngress(req)
 	if err != nil {
 		log.WithError(err).Errorln("failed to create ingress with livekit")
-		return nil, err
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil, config.ErrRoomUnexpectedError
 	}
 	if f == nil {
-		err = fmt.Errorf("livekit returned invalid nil create ingress response")
-		log.WithError(err).Errorln()
-		return nil, err
+		log.Errorln("livekit returned invalid nil create ingress response")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil, config.ErrRoomUnexpectedError
 	}
 
 	// add this user in our bucket
@@ -148,7 +162,7 @@ func (m *RoomModel) CreateIngress(r *plugnmeet.CreateIngressReq) (*livekit.Ingre
 	err = m.natsService.AddUser(r.RoomId, req.ParticipantIdentity, r.ParticipantName, true, false, &mt, plugnmeet.ClientType_WEB)
 	if err != nil {
 		log.WithError(err).Errorln("failed to add ingress user to NATS")
-		return nil, err
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil, config.ErrRoomUnexpectedError
 	}
 
 	ingressFeatures.InputType = r.InputType
@@ -159,7 +173,7 @@ func (m *RoomModel) CreateIngress(r *plugnmeet.CreateIngressReq) (*livekit.Ingre
 	err = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, metadata)
 	if err != nil {
 		log.WithError(err).Errorln("failed to update and broadcast room metadata")
-		return nil, err
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil, config.ErrRoomUnexpectedError
 	}
 
 	// send analytics
@@ -170,11 +184,11 @@ func (m *RoomModel) CreateIngress(r *plugnmeet.CreateIngressReq) (*livekit.Ingre
 	})
 
 	log.Info("successfully created ingress")
-	return f, err
+	return plugnmeet.StatusCode_SUCCESS, f, nil
 }
 
 // ChangeSharedNotepadStatus toggles the shared notepad active state.
-func (m *RoomModel) ChangeSharedNotepadStatus(r *plugnmeet.ChangeSharedNotepadStatusReq) error {
+func (m *RoomModel) ChangeSharedNotepadStatus(r *plugnmeet.ChangeSharedNotepadStatusReq) (plugnmeet.StatusCode, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId":   r.RoomId,
 		"isActive": r.IsActive,
@@ -185,17 +199,17 @@ func (m *RoomModel) ChangeSharedNotepadStatus(r *plugnmeet.ChangeSharedNotepadSt
 	meta, err := m.natsService.GetRoomMetadataStruct(r.RoomId)
 	if err != nil {
 		log.WithError(err).Errorln("Failed to get room metadata")
-		return err
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrRoomUnexpectedError
 	}
 	if meta == nil {
-		log.WithError(config.InvalidNilRoomMetadata).Errorln()
-		return config.InvalidNilRoomMetadata
+		log.Warnln("room metadata not found")
+		return plugnmeet.StatusCode_ROOM_NOT_FOUND, config.ErrRoomNotFound
 	}
 
 	np := meta.GetRoomFeatures().GetSharedNotePadFeatures()
 	if np == nil {
-		log.WithError(config.InvalidNilRoomMetadata).Errorln()
-		return config.InvalidNilRoomMetadata
+		log.Warnln("shared notepad features not found in room metadata")
+		return plugnmeet.StatusCode_ROOM_NOT_FOUND, config.ErrRoomNotFound
 	}
 
 	if r.IsActive && np.NotePadId == "" {
@@ -205,7 +219,7 @@ func (m *RoomModel) ChangeSharedNotepadStatus(r *plugnmeet.ChangeSharedNotepadSt
 
 	if err = m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, meta); err != nil {
 		log.WithError(err).Errorln("Failed to update and broadcast room metadata")
-		return err
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrRoomUnexpectedError
 	}
 
 	val := plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_STARTED.String()
@@ -220,7 +234,7 @@ func (m *RoomModel) ChangeSharedNotepadStatus(r *plugnmeet.ChangeSharedNotepadSt
 	})
 
 	log.Info("Successfully changed shared notepad status")
-	return nil
+	return plugnmeet.StatusCode_SUCCESS, nil
 }
 
 func (m *RoomModel) BroadcastToRoom(r *plugnmeet.BroadcastToRoomReq) (plugnmeet.StatusCode, error) {
@@ -233,7 +247,8 @@ func (m *RoomModel) BroadcastToRoom(r *plugnmeet.BroadcastToRoomReq) (plugnmeet.
 	if r.OnlyToAdmins {
 		users, err := m.natsService.GetOnlineUsersList(r.RoomId)
 		if err != nil {
-			return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, err
+			log.WithError(err).Errorln("failed to get online users list")
+			return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrRoomUnexpectedError
 		}
 
 		if users == nil {

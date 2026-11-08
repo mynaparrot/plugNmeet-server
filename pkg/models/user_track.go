@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -14,7 +13,7 @@ import (
 // if track_sid wasn't send then it will find the microphone track & mute it
 // for unmute you'll require enabling "enable_remote_unmute: true" in livekit
 // under room settings. For privacy reason we aren't using it.
-func (m *UserModel) MuteUnMuteTrack(ctx context.Context, r *plugnmeet.MuteUnMuteTrackReq) error {
+func (m *UserModel) MuteUnMuteTrack(ctx context.Context, r *plugnmeet.MuteUnMuteTrackReq) (plugnmeet.StatusCode, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId":          r.RoomId,
 		"userId":          r.UserId,
@@ -35,13 +34,12 @@ func (m *UserModel) MuteUnMuteTrack(ctx context.Context, r *plugnmeet.MuteUnMute
 	p, err := m.lk.LoadParticipantInfo(r.RoomId, r.UserId)
 	if err != nil {
 		log.WithError(err).Error("failed to load participant info")
-		return fmt.Errorf("footer.notice.failed-to-load-participant-info")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrUserFailedToLoadParticipant
 	}
 
 	if p == nil || p.State != livekit.ParticipantInfo_ACTIVE {
-		err = config.UserNotActive
-		log.WithError(err).Warnln("participant not active")
-		return err
+		log.Warnln("participant not active")
+		return plugnmeet.StatusCode_USER_NOT_FOUND, config.ErrUserNotOnline
 	}
 
 	trackSid := r.TrackSid
@@ -65,29 +63,29 @@ func (m *UserModel) MuteUnMuteTrack(ctx context.Context, r *plugnmeet.MuteUnMute
 
 	if trackSid == "" {
 		log.Warnln("No suitable track found to mute/unmute")
-		return fmt.Errorf("footer.notice.no-suitable-track-found")
+		return plugnmeet.StatusCode_NOT_FOUND, config.ErrUserNoSuitableTrack
 	}
 
 	_, err = m.lk.MuteUnMuteTrack(ctx, r.RoomId, targetUserId, trackSid, r.Muted)
 	if err != nil {
 		log.WithError(err).Error("failed to mute/unmute track in livekit")
-		return fmt.Errorf("footer.notice.failed-to-mute-unmute-track")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrUserMuteUnmuteFailed
 	}
 
 	log.Infoln("Successfully muted/unmuted track")
-	return nil
+	return plugnmeet.StatusCode_SUCCESS, nil
 }
 
-func (m *UserModel) muteUnmuteAllMic(ctx context.Context, r *plugnmeet.MuteUnMuteTrackReq, log *logrus.Entry) error {
+func (m *UserModel) muteUnmuteAllMic(ctx context.Context, r *plugnmeet.MuteUnMuteTrackReq, log *logrus.Entry) (plugnmeet.StatusCode, error) {
 	log.Infoln("request to mute/unmute all microphones")
 	participants, err := m.lk.LoadParticipants(ctx, r.RoomId)
 	if err != nil {
-		return err
+		log.WithError(err).Error("failed to load participants")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrUserUnexpectedError
 	}
 	if participants == nil {
-		err = fmt.Errorf("no active users found")
-		log.WithError(err).Warnln()
-		return err
+		log.Warnln("no active users found")
+		return plugnmeet.StatusCode_USER_NOT_FOUND, config.ErrUserNotOnline
 	}
 
 	for _, p := range participants {
@@ -107,5 +105,5 @@ func (m *UserModel) muteUnmuteAllMic(ctx context.Context, r *plugnmeet.MuteUnMut
 	}
 
 	log.Info("Successfully processed mute/unmute all microphones request")
-	return nil
+	return plugnmeet.StatusCode_SUCCESS, nil
 }

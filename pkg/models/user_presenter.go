@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 )
@@ -36,7 +37,7 @@ func (m *UserModel) CreateNewPresenter(r *plugnmeet.GenerateTokenReq) error {
 // SwitchPresenter promotes the new presenter *before* demoting the old one and ensures
 // the requesting admin becomes the presenter on demotion, guaranteeing the
 // room is never left without a presenter.
-func (m *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
+func (m *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) (plugnmeet.StatusCode, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId":          r.RoomId,
 		"userId":          r.UserId,
@@ -67,7 +68,7 @@ func (m *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
 	if err := m.updatePresenterStatus(r.RoomId, newPresenterId, true); err != nil {
 		// If we can't even promote the new presenter, we must stop.
 		log.WithError(err).WithField("promote_user_id", newPresenterId).Errorln("failed to promote new presenter")
-		return err
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrUserUnexpectedError
 	}
 
 	// 2. Only after a successful promotion, demote the old presenter.
@@ -81,7 +82,7 @@ func (m *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) error {
 	}
 
 	log.Info("Presenter switch process completed successfully")
-	return nil
+	return plugnmeet.StatusCode_SUCCESS, nil
 }
 
 // FindCurrentPresenter check all the online users to find the current presenter

@@ -16,28 +16,29 @@ func (m *RoomModel) IsRoomActive(r *plugnmeet.IsRoomActiveReq) (*plugnmeet.IsRoo
 	res := &plugnmeet.IsRoomActiveRes{
 		Status:     true,
 		IsActive:   false,
-		Msg:        "room is not active",
+		Msg:        config.ErrRoomNotActive.Error(),
 		StatusCode: plugnmeet.StatusCode_ROOM_NOT_ACTIVE,
 	}
 
 	// NATS is the single source of truth for this check.
 	rInfo, meta, err := m.natsService.GetRoomInfoWithMetadata(r.RoomId)
 	if err != nil {
+		m.logger.WithField("roomId", r.RoomId).WithError(err).Errorln("failed to get room info with metadata")
 		res.Status = false
-		res.Msg = "error getting room info from NATS"
+		res.Msg = config.ErrRoomUnexpectedError.Error()
 		res.StatusCode = plugnmeet.StatusCode_INTERNAL_SERVER_ERROR
 		return res, nil, nil
 	}
 
 	if rInfo == nil || meta == nil {
-		res.Msg = "room not found"
+		res.Msg = config.ErrRoomNotFound.Error()
 		res.StatusCode = plugnmeet.StatusCode_ROOM_NOT_FOUND
 		return res, nil, nil
 	}
 
 	if m.natsService.IsRoomStatusActive(rInfo.Status) {
 		res.IsActive = true
-		res.Msg = "room is active"
+		res.Msg = config.MsgSuccess
 		res.StatusCode = plugnmeet.StatusCode_SUCCESS
 	}
 	// If status is "ended" or anything else, it will correctly return IsActive: false and "room is not active".
@@ -52,12 +53,13 @@ func (m *RoomModel) GetActiveRoomInfo(ctx context.Context, r *plugnmeet.GetActiv
 
 	roomDbInfo, _ := m.ds.GetRoomInfoByRoomId(r.RoomId, 1)
 	if roomDbInfo == nil || roomDbInfo.ID == 0 {
-		return false, "room not found in active state", plugnmeet.StatusCode_ROOM_NOT_FOUND, nil
+		return false, config.ErrRoomNotFound.Error(), plugnmeet.StatusCode_ROOM_NOT_FOUND, nil
 	}
 
 	rrr, err := m.natsService.GetRoomInfo(r.RoomId)
 	if err != nil {
-		return false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil
+		log.WithError(err).Errorln("failed to get room info from NATS")
+		return false, config.ErrRoomUnexpectedError.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil
 	}
 	if rrr == nil || (rrr.Status != natsservice.RoomStatusCreated && rrr.Status != natsservice.RoomStatusActive) {
 		// The room is not in NATS or its status is not active, so we'll mark it as ended in the DB.
@@ -65,9 +67,10 @@ func (m *RoomModel) GetActiveRoomInfo(ctx context.Context, r *plugnmeet.GetActiv
 		roomDbInfo.IsRunning = 0
 		_, err := m.ds.UpdateRoomStatus(roomDbInfo)
 		if err != nil {
-			return false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil
+			log.WithError(err).Errorln("failed to update room status in db")
+			return false, config.ErrRoomUnexpectedError.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil
 		}
-		return false, "room is not active", plugnmeet.StatusCode_ROOM_NOT_ACTIVE, nil
+		return false, config.ErrRoomNotActive.Error(), plugnmeet.StatusCode_ROOM_NOT_ACTIVE, nil
 	}
 
 	res := new(plugnmeet.ActiveRoomWithParticipant)
@@ -97,16 +100,17 @@ func (m *RoomModel) GetActiveRoomInfo(ctx context.Context, r *plugnmeet.GetActiv
 		}
 	}
 
-	return true, "success", plugnmeet.StatusCode_SUCCESS, res
+	return true, config.MsgSuccess, plugnmeet.StatusCode_SUCCESS, res
 }
 
 func (m *RoomModel) GetActiveRoomsInfo(userCtx context.Context) (bool, string, plugnmeet.StatusCode, []*plugnmeet.ActiveRoomWithParticipant) {
 	roomsInfo, err := m.ds.GetActiveRoomsInfo(userCtx)
 	if err != nil {
-		return false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil
+		m.logger.WithError(err).Errorln("failed to get active rooms info from db")
+		return false, config.ErrRoomUnexpectedError.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil
 	}
 	if roomsInfo == nil || len(roomsInfo) == 0 {
-		return false, "no active room found", plugnmeet.StatusCode_NOT_FOUND, nil
+		return false, config.ErrRoomNotFound.Error(), plugnmeet.StatusCode_NOT_FOUND, nil
 	}
 	res := make([]*plugnmeet.ActiveRoomWithParticipant, 0, len(roomsInfo))
 
@@ -147,10 +151,10 @@ func (m *RoomModel) GetActiveRoomsInfo(userCtx context.Context) (bool, string, p
 		res = append(res, i)
 	}
 
-	return true, "success", plugnmeet.StatusCode_SUCCESS, res
+	return true, config.MsgSuccess, plugnmeet.StatusCode_SUCCESS, res
 }
 
-func (m *RoomModel) FetchPastRooms(userCtx context.Context, r *plugnmeet.FetchPastRoomsReq) (*plugnmeet.FetchPastRoomsResult, error) {
+func (m *RoomModel) FetchPastRooms(userCtx context.Context, r *plugnmeet.FetchPastRoomsReq) (plugnmeet.StatusCode, *plugnmeet.FetchPastRoomsResult, error) {
 	if r.Limit <= 0 {
 		r.Limit = 20
 	}
@@ -163,10 +167,11 @@ func (m *RoomModel) FetchPastRooms(userCtx context.Context, r *plugnmeet.FetchPa
 	}
 	rooms, total, err := m.ds.GetPastRooms(userCtx, r.RoomIds, uint64(r.From), uint64(r.Limit), &r.OrderBy)
 	if err != nil {
-		return nil, err
+		m.logger.WithError(err).Errorln("failed to fetch past rooms from db")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil, config.ErrRoomUnexpectedError
 	}
 	if total == 0 {
-		return nil, config.NotFoundErr
+		return plugnmeet.StatusCode_NOT_FOUND, nil, config.ErrRoomNotFound
 	}
 
 	list := make([]*plugnmeet.PastRoomInfo, 0, len(rooms))
@@ -195,5 +200,5 @@ func (m *RoomModel) FetchPastRooms(userCtx context.Context, r *plugnmeet.FetchPa
 		RoomsList:  list,
 	}
 
-	return result, nil
+	return plugnmeet.StatusCode_SUCCESS, result, nil
 }

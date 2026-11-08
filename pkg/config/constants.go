@@ -16,6 +16,13 @@ const (
 	RecorderUserAuthName  = "PLUGNMEET_RECORDER_AUTH"
 	HeaderRoomId          = "Room-Id"
 	UploadFileTempDir     = "tmp"
+	// LocalsCallerKey is the fiber Locals key of the trusted caller
+	// classification, set by the route middleware of the integrator surfaces.
+	LocalsCallerKey = "pnmCaller"
+	// CallerIntegrator classifies a request as coming from an external
+	// integration (Auth API, LTI, BBB), which needs curated English instead of the
+	// client i18n keys.
+	CallerIntegrator = "integrator"
 	// NativeTwinIdentitySuffix is appended to a hybrid user's userId to form
 	// the LiveKit identity of their publish-only native twin: "[userID]-native".
 	NativeTwinIdentitySuffix = "-native"
@@ -39,8 +46,6 @@ const (
 	// PollAutoClosedBy is the closed_by marker for polls auto-closed at expiry.
 	PollAutoClosedBy = "pnm_poll_auto_close"
 
-	// MsgRoomIdRequired is the plain error text when an Auth API request omits room_id.
-	MsgRoomIdRequired = "missing required field room_id"
 	// ExternalApiUserId is the created_by marker for polls pushed via the Auth API without a user_id.
 	ExternalApiUserId = "external-api"
 )

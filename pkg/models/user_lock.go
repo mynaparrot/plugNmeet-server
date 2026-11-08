@@ -1,10 +1,10 @@
 package models
 
 import (
-	"errors"
 	"reflect"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/sirupsen/logrus"
 )
 
@@ -38,7 +38,7 @@ func (m *UserModel) applyDefaultLockSettings(defaultLocks, userLocks *plugnmeet.
 
 // UpdateUserLockSettings is the main entry point for updating lock settings.
 // It now acts as a router for single-user or all-user updates.
-func (m *UserModel) UpdateUserLockSettings(r *plugnmeet.UpdateUserLockSettingsReq) error {
+func (m *UserModel) UpdateUserLockSettings(r *plugnmeet.UpdateUserLockSettingsReq) (plugnmeet.StatusCode, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"method":    "UpdateUserLockSettings",
 		"room_id":   r.RoomId,
@@ -54,28 +54,28 @@ func (m *UserModel) UpdateUserLockSettings(r *plugnmeet.UpdateUserLockSettingsRe
 
 	// For a single user, perform the update and broadcast immediately.
 	log.Info("request to update single user lock settings")
-	err := m.updateAndBroadcastUserLock(r.RoomId, r.UserId, r.Service, r.Direction, false)
-	if err != nil {
-		log.WithError(err).Errorln("failed to update user lock settings")
-	}
-	return err
+	return m.updateAndBroadcastUserLock(log, r.RoomId, r.UserId, r.Service, r.Direction, false)
 }
 
 // handleUpdateAllUsersLockSettings orchestrates the update for all users in a room.
-func (m *UserModel) handleUpdateAllUsersLockSettings(r *plugnmeet.UpdateUserLockSettingsReq, log *logrus.Entry) error {
+func (m *UserModel) handleUpdateAllUsersLockSettings(r *plugnmeet.UpdateUserLockSettingsReq, log *logrus.Entry) (plugnmeet.StatusCode, error) {
 	log.Info("request to update all users lock settings")
 
 	// First, update the room's default settings for any future users.
-	err := m.updateDefaultRoomLockSettings(r)
-	if err != nil {
+	if statusCode, err := m.updateDefaultRoomLockSettings(r); err != nil {
 		// Log the error but continue, as updating existing users is also important.
 		log.WithError(err).Errorln("failed to update default room lock settings")
+		if statusCode == plugnmeet.StatusCode_ROOM_NOT_FOUND {
+			// the room is gone, updating its online users can't succeed either
+			return statusCode, err
+		}
 	}
 
 	// Get the list of all online users to update them.
 	userIds, err := m.natsService.GetOnlineUsersId(r.RoomId)
 	if err != nil {
-		return err
+		log.WithError(err).Errorln("failed to get online users list")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrUserUnexpectedError
 	}
 
 	for _, id := range userIds {
@@ -83,55 +83,76 @@ func (m *UserModel) handleUpdateAllUsersLockSettings(r *plugnmeet.UpdateUserLock
 			// nothing for requested user as is admin
 			continue
 		}
-		if err := m.updateAndBroadcastUserLock(r.RoomId, id, r.Service, r.Direction, true); err != nil {
+		if _, err := m.updateAndBroadcastUserLock(log, r.RoomId, id, r.Service, r.Direction, true); err != nil {
 			log.WithError(err).WithField("user_id", id).Errorln("failed to update user lock settings during all-user change")
 		}
 	}
 
-	return nil
+	return plugnmeet.StatusCode_SUCCESS, nil
 }
 
 // updateAndBroadcastUserLock is the single, reusable worker function that updates
 // a specific user's lock settings and broadcasts the change.
-func (m *UserModel) updateAndBroadcastUserLock(roomId, userId, service, direction string, forAllUserTask bool) error {
+func (m *UserModel) updateAndBroadcastUserLock(log *logrus.Entry, roomId, userId, service, direction string, forAllUserTask bool) (plugnmeet.StatusCode, error) {
+	log = log.WithFields(logrus.Fields{
+		"target_user_id": userId,
+		"service":        service,
+		"direction":      direction,
+	})
+
 	mt, err := m.natsService.GetUserMetadataStruct(roomId, userId)
 	if err != nil {
-		return err
+		log.WithError(err).Errorln("failed to get user metadata")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrUserUnexpectedError
 	}
 	if mt == nil {
-		return errors.New("user's metadata not found")
+		log.Warnln("user metadata not found")
+		return plugnmeet.StatusCode_USER_NOT_FOUND, config.ErrUserNotFound
 	}
 
 	// when target user is admin, we should not allow lock/unlock except for whiteboard
 	if mt.IsAdmin && service != "whiteboard" {
 		if forAllUserTask {
 			// silently skip when setting global locking for all users
-			return nil
+			return plugnmeet.StatusCode_SUCCESS, nil
 		}
 		// return error for individual user updates
-		return errors.New("notifications.cannot-lock-admin")
+		log.Warnln("cannot change lock settings of another admin")
+		return plugnmeet.StatusCode_PERMISSION_DENIED, config.ErrUserCannotLockAdmin
 	}
 
 	// Apply the new setting to the struct.
 	m.assignNewLockSetting(service, direction, mt.LockSettings)
 
 	// Persist the change and notify the clients.
-	return m.natsService.UpdateAndBroadcastUserMetadata(roomId, userId, mt, nil)
+	if err := m.natsService.UpdateAndBroadcastUserMetadata(roomId, userId, mt, nil); err != nil {
+		log.WithError(err).Errorln("failed to update and broadcast user metadata")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrUserUnexpectedError
+	}
+
+	return plugnmeet.StatusCode_SUCCESS, nil
 }
 
 // updateDefaultRoomLockSettings updates the room's default lock settings for future users.
-func (m *UserModel) updateDefaultRoomLockSettings(r *plugnmeet.UpdateUserLockSettingsReq) error {
+func (m *UserModel) updateDefaultRoomLockSettings(r *plugnmeet.UpdateUserLockSettingsReq) (plugnmeet.StatusCode, error) {
 	mt, err := m.natsService.GetRoomMetadataStruct(r.RoomId)
 	if err != nil {
-		return err
+		m.logger.WithError(err).Errorln("failed to get room metadata")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrUserUnexpectedError
 	}
 	if mt == nil {
-		return errors.New("invalid nil room metadata information")
+		m.logger.WithField("room_id", r.RoomId).Warnln("room metadata not found")
+		return plugnmeet.StatusCode_ROOM_NOT_FOUND, config.ErrRoomNotFound
 	}
 
 	m.assignNewLockSetting(r.Service, r.Direction, mt.DefaultLockSettings)
 	// Update the room metadata and broadcast the change.
-	return m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, mt)
+	if err := m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, mt); err != nil {
+		m.logger.WithError(err).Errorln("failed to update and broadcast room metadata")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrUserUnexpectedError
+	}
+
+	return plugnmeet.StatusCode_SUCCESS, nil
 }
 
 // lockSettingMap provides a map service strings to the

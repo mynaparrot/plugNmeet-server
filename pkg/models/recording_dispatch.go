@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/url"
 	"sort"
@@ -41,12 +40,11 @@ func (m *RecordingModel) DispatchRecorderTask(req *plugnmeet.RecordingReq) error
 		acquired, err := lock.TryLock(ctx)
 		if err != nil {
 			log.WithError(err).Error("failed to acquire recorder task lock")
-			return fmt.Errorf("Failed to acquire recorder task lock")
+			return config.ErrRecordingOperationFailed
 		}
 		if !acquired {
-			err := errors.New("another request is already in progress")
-			log.WithError(err).Warn("recorder task lock already acquired")
-			return err
+			// expected state: the previous start/stop request still holds the lock
+			return config.ErrRecordingTaskInProgress
 		}
 		defer lock.Unlock(ctx)
 	}
@@ -57,9 +55,8 @@ func (m *RecordingModel) DispatchRecorderTask(req *plugnmeet.RecordingReq) error
 
 	if req.RoomTableId == 0 {
 		if req.Sid == "" {
-			err := errors.New("empty sid")
-			log.WithError(err).Error("roomTableId is 0 and sid is empty")
-			return err
+			// expected caller error: there is nothing to look the room up by
+			return config.ErrRecordingRoomSidRequired
 		}
 		// in this case, we'll try to fetch the room info
 		log.Info("roomTableId is 0, fetching room info by sid")
@@ -100,7 +97,7 @@ func (m *RecordingModel) DispatchRecorderTask(req *plugnmeet.RecordingReq) error
 	payload, err := proto.Marshal(toSend)
 	if err != nil {
 		log.WithError(err).Error("Failed to marshal message for recorder")
-		return fmt.Errorf("Failed to marshal message for recorder")
+		return config.ErrRecordingOperationFailed
 	}
 
 	log.Info("Sending request to NATS recorder channel")
@@ -116,18 +113,17 @@ func (m *RecordingModel) DispatchRecorderTask(req *plugnmeet.RecordingReq) error
 		} else {
 			log.WithError(err).Errorf("Timed out waiting for a response from the NATS recorder channel after %s", recorderResponseTimeout)
 		}
-		return fmt.Errorf("Timed out waiting for a response from the NATS recorder channel")
+		return config.ErrRecordingOperationFailed
 	}
 
 	res := new(plugnmeet.CommonResponse)
 	if err = proto.Unmarshal(msg.Data, res); err != nil {
 		log.WithError(err).Error("Failed to unmarshal response from recorder")
-		return fmt.Errorf("Failed to unmarshal response from recorder")
+		return config.ErrRecordingOperationFailed
 	}
 	if !res.Status {
-		err = errors.New(res.GetMsg())
-		log.WithError(err).Error("Recorder returned a non-successful response")
-		return fmt.Errorf("Recorder returned a non-successful response")
+		log.WithField("recorderMsg", res.GetMsg()).Error("Recorder returned a non-successful response")
+		return config.ErrRecordingOperationFailed
 	}
 
 	// we'll update room metadata for recorder options
@@ -160,9 +156,8 @@ func (m *RecordingModel) addTokenAndRecorder(ctx context.Context, req *plugnmeet
 
 	recorderId := m.selectRecorder(log)
 	if recorderId == "" {
-		err := fmt.Errorf("notifications.no-recorder-available")
-		log.WithError(err).Error("no recorder available")
-		return err
+		log.Error("no recorder available")
+		return config.ErrRecordingNoRecorder
 	}
 
 	gt := &plugnmeet.GenerateTokenReq{
@@ -173,10 +168,10 @@ func (m *RecordingModel) addTokenAndRecorder(ctx context.Context, req *plugnmeet
 			IsAdmin:  true,
 		},
 	}
-	token, err := m.um.GetPNMJoinToken(ctx, gt, false)
+	_, token, err := m.um.GetPNMJoinToken(ctx, gt, false)
 	if err != nil {
 		log.WithError(err).Errorln("error getting pnm token")
-		return fmt.Errorf("Error getting token")
+		return config.ErrRecordingOperationFailed
 	}
 
 	rq.RecorderId = recorderId

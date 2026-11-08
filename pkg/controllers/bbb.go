@@ -55,7 +55,7 @@ func NewBBBController(args BBBControllerArgs) *BBBController {
 func (bc *BBBController) HandleVerifyApiRequest(c fiber.Ctx) error {
 	apiKey := c.Params("apiKey")
 	if apiKey == "" || subtle.ConstantTimeCompare([]byte(apiKey), []byte(bc.AppConfig.Client.ApiKey)) != 1 {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "apiKeyError", "invalid api key"))
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "apiKeyError", config.MsgBBBApiKeyInvalid))
 	}
 
 	hasParams := false
@@ -79,7 +79,7 @@ func (bc *BBBController) HandleVerifyApiRequest(c fiber.Ctx) error {
 			}
 		}
 	} else {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", "unsupported http method"))
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", config.MsgBBBUnsupportedMethod))
 	}
 
 	if !hasParams || (strings.HasSuffix(c.Path(), "/api") || strings.HasSuffix(c.Path(), "/api/")) {
@@ -96,7 +96,7 @@ func (bc *BBBController) HandleVerifyApiRequest(c fiber.Ctx) error {
 	} else {
 		s1 := strings.SplitN(c.OriginalURL(), "?", 2)
 		if len(s1) != 2 {
-			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "checksumError", "Checksums do not match"))
+			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "checksumError", config.MsgBBBChecksumMismatch))
 		}
 		s2 := strings.Split(c.Path(), "/")
 		method = s2[len(s2)-1]
@@ -106,7 +106,7 @@ func (bc *BBBController) HandleVerifyApiRequest(c fiber.Ctx) error {
 	s3 := strings.Split(data, "checksum=")
 	// more than one checksum= parameter is never a valid signed request
 	if len(s3) > 2 {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "checksumError", "Checksums do not match"))
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "checksumError", config.MsgBBBChecksumMismatch))
 	}
 
 	var queries string
@@ -120,12 +120,12 @@ func (bc *BBBController) HandleVerifyApiRequest(c fiber.Ctx) error {
 	}
 	// checksum must be the last parameter, otherwise the signature covers too little
 	if strings.Contains(checksum, "&") {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "checksumError", "Checksums do not match"))
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "checksumError", config.MsgBBBChecksumMismatch))
 	}
 
 	ourSum := bbbapiwrapper.CalculateCheckSum(bc.AppConfig.Client.Secret, method, queries)
 	if subtle.ConstantTimeCompare([]byte(checksum), []byte(ourSum)) != 1 {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "checksumError", "Checksums do not match"))
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "checksumError", config.MsgBBBChecksumMismatch))
 	}
 
 	return c.Next()
@@ -141,7 +141,7 @@ func (bc *BBBController) HandleBBBCreate(c fiber.Ctx) error {
 		err = c.Bind().Query(q)
 	}
 	if err != nil {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", config.MsgBBBParsingFailed))
 	}
 
 	// now we'll check if any presentation file was sent or not
@@ -149,7 +149,7 @@ func (bc *BBBController) HandleBBBCreate(c fiber.Ctx) error {
 		b := new(bbbapiwrapper.PreUploadWhiteboardPostFile)
 		err = xml.Unmarshal(c.Body(), b)
 		if err != nil {
-			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", err.Error()))
+			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", config.MsgBBBParsingFailed))
 		}
 		if len(b.Module.Documents) > 0 {
 			for i := 0; i < len(b.Module.Documents); i++ {
@@ -168,16 +168,17 @@ func (bc *BBBController) HandleBBBCreate(c fiber.Ctx) error {
 
 	pnmReq, err := bbbapiwrapper.ConvertCreateRequest(q, c.Queries())
 	if err != nil {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", config.MsgBBBInvalidRequest))
 	}
 
 	if err = validateRequest(pnmReq); err != nil {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", err.Error()))
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", config.MsgBBBInvalidRequest))
 	}
 
-	room, err := bc.RoomModel.CreateRoom(c.RequestCtx(), pnmReq)
+	_, room, err := bc.RoomModel.CreateRoom(c.RequestCtx(), pnmReq)
 	if err != nil {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
+		// the model logged the operational error
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", config.MsgBBBCreateFailed))
 	}
 
 	return c.XML(bbbapiwrapper.CreateMeetingResp{
@@ -206,17 +207,17 @@ func (bc *BBBController) HandleBBBJoin(c fiber.Ctx) error {
 		err = c.Bind().Query(q)
 	}
 	if err != nil {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", config.MsgBBBParsingFailed))
 	}
 
 	roomId := bbbapiwrapper.CheckMeetingIdToMatchFormat(q.MeetingID)
 	metadata, err := bc.NatsService.GetRoomMetadataStruct(roomId)
 	if err != nil {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", config.MsgBBBMeetingInfoFailed))
 	}
 
 	if metadata == nil {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", "meeting is not active"))
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", config.MsgBBBMeetingNotActive))
 	}
 
 	ex := new(bbbapiwrapper.CreateMeetingDefaultExtraData)
@@ -225,7 +226,7 @@ func (bc *BBBController) HandleBBBJoin(c fiber.Ctx) error {
 		if data, ok := metadata.ExtraData[bbbapiwrapper.BbbExtraDataTag]; ok {
 			err = json.Unmarshal([]byte(data), ex)
 			if err != nil {
-				return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
+				return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", config.MsgBBBExtraDataMissing))
 			}
 			if ex.Logo != "" {
 				customDesign.CustomLogo = &ex.Logo
@@ -244,10 +245,10 @@ func (bc *BBBController) HandleBBBJoin(c fiber.Ctx) error {
 		}
 	} else {
 		if q.Password == "" {
-			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", "password missing"))
+			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", config.MsgBBBPasswordMissing))
 		}
 		if metadata.ExtraData == nil {
-			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", "did not found extra data"))
+			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", config.MsgBBBExtraDataMissing))
 		}
 		if subtle.ConstantTimeCompare([]byte(q.Password), []byte(ex.ModeratorPW)) == 1 {
 			isAdmin = true
@@ -256,17 +257,18 @@ func (bc *BBBController) HandleBBBJoin(c fiber.Ctx) error {
 
 	req := bbbapiwrapper.ConvertJoinRequest(q, isAdmin)
 	if err = validateRequest(req); err != nil {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", err.Error()))
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", config.MsgBBBInvalidRequest))
 	}
 
 	exist := bc.NatsService.IsUserExistInBlockList(req.RoomId, req.UserInfo.UserId)
 	if exist {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", "this user is blocked to join this session"))
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", config.MsgBBBUserBlocked))
 	}
 
-	token, err := bc.UserModel.GetPNMJoinToken(c.RequestCtx(), req, false)
+	_, token, err := bc.UserModel.GetPNMJoinToken(c.RequestCtx(), req, false)
 	if err != nil {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
+		// the model logged the operational error
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", config.MsgBBBJoinFailed))
 	}
 
 	ul := fmt.Sprintf("%s://%s/?access_token=%s", c.Protocol(), c.Hostname(), token)
@@ -281,7 +283,7 @@ func (bc *BBBController) HandleBBBJoin(c fiber.Ctx) error {
 		}
 		cd, err := op.Marshal(customDesign)
 		if err != nil {
-			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
+			return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", config.MsgBBBJoinFailed))
 		}
 		ul = fmt.Sprintf("%s&custom_design=%s", ul, string(cd))
 	}
@@ -310,7 +312,7 @@ func (bc *BBBController) HandleBBBIsMeetingRunning(c fiber.Ctx) error {
 		err = c.Bind().Query(q)
 	}
 	if err != nil {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", config.MsgBBBParsingFailed))
 	}
 
 	res, _, _ := bc.RoomModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{
@@ -333,7 +335,7 @@ func (bc *BBBController) HandleBBBGetMeetingInfo(c fiber.Ctx) error {
 		err = c.Bind().Query(q)
 	}
 	if err != nil {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", config.MsgBBBParsingFailed))
 	}
 
 	status, msg, _, res := bc.RoomModel.GetActiveRoomInfo(c.RequestCtx(), &plugnmeet.GetActiveRoomInfoReq{
@@ -341,13 +343,14 @@ func (bc *BBBController) HandleBBBGetMeetingInfo(c fiber.Ctx) error {
 	})
 
 	if !status {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "notFound", msg))
+		// msg may be a client i18n key, integrators get curated English
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", callerMsg(c, msg)))
 	}
 
 	d := bbbapiwrapper.ConvertActiveRoomInfoToBBBMeetingInfo(res)
 	marshal, err := xml.Marshal(d)
 	if err != nil {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", config.MsgBBBMeetingInfoFailed))
 	}
 
 	dd := strings.Replace(string(marshal), "<meeting>", "", 1)
@@ -387,7 +390,7 @@ func (bc *BBBController) HandleBBBEndMeetings(c fiber.Ctx) error {
 		err = c.Bind().Query(q)
 	}
 	if err != nil {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", config.MsgBBBParsingFailed))
 	}
 
 	status, msg, _ := bc.RoomModel.EndRoom(c.RequestCtx(), &plugnmeet.RoomEndReq{
@@ -395,7 +398,8 @@ func (bc *BBBController) HandleBBBEndMeetings(c fiber.Ctx) error {
 	})
 
 	if !status {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", msg))
+		// msg may be a client i18n key, integrators get curated English
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", callerMsg(c, msg)))
 	}
 	return c.XML(bbbapiwrapper.CommonResponseMsg("SUCCESS", "sentEndMeetingRequest", "A request to end the meeting was sent.  Please wait a few seconds, and then use the getMeetingInfo or isMeetingRunning API calls to verify that it was ended"))
 }
@@ -410,13 +414,14 @@ func (bc *BBBController) HandleBBBGetRecordings(c fiber.Ctx) error {
 		err = c.Bind().Query(q)
 	}
 	if err != nil {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", config.MsgBBBParsingFailed))
 	}
 
 	host := fmt.Sprintf("%s://%s", c.Protocol(), c.Hostname())
 	recordings, pagination, err := bc.BBBApiWrapperModel.GetRecordings(host, q)
 	if err != nil {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
+		// the model logged the operational error
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", config.MsgBBBRecordingsFetchFailed))
 	}
 
 	if len(recordings) == 0 {
@@ -440,7 +445,7 @@ func (bc *BBBController) HandleBBBDeleteRecordings(c fiber.Ctx) error {
 		err = c.Bind().Query(q)
 	}
 	if err != nil {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", "We can not parse request"))
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", config.MsgBBBParsingFailed))
 	}
 
 	err = bc.RecordingModel.DeleteRecording(&plugnmeet.DeleteRecordingReq{
@@ -448,7 +453,8 @@ func (bc *BBBController) HandleBBBDeleteRecordings(c fiber.Ctx) error {
 	})
 
 	if err != nil {
-		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", err.Error()))
+		// the model logged the operational error
+		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", config.MsgBBBRecordingDeleteFailed))
 	}
 
 	return c.XML(bbbapiwrapper.DeleteRecordingsRes{

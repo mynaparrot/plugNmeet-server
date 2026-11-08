@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -16,7 +15,7 @@ import (
 
 var validUserIDRegex = regexp.MustCompile("^[a-zA-Z0-9-_]+$")
 
-func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTokenReq, backToMainRoom bool) (string, error) {
+func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTokenReq, backToMainRoom bool) (plugnmeet.StatusCode, string, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"room_id":  g.GetRoomId(),
 		"user_id":  g.GetUserInfo().GetUserId(),
@@ -31,39 +30,34 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 
 	// Step 2: Validate the user's name to prevent conflicts with reserved system names.
 	if g.GetUserInfo().GetName() == config.RecorderUserAuthName {
-		err := fmt.Errorf("name: %s is reserved for internal use only", config.RecorderUserAuthName)
-		log.WithError(err).Warnln()
-		return "", err
+		log.Warnf("name: %s is reserved for internal use only", config.RecorderUserAuthName)
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, "", config.ErrUserReservedName
 	}
 	if config.IsUserIdInternal(g.GetUserInfo().GetUserId()) {
-		err := fmt.Errorf("user_id: %s is reserved for internal use only", g.GetUserInfo().GetUserId())
-		log.WithError(err).Warnln()
-		return "", err
+		log.Warnf("user_id: %s is reserved for internal use only", g.GetUserInfo().GetUserId())
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, "", config.ErrUserReservedUserId
 	}
 	if strings.HasSuffix(g.GetUserInfo().GetUserId(), config.NativeTwinIdentitySuffix) {
-		err := fmt.Errorf("user_id: suffix %s is reserved for internal use only", config.NativeTwinIdentitySuffix)
-		log.WithError(err).Warnln()
-		return "", err
+		log.Warnf("user_id: suffix %s is reserved for internal use only", config.NativeTwinIdentitySuffix)
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, "", config.ErrUserReservedUserId
 	}
 
 	// Step 3: Fetch the current room information and metadata from NATS.
 	rInfo, meta, err := m.natsService.GetRoomInfoWithMetadata(g.GetRoomId())
 	if err != nil {
 		log.WithError(err).Errorln("failed to get room info with metadata")
-		return "", err
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, "", config.ErrUserUnexpectedError
 	}
 
 	if rInfo == nil || meta == nil {
-		err = fmt.Errorf("did not find correct room info")
-		log.WithError(err).Errorln()
-		return "", err
+		log.Warnln("did not find correct room info")
+		return plugnmeet.StatusCode_ROOM_NOT_FOUND, "", config.ErrUserRoomInfoNotFound
 	}
 
 	// Step 4: Ensure the room is not in an ended state.
 	if rInfo.Status == natsservice.RoomStatusEnded {
-		err = fmt.Errorf("room found in delete status, need to recreate it")
-		log.WithError(err).Warnln()
-		return "", err
+		log.Warnln("room found in delete status, need to recreate it")
+		return plugnmeet.StatusCode_ROOM_NOT_ACTIVE, "", config.ErrUserRoomEnded
 	}
 
 	if g.UserInfo.UserMetadata == nil {
@@ -96,12 +90,12 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 		status, err := m.natsService.GetRoomUserStatus(g.GetRoomId(), g.GetUserInfo().GetUserId())
 		if err != nil {
 			log.WithError(err).Errorln("failed to get room user status")
-			return "", err
+			return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, "", config.ErrUserUnexpectedError
 		}
 		if status == natsservice.UserStatusOnline {
 			log.Warnln("same user found in online status, removing that user before re-generating token")
 
-			_ = m.RemoveParticipant(&plugnmeet.RemoveParticipantReq{
+			_, _ = m.RemoveParticipant(&plugnmeet.RemoveParticipantReq{
 				RoomId: g.GetRoomId(),
 				UserId: g.GetUserInfo().GetUserId(),
 				Msg:    "notifications.room-disconnected-duplicate-entry",
@@ -114,20 +108,17 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 
 	// Step 7: Validate the format of the final user ID.
 	if !validUserIDRegex.MatchString(g.UserInfo.UserId) {
-		err = fmt.Errorf("user_id should only contain ASCII letters (a-z A-Z), digits (0-9) or -_")
-		log.WithError(err).Errorln()
-		return "", err
+		log.Warnln("user_id should only contain ASCII letters (a-z A-Z), digits (0-9) or -_")
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, "", config.ErrUserInvalidUserId
 	}
 	// Add an extra check to ensure our chosen separator pattern is not present.
 	if strings.Contains(g.UserInfo.UserId, natsservice.UserKeyFieldPrefix) {
-		err = fmt.Errorf("user_id cannot contain the reserved pattern '%s'", natsservice.UserKeyFieldPrefix)
-		log.WithError(err).Errorln()
-		return "", err
+		log.Warnf("user_id cannot contain the reserved pattern '%s'", natsservice.UserKeyFieldPrefix)
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, "", config.ErrUserInvalidUserId
 	}
 	if strings.HasPrefix(g.UserInfo.UserId, natsservice.UserKeyPrefix) {
-		err = fmt.Errorf("user_id cannot start with the reserved pattern '%s'", natsservice.UserKeyPrefix)
-		log.WithError(err).Errorln()
-		return "", err
+		log.Warnf("user_id cannot start with the reserved pattern '%s'", natsservice.UserKeyPrefix)
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, "", config.ErrUserInvalidUserId
 	}
 
 	// Step 8: Assign permissions and lock settings based on whether the user is an admin.
@@ -138,7 +129,7 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 		// check current room users to make presenter
 		if err := m.CreateNewPresenter(g); err != nil {
 			log.WithError(err).Errorln("failed to create new presenter")
-			return "", err
+			return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, "", config.ErrUserUnexpectedError
 		}
 
 		// by default, no lock for admin user
@@ -166,7 +157,7 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 	err = m.natsService.AddUser(g.RoomId, g.UserInfo.UserId, g.UserInfo.Name, g.UserInfo.IsAdmin, g.UserInfo.UserMetadata.IsPresenter, g.UserInfo.UserMetadata, g.UserInfo.ClientType)
 	if err != nil {
 		log.WithError(err).Errorln("failed to add user to nats")
-		return "", err
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, "", config.ErrUserUnexpectedError
 	}
 
 	// Step 10: Generate and return the final JWT for the client to use.
@@ -179,8 +170,14 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 		ClientType: g.UserInfo.ClientType,
 	}
 
+	token, err := m.am.GeneratePNMJoinToken(c)
+	if err != nil {
+		log.WithError(err).Errorln("failed to sign pnm join token")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, "", config.ErrUserUnexpectedError
+	}
+
 	log.Infoln("Successfully generated pnm join token")
-	return m.am.GeneratePNMJoinToken(c)
+	return plugnmeet.StatusCode_SUCCESS, token, nil
 }
 
 // waitForUserToBeOffline polls until the user's status is no longer "online".

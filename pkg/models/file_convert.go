@@ -192,7 +192,7 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 
 	if err := m.ValidateMimeType(mType); err != nil {
 		log.WithError(err).Error("mime type validation failed")
-		return nil, fmt.Errorf("mime type validation failed")
+		return nil, config.ErrFileTypeNotAllowed
 	}
 
 	fileId := uuid.NewString()
@@ -261,7 +261,7 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 
 	res = &ConvertWhiteboardFileRes{
 		Status:     true,
-		Msg:        "success",
+		Msg:        config.MsgSuccess,
 		FileName:   fileName,
 		FilePath:   filepath.Join(roomSid, fileId),
 		FileId:     fileId,
@@ -293,10 +293,10 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 }
 
 // MergeWhiteboardPdfExport merges the uploaded PDF slices into a single PDF file.
-func (m *FileModel) MergeWhiteboardPdfExport(req *plugnmeet.UploadedFileMergeReq, requestedUserId string) (*plugnmeet.UploadedFileRes, error) {
+func (m *FileModel) MergeWhiteboardPdfExport(req *plugnmeet.UploadedFileMergeReq, requestedUserId string) (*plugnmeet.UploadedFileRes, plugnmeet.StatusCode, error) {
 	req.ResumableIdentifier = helpers.MakeSafeFilename(req.ResumableIdentifier, false)
 	if req.ResumableIdentifier == "" {
-		return nil, fmt.Errorf("invalid or empty resumableIdentifier")
+		return nil, plugnmeet.StatusCode_INVALID_PARAMETERS, config.ErrFileInvalidRequest
 	}
 
 	log := m.logger.WithFields(logrus.Fields{
@@ -320,7 +320,7 @@ func (m *FileModel) MergeWhiteboardPdfExport(req *plugnmeet.UploadedFileMergeReq
 		hookRes, err := m.app.Hooks.RunDownloadHook(m.ctx, hookData, nil, time.Minute*10, log)
 		if err != nil {
 			log.WithError(err).Error("download hook failed")
-			return nil, fmt.Errorf("download hook failed")
+			return nil, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrFileMergeFailed
 		}
 		if hookRes != nil && hookRes.OutputPath != "" {
 			savedPath = hookRes.OutputPath
@@ -330,17 +330,17 @@ func (m *FileModel) MergeWhiteboardPdfExport(req *plugnmeet.UploadedFileMergeReq
 	// Ensure the temporary directory exists before trying to read from it
 	if _, err := os.Stat(savedPath); os.IsNotExist(err) {
 		log.WithError(err).Errorf("Temporary directory %s does not exist", savedPath)
-		return nil, fmt.Errorf("temporary directory for export not found")
+		return nil, plugnmeet.StatusCode_NOT_FOUND, config.ErrFileChunksNotFound
 	}
 
 	imageFiles, err := filepath.Glob(filepath.Join(savedPath, "*.png"))
 	if err != nil {
 		log.WithError(err).Errorf("Failed to list PNG files in %s", savedPath)
-		return nil, fmt.Errorf("failed to list image slices")
+		return nil, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrFileMergeFailed
 	}
 	if len(imageFiles) == 0 {
 		log.Warnf("No PNG files found in temporary directory: %s", savedPath)
-		return nil, fmt.Errorf("no image slices found for export")
+		return nil, plugnmeet.StatusCode_NOT_FOUND, config.ErrFileChunksNotFound
 	}
 
 	// Use natural sort for robustness and simplicity.
@@ -351,7 +351,7 @@ func (m *FileModel) MergeWhiteboardPdfExport(req *plugnmeet.UploadedFileMergeReq
 	finalPdfOutputDir := filepath.Join(m.app.UploadFileSettings.Path, req.RoomSid)
 	if err := os.MkdirAll(finalPdfOutputDir, 0755); err != nil {
 		log.WithError(err).Errorf("Failed to create final PDF output directory: %s", finalPdfOutputDir)
-		return nil, fmt.Errorf("failed to create output directory for PDF")
+		return nil, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrFileMergeFailed
 	}
 
 	baseFileName := strings.TrimSuffix(req.ResumableFilename, filepath.Ext(req.ResumableFilename))
@@ -374,7 +374,7 @@ func (m *FileModel) MergeWhiteboardPdfExport(req *plugnmeet.UploadedFileMergeReq
 
 	if err := executeCommand(timeoutCtx, log, "img2pdf", args...); err != nil {
 		log.WithError(err).Error("img2pdf execution failed")
-		return nil, fmt.Errorf("failed to build PDF (img2pdf)")
+		return nil, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrFileMergeFailed
 	}
 
 	// clean original dir
@@ -390,7 +390,7 @@ func (m *FileModel) MergeWhiteboardPdfExport(req *plugnmeet.UploadedFileMergeReq
 		uploadRes, err := m.app.Hooks.RunUploadHook(uploadHookData, log)
 		if err != nil {
 			log.WithError(err).Error("upload hook pipeline failed")
-			return nil, fmt.Errorf("upload hook pipeline failed")
+			return nil, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrFileUploadFailed
 		}
 		if uploadRes != nil && uploadRes.OutputPath != "" {
 			log.Infof("Successfully uploaded file into %s", uploadRes.OutputPath)
@@ -411,7 +411,7 @@ func (m *FileModel) MergeWhiteboardPdfExport(req *plugnmeet.UploadedFileMergeReq
 
 	res := &plugnmeet.UploadedFileRes{
 		Status:        true,
-		Msg:           "success",
+		Msg:           config.MsgSuccess,
 		FileId:        fileId,
 		FilePath:      filepath.Join(req.RoomSid, finalPdfFileName),
 		FileName:      finalPdfFileName,
@@ -438,7 +438,7 @@ func (m *FileModel) MergeWhiteboardPdfExport(req *plugnmeet.UploadedFileMergeReq
 	}
 	log.Info("Successfully built and broadcasted whiteboard PDF export file")
 
-	return res, nil
+	return res, plugnmeet.StatusCode_SUCCESS, nil
 }
 
 // addFileToNatsStore stores the metadata of a converted file into the dedicated NATS KV bucket.

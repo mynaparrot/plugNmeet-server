@@ -3,11 +3,9 @@ package controllers
 import (
 	"errors"
 	"net/url"
-	"path/filepath"
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -45,20 +43,20 @@ func NewRecordingController(args RecordingControllerArgs) *RecordingController {
 func (rc *RecordingController) HandleFetchRecordings(c fiber.Ctx) error {
 	req := new(plugnmeet.FetchRecordingsReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthInvalidRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	result, err := rc.recordingModel.FetchRecordings(req)
 	if err != nil {
 		if errors.Is(err, config.NotFoundErr) {
-			return utils.SendCommonProtoJsonResponse(c, false, "no recording found", plugnmeet.StatusCode_NOT_FOUND)
+			return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthRecordingNotFound, plugnmeet.StatusCode_NOT_FOUND)
 		}
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
+		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthRecordingsFetchFailed, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 
 	r := &plugnmeet.FetchRecordingsRes{
 		Status:     true,
-		Msg:        "success",
+		Msg:        config.MsgIntegratorSuccess,
 		StatusCode: plugnmeet.StatusCode_SUCCESS,
 		Result:     result,
 	}
@@ -69,15 +67,15 @@ func (rc *RecordingController) HandleFetchRecordings(c fiber.Ctx) error {
 func (rc *RecordingController) HandleRecordingInfo(c fiber.Ctx) error {
 	req := new(plugnmeet.RecordingInfoReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthInvalidRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	result, err := rc.recordingModel.RecordingInfo(req)
 	if err != nil {
 		if errors.Is(err, config.NotFoundErr) {
-			return utils.SendCommonProtoJsonResponse(c, false, "recording not found", plugnmeet.StatusCode_NOT_FOUND)
+			return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthRecordingNotFound, plugnmeet.StatusCode_NOT_FOUND)
 		}
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
+		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthRecordingsFetchFailed, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 
 	return utils.SendProtoJsonResponse(c, result)
@@ -87,71 +85,74 @@ func (rc *RecordingController) HandleRecordingInfo(c fiber.Ctx) error {
 func (rc *RecordingController) HandleUpdateRecordingMetadata(c fiber.Ctx) error {
 	req := new(plugnmeet.UpdateRecordingMetadataReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthInvalidRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	err := rc.recordingModel.UpdateRecordingMetadata(req)
 	if err != nil {
 		if errors.Is(err, config.NotFoundErr) {
-			return utils.SendCommonProtoJsonResponse(c, false, "recording not found", plugnmeet.StatusCode_NOT_FOUND)
+			return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthRecordingNotFound, plugnmeet.StatusCode_NOT_FOUND)
 		}
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
+		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthRecordingUpdateFailed, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 
-	return utils.SendCommonProtoJsonResponse(c, true, "success", plugnmeet.StatusCode_SUCCESS)
+	return utils.SendCommonProtoJsonResponse(c, true, config.MsgIntegratorSuccess, plugnmeet.StatusCode_SUCCESS)
 }
 
 // HandleMergeRecordings handles merging multiple recordings into a single new one.
 func (rc *RecordingController) HandleMergeRecordings(c fiber.Ctx) error {
 	req := new(plugnmeet.MergeRecordingsReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthInvalidRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	statusCode, err := rc.recordingModel.MergeRecordings(c.RequestCtx(), req)
 	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), statusCode)
+		if errors.Is(err, config.NotFoundErr) {
+			return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthRecordingNotFound, plugnmeet.StatusCode_NOT_FOUND)
+		}
+		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthRecordingMergeFailed, statusCode)
 	}
 
-	return utils.SendCommonProtoJsonResponse(c, true, "successfully registered new recording merging task", statusCode)
+	return utils.SendCommonProtoJsonResponse(c, true, config.MsgIntegratorSuccess, statusCode)
 }
 
 // HandleDeleteRecording handles deleting a recording.
 func (rc *RecordingController) HandleDeleteRecording(c fiber.Ctx) error {
 	req := new(plugnmeet.DeleteRecordingReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthInvalidRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	err := rc.recordingModel.DeleteRecording(req)
 	if err != nil {
 		if errors.Is(err, config.NotFoundErr) {
-			return utils.SendCommonProtoJsonResponse(c, false, "recording not found", plugnmeet.StatusCode_NOT_FOUND)
+			return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthRecordingNotFound, plugnmeet.StatusCode_NOT_FOUND)
 		}
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
+		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthRecordingDeleteFailed, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 
-	return utils.SendCommonProtoJsonResponse(c, true, "success", plugnmeet.StatusCode_SUCCESS)
+	return utils.SendCommonProtoJsonResponse(c, true, config.MsgIntegratorSuccess, plugnmeet.StatusCode_SUCCESS)
 }
 
 // HandleGetDownloadToken handles generating a download token for a recording.
 func (rc *RecordingController) HandleGetDownloadToken(c fiber.Ctx) error {
 	req := new(plugnmeet.GetDownloadTokenReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthInvalidRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	token, err := rc.recordingModel.GetDownloadToken(req)
 	if err != nil {
 		if errors.Is(err, config.NotFoundErr) {
-			return utils.SendCommonProtoJsonResponse(c, false, "recording not found", plugnmeet.StatusCode_NOT_FOUND)
+			return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthRecordingNotFound, plugnmeet.StatusCode_NOT_FOUND)
 		}
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
+		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthDownloadTokenFailed, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 
 	r := &plugnmeet.GetDownloadTokenRes{
 		Status:     true,
-		Msg:        "success",
+		Msg:        config.MsgIntegratorSuccess,
 		StatusCode: plugnmeet.StatusCode_SUCCESS,
 		Token:      &token,
 	}
@@ -162,34 +163,16 @@ func (rc *RecordingController) HandleGetDownloadToken(c fiber.Ctx) error {
 func (rc *RecordingController) HandleDownloadRecording(c fiber.Ctx) error {
 	token := c.Params("token")
 
-	if len(token) == 0 {
-		return c.Status(fiber.StatusUnauthorized).SendString("token require or invalid url")
+	if token == "" {
+		return c.Status(fiber.StatusUnauthorized).SendString(config.MsgFileDownloadTokenInvalid)
 	}
 
 	res, status, err := rc.recordingModel.VerifyRecordingToken(token)
 	if err != nil {
-		return c.Status(status).SendString(err.Error())
+		return downloadTokenErrorResponse(c, res, status, err, rc.logger)
 	}
 
-	switch res.Action {
-	case hooks.DownloadHookDataActionRedirect:
-		if res.RedirectUrl == "" {
-			return c.Status(fiber.StatusInternalServerError).SendString("hook script did not provide a redirect_url")
-		}
-		return c.Redirect().Status(fiber.StatusTemporaryRedirect).To(res.RedirectUrl)
-	case hooks.DownloadHookDataActionServeLocal:
-		if res.OutputPath == "" {
-			return c.Status(fiber.StatusInternalServerError).SendString("hook script did not provide a local_path")
-		}
-		if res.MimeType == "" {
-			return c.Status(fiber.StatusInternalServerError).SendString("hook script did not provide a mime_type")
-		}
-		c.Set(fiber.HeaderContentType, res.MimeType)
-		c.Set(fiber.HeaderContentDisposition, "attachment; filename="+filepath.Base(res.OutputPath))
-		return c.SendFile(res.OutputPath)
-	default:
-		return c.Status(fiber.StatusInternalServerError).SendString("invalid action from download hook")
-	}
+	return serveDownloadHookResult(c, res, rc.logger)
 }
 
 // isValidRtmpUrl allows only absolute rtmp/rtmps urls.
@@ -209,59 +192,64 @@ func (rc *RecordingController) HandleRecorderTasks(c fiber.Ctx) error {
 	roomSid := fiber.Locals[string](c, "roomSid")
 
 	if !isAdmin {
-		return utils.SendCommonProtobufResponse(c, false, "only admin can start recording")
+		return utils.SendCommonProtobufResponse(c, false, config.ErrUserOnlyAdmin.Error())
 	}
 
 	if roomId == "" {
-		return utils.SendCommonProtobufResponse(c, false, "no roomId in token")
+		return utils.SendCommonProtobufResponse(c, false, config.ErrRoomIdRequired.Error())
 	}
 
 	req := new(plugnmeet.RecordingReq)
 	err := proto.Unmarshal(c.Body(), req)
 	if err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
+		// expected malformed caller input: no server-side log
+		return utils.SendCommonProtobufResponse(c, false, config.ErrRecordingInvalidRequest.Error())
 	}
 
 	if req.Sid != roomSid {
-		return utils.SendCommonProtobufResponse(c, false, "roomSid in token mismatched")
+		return utils.SendCommonProtobufResponse(c, false, config.ErrUserRoomSidMismatch.Error())
 	}
 
 	// now need to check if meeting is running or not
 	room, err := rc.ds.GetRoomInfoBySid(roomSid, new(1))
 	if err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
+		rc.logger.WithError(err).WithFields(logrus.Fields{
+			"roomId":  roomId,
+			"roomSid": roomSid,
+		}).Errorln("failed to fetch room info by sid")
+		return utils.SendCommonProtobufResponse(c, false, config.ErrRecordingOperationFailed.Error())
 	}
 
 	if room == nil || room.ID == 0 {
-		return utils.SendCommonProtobufResponse(c, false, "notifications.room-not-active")
+		return utils.SendCommonProtobufResponse(c, false, config.ErrAuthRoomNotActive.Error())
 	}
 
 	if room.RoomId != roomId {
-		return utils.SendCommonProtobufResponse(c, false, "roomId in token mismatched")
+		return utils.SendCommonProtobufResponse(c, false, config.ErrUserRoomIdMismatch.Error())
 	}
 
 	switch req.Task {
 	case plugnmeet.RecordingTasks_START_RECORDING:
 		if room.IsRecording == 1 {
-			return utils.SendCommonProtobufResponse(c, false, "notifications.recording-already-running")
+			return utils.SendCommonProtobufResponse(c, false, config.ErrRecordingAlreadyRunning.Error())
 		}
 	case plugnmeet.RecordingTasks_STOP_RECORDING:
 		if room.IsRecording == 0 {
-			return utils.SendCommonProtobufResponse(c, false, "notifications.recording-not-running")
+			return utils.SendCommonProtobufResponse(c, false, config.ErrRecordingNotRunning.Error())
 		}
 	case plugnmeet.RecordingTasks_START_RTMP:
 		if req.RtmpUrl == nil || *req.RtmpUrl == "" {
-			return utils.SendCommonProtobufResponse(c, false, "rtmpUrl required")
+			return utils.SendCommonProtobufResponse(c, false, config.ErrRecordingRtmpUrlRequired.Error())
 		}
 		if !isValidRtmpUrl(*req.RtmpUrl) {
-			return utils.SendCommonProtobufResponse(c, false, "invalid rtmpUrl: only rtmp and rtmps schemes are allowed")
+			return utils.SendCommonProtobufResponse(c, false, config.ErrRecordingInvalidRtmpUrl.Error())
 		}
 		if room.IsActiveRtmp == 1 {
-			return utils.SendCommonProtobufResponse(c, false, "notifications.rtmp-already-running")
+			return utils.SendCommonProtobufResponse(c, false, config.ErrRecordingRtmpAlreadyRunning.Error())
 		}
 	case plugnmeet.RecordingTasks_STOP_RTMP:
 		if room.IsActiveRtmp == 0 {
-			return utils.SendCommonProtobufResponse(c, false, "notifications.rtmp-not-running")
+			return utils.SendCommonProtobufResponse(c, false, config.ErrRecordingRtmpNotRunning.Error())
 		}
 	}
 
@@ -273,7 +261,7 @@ func (rc *RecordingController) HandleRecorderTasks(c fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	return utils.SendCommonProtobufResponse(c, true, "success")
+	return utils.SendCommonProtobufResponse(c, true, config.MsgSuccess)
 }
 
 // HandleRecorderEvents handles events coming from the recorder.
@@ -283,7 +271,7 @@ func (rc *RecordingController) HandleRecorderEvents(c fiber.Ctx) error {
 		rc.logger.WithError(err).Errorln("unmarshalling failed")
 		return c.JSON(fiber.Map{
 			"status": false,
-			"msg":    err.Error(),
+			"msg":    config.MsgAuthInvalidRequest,
 		})
 	}
 

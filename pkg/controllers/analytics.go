@@ -4,7 +4,6 @@ import (
 	"errors"
 	"path/filepath"
 
-	"buf.build/go/protovalidate"
 	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -12,33 +11,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"go.uber.org/fx"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 )
-
-var unmarshalOpts = protojson.UnmarshalOptions{
-	DiscardUnknown: true,
-}
-
-func parseAndValidateRequest(data []byte, msg proto.Message) error {
-	err := unmarshalOpts.Unmarshal(data, msg)
-	if err != nil {
-		return err
-	}
-	return validateRequest(msg)
-}
-
-func validateRequest(msg proto.Message) error {
-	v, err := protovalidate.New()
-	if err != nil {
-		return err
-	}
-
-	if err = v.Validate(msg); err != nil {
-		return err
-	}
-	return nil
-}
 
 // AnalyticsController holds the dependencies for analytics-related handlers.
 type AnalyticsController struct {
@@ -65,20 +38,20 @@ func NewAnalyticsController(args AnalyticsControllerArgs) *AnalyticsController {
 func (ac *AnalyticsController) HandleFetchAnalytics(c fiber.Ctx) error {
 	req := new(plugnmeet.FetchAnalyticsReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthInvalidRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	result, err := ac.AnalyticsModel.FetchAnalytics(req)
 	if err != nil {
 		if errors.Is(err, config.NotFoundErr) {
-			return utils.SendCommonProtoJsonResponse(c, false, "no artifact found", plugnmeet.StatusCode_NOT_FOUND)
+			return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthArtifactNotFound, plugnmeet.StatusCode_NOT_FOUND)
 		}
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
+		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthAnalyticsFetchFailed, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 
 	r := &plugnmeet.FetchAnalyticsRes{
 		Status: true,
-		Msg:    "success",
+		Msg:    config.MsgIntegratorSuccess,
 		Result: result,
 	}
 	return utils.SendProtoJsonResponse(c, r)
@@ -89,7 +62,7 @@ func (ac *AnalyticsController) HandleFetchAnalytics(c fiber.Ctx) error {
 func (ac *AnalyticsController) HandleDeleteAnalytics(c fiber.Ctx) error {
 	req := new(plugnmeet.DeleteAnalyticsReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthInvalidRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	newReq := &plugnmeet.DeleteArtifactReq{
@@ -98,12 +71,12 @@ func (ac *AnalyticsController) HandleDeleteAnalytics(c fiber.Ctx) error {
 	err := ac.artifactModel.DeleteArtifact(newReq)
 	if err != nil {
 		if errors.Is(err, config.NotFoundErr) {
-			return utils.SendCommonProtoJsonResponse(c, false, "artifact not found", plugnmeet.StatusCode_NOT_FOUND)
+			return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthArtifactNotFound, plugnmeet.StatusCode_NOT_FOUND)
 		}
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
+		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthArtifactDeleteFailed, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 
-	return utils.SendCommonProtoJsonResponse(c, true, "success", plugnmeet.StatusCode_SUCCESS)
+	return utils.SendCommonProtoJsonResponse(c, true, config.MsgIntegratorSuccess, plugnmeet.StatusCode_SUCCESS)
 }
 
 // HandleGetAnalyticsDownloadToken generates a download token for analytics.
@@ -111,7 +84,7 @@ func (ac *AnalyticsController) HandleDeleteAnalytics(c fiber.Ctx) error {
 func (ac *AnalyticsController) HandleGetAnalyticsDownloadToken(c fiber.Ctx) error {
 	req := new(plugnmeet.GetAnalyticsDownloadTokenReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthInvalidRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	newReq := &plugnmeet.GetArtifactDownloadTokenReq{
@@ -120,14 +93,14 @@ func (ac *AnalyticsController) HandleGetAnalyticsDownloadToken(c fiber.Ctx) erro
 	token, err := ac.artifactModel.GetArtifactDownloadToken(newReq)
 	if err != nil {
 		if errors.Is(err, config.NotFoundErr) {
-			return utils.SendCommonProtoJsonResponse(c, false, "artifact not found", plugnmeet.StatusCode_NOT_FOUND)
+			return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthArtifactNotFound, plugnmeet.StatusCode_NOT_FOUND)
 		}
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
+		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthDownloadTokenFailed, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 
 	r := &plugnmeet.GetAnalyticsDownloadTokenRes{
 		Status: true,
-		Msg:    "success",
+		Msg:    config.MsgIntegratorSuccess,
 		Token:  &token,
 	}
 	return utils.SendProtoJsonResponse(c, r)

@@ -92,7 +92,7 @@ func (m *BreakoutRoomModel) BackToMainRoom(ctx context.Context, r *plugnmeet.Bac
 			UserMetadata: pmeta,
 		},
 	}
-	token, err := m.um.GetPNMJoinToken(ctx, req, true)
+	_, token, err := m.um.GetPNMJoinToken(ctx, req, true)
 	if err != nil {
 		log.WithError(err).Error("failed to generate join token for main room")
 		return "", config.ErrBkRoomUnexpectedError
@@ -255,7 +255,7 @@ func (m *BreakoutRoomModel) MoveBreakoutRoomUser(ctx context.Context, r *plugnme
 	if r.BreakoutRoomId == "" {
 		req.RoomId = r.RoomId
 	}
-	token, err := m.um.GetPNMJoinToken(ctx, req, r.BreakoutRoomId == "")
+	_, token, err := m.um.GetPNMJoinToken(ctx, req, r.BreakoutRoomId == "")
 	if err != nil {
 		log.WithError(err).Error("failed to generate token for target room")
 		return config.ErrBkRoomUnexpectedError
