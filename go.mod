@@ -21,9 +21,9 @@ require (
 	github.com/livekit/protocol v1.51.1-0.20260910121219-271d9cde3897
 	github.com/livekit/server-sdk-go/v2 v2.19.0
 	github.com/mynaparrot/plugnmeet-protocol v1.6.4-0.20261104112659-0e6359726f97
-	github.com/nats-io/jwt/v2 v2.8.2
+	github.com/nats-io/jwt/v2 v2.8.3
 	github.com/nats-io/nats.go v1.55.0
-	github.com/nats-io/nkeys v0.4.16
+	github.com/nats-io/nkeys v0.4.17
 	github.com/openai/openai-go/v3 v3.94.0
 	github.com/pion/webrtc/v4 v4.2.19
 	github.com/prometheus/client_golang v1.25.0
