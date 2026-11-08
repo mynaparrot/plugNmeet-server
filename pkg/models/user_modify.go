@@ -11,7 +11,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-func (m *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
+func (m *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) (plugnmeet.StatusCode, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId":    r.GetRoomId(),
 		"userId":    r.GetUserId(),
@@ -23,13 +23,12 @@ func (m *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 	status, err := m.natsService.GetRoomUserStatus(r.RoomId, r.UserId)
 	if err != nil {
 		log.WithError(err).Errorln("failed to get room user status")
-		return err
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrUserUnexpectedError
 	}
 
 	if status != natsservice.UserStatusOnline {
-		err = config.UserNotActive
-		log.WithError(err).Warnln("user not online")
-		return err
+		log.Warnln("user not online")
+		return plugnmeet.StatusCode_USER_NOT_FOUND, config.ErrUserNotOnline
 	}
 
 	if err := m.natsService.NotifyErrorMsg(r.RoomId, r.Msg, &r.UserId); err != nil {
@@ -67,7 +66,7 @@ func (m *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) error {
 	})
 
 	log.Infoln("Participant removed successfully")
-	return nil
+	return plugnmeet.StatusCode_SUCCESS, nil
 }
 
 func (m *UserModel) RaisedHand(roomId, userId, msg string) {

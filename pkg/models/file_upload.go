@@ -43,12 +43,12 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx, req *ResumableUploadReq) (*
 
 	safeIdentifier := helpers.MakeSafeFilename(req.ResumableIdentifier, false)
 	if safeIdentifier == "" {
-		return nil, fiber.NewError(fiber.StatusBadRequest, "invalid resumableIdentifier")
+		return nil, fiber.NewError(fiber.StatusBadRequest, config.ErrFileInvalidRequest.Error())
 	}
 
 	maxSize := int64(m.app.UploadFileSettings.MaxSize) * 1024 * 1024
 	if req.ResumableChunkNumber < 1 || req.ResumableTotalChunks < 1 || req.ResumableChunkNumber > req.ResumableTotalChunks {
-		return nil, fiber.NewError(fiber.StatusBadRequest, "invalid chunk number")
+		return nil, fiber.NewError(fiber.StatusBadRequest, config.ErrFileInvalidRequest.Error())
 	}
 
 	// Create a logger with more context for this specific upload operation.
@@ -115,42 +115,42 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx, req *ResumableUploadReq) (*
 			reqFile, err := c.FormFile("file")
 			if err != nil {
 				log.WithError(err).Errorln("failed to get 'file' from form-data")
-				return nil, fiber.NewError(fiber.StatusBadRequest, "missing 'file' in form-data")
+				return nil, fiber.NewError(fiber.StatusBadRequest, config.ErrFileMissingFile.Error())
 			}
 
 			if req.ResumableTotalSize <= 0 {
-				return nil, fiber.NewError(fiber.StatusBadRequest, "invalid file size")
+				return nil, fiber.NewError(fiber.StatusBadRequest, config.ErrFileInvalidRequest.Error())
 			}
 			// check the declared size as well as the actual chunk on every part
 			if req.ResumableTotalSize > maxSize ||
 				reqFile.Size > maxSize ||
 				(req.ResumableChunkSize > 0 && int64(req.ResumableChunkNumber-1)*req.ResumableChunkSize+reqFile.Size > maxSize) {
 				log.Warnln("uploaded chunk exceeds the configured maximum file size")
-				return nil, fiber.NewError(fiber.StatusBadRequest, fmt.Sprintf("file too large: max allowed is %dMB", m.app.UploadFileSettings.MaxSize))
+				return nil, fiber.NewError(fiber.StatusRequestEntityTooLarge, config.ErrFileTooLarge.Error())
 			}
 
 			if req.ResumableChunkNumber == 1 {
 				file, err := reqFile.Open()
 				if err != nil {
 					log.WithError(err).Errorln("failed to open multipart file header")
-					return nil, fiber.NewError(fiber.StatusInternalServerError, "failed to open uploaded file")
+					return nil, fiber.NewError(fiber.StatusInternalServerError, config.ErrFileUploadFailed.Error())
 				}
 				// detectMimeTypeForValidation will run f.Close() in defer
 				if err := m.detectMimeTypeForValidation(file); err != nil {
-					return nil, fiber.NewError(fiber.StatusUnsupportedMediaType, err.Error())
+					return nil, fiber.NewError(fiber.StatusUnsupportedMediaType, config.ErrFileTypeNotAllowed.Error())
 				}
 			}
 
 			// for hook system we'll need to ensure dir exists
 			if err := os.MkdirAll(chunkDir, 0755); err != nil {
 				log.WithError(err).Errorln("failed to create chunk directory")
-				return nil, fiber.NewError(fiber.StatusInternalServerError, "failed to create chunk directory")
+				return nil, fiber.NewError(fiber.StatusInternalServerError, config.ErrFileUploadFailed.Error())
 			}
 
 			// Always save the file to the local chunk path first.
 			if err := c.SaveFile(reqFile, chunkPath); err != nil {
 				log.WithError(err).Errorln("failed to write chunk data")
-				return nil, fiber.NewError(fiber.StatusServiceUnavailable, "failed to write chunk data")
+				return nil, fiber.NewError(fiber.StatusServiceUnavailable, config.ErrFileUploadFailed.Error())
 			}
 
 			// If hook is enabled, pass the saved chunk to the script.
@@ -173,7 +173,7 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx, req *ResumableUploadReq) (*
 				}
 				if _, err = m.app.Hooks.RunResumableUploadHook(hookData, log); err != nil {
 					log.WithError(err).Error("resumable upload hook 'part-upload' failed")
-					return nil, fiber.NewError(fiber.StatusServiceUnavailable, "hook failed to upload part")
+					return nil, fiber.NewError(fiber.StatusServiceUnavailable, config.ErrFileUploadFailed.Error())
 				}
 			}
 
@@ -185,11 +185,11 @@ func (m *FileModel) ResumableFileUpload(c fiber.Ctx, req *ResumableUploadReq) (*
 }
 
 // UploadedFileMerge will combine all the parts and create a final file
-func (m *FileModel) UploadedFileMerge(req *plugnmeet.UploadedFileMergeReq) (*plugnmeet.UploadedFileRes, error) {
+func (m *FileModel) UploadedFileMerge(req *plugnmeet.UploadedFileMergeReq) (*plugnmeet.UploadedFileRes, plugnmeet.StatusCode, error) {
 	safeFilename := helpers.MakeSafeFilename(req.ResumableFilename, true)
 	req.ResumableIdentifier = helpers.MakeSafeFilename(req.ResumableIdentifier, false) // should be fine here as already uploaded
 	if req.ResumableIdentifier == "" {
-		return nil, fmt.Errorf("invalid empty resumableIdentifier")
+		return nil, plugnmeet.StatusCode_INVALID_PARAMETERS, config.ErrFileInvalidRequest
 	}
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId":              req.RoomId,
@@ -217,11 +217,12 @@ func (m *FileModel) UploadedFileMerge(req *plugnmeet.UploadedFileMergeReq) (*plu
 		result, err := m.app.Hooks.RunResumableUploadHook(hookData, log)
 		if err != nil {
 			log.WithError(err).Error("resumable upload hook 'merge' failed")
-			return nil, fmt.Errorf("resumable upload hook 'merge' failed")
+			return nil, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrFileMergeFailed
 		}
 		if result != nil {
 			if result.OutputResponseType != hooks.ResumableUploadOutputTypeMergeSuccess || result.OutputPath == "" {
-				return nil, fmt.Errorf("resumable upload hook 'merge' did not return success status or output_path")
+				log.Errorln("resumable upload hook 'merge' did not return success status or output_path")
+				return nil, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrFileMergeFailed
 			}
 			finalPath = result.OutputPath
 			fileMimeType = result.FileMimeType
@@ -233,37 +234,39 @@ func (m *FileModel) UploadedFileMerge(req *plugnmeet.UploadedFileMergeReq) (*plu
 		chunkDir := filepath.Join(tempFolder, req.ResumableIdentifier)
 
 		if _, err := os.Stat(chunkDir); os.IsNotExist(err) {
-			return nil, fmt.Errorf("requested file's chunks not found for identifier %s, make sure those were uploaded", req.ResumableIdentifier)
+			log.WithField("identifier", req.ResumableIdentifier).Warnln("requested file's chunks not found")
+			return nil, plugnmeet.StatusCode_NOT_FOUND, config.ErrFileChunksNotFound
 		}
 
 		// combining chunks into one file
 		combinedFile, err := m.combineResumableFiles(req, chunkDir, safeFilename)
 		if err != nil {
 			log.WithError(err).Error("failed to combine chunks")
-			return nil, fmt.Errorf("failed to combine chunks")
+			return nil, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrFileMergeFailed
 		}
 
 		// check the file size again
 		stat, err := os.Stat(combinedFile)
 		if err != nil {
 			log.WithError(err).Error("failed to get file info")
-			return nil, fmt.Errorf("failed to get file info")
+			return nil, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrFileMergeFailed
 		}
 		if stat.Size() > int64(m.app.UploadFileSettings.MaxSize*1024*1024) {
 			_ = os.Remove(combinedFile)
-			return nil, fmt.Errorf("file too large: max allowed is %dMB", m.app.UploadFileSettings.MaxSize)
+			return nil, plugnmeet.StatusCode_INVALID_PARAMETERS, config.ErrFileTooLarge
 		}
 
 		// we'll detect mime type again for sending data
 		mType, err := mimetype.DetectFile(combinedFile)
 		if err != nil {
 			log.WithError(err).Error("mime detection failed")
-			return nil, fmt.Errorf("mime detection failed")
+			_ = os.Remove(combinedFile)
+			return nil, plugnmeet.StatusCode_INVALID_PARAMETERS, config.ErrFileTypeNotAllowed
 		}
 
 		if err := m.ValidateMimeType(mType); err != nil {
 			_ = os.Remove(combinedFile)
-			return nil, err
+			return nil, plugnmeet.StatusCode_INVALID_PARAMETERS, err
 		}
 		finalPath = filepath.Join(req.RoomSid, safeFilename)
 		fileMimeType = mType.String()
@@ -294,7 +297,7 @@ func (m *FileModel) UploadedFileMerge(req *plugnmeet.UploadedFileMergeReq) (*plu
 
 	res := &plugnmeet.UploadedFileRes{
 		Status:        true,
-		Msg:           "file uploaded successfully",
+		Msg:           config.MsgSuccess,
 		FileId:        fileId,
 		FileType:      req.FileType,
 		FileMimeType:  fileMimeType,
@@ -303,7 +306,7 @@ func (m *FileModel) UploadedFileMerge(req *plugnmeet.UploadedFileMergeReq) (*plu
 		FileExtension: fileExtension,
 	}
 
-	return res, nil
+	return res, plugnmeet.StatusCode_SUCCESS, nil
 }
 
 func (m *FileModel) combineResumableFiles(req *plugnmeet.UploadedFileMergeReq, chunksDir, safeFilename string) (string, error) {
@@ -368,11 +371,11 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 	locked, err := lock.TryLock(c.RequestCtx())
 	if err != nil {
 		log.WithError(err).Error("failed to acquire lock")
-		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, "failed to acquire lock")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, config.MsgFileUploadFailed)
 	}
 	if !locked {
 		log.Warn("another whiteboard file upload is already in progress")
-		return plugnmeet.StatusCode_CONFLICT, fiber.NewError(fiber.StatusConflict, "Another whiteboard file upload is already in progress for this room")
+		return plugnmeet.StatusCode_CONFLICT, fiber.NewError(fiber.StatusConflict, config.MsgFileUploadInProgress)
 	}
 	defer func() {
 		if fiberErr != nil {
@@ -387,7 +390,7 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 	if documentLink != "" {
 		// fast checking and return if error
 		if _, err := url.ParseRequestURI(documentLink); err != nil {
-			return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusBadRequest, "Invalid document_link provided")
+			return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusBadRequest, config.MsgFileInvalidDocumentLink)
 		}
 
 		gLog := m.logger.WithFields(logrus.Fields{
@@ -412,7 +415,7 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 		case err := <-errChan:
 			if err != nil {
 				gLog.WithError(err).Error("Failed to process file")
-				return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusBadRequest, err.Error())
+				return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, config.MsgFileConversionFailed)
 			}
 			gLog.Info("File successfully processed")
 		case <-c.RequestCtx().Done():
@@ -426,22 +429,23 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 	// The rest of the function handles direct file uploads
 	document, err := c.FormFile("document")
 	if err != nil {
-		return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusBadRequest, err.Error())
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusBadRequest, config.MsgFileInvalidRequest)
 	}
 
 	// Check file size before saving
 	if document.Size > int64(maxSize) {
-		return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.ErrRequestEntityTooLarge
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusRequestEntityTooLarge, config.MsgFileTooLarge)
 	}
 
 	f, err := document.Open()
 	if err != nil {
-		return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusBadRequest, err.Error())
+		log.WithError(err).Error("failed to open the uploaded document")
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusBadRequest, config.MsgFileUploadFailed)
 	}
 
 	// detectMimeTypeForValidation will run f.Close() in defer
 	if err := m.detectMimeTypeForValidation(f); err != nil {
-		return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusBadRequest, err.Error())
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusBadRequest, config.MsgFileTypeNotAllowed)
 	}
 
 	fileName := helpers.MakeSafeFilename(document.Filename, true)
@@ -450,11 +454,12 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 
 	if err := os.MkdirAll(filepath.Join(m.app.UploadFileSettings.Path, rf.RoomSid), 0755); err != nil {
 		log.WithError(err).Errorln("failed to create file directory")
-		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, "failed to create directory")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, config.MsgFileUploadFailed)
 	}
 
 	if err := c.SaveFile(document, finalFile); err != nil {
-		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, err.Error())
+		log.WithError(err).Errorln("failed to save the uploaded document")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, config.MsgFileUploadFailed)
 	}
 
 	// now we're good to for start converting, ConvertAndBroadcastWhiteboardFile expect savePath not full path
@@ -463,7 +468,8 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 			// process will continue in background
 			return plugnmeet.StatusCode_SUCCESS, nil
 		}
-		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, err.Error())
+		log.WithError(err).Errorln("failed to convert the uploaded document")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, config.MsgFileConversionFailed)
 	}
 
 	log.Infof("File %s successfully uploaded and broadcasted", fileName)
@@ -487,7 +493,7 @@ type WhiteboardPdfExportSliceUploadReq struct {
 func (m *FileModel) WhiteboardPdfExportSliceUpload(c fiber.Ctx, req *WhiteboardPdfExportSliceUploadReq) *fiber.Error {
 	req.ExportId = helpers.MakeSafeFilename(req.ExportId, false)
 	if req.ExportId == "" {
-		return fiber.NewError(fiber.StatusBadRequest, "invalid or empty export_id")
+		return fiber.NewError(fiber.StatusBadRequest, config.ErrFileInvalidRequest.Error())
 	}
 
 	log := m.logger.WithFields(logrus.Fields{
@@ -499,23 +505,24 @@ func (m *FileModel) WhiteboardPdfExportSliceUpload(c fiber.Ctx, req *WhiteboardP
 
 	file, err := c.FormFile("file")
 	if err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "missing 'file' in form-data")
+		return fiber.NewError(fiber.StatusBadRequest, config.ErrFileMissingFile.Error())
 	}
 
 	maxSize := m.app.UploadFileSettings.MaxSizeWhiteboardFile * 1024 * 1024
 	// Check file size before saving
 	if file.Size > int64(maxSize) {
-		return fiber.ErrRequestEntityTooLarge
+		return fiber.NewError(fiber.StatusRequestEntityTooLarge, config.ErrFileTooLarge.Error())
 	}
 
 	f, err := file.Open()
 	if err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "failed to open multipart file header")
+		log.WithError(err).Errorln("failed to open multipart file header")
+		return fiber.NewError(fiber.StatusBadRequest, config.ErrFileUploadFailed.Error())
 	}
 
 	// detectMimeTypeForValidation will run f.Close() in defer.
 	if err := m.detectMimeTypeForValidation(f); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		return fiber.NewError(fiber.StatusBadRequest, config.ErrFileTypeNotAllowed.Error())
 	}
 
 	fileName := helpers.MakeSafeFilename(file.Filename, true)
@@ -525,12 +532,12 @@ func (m *FileModel) WhiteboardPdfExportSliceUpload(c fiber.Ctx, req *WhiteboardP
 
 	if err := os.MkdirAll(exportSlicesDir, 0755); err != nil {
 		log.WithError(err).Error("failed to create export slices directory")
-		return fiber.NewError(fiber.StatusInternalServerError, "failed to create directory")
+		return fiber.NewError(fiber.StatusInternalServerError, config.ErrFileUploadFailed.Error())
 	}
 
 	if err := c.SaveFile(file, finalFile); err != nil {
 		log.WithError(err).Error("failed to save file")
-		return fiber.NewError(fiber.StatusInternalServerError, "failed to save file")
+		return fiber.NewError(fiber.StatusInternalServerError, config.ErrFileUploadFailed.Error())
 	}
 
 	// Trigger hook if configured.
@@ -544,7 +551,7 @@ func (m *FileModel) WhiteboardPdfExportSliceUpload(c fiber.Ctx, req *WhiteboardP
 		}
 		if _, err := m.app.Hooks.RunUploadHook(hookData, log); err != nil {
 			log.WithError(err).Error("upload hook 'upload' failed")
-			return fiber.NewError(fiber.StatusServiceUnavailable, "hook failed to upload file")
+			return fiber.NewError(fiber.StatusServiceUnavailable, config.ErrFileUploadFailed.Error())
 		}
 	}
 

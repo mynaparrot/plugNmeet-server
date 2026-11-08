@@ -328,7 +328,7 @@ func (m *RecordingModel) MergeRecordings(ctx context.Context, req *plugnmeet.Mer
 				return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, err
 			}
 			if roomInfo == nil {
-				return plugnmeet.StatusCode_ROOM_NOT_FOUND, config.ErrRoomNotFound
+				return plugnmeet.StatusCode_ROOM_NOT_FOUND, config.ErrRecordingRoomNotFound
 			}
 			// Set context for the rest of the function
 			roomId = roomInfo.RoomId

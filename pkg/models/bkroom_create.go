@@ -101,7 +101,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 
 	// auto-switch presenter because the later seeding flow needs presenter role
 	if !m.natsService.IsUserPresenter(r.RoomId, r.RequestedUserId) {
-		switchErr := m.um.SwitchPresenter(&plugnmeet.SwitchPresenterReq{
+		_, switchErr := m.um.SwitchPresenter(&plugnmeet.SwitchPresenterReq{
 			Task:            plugnmeet.SwitchPresenterTask_PROMOTE,
 			RoomId:          r.RoomId,
 			UserId:          r.RequestedUserId,
@@ -213,7 +213,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 		bRoom.Metadata = meta
 		// Step 6: capture the returned roomSid so it flows into the Redis hash,
 		// the create response, and downstream listRooms/myRooms consumers.
-		ari, err := m.rm.CreateRoom(userCtx, bRoom)
+		_, ari, err := m.rm.CreateRoom(userCtx, bRoom)
 
 		if err != nil {
 			roomLog.WithError(err).Error("Failed to create breakout room")

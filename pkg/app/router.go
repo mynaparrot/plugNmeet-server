@@ -130,8 +130,17 @@ func (r *Router) registerBaseRoutes() {
 	r.fiberApp.Use("/healthCheck", r.ctrl.HealthCheckController.HandleHealthCheck)
 }
 
+// markIntegrator classifies the request as coming from an external integration.
+// It is applied on the trusted route groups (/auth, /lti, /bbb) only, so the
+// handlers can answer with curated English instead of the client i18n keys
+// without ever trusting a client-supplied field.
+func (r *Router) markIntegrator(c fiber.Ctx) error {
+	c.Locals(config.LocalsCallerKey, config.CallerIntegrator)
+	return c.Next()
+}
+
 func (r *Router) registerLtiRoutes() {
-	lti := r.fiberApp.Group("/lti")
+	lti := r.fiberApp.Group("/lti", r.markIntegrator)
 	lti.Get("/v1", r.ctrl.LtiV1Controller.HandleLTIV1GETREQUEST)
 	lti.Post("/v1", r.ctrl.LtiV1Controller.HandleLTIV1Landing)
 	ltiV1API := lti.Group("/v1/api", r.ctrl.LtiV1Controller.HandleLTIV1VerifyHeaderToken)
@@ -144,7 +153,7 @@ func (r *Router) registerLtiRoutes() {
 }
 
 func (r *Router) registerAuthRoutes() {
-	auth := r.fiberApp.Group("/auth", r.ctrl.AuthController.HandleAuthHeaderCheck)
+	auth := r.fiberApp.Group("/auth", r.markIntegrator, r.ctrl.AuthController.HandleAuthHeaderCheck)
 	auth.Post("/getClientFiles", r.ctrl.FileController.HandleGetClientFiles)
 
 	room := auth.Group("/room")
@@ -186,7 +195,7 @@ func (r *Router) registerAuthRoutes() {
 }
 
 func (r *Router) registerBBBRoutes() {
-	bbb := r.fiberApp.Group("/:apiKey/bigbluebutton/api", r.ctrl.BBBController.HandleVerifyApiRequest)
+	bbb := r.fiberApp.Group("/:apiKey/bigbluebutton/api", r.markIntegrator, r.ctrl.BBBController.HandleVerifyApiRequest)
 	bbb.All("/create", r.ctrl.BBBController.HandleBBBCreate)
 	bbb.All("/join", r.ctrl.BBBController.HandleBBBJoin)
 	bbb.All("/isMeetingRunning", r.ctrl.BBBController.HandleBBBIsMeetingRunning)

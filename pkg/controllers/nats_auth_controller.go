@@ -45,14 +45,14 @@ func (s *NatsAuthController) Handle(r micro.Request) {
 	if len(xKey) > 0 {
 		if s.curveKeyPair == nil {
 			s.logger.Errorln("received encrypted data from nats server but curveKeyPair is nil")
-			_ = r.Error("500", "xKey not supported", nil)
+			_ = r.Error("500", config.ErrAuthUnexpected.Error(), nil)
 			return
 		}
 
 		data, err = s.curveKeyPair.Open(r.Data(), xKey)
 		if err != nil {
 			s.logger.WithError(err).Errorln("error decrypting message from nats server")
-			_ = r.Error("500", err.Error(), nil)
+			_ = r.Error("500", config.ErrAuthUnexpected.Error(), nil)
 			return
 		}
 	} else {
@@ -62,7 +62,7 @@ func (s *NatsAuthController) Handle(r micro.Request) {
 	rc, err := jwt.DecodeAuthorizationRequestClaims(string(data))
 	if err != nil {
 		s.logger.WithError(err).Errorln("error decoding authorization request")
-		_ = r.Error("500", err.Error(), nil)
+		_ = r.Error("500", config.ErrAuthUnexpected.Error(), nil)
 		return
 	}
 
@@ -71,12 +71,17 @@ func (s *NatsAuthController) Handle(r micro.Request) {
 
 	claims, err := s.handleClaims(rc)
 	if err != nil {
-		s.logger.WithError(err).Errorln("error handling claims")
+		// operational failures are logged where they happen, so only the key is
+		// sent back here
 		s.respond(r, userNkey, serverId, "", err)
 		return
 	}
 
 	token, err := s.validateAndSign(claims, s.issuerKeyPair)
+	if err != nil {
+		s.logger.WithError(err).Errorln("error validating or signing user claims")
+		err = config.ErrAuthUnexpected
+	}
 	s.respond(r, userNkey, serverId, token, err)
 }
 
@@ -87,12 +92,13 @@ func (s *NatsAuthController) handleClaims(req *jwt.AuthorizationRequestClaims) (
 	// check the info first
 	data, err := s.authModel.VerifyPlugNmeetAccessToken(req.ConnectOptions.Token, 0)
 	if err != nil {
-		return nil, err
+		return nil, models.TokenVerifyError(err)
 	}
 
 	marshal, err := protojson.Marshal(data)
 	if err != nil {
-		return nil, err
+		s.logger.WithError(err).Errorln("error marshalling token claims")
+		return nil, config.ErrAuthUnexpected
 	}
 	// Before we were using Auth tokens as default name but NATS v2.10.28 & v2.11.2 (#6808) Auth tokens are now redacted.
 	// So we'll add plain user info here otherwise user CONNECT & DISCONNECT logics will be breaking.
@@ -143,34 +149,38 @@ func (s *NatsAuthController) setPermissionForClient(data *plugnmeet.PlugNmeetTok
 	userId := data.GetUserId()
 
 	if s.natsService.IsUserExistInBlockList(roomId, userId) {
-		return fmt.Errorf("user %s is in block list", userId)
+		return config.ErrAuthUserBlocked
 	}
 
 	userInfo, err := s.natsService.GetUserInfo(roomId, userId)
 	if err != nil {
-		return err
+		s.logUserFailure(roomId, userId, "failed to fetch user info", err)
+		return config.ErrAuthUnexpected
 	}
 	if userInfo == nil {
-		return fmt.Errorf("user info not found for userId: %s, roomId: %s", userId, roomId)
+		return config.ErrAuthUserInfoNotFound
 	}
 
 	status, err := s.natsService.GetRoomUserStatus(roomId, userId)
 	if err != nil {
-		return err
+		s.logUserFailure(roomId, userId, "failed to fetch room user status", err)
+		return config.ErrAuthUnexpected
 	}
 	if status == natsservice.UserStatusRemoved || status == "" {
-		return fmt.Errorf("user %s is not active (status: %s)", userId, status)
+		return config.ErrAuthUserNotActive
 	}
 
 	meta, err := s.natsService.UnmarshalUserMetadata(userInfo.Metadata)
 	if err != nil {
-		return err
+		s.logUserFailure(roomId, userId, "failed to unmarshal user metadata", err)
+		return config.ErrAuthUnexpected
 	}
 	waitForApproval := meta.GetWaitForApproval()
 
 	stream, durableName, err := s.natsService.CreateUserConsumer(roomId, userId, waitForApproval)
 	if err != nil {
-		return err
+		s.logUserFailure(roomId, userId, "failed to create user consumer", err)
+		return config.ErrAuthUnexpected
 	}
 
 	pubAllow := jwt.StringList{
@@ -215,12 +225,22 @@ func (s *NatsAuthController) setPermissionForClient(data *plugnmeet.PlugNmeetTok
 	return nil
 }
 
-func (s *NatsAuthController) respond(req micro.Request, userNKey, serverId, userJWT string, err error) {
+// logUserFailure logs an operational auth failure once, at the failure site.
+func (s *NatsAuthController) logUserFailure(roomId, userId, msg string, err error) {
+	s.logger.WithFields(logrus.Fields{
+		"roomId": roomId,
+		"userId": userId,
+	}).WithError(err).Error(msg)
+}
+
+// respond answers the authorization request. authErr must be one of the
+// config.ErrAuth* key sentinels, so the client always receives a translation key.
+func (s *NatsAuthController) respond(req micro.Request, userNKey, serverId, userJWT string, authErr error) {
 	rc := jwt.NewAuthorizationResponseClaims(userNKey)
 	rc.Audience = serverId
 	rc.Jwt = userJWT
-	if err != nil {
-		rc.Error = err.Error()
+	if authErr != nil {
+		rc.Error = authErr.Error()
 	}
 
 	token, err := rc.Encode(s.issuerKeyPair)

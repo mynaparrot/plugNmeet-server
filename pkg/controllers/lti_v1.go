@@ -12,17 +12,11 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/sirupsen/logrus"
 	"go.uber.org/fx"
 )
 
 const (
-	// Error messages
-	errAuthorizationHeaderMissing = "Authorization header is missing"
-	errInvalidAuthorizationHeader = "invalid authorization header"
-	errOnlyAdminCanPerform        = "only admin can perform this"
-	errPleaseUsePostRequest       = "please use POST request"
-	errRoomIdMissing              = "room id is missing"
-
 	// Context keys
 	ctxKeyRoomID       = "roomId"
 	ctxKeyRoomTitle    = "roomTitle"
@@ -35,6 +29,7 @@ const (
 // LtiV1Controller holds dependencies for LTI v1 related handlers.
 type LtiV1Controller struct {
 	app            *config.AppConfig
+	logger         *logrus.Entry
 	LtiV1Model     *models.LtiV1Model
 	RoomModel      *models.RoomModel
 	RecordingModel *models.RecordingModel
@@ -46,12 +41,14 @@ type LtiV1ControllerArgs struct {
 	LtiV1Model     *models.LtiV1Model
 	RoomModel      *models.RoomModel
 	RecordingModel *models.RecordingModel
+	Logger         *logrus.Logger
 }
 
 // NewLtiV1Controller creates a new LtiV1Controller.
 func NewLtiV1Controller(args LtiV1ControllerArgs) *LtiV1Controller {
 	return &LtiV1Controller{
 		app:            args.App,
+		logger:         args.Logger.WithField("controller", "lti_v1"),
 		LtiV1Model:     args.LtiV1Model,
 		RoomModel:      args.RoomModel,
 		RecordingModel: args.RecordingModel,
@@ -62,7 +59,7 @@ func NewLtiV1Controller(args LtiV1ControllerArgs) *LtiV1Controller {
 func (lc *LtiV1Controller) HandleLTIV1Landing(c fiber.Ctx) error {
 	b := c.Body()
 	if len(b) == 0 {
-		return c.Status(fiber.StatusUnauthorized).SendString("empty body")
+		return c.Status(fiber.StatusUnauthorized).SendString(config.MsgLTIEmptyBody)
 	}
 
 	hostName := c.Hostname()
@@ -88,24 +85,44 @@ func (lc *LtiV1Controller) HandleLTIV1Landing(c fiber.Ctx) error {
 
 	signingURL := fmt.Sprintf("%s://%s%s", proto, hostName, c.Path())
 
-	return lc.LtiV1Model.LTIV1Landing(c, string(b), signingURL)
+	if err := lc.LtiV1Model.LTIV1Landing(c, string(b), signingURL); err != nil {
+		// the model errors are internal sentinels or dependency text, so they are
+		// only logged here and never answered to the LTI consumer
+		lc.logger.WithError(err).Errorln("lti v1 landing failed")
+		status, msg := ltiLandingErrorResponse(err)
+		return sendErrorResponse(c, status, msg)
+	}
+
+	return nil
+}
+
+// ltiLandingErrorResponse classifies a launch failure into a status and curated
+// English text; unknown errors fall back to the generic integrator message.
+func ltiLandingErrorResponse(err error) (int, string) {
+	switch {
+	case errors.Is(err, config.InvalidConsumerKey), errors.Is(err, config.VerificationFailed):
+		return fiber.StatusUnauthorized, config.MsgLTILaunchVerificationFailed
+	case errors.Is(err, config.UserIdOrEmailRequired):
+		return fiber.StatusBadRequest, config.MsgLTIInvalidRequest
+	}
+	return fiber.StatusInternalServerError, config.MsgIntegratorUnexpected
 }
 
 // HandleLTIV1GETREQUEST handles GET requests to LTI endpoints, which are not allowed.
 func (lc *LtiV1Controller) HandleLTIV1GETREQUEST(c fiber.Ctx) error {
-	return sendErrorResponse(c, fiber.StatusMethodNotAllowed, errPleaseUsePostRequest)
+	return sendErrorResponse(c, fiber.StatusMethodNotAllowed, config.MsgLTIPostRequired)
 }
 
 // HandleLTIV1VerifyHeaderToken is a middleware to verify the LTI Authorization header token.
 func (lc *LtiV1Controller) HandleLTIV1VerifyHeaderToken(c fiber.Ctx) error {
 	authToken := c.Get("Authorization")
 	if authToken == "" {
-		return sendErrorResponse(c, fiber.StatusUnauthorized, errAuthorizationHeaderMissing)
+		return sendErrorResponse(c, fiber.StatusUnauthorized, config.MsgLTIAuthorizationHeaderMissing)
 	}
 
 	auth, err := lc.LtiV1Model.LTIV1VerifyHeaderToken(authToken)
 	if err != nil {
-		return sendErrorResponse(c, fiber.StatusUnauthorized, errInvalidAuthorizationHeader)
+		return sendErrorResponse(c, fiber.StatusUnauthorized, config.MsgLTIInvalidAuthorizationHeader)
 	}
 
 	c.Locals(ctxKeyRoomID, auth.RoomId)
@@ -128,12 +145,14 @@ func (lc *LtiV1Controller) HandleLTIV1VerifyHeaderToken(c fiber.Ctx) error {
 func (lc *LtiV1Controller) HandleLTIV1IsRoomActive(c fiber.Ctx) error {
 	roomId := fiber.Locals[string](c, ctxKeyRoomID)
 	if roomId == "" {
-		return sendErrorResponse(c, fiber.StatusBadRequest, errRoomIdMissing)
+		return sendErrorResponse(c, fiber.StatusBadRequest, config.MsgLTIRoomIdMissing)
 	}
 
 	res, _, _ := lc.RoomModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{
 		RoomId: roomId,
 	})
+	// the model answers with the client success key, integrators get plain English
+	res.Msg = callerMsg(c, res.GetMsg())
 
 	return utils.SendProtoJsonResponse(c, res)
 }
@@ -157,12 +176,13 @@ func (lc *LtiV1Controller) HandleLTIV1JoinRoom(c fiber.Ctx) error {
 
 	token, err := lc.LtiV1Model.LTIV1JoinRoom(c.RequestCtx(), claim)
 	if err != nil {
-		return sendErrorResponse(c, fiber.StatusInternalServerError, err.Error())
+		// the model logged the operational error
+		return sendErrorResponse(c, fiber.StatusInternalServerError, config.MsgLTIRoomJoinFailed)
 	}
 
 	return c.JSON(fiber.Map{
 		"status": true,
-		"msg":    "success",
+		"msg":    config.MsgIntegratorSuccess,
 		"token":  token,
 	})
 }
@@ -170,20 +190,25 @@ func (lc *LtiV1Controller) HandleLTIV1JoinRoom(c fiber.Ctx) error {
 // HandleLTIV1EndRoom handles ending an LTI room session.
 func (lc *LtiV1Controller) HandleLTIV1EndRoom(c fiber.Ctx) error {
 	if isAdmin, ok := c.Locals(ctxKeyIsAdmin).(bool); !ok || !isAdmin {
-		return sendErrorResponse(c, fiber.StatusForbidden, errOnlyAdminCanPerform)
+		return sendErrorResponse(c, fiber.StatusForbidden, config.MsgLTIOnlyAdmin)
 	}
 
 	roomId, ok := c.Locals(ctxKeyRoomID).(string)
 	if !ok || roomId == "" {
-		return sendErrorResponse(c, fiber.StatusBadRequest, errRoomIdMissing)
+		return sendErrorResponse(c, fiber.StatusBadRequest, config.MsgLTIRoomIdMissing)
 	}
-	status, msg, _ := lc.RoomModel.EndRoom(c.RequestCtx(), &plugnmeet.RoomEndReq{
+	// the client-facing "room ended" notice is broadcast by the model; the LTI
+	// consumer gets its own curated answer and never sees a client i18n key
+	status, _, _ := lc.RoomModel.EndRoom(c.RequestCtx(), &plugnmeet.RoomEndReq{
 		RoomId: roomId,
 	})
+	if !status {
+		return sendErrorResponse(c, fiber.StatusInternalServerError, config.MsgLTIRoomEndFailed)
+	}
 
 	return c.JSON(fiber.Map{
-		"status": status,
-		"msg":    msg,
+		"status": true,
+		"msg":    config.MsgIntegratorSuccess,
 	})
 }
 
@@ -191,25 +216,25 @@ func (lc *LtiV1Controller) HandleLTIV1EndRoom(c fiber.Ctx) error {
 func (lc *LtiV1Controller) HandleLTIV1FetchRecordings(c fiber.Ctx) error {
 	req := new(plugnmeet.FetchRecordingsReq)
 	if err := c.Bind().Body(req); err != nil {
-		return sendErrorResponse(c, fiber.StatusBadRequest, err.Error())
+		return sendErrorResponse(c, fiber.StatusBadRequest, config.MsgLTIInvalidRequest)
 	}
 
 	roomId, ok := c.Locals(ctxKeyRoomID).(string)
 	if !ok || roomId == "" {
-		return sendErrorResponse(c, fiber.StatusBadRequest, errRoomIdMissing)
+		return sendErrorResponse(c, fiber.StatusBadRequest, config.MsgLTIRoomIdMissing)
 	}
 	req.RoomIds = []string{roomId}
 	result, err := lc.RecordingModel.FetchRecordings(req)
 	if err != nil {
 		if errors.Is(err, config.NotFoundErr) {
-			return sendErrorResponse(c, fiber.StatusNotFound, "no recording found")
+			return sendErrorResponse(c, fiber.StatusNotFound, config.MsgLTIRecordingNotFound)
 		}
-		return sendErrorResponse(c, fiber.StatusInternalServerError, err.Error())
+		return sendErrorResponse(c, fiber.StatusInternalServerError, config.MsgLTIRecordingsFetchFailed)
 	}
 
 	return c.JSON(fiber.Map{
 		"status": true,
-		"msg":    "success",
+		"msg":    config.MsgIntegratorSuccess,
 		"result": result,
 	})
 }
@@ -218,74 +243,84 @@ func (lc *LtiV1Controller) HandleLTIV1FetchRecordings(c fiber.Ctx) error {
 func (lc *LtiV1Controller) HandleLTIV1GetRecordingDownloadToken(c fiber.Ctx) error {
 	roomId, ok := c.Locals(ctxKeyRoomID).(string)
 	if !ok || roomId == "" {
-		return sendErrorResponse(c, fiber.StatusBadRequest, errRoomIdMissing)
+		return sendErrorResponse(c, fiber.StatusBadRequest, config.MsgLTIRoomIdMissing)
 	}
 
 	req := new(plugnmeet.GetDownloadTokenReq)
 	if err := c.Bind().Body(req); err != nil {
-		return sendErrorResponse(c, fiber.StatusBadRequest, err.Error())
+		return sendErrorResponse(c, fiber.StatusBadRequest, config.MsgLTIInvalidRequest)
 	}
 
 	recording, err := lc.RecordingModel.FetchRecording(req.RecordId)
 	if err != nil {
-		if errors.Is(err, config.NotFoundErr) {
-			return sendErrorResponse(c, fiber.StatusNotFound, "recording not found")
+		status, msg := ltiRecordingFetchErrorResponse(err)
+		if status != fiber.StatusNotFound {
+			lc.logger.WithError(err).WithField("recordId", req.RecordId).Errorln("failed to fetch recording")
 		}
-		return sendErrorResponse(c, fiber.StatusInternalServerError, err.Error())
+		return sendErrorResponse(c, status, msg)
 	}
 	if recording.RoomId != roomId {
-		return sendErrorResponse(c, fiber.StatusNotFound, "recording not found")
+		return sendErrorResponse(c, fiber.StatusNotFound, config.MsgLTIRecordingNotFound)
 	}
 
 	token, err := lc.RecordingModel.CreateTokenForDownload(recording.FilePath)
 	if err != nil {
-		return sendErrorResponse(c, fiber.StatusInternalServerError, err.Error())
+		return sendErrorResponse(c, fiber.StatusInternalServerError, config.MsgLTIDownloadTokenFailed)
 	}
 
 	return c.JSON(fiber.Map{
 		"status": true,
-		"msg":    "success",
+		"msg":    config.MsgIntegratorSuccess,
 		"token":  token,
 	})
+}
+
+// ltiRecordingFetchErrorResponse maps a FetchRecording error: only a NotFoundErr
+// means the recording is missing, anything else is an operational failure.
+func ltiRecordingFetchErrorResponse(err error) (int, string) {
+	if errors.Is(err, config.NotFoundErr) {
+		return fiber.StatusNotFound, config.MsgLTIRecordingNotFound
+	}
+	return fiber.StatusInternalServerError, config.MsgLTIRecordingFetchFailed
 }
 
 // HandleLTIV1DeleteRecordings deletes a recording for an LTI room.
 func (lc *LtiV1Controller) HandleLTIV1DeleteRecordings(c fiber.Ctx) error {
 	if isAdmin, ok := c.Locals(ctxKeyIsAdmin).(bool); !ok || !isAdmin {
-		return sendErrorResponse(c, fiber.StatusForbidden, errOnlyAdminCanPerform)
+		return sendErrorResponse(c, fiber.StatusForbidden, config.MsgLTIOnlyAdmin)
 	}
 
 	roomId, ok := c.Locals(ctxKeyRoomID).(string)
 	if !ok || roomId == "" {
-		return sendErrorResponse(c, fiber.StatusBadRequest, errRoomIdMissing)
+		return sendErrorResponse(c, fiber.StatusBadRequest, config.MsgLTIRoomIdMissing)
 	}
 
 	req := new(plugnmeet.DeleteRecordingReq)
 	if err := c.Bind().Body(req); err != nil {
-		return sendErrorResponse(c, fiber.StatusBadRequest, err.Error())
+		return sendErrorResponse(c, fiber.StatusBadRequest, config.MsgLTIInvalidRequest)
 	}
 
 	recording, err := lc.RecordingModel.FetchRecording(req.RecordId)
 	if err != nil {
 		if errors.Is(err, config.NotFoundErr) {
-			return sendErrorResponse(c, fiber.StatusNotFound, "recording not found")
+			return sendErrorResponse(c, fiber.StatusNotFound, config.MsgLTIRecordingNotFound)
 		}
-		return sendErrorResponse(c, fiber.StatusInternalServerError, err.Error())
+		return sendErrorResponse(c, fiber.StatusInternalServerError, config.MsgLTIRecordingDeleteFailed)
 	}
 	if recording.RoomId != roomId {
-		return sendErrorResponse(c, fiber.StatusNotFound, "recording not found")
+		return sendErrorResponse(c, fiber.StatusNotFound, config.MsgLTIRecordingNotFound)
 	}
 
 	if err := lc.RecordingModel.DeleteRecording(req); err != nil {
 		if errors.Is(err, config.NotFoundErr) {
-			return sendErrorResponse(c, fiber.StatusNotFound, "recording not found")
+			return sendErrorResponse(c, fiber.StatusNotFound, config.MsgLTIRecordingNotFound)
 		}
-		return sendErrorResponse(c, fiber.StatusInternalServerError, err.Error())
+		return sendErrorResponse(c, fiber.StatusInternalServerError, config.MsgLTIRecordingDeleteFailed)
 	}
 
 	return c.JSON(fiber.Map{
 		"status": true,
-		"msg":    "success",
+		"msg":    config.MsgIntegratorSuccess,
 	})
 }
 

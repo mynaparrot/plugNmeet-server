@@ -2,11 +2,11 @@ package models
 
 import (
 	"errors"
-	"fmt"
 	"net/url"
 	"strings"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/sirupsen/logrus"
 )
 
@@ -24,7 +24,7 @@ func validateExternalUrl(rawUrl string) error {
 	return nil
 }
 
-func (m *RoomModel) HandleExternalDisplayTask(req *plugnmeet.ExternalDisplayLinkReq) error {
+func (m *RoomModel) HandleExternalDisplayTask(req *plugnmeet.ExternalDisplayLinkReq) (plugnmeet.StatusCode, error) {
 	switch req.Task {
 	case plugnmeet.ExternalDisplayLinkTask_START_EXTERNAL_LINK:
 		return m.startExternalDisplay(req)
@@ -32,10 +32,14 @@ func (m *RoomModel) HandleExternalDisplayTask(req *plugnmeet.ExternalDisplayLink
 		return m.endExternalDisplay(req)
 	}
 
-	return fmt.Errorf("not valid request")
+	m.logger.WithFields(logrus.Fields{
+		"roomId": req.RoomId,
+		"task":   req.Task.String(),
+	}).Warnln("invalid external display task")
+	return plugnmeet.StatusCode_INVALID_PARAMETERS, config.ErrRoomInvalidRequest
 }
 
-func (m *RoomModel) startExternalDisplay(req *plugnmeet.ExternalDisplayLinkReq) error {
+func (m *RoomModel) startExternalDisplay(req *plugnmeet.ExternalDisplayLinkReq) (plugnmeet.StatusCode, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId": req.RoomId,
 		"userId": req.UserId,
@@ -45,13 +49,12 @@ func (m *RoomModel) startExternalDisplay(req *plugnmeet.ExternalDisplayLinkReq) 
 	log.Infoln("request to start external display link")
 
 	if req.Url == nil || *req.Url == "" {
-		err := errors.New("valid url required")
-		log.WithError(err).Warnln()
-		return err
+		log.Warnln("valid url required")
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, config.ErrRoomInvalidUrl
 	}
 	if err := validateExternalUrl(*req.Url); err != nil {
-		log.WithError(err).Warnln()
-		return err
+		log.WithError(err).Warnln("invalid external display url")
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, config.ErrRoomInvalidUrl
 	}
 
 	opts := &updateRoomMetadataOpts{
@@ -62,7 +65,7 @@ func (m *RoomModel) startExternalDisplay(req *plugnmeet.ExternalDisplayLinkReq) 
 	return m.updateExternalDisplayRoomMetadata(req.RoomId, opts, log)
 }
 
-func (m *RoomModel) endExternalDisplay(req *plugnmeet.ExternalDisplayLinkReq) error {
+func (m *RoomModel) endExternalDisplay(req *plugnmeet.ExternalDisplayLinkReq) (plugnmeet.StatusCode, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId": req.RoomId,
 		"userId": req.UserId,
@@ -76,17 +79,16 @@ func (m *RoomModel) endExternalDisplay(req *plugnmeet.ExternalDisplayLinkReq) er
 	return m.updateExternalDisplayRoomMetadata(req.RoomId, opts, log)
 }
 
-func (m *RoomModel) updateExternalDisplayRoomMetadata(roomId string, opts *updateRoomMetadataOpts, log *logrus.Entry) error {
+func (m *RoomModel) updateExternalDisplayRoomMetadata(roomId string, opts *updateRoomMetadataOpts, log *logrus.Entry) (plugnmeet.StatusCode, error) {
 	log.Info("updating room metadata for external display")
 	roomMeta, err := m.natsService.GetRoomMetadataStruct(roomId)
 	if err != nil {
 		log.WithError(err).Error("failed to get room metadata")
-		return err
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrRoomUnexpectedError
 	}
 	if roomMeta == nil {
-		err = errors.New("invalid nil room metadata information")
-		log.WithError(err).Error()
-		return err
+		log.Error("room metadata not found")
+		return plugnmeet.StatusCode_ROOM_NOT_FOUND, config.ErrRoomNotFound
 	}
 
 	if opts.isActive != nil {
@@ -120,9 +122,10 @@ func (m *RoomModel) updateExternalDisplayRoomMetadata(roomId string, opts *updat
 
 	m.analyticsModel.HandleEvent(d)
 
-	if err == nil {
-		log.Info("Successfully updated room metadata")
+	if err != nil {
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrRoomUnexpectedError
 	}
 
-	return err
+	log.Info("Successfully updated room metadata")
+	return plugnmeet.StatusCode_SUCCESS, nil
 }

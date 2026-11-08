@@ -35,7 +35,7 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 	// Wait until any ongoing room creation or ending in process to complete first to avoid race conditions.
 	if errWait := waitUntilRoomCreationCompletes(ctx, m.rs, roomID, m.logger); errWait != nil {
 		log.WithError(errWait).Error("Cannot end room as it's locked during creation")
-		return false, "failed to end room, it may be starting", plugnmeet.StatusCode_INTERNAL_SERVER_ERROR
+		return false, config.ErrRoomEndFailed.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR
 	}
 
 	// The lock spans the whole end + analytics pipeline, blocking re-creation until
@@ -45,11 +45,11 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 
 	if errLock != nil {
 		log.WithError(errLock).Error("Redis error acquiring room-end lock")
-		return false, "failed to end room", plugnmeet.StatusCode_INTERNAL_SERVER_ERROR
+		return false, config.ErrRoomEndFailed.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR
 	}
 	if !lockAcquired {
 		log.Warn("Could not acquire room-end lock. Another end-room process is likely already running.")
-		return true, "success", plugnmeet.StatusCode_SUCCESS
+		return true, config.MsgSuccess, plugnmeet.StatusCode_SUCCESS
 	}
 
 	log.WithField("lockVal", lockVal).Info("Room-end lock acquired")
@@ -65,12 +65,13 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 		roomDbInfo, dbErr := m.ds.GetRoomInfoByRoomId(roomID, 1) // Using 1 for active
 		if dbErr != nil {
 			// an error occurred, we must release the lock.
+			log.WithError(dbErr).Error("DB error fetching room info during EndRoom")
 			_ = m.rs.UnlockRoomCreation(ctx, roomID, lockVal)
-			return false, "failed to end room", plugnmeet.StatusCode_INTERNAL_SERVER_ERROR
+			return false, config.ErrRoomEndFailed.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR
 		}
 		if roomDbInfo == nil || roomDbInfo.ID == 0 {
 			_ = m.rs.UnlockRoomCreation(ctx, roomID, lockVal)
-			return false, "room not found or not active", plugnmeet.StatusCode_ROOM_NOT_FOUND
+			return false, config.ErrRoomNotFound.Error(), plugnmeet.StatusCode_ROOM_NOT_FOUND
 		}
 		if roomDbInfo.IsRunning == 1 {
 			log.Warn("Room active in DB but not in NATS during EndRoom. Marking as ended and cleaning up.")
@@ -87,7 +88,7 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 			log.Warn("Room found in DB but already marked as not running. Releasing lock.")
 			_ = m.rs.UnlockRoomCreation(ctx, roomID, lockVal)
 		}
-		return true, "success", plugnmeet.StatusCode_SUCCESS
+		return true, config.MsgSuccess, plugnmeet.StatusCode_SUCCESS
 	}
 
 	// Temporarily cache the live room data in Redis.
@@ -119,7 +120,7 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 		started:    started,
 		lockVal:    lockVal,
 	})
-	return true, "success", plugnmeet.StatusCode_SUCCESS
+	return true, config.MsgSuccess, plugnmeet.StatusCode_SUCCESS
 }
 
 // onAfterRoomEnded performs all the necessary tasks after a room has ended.

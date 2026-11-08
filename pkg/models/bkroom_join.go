@@ -85,7 +85,7 @@ func (m *BreakoutRoomModel) JoinBreakoutRoom(ctx context.Context, r *plugnmeet.J
 			UserMetadata: meta,
 		},
 	}
-	token, err := m.um.GetPNMJoinToken(ctx, req, false)
+	_, token, err := m.um.GetPNMJoinToken(ctx, req, false)
 	if err != nil {
 		log.WithError(err).Error("failed to generate join token for breakout room")
 		return "", config.ErrBkRoomUnexpectedError

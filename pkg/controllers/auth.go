@@ -5,10 +5,8 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
-	"errors"
 	"strings"
 
-	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
@@ -16,6 +14,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/version"
+	"github.com/sirupsen/logrus"
 	"go.uber.org/fx"
 	"google.golang.org/protobuf/proto"
 )
@@ -26,6 +25,7 @@ type AuthController struct {
 	AuthModel   *models.AuthModel
 	RoomModel   *models.RoomModel
 	NatsService *natsservice.NatsService
+	Logger      *logrus.Entry
 }
 
 type AuthControllerArgs struct {
@@ -34,6 +34,7 @@ type AuthControllerArgs struct {
 	AuthModel   *models.AuthModel
 	RoomModel   *models.RoomModel
 	NatsService *natsservice.NatsService
+	Logger      *logrus.Logger
 }
 
 // NewAuthController creates a new AuthController.
@@ -43,6 +44,7 @@ func NewAuthController(args AuthControllerArgs) *AuthController {
 		AuthModel:   args.AuthModel,
 		RoomModel:   args.RoomModel,
 		NatsService: args.NatsService,
+		Logger:      args.Logger.WithField("controller", "auth"),
 	}
 }
 
@@ -52,17 +54,14 @@ func (ac *AuthController) HandleAuthHeaderCheck(c fiber.Ctx) error {
 	signature := c.Get("HASH-SIGNATURE")
 
 	if apiKey == "" {
-		c.Status(fiber.StatusUnauthorized)
-		return ac.sendVerificationRes(c, false, "Missing API-KEY header.", plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER)
+		return ac.sendAuthError(c, config.ErrAuthS2SApiKeyMissing, plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER)
 	}
 	if subtle.ConstantTimeCompare([]byte(apiKey), []byte(ac.AppConfig.Client.ApiKey)) != 1 {
-		c.Status(fiber.StatusUnauthorized)
-		return ac.sendVerificationRes(c, false, "Invalid API key provided.", plugnmeet.StatusCode_INVALID_API_KEY)
+		return ac.sendAuthError(c, config.ErrAuthS2SApiKeyInvalid, plugnmeet.StatusCode_INVALID_API_KEY)
 	}
 
 	if signature == "" {
-		c.Status(fiber.StatusUnauthorized)
-		return ac.sendVerificationRes(c, false, "Missing HASH-SIGNATURE header.", plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER)
+		return ac.sendAuthError(c, config.ErrAuthS2SSignatureMissing, plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER)
 	}
 
 	mac := hmac.New(sha256.New, []byte(ac.AppConfig.Client.Secret))
@@ -72,8 +71,7 @@ func (ac *AuthController) HandleAuthHeaderCheck(c fiber.Ctx) error {
 		roomId := c.Get(config.HeaderRoomId)
 		if roomId == "" {
 			// The client MUST send Room-Id for the signature contract to be met.
-			c.Status(fiber.StatusUnauthorized)
-			return ac.sendVerificationRes(c, false, "Missing Room-Id header for multipart request.", plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER)
+			return ac.sendAuthError(c, config.ErrAuthS2SRoomIdHeaderMissing, plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER)
 		}
 		mac.Write([]byte(roomId))
 	} else {
@@ -83,8 +81,7 @@ func (ac *AuthController) HandleAuthHeaderCheck(c fiber.Ctx) error {
 
 	expectedSignature := hex.EncodeToString(mac.Sum(nil))
 	if subtle.ConstantTimeCompare([]byte(expectedSignature), []byte(signature)) != 1 {
-		c.Status(fiber.StatusUnauthorized)
-		return ac.sendVerificationRes(c, false, "Failed to verify provided authentication details.", plugnmeet.StatusCode_INVALID_TOKEN_OR_SIGNATURE)
+		return ac.sendAuthError(c, config.ErrAuthS2SSignatureInvalid, plugnmeet.StatusCode_INVALID_TOKEN_OR_SIGNATURE)
 	}
 
 	return c.Next()
@@ -98,26 +95,15 @@ func (ac *AuthController) HandleVerifyHeaderToken(c fiber.Ctx) error {
 		authToken = c.FormValue("Authorization")
 	}
 
-	errStatus := fiber.StatusUnauthorized
 	path := c.Path()
-	if strings.Contains(path, "fileUpload") {
-		// mostly to handle resumable.js path
-		errStatus = fiber.StatusBadRequest
-	}
 
 	if authToken == "" {
-		_ = c.SendStatus(errStatus)
-		return ac.sendVerificationRes(c, false, "notifications.auth-header-missing", plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER)
+		return ac.sendAuthError(c, config.ErrAuthHeaderMissing, plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER)
 	}
 
 	claims, err := ac.AuthModel.VerifyPlugNmeetAccessToken(authToken, 0)
 	if err != nil {
-		_ = c.SendStatus(errStatus)
-		errMsg := "notifications.invalid-token"
-		if errors.Is(err, jwt.ErrExpired) {
-			errMsg = "notifications.token-expired"
-		}
-		return ac.sendVerificationRes(c, false, errMsg, plugnmeet.StatusCode_INVALID_TOKEN_OR_SIGNATURE)
+		return ac.sendAuthError(c, models.TokenVerifyError(err), plugnmeet.StatusCode_INVALID_TOKEN_OR_SIGNATURE)
 	}
 
 	// Let the "return to main room" route reach the handler even for an ended
@@ -132,41 +118,36 @@ func (ac *AuthController) HandleVerifyHeaderToken(c fiber.Ctx) error {
 
 	rf, err := ac.NatsService.GetRoomInfo(claims.RoomId)
 	if err != nil {
-		_ = c.SendStatus(errStatus)
-		return ac.sendVerificationRes(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
+		ac.logAuthFailure(claims.RoomId, claims.UserId, "failed to fetch room info", err)
+		return ac.sendAuthError(c, config.ErrAuthUnexpected, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 	if rf == nil || rf.DbTableId == 0 || !ac.NatsService.IsRoomStatusActive(rf.Status) {
-		_ = c.SendStatus(errStatus)
-		return ac.sendVerificationRes(c, false, "notifications.room-not-active", plugnmeet.StatusCode_ROOM_NOT_FOUND)
+		return ac.sendAuthError(c, config.ErrAuthRoomNotActive, plugnmeet.StatusCode_ROOM_NOT_ACTIVE)
 	}
 
 	if ac.NatsService.IsUserExistInBlockList(claims.RoomId, claims.UserId) {
-		_ = c.SendStatus(errStatus)
-		return ac.sendVerificationRes(c, false, "notifications.you-are-blocked", plugnmeet.StatusCode_USER_BLOCKED)
+		return ac.sendAuthError(c, config.ErrAuthUserBlocked, plugnmeet.StatusCode_USER_BLOCKED)
 	}
 
 	if !strings.HasSuffix(path, "/verifyToken") && !strings.HasSuffix(path, "/getClientFiles") {
 		status, err := ac.NatsService.GetRoomUserStatus(claims.RoomId, claims.UserId)
 		if err != nil {
-			_ = c.SendStatus(errStatus)
-			return ac.sendVerificationRes(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
+			ac.logAuthFailure(claims.RoomId, claims.UserId, "failed to fetch room user status", err)
+			return ac.sendAuthError(c, config.ErrAuthUnexpected, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 		}
 		if status != natsservice.UserStatusOnline {
-			_ = c.SendStatus(errStatus)
-			return ac.sendVerificationRes(c, false, "notifications.user-not-active", plugnmeet.StatusCode_USER_NOT_ACTIVE)
+			return ac.sendAuthError(c, config.ErrAuthUserNotActive, plugnmeet.StatusCode_USER_NOT_ACTIVE)
 		}
 		meta, err := ac.NatsService.GetUserMetadataStruct(claims.RoomId, claims.UserId)
 		if err != nil {
-			_ = c.SendStatus(errStatus)
-			return ac.sendVerificationRes(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
+			ac.logAuthFailure(claims.RoomId, claims.UserId, "failed to fetch user metadata", err)
+			return ac.sendAuthError(c, config.ErrAuthUnexpected, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 		}
 		if meta == nil {
-			_ = c.SendStatus(errStatus)
-			return ac.sendVerificationRes(c, false, "notifications.user-not-active", plugnmeet.StatusCode_USER_NOT_ACTIVE)
+			return ac.sendAuthError(c, config.ErrAuthUserNotActive, plugnmeet.StatusCode_USER_NOT_ACTIVE)
 		}
 		if meta.GetWaitForApproval() {
-			_ = c.SendStatus(errStatus)
-			return ac.sendVerificationRes(c, false, "notifications.user-waiting-for-approval", plugnmeet.StatusCode_PERMISSION_DENIED)
+			return ac.sendAuthError(c, config.ErrAuthUserWaitApproval, plugnmeet.StatusCode_PERMISSION_DENIED)
 		}
 	}
 
@@ -180,12 +161,29 @@ func (ac *AuthController) HandleVerifyHeaderToken(c fiber.Ctx) error {
 	return c.Next()
 }
 
-func (ac *AuthController) sendVerificationRes(c fiber.Ctx, s bool, m string, statusCode plugnmeet.StatusCode) error {
-	cType := c.Get(fiber.HeaderContentType)
-	if cType == "application/protobuf" {
-		return utils.SendCommonProtobufResponse(c, s, m)
+// sendAuthError sends a failed auth response. The HTTP status is non-2xx and
+// derived from the status code, and the body carries the status code. The message
+// comes from the caller: curated English for the server-to-server /auth
+// endpoints, an i18n key for the browser facing /api endpoints.
+func (ac *AuthController) sendAuthError(c fiber.Ctx, authErr error, statusCode plugnmeet.StatusCode) error {
+	if c.Get(fiber.HeaderContentType) == "application/protobuf" {
+		return utils.SendCommonErrorProtobufResponse(c, authErr.Error(), statusCode)
 	}
-	return utils.SendCommonProtoJsonResponse(c, s, m, statusCode)
+	return utils.SendCommonErrorJsonResponse(c, authErr.Error(), statusCode)
+}
+
+// sendVerifyTokenError sends a failed verify token response. The endpoint always
+// answers with a protobuf CommonResponse body.
+func (ac *AuthController) sendVerifyTokenError(c fiber.Ctx, authErr error, statusCode plugnmeet.StatusCode) error {
+	return utils.SendCommonErrorProtobufResponse(c, authErr.Error(), statusCode)
+}
+
+// logAuthFailure logs an operational auth failure once, at the failure site.
+func (ac *AuthController) logAuthFailure(roomId, userId, msg string, err error) {
+	ac.Logger.WithFields(logrus.Fields{
+		"roomId": roomId,
+		"userId": userId,
+	}).WithError(err).Errorln(msg)
 }
 
 // HandleVerifyToken verifies a user's token before they join a room.
@@ -196,25 +194,28 @@ func (ac *AuthController) HandleVerifyToken(c fiber.Ctx) error {
 
 	req := new(plugnmeet.VerifyTokenReq)
 	if err := proto.Unmarshal(c.Body(), req); err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
+		// An unparsable request is an invalid request from the client, not an
+		// operational failure: report it without logging decoder internals.
+		return ac.sendVerifyTokenError(c, config.ErrAuthInvalidRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	// check for duplicate join
 	status, err := ac.NatsService.GetRoomUserStatus(roomId, requestedUserId)
 	if err != nil {
-		return utils.SendCommonProtobufResponse(c, false, err.Error())
+		ac.logAuthFailure(roomId, requestedUserId, "failed to fetch room user status", err)
+		return ac.sendVerifyTokenError(c, config.ErrAuthUnexpected, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 	if status == "" {
-		return utils.SendCommonProtobufResponse(c, false, "notifications.user-info-not-found")
+		return ac.sendVerifyTokenError(c, config.ErrAuthUserInfoNotFound, plugnmeet.StatusCode_USER_NOT_FOUND)
 	} else if status == natsservice.UserStatusOnline {
-		return utils.SendCommonProtobufResponse(c, false, "notifications.room-disconnected-duplicate-entry")
+		return ac.sendVerifyTokenError(c, config.ErrAuthDuplicateEntry, plugnmeet.StatusCode_CONFLICT)
 	} else if status == natsservice.UserStatusRemoved {
-		return utils.SendCommonProtobufResponse(c, false, "notifications.room-disconnected-participant-removed")
+		return ac.sendVerifyTokenError(c, config.ErrAuthUserRemoved, plugnmeet.StatusCode_USER_NOT_ACTIVE)
 	}
 
 	exist := ac.NatsService.IsUserExistInBlockList(roomId, requestedUserId)
 	if exist {
-		return utils.SendCommonProtobufResponse(c, false, "notifications.you-are-blocked")
+		return ac.sendVerifyTokenError(c, config.ErrAuthUserBlocked, plugnmeet.StatusCode_USER_BLOCKED)
 	}
 
 	rr, rInfo, meta := ac.RoomModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{
@@ -222,17 +223,18 @@ func (ac *AuthController) HandleVerifyToken(c fiber.Ctx) error {
 	})
 
 	if !rr.GetIsActive() {
-		return utils.SendCommonProtobufResponse(c, false, "notifications.room-not-active")
+		return ac.sendVerifyTokenError(c, config.ErrAuthRoomNotActive, plugnmeet.StatusCode_ROOM_NOT_ACTIVE)
 	}
 
 	// rInfo and meta are guaranteed to be non-nil if IsActive is true.
 	if rInfo.MaxParticipants > 0 {
 		onlineUsers, err := ac.NatsService.GetOnlineUsersId(roomId)
 		if err != nil {
-			return utils.SendCommonProtobufResponse(c, false, err.Error())
+			ac.logAuthFailure(roomId, requestedUserId, "failed to fetch online users", err)
+			return ac.sendVerifyTokenError(c, config.ErrAuthUnexpected, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 		}
 		if int64(len(onlineUsers)) >= int64(rInfo.MaxParticipants) {
-			return utils.SendCommonProtobufResponse(c, false, "notifications.max-num-participates-exceeded")
+			return ac.sendVerifyTokenError(c, config.ErrAuthMaxParticipants, plugnmeet.StatusCode_CONFLICT)
 		}
 	}
 
@@ -244,7 +246,7 @@ func (ac *AuthController) HandleVerifyToken(c fiber.Ctx) error {
 	natsSubjs := ac.AppConfig.NatsInfo.Subjects
 	res := &plugnmeet.VerifyTokenRes{
 		Status:         true,
-		Msg:            "token is valid",
+		Msg:            config.AuthMsgTokenValid,
 		NatsWsUrls:     ac.AppConfig.NatsInfo.NatsWSUrls,
 		ServerVersion:  new(version.Version),
 		RoomId:         &roomId,

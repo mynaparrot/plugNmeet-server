@@ -1,14 +1,12 @@
 package models
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/sirupsen/logrus"
 )
 
-func (m *RoomModel) HandleExternalMediaTask(req *plugnmeet.ExternalMediaPlayerReq) error {
+func (m *RoomModel) HandleExternalMediaTask(req *plugnmeet.ExternalMediaPlayerReq) (plugnmeet.StatusCode, error) {
 	switch req.Task {
 	case plugnmeet.ExternalMediaPlayerTask_START_PLAYBACK:
 		return m.startExternalMediaPlayBack(req)
@@ -16,10 +14,14 @@ func (m *RoomModel) HandleExternalMediaTask(req *plugnmeet.ExternalMediaPlayerRe
 		return m.endExternalMediaPlayBack(req)
 	}
 
-	return fmt.Errorf("not valid request")
+	m.logger.WithFields(logrus.Fields{
+		"roomId": req.RoomId,
+		"task":   req.Task.String(),
+	}).Warnln("invalid external media player task")
+	return plugnmeet.StatusCode_INVALID_PARAMETERS, config.ErrRoomInvalidRequest
 }
 
-func (m *RoomModel) startExternalMediaPlayBack(req *plugnmeet.ExternalMediaPlayerReq) error {
+func (m *RoomModel) startExternalMediaPlayBack(req *plugnmeet.ExternalMediaPlayerReq) (plugnmeet.StatusCode, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId": req.RoomId,
 		"userId": req.UserId,
@@ -29,13 +31,12 @@ func (m *RoomModel) startExternalMediaPlayBack(req *plugnmeet.ExternalMediaPlaye
 	log.Infoln("request to start external media playback")
 
 	if req.Url == nil || *req.Url == "" {
-		err := errors.New("valid url required")
-		log.WithError(err).Warnln()
-		return err
+		log.Warnln("valid url required")
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, config.ErrRoomInvalidUrl
 	}
 	if err := validateExternalUrl(*req.Url); err != nil {
-		log.WithError(err).Warnln()
-		return err
+		log.WithError(err).Warnln("invalid external media url")
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, config.ErrRoomInvalidUrl
 	}
 
 	opts := &updateRoomMetadataOpts{
@@ -46,7 +47,7 @@ func (m *RoomModel) startExternalMediaPlayBack(req *plugnmeet.ExternalMediaPlaye
 	return m.updateExternalMediaRoomMetadata(req.RoomId, opts, log)
 }
 
-func (m *RoomModel) endExternalMediaPlayBack(req *plugnmeet.ExternalMediaPlayerReq) error {
+func (m *RoomModel) endExternalMediaPlayBack(req *plugnmeet.ExternalMediaPlayerReq) (plugnmeet.StatusCode, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId": req.RoomId,
 		"userId": req.UserId,
@@ -60,18 +61,17 @@ func (m *RoomModel) endExternalMediaPlayBack(req *plugnmeet.ExternalMediaPlayerR
 	return m.updateExternalMediaRoomMetadata(req.RoomId, opts, log)
 }
 
-func (m *RoomModel) updateExternalMediaRoomMetadata(roomId string, opts *updateRoomMetadataOpts, log *logrus.Entry) error {
+func (m *RoomModel) updateExternalMediaRoomMetadata(roomId string, opts *updateRoomMetadataOpts, log *logrus.Entry) (plugnmeet.StatusCode, error) {
 	log.Info("updating room metadata for external media player")
 	roomMeta, err := m.natsService.GetRoomMetadataStruct(roomId)
 	if err != nil {
 		log.WithError(err).Error("failed to get room metadata")
-		return err
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrRoomUnexpectedError
 	}
 
 	if roomMeta == nil {
-		err = errors.New("invalid nil room metadata information")
-		log.WithError(err).Error()
-		return err
+		log.Error("room metadata not found")
+		return plugnmeet.StatusCode_ROOM_NOT_FOUND, config.ErrRoomNotFound
 	}
 
 	if opts.isActive != nil {
@@ -104,9 +104,10 @@ func (m *RoomModel) updateExternalMediaRoomMetadata(roomId string, opts *updateR
 	}
 	m.analyticsModel.HandleEvent(d)
 
-	if err == nil {
-		log.Info("Successfully updated room metadata")
+	if err != nil {
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrRoomUnexpectedError
 	}
 
-	return err
+	log.Info("Successfully updated room metadata")
+	return plugnmeet.StatusCode_SUCCESS, nil
 }

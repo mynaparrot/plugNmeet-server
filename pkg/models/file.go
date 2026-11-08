@@ -61,20 +61,23 @@ func (m *FileModel) detectMimeTypeForValidation(file multipart.File) error {
 
 	mtype, err := mimetype.DetectReader(file)
 	if err != nil {
-		return err
+		m.logger.WithError(err).Warnln("failed to detect the file mime type")
+		return config.ErrFileTypeNotAllowed
 	}
 
 	return m.ValidateMimeType(mtype)
 }
 
+// ValidateMimeType returns config.ErrFileTypeNotAllowed for every unsupported
+// file, so callers can send the value to the client as an i18n key.
 func (m *FileModel) ValidateMimeType(mtype *mimetype.MIME) error {
 	if mtype == nil {
-		return fmt.Errorf("invalid: can't determine file type")
+		return config.ErrFileTypeNotAllowed
 	}
 
 	ext := strings.TrimPrefix(mtype.Extension(), ".")
 	if ext == "" {
-		return fmt.Errorf("invalid: can't determine file type")
+		return config.ErrFileTypeNotAllowed
 	}
 
 	for _, t := range m.app.UploadFileSettings.AllowedTypes {
@@ -83,7 +86,8 @@ func (m *FileModel) ValidateMimeType(mtype *mimetype.MIME) error {
 		}
 	}
 
-	return fmt.Errorf("'%s' is not an allowed file type", ext)
+	m.logger.WithField("fileType", ext).Warnln("file type is not in the allowed list")
+	return config.ErrFileTypeNotAllowed
 }
 
 func (m *FileModel) updateRoomMetadataWithOfficeFile(roomId string, f *ConvertWhiteboardFileRes) error {
@@ -117,8 +121,12 @@ func (m *FileModel) GetRoomFilesByType(roomId string, fileType plugnmeet.RoomUpl
 	}
 
 	if allFiles == nil {
-		// Return an empty slice instead of nil for better client-side handling
-		return nil, fmt.Errorf("no files found for room")
+		// A room without files is a normal state, not an error.
+		return &plugnmeet.GetRoomUploadedFilesRes{
+			Status: true,
+			Msg:    config.MsgSuccess,
+			Files:  make([]*plugnmeet.RoomUploadedFileMetadata, 0),
+		}, nil
 	}
 
 	filteredFiles := make([]*plugnmeet.RoomUploadedFileMetadata, 0, len(allFiles))
@@ -130,7 +138,7 @@ func (m *FileModel) GetRoomFilesByType(roomId string, fileType plugnmeet.RoomUpl
 
 	return &plugnmeet.GetRoomUploadedFilesRes{
 		Status: true,
-		Msg:    "success",
+		Msg:    config.MsgSuccess,
 		Files:  filteredFiles,
 	}, nil
 }

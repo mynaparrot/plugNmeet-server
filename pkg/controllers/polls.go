@@ -78,7 +78,7 @@ func (pc *PollsController) HandleCreatePollAuth(c fiber.Ctx) error {
 	req := new(plugnmeet.CreatePollReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
 		pc.logger.WithError(err).Warnln("failed to unmarshal create poll request")
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthInvalidRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	if req.RoomId == "" {
@@ -88,7 +88,7 @@ func (pc *PollsController) HandleCreatePollAuth(c fiber.Ctx) error {
 	// same running-session check as HandleUploadWhiteboardFile
 	res, _, _ := pc.RoomModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{RoomId: req.RoomId})
 	if !res.GetIsActive() {
-		return utils.SendCommonProtoJsonResponse(c, false, res.GetMsg(), res.GetStatusCode())
+		return utils.SendCommonProtoJsonResponse(c, false, callerMsg(c, res.GetMsg()), res.GetStatusCode())
 	}
 
 	if req.UserId == "" {
@@ -97,7 +97,7 @@ func (pc *PollsController) HandleCreatePollAuth(c fiber.Ctx) error {
 
 	pollId, err := pc.PollModel.CreatePoll(req)
 	if err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, err.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
+		return utils.SendCommonProtoJsonResponse(c, false, callerMsg(c, err.Error()), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 
 	return utils.SendProtoJsonResponse(c, &plugnmeet.CreatePollRes{

@@ -2,13 +2,13 @@ package models
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
@@ -16,7 +16,7 @@ import (
 	"github.com/spf13/cast"
 )
 
-func (m *RoomModel) CreateRoom(userCtx context.Context, r *plugnmeet.CreateRoomReq) (*plugnmeet.ActiveRoomInfo, error) {
+func (m *RoomModel) CreateRoom(userCtx context.Context, r *plugnmeet.CreateRoomReq) (plugnmeet.StatusCode, *plugnmeet.ActiveRoomInfo, error) {
 	log := m.logger.WithFields(logrus.Fields{
 		"room_id":       r.GetRoomId(),
 		"breakout_room": r.GetMetadata().GetIsBreakoutRoom(),
@@ -27,20 +27,19 @@ func (m *RoomModel) CreateRoom(userCtx context.Context, r *plugnmeet.CreateRoomR
 
 	// Validate the roomId to ensure it doesn't contain our internal patterns.
 	if strings.Contains(r.RoomId, natsservice.UserKeyFieldPrefix) {
-		err := fmt.Errorf("RoomId cannot contain the reserved pattern '%s'", natsservice.UserKeyFieldPrefix)
-		log.WithError(err).Errorln()
-		return nil, err
+		log.Errorf("room_id cannot contain the reserved pattern '%s'", natsservice.UserKeyFieldPrefix)
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, nil, config.ErrRoomIdNotAllowed
 	}
 	if strings.HasPrefix(r.RoomId, natsservice.UserKeyPrefix) {
-		err := fmt.Errorf("RoomId cannot start with the reserved pattern '%s'", natsservice.UserKeyPrefix)
-		log.WithError(err).Errorln()
-		return nil, err
+		log.Errorf("room_id cannot start with the reserved pattern '%s'", natsservice.UserKeyPrefix)
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, nil, config.ErrRoomIdNotAllowed
 	}
 
 	// we'll lock the same room creation until the room is created
 	lockValue, err := acquireRoomCreationLockWithRetry(userCtx, m.rs, r.GetRoomId(), log)
 	if err != nil {
-		return nil, err // Error already logged by helper
+		log.WithError(err).Errorln("failed to acquire room creation lock")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil, config.ErrRoomUnexpectedError
 	}
 
 	// Defer unlock using the obtained lockValue for safety.
@@ -59,7 +58,7 @@ func (m *RoomModel) CreateRoom(userCtx context.Context, r *plugnmeet.CreateRoomR
 	roomDbInfo, err := m.ds.GetRoomInfoByRoomId(r.RoomId, 1)
 	if err != nil {
 		log.WithError(err).Error("Could not get room info from db")
-		return nil, err
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil, config.ErrRoomUnexpectedError
 	}
 
 	// handle existing room logic
@@ -67,12 +66,11 @@ func (m *RoomModel) CreateRoom(userCtx context.Context, r *plugnmeet.CreateRoomR
 		log.Info("Found existing active room in db, attempting to handle it")
 		ari, err := m.handleExistingRoom(r, roomDbInfo, log)
 		if err != nil {
-			log.WithError(err).Error("Failed to handle existing room")
-			return nil, err
+			return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil, config.ErrRoomUnexpectedError
 		}
 		if ari != nil {
 			log.Info("Successfully handled existing room, returning info")
-			return ari, nil
+			return plugnmeet.StatusCode_SUCCESS, ari, nil
 		}
 		// otherwise, we'll keep going
 		log.Info("Existing room record was stale or mismatched, proceeding to create a new session")
@@ -83,7 +81,7 @@ func (m *RoomModel) CreateRoom(userCtx context.Context, r *plugnmeet.CreateRoomR
 
 	// reject pre-assignments that could never be created
 	if err := m.validatePreassignedBreakoutRooms(r, log); err != nil {
-		return nil, err
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, nil, err
 	}
 
 	// prepare DB model
@@ -92,7 +90,7 @@ func (m *RoomModel) CreateRoom(userCtx context.Context, r *plugnmeet.CreateRoomR
 	// save info to db
 	if _, err := m.ds.InsertOrUpdateRoomInfo(roomDbInfo); err != nil {
 		log.WithError(err).Error("Failed to insert or update room in db")
-		return nil, err
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil, config.ErrRoomUnexpectedError
 	}
 	log = log.WithFields(logrus.Fields{
 		"room_sid": sid,
@@ -120,7 +118,7 @@ func (m *RoomModel) CreateRoom(userCtx context.Context, r *plugnmeet.CreateRoomR
 	mt, err := m.natsService.AddRoom(roomDbInfo.ID, r.RoomId, sid, r.EmptyTimeout, r.MaxParticipants, r.Metadata)
 	if err != nil {
 		log.WithError(err).Error("Failed to add room to NATS")
-		return nil, err
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil, config.ErrRoomUnexpectedError
 	}
 	log.WithField("table_id", roomDbInfo.ID).Info("Room info added to NATS")
 
@@ -143,7 +141,7 @@ func (m *RoomModel) CreateRoom(userCtx context.Context, r *plugnmeet.CreateRoomR
 	go m.sendRoomCreatedWebhook(ari, r.EmptyTimeout, r.MaxParticipants)
 
 	log.Infof("Successfully finished room creation after %s", time.Since(started))
-	return ari, nil
+	return plugnmeet.StatusCode_SUCCESS, ari, nil
 }
 
 // handleExistingRoom to handle logic if room already exists
@@ -275,15 +273,13 @@ func (m *RoomModel) validatePreassignedBreakoutRooms(r *plugnmeet.CreateRoomReq,
 	if s := m.app.RoomDefaultSettings; s != nil && s.MaxNumBreakoutRooms != nil {
 		serverMax := *s.MaxNumBreakoutRooms
 		if serverMax > 0 && count > serverMax {
-			err := fmt.Errorf("preassigned_rooms count (%d) exceeds the server maximum breakout rooms (%d)", count, serverMax)
-			log.WithError(err).Errorln()
-			return err
+			log.Errorf("preassigned_rooms count (%d) exceeds the server maximum breakout rooms (%d)", count, serverMax)
+			return config.ErrRoomPreassignedLimit
 		}
 	}
 	if allowedRooms := features.AllowedNumberRooms; allowedRooms > 0 && count > allowedRooms {
-		err := fmt.Errorf("preassigned_rooms count (%d) exceeds allowed_number_rooms (%d)", count, allowedRooms)
-		log.WithError(err).Errorln()
-		return err
+		log.Errorf("preassigned_rooms count (%d) exceeds allowed_number_rooms (%d)", count, allowedRooms)
+		return config.ErrRoomPreassignedLimit
 	}
 
 	// a user can only be pre-assigned to a single room; crossed assignments
@@ -293,9 +289,8 @@ func (m *RoomModel) validatePreassignedBreakoutRooms(r *plugnmeet.CreateRoomReq,
 	for _, room := range features.PreassignedRooms {
 		for _, u := range room.UserIds {
 			if _, ok := assignedUsers[u]; ok {
-				err := fmt.Errorf("user (%s) is pre-assigned to multiple breakout rooms", u)
-				log.WithError(err).Errorln()
-				return err
+				log.Errorf("user (%s) is pre-assigned to multiple breakout rooms", u)
+				return config.ErrRoomPreassignedUser
 			}
 			assignedUsers[u] = struct{}{}
 		}

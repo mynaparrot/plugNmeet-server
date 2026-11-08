@@ -44,6 +44,15 @@ func (m *AuthModel) VerifyPlugNmeetAccessToken(token string, gracefulPeriod time
 	return auth.VerifyPlugNmeetAccessToken(m.app.Client.ApiKey, m.app.Client.Secret, token, gracefulPeriod)
 }
 
+// TokenVerifyError maps an access token verification failure to the client facing
+// i18n key sentinel.
+func TokenVerifyError(err error) error {
+	if errors.Is(err, jwt.ErrExpired) {
+		return config.ErrAuthTokenExpired
+	}
+	return config.ErrAuthTokenInvalid
+}
+
 func (m *AuthModel) UnsafeClaimsWithoutVerification(token string) (*plugnmeet.PlugNmeetTokenClaims, error) {
 	cl := new(plugnmeet.PlugNmeetTokenClaims)
 	tk, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.HS256})
