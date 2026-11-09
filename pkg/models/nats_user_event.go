@@ -111,6 +111,9 @@ func (m *NatsModel) HandleSendUsersList(roomId, userId string, event *plugnmeet.
 			}
 			visible = append(visible, id)
 		}
+		// users inside the disconnect grace period are still in clients' stores until
+		// their USER_OFFLINE arrives, so hide them from the reconcile as well.
+		hidden = append(hidden, m.natsService.GetDisconnectedUsersId(roomId)...)
 		idsJson, err := json.Marshal(struct {
 			Ids       []string `json:"ids"`
 			HiddenIds []string `json:"hiddenIds"`

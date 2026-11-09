@@ -82,6 +82,7 @@ func (m *NatsModel) HandleFromClientToServerReq(roomId, userId string, req *plug
 		switch req.Event {
 		case plugnmeet.NatsMsgClientToServerEvents_REQ_INITIAL_DATA,
 			plugnmeet.NatsMsgClientToServerEvents_REQ_RENEW_PNM_TOKEN,
+			plugnmeet.NatsMsgClientToServerEvents_REQ_LEAVE_ROOM,
 			plugnmeet.NatsMsgClientToServerEvents_PING:
 			// allowed while waiting for approval
 		default:
@@ -100,6 +101,8 @@ func (m *NatsModel) HandleFromClientToServerReq(roomId, userId string, req *plug
 		m.HandleMediaServerInfo(roomId, userId, true)
 	case plugnmeet.NatsMsgClientToServerEvents_PING:
 		m.HandleClientPing(roomId, userId)
+	case plugnmeet.NatsMsgClientToServerEvents_REQ_LEAVE_ROOM:
+		m.HandleUserLeaveRoom(roomId, userId)
 	case plugnmeet.NatsMsgClientToServerEvents_REQ_RAISE_HAND:
 		m.userModel.RaisedHand(roomId, userId, req.Msg)
 	case plugnmeet.NatsMsgClientToServerEvents_REQ_LOWER_HAND:

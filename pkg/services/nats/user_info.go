@@ -112,6 +112,12 @@ func (s *NatsService) GetOnlineUsersId(roomId string) ([]string, error) {
 	return userIds, nil
 }
 
+// GetDisconnectedUsersId returns the ids of the users inside the disconnect grace period.
+// Cache only, as the online users list must never trigger a KV scan.
+func (s *NatsService) GetDisconnectedUsersId(roomId string) []string {
+	return s.cs.getRoomUserIds(roomId, UserStatusDisconnected)
+}
+
 // GetRoomUserIds retrieves all user IDs for a given room.
 func (s *NatsService) GetRoomUserIds(roomId string) []string {
 	var userIds []string

@@ -51,7 +51,7 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId, calledFrom string) {
 			}
 
 			// `status` is the state before this join: "added" on first join, "offline" on
-			// rejoin after the 5s grace period, or "disconnected" on a quick reconnect.
+			// rejoin after the grace period, or "disconnected" on a quick reconnect.
 			// A quick reconnect means USER_LEFT was never recorded, so the USER_JOINED
 			// analytics event and the DB participant increment are skipped.
 			if status != natsservice.UserStatusDisconnected {
@@ -88,7 +88,7 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId, calledFrom string) {
 }
 
 // OnAfterUserDisconnected should be run in separate goroutine
-// we'll wait for 5 seconds before declare user as offline
+// we'll wait for the grace period before declare user as offline
 // but will broadcast as disconnected
 func (m *NatsModel) OnAfterUserDisconnected(roomId, userId, calledFrom string) {
 	log := m.logger.WithFields(logrus.Fields{
@@ -101,13 +101,21 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId, calledFrom string) {
 
 	key := fmt.Sprintf("user-disconnected-%s-%s", roomId, userId)
 	_, _, shared := m.sfGroup.Do(key, func() (interface{}, error) {
+		status, _ := m.natsService.GetRoomUserStatus(roomId, userId)
+		// The user left the room intentionally: the leave handler already marked the
+		// user offline and owns the broadcasts and cleanup.
+		if status == natsservice.UserStatusOffline {
+			log.Debug("User is already offline after leaving the room, skipping disconnect handling")
+			return nil, nil
+		}
+
 		// The left analytics are recorded only if the user stays offline after the grace period.
 		disconnectedAt := time.Now().UnixMilli()
 
 		// Immediately set status to disconnected and notify clients.
 		// A removed user must keep the `removed` status; otherwise the NATS SDK would
 		// auto-reconnect after we kicked the connection.
-		if status, _ := m.natsService.GetRoomUserStatus(roomId, userId); status != natsservice.UserStatusRemoved {
+		if status != natsservice.UserStatusRemoved {
 			if err := m.natsService.UpdateUserStatus(roomId, userId, natsservice.UserStatusDisconnected); err != nil {
 				log.WithError(err).WithField("status", natsservice.UserStatusDisconnected).Warn("Failed to update user status")
 			}
@@ -125,7 +133,8 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId, calledFrom string) {
 		}
 
 		// Start a non-blocking background task to handle the full offline/cleanup lifecycle.
-		go m.handleDelayedOfflineTasks(roomId, userId, disconnectedAt, userInfo, log)
+		// Stage 1 gives the client 15s to reconnect before the user is marked offline.
+		go m.handleDelayedOfflineTasks(roomId, userId, disconnectedAt, userInfo, 15*time.Second, log)
 		return nil, nil
 	})
 
@@ -135,7 +144,7 @@ func (m *NatsModel) OnAfterUserDisconnected(roomId, userId, calledFrom string) {
 }
 
 // handleDelayedOfflineTasks manages the grace period for user reconnection and subsequent cleanup using periodic checks.
-func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, disconnectedAt int64, userInfo *plugnmeet.NatsKvUserInfo, log *logrus.Entry) {
+func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, disconnectedAt int64, userInfo *plugnmeet.NatsKvUserInfo, gracePeriod time.Duration, log *logrus.Entry) {
 	log = log.WithField("subMethod", "handleDelayedOfflineTasks")
 	log.Info("Starting delayed offline tasks with periodic checks")
 	started := time.Now()
@@ -143,10 +152,21 @@ func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, disconnecte
 	// get TurnCredentials to use it later otherwise it may cleaned up if room ended
 	turnCreds, _ := m.natsService.GetUserTurnCredentials(roomId, userId)
 
-	// Stage 1: Wait for the reconnection grace period (5s), checking every second.
-	reconnected, roomEnded := m.waitForReconnect(roomId, userId, 5*time.Second, 1*time.Second, log)
-	if reconnected {
-		log.Info("User reconnected within grace period, aborting offline tasks")
+	// Stage 1: Wait for the reconnection grace period, checking every second.
+	// An intentional leave has no grace period (gracePeriod 0), so its offline tasks
+	// run right away.
+	var reconnected, roomEnded bool
+	if gracePeriod > 0 {
+		if reconnected, roomEnded = m.waitForReconnect(roomId, userId, gracePeriod, time.Second, log); reconnected {
+			log.Info("User reconnected within grace period, aborting offline tasks")
+			return
+		}
+	}
+
+	// The user left intentionally while we were waiting; that path owns the analytics,
+	// the broadcast and the cleanup.
+	if status, _ := m.natsService.GetRoomUserStatus(roomId, userId); status == natsservice.UserStatusOffline {
+		log.Info("User already offline, aborting offline tasks")
 		return
 	}
 
@@ -197,6 +217,34 @@ func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, disconnecte
 	}
 
 	log.Infof("User offline tasks completed after %s", time.Since(started))
+}
+
+// HandleUserLeaveRoom handles an intentional leave request from the client: there is no
+// reconnect grace period, so the user is taken offline right away.
+func (m *NatsModel) HandleUserLeaveRoom(roomId, userId string) {
+	log := m.logger.WithFields(logrus.Fields{
+		"roomId": roomId,
+		"userId": userId,
+		"method": "HandleUserLeaveRoom",
+	})
+
+	status, err := m.natsService.GetRoomUserStatus(roomId, userId)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get room user status")
+		return
+	}
+	// idempotent: the user is already offline or removed by another path
+	if status == natsservice.UserStatusOffline || status == natsservice.UserStatusRemoved {
+		return
+	}
+
+	userInfo, err := m.natsService.GetUserInfo(roomId, userId)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get user info")
+	}
+
+	log.Info("User left the room, running offline tasks without grace period")
+	go m.handleDelayedOfflineTasks(roomId, userId, time.Now().UnixMilli(), userInfo, 0, log)
 }
 
 // waitForReconnect periodically checks for user reconnection or if the room has ended.
