@@ -35,18 +35,22 @@ func (m *UserModel) RemoveParticipant(r *plugnmeet.RemoveParticipantReq) (plugnm
 		log.WithError(err).Errorln("error notifying user with custom message")
 	}
 
+	if r.Msg == "" {
+		r.Msg = "notifications.room-disconnected-participant-removed"
+	}
+
 	// send notification to be disconnected
-	if err := m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SESSION_ENDED, r.GetRoomId(), "notifications.room-disconnected-participant-removed", &r.UserId); err != nil {
+	if err := m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SESSION_ENDED, r.GetRoomId(), r.Msg, &r.UserId); err != nil {
 		log.WithError(err).Errorln("error broadcasting SESSION_ENDED event")
+	}
+
+	if err = m.natsService.UpdateUserStatus(r.RoomId, r.UserId, natsservice.UserStatusRemoved); err != nil {
+		log.WithError(err).Warnln("error updating user status to removed")
 	}
 
 	// now remove from lk
 	if _, err = m.lk.RemoveParticipant(r.RoomId, r.UserId); err != nil {
 		log.WithError(err).Errorln("error removing user from livekit, keep continuing")
-	}
-
-	if err = m.natsService.UpdateUserStatus(r.RoomId, r.UserId, natsservice.UserStatusRemoved); err != nil {
-		log.WithError(err).Warnln("error updating user status to removed")
 	}
 
 	// finally, check if requested to block as well as

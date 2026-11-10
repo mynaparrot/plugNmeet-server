@@ -95,17 +95,16 @@ func (m *RoomModel) EndRoom(ctx context.Context, r *plugnmeet.RoomEndReq) (bool,
 	// This serves as a fallback in case the 'room_finished' webhook from LiveKit is delayed.
 	m.rs.HoldTemporaryRoomData(info)
 
-	// Broadcast a 'SESSION_ENDED' event to all clients in the room.
-	if err = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SESSION_ENDED, roomID, "notifications.room-disconnected-room-ended", nil); err != nil {
-		log.WithError(err).Error("Error sending session ended notification message")
-	}
-
-	// waiting users' consumers only listen to the private subject, so notify them directly
-	if participants, err := m.natsService.GetOnlineUsersList(roomID); err == nil {
-		for _, p := range participants {
-			if mt, err := m.natsService.UnmarshalUserMetadata(p.Metadata); err == nil && mt != nil && mt.GetWaitForApproval() {
-				_ = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_SESSION_ENDED, roomID, "notifications.room-disconnected-room-ended", new(p.UserId))
-			}
+	// remove all the online users from the session asynchronously
+	if participants, err := m.natsService.GetOnlineUsersId(roomID); err == nil {
+		for _, uId := range participants {
+			go func(userId string) {
+				_, _ = m.userModel.RemoveParticipant(&plugnmeet.RemoveParticipantReq{
+					UserId: userId,
+					RoomId: roomID,
+					Msg:    "notifications.room-disconnected-room-ended",
+				})
+			}(uId)
 		}
 	}
 
