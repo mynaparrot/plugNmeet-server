@@ -13,6 +13,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
@@ -441,7 +442,9 @@ func (m *RecordingModel) MergeRecordings(ctx context.Context, req *plugnmeet.Mer
 	}
 
 	// we'll also use lockKey just for preventing repeated request, default: 2 minutes
-	pubAck, err := m.js.Publish(ctx, m.app.NatsInfo.Recorder.TranscodingJobs, data, jetstream.WithMsgID(lockKey))
+	// merge job is variant agnostic, we'll use the full screen variant consumer
+	subject := utils.GetTranscodingJobSubject(m.app.NatsInfo.Recorder.TranscodingJobs, plugnmeet.CloudRecordingVariants_FULL_SCREEN_CLOUD_RECORDING)
+	pubAck, err := m.js.Publish(ctx, subject, data, jetstream.WithMsgID(lockKey))
 	if err != nil {
 		log.WithError(err).Error("failed to publish message to NATS")
 		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, err

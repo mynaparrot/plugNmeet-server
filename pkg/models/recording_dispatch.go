@@ -82,6 +82,7 @@ func (m *RecordingModel) DispatchRecorderTask(req *plugnmeet.RecordingReq) error
 
 	switch req.Task {
 	case plugnmeet.RecordingTasks_START_RECORDING:
+		toSend.RecordingVariant = req.RecordingVariant
 		if err := m.addTokenAndRecorder(context.Background(), req, toSend, config.RecorderBot, log); err != nil {
 			log.WithError(err).Error("failed to add token for recording bot")
 			return err
@@ -154,34 +155,42 @@ func (m *RecordingModel) addTokenAndRecorder(ctx context.Context, req *plugnmeet
 	})
 	log.Info("adding token and selecting recorder")
 
-	recorderId := m.selectRecorder(log)
+	variant := plugnmeet.CloudRecordingVariants_FULL_SCREEN_CLOUD_RECORDING
+	if req.Task == plugnmeet.RecordingTasks_START_RECORDING && req.RecordingVariant != nil {
+		variant = req.GetRecordingVariant()
+	}
+	log = log.WithField("variant", variant.String())
+
+	recorderId := m.selectRecorder(variant, log)
 	if recorderId == "" {
-		log.Error("no recorder available")
+		log.Error("no recorder available for this variant")
 		return config.ErrRecordingNoRecorder
 	}
 
-	gt := &plugnmeet.GenerateTokenReq{
-		RoomId: req.RoomId,
-		UserInfo: &plugnmeet.UserInfo{
-			UserId:   userId,
-			IsHidden: true,
-			IsAdmin:  true,
-		},
-	}
-	_, token, err := m.um.GetPNMJoinToken(ctx, gt, false)
-	if err != nil {
-		log.WithError(err).Errorln("error getting pnm token")
-		return config.ErrRecordingOperationFailed
-	}
-
 	rq.RecorderId = recorderId
-	rq.AccessToken = token
 
-	// if we have custom design, then we'll set custom design with token
-	// don't need to change anything in the recorder.
-	if req.CustomDesign != nil && *req.CustomDesign != "" {
-		log.Info("appending custom design to access token")
-		rq.AccessToken += "&custom_design=" + url.QueryEscape(*req.CustomDesign)
+	if variant == plugnmeet.CloudRecordingVariants_FULL_SCREEN_CLOUD_RECORDING {
+		gt := &plugnmeet.GenerateTokenReq{
+			RoomId: req.RoomId,
+			UserInfo: &plugnmeet.UserInfo{
+				UserId:   userId,
+				IsHidden: true,
+				IsAdmin:  true,
+			},
+		}
+		_, token, err := m.um.GetPNMJoinToken(ctx, gt, false)
+		if err != nil {
+			log.WithError(err).Errorln("error getting pnm token")
+			return config.ErrRecordingOperationFailed
+		}
+		rq.AccessToken = token
+
+		// if we have custom design, then we'll set custom design with token
+		// don't need to change anything in the recorder.
+		if req.CustomDesign != nil && *req.CustomDesign != "" {
+			log.Info("appending custom design to access token")
+			rq.AccessToken += "&custom_design=" + url.QueryEscape(*req.CustomDesign)
+		}
 	}
 
 	log.WithField("recorderId", recorderId).Info("successfully added token and selected recorder")
@@ -222,14 +231,23 @@ func calculateRecorderScore(r *utils.RecorderInfo) float64 {
 	return combinedScore
 }
 
-func (m *RecordingModel) selectRecorder(log *logrus.Entry) string {
+func (m *RecordingModel) selectRecorder(variant plugnmeet.CloudRecordingVariants, log *logrus.Entry) string {
 	log = log.WithField("method", "selectRecorder")
 	log.Info("Selecting a recorder")
 
 	recorders := m.natsService.GetAllActiveRecorders()
 
+	// only keep recorders that can handle the requested variant
+	filtered := make([]*utils.RecorderInfo, 0, len(recorders))
+	for _, r := range recorders {
+		if r.Variant == variant {
+			filtered = append(filtered, r)
+		}
+	}
+	recorders = filtered
+
 	if len(recorders) < 1 {
-		log.Warn("No active recorders found")
+		log.Warn("No active recorders found for this variant")
 		return ""
 	}
 

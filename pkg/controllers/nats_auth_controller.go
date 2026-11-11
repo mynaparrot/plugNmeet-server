@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
@@ -123,12 +122,12 @@ func (s *NatsAuthController) setPermissionForRecorder(data *plugnmeet.PlugNmeetT
 		fmt.Sprintf("$JS.API.STREAM.INFO.KV_%s", s.app.NatsInfo.Recorder.RecorderInfoKv),
 		fmt.Sprintf("$KV.%s.>", s.app.NatsInfo.Recorder.RecorderInfoKv),
 		fmt.Sprintf("$JS.API.DIRECT.GET.KV_%s.>", s.app.NatsInfo.Recorder.RecorderInfoKv),
-		// Allow publishing the job to the stream
-		s.app.NatsInfo.Recorder.TranscodingJobs,
-		// Allow fetching the next message from the consumer & send ack
-		fmt.Sprintf("$JS.API.CONSUMER.MSG.NEXT.%s.%s", s.app.NatsInfo.Recorder.TranscodingJobs, utils.TranscoderConsumerDurable),
-		fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.%s", s.app.NatsInfo.Recorder.TranscodingJobs, utils.TranscoderConsumerDurable),
-		fmt.Sprintf("$JS.ACK.%s.%s.>", s.app.NatsInfo.Recorder.TranscodingJobs, utils.TranscoderConsumerDurable),
+		// Allow publishing the job to the stream (variant specific subjects)
+		fmt.Sprintf("%s.*", s.app.NatsInfo.Recorder.TranscodingJobs),
+		// Allow fetching the next message from the variant consumer & send ack
+		fmt.Sprintf("$JS.API.CONSUMER.MSG.NEXT.%s.*", s.app.NatsInfo.Recorder.TranscodingJobs),
+		fmt.Sprintf("$JS.API.CONSUMER.INFO.%s.*", s.app.NatsInfo.Recorder.TranscodingJobs),
+		fmt.Sprintf("$JS.ACK.%s.>", s.app.NatsInfo.Recorder.TranscodingJobs),
 	}
 
 	claims.Permissions = jwt.Permissions{

@@ -51,6 +51,9 @@ func (ncs *NatsCacheService) updateRecorderCache(entry jetstream.KeyValueEntry) 
 		recorder.TotalCores, _ = strconv.ParseInt(val, 10, 64)
 	case plugnmeet.RecorderInfoKeys_RECORDER_INFO_CPU_SCORE:
 		recorder.CpuScore, _ = strconv.ParseFloat(val, 64)
+	case plugnmeet.RecorderInfoKeys_RECORDER_INFO_VARIANT:
+		variant, _ := strconv.ParseInt(val, 10, 32)
+		recorder.Variant = plugnmeet.CloudRecordingVariants(variant)
 	}
 }
 

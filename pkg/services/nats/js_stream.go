@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/nats-io/nats.go/jetstream"
@@ -127,7 +128,7 @@ func (s *NatsService) CreateTranscoderStreamWithConsumer(ctx context.Context, lo
 		Replicas:    s.app.NatsInfo.NumReplicas,
 		Retention:   jetstream.WorkQueuePolicy,
 		Subjects: []string{
-			s.app.NatsInfo.Recorder.TranscodingJobs,
+			fmt.Sprintf("%s.*", s.app.NatsInfo.Recorder.TranscodingJobs),
 		},
 	})
 	if err != nil {
@@ -136,17 +137,24 @@ func (s *NatsService) CreateTranscoderStreamWithConsumer(ctx context.Context, lo
 	}
 	log.Info("Created/Updated recorder transcoder stream")
 
-	_, err = transcoderStream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
-		Durable:    utils.TranscoderConsumerDurable,
-		AckPolicy:  jetstream.AckExplicitPolicy,
-		AckWait:    maxTranscodingAckWait,
-		MaxDeliver: maxTranscodingRetries,
-	})
-	if err != nil {
-		log.WithError(err).Error("error creating recorder transcoder consumer")
-		return err
+	// one durable consumer per recording variant
+	for _, variant := range []plugnmeet.CloudRecordingVariants{
+		plugnmeet.CloudRecordingVariants_FULL_SCREEN_CLOUD_RECORDING,
+		plugnmeet.CloudRecordingVariants_MEDIA_ONLY_CLOUD_RECORDING,
+	} {
+		_, err = transcoderStream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
+			Durable:       utils.GetTranscoderConsumerDurable(variant),
+			FilterSubject: utils.GetTranscodingJobSubject(s.app.NatsInfo.Recorder.TranscodingJobs, variant),
+			AckPolicy:     jetstream.AckExplicitPolicy,
+			AckWait:       maxTranscodingAckWait,
+			MaxDeliver:    maxTranscodingRetries,
+		})
+		if err != nil {
+			log.WithError(err).Errorf("error creating recorder transcoder consumer for variant %s", variant.String())
+			return err
+		}
+		log.Infof("Created/Updated recorder transcoder consumer for variant %s", variant.String())
 	}
-	log.Info("Created/Updated recorder transcoder consumer")
 
 	return nil
 }
