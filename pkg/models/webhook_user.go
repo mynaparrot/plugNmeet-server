@@ -137,6 +137,17 @@ func (m *WebhookModel) ensureUserIsOffline(event *livekit.WebhookEvent, log *log
 			return
 		}
 
+		// a LiveKit-only reconnect yields a new participant SID while NATS stays connected
+		if participant, err := m.lk.LoadParticipantInfo(event.Room.Name, event.Participant.Identity); err != nil {
+			log.WithError(err).Info("failed to load participant info from livekit, continuing with manual disconnect")
+		} else if participant != nil && event.Participant.Sid != "" && participant.Sid != event.Participant.Sid {
+			log.WithFields(logrus.Fields{
+				"oldParticipantSid": event.Participant.Sid,
+				"newParticipantSid": participant.Sid,
+			}).Info("user rejoined the room with a new participant session, skipping manual disconnect")
+			return
+		}
+
 		// user should be offline because it's disconnected from media server
 		// but may be for some reason it wasn't triggered by Nats correctly
 		log.Warnln("User status remain online, triggering OnAfterUserDisconnected manually")
