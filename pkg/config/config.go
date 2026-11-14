@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/livekit/protocol/livekit"
+	"github.com/mynaparrot/plugnmeet-protocol/connections"
 	"github.com/mynaparrot/plugnmeet-protocol/logging"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/sirupsen/logrus"
@@ -26,8 +27,8 @@ type AppConfig struct {
 	LogSettings         logging.LogSettings        `yaml:"log_settings"`
 	LivekitInfo         LivekitInfo                `yaml:"livekit_info"`
 	LivekitSipInfo      *LivekitSipInfo            `yaml:"livekit_sip_info"`
-	RedisInfo           RedisInfo                  `yaml:"redis_info"`
-	DatabaseInfo        DatabaseInfo               `yaml:"database_info"`
+	RedisInfo           connections.RedisInfo      `yaml:"redis_info"`
+	DatabaseInfo        connections.DatabaseInfo   `yaml:"database_info"`
 	UploadFileSettings  UploadFileSettings         `yaml:"upload_file_settings"`
 	RecorderInfo        RecorderInfo               `yaml:"recorder_info"`
 	AnalyticsSettings   *AnalyticsSettings         `yaml:"analytics_settings"`
@@ -134,42 +135,6 @@ type CopyrightConf struct {
 	Display       bool   `yaml:"display"`
 	AllowOverride bool   `yaml:"allow_override"`
 	Text          string `yaml:"text"`
-}
-
-type DatabaseInfo struct {
-	DriverName      string          `yaml:"driver_name"`
-	Host            string          `yaml:"host"`
-	Port            int32           `yaml:"port"`
-	Username        string          `yaml:"username"`
-	Password        string          `yaml:"password"`
-	DBName          string          `yaml:"db"`
-	Prefix          string          `yaml:"prefix"`
-	Charset         *string         `yaml:"charset"`
-	Loc             *string         `yaml:"loc"`
-	ConnMaxLifetime *time.Duration  `yaml:"conn_max_lifetime"`
-	MaxOpenConns    *int            `yaml:"max_open_conns"`
-	Replicas        []ReplicaDBInfo `yaml:"replicas"`
-}
-
-// ReplicaDBInfo holds connection details for a read replica database.
-type ReplicaDBInfo struct {
-	Host     string `yaml:"host"`
-	Port     int32  `yaml:"port"`
-	Username string `yaml:"username"`
-	Password string `yaml:"password"`
-}
-
-type RedisInfo struct {
-	Host              string         `yaml:"host"`
-	Username          string         `yaml:"username"`
-	Password          string         `yaml:"password"`
-	DBName            int            `yaml:"db"`
-	DefaultTTL        *time.Duration `yaml:"default_ttl"`
-	UseTLS            bool           `yaml:"use_tls"`
-	MasterName        string         `yaml:"sentinel_master_name"`
-	SentinelUsername  string         `yaml:"sentinel_username"`
-	SentinelPassword  string         `yaml:"sentinel_password"`
-	SentinelAddresses []string       `yaml:"sentinel_addresses"`
 }
 
 type NatsInfo struct {

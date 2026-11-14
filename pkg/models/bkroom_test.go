@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mynaparrot/plugnmeet-protocol/connections"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
@@ -325,7 +326,7 @@ func sqliteDDLFromInstallDump(dump, table string) string {
 	return fmt.Sprintf("CREATE TABLE %s (\n\t%s\n)", config.FormatDBTable(table), strings.Join(columns, ",\n\t"))
 }
 
-func newArtifactTestEnv(t *testing.T) (*ArtifactModel, *gorm.DB, *redis.Client) {
+func newArtifactTestEnv(t *testing.T) (*ArtifactModel, *gorm.DB, redis.UniversalClient) {
 	t.Helper()
 
 	ctx := context.Background()
@@ -354,7 +355,7 @@ func newArtifactTestEnv(t *testing.T) (*ArtifactModel, *gorm.DB, *redis.Client) 
 
 	ttl := 2 * time.Minute
 	app := &config.AppConfig{
-		RedisInfo: config.RedisInfo{DefaultTTL: &ttl},
+		RedisInfo: connections.RedisInfo{DefaultTTL: &ttl},
 		Insights:  &config.InsightsConfig{},
 	}
 	rs := redisservice.New(redisservice.Args{Ctx: ctx, Rc: rc, App: app, Logger: logger})
@@ -391,7 +392,7 @@ func createTestRoomRow(t *testing.T, gdb *gorm.DB, roomId string, isBreakout boo
 	return row
 }
 
-func seedChatTranslationUsage(t *testing.T, rc *redis.Client, roomId string) string {
+func seedChatTranslationUsage(t *testing.T, rc redis.UniversalClient, roomId string) string {
 	t.Helper()
 
 	key := fmt.Sprintf("%s:%s:usage", redisservice.ChatTranslationRedisKey, roomId)

@@ -23,7 +23,7 @@ type JanitorModel struct {
 	ctx         context.Context
 	cancel      context.CancelFunc
 	app         *config.AppConfig
-	rds         *redis.Client
+	rds         redis.UniversalClient
 	js          jetstream.JetStream
 	ds          *dbservice.DatabaseService
 	rs          *redisservice.RedisService
@@ -45,7 +45,7 @@ type JanitorModelArgs struct {
 	fx.In
 	MainCtx       context.Context
 	App           *config.AppConfig
-	RDS           *redis.Client
+	RDS           redis.UniversalClient
 	JS            jetstream.JetStream
 	Ds            *dbservice.DatabaseService
 	Rs            *redisservice.RedisService

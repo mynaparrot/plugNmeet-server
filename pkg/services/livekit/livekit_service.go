@@ -16,7 +16,7 @@ import (
 type LivekitService struct {
 	app    *config.AppConfig
 	ctx    context.Context
-	rds    *redis.Client
+	rds    redis.UniversalClient
 	lkc    *lksdk.RoomServiceClient
 	logger *logrus.Entry
 }
@@ -25,7 +25,7 @@ type Args struct {
 	fx.In
 	Ctx    context.Context
 	App    *config.AppConfig
-	RDS    *redis.Client
+	RDS    redis.UniversalClient
 	Logger *logrus.Logger
 }
 

@@ -17,7 +17,7 @@ const (
 
 type RedisService struct {
 	ctx              context.Context
-	rc               *redis.Client
+	rc               redis.UniversalClient
 	defaultTTL       time.Duration
 	unlockScriptExec *redis.Script
 	renewScriptExec  *redis.Script
@@ -27,7 +27,7 @@ type RedisService struct {
 type Args struct {
 	fx.In
 	Ctx    context.Context
-	Rc     *redis.Client
+	Rc     redis.UniversalClient
 	App    *config.AppConfig
 	Logger *logrus.Logger
 }
@@ -43,7 +43,7 @@ func New(args Args) *RedisService {
 	}
 }
 
-func (s *RedisService) GetRedisClient() *redis.Client {
+func (s *RedisService) GetRedisClient() redis.UniversalClient {
 	return s.rc
 }
 

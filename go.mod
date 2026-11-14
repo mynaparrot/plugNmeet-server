@@ -20,24 +20,22 @@ require (
 	github.com/livekit/media-sdk v0.1.1
 	github.com/livekit/protocol v1.51.1-0.20260910121219-271d9cde3897
 	github.com/livekit/server-sdk-go/v2 v2.19.0
-	github.com/mynaparrot/plugnmeet-protocol v1.6.4-0.20261111185358-f77ae542c9b9
+	github.com/mynaparrot/plugnmeet-protocol v1.6.4-0.20261114085453-005e5ceded4a
 	github.com/nats-io/jwt/v2 v2.8.3
 	github.com/nats-io/nats.go v1.55.0
 	github.com/nats-io/nkeys v0.4.17
-	github.com/openai/openai-go/v3 v3.96.0
+	github.com/openai/openai-go/v3 v3.99.0
 	github.com/pion/webrtc/v4 v4.2.19
 	github.com/prometheus/client_golang v1.25.0
 	github.com/redis/go-redis/v9 v9.23.0
 	github.com/sirupsen/logrus v1.10.2
 	github.com/spf13/cast v1.10.0
 	go.uber.org/fx v1.24.0
-	golang.org/x/sync v0.24.0
+	golang.org/x/sync v0.25.0
 	google.golang.org/genai v1.77.0
 	google.golang.org/protobuf v1.36.12
-	gorm.io/driver/mysql v1.6.0
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.31.2
-	gorm.io/plugin/dbresolver v1.6.2
 )
 
 require (
@@ -49,7 +47,7 @@ require (
 	cloud.google.com/go/auth v0.18.2 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	filippo.io/edwards25519 v1.2.0 // indirect
-	github.com/DeRuina/timberjack v1.4.9 // indirect
+	github.com/DeRuina/timberjack v1.4.10 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/at-wat/ebml-go v0.18.0 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
@@ -145,5 +143,7 @@ require (
 	google.golang.org/grpc v1.85.0 // indirect
 	gopkg.in/hraban/opus.v2 v2.0.0-20230925203106-0188a62cb302 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gorm.io/driver/mysql v1.6.0 // indirect
+	gorm.io/plugin/dbresolver v1.6.2 // indirect
 	mvdan.cc/sh/v3 v3.14.1 // indirect
 )

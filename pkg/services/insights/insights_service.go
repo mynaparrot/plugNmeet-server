@@ -23,7 +23,7 @@ type ProviderArgs struct {
 	ProviderAccount *config.ProviderAccount
 	ServiceConfig   *config.ServiceConfig
 	Logger          *logrus.Entry
-	RDS             *redis.Client
+	RDS             redis.UniversalClient
 }
 
 // NewProvider is a factory function that creates and returns the configured AI provider.

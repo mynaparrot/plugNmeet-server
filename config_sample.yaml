@@ -124,6 +124,12 @@ redis_info:
 #  If Sentinel uses different credentials, specify them here:
 #  sentinel_username: user
 #  sentinel_password: pass
+#  For Redis Cluster setup, uncomment the following lines.
+#  When cluster_addresses is provided, the top-level "host" and "db" fields will be ignored.
+#  cluster_addresses:
+#    - localhost:7000
+#    - localhost:7001
+#    - localhost:7002
 
 database_info:
   # Currently supports only MySQL/MariaDB. More options may be added in the future.
@@ -142,6 +148,11 @@ database_info:
   conn_max_lifetime: 4m
   # Maximum number of open connections. Default is 10.
   max_open_conns: 10
+  # Connection timeout. Default is 3s.
+  connect_timeout: 3s
+  # Read/write timeout, disabled by default.
+  # read_timeout: 60s
+  # write_timeout: 60s
   # Optional Read Replicas
 #  replicas:
 #    - host: "replica-db-host-1"
@@ -152,6 +163,18 @@ database_info:
 #      port: 3306
 #      username: "user"
 #      password: "password"
+  # Optional priority-based failover.
+#  failover:
+#    hosts:            # tried in order after the primary host
+#      - host: "failover-db-host-1"
+#        port: 3306
+#        username: "user"
+#        password: "password"
+#    cooldown: 30s
+#    health_check_interval: 5s # 0 disables, and then no failback happens
+#    failback: true            # return to the primary once it is healthy again
+#    failback_delay: 60s       # primary must stay healthy this long first (needs health monitor)
+#    galera_check: true        # set false for non-Galera servers
 
 nats_info:
   nats_urls:

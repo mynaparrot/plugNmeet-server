@@ -41,7 +41,7 @@ type AgentTaskResponse struct {
 type InsightsModel struct {
 	ctx           context.Context
 	appConfig     *config.AppConfig
-	rds           *redis.Client
+	rds           redis.UniversalClient
 	natsConn      *nats.Conn
 	js            jetstream.JetStream
 	logger        *logrus.Entry
@@ -56,7 +56,7 @@ type InsightsModelArgs struct {
 	fx.In
 	Ctx           context.Context
 	AppConfig     *config.AppConfig
-	RDS           *redis.Client
+	RDS           redis.UniversalClient
 	NatsConn      *nats.Conn
 	JS            jetstream.JetStream
 	RedisService  *redisservice.RedisService

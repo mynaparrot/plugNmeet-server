@@ -26,11 +26,11 @@ type OpenAIProvider struct {
 	service      *config.ServiceConfig
 	openAiClient openAiSdk.Client
 	logger       *logrus.Entry
-	redis        *redis.Client
+	redis        redis.UniversalClient
 }
 
 // NewProvider creates a new OpenAI provider.
-func NewProvider(ctx context.Context, providerAccount *config.ProviderAccount, serviceConfig *config.ServiceConfig, log *logrus.Entry, redis *redis.Client) (insights.Provider, error) {
+func NewProvider(ctx context.Context, providerAccount *config.ProviderAccount, serviceConfig *config.ServiceConfig, log *logrus.Entry, redis redis.UniversalClient) (insights.Provider, error) {
 	if providerAccount.Credentials.APIKey == "" {
 		return nil, fmt.Errorf("openai provider requires api_key")
 	}

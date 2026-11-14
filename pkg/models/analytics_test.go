@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mynaparrot/plugnmeet-protocol/connections"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
@@ -16,7 +17,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-func newTestAnalyticsModel(t *testing.T) (*AnalyticsModel, *redis.Client) {
+func newTestAnalyticsModel(t *testing.T) (*AnalyticsModel, redis.UniversalClient) {
 	t.Helper()
 
 	host := os.Getenv("TEST_REDIS_HOST")
@@ -38,7 +39,7 @@ func newTestAnalyticsModel(t *testing.T) (*AnalyticsModel, *redis.Client) {
 	logger.SetLevel(logrus.PanicLevel)
 
 	app := &config.AppConfig{
-		RedisInfo: config.RedisInfo{DefaultTTL: &ttl},
+		RedisInfo: connections.RedisInfo{DefaultTTL: &ttl},
 		NatsInfo:  config.NatsInfo{DefaultTTL: &ttl},
 	}
 

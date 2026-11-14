@@ -11,7 +11,7 @@ import (
 
 type HealthCheckController struct {
 	app *config.AppConfig
-	rds *redis.Client
+	rds redis.UniversalClient
 	db  *gorm.DB
 	nc  *nats.Conn
 }
@@ -19,7 +19,7 @@ type HealthCheckController struct {
 type HealthCheckControllerArgs struct {
 	fx.In
 	App      *config.AppConfig
-	RDS      *redis.Client
+	RDS      redis.UniversalClient
 	DB       *gorm.DB
 	NatsConn *nats.Conn
 }

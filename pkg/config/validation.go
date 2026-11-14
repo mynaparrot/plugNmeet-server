@@ -2,11 +2,11 @@ package config
 
 import (
 	"fmt"
-	"net"
 	"net/url"
 	"slices"
-	"strconv"
 	"strings"
+
+	"github.com/mynaparrot/plugnmeet-protocol/connections"
 )
 
 // validateAppConfig validates the external service configuration.
@@ -17,10 +17,10 @@ func validateAppConfig(appCnf *AppConfig) error {
 	if err := validateNatsInfo(&appCnf.NatsInfo); err != nil {
 		return err
 	}
-	if err := validateRedisInfo(&appCnf.RedisInfo); err != nil {
+	if err := connections.ValidateRedisInfo(&appCnf.RedisInfo); err != nil {
 		return err
 	}
-	return validateDatabaseInfo(&appCnf.DatabaseInfo)
+	return connections.ValidateDatabaseInfo(&appCnf.DatabaseInfo)
 }
 
 // validateLivekitInfo normalizes and validates the optional client-facing URL.
@@ -62,44 +62,6 @@ func validateNatsInfo(n *NatsInfo) error {
 	return nil
 }
 
-func validateRedisInfo(r *RedisInfo) error {
-	if len(r.SentinelAddresses) > 0 {
-		if strings.TrimSpace(r.MasterName) == "" {
-			return fmt.Errorf("redis_info.sentinel_master_name: required when sentinel_addresses is set")
-		}
-		for i, addr := range r.SentinelAddresses {
-			if err := validateHostPort(fmt.Sprintf("redis_info.sentinel_addresses[%d]", i), addr); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-	return validateHostPort("redis_info.host", r.Host)
-}
-
-func validateDatabaseInfo(d *DatabaseInfo) error {
-	if strings.TrimSpace(d.Host) == "" {
-		return fmt.Errorf("database_info.host: required")
-	}
-	if err := validatePort("database_info.port", int(d.Port)); err != nil {
-		return err
-	}
-	if strings.TrimSpace(d.DBName) == "" {
-		return fmt.Errorf("database_info.db: required")
-	}
-	for i, r := range d.Replicas {
-		if strings.TrimSpace(r.Host) == "" {
-			return fmt.Errorf("database_info.replicas[%d].host: required", i)
-		}
-		if r.Port != 0 {
-			if err := validatePort(fmt.Sprintf("database_info.replicas[%d].port", i), int(r.Port)); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
 // validateURL ensures raw is an absolute URL with a host and an allowed scheme.
 func validateURL(field, raw string, allowedSchemes ...string) error {
 	u, err := url.Parse(strings.TrimSpace(raw))
@@ -108,27 +70,6 @@ func validateURL(field, raw string, allowedSchemes ...string) error {
 	}
 	if !slices.Contains(allowedSchemes, u.Scheme) {
 		return fmt.Errorf("%s: %q scheme must be one of %s", field, raw, strings.Join(allowedSchemes, ", "))
-	}
-	return nil
-}
-
-// validateHostPort ensures raw is in "host:port" format with a valid port.
-func validateHostPort(field, raw string) error {
-	host, portStr, err := net.SplitHostPort(strings.TrimSpace(raw))
-	if err != nil || host == "" {
-		return fmt.Errorf("%s: %q must be in host:port format", field, raw)
-	}
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return fmt.Errorf("%s: %q has an invalid port", field, raw)
-	}
-	return validatePort(field, port)
-}
-
-// validatePort ensures port is within the valid TCP range.
-func validatePort(field string, port int) error {
-	if port < 1 || port > 65535 {
-		return fmt.Errorf("%s: port %d must be between 1 and 65535", field, port)
 	}
 	return nil
 }

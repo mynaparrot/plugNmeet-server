@@ -1,6 +1,10 @@
 package config
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/mynaparrot/plugnmeet-protocol/connections"
+)
 
 func strPtr(s string) *string { return &s }
 
@@ -87,19 +91,22 @@ func TestValidateNatsInfo(t *testing.T) {
 func TestValidateRedisInfo(t *testing.T) {
 	tests := []struct {
 		name    string
-		input   RedisInfo
+		input   connections.RedisInfo
 		wantErr bool
 	}{
-		{"standalone valid", RedisInfo{Host: "localhost:6379"}, false},
-		{"standalone missing port", RedisInfo{Host: "localhost"}, true},
-		{"sentinel valid", RedisInfo{MasterName: "mymaster", SentinelAddresses: []string{"host1:26379", "host2:26379"}}, false},
-		{"sentinel missing master", RedisInfo{SentinelAddresses: []string{"host1:26379"}}, true},
-		{"sentinel invalid address", RedisInfo{MasterName: "mymaster", SentinelAddresses: []string{"host1"}}, true},
+		{"standalone valid", connections.RedisInfo{Host: "localhost:6379"}, false},
+		{"standalone missing port", connections.RedisInfo{Host: "localhost"}, true},
+		{"sentinel valid", connections.RedisInfo{MasterName: "mymaster", SentinelAddresses: []string{"host1:26379", "host2:26379"}}, false},
+		{"sentinel missing master", connections.RedisInfo{SentinelAddresses: []string{"host1:26379"}}, true},
+		{"sentinel invalid address", connections.RedisInfo{MasterName: "mymaster", SentinelAddresses: []string{"host1"}}, true},
+		{"cluster valid", connections.RedisInfo{ClusterAddresses: []string{"localhost:7000", "localhost:7001"}}, false},
+		{"cluster invalid address", connections.RedisInfo{ClusterAddresses: []string{"localhost"}}, true},
+		{"cluster with sentinel", connections.RedisInfo{ClusterAddresses: []string{"localhost:7000"}, SentinelAddresses: []string{"host1:26379"}}, true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateRedisInfo(&tt.input)
+			err := connections.ValidateRedisInfo(&tt.input)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("err = %v, wantErr = %v", err, tt.wantErr)
 			}
@@ -110,22 +117,24 @@ func TestValidateRedisInfo(t *testing.T) {
 func TestValidateDatabaseInfo(t *testing.T) {
 	tests := []struct {
 		name    string
-		input   DatabaseInfo
+		input   connections.DatabaseInfo
 		wantErr bool
 	}{
-		{"valid", DatabaseInfo{Host: "localhost", Port: 3306, DBName: "plugnmeet"}, false},
-		{"missing host", DatabaseInfo{Port: 3306, DBName: "plugnmeet"}, true},
-		{"invalid port", DatabaseInfo{Host: "localhost", Port: 0, DBName: "plugnmeet"}, true},
-		{"port out of range", DatabaseInfo{Host: "localhost", Port: 70000, DBName: "plugnmeet"}, true},
-		{"missing db", DatabaseInfo{Host: "localhost", Port: 3306}, true},
-		{"replica inherits port", DatabaseInfo{Host: "localhost", Port: 3306, DBName: "plugnmeet", Replicas: []ReplicaDBInfo{{Host: "replica"}}}, false},
-		{"replica missing host", DatabaseInfo{Host: "localhost", Port: 3306, DBName: "plugnmeet", Replicas: []ReplicaDBInfo{{Port: 3306}}}, true},
-		{"replica invalid port", DatabaseInfo{Host: "localhost", Port: 3306, DBName: "plugnmeet", Replicas: []ReplicaDBInfo{{Host: "replica", Port: 70000}}}, true},
+		{"valid", connections.DatabaseInfo{Host: "localhost", Port: 3306, DBName: "plugnmeet"}, false},
+		{"missing host", connections.DatabaseInfo{Port: 3306, DBName: "plugnmeet"}, true},
+		{"invalid port", connections.DatabaseInfo{Host: "localhost", Port: 0, DBName: "plugnmeet"}, true},
+		{"port out of range", connections.DatabaseInfo{Host: "localhost", Port: 70000, DBName: "plugnmeet"}, true},
+		{"missing db", connections.DatabaseInfo{Host: "localhost", Port: 3306}, true},
+		{"replica inherits port", connections.DatabaseInfo{Host: "localhost", Port: 3306, DBName: "plugnmeet", Replicas: []connections.ReplicaDBInfo{{Host: "replica"}}}, false},
+		{"replica missing host", connections.DatabaseInfo{Host: "localhost", Port: 3306, DBName: "plugnmeet", Replicas: []connections.ReplicaDBInfo{{Port: 3306}}}, true},
+		{"replica invalid port", connections.DatabaseInfo{Host: "localhost", Port: 3306, DBName: "plugnmeet", Replicas: []connections.ReplicaDBInfo{{Host: "replica", Port: 70000}}}, true},
+		{"failover valid", connections.DatabaseInfo{Host: "localhost", Port: 3306, DBName: "plugnmeet", Failover: &connections.FailoverSettings{Hosts: []connections.ReplicaDBInfo{{Host: "db2", Port: 3306}}}}, false},
+		{"failover missing host", connections.DatabaseInfo{Host: "localhost", Port: 3306, DBName: "plugnmeet", Failover: &connections.FailoverSettings{Hosts: []connections.ReplicaDBInfo{{Port: 3306}}}}, true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateDatabaseInfo(&tt.input)
+			err := connections.ValidateDatabaseInfo(&tt.input)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("err = %v, wantErr = %v", err, tt.wantErr)
 			}

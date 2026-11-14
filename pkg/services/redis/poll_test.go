@@ -15,7 +15,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func redisClientForTest(t *testing.T, addr string) *redis.Client {
+func redisClientForTest(t *testing.T, addr string) redis.UniversalClient {
 	t.Helper()
 	c := redis.NewClient(&redis.Options{Addr: addr})
 	if err := c.Ping(context.Background()).Err(); err != nil {
