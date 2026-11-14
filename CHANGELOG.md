@@ -1,5 +1,33 @@
 # Changelog
 
+## [2.6.0](https://github.com/mynaparrot/plugNmeet-server/compare/v2.5.7...v2.6.0) (2026-11-14)
+
+
+### Features
+
+* 15s reconnect grace period and immediate offline on intentional leave ([becd4c1](https://github.com/mynaparrot/plugNmeet-server/commit/becd4c1cdf82847a8d8c53c77d827b66f7482821))
+* added database failover + redis cluster ([0e26c0d](https://github.com/mynaparrot/plugNmeet-server/commit/0e26c0d259f1a93642a25109a4845213a5f78d1e))
+* **config:** add optional livekit_info.client_host for the client-facing URL ([7b2bf9c](https://github.com/mynaparrot/plugNmeet-server/commit/7b2bf9cc45acf1ce49c9155a0ab253a41eb32e45))
+* **countdown-timer:** host-controlled meeting countdown timer ([#936](https://github.com/mynaparrot/plugNmeet-server/issues/936)) ([d806361](https://github.com/mynaparrot/plugNmeet-server/commit/d806361671bafc54c6237b2e2517c26316dd4da5))
+* **polls:** support text-answer polls with atomic Redis grouping and validation ([#938](https://github.com/mynaparrot/plugNmeet-server/issues/938)) ([d806361](https://github.com/mynaparrot/plugNmeet-server/commit/d806361671bafc54c6237b2e2517c26316dd4da5))
+* **recording:** route recorder tasks and JetStream consumers by CloudRecordingVariants ([18b5609](https://github.com/mynaparrot/plugNmeet-server/commit/18b5609e8fbbc0acbe6aeb6921dd5768a0c438f3))
+* standardize client and integration responses and prevent internal error leaks ([#950](https://github.com/mynaparrot/plugNmeet-server/issues/950)) ([870b1c5](https://github.com/mynaparrot/plugNmeet-server/commit/870b1c537bdbc389cfd2633371a4192231597dce))
+* strip sensitive room metadata for waiting users and defer media init until join ([a8c8439](https://github.com/mynaparrot/plugNmeet-server/commit/a8c8439254030b8bd5ca4e6247aebed01a4b15d2))
+
+
+### Bug Fixes
+
+* added few more error messages ([e28213f](https://github.com/mynaparrot/plugNmeet-server/commit/e28213f7ed3af15ccb385dae051c3b323f0b25f9))
+* **analytics:** ignore transient NATS reconnects in user join/left events ([3f3ef73](https://github.com/mynaparrot/plugNmeet-server/commit/3f3ef73700c6e73e35dbd536dae3bf6b26926738))
+* bump fiber `v3.7.0` ([3b28ccb](https://github.com/mynaparrot/plugNmeet-server/commit/3b28ccb8ba48a4041e7b5572c108779842d5e39e))
+* harden path validation, nil safety, and input sanitization ([cb46b21](https://github.com/mynaparrot/plugNmeet-server/commit/cb46b218c48bdbe2181fd5e69a38136711999581))
+* **nats:** two-phase waiting-room permissions and hard-kick of removed users ([#947](https://github.com/mynaparrot/plugNmeet-server/issues/947)) ([07c4941](https://github.com/mynaparrot/plugNmeet-server/commit/07c4941fee6054be1798e186c379d58449f25f6d))
+* **recorder:** add support to connect by NATS websocket + CustomInboxPrefix ([1fc8260](https://github.com/mynaparrot/plugNmeet-server/commit/1fc826033bb26f0d95f5a138e5d8779d0f1c6d39))
+* skip manual offline kick when user rejoined LiveKit with new SID ([c80d1d9](https://github.com/mynaparrot/plugNmeet-server/commit/c80d1d9085406883498316aa2ee7e14df870aa96))
+* trigger remove user upon room end ([d40035a](https://github.com/mynaparrot/plugNmeet-server/commit/d40035ae8b2bbb521503eecda6d0a74bfbacbd85))
+* use `time.AfterFunc` instated of plain goroutine ([d4aef74](https://github.com/mynaparrot/plugNmeet-server/commit/d4aef744305c84dbe6607f43f6965607eea41430))
+* use storage hook logic from proto ([48f8f54](https://github.com/mynaparrot/plugNmeet-server/commit/48f8f54b6be9d370b80ff9cd5c0620cb5104d7a6))
+
 ## [2.5.7](https://github.com/mynaparrot/plugNmeet-server/compare/v2.5.6...v2.5.7) (2026-11-03)
 
 
