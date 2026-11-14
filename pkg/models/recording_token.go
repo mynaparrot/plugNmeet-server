@@ -65,7 +65,7 @@ func (m *RecordingModel) VerifyRecordingToken(token string) (*hooks.DownloadHook
 		return nil, fiber.StatusBadRequest, err
 	}
 
-	if m.app.Hooks != nil {
+	if m.app.Hooks.HasDownloadHook() {
 		// Hooks are defined, so use the pipeline.
 		req := hooks.DownloadHookData{
 			InputPath:    inputPath,

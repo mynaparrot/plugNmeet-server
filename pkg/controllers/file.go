@@ -170,7 +170,7 @@ func (fc *FileController) HandleDownloadUploadedFile(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).SendString(config.MsgFileDownloadInvalidPath)
 	}
 
-	if fc.AppConfig.Hooks != nil {
+	if fc.AppConfig.Hooks.HasDownloadHook() {
 		req := hooks.DownloadHookData{
 			InputPath:    relativePath,
 			HookFileType: hooks.HookFileTypeRoomFile,

@@ -150,7 +150,7 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 	var mType *mimetype.MIME
 
 	// If hooks are enabled, we need to download the file first.
-	if m.app.Hooks != nil {
+	if m.app.Hooks.HasDownloadHook() {
 		req := hooks.DownloadHookData{
 			InputPath:    cleanPath,
 			HookFileType: hooks.HookFileTypeRoomFile,
@@ -241,7 +241,7 @@ func (m *FileModel) processAndBroadcastWhiteboardFile(roomId, roomSid, filePath 
 
 	// If hooks are enabled, upload the entire directory of converted images
 	// (page_N.png + page_N_meta.json).
-	if m.app.Hooks != nil {
+	if m.app.Hooks.HasUploadHook() {
 		req := hooks.UploadHookData{
 			InputDirectoryPath: outputDir,
 			FileId:             fileId,
@@ -309,7 +309,7 @@ func (m *FileModel) MergeWhiteboardPdfExport(req *plugnmeet.UploadedFileMergeReq
 	// The directory where all slices for this export job are stored.
 	savedPath := m.getWhiteboardPdfExportSlicesDir(req.RoomSid, req.ResumableIdentifier)
 
-	if m.app.Hooks != nil {
+	if m.app.Hooks.HasDownloadHook() {
 		hookData := &hooks.DownloadHookData{
 			HookFileType: hooks.HookFileTypeFileGroup,
 			RoomSid:      req.RoomSid,
@@ -380,7 +380,7 @@ func (m *FileModel) MergeWhiteboardPdfExport(req *plugnmeet.UploadedFileMergeReq
 	// clean original dir
 	_ = os.RemoveAll(savedPath)
 
-	if m.app.Hooks != nil {
+	if m.app.Hooks.HasUploadHook() {
 		uploadHookData := &hooks.UploadHookData{
 			HookFileType: hooks.HookFileTypeRoomFile, // general room file
 			RoomSid:      req.RoomSid,
@@ -395,7 +395,9 @@ func (m *FileModel) MergeWhiteboardPdfExport(req *plugnmeet.UploadedFileMergeReq
 		if uploadRes != nil && uploadRes.OutputPath != "" {
 			log.Infof("Successfully uploaded file into %s", uploadRes.OutputPath)
 		}
+	}
 
+	if m.app.Hooks.HasDeleteHook() {
 		// also deleted the files by group id
 		deleteHookData := &hooks.DeleteHookData{
 			HookFileType: hooks.HookFileTypeFileGroup,

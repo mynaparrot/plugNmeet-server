@@ -187,8 +187,8 @@ github.com/molecule-man/go-brrr v1.3.1 h1:EwaJUzRIlp/dFmIpzq4J17CA5Zi5OHo2vOGmu0
 github.com/molecule-man/go-brrr v1.3.1/go.mod h1:7ybW6/7gA3oKY45jOfVNjSJDtrr6ea4tzbsTkjmQDC4=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
-github.com/mynaparrot/plugnmeet-protocol v1.6.4-0.20261114085453-005e5ceded4a h1:Sv9/qnf+D3qI6LUNHI/+b6Ab90hseLw/SrzYcdCHPME=
-github.com/mynaparrot/plugnmeet-protocol v1.6.4-0.20261114085453-005e5ceded4a/go.mod h1:tnCcgvxenrclGyl+ybv3snTKUr9o1qUMVjs1HDT70O0=
+github.com/mynaparrot/plugnmeet-protocol v1.6.4-0.20261114142648-c4d001a4109d h1:usHaBRiyc5FVe/epCljPElBTbWU0bIN99DnnmwNkO0c=
+github.com/mynaparrot/plugnmeet-protocol v1.6.4-0.20261114142648-c4d001a4109d/go.mod h1:F6ByVp/e8TDvIAVoUFXJiuHj7UxhzKdZS6AlO0oCZWM=
 github.com/nats-io/jwt/v2 v2.8.3 h1:pqImTmlqH2zPHKNdRXO0YRyWif2diGRlrtLFJ2RxM2I=
 github.com/nats-io/jwt/v2 v2.8.3/go.mod h1:OOY2rP/UU8tcfoqhbHmBKcNdpFMKvmxIkmFFa16M4wI=
 github.com/nats-io/nats.go v1.55.0 h1:Ng8QKHdvdHIWoaiq0+d/aH1BWkxvcJxWJ0Y/9BPKx3M=

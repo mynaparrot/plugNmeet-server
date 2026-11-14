@@ -178,7 +178,7 @@ func (m *ArtifactModel) VerifyArtifactDownloadJWT(token string) (*hooks.Download
 		return nil, fiber.StatusBadRequest, err
 	}
 
-	if m.app.Hooks != nil {
+	if m.app.Hooks.HasDownloadHook() {
 		// Hooks are defined, so use the pipeline.
 		req := hooks.DownloadHookData{
 			InputPath:    inputPath,
@@ -231,7 +231,7 @@ func (m *ArtifactModel) DeleteArtifact(req *plugnmeet.DeleteArtifactReq) error {
 	if err := protojson.Unmarshal([]byte(artifact.Metadata), &metadata); err == nil {
 		if metadata.FileInfo != nil && metadata.FileInfo.FilePath != "" {
 			// If delete hook is configured, we'll use it.
-			if m.app.Hooks != nil {
+			if m.app.Hooks.HasDeleteHook() {
 				delReq := hooks.DeleteHookData{
 					InputPath:    metadata.FileInfo.FilePath,
 					HookFileType: hooks.HookFileTypeArtifact,

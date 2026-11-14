@@ -11,6 +11,7 @@ import (
 
 	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/connections"
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/logging"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/sirupsen/logrus"
@@ -36,7 +37,7 @@ type AppConfig struct {
 	NatsInfo            NatsInfo                   `yaml:"nats_info"`
 	Insights            *InsightsConfig            `yaml:"insights"`
 	TurnServer          *TurnConfig                `yaml:"turn_server"`
-	Hooks               *Hooks                     `yaml:"hooks"`
+	Hooks               *hooks.Config              `yaml:"hooks"`
 }
 
 type ClientInfo struct {

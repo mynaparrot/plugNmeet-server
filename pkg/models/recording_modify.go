@@ -165,7 +165,7 @@ func (m *RecordingModel) addRecordingInfoFile(r *plugnmeet.RecorderToPlugNmeet, 
 	log.Infoln("Successfully created recording info file")
 
 	// run upload hook
-	if m.app.Hooks != nil {
+	if m.app.Hooks.HasUploadHook() {
 		req := hooks.UploadHookData{
 			InputPath:    p,
 			HookFileType: hooks.HookFileTypeRecordingMetadata,

@@ -120,7 +120,7 @@ func TestDownloadTokensRejectUnsafePaths(t *testing.T) {
 	env := newDownloadTestEnv(t)
 
 	// a configured download hook makes sure the path is validated before hooks run
-	env.rm.app.Hooks = &config.Hooks{
+	env.rm.app.Hooks = &hooks.Config{
 		DownloadHook: &hooks.HookScriptConfig{
 			Scripts: []hooks.HookScript{{Script: "/bin/true"}},
 		},

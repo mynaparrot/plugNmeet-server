@@ -181,7 +181,7 @@ func (m *RoomModel) onAfterRoomEnded(p *onAfterRoomEndedParams) {
 	})
 
 	// Trigger room end hook for any external cleanup
-	if m.app.Hooks != nil {
+	if m.app.Hooks.HasRoomEndHook() {
 		log.Info("Running room end hook")
 		req := &hooks.RoomEndHookData{
 			RoomId:  p.roomId,

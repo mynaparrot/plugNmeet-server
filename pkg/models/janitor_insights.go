@@ -64,7 +64,7 @@ func (m *JanitorModel) CheckInsightsPendingSummarizeJobs() {
 			}
 
 			deletedFile := false
-			if m.app.Hooks != nil {
+			if m.app.Hooks.HasDeleteHook() {
 				if res, err := m.app.Hooks.RunDeleteHook(&hooks.DeleteHookData{
 					InputPath:    payload.OriginalFilePath,
 					HookFileType: hooks.HookFileTypeArtifact,

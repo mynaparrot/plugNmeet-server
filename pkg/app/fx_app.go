@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/goccy/go-yaml"
 	lkLogger "github.com/livekit/protocol/logger"
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/logging"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/controllers"
@@ -69,7 +71,20 @@ func provideLogger(appCnf *config.AppConfig) (*logrus.Logger, error) {
 // In the future, other pre-start logic can be added here.
 func ExecuteBootstrapTasks(lc fx.Lifecycle, ctx context.Context, cancel context.CancelFunc, appCnf *config.AppConfig, logger *logrus.Logger) error {
 	if appCnf.Hooks != nil {
-		if err := appCnf.Hooks.InitializeHooks(ctx, appCnf.RootWorkingDir, logger); err != nil {
+		categories := []hooks.Category{
+			{Name: hooks.HookNameUpload, Config: appCnf.Hooks.UploadHook},
+			{Name: hooks.HookNameDownload, Config: appCnf.Hooks.DownloadHook},
+			{Name: hooks.HookNameDelete, Config: appCnf.Hooks.DeleteHook},
+			{Name: hooks.HookNameResumableUpload, Config: appCnf.Hooks.ResumableUploadHook},
+			{Name: hooks.HookNameRoomEnd, Config: appCnf.Hooks.RoomEndHook},
+		}
+		err := appCnf.Hooks.Initialize(ctx, hooks.InitOptions{
+			RootWorkingDir: appCnf.RootWorkingDir,
+			DefaultTimeout: 5 * time.Minute,
+			Logger:         logger,
+			Downloader:     config.NewGrabDownloader(),
+		}, categories...)
+		if err != nil {
 			logger.WithError(err).Error("failed to initialize hooks")
 			return err
 		}

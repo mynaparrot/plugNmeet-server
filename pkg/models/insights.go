@@ -294,7 +294,7 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 			if insights.SummarizeJobMaxDeliverNum == metadata.NumDelivered {
 				log.Warnf("Maximum number of retrying passed, limit: %d, delivered: %d", insights.SummarizeJobMaxDeliverNum, metadata.NumDelivered)
 				// so, maximum delivery done, and we can delete the original file to ensure it's remain as orphan
-				if s.appConfig.Hooks != nil {
+				if s.appConfig.Hooks.HasDeleteHook() {
 					req := &hooks.DeleteHookData{
 						InputPath:    originalPath,
 						HookFileType: hooks.HookFileTypeArtifact,
@@ -342,7 +342,7 @@ func (s *InsightsModel) StartProcessingSummarizeJob(payload *insights.SummarizeJ
 	userPrompt := string(payload.Options)
 
 	// download the file to local
-	if s.appConfig.Hooks != nil {
+	if s.appConfig.Hooks.HasDownloadHook() {
 		req := &hooks.DownloadHookData{
 			InputPath:    payload.FilePath,
 			HookFileType: hooks.HookFileTypeArtifact,
