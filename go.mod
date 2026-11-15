@@ -4,7 +4,7 @@ go 1.27.3
 
 require (
 	buf.build/go/protovalidate v1.4.0
-	github.com/Microsoft/cognitive-services-speech-sdk-go v1.53.0
+	github.com/Microsoft/cognitive-services-speech-sdk-go v1.53.1
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/facette/natsort v0.0.0-20181210072756-2cd4dd1e2dcb
 	github.com/gabriel-vasile/mimetype v1.4.16
