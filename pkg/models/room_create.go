@@ -14,6 +14,7 @@ import (
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cast"
+	"google.golang.org/protobuf/proto"
 )
 
 func (m *RoomModel) CreateRoom(userCtx context.Context, r *plugnmeet.CreateRoomReq) (plugnmeet.StatusCode, *plugnmeet.ActiveRoomInfo, error) {
@@ -84,11 +85,22 @@ func (m *RoomModel) CreateRoom(userCtx context.Context, r *plugnmeet.CreateRoomR
 		return plugnmeet.StatusCode_INVALID_PARAMETERS, nil, err
 	}
 
+	// an AI agent room is refused loudly instead of silently running without a boundary
+	if err := m.validateAIAgentFeatures(r, log); err != nil {
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, nil, err
+	}
+
+	// the AI text chat may bring its own external MCP servers; they share the
+	// room-wide budget with the AI agent's servers
+	if err := m.validateAITextChatMCPServers(r, log); err != nil {
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, nil, err
+	}
+
 	// prepare DB model
 	roomDbInfo, sid := m.prepareRoomDbInfo(r, roomDbInfo)
 
 	// save info to db
-	if _, err := m.ds.InsertOrUpdateRoomInfo(roomDbInfo); err != nil {
+	if err := m.saveRoomDbInfo(r, roomDbInfo); err != nil {
 		log.WithError(err).Error("Failed to insert or update room in db")
 		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, nil, config.ErrRoomUnexpectedError
 	}
@@ -113,6 +125,15 @@ func (m *RoomModel) CreateRoom(userCtx context.Context, r *plugnmeet.CreateRoomR
 			}
 		}
 	}
+
+	// keep the external MCP endpoints and credentials out of the metadata that
+	// every participant receives, and pre-warm their tools for the session
+	m.aiAgentModel.PrepareRoomExternalMCP(
+		userCtx,
+		r.RoomId,
+		r.GetMetadata().GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures(),
+		r.GetMetadata().GetRoomFeatures().GetInsightsFeatures().GetAiFeatures().GetAiTextChatFeatures(),
+	)
 
 	// now create room bucket
 	mt, err := m.natsService.AddRoom(roomDbInfo.ID, r.RoomId, sid, r.EmptyTimeout, r.MaxParticipants, r.Metadata)
@@ -247,6 +268,11 @@ func (m *RoomModel) setRoomDefaults(r *plugnmeet.CreateRoomReq) {
 				}
 				r.Metadata.RoomFeatures.InsightsFeatures.ChatTranslationFeatures.MaxSelectedTransLangs = int32(maxSelectedChatTransLangs)
 			}
+
+			// store the AI agent features with every documented default applied
+			if aiAgentFeatures := r.Metadata.RoomFeatures.InsightsFeatures.GetAiAgentFeatures(); aiAgentFeatures != nil {
+				r.Metadata.RoomFeatures.InsightsFeatures.AiAgentFeatures = NormalizeAIAgentFeatures(aiAgentFeatures)
+			}
 		}
 	}
 
@@ -255,6 +281,137 @@ func (m *RoomModel) setRoomDefaults(r *plugnmeet.CreateRoomReq) {
 			r.Metadata.RoomFeatures.SipDialInFeatures.IsAllow = false
 		}
 	}
+
+	m.applyAIAgentRoomDefaults(r)
+}
+
+// applyAIAgentRoomDefaults prepares a room that hosts the AI agent: the
+// pre-authorized participants get a focused 1-on-1 setup, and per-user sessions
+// need the breakout room infrastructure.
+func (m *RoomModel) applyAIAgentRoomDefaults(r *plugnmeet.CreateRoomReq) {
+	features := r.GetMetadata().GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()
+	if !features.GetIsAllow() {
+		return
+	}
+
+	// Only the named participants are expected to talk to the agent, so their
+	// camera and screen stay off until they enable them explicitly.
+	if len(features.GetAllowedParticipantIds()) > 0 {
+		locks := r.Metadata.DefaultLockSettings
+		if locks == nil {
+			locks = new(plugnmeet.LockSettings)
+			r.Metadata.DefaultLockSettings = locks
+		}
+		if locks.LockWebcam == nil {
+			locks.LockWebcam = proto.Bool(true)
+		}
+		if locks.LockScreenSharing == nil {
+			locks.LockScreenSharing = proto.Bool(true)
+		}
+	}
+
+	// a direct 1-on-1 room has a single designated participant, so the agent
+	// starts as soon as that participant joins
+	if !features.GetAutoCreatePerUserSession() && len(features.GetAllowedParticipantIds()) == 1 {
+		features.AutoJoinOnFirstParticipant = true
+	}
+
+	// every participant gets their own room, so the parent needs breakouts
+	if features.GetAutoCreatePerUserSession() && !r.GetMetadata().GetIsBreakoutRoom() {
+		if breakout := r.Metadata.RoomFeatures.BreakoutRoomFeatures; breakout != nil {
+			breakout.IsAllow = true
+		}
+	}
+}
+
+// validateAIAgentFeatures refuses an AI agent room that could never run safely:
+// a missing prompt or topic, an unreadable E2EE key, or a missing provider.
+func (m *RoomModel) validateAIAgentFeatures(r *plugnmeet.CreateRoomReq, log *logrus.Entry) error {
+	features := r.GetMetadata().GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()
+	if !features.GetIsAllow() {
+		return nil
+	}
+	if m.aiAgentModel == nil {
+		log.Warn("ai_agent_features.is_allow rejected: the AI agent is not available")
+		return config.ErrAIAgentNotAllowed
+	}
+
+	err := m.aiAgentModel.ValidateAIAgentFeatures(
+		features,
+		r.GetMetadata().GetRoomFeatures().GetEndToEndEncryptionFeatures(),
+		r.GetMetadata().GetRoomFeatures().GetInsightsFeatures().GetIsAllow(),
+	)
+	if err != nil {
+		log.WithError(err).Warn("ai_agent_features was refused")
+		return err
+	}
+
+	return m.validateAIAgentSessionLimits(r, features, log)
+}
+
+// validateAIAgentSessionLimits refuses session limits that can never be honoured:
+// more concurrent sessions than breakout rooms, and more pre-authorized
+// participants than the concurrent session limit allows.
+func (m *RoomModel) validateAIAgentSessionLimits(r *plugnmeet.CreateRoomReq, features *plugnmeet.InsightsAIAgentFeatures, log *logrus.Entry) error {
+	// allowed_number_rooms is already clamped by the server's own maximum
+	allowedRooms := r.GetMetadata().GetRoomFeatures().GetBreakoutRoomFeatures().GetAllowedNumberRooms()
+	if maxConc := features.GetMaxConcurrentSessions(); maxConc > 0 && allowedRooms > 0 && maxConc > allowedRooms {
+		log.Errorf("max_concurrent_sessions (%d) exceeds allowed_number_rooms (%d)", maxConc, allowedRooms)
+		return config.ErrAIAgentMaxConcurrentSessions
+	}
+
+	allowedParticipantIds := features.GetAllowedParticipantIds()
+	if len(allowedParticipantIds) == 0 || r.GetMetadata().GetIsBreakoutRoom() {
+		return nil
+	}
+
+	// a direct 1-on-1 session runs in the room itself, so exactly one
+	// participant may be pre-authorized
+	if !features.GetAutoCreatePerUserSession() {
+		if len(allowedParticipantIds) > 1 {
+			log.Errorf("a direct AI session supports 1 allowed_participant_id, got %d", len(allowedParticipantIds))
+			return config.ErrAIAgentDirectSessionUsers
+		}
+		return nil
+	}
+
+	// per-user sessions open one breakout room per participant
+	if limit := effectiveMaxAISessions(r.GetMetadata()); uint32(len(allowedParticipantIds)) > limit {
+		log.Errorf("%d allowed_participant_ids exceed the effective session limit (%d)", len(allowedParticipantIds), limit)
+		return config.ErrAIAgentMaxConcurrentSessions
+	}
+
+	return nil
+}
+
+// validateAITextChatMCPServers refuses AI text chat MCP servers that could never
+// be warmed: the feature must be enabled, the endpoints must pass the same shape
+// checks as the AI agent's, and the merged room configuration must stay within
+// the shared server budget.
+func (m *RoomModel) validateAITextChatMCPServers(r *plugnmeet.CreateRoomReq, log *logrus.Entry) error {
+	insightsFeatures := r.GetMetadata().GetRoomFeatures().GetInsightsFeatures()
+	features := insightsFeatures.GetAiFeatures().GetAiTextChatFeatures()
+	servers := features.GetMcpServers()
+	if len(servers) == 0 {
+		return nil
+	}
+	if !insightsFeatures.GetIsAllow() || !features.GetIsAllow() {
+		log.Warn("ai text chat mcp servers rejected: the ai text chat is not enabled")
+		return config.ErrAIAgentInvalidMCPServer
+	}
+
+	if err := ValidateExternalMCPServers(servers); err != nil {
+		log.WithError(err).Warn("ai text chat mcp servers were refused")
+		return err
+	}
+
+	agentServers := insightsFeatures.GetAiAgentFeatures().GetMcpServers()
+	if _, err := MergeExternalMCPServers(agentServers, servers); err != nil {
+		log.WithError(err).Warn("ai text chat mcp servers were refused")
+		return err
+	}
+
+	return nil
 }
 
 // validatePreassignedBreakoutRooms rejects pre-assignment lists that can never
@@ -328,6 +485,20 @@ func (m *RoomModel) prepareRoomDbInfo(r *plugnmeet.CreateRoomReq, existing *dbmo
 		existing.WebhookUrl = *r.Metadata.WebhookUrl
 	}
 	return existing, sId
+}
+
+// saveRoomDbInfo stores the prepared room row. A brand-new breakout room clones
+// its parent's row, so all table columns are inherited; anything else is a plain
+// insert or update.
+func (m *RoomModel) saveRoomDbInfo(r *plugnmeet.CreateRoomReq, info *dbmodels.RoomInfo) error {
+	if r.GetMetadata().GetIsBreakoutRoom() && info.ID == 0 {
+		if _, parentTableId, err := ParseBreakoutParentRoomRef(r.GetMetadata().GetParentRoomId()); err == nil && parentTableId > 0 {
+			return m.ds.CloneParentRoomInfoForBreakout(parentTableId, info)
+		}
+	}
+
+	_, err := m.ds.InsertOrUpdateRoomInfo(info)
+	return err
 }
 
 // prepareWhiteboardPreloadFile preload whiteboard file

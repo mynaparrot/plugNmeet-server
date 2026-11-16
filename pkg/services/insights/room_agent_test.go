@@ -1,11 +1,33 @@
 package insightsservice
 
 import (
+	"strings"
 	"sync"
 	"testing"
 
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 )
+
+// The AI agent registers its identity in NATS and then joins LiveKit with that
+// same id, because browsers resolve the agent's audio track through the
+// NATS-backed participant list.
+func TestRoomAgentIdentityReusesProvidedAgentUserId(t *testing.T) {
+	payload := &insights.InsightsTaskPayload{ServiceType: insights.ServiceTypeAIAgent}
+	const agentUserId = "pnm_agent-ai_agent-fixed"
+
+	if got := roomAgentIdentity(payload, agentUserId); got != agentUserId {
+		t.Fatalf("expected the provided identity %q, got %q", agentUserId, got)
+	}
+
+	generated := roomAgentIdentity(payload, "")
+	if !strings.HasPrefix(generated, config.AgentUserUserIdPrefix+string(insights.ServiceTypeAIAgent)+"-") {
+		t.Fatalf("unexpected generated identity %q", generated)
+	}
+	if again := roomAgentIdentity(payload, ""); again == generated {
+		t.Fatalf("expected a fresh identity per call, got %q twice", generated)
+	}
+}
 
 func newTestPipeline(trackID string) (*activePipeline, chan struct{}) {
 	canceled := make(chan struct{})

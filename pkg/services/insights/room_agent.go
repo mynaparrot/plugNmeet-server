@@ -79,10 +79,29 @@ type RoomAgentArgs struct {
 	RedisService    *redisservice.RedisService
 	Logger          *logrus.Entry
 	Payload         *insights.InsightsTaskPayload
+	// AgentUserId is the LiveKit identity to join with. Callers that also
+	// register the participant in NATS pass it so both agree on one id;
+	// when empty a fresh identity is generated.
+	AgentUserId string
+}
+
+// roomAgentIdentity returns the LiveKit identity of the agent participant.
+func roomAgentIdentity(payload *insights.InsightsTaskPayload, agentUserId string) string {
+	if agentUserId != "" {
+		return agentUserId
+	}
+	return fmt.Sprintf("%s%s-%s", config.AgentUserUserIdPrefix, payload.ServiceType, uuid.NewString())
 }
 
 // NewRoomAgent creates and connects a new RoomAgent to a LiveKit room.
 func NewRoomAgent(args *RoomAgentArgs) (*RoomAgent, error) {
+	return newRoomAgent(args, nil)
+}
+
+// newRoomAgent connects a RoomAgent to the LiveKit room. When task is nil, a
+// task is created from the payload's service type; callers that own the task
+// (the AI agent) pass it in so their own audio pipeline runs unchanged.
+func newRoomAgent(args *RoomAgentArgs, task insights.Task) (*RoomAgent, error) {
 	ctx, cancel := context.WithCancel(args.Ctx)
 	log := args.Logger.WithFields(logrus.Fields{
 		"service":     "room-agent",
@@ -92,23 +111,26 @@ func NewRoomAgent(args *RoomAgentArgs) (*RoomAgent, error) {
 		"serviceId":   args.ServiceConfig.ID,
 	})
 
-	// Create a single task for this agent's one and only service.
-	taskArgs := &TaskArgs{
-		Ctx:             ctx,
-		ServiceType:     args.Payload.ServiceType,
-		AppConf:         args.AppConf,
-		NatsConn:        args.NatsConn,
-		JS:              args.JS,
-		ServiceConfig:   args.ServiceConfig,
-		ProviderAccount: args.ProviderAccount,
-		NatsService:     args.NatsService,
-		RedisService:    args.RedisService,
-		Logger:          log,
-	}
-	task, err := NewTask(taskArgs)
-	if err != nil {
-		cancel()
-		return nil, fmt.Errorf("could not create task for service '%s': %w", args.Payload.ServiceType, err)
+	if task == nil {
+		// Create a single task for this agent's one and only service.
+		taskArgs := &TaskArgs{
+			Ctx:             ctx,
+			ServiceType:     args.Payload.ServiceType,
+			AppConf:         args.AppConf,
+			NatsConn:        args.NatsConn,
+			JS:              args.JS,
+			ServiceConfig:   args.ServiceConfig,
+			ProviderAccount: args.ProviderAccount,
+			NatsService:     args.NatsService,
+			RedisService:    args.RedisService,
+			Logger:          log,
+		}
+		var err error
+		task, err = NewTask(taskArgs)
+		if err != nil {
+			cancel()
+			return nil, fmt.Errorf("could not create task for service '%s': %w", args.Payload.ServiceType, err)
+		}
 	}
 
 	agent := &RoomAgent{
@@ -138,7 +160,7 @@ func NewRoomAgent(args *RoomAgentArgs) (*RoomAgent, error) {
 
 	c := &plugnmeet.PlugNmeetTokenClaims{
 		RoomId:   args.Payload.RoomId,
-		UserId:   fmt.Sprintf("%s%s-%s", config.AgentUserUserIdPrefix, args.Payload.ServiceType, uuid.NewString()),
+		UserId:   roomAgentIdentity(args.Payload, args.AgentUserId),
 		IsAdmin:  true,
 		IsHidden: args.Payload.HiddenAgent,
 	}
@@ -265,7 +287,7 @@ func (a *RoomAgent) ActivateRoomWideTask() {
 
 	// Subscribe to all existing participants' microphone tracks only.
 	for _, p := range a.Room.GetRemoteParticipants() {
-		if a.isSystemAgent(p.Identity()) {
+		if a.isSystemAgent(p.Identity()) || !a.isCaptureAllowed(p.Identity()) {
 			continue
 		}
 		for _, pub := range p.TrackPublications() {
@@ -429,6 +451,11 @@ func (a *RoomAgent) onTrackPublished(publication *lksdk.RemoteTrackPublication, 
 	}
 
 	if a.payload.CaptureAllParticipantsTracks {
+		// a targeted room-wide task only captures the participants it names
+		if !a.isCaptureAllowed(rp.Identity()) {
+			log.Infoln("participant is not part of the targeted capture, ignoring track")
+			return
+		}
 		if err := publication.SetSubscribed(true); err != nil {
 			log.WithError(err).Warn("failed to subscribe to microphone track")
 		}
@@ -673,6 +700,16 @@ func (a *RoomAgent) isSystemAgent(userId string) bool {
 	}
 
 	return false
+}
+
+// isCaptureAllowed reports whether a participant's audio belongs to this agent's
+// task. An empty target list captures everybody in the room.
+func (a *RoomAgent) isCaptureAllowed(identity string) bool {
+	if len(a.payload.TargetUsers) == 0 {
+		return true
+	}
+
+	return a.payload.TargetUsers[config.PrimaryIdentityFromNative(identity)]
 }
 
 // isMicrophoneOpusTrack checks if the given track publication is a microphone source and of Opus codec.

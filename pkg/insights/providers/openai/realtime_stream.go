@@ -615,6 +615,32 @@ func hasSpeechPCM16(pcm []int16, threshold float64) bool {
 	return rms >= threshold
 }
 
+// resamplePCM16Bytes16kTo24k converts little-endian 16 kHz PCM16 mono audio to
+// 24 kHz, which is the rate both Realtime and Live sessions expect on the wire.
+func resamplePCM16Bytes16kTo24k(pcm16kMono []byte) []byte {
+	samples := len(pcm16kMono) &^ 1
+	if samples == 0 {
+		return nil
+	}
+
+	input := make([]int16, samples/2)
+	for i := range input {
+		input[i] = int16(binary.LittleEndian.Uint16(pcm16kMono[i*2:]))
+	}
+
+	output := resamplePCM16Linear(input, defaultLiveKitInputSampleRate, defaultRealtimeSampleRate)
+	if len(output) == 0 {
+		return nil
+	}
+
+	pcm := make([]byte, len(output)*2)
+	for i, sample := range output {
+		binary.LittleEndian.PutUint16(pcm[i*2:], uint16(sample))
+	}
+
+	return pcm
+}
+
 func resamplePCM16Linear(input []int16, inputRate, outputRate int) []int16 {
 	if len(input) == 0 || inputRate <= 0 || outputRate <= 0 || inputRate == outputRate {
 		return input

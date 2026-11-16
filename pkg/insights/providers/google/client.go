@@ -18,6 +18,8 @@ type GoogleProvider struct {
 	logger *logrus.Entry
 }
 
+var _ insights.ToolTextChatProvider = (*GoogleProvider)(nil)
+
 // NewProvider creates a new Google AI provider.
 func NewProvider(ctx context.Context, providerAccount *config.ProviderAccount, serviceConfig *config.ServiceConfig, log *logrus.Entry) (insights.Provider, error) {
 	if providerAccount.Credentials.APIKey == "" {
@@ -40,6 +42,11 @@ func NewProvider(ctx context.Context, providerAccount *config.ProviderAccount, s
 // AITextChatStream delegates to the chat implementation.
 func (p *GoogleProvider) AITextChatStream(ctx context.Context, chatModel string, history []*plugnmeet.InsightsAITextChatContent) (<-chan *plugnmeet.InsightsAITextChatStreamResult, error) {
 	return newChatStream(ctx, p.client, chatModel, history, p.logger)
+}
+
+// AITextChatStreamWithTools streams a chat turn that may call functions.
+func (p *GoogleProvider) AITextChatStreamWithTools(ctx context.Context, chatModel string, history []*plugnmeet.InsightsAITextChatContent, tools *insights.AITextChatToolRunner) (<-chan *plugnmeet.InsightsAITextChatStreamResult, error) {
+	return newChatStreamWithTools(ctx, p.client, chatModel, history, tools, p.logger)
 }
 
 // AIChatTextSummarize delegates to the chat implementation.

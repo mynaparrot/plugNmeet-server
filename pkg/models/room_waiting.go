@@ -69,6 +69,11 @@ func (m *RoomModel) approveUser(roomId, userId, metadata string) error {
 	// the waiting user's consumer only listens to the private subject, so notify it directly
 	_ = m.natsService.BroadcastUserMetadata(roomId, userId, nil, &userId)
 
+	// an approved participant can now start the AI agent
+	if m.aiAgentModel != nil {
+		go m.aiAgentModel.OnUserJoined(m.ctx, roomId, userId)
+	}
+
 	return nil
 }
 

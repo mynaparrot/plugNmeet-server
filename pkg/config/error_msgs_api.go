@@ -175,6 +175,27 @@ var (
 	ErrRecordingRtmpNotRunning     = errors.New("notifications.rtmp-not-running")
 )
 
+// AI agent errors are returned to clients by the /api/aiAgent endpoints; their
+// values are i18n keys the client resolves via t(), never operational error text.
+var (
+	ErrAIAgentOnlyAdmin       = errors.New("ai-agent.errors.only-admin")
+	ErrAIAgentNotAllowed      = errors.New("ai-agent.errors.not-allowed")
+	ErrAIAgentNotRunning      = errors.New("ai-agent.errors.not-running")
+	ErrAIAgentInvalidRequest  = errors.New("ai-agent.errors.invalid-request")
+	ErrAIAgentE2EEUnsupported = errors.New("ai-agent.errors.e2ee-unsupported")
+	ErrAIAgentProviderMissing = errors.New("ai-agent.errors.provider-missing")
+	ErrAIAgentPromptRequired  = errors.New("ai-agent.errors.prompt-required")
+	ErrAIAgentTopicRequired   = errors.New("ai-agent.errors.topic-required")
+	ErrAIAgentNoDelegate      = errors.New("ai-agent.errors.no-delegate")
+	ErrAIAgentGeneric         = errors.New("ai-agent.errors.generic")
+	// 1-on-1 session errors: a misconfigured session limit, or a caller that is
+	// not one of the participants the agent may talk to.
+	ErrAIAgentMaxConcurrentSessions = errors.New("ai-agent.errors.max-concurrent-sessions")
+	ErrAIAgentDirectSessionUsers    = errors.New("ai-agent.errors.direct-session-single-user")
+	ErrAIAgentBreakoutOneUser       = errors.New("ai-agent.errors.breakout-one-user")
+	ErrAIAgentUserNotAllowed        = errors.New("ai-agent.errors.user-not-allowed")
+)
+
 // MsgSuccess is the generic success message of the response envelopes. It is an
 // i18n key the client resolves via t(), never English text.
 const MsgSuccess = "notifications.success"

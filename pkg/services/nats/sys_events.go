@@ -156,3 +156,14 @@ func (s *NatsService) NotifyWarningMsg(roomId, msg string, withSound bool, userI
 func (s *NatsService) NotifyErrorMsg(roomId, msg string, userId *string) error {
 	return s.BroadcastSystemNotificationToRoom(roomId, msg, plugnmeet.NatsSystemNotificationTypes_NATS_SYSTEM_NOTIFICATION_ERROR, true, userId)
 }
+
+// BroadcastAIAgentState publishes the AI agent's runtime state to everyone in the room.
+func (s *NatsService) BroadcastAIAgentState(roomId string, msg *plugnmeet.AIAgentStateMsg) error {
+	return s.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_AI_AGENT_STATE, roomId, msg, nil)
+}
+
+// SendAIAgentToolCallToUser asks one participant's browser to execute a
+// client-delegated tool call. Only the addressed user receives it.
+func (s *NatsService) SendAIAgentToolCallToUser(roomId, userId string, msg *plugnmeet.AIAgentToolCallMsg) error {
+	return s.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_AI_AGENT_TOOL_CALL, roomId, msg, &userId)
+}

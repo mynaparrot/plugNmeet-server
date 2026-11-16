@@ -15,6 +15,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
+	"github.com/mynaparrot/plugnmeet-server/pkg/services/insights/mcp"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/nats-io/nats.go"
@@ -50,6 +51,9 @@ type InsightsModel struct {
 	redisService  *redisservice.RedisService
 	natsService   *natsservice.NatsService
 	artifactModel *ArtifactModel
+	// aiAgentModel owns the MCP tool backends; the admin AI text chat builds its
+	// tool dependencies through it. Wired in wireCircularModels.
+	aiAgentModel *AIAgentModel
 }
 
 type InsightsModelArgs struct {
@@ -78,6 +82,22 @@ func NewInsightsModel(args InsightsModelArgs) *InsightsModel {
 		artifactModel: args.ArtifactModel,
 		logger:        args.Logger.WithField("model", "insights"),
 	}
+}
+
+// SetAIAgentModel is an initializer to prevent a circular dependency: the AI
+// agent model already depends on the insights model.
+func (s *InsightsModel) SetAIAgentModel(m *AIAgentModel) {
+	s.aiAgentModel = m
+}
+
+// BuildToolDependencies wires the MCP tools of an AI text chat session run by
+// userID. It returns nil when the agent model is not wired yet, so a partially
+// initialised server never registers half-configured tools.
+func (s *InsightsModel) BuildToolDependencies(roomId, userId string, log *logrus.Entry) mcp.ToolDependencies {
+	if s.aiAgentModel == nil {
+		return mcp.ToolDependencies{}
+	}
+	return s.aiAgentModel.BuildToolDependencies(roomId, userId, log)
 }
 
 // ConfigureAgent sends a configuration task and waits for confirmation.

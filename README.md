@@ -1,10 +1,22 @@
-# Plug-N-Meet - A Scalable, Customizable, Open-Source Web Conferencing System
+# Plug-N-Meet — Scalable, Customizable, Open-Source Web Conferencing with Native Agentic AI
 
-Plug-N-Meet is a powerful, open-source web conferencing solution built on the high-performance WebRTC infrastructure of [LiveKit](https://github.com/livekit/livekit-server). Designed for scalability and easy customization, Plug-N-Meet allows you to seamlessly integrate a feature-rich, self-hosted, and AI-powered video conferencing experience into any existing website, application, or system.
+**The open-source, self-hosted video conferencing software. Scalable, customizable, and with a powerful AI Meeting Agent.**
+
+Plug-N-Meet is built on **Go** for the server and [LiveKit](https://github.com/livekit/livekit-server) for the high-performance WebRTC media layer, and it ships with a native, multimodal **AI Agent** and **Classroom AI Co-Pilot** — not a bolt-on plugin. The agent can speak and listen in real time, draw on the collaborative whiteboard, see participants' work, write shared notes, launch quizzes, and connect to external **MCP (Model Context Protocol)** servers for web knowledge and tool use. The result is a feature-rich, self-hosted conferencing platform you can integrate into any existing website, application, or system.
 
 Have questions or ideas? [Join our developer community on Discord](https://discord.gg/2X2ZaCHu4C) to connect with the team and discuss your suggestions.
 
 ![banner](./github_files/banner.jpg)
+
+## Native Agentic AI & Multimodal Capabilities
+
+Plug-N-Meet treats the AI as a **first-class participant inside the room**, with its own identity, permissions, microphone, whiteboard write/vision access, and shared-note access. It is not a sidebar chatbot bolted onto a meeting — it can act.
+
+*   **Autonomous 1-on-1 Voice & Vision Agent (Virtual Teacher / Assistant)**: Launch a dedicated AI participant that holds a real, spoken conversation with a single participant over **native bidirectional Realtime audio** — **OpenAI Realtime** and **Google Gemini Live**, with instant barge-in — not a slow chained `speech-to-text → LLM → text-to-speech` pipeline. On the **Whiteboard** it draws diagrams, shapes, and text and points at things with a laser cursor, and it visually inspects what the participant drew or wrote on the **Whiteboard canvas** (not a camera feed or screen share). It answers questions, walks through a topic step by step, stays strictly within a server-enforced topic boundary, and generates a structured `AI_AGENT_SESSION_SUMMARY` artifact so the conversation can continue across multiple sessions.
+*   **1-on-1 AI Breakout Labs & Auto-Isolated Demo Rooms**: Spin up isolated breakout rooms where each participant gets their own private AI agent session — ideal for language practice, oral exams, interviews, tutoring, or guided demos. Rooms are created, populated, and cleaned up automatically, so a moderator can run a whole classroom of simultaneous 1-on-1 AI sessions without any manual pairing.
+*   **Moderator AI Co-Pilot (`ai_text_chat`)**: A moderator-facing co-pilot built into the client and the **Shared Notepad**, which it reads and writes. It understands the meeting context, answers questions about the discussion, inspects and draws on the **Whiteboard**, drafts and previews **Quizzes/Polls** before they are published, and manages **Breakout Rooms** and room settings — all through the same insights/streaming endpoint used by the rest of the AI features.
+*   **External MCP (Model Context Protocol) & Web Knowledge**: Connect the agent to external **MCP** servers to give it real tools and real knowledge — search the web, query documentation or a knowledge base, look up records, and call backend APIs. Agent capabilities are configurable per deployment, so you decide which servers, tools, and data sources are in scope.
+*   **Live Speech-to-Text, Spoken Translation & Meeting Summarization**: Continuous real-time transcription of the meeting, spoken translation of speech into other languages, and automated end-of-meeting summaries with action items and artifacts — all exposed through the Artifacts API so you can build on top of the results.
 
 ## Key Features
 
@@ -12,7 +24,6 @@ Have questions or ideas? [Join our developer community on Discord](https://disco
 *   **Adaptive Streaming**: **Simulcast** and **Dynacast** support ensures stable calls even on poor networks by intelligently managing video quality and bandwidth. Supported codecs include `H264`, `VP8`, `VP9`, and `AV1`.
 *   **Rich Collaboration Tools**: Engage users with HD audio/video, screen sharing, virtual backgrounds, a collaborative whiteboard with office file support (PDF, DOCX, PPTX), shared notepad, polls, and breakout rooms.
 *   **Secure & Private Communication**: Features WebRTC-based encryption by default, with optional **End-to-End Encryption (E2EE)** for all media and data channels, ensuring conversations remain confidential.
-*   **AI-Powered Meeting Intelligence**: Turn meetings into actionable intelligence. The AI agent provides live spoken translations, real-time transcription, and automated summaries with action items, all accessible via the Artifacts API.
 *   **Telephone Dial-In (SIP Gateway):** Allow participants to join the audio of your meeting by dialing a standard phone number—no internet required.
 *   **Flexible Integration**: Easily integrate with any website or system using our straightforward API and SDKs for PHP and JavaScript. Ready-to-use plugins are available for **WordPress**, **Moodle**, and **Joomla**.
 *   **Deep Customization**: Easily customize the UI, features, branding, and URLs to match your application's look and feel without modifying core code.

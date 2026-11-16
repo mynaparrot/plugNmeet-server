@@ -19,6 +19,47 @@ func (s *DatabaseService) InsertOrUpdateRoomInfo(info *dbmodels.RoomInfo) (int64
 	return result.RowsAffected, nil
 }
 
+// CloneParentRoomInfoForBreakout inserts info as a new room_info row by cloning
+// the parent row, so every table column is inherited without listing them here.
+// The child-specific columns are overridden and the loaded info carries the new
+// row id.
+func (s *DatabaseService) CloneParentRoomInfoForBreakout(parentTableId uint64, info *dbmodels.RoomInfo) error {
+	table := new(dbmodels.RoomInfo).TableName()
+
+	rawRow := make(map[string]any)
+	if err := s.db.Table(table).Where("id = ?", parentTableId).Take(&rawRow).Error; err != nil {
+		return err
+	}
+
+	// the primary key and the lifecycle timestamps belong to the parent row
+	delete(rawRow, "id")
+	delete(rawRow, "ended")
+	delete(rawRow, "modified")
+
+	rawRow["room_title"] = info.RoomTitle
+	rawRow["roomId"] = info.RoomId
+	rawRow["sid"] = info.Sid
+	rawRow["joined_participants"] = 0
+	rawRow["is_breakout_room"] = 1
+	rawRow["is_running"] = 1
+	rawRow["parent_room_id"] = info.ParentRoomID
+
+	rawRow["is_recording"] = 0
+	rawRow["recorder_id"] = ""
+	rawRow["is_active_rtmp"] = 0
+	rawRow["rtmp_node_id"] = ""
+	rawRow["webhook_url"] = ""
+
+	rawRow["creation_time"] = time.Now().Unix()
+	rawRow["created"] = time.Now().UTC()
+
+	if err := s.db.Table(table).Create(rawRow).Error; err != nil {
+		return err
+	}
+
+	return s.db.Where("sid = ?", info.Sid).Take(info).Error
+}
+
 func (s *DatabaseService) UpdateRoomStatus(info *dbmodels.RoomInfo) (int64, error) {
 	update := map[string]interface{}{
 		"is_running": info.IsRunning,

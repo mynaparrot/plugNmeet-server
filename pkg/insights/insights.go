@@ -60,6 +60,7 @@ const (
 	ServiceTypeSpeechSynthesis    ServiceType = "speech-synthesis"
 	ServiceTypeAITextChat         ServiceType = "ai_text_chat"
 	ServiceTypeMeetingSummarizing ServiceType = "meeting_summarizing"
+	ServiceTypeAIAgent            ServiceType = "ai_agent"
 
 	// AITaskTypeChat is for regular chat interactions.
 	AITaskTypeChat AITaskType = "chat"
@@ -81,6 +82,8 @@ func ToServiceType(t plugnmeet.InsightsServiceType) (ServiceType, error) {
 		return ServiceTypeAITextChat, nil
 	case plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_MEETING_SUMMARIZING:
 		return ServiceTypeMeetingSummarizing, nil
+	case plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_AI_AGENT:
+		return ServiceTypeAIAgent, nil
 	default:
 		return "", fmt.Errorf("unknown or unsupported insights service type: %s", t.String())
 	}
@@ -100,6 +103,8 @@ func FromServiceType(t ServiceType) (plugnmeet.InsightsServiceType, error) {
 		return plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_AI_TEXT_CHAT, nil
 	case ServiceTypeMeetingSummarizing:
 		return plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_MEETING_SUMMARIZING, nil
+	case ServiceTypeAIAgent:
+		return plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_AI_AGENT, nil
 	default:
 		return plugnmeet.InsightsServiceType_INSIGHTS_SERVICE_TYPE_UNSPECIFIED, fmt.Errorf("unknown or unsupported insights service type: %s", t)
 	}
@@ -216,6 +221,26 @@ type Provider interface {
 
 	// DeleteUploadedFile deletes a file that was previously uploaded to the provider's storage.
 	DeleteUploadedFile(ctx context.Context, fileName string) error
+
+	// CreateRealtimeSession opens a bidirectional multimodal session.
+	// Providers that do not support it must return ErrRealtimeNotSupported.
+	CreateRealtimeSession(ctx context.Context, model string, opts *RealtimeSessionOptions) (RealtimeSession, error)
+}
+
+// AITextChatToolRunner carries the tools of one AI text chat turn: the
+// declarations the provider offers to the model plus the callback that runs a
+// requested tool. Execute returns the model-facing JSON output and whether the
+// tool failed; it never returns an empty output on success.
+type AITextChatToolRunner struct {
+	Tools   []*MCPToolSpec
+	Execute func(ctx context.Context, callID, name, argsJSON string) (outputJSON string, isError bool)
+}
+
+// ToolTextChatProvider is implemented by the providers that can run a text chat
+// turn with tools. Providers that cannot must simply not implement it; the
+// caller then falls back to AITextChatStream without tools.
+type ToolTextChatProvider interface {
+	AITextChatStreamWithTools(ctx context.Context, chatModel string, history []*plugnmeet.InsightsAITextChatContent, tools *AITextChatToolRunner) (<-chan *plugnmeet.InsightsAITextChatStreamResult, error)
 }
 
 // Task defines the interface for any runnable, self-contained AI task.

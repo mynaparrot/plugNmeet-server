@@ -32,6 +32,13 @@ var (
 	UserIdOrEmailRequired = errors.New("either value of user_id or lis_person_contact_email_primary  required")
 )
 
+// ErrAIAgentInvalidMCPServer is the CreateRoom refusal of an external MCP server
+// configuration which can never be dialled safely. Its text is plain English for
+// the same reason as the other integrator messages below.
+var (
+	ErrAIAgentInvalidMCPServer = errors.New(MsgAuthAIAgentInvalidMCPServer)
+)
+
 // MsgRoomIdRequired is the plain error text when an Auth API request omits room_id.
 const MsgRoomIdRequired = "missing required field room_id"
 
@@ -122,6 +129,14 @@ const (
 	MsgAuthArtifactsFetchFailed        = "The artifacts could not be fetched."
 	MsgAuthArtifactDeleteFailed        = "The artifact could not be deleted."
 	MsgAuthAnalyticsFetchFailed        = "The analytics could not be fetched."
+	// The AI agent answers a browser client with an i18n key (api_error_msgs.go),
+	// so every one of these must have a curated integrator text here.
+	MsgAuthAIAgentNotAllowed       = "The AI Assistant is not enabled for this room."
+	MsgAuthAIAgentE2EEUnsupported  = "The AI Assistant is not available while self-managed End-to-End Encryption is active."
+	MsgAuthAIAgentPromptRequired   = "An instructions prompt is required to start the AI Assistant."
+	MsgAuthAIAgentTopicRequired    = "A topic is required to start the AI Assistant."
+	MsgAuthAIAgentProviderMissing  = "No AI provider is configured for the AI Assistant."
+	MsgAuthAIAgentInvalidMCPServer = "ai_agent_features.mcp_servers contains an invalid or disallowed server configuration"
 )
 
 // LTI (/lti) messages.
@@ -206,6 +221,14 @@ var integratorMsgs = map[string]string{
 	ErrRoomUserNotFound.Error():            MsgAuthUserNotFound,
 	ErrRoomFeatureNotAllowed.Error():       MsgAuthFeatureNotAllowed,
 	ErrRoomInvalidUrl.Error():              MsgAuthInvalidUrl,
+	// CreateRoom refusals of an ai_agent_features block (§2.2 of the AI agent
+	// design): the browser gets an i18n key, an integrator gets English text.
+	ErrAIAgentNotAllowed.Error():       MsgAuthAIAgentNotAllowed,
+	ErrAIAgentE2EEUnsupported.Error():  MsgAuthAIAgentE2EEUnsupported,
+	ErrAIAgentPromptRequired.Error():   MsgAuthAIAgentPromptRequired,
+	ErrAIAgentTopicRequired.Error():    MsgAuthAIAgentTopicRequired,
+	ErrAIAgentProviderMissing.Error():  MsgAuthAIAgentProviderMissing,
+	ErrAIAgentInvalidMCPServer.Error(): MsgAuthAIAgentInvalidMCPServer,
 }
 
 // IntegratorMsg returns the curated English text for a message which was produced

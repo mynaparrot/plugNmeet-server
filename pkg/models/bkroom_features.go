@@ -30,6 +30,19 @@ func isBreakoutChildRoomId(breakoutRoomId, parentRoomId string) bool {
 	return err == nil && idx > 0
 }
 
+// hasParentRoomReference reports whether the room's own metadata names
+// parentRoomId as its parent. The server writes that reference, so it is the
+// authoritative binding for rooms whose id does not follow the numeric pattern.
+func (m *BreakoutRoomModel) hasParentRoomReference(roomId, parentRoomId string) bool {
+	meta, err := m.natsService.GetRoomMetadataStruct(roomId)
+	if err != nil || !meta.GetIsBreakoutRoom() {
+		return false
+	}
+	plainParentRoomId, _, err := ParseBreakoutParentRoomRef(meta.GetParentRoomId())
+
+	return err == nil && plainParentRoomId == parentRoomId
+}
+
 // BackToMainRoom issues a fresh parent-room join token for a participant
 // returning from a breakout room. The parent comes from the client-supplied parent_room_id.
 func (m *BreakoutRoomModel) BackToMainRoom(ctx context.Context, r *plugnmeet.BackToMainRoomReq) (string, error) {
@@ -43,7 +56,9 @@ func (m *BreakoutRoomModel) BackToMainRoom(ctx context.Context, r *plugnmeet.Bac
 
 	// Bind the client-supplied parent room id to the caller's actual breakout:
 	// breakout ids are <parentRoomId>-<n>, so the caller's room must be a child of it.
-	if !isBreakoutChildRoomId(r.RoomId, r.ParentRoomId) {
+	// A per-user AI room is named after its participant, so its own metadata is
+	// the reference there.
+	if !isBreakoutChildRoomId(r.RoomId, r.ParentRoomId) && !m.hasParentRoomReference(r.RoomId, r.ParentRoomId) {
 		log.Warn("parent room id does not match the caller's breakout room")
 		return "", config.ErrBkRoomUnexpectedError
 	}

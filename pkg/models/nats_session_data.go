@@ -144,10 +144,13 @@ func (m *NatsModel) parseAndAuthorizeSessionData(roomId, userId string, req *plu
 				authorized = true
 			}
 		}
+		// The AI agent delegate saves on the agent's behalf while it presents.
+		authorized = authorized || m.isAIAgentDelegate(roomId, userId)
 	case plugnmeet.SessionDataType_SESSION_DATA_TYPE_NOTEPAD:
 		if userInfo, err := m.natsService.GetUserInfo(roomId, userId); err == nil && userInfo != nil {
 			authorized = userInfo.GetIsPresenter() || userInfo.GetIsAdmin() || isFetch
 		}
+		authorized = authorized || m.isAIAgentDelegate(roomId, userId)
 	default:
 		m.logger.Warnf("invalid session data type from user %s", userId)
 		return header, plugnmeet.SessionDataType_SESSION_DATA_TYPE_UNSPECIFIED, false
@@ -214,4 +217,13 @@ func (m *NatsModel) sendSessionDataSaveResponse(roomId, userId string, header *p
 	if err != nil {
 		m.logger.WithError(err).Errorln("failed to send session data save response")
 	}
+}
+
+// isAIAgentDelegate reports whether userId currently executes the AI agent's
+// client-delegated tools, which also authorizes its whiteboard and notepad saves.
+func (m *NatsModel) isAIAgentDelegate(roomId, userId string) bool {
+	if m.aiAgentModel == nil {
+		return false
+	}
+	return m.aiAgentModel.IsUserAgentDelegate(m.ctx, roomId, userId)
 }

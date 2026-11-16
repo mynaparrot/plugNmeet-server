@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -25,7 +27,26 @@ const (
 	// uploaded-file KV entry (unlike a real office file), so the create flow
 	// seeds child rooms with file_id "default" and skips the room-file lookup.
 	DefaultOfficeFileSentinel = "default"
+	// aiBreakoutDefaultDurationMinutes is how long a per-user 1-on-1 AI room
+	// lives when the parent room has no duration limit of its own.
+	aiBreakoutDefaultDurationMinutes = 60
+	// defaultMaxAIBreakoutSessions applies when a room does not limit its
+	// breakout rooms explicitly.
+	defaultMaxAIBreakoutSessions = 6
 )
+
+// effectiveMaxAISessions reports how many AI sessions a parent room may run in
+// parallel: its allowed breakout rooms, capped by max_concurrent_sessions.
+func effectiveMaxAISessions(meta *plugnmeet.RoomMetadata) uint32 {
+	allowed := meta.GetRoomFeatures().GetBreakoutRoomFeatures().GetAllowedNumberRooms()
+	if allowed == 0 {
+		allowed = defaultMaxAIBreakoutSessions
+	}
+	if maxConc := meta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures().GetMaxConcurrentSessions(); maxConc > 0 && maxConc < allowed {
+		return maxConc
+	}
+	return allowed
+}
 
 func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plugnmeet.CreateBreakoutRoomsReq) ([]*plugnmeet.BreakoutRoom, error) {
 	log := m.logger.WithFields(logrus.Fields{
@@ -72,6 +93,12 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 		}
 	}
 
+	if r.EnableAiAgent {
+		if err := m.validateAIAgentBreakoutRequest(r, meta, log); err != nil {
+			return nil, err
+		}
+	}
+
 	// validate cross-room entries: titles must be unique and a user may be
 	// assigned to only one room.
 	titles := make(map[string]struct{}, len(r.Rooms))
@@ -99,8 +126,11 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 		}
 	}
 
-	// auto-switch presenter because the later seeding flow needs presenter role
-	if !m.natsService.IsUserPresenter(r.RoomId, r.RequestedUserId) {
+	// auto-switch presenter because the later seeding flow needs presenter role.
+	// This only applies to an explicit requester (a user-driven whiteboard
+	// share). Requests without a requester (auto-created per-user AI rooms) seed
+	// nothing and must never change the parent room's presenter.
+	if r.RequestedUserId != "" && !m.natsService.IsUserPresenter(r.RoomId, r.RequestedUserId) {
 		_, switchErr := m.um.SwitchPresenter(&plugnmeet.SwitchPresenterReq{
 			Task:            plugnmeet.SwitchPresenterTask_PROMOTE,
 			RoomId:          r.RoomId,
@@ -146,6 +176,12 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 			IsAllow:   false,
 			IsEnabled: false,
 		}
+	}
+
+	// a normal breakout room must never inherit an active AI agent; per-user AI
+	// rooms get their own features below, one per room
+	if !r.EnableAiAgent && meta.RoomFeatures.InsightsFeatures != nil && meta.RoomFeatures.InsightsFeatures.AiAgentFeatures != nil {
+		meta.RoomFeatures.InsightsFeatures.AiAgentFeatures.IsAllow = false
 	}
 
 	// clear few main room data
@@ -200,6 +236,13 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	// written to the parent's metadata below, superseding the API-seeded list.
 	createdPreassigned := make([]*plugnmeet.PreassignedBreakoutRoom, 0, len(r.Rooms))
 
+	// capture the parent's agent features once, before the loop: every child
+	// must clone the parent configuration, never an already-prepared sibling.
+	var parentAiFeatures *plugnmeet.InsightsAIAgentFeatures
+	if r.EnableAiAgent {
+		parentAiFeatures = meta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()
+	}
+
 	for _, room := range r.Rooms {
 		bRoomId := fmt.Sprintf(BreakoutRoomFormat, r.RoomId, room.Id)
 		roomLog := log.WithFields(logrus.Fields{
@@ -210,6 +253,9 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 		bRoom := new(plugnmeet.CreateRoomReq)
 		bRoom.RoomId = bRoomId
 		meta.RoomTitle = room.Title
+		if r.EnableAiAgent {
+			prepareAIAgentBreakoutChild(parentAiFeatures, meta, room.Users[0].Id, r.GetAiAgentContext(), room.GetAiAgentContext())
+		}
 		bRoom.Metadata = meta
 		// Step 6: capture the returned roomSid so it flows into the Redis hash,
 		// the create response, and downstream listRooms/myRooms consumers.
@@ -227,6 +273,9 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 		room.RoomSid = ari.GetSid()
 		room.Duration = r.Duration
 		room.Created = uint64(time.Now().Unix())
+		// mark the room as an AI Agent session so listRooms/myRooms consumers
+		// can show a badge without re-deriving it from the parent's metadata.
+		room.EnableAiAgent = r.EnableAiAgent
 
 		marshal, err := protojson.Marshal(room)
 		if err != nil {
@@ -295,7 +344,15 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	// save create-time snapshot so that can be populated again
 	origMeta.RoomFeatures.BreakoutRoomFeatures.AllowReturnToMainRoom = r.AllowReturnToMainRoom
 	origMeta.RoomFeatures.BreakoutRoomFeatures.AllowSelfSelect = r.AllowSelfSelect
-	origMeta.RoomFeatures.BreakoutRoomFeatures.PreassignedRooms = createdPreassigned
+	// A user-driven create replaces the whole set with the create-time snapshot.
+	// Auto-created per-user AI rooms have no requester and are additive: they are
+	// merged by room id so that when the next participant joins, the previously
+	// created (still active) rooms keep their preassignment.
+	if r.RequestedUserId == "" || r.EnableAiAgent {
+		origMeta.RoomFeatures.BreakoutRoomFeatures.PreassignedRooms = mergePreassignedBreakoutRooms(origMeta.RoomFeatures.BreakoutRoomFeatures.GetPreassignedRooms(), createdPreassigned)
+	} else {
+		origMeta.RoomFeatures.BreakoutRoomFeatures.PreassignedRooms = createdPreassigned
+	}
 
 	if err := m.natsService.UpdateAndBroadcastRoomMetadata(r.RoomId, origMeta); err != nil {
 		log.WithError(err).Error("Failed to update parent room metadata")
@@ -311,6 +368,217 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 
 	log.Info("Finished breakout rooms creation")
 	return createdRooms, err
+}
+
+// mergePreassignedBreakoutRooms returns existing plus created, keyed by room id:
+// an entry from created supersedes an existing entry with the same room id while
+// all other existing entries are preserved. This keeps earlier participants'
+// preassigned rooms when per-user AI rooms are created incrementally.
+func mergePreassignedBreakoutRooms(existing, created []*plugnmeet.PreassignedBreakoutRoom) []*plugnmeet.PreassignedBreakoutRoom {
+	merged := make([]*plugnmeet.PreassignedBreakoutRoom, 0, len(existing)+len(created))
+	index := make(map[string]int, len(existing)+len(created))
+
+	for _, room := range existing {
+		if room == nil {
+			continue
+		}
+		if i, ok := index[room.GetRoomId()]; ok {
+			merged[i] = room
+			continue
+		}
+		index[room.GetRoomId()] = len(merged)
+		merged = append(merged, room)
+	}
+
+	for _, room := range created {
+		if room == nil {
+			continue
+		}
+		if i, ok := index[room.GetRoomId()]; ok {
+			merged[i] = room
+			continue
+		}
+		index[room.GetRoomId()] = len(merged)
+		merged = append(merged, room)
+	}
+
+	return merged
+}
+
+// validateAIAgentBreakoutRequest enforces what a 1-on-1 AI session needs: the
+// parent must host the agent, every room carries exactly one assigned user and
+// the new rooms must fit the parent's concurrent session limit.
+func (m *BreakoutRoomModel) validateAIAgentBreakoutRequest(r *plugnmeet.CreateBreakoutRoomsReq, meta *plugnmeet.RoomMetadata, log *logrus.Entry) error {
+	if !meta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures().GetIsAllow() {
+		log.Error("ai agent is not enabled for the parent room")
+		return config.ErrAIAgentNotAllowed
+	}
+
+	// rooms that are still open already hold a session slot
+	existing := int64(0)
+	if count, err := m.rs.CountBreakoutRooms(r.RoomId); err == nil {
+		existing = count
+	}
+	if maxSessions := effectiveMaxAISessions(meta); uint32(len(r.Rooms))+uint32(existing) > maxSessions {
+		log.WithFields(logrus.Fields{"maxSessions": maxSessions, "existingRooms": existing}).Error("AI breakout rooms exceed the concurrent session limit")
+		return config.ErrBkRoomMaxRoomsExceeded
+	}
+
+	// 1-on-1 means one assigned participant per room and no self-select
+	if r.GetAllowSelfSelect() {
+		log.Error("1-on-1 AI breakout rooms cannot be self-select")
+		return config.ErrAIAgentBreakoutOneUser
+	}
+	for _, room := range r.Rooms {
+		if len(room.GetUsers()) != 1 {
+			log.WithFields(logrus.Fields{"breakoutRoom": room.GetTitle(), "users": len(room.GetUsers())}).Error("1-on-1 AI breakout room requires exactly 1 assigned user")
+			return config.ErrAIAgentBreakoutOneUser
+		}
+	}
+
+	return nil
+}
+
+// prepareAIAgentBreakoutChild narrows the shared child metadata down to the one
+// participant this 1-on-1 room is created for. parentAiFeatures is the parent
+// room's configuration, captured before the create loop, so every child starts
+// from it instead of inheriting the context of an earlier child.
+func prepareAIAgentBreakoutChild(parentAiFeatures *plugnmeet.InsightsAIAgentFeatures, meta *plugnmeet.RoomMetadata, userId, globalContext, roomContext string) {
+	insightsFeatures := meta.GetRoomFeatures().GetInsightsFeatures()
+	if parentAiFeatures == nil || insightsFeatures == nil {
+		return
+	}
+
+	// clone so every child room keeps its own participant list and prompt
+	features := proto.Clone(parentAiFeatures).(*plugnmeet.InsightsAIAgentFeatures)
+	features.SystemPrompt = appendBreakoutAIContext(features.GetSystemPrompt(), globalContext, roomContext)
+	features.IsAllow = true
+	features.IsEnabled = false
+	features.ActiveSessionId = nil
+	features.AutoCreatePerUserSession = false
+	features.AutoJoinOnFirstParticipant = true
+	features.AllowedParticipantIds = []string{userId}
+	insightsFeatures.AiAgentFeatures = features
+
+	locks := meta.DefaultLockSettings
+	if locks == nil {
+		locks = new(plugnmeet.LockSettings)
+		meta.DefaultLockSettings = locks
+	}
+	locks.LockWebcam = proto.Bool(true)
+	locks.LockScreenSharing = proto.Bool(true)
+}
+
+// appendBreakoutAIContext preserves the parent's system prompt and appends the
+// extra context of a 1-on-1 breakout session. Without any extra context the
+// prompt is returned unchanged.
+func appendBreakoutAIContext(basePrompt, globalContext, roomContext string) string {
+	basePrompt = strings.TrimSpace(basePrompt)
+	globalContext = strings.TrimSpace(globalContext)
+	roomContext = strings.TrimSpace(roomContext)
+	if globalContext == "" && roomContext == "" {
+		return basePrompt
+	}
+
+	sessionContext := []string{"Breakout Session Context:"}
+	if globalContext != "" {
+		sessionContext = append(sessionContext, globalContext)
+	}
+	if roomContext != "" {
+		sessionContext = append(sessionContext, roomContext)
+	}
+
+	section := strings.Join(sessionContext, "\n")
+	if basePrompt == "" {
+		return section
+	}
+
+	return basePrompt + "\n\n" + section
+}
+
+// EnsurePerUserAIBreakoutRoom returns the participant's own 1-on-1 AI breakout
+// room, creating it on first call. The child room id is derived from the user id
+// so repeated joins resolve to the same room.
+func (m *BreakoutRoomModel) EnsurePerUserAIBreakoutRoom(ctx context.Context, parentRoomId, userId, userName string) (string, error) {
+	childRoomId := fmt.Sprintf(BreakoutRoomFormat, parentRoomId, userId)
+	log := m.logger.WithFields(logrus.Fields{
+		"roomId":  parentRoomId,
+		"userId":  userId,
+		"childId": childRoomId,
+		"method":  "EnsurePerUserAIBreakoutRoom",
+	})
+
+	_, meta, err := m.natsService.GetRoomInfoWithMetadata(parentRoomId)
+	if err != nil {
+		log.WithError(err).Error("failed to get parent room info")
+		return "", config.ErrBkRoomUnexpectedError
+	}
+	if meta == nil {
+		log.Error("invalid empty parent room metadata")
+		return "", config.ErrBkRoomUnexpectedError
+	}
+
+	// an already open room is reused, so a re-join never creates a second one
+	if room, err := m.fetchBreakoutRoom(parentRoomId, childRoomId); err == nil && room != nil {
+		log.Info("per-user AI breakout room already exists")
+		return childRoomId, nil
+	}
+
+	// no requester: the participant auto-joins through GetPNMJoinToken, which
+	// neither seeds a parent whiteboard nor may promote anybody to presenter in
+	// the parent room.
+	_, err = m.CreateBreakoutRooms(ctx, &plugnmeet.CreateBreakoutRoomsReq{
+		RoomId:                parentRoomId,
+		RequestedUserId:       "",
+		Duration:              m.perUserAIBreakoutDuration(parentRoomId),
+		Rooms:                 []*plugnmeet.BreakoutRoom{perUserAIBreakoutRoom(userId, userName)},
+		AllowReturnToMainRoom: meta.GetRoomFeatures().GetBreakoutRoomFeatures().GetAllowReturnToMainRoom(),
+		EnableAiAgent:         true,
+	})
+	if err != nil {
+		log.WithError(err).Error("failed to create the per-user AI breakout room")
+		return "", err
+	}
+
+	log.Info("per-user AI breakout room created")
+	return childRoomId, nil
+}
+
+// perUserAIBreakoutRoom builds the single 1-on-1 room of one participant.
+func perUserAIBreakoutRoom(userId, userName string) *plugnmeet.BreakoutRoom {
+	return &plugnmeet.BreakoutRoom{
+		Id:    userId,
+		Title: fmt.Sprintf("%s (AI Session)", userName),
+		Users: []*plugnmeet.BreakoutRoomUser{
+			{Id: userId, Name: userName},
+		},
+	}
+}
+
+// perUserAIBreakoutDuration returns the child's duration: the default, clamped
+// to what is left of the parent room.
+func (m *BreakoutRoomModel) perUserAIBreakoutDuration(parentRoomId string) uint64 {
+	duration := uint64(aiBreakoutDefaultDurationMinutes)
+
+	info, err := m.rm.GetRoomDurationInfo(parentRoomId)
+	if err != nil || info == nil || info.Duration == 0 || info.StartedAt == 0 {
+		return duration
+	}
+
+	now := uint64(time.Now().Unix())
+	endsAt := info.StartedAt + info.Duration*60
+	if endsAt <= now {
+		return duration
+	}
+	remaining := (endsAt - now) / 60
+	if remaining == 0 {
+		remaining = 1
+	}
+	if remaining < duration {
+		duration = remaining
+	}
+
+	return duration
 }
 
 // normalizeBreakoutWhiteboardShare validates the optional whiteboard share

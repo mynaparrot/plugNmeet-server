@@ -51,6 +51,7 @@ type RoomModel struct {
 	analyticsModel  *AnalyticsModel
 	breakoutModel   *BreakoutRoomModel
 	insightsModel   *InsightsModel
+	aiAgentModel    *AIAgentModel
 }
 
 type updateRoomMetadataOpts struct {
@@ -74,6 +75,7 @@ type RoomModelArgs struct {
 	PollModel       *PollModel
 	AnalyticsModel  *AnalyticsModel
 	InsightsModel   *InsightsModel
+	AIAgentModel    *AIAgentModel
 	Logger          *logrus.Logger
 }
 
@@ -92,6 +94,7 @@ func NewRoomModel(args RoomModelArgs) *RoomModel {
 		pollModel:       args.PollModel,
 		analyticsModel:  args.AnalyticsModel,
 		insightsModel:   args.InsightsModel,
+		aiAgentModel:    args.AIAgentModel,
 		logger:          args.Logger.WithField("model", "room"),
 	}
 }

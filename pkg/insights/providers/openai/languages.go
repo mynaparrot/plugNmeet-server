@@ -96,4 +96,5 @@ var openaiTextLanguages = []plugnmeet.InsightsSupportedLangInfo{
 var supportedLanguages = map[insights.ServiceType][]plugnmeet.InsightsSupportedLangInfo{
 	insights.ServiceTypeTranscription: openaiTextLanguages,
 	insights.ServiceTypeTranslation:   openaiTextLanguages,
+	insights.ServiceTypeAIAgent:       openaiTextLanguages,
 }

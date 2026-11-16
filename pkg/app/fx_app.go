@@ -124,9 +124,17 @@ var HelperModule = fx.Module("helpers",
 )
 
 // wireCircularModels is a dedicated Invoke function for wiring circular model dependencies.
-func wireCircularModels(rm *models.RoomModel, bm *models.BreakoutRoomModel, analyticsModel *models.AnalyticsModel, artifactModel *models.ArtifactModel) {
+func wireCircularModels(rm *models.RoomModel, bm *models.BreakoutRoomModel, um *models.UserModel, analyticsModel *models.AnalyticsModel, artifactModel *models.ArtifactModel, pollModel *models.PollModel, aiAgentModel *models.AIAgentModel, recordingModel *models.RecordingModel, insightsModel *models.InsightsModel) {
 	rm.SetBreakoutRoomModel(bm)
+	um.SetBreakoutRoomModel(bm)
 	analyticsModel.SetArtifactModel(artifactModel)
+	pollModel.SetAIAgentModel(aiAgentModel)
+	aiAgentModel.SetRoomModel(rm)
+	aiAgentModel.SetBreakoutRoomModel(bm)
+	aiAgentModel.SetRecordingModel(recordingModel)
+	aiAgentModel.SetInsightsModel(insightsModel)
+	aiAgentModel.SetArtifactModel(artifactModel)
+	insightsModel.SetAIAgentModel(aiAgentModel)
 }
 
 var ModelModule = fx.Module("models",
@@ -135,6 +143,7 @@ var ModelModule = fx.Module("models",
 		models.NewArtifactModel,
 		models.NewAuthModel,
 		models.NewInsightsModel,
+		models.NewAIAgentModel,
 		models.NewBBBApiWrapperModel,
 		models.NewFileModel,
 		models.NewLtiV1Model,
@@ -167,6 +176,7 @@ var ControllerModule = fx.Module("controllers",
 		controllers.NewWebhookController,
 		controllers.NewNatsController,
 		controllers.NewInsightsController,
+		controllers.NewAIAgentController,
 	),
 )
 

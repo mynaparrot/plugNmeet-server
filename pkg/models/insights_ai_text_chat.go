@@ -9,6 +9,8 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
+	"github.com/mynaparrot/plugnmeet-server/pkg/services/insights/mcp"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cast"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -71,9 +73,18 @@ func (s *InsightsModel) AITextChatRequest(roomId, userId, prompt, streamId strin
 		return fmt.Errorf("chat_model not configured for ai_text_chat service")
 	}
 
-	// 4. Launch the background task ONLY after validation is successful (ASYNC)
+	// 4. Only a room administrator may run the room-wide tool set.
+	var toolRunner *insights.AITextChatToolRunner
+	if !isEphemeral && requestFrom == plugnmeet.InsightsAIRequestSource_INSIGHTS_AI_REQUEST_SOURCE_CHAT {
+		userInfo, _ := s.natsService.GetUserInfo(roomId, userId)
+		if s.shouldAttachAdminTools(requestFrom, isEphemeral, userInfo) {
+			toolRunner = s.adminTextChatToolRunner(ctx, roomId, userId, logger)
+		}
+	}
+
+	// 5. Launch the background task ONLY after validation is successful (ASYNC)
 	go func() {
-		stream, err := provider.AITextChatStream(ctx, chatModel, history)
+		stream, err := textChatStream(ctx, provider, chatModel, history, toolRunner)
 		if err != nil {
 			logger.WithError(err).Error("failed to get chat stream")
 			return
@@ -129,6 +140,91 @@ func (s *InsightsModel) AITextChatRequest(roomId, userId, prompt, streamId strin
 	}()
 
 	return nil // Success, request accepted
+}
+
+// shouldAttachAdminTools reports whether an AI text chat request may run the
+// room-wide admin tool set: only a regular chat request of a room administrator
+// while the AI agent model is wired.
+func (s *InsightsModel) shouldAttachAdminTools(requestFrom plugnmeet.InsightsAIRequestSource, isEphemeral bool, userInfo *plugnmeet.NatsKvUserInfo) bool {
+	return !isEphemeral &&
+		requestFrom == plugnmeet.InsightsAIRequestSource_INSIGHTS_AI_REQUEST_SOURCE_CHAT &&
+		userInfo.GetIsAdmin() &&
+		s.aiAgentModel != nil
+}
+
+// adminTextChatToolRunner builds the tool set of an administrator's AI text chat
+// session: the room, whiteboard, notepad, poll, breakout, insights and external
+// MCP tools, with the browser side reaching the administrator's own client.
+func (s *InsightsModel) adminTextChatToolRunner(ctx context.Context, roomId, userId string, logger *logrus.Entry) *insights.AITextChatToolRunner {
+	if s.aiAgentModel == nil {
+		return nil
+	}
+	// The external servers are discovered when the chat is configured; this only
+	// warms what is still missing, so a request never waits on a remote server.
+	mcp.EnsureRoomExternalMCP(ctx, s.redisService, roomId, nil, 0, logger)
+
+	deps := s.BuildToolDependencies(roomId, userId, logger)
+	reg := mcp.BuildAdminTextChatToolRegistry(s.aiAgentModel.roomAgentFeatures(roomId), deps)
+	exec := mcp.NewExecutor(mcp.ExecutorOptions{
+		Registry: reg,
+		Client:   s.aiAgentModel.NewUserClientRPCSender(userId),
+	})
+
+	return &insights.AITextChatToolRunner{
+		Tools: reg.Specs(),
+		Execute: func(ctx context.Context, callID, name, argsJSON string) (string, bool) {
+			result := exec.Execute(ctx, mcp.ToolCall{
+				CallID:   callID,
+				RoomID:   roomId,
+				ToolName: name,
+				ArgsJSON: argsJSON,
+			})
+			return result.OutputJSON, result.IsError
+		},
+	}
+}
+
+// adminTextChatToolsPrompt is added to the provider call of an administrator's
+// AI text chat. The quiz rule keeps a test from reaching the participants before
+// the administrator has seen and approved it.
+const adminTextChatToolsPrompt = "You are the assistant of the room administrator and you can act on the live room " +
+	"through your tools: room settings and lock state, whiteboard, notepad, polls, breakout rooms, insights " +
+	"and any attached external MCP server. Use them instead of telling the administrator to do the work " +
+	"manually, and only for what was asked. Whenever a quiz is requested: first check the attached external " +
+	"lesson/resource tools or the notepad content for the source material, then call draft_quiz so the " +
+	"questions, the options and the correct answers are previewed in this chat, and wait for the " +
+	"administrator's explicit approval before calling publish_quiz. For a multi-question quiz, pass all " +
+	"questions in one draft_quiz call using the `questions` array; if you draft them one at a time, every " +
+	"single-question draft is added to the room's pending draft. To publish all pending drafted questions, " +
+	"call publish_quiz with draft_id \"latest\" or omit draft_id. Never publish a quiz whose draft has not " +
+	"been approved. For Speech-to-Text, first establish whom it is for: specific participant names or user " +
+	"ids, or everyone. After you configure it for the requested user(s) or for everyone, always remind the " +
+	"user to click the \"T\" icon in the bottom menu bar, select their spoken language, and click Start, " +
+	"because transcription does not start automatically. When asked to use the whiteboard (or the shared " +
+	"notepad), never switch to the other surface just because a tool call failed once while opening; retry " +
+	"the requested surface's tool once instead."
+
+// textChatStream starts the provider stream, using the tool calling variant when
+// an admin runner is present and the provider supports tools.
+func textChatStream(ctx context.Context, provider insights.Provider, chatModel string, history []*plugnmeet.InsightsAITextChatContent, runner *insights.AITextChatToolRunner) (<-chan *plugnmeet.InsightsAITextChatStreamResult, error) {
+	if runner != nil {
+		if toolProvider, ok := provider.(insights.ToolTextChatProvider); ok {
+			return toolProvider.AITextChatStreamWithTools(ctx, chatModel, withAdminTextChatToolsPrompt(history), runner)
+		}
+	}
+	return provider.AITextChatStream(ctx, chatModel, history)
+}
+
+// withAdminTextChatToolsPrompt returns a copy of history with the tool
+// instructions prepended. The stored chat history is never mutated.
+func withAdminTextChatToolsPrompt(history []*plugnmeet.InsightsAITextChatContent) []*plugnmeet.InsightsAITextChatContent {
+	out := make([]*plugnmeet.InsightsAITextChatContent, 0, len(history)+1)
+	out = append(out, &plugnmeet.InsightsAITextChatContent{
+		Role: plugnmeet.InsightsAITextChatRole_INSIGHTS_AI_TEXT_CHAT_ROLE_SYSTEM,
+		Text: adminTextChatToolsPrompt,
+	})
+
+	return append(out, history...)
 }
 
 func (s *InsightsModel) buildHistoryWithUserPrompt(ctx context.Context, roomId, userId, prompt string) ([]*plugnmeet.InsightsAITextChatContent, error) {

@@ -5,6 +5,7 @@ go 1.27.3
 require (
 	buf.build/go/protovalidate v1.4.0
 	github.com/Microsoft/cognitive-services-speech-sdk-go v1.53.0
+	github.com/alicebob/miniredis/v2 v2.40.0
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/facette/natsort v0.0.0-20181210072756-2cd4dd1e2dcb
 	github.com/gabriel-vasile/mimetype v1.4.16
@@ -20,6 +21,7 @@ require (
 	github.com/livekit/media-sdk v0.1.1
 	github.com/livekit/protocol v1.51.1-0.20260910121219-271d9cde3897
 	github.com/livekit/server-sdk-go/v2 v2.19.0
+	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/mynaparrot/plugnmeet-protocol v1.6.4-0.20261114142648-c4d001a4109d
 	github.com/nats-io/jwt/v2 v2.8.3
 	github.com/nats-io/nats.go v1.55.0
@@ -68,6 +70,7 @@ require (
 	github.com/gofiber/utils/v2 v2.6.4 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.14 // indirect
 	github.com/googleapis/gax-go/v2 v2.19.0 // indirect
@@ -111,6 +114,8 @@ require (
 	github.com/prometheus/common v0.72.0 // indirect
 	github.com/prometheus/procfs v0.22.0 // indirect
 	github.com/puzpuzpuz/xsync/v4 v4.5.0 // indirect
+	github.com/segmentio/asm v1.1.3 // indirect
+	github.com/segmentio/encoding v0.5.4 // indirect
 	github.com/tidwall/gjson v1.20.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
@@ -120,6 +125,8 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.78.0 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
+	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
+	github.com/yuin/gopher-lua v1.1.1 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.70.0 // indirect
@@ -135,6 +142,7 @@ require (
 	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/exp v0.0.0-20260820142414-ca536658362e // indirect
 	golang.org/x/net v0.62.0 // indirect
+	golang.org/x/oauth2 v0.37.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
@@ -147,3 +155,7 @@ require (
 	gorm.io/plugin/dbresolver v1.6.2 // indirect
 	mvdan.cc/sh/v3 v3.14.1 // indirect
 )
+
+// Temporary during virtual-teacher implementation: build against the local
+// plugnmeet-protocol checkout instead of the published version.
+replace github.com/mynaparrot/plugnmeet-protocol => ../protocol

@@ -272,6 +272,17 @@ func (r *Router) registerAPIRoutes() {
 	// insights AI routers
 	r.registerInsightsRegisterAPIRoutes(api)
 
+	// AI agent (virtual teacher) controls
+	aiAgent := api.Group("/aiAgent")
+	aiAgent.Post("/start", r.ctrl.AIAgentController.HandleStart)
+	aiAgent.Post("/stop", r.ctrl.AIAgentController.HandleStop)
+	aiAgent.Get("/status", r.ctrl.AIAgentController.HandleStatus)
+	aiAgent.Post("/status", r.ctrl.AIAgentController.HandleStatus)
+	aiAgent.Post("/sendContext", r.ctrl.AIAgentController.HandleSendContext)
+	aiAgent.Post("/pause", r.ctrl.AIAgentController.HandlePause)
+	aiAgent.Post("/resume", r.ctrl.AIAgentController.HandleResume)
+	aiAgent.Post("/redelegate", r.ctrl.AIAgentController.HandleRedelegate)
+
 	// for resumable.js need both GET and POST  methods.
 	// https://github.com/23/resumable.js#how-do-i-set-it-up-with-my-server
 	api.Get("/fileUpload", r.ctrl.FileController.HandleFileUpload)

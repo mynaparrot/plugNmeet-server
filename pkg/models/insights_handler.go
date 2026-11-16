@@ -7,7 +7,11 @@ import (
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"google.golang.org/protobuf/encoding/protojson"
+
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
+	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 )
 
 func (s *InsightsModel) TranscriptionConfigure(req *plugnmeet.InsightsTranscriptionConfigReq, roomId string) error {
@@ -332,7 +336,17 @@ func (s *InsightsModel) ExecuteAITextChat(req *plugnmeet.InsightsAITextChatConte
 		return fmt.Errorf("empty room medata")
 	}
 
-	insightsFeatures := metadata.RoomFeatures.InsightsFeatures
+	insightsFeatures := metadata.GetRoomFeatures().GetInsightsFeatures()
+
+	// A running AI agent owns the AI Chat box: the participant's message goes to
+	// the agent's live session instead of the text-chat provider.
+	requestFrom := req.GetRequestFrom()
+	if requestFrom == plugnmeet.InsightsAIRequestSource_INSIGHTS_AI_REQUEST_SOURCE_CHAT && insightsFeatures.GetIsAllow() {
+		if aiAgentFeatures := insightsFeatures.GetAiAgentFeatures(); aiAgentFeatures.GetIsAllow() {
+			return s.handleAIAgentChatMessage(req, aiAgentFeatures, roomId, userId)
+		}
+	}
+
 	if !insightsFeatures.IsAllow || !insightsFeatures.AiFeatures.IsAllow || !insightsFeatures.AiFeatures.AiTextChatFeatures.IsAllow || !insightsFeatures.AiFeatures.AiTextChatFeatures.IsEnabled {
 		// The client translates the sentinel key; log the full sentence here.
 		s.logger.WithField("roomId", roomId).WithField("userId", userId).Warn("AI text chat features are not enabled for this room")
@@ -356,10 +370,6 @@ func (s *InsightsModel) ExecuteAITextChat(req *plugnmeet.InsightsAITextChatConte
 		return fmt.Errorf("insights.ai-text-chat.not-allowed")
 	}
 
-	requestFrom := plugnmeet.InsightsAIRequestSource_INSIGHTS_AI_REQUEST_SOURCE_CHAT
-	if req.RequestFrom != nil {
-		requestFrom = *req.RequestFrom
-	}
 	if requestFrom == plugnmeet.InsightsAIRequestSource_INSIGHTS_AI_REQUEST_SOURCE_NOTEPAD &&
 		aiTextChatFeatures.IsNotepadAiDisabled {
 		// The client translates the sentinel key; log the full sentence here.
@@ -385,6 +395,59 @@ func (s *InsightsModel) ExecuteAITextChat(req *plugnmeet.InsightsAITextChatConte
 	}
 
 	return s.AITextChatRequest(roomId, userId, req.Text, streamId, requestFrom)
+}
+
+// handleAIAgentChatMessage passes a participant's AI Chat message to the room's
+// running AI agent. The agent answers by voice and, when useful, with a written
+// chat message of its own, so only the caller's own stream is closed here.
+func (s *InsightsModel) handleAIAgentChatMessage(req *plugnmeet.InsightsAITextChatContent, aiAgentFeatures *plugnmeet.InsightsAIAgentFeatures, roomId, userId string) error {
+	logger := s.logger.WithField("roomId", roomId).WithField("userId", userId)
+
+	if !aiAgentFeatures.GetAllowChatMessage() {
+		logger.Warn("the AI agent is not allowed to answer in the AI Chat box")
+		return fmt.Errorf("insights.ai-text-chat.feature-disabled")
+	}
+
+	// a 1-on-1 room only takes turns from its participants and the admins
+	if allowed := aiAgentFeatures.GetAllowedParticipantIds(); len(allowed) > 0 && !containsUserId(allowed, userId) {
+		if info, _ := s.natsService.GetUserInfo(roomId, userId); !info.GetIsAdmin() {
+			logger.Warn("user is not allowed to talk to the AI agent")
+			return config.ErrAIAgentUserNotAllowed
+		}
+	}
+
+	agent, ok := insightsservice.GetActiveAIAgent(roomId)
+	if !ok {
+		logger.Warn("the AI agent is not running in this room")
+		return fmt.Errorf("ai-agent.errors.session-not-started")
+	}
+
+	userName := userId
+	if userInfo, _ := s.natsService.GetUserInfo(roomId, userId); userInfo.GetName() != "" {
+		userName = userInfo.GetName()
+	}
+	if err := agent.HandleParticipantChatMessage(userId, userName, req.GetText()); err != nil {
+		logger.WithError(err).Error("failed to pass the chat message to the AI agent")
+		return err
+	}
+
+	// The client keeps its request pending until the last chunk of its stream id
+	// arrives; the agent's answer comes back as its own chat event.
+	streamId := req.GetStreamId()
+	if streamId == "" {
+		return nil
+	}
+	res := &plugnmeet.InsightsAITextChatStreamResult{
+		Id:          streamId,
+		IsLastChunk: true,
+		CreatedAt:   fmt.Sprintf("%d", time.Now().UnixMilli()),
+		RequestFrom: plugnmeet.InsightsAIRequestSource_INSIGHTS_AI_REQUEST_SOURCE_CHAT.Enum(),
+	}
+	if raw, err := protojson.Marshal(res); err == nil {
+		_ = s.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_RESP_INSIGHTS_AI_TEXT_CHAT, roomId, string(raw), &userId)
+	}
+
+	return nil
 }
 
 func (s *InsightsModel) EndAITextChat(roomId string) error {

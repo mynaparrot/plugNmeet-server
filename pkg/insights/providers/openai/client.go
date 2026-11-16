@@ -29,6 +29,8 @@ type OpenAIProvider struct {
 	redis        redis.UniversalClient
 }
 
+var _ insights.ToolTextChatProvider = (*OpenAIProvider)(nil)
+
 // NewProvider creates a new OpenAI provider.
 func NewProvider(ctx context.Context, providerAccount *config.ProviderAccount, serviceConfig *config.ServiceConfig, log *logrus.Entry, redis redis.UniversalClient) (insights.Provider, error) {
 	if providerAccount.Credentials.APIKey == "" {
@@ -48,6 +50,72 @@ func NewProvider(ctx context.Context, providerAccount *config.ProviderAccount, s
 		logger:       log,
 		redis:        redis,
 	}, nil
+}
+
+// CreateRealtimeSession opens a bidirectional agent session. Live models use the
+// Live SDK (Responses delegation); everything else uses the Realtime SDK, which
+// also serves OpenAI-compatible self-hosted servers.
+func (p *OpenAIProvider) CreateRealtimeSession(ctx context.Context, model string, opts *insights.RealtimeSessionOptions) (insights.RealtimeSession, error) {
+	if opts == nil {
+		opts = &insights.RealtimeSessionOptions{}
+	}
+
+	model = p.resolveRealtimeModel(model)
+	if isLiveModel(model) {
+		return p.createLiveSession(ctx, model, opts)
+	}
+
+	return p.createRealtimeAgentSession(ctx, model, opts)
+}
+
+func (p *OpenAIProvider) resolveRealtimeModel(model string) string {
+	if model = strings.TrimSpace(model); model != "" {
+		return model
+	}
+
+	if resolved := p.serviceOption("realtime_model", p.serviceOption("model", "")); resolved != "" {
+		return resolved
+	}
+
+	return defaultRealtimeAgentModel
+}
+
+func isLiveModel(model string) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(model)), "gpt-live")
+}
+
+// serviceOption reads an option without requiring a configured service block.
+func (p *OpenAIProvider) serviceOption(key, defaultValue string) string {
+	if p.service == nil {
+		return defaultValue
+	}
+	return p.service.GetOptionsString(key, defaultValue)
+}
+
+// realtimeOption prefers an explicit session override over the service config.
+func (p *OpenAIProvider) realtimeOption(opts *insights.RealtimeSessionOptions, key, defaultValue string) string {
+	if value, ok := opts.Extra[key].(string); ok {
+		if value = strings.TrimSpace(value); value != "" {
+			return value
+		}
+	}
+	return p.serviceOption(key, defaultValue)
+}
+
+// realtimeRequestOptions builds the auth headers for Realtime and Live sockets.
+// Self-hosted servers commonly expect the key in a custom header instead of a
+// bearer token.
+func (p *OpenAIProvider) realtimeRequestOptions() []option.RequestOption {
+	apiKey := p.account.Credentials.APIKey
+	authHeader := strings.TrimSpace(p.serviceOption("realtime_auth_header", "Authorization"))
+	if authHeader == "" || strings.EqualFold(authHeader, "Authorization") {
+		return []option.RequestOption{option.WithHeader("Authorization", "Bearer "+apiKey)}
+	}
+
+	return []option.RequestOption{
+		option.WithHeaderDel("Authorization"),
+		option.WithHeader(authHeader, apiKey),
+	}
 }
 
 // CreateTranscription initializes a real-time transcription stream using OpenAI's realtime API.
@@ -107,6 +175,11 @@ func (p *OpenAIProvider) GetSupportedLanguages(serviceType insights.ServiceType)
 // AITextChatStream sends a prompt with history and streams back the AI's response.
 func (p *OpenAIProvider) AITextChatStream(ctx context.Context, chatModel string, history []*plugnmeet.InsightsAITextChatContent) (<-chan *plugnmeet.InsightsAITextChatStreamResult, error) {
 	return chatStream(ctx, p.openAiClient, p.service, chatModel, history, p.logger)
+}
+
+// AITextChatStreamWithTools streams a chat turn that may call tools.
+func (p *OpenAIProvider) AITextChatStreamWithTools(ctx context.Context, chatModel string, history []*plugnmeet.InsightsAITextChatContent, tools *insights.AITextChatToolRunner) (<-chan *plugnmeet.InsightsAITextChatStreamResult, error) {
+	return chatStreamWithTools(ctx, p.openAiClient, p.service, chatModel, history, tools, p.logger)
 }
 
 // AIChatTextSummarize summarizes a conversation history.

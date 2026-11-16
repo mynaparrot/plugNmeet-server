@@ -151,6 +151,11 @@ func (m *RoomModel) onAfterRoomEnded(p *onAfterRoomEndedParams) {
 		}
 	}
 
+	// The AI agent must leave before we wait for the participants to disconnect,
+	// otherwise its own LiveKit participant keeps the room busy. Stopping also
+	// flushes its telemetry to Redis for the session summary.
+	m.aiAgentModel.StopForRoomEnd(m.ctx, p.roomId)
+
 	// Wait for all users to disconnect before proceeding.
 	m.waitForAllUsersToDisconnect(p.roomId, config.WaitBeforeTriggerOnAfterRoomEnded)
 
@@ -203,6 +208,10 @@ func (m *RoomModel) onAfterRoomEnded(p *onAfterRoomEndedParams) {
 	if err := m.DeleteRoomWithDuration(p.roomId); err != nil {
 		log.WithError(err).Error("Error deleting room duration")
 	}
+
+	// Build the AI agent session summary while its polls, quiz metadata,
+	// telemetry and progress are still in Redis.
+	m.aiAgentModel.FinalizeSession(m.ctx, p.dbTableId, p.roomId, p.roomSid)
 
 	// Clean up any polls created during the session.
 	if err := m.pollModel.CleanUpPolls(p.roomId); err != nil {

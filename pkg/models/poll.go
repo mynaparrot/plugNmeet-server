@@ -17,6 +17,9 @@ type PollModel struct {
 	analyticsModel *AnalyticsModel
 	natsService    *natsservice.NatsService
 	logger         *logrus.Entry
+	// aiAgentModel is wired after construction (it depends on this model), so it
+	// is nil whenever no AI agent is configured.
+	aiAgentModel *AIAgentModel
 }
 
 type PollModelArgs struct {
@@ -38,6 +41,11 @@ func NewPollModel(args PollModelArgs) *PollModel {
 		analyticsModel: args.AnalyticsModel,
 		logger:         args.Logger.WithField("model", "poll"),
 	}
+}
+
+// SetAIAgentModel wires the optional AI agent reaction hook.
+func (m *PollModel) SetAIAgentModel(aiAgentModel *AIAgentModel) {
+	m.aiAgentModel = aiAgentModel
 }
 
 func (m *PollModel) ManageActivation(req *plugnmeet.ActivatePollsReq) error {

@@ -11,12 +11,21 @@ import (
 	lkmedia "github.com/livekit/server-sdk-go/v2/pkg/media"
 )
 
+const (
+	// DefaultSampleRate16k is the PCM sample rate of synthesized (TTS) audio.
+	DefaultSampleRate16k = 16000
+	// DefaultOutputSampleRate24k is the native agent voice rate of realtime providers.
+	DefaultOutputSampleRate24k = 24000
+)
+
 type AudioPublisher struct {
 	track     *lkmedia.PCMLocalTrack
 	closeOnce sync.Once
 }
 
 // NewAudioPublisher creates and publishes a new local audio track to the room.
+// sampleRate is the rate of the PCM written to the track: DefaultSampleRate16k
+// for TTS synthesis, DefaultOutputSampleRate24k for realtime agent audio.
 func NewAudioPublisher(room *lksdk.Room, trackName string, sampleRate int, numChannels int, e2eeKey *string) (publisher *AudioPublisher, err error) {
 	defer func() {
 		if err != nil {
@@ -94,6 +103,15 @@ func (p *AudioPublisher) WriteSample(sample media.PCM16Sample) error {
 		return errors.New("publisher is not initialized")
 	}
 	return p.track.WriteSample(sample)
+}
+
+// Flush drops queued PCM that has not reached the room yet. Used for barge-in so
+// the agent stops talking the instant a participant speaks. ClearQueue takes the
+// track's own lock, so Flush is safe alongside WriteSample and Close.
+func (p *AudioPublisher) Flush() {
+	if p.track != nil {
+		p.track.ClearQueue()
+	}
 }
 
 // Close unpublishes and closes the local track safely using sync.Once.

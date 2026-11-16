@@ -33,6 +33,7 @@ type ApplicationControllers struct {
 	HealthCheckController  *controllers.HealthCheckController
 	InsightsController     *controllers.InsightsController
 	ArtifactController     *controllers.ArtifactController
+	AIAgentController      *controllers.AIAgentController
 }
 
 // Application is the root struct holding all dependencies for lifecycle management.

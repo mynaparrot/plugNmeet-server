@@ -75,6 +75,10 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId, calledFrom string) {
 					}
 				}
 			}
+			// The AI agent hooks in after the USER_JOINED broadcast: a real user is
+			// now online, which may require a delegate or the agent itself.
+			go m.aiAgentModel.OnUserJoined(m.ctx, roomId, userId)
+
 			log.Info("Successfully processed user joined event")
 		} else if err != nil {
 			log.WithError(err).Warn("Could not get user info after join")
@@ -192,6 +196,10 @@ func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, disconnecte
 		// Fallback if userInfo was not available initially.
 		_ = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_USER_OFFLINE, roomId, &plugnmeet.NatsKvUserInfo{UserId: userId, RoomId: roomId}, nil)
 	}
+
+	// The user is really gone, so let the AI agent re-select its delegate and
+	// arm its empty-room grace timer.
+	go m.aiAgentModel.OnUserLeft(m.ctx, roomId, userId)
 
 	// If the room ended during Stage 1, skip Stage 2 and go straight to cleanup.
 	if roomEnded {

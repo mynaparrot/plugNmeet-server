@@ -348,6 +348,46 @@ insights:
           input_price_per_million_tokens: 0.35
           output_price_per_million_tokens: 0.70
 
+    # AI agent (virtual teacher): a visible in-room voice assistant with a
+    # server-owned topic boundary. The room enables it through
+    # room_features.insights_features.ai_agent_features (see the API docs).
+    ai_agent:
+      provider: "google"
+      id: "default-gemini-creds"
+      options:
+        # Model used for the bidirectional realtime session (audio in and out).
+        realtime_model: "gemini-3.8-live"
+        # Text model used once at room end to refine the AI_AGENT_SESSION_SUMMARY
+        # artifact. Leave it unset and the server falls back to the
+        # summarize_model of ai_text_chat/meeting_summarizing (same provider),
+        # or to a deterministic local summary when no text model is available.
+        summarize_model: "gemini-3.1-flash-lite"
+      pricing:
+        default:
+          input_price_per_million_tokens: 3.50
+          output_price_per_million_tokens: 10.50
+
+    # OpenAI: use provider "openai" with an account from the accounts section.
+    # Models prefixed with "gpt-live" use the Live SDK (Responses delegation);
+    # every other model uses the Realtime SDK, including OpenAI-compatible
+    # self-hosted servers.
+    # ai_agent:
+    #   provider: "openai"
+    #   id: "default-openai-creds"
+    #   options:
+    #     realtime_model: "gpt-realtime-2.1-mini"  # default; "gpt-realtime-2.1" for the full model
+    #     # realtime_model: "gpt-live-1"           # Live SDK
+    #     # delegation_model: "gpt-5.4-mini"       # Live only: Responses backend for tools
+    #     # Text model used once at room end to refine AI_AGENT_SESSION_SUMMARY.
+    #     # summarize_model: "gpt-5.4-mini"
+    #     # default_voice: "marin"
+    #     # Realtime only: self-hosted servers usually need their own turn
+    #     # detection and may not support input transcription.
+    #     # turn_detection: "semantic_vad"         # semantic_vad (default), server_vad, none
+    #     # input_transcription_model: "gpt-transcribe"  # or "gpt-live-transcribe" (no VAD), "none" disables
+    #     # realtime_auth_header: "Authorization"  # e.g. "api-key" for self-hosted gateways
+    #   # pricing uses the same shape as above, keyed per model or "default".
+
 # Custom TURN Server (Optional)
 #turn_server:
 #  # Set to true to use a custom TURN provider instead of LiveKit's default.

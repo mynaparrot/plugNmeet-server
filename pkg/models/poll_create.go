@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"time"
@@ -232,6 +233,13 @@ func (m *PollModel) UserSubmitResponse(r *plugnmeet.SubmitPollResponseReq) error
 		UserId:    &r.UserId,
 		HsetValue: new(string(marshal)),
 	})
+
+	// Push hook: a running AI agent reacts without polling.
+	selected := 0
+	if len(r.SelectedOptions) > 0 {
+		selected = int(r.SelectedOptions[0])
+	}
+	m.aiAgentModel.OnPollResponseSubmitted(context.Background(), r.RoomId, r.PollId, r.UserId, "", selected)
 
 	log.Info("successfully submitted poll response")
 	return nil

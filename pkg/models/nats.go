@@ -27,6 +27,7 @@ type NatsModel struct {
 	natsService    *natsservice.NatsService
 	userModel      *UserModel
 	analyticsModel *AnalyticsModel
+	aiAgentModel   *AIAgentModel
 	logger         *logrus.Entry
 	sfGroup        *singleflight.Group
 }
@@ -43,6 +44,7 @@ type NatsModelArgs struct {
 	AnalyticsModel *AnalyticsModel
 	AuthModel      *AuthModel
 	UserModel      *UserModel
+	AIAgentModel   *AIAgentModel
 	Logger         *logrus.Logger
 }
 
@@ -58,6 +60,7 @@ func NewNatsModel(args NatsModelArgs) *NatsModel {
 		authModel:      args.AuthModel,
 		userModel:      args.UserModel,
 		analyticsModel: args.AnalyticsModel,
+		aiAgentModel:   args.AIAgentModel,
 		logger:         args.Logger.WithField("model", "nats"),
 		sfGroup:        new(singleflight.Group),
 	}
@@ -133,5 +136,29 @@ func (m *NatsModel) HandleFromClientToServerReq(roomId, userId string, req *plug
 		m.HandleSessionDataSave(roomId, userId, req)
 	case plugnmeet.NatsMsgClientToServerEvents_SESSION_DATA_FETCH_REQUEST:
 		m.HandleSessionDataFetchRequest(roomId, userId, req)
+	case plugnmeet.NatsMsgClientToServerEvents_AI_AGENT_TOOL_RESULT:
+		if m.aiAgentModel == nil {
+			return
+		}
+		res := new(plugnmeet.AIAgentToolResultMsg)
+		if err := protojson.Unmarshal([]byte(req.Msg), res); err != nil {
+			m.logger.WithError(err).Warnln("failed to decode the ai agent tool result")
+			return
+		}
+		m.aiAgentModel.HandleClientToolResult(m.ctx, roomId, userId, res)
+	case plugnmeet.NatsMsgClientToServerEvents_AI_AGENT_WHITEBOARD_SCENE:
+		if m.aiAgentModel == nil {
+			return
+		}
+		scene := new(plugnmeet.AIAgentWhiteboardSceneMsg)
+		if err := protojson.Unmarshal([]byte(req.Msg), scene); err != nil {
+			m.logger.WithError(err).Warnln("failed to decode the ai agent whiteboard scene")
+			return
+		}
+		// The image may travel in the binary payload to avoid base64 inflation.
+		if len(req.BinMsg) > 0 && len(scene.WebpImage) == 0 {
+			scene.WebpImage = req.BinMsg
+		}
+		m.aiAgentModel.HandleWhiteboardScene(m.ctx, roomId, userId, scene)
 	}
 }

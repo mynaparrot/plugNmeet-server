@@ -19,6 +19,7 @@ type UserModel struct {
 	analyticsModel *AnalyticsModel
 	am             *AuthModel
 	logger         *logrus.Entry
+	breakoutModel  *BreakoutRoomModel
 }
 
 type UserModelArgs struct {
@@ -44,4 +45,9 @@ func NewUserModel(args UserModelArgs) *UserModel {
 		am:             args.Am,
 		logger:         args.Logger.WithField("model", "user"),
 	}
+}
+
+// SetBreakoutRoomModel wires the breakout room model after construction.
+func (m *UserModel) SetBreakoutRoomModel(bm *BreakoutRoomModel) {
+	m.breakoutModel = bm
 }

@@ -32,6 +32,11 @@ func NewProvider(providerAccount *config.ProviderAccount, serviceConfig *config.
 	}, nil
 }
 
+// CreateRealtimeSession is not supported by the Azure provider.
+func (p *AzureProvider) CreateRealtimeSession(ctx context.Context, model string, opts *insights.RealtimeSessionOptions) (insights.RealtimeSession, error) {
+	return nil, insights.ErrRealtimeNotSupported
+}
+
 // CreateTranscription now uses the stored credentials and parses the options.
 func (p *AzureProvider) CreateTranscription(ctx context.Context, roomId, userId string, options []byte) (insights.TranscriptionStream, error) {
 	opts := &insights.TranscriptionOptions{}
