@@ -178,7 +178,7 @@ func (m *ArtifactModel) CreateAllRoomUsageArtifacts(roomId, roomSid string, room
 	isBreakout := roomInfo.IsBreakoutRoom != 0
 
 	if isBreakout {
-		parentRoomId, parentTableId, perr := ParseBreakoutParentRoomRef(roomInfo.ParentRoomID)
+		parentRoomId, parentTableId, perr := helpers.ParseBreakoutParentRoomRef(roomInfo.ParentRoomID)
 		if perr != nil {
 			log.WithError(perr).Error("failed to parse parent room reference for usage artifacts, skipping cost usage harvest")
 			return

@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 
@@ -355,7 +356,7 @@ func (m *AIAgentModel) closeBreakoutRoomAfterStop(roomId, reason string) {
 	if err != nil || info == nil || meta == nil || !meta.GetIsBreakoutRoom() {
 		return
 	}
-	parentRoomId, _, err := ParseBreakoutParentRoomRef(meta.GetParentRoomId())
+	parentRoomId, _, err := helpers.ParseBreakoutParentRoomRef(meta.GetParentRoomId())
 	if err != nil {
 		m.logger.WithError(err).WithField("roomId", roomId).Warn("could not resolve the parent of the breakout room")
 		return

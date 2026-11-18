@@ -10,6 +10,7 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -152,7 +153,7 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	// "<plain parent roomId>:<parent DB table id>" so metadata consumers can
 	// resolve the exact parent session. All parent Redis keys, ids and
 	// broadcasts keep using the plain r.RoomId.
-	meta.ParentRoomId = FormatBreakoutParentRoomRef(r.RoomId, mainRoom.DbTableId)
+	meta.ParentRoomId = helpers.FormatBreakoutParentRoomRef(r.RoomId, mainRoom.DbTableId)
 	// this is crucial as breakout room should not generate userID
 	meta.RoomFeatures.AutoGenUserId = new(false)
 
@@ -763,7 +764,7 @@ func (m *BreakoutRoomModel) PostTaskAfterRoomStartWebhook(roomId string, metadat
 
 	// the metadata reference is "<parent roomId>:<parent table id>"; the plain
 	// room id is required as the Redis hash key.
-	parentRoomId, _, err := ParseBreakoutParentRoomRef(metadata.ParentRoomId)
+	parentRoomId, _, err := helpers.ParseBreakoutParentRoomRef(metadata.ParentRoomId)
 	if err != nil {
 		log.WithError(err).Error("Failed to parse parent room reference")
 		return err

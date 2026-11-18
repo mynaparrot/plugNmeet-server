@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"github.com/sirupsen/logrus"
 )
@@ -68,6 +69,12 @@ func (m *JanitorModel) activeRoomChecker() {
 			continue
 		}
 
+		// A parent room with active breakout rooms is occupied as long as any
+		// human participant is online in the parent or one of its breakouts.
+		if meta, mErr := m.natsService.GetRoomMetadataStruct(room.RoomId); mErr == nil && isParentWithActiveBreakouts(meta) {
+			userIds = m.collectParentBreakoutHumanUsers(room.RoomId)
+		}
+
 		if userIds == nil || len(userIds) == 0 {
 			// no user online
 			valid := rInfo.CreatedAt + rInfo.EmptyTimeout
@@ -105,4 +112,37 @@ func (m *JanitorModel) activeRoomChecker() {
 			_, _ = m.ds.UpdateNumParticipants(room.Sid, count)
 		}
 	}
+}
+
+// collectParentBreakoutHumanUsers returns the deduplicated online human users
+// of a parent room and its active breakout rooms. Internal agent bots are
+// excluded so they never inflate the participant count.
+func (m *JanitorModel) collectParentBreakoutHumanUsers(parentRoomId string) []string {
+	seen := make(map[string]struct{})
+	var userIds []string
+
+	addRoom := func(roomId string) {
+		users, err := m.natsService.GetOnlineUsersId(roomId)
+		if err != nil {
+			return
+		}
+		for _, userId := range users {
+			if config.IsUserIdInternal(userId) {
+				continue
+			}
+			if _, ok := seen[userId]; ok {
+				continue
+			}
+			seen[userId] = struct{}{}
+			userIds = append(userIds, userId)
+		}
+	}
+
+	addRoom(parentRoomId)
+	if roomIds, err := m.rs.GetBreakoutRoomIdsByParentRoomId(parentRoomId); err == nil {
+		for _, roomId := range roomIds {
+			addRoom(roomId)
+		}
+	}
+	return userIds
 }

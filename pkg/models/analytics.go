@@ -23,12 +23,20 @@ const (
 	analyticsUserKey = analyticsRoomKey + ":user:%s"
 )
 
+// analyticsNatsService is the subset of the NATS service the analytics model
+// needs, so attribution can be unit tested without a live NATS connection.
+type analyticsNatsService interface {
+	GetRoomMetadataStruct(roomId string) (*plugnmeet.RoomMetadata, error)
+	UnmarshalUserMetadata(metadata string) (*plugnmeet.UserMetadata, error)
+	UnmarshalRoomMetadata(metadata string) (*plugnmeet.RoomMetadata, error)
+}
+
 type AnalyticsModel struct {
 	ctx             context.Context
 	app             *config.AppConfig
 	ds              *dbservice.DatabaseService
 	rs              *redisservice.RedisService
-	natsService     *natsservice.NatsService
+	natsService     analyticsNatsService
 	webhookNotifier *helpers.WebhookNotifier
 	logger          *logrus.Entry
 	artifactModel   *ArtifactModel
@@ -160,6 +168,19 @@ func (m *AnalyticsModel) HandleEvent(d *plugnmeet.AnalyticsDataMsg) {
 	// only default it, so callers can pass the exact time an event happened.
 	if d.Time == 0 {
 		d.Time = time.Now().UnixMilli()
+	}
+
+	// Internal agent bots must never be recorded as human users.
+	if d.UserId != nil && config.IsUserIdInternal(d.GetUserId()) {
+		return
+	}
+
+	// Breakout room user activity is attributed to the parent room. Routing here,
+	// before any handler builds its Redis key, covers every user event (join,
+	// leave, media, polls, chat, ...) instead of only join/leave.
+	if d.EventType == plugnmeet.AnalyticsEventType_ANALYTICS_EVENT_TYPE_USER ||
+		d.GetEventName() == plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_USER_JOINED {
+		d.RoomId = m.analyticsRoomId(d.RoomId)
 	}
 
 	switch d.EventType {
@@ -304,13 +325,16 @@ func (m *AnalyticsModel) FetchAnalytics(r *plugnmeet.FetchAnalyticsReq) (*plugnm
 func (m *AnalyticsModel) analyticsRoomId(roomId string) string {
 	meta, err := m.natsService.GetRoomMetadataStruct(roomId)
 	if err != nil || meta == nil {
-		return roomId
+		// Delayed events (e.g. USER_LEFT after the breakout room closed and its
+		// NATS bucket was removed) can no longer read metadata, so fall back to
+		// the persisted room row.
+		return m.analyticsRoomIdFromDb(roomId)
 	}
 	if meta.IsBreakoutRoom && meta.ParentRoomId != "" {
 		// metadata stores "<parent roomId>:<parent table id>"; only the plain
 		// room id is a valid analytics key. On parse failure we keep the
 		// event on the breakout room, which never exports analytics.
-		parentRoomId, _, pErr := ParseBreakoutParentRoomRef(meta.ParentRoomId)
+		parentRoomId, _, pErr := helpers.ParseBreakoutParentRoomRef(meta.ParentRoomId)
 		if pErr != nil {
 			m.logger.WithError(pErr).WithField("roomId", roomId).
 				Warn("failed to parse parent room reference; keeping analytics on the breakout room")
@@ -319,4 +343,33 @@ func (m *AnalyticsModel) analyticsRoomId(roomId string) string {
 		return parentRoomId
 	}
 	return roomId
+}
+
+// analyticsRoomIdFromDb resolves a breakout room's parent from the persisted
+// room row when the NATS metadata is no longer available.
+func (m *AnalyticsModel) analyticsRoomIdFromDb(roomId string) string {
+	if m.ds == nil {
+		return roomId
+	}
+
+	roomInfo, dbErr := m.ds.GetRoomInfoByRoomId(roomId, 1)
+	if dbErr == nil && roomInfo == nil {
+		roomInfo, dbErr = m.ds.GetRoomInfoByRoomId(roomId, 0)
+	}
+	if dbErr != nil {
+		m.logger.WithError(dbErr).WithField("roomId", roomId).
+			Warn("failed to load room info for analytics attribution")
+		return roomId
+	}
+	if roomInfo == nil || roomInfo.IsBreakoutRoom == 0 || roomInfo.ParentRoomID == "" {
+		return roomId
+	}
+
+	parentRoomId, _, pErr := helpers.ParseBreakoutParentRoomRef(roomInfo.ParentRoomID)
+	if pErr != nil {
+		m.logger.WithError(pErr).WithField("roomId", roomId).
+			Warn("failed to parse parent room reference; keeping analytics on the breakout room")
+		return roomId
+	}
+	return parentRoomId
 }

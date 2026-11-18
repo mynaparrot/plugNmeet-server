@@ -17,8 +17,10 @@ import (
 
 // roomNotifier holds a dedicated worker and the cached webhook URLs for a single room.
 type roomNotifier struct {
-	worker *webhook.Notifier
-	urls   []string
+	worker         *webhook.Notifier
+	urls           []string
+	isBreakoutRoom bool
+	parentRoomId   string
 }
 
 type WebhookNotifier struct {
@@ -40,6 +42,8 @@ type WebhookNotifier struct {
 type webhookRedisFields struct {
 	Urls            []string `json:"urls"`
 	PerformDeleting bool     `json:"perform_deleting"`
+	IsBreakoutRoom  bool     `json:"is_breakout_room,omitempty"`
+	ParentRoomId    string   `json:"parent_room_id,omitempty"`
 }
 
 type WebhookNotifierArgs struct {
@@ -124,8 +128,10 @@ func (w *WebhookNotifier) getOrCreateNotifier(roomId string) *roomNotifier {
 
 	// Create the new wrapper with the fetched URLs and the worker.
 	newNotifier := &roomNotifier{
-		worker: webhook.NewNotifier(w.ctx, 1, 2, w.logger),
-		urls:   d.Urls,
+		worker:         webhook.NewNotifier(w.ctx, 1, 2, w.logger),
+		urls:           d.Urls,
+		isBreakoutRoom: d.IsBreakoutRoom,
+		parentRoomId:   d.ParentRoomId,
 	}
 
 	// Lock again to safely add to the map.
@@ -176,18 +182,17 @@ func (w *WebhookNotifier) RegisterWebhook(roomId, sid string) {
 		return
 	}
 
+	roomInfo, _ := w.ds.GetRoomInfoBySid(sid, nil)
+
 	var urls []string
 	if w.defaultUrl != "" {
 		urls = append(urls, w.defaultUrl)
 		log.WithField("default_url", w.defaultUrl).Debug("added default webhook url")
 	}
 
-	if w.enabledForPerMeeting {
-		roomInfo, _ := w.ds.GetRoomInfoBySid(sid, nil)
-		if roomInfo != nil && roomInfo.WebhookUrl != "" {
-			urls = append(urls, roomInfo.WebhookUrl)
-			log.WithField("per_meeting_url", roomInfo.WebhookUrl).Debug("added per-meeting webhook url")
-		}
+	if w.enabledForPerMeeting && roomInfo != nil && roomInfo.WebhookUrl != "" {
+		urls = append(urls, roomInfo.WebhookUrl)
+		log.WithField("per_meeting_url", roomInfo.WebhookUrl).Debug("added per-meeting webhook url")
 	}
 
 	if len(urls) < 1 {
@@ -199,6 +204,12 @@ func (w *WebhookNotifier) RegisterWebhook(roomId, sid string) {
 	d := &webhookRedisFields{
 		Urls:            urls,
 		PerformDeleting: false,
+	}
+	if roomInfo != nil && roomInfo.IsBreakoutRoom != 0 {
+		if parentRoomId := PlainParentRoomIdFromRef(roomInfo.ParentRoomID); parentRoomId != "" {
+			d.IsBreakoutRoom = true
+			d.ParentRoomId = parentRoomId
+		}
 	}
 
 	err := w.saveData(roomId, d)
@@ -244,6 +255,11 @@ func (w *WebhookNotifier) SendWebhookEvent(event *plugnmeet.CommonNotifyEvent) e
 	if !w.isEnabled || event.Room.GetRoomId() == "" {
 		return nil
 	}
+	// Internal agent participants are server-side bots, so their join/leave
+	// events must not be delivered as human participant webhooks.
+	if event.Participant != nil && config.IsUserIdInternal(event.Participant.GetIdentity()) {
+		return nil
+	}
 	roomId := event.Room.GetRoomId()
 
 	// Handle state changes for room_started and room_finished
@@ -270,6 +286,14 @@ func (w *WebhookNotifier) SendWebhookEvent(event *plugnmeet.CommonNotifyEvent) e
 		return nil
 	}
 
+	// Breakout room activity is reported as parent room activity, while the
+	// breakout room id remains available to the consumer.
+	if notifier.isBreakoutRoom && notifier.parentRoomId != "" {
+		event.Room.IsBreakoutRoom = new(true)
+		event.Room.BreakoutRoomId = new(roomId)
+		event.Room.RoomId = new(notifier.parentRoomId)
+	}
+
 	// Send the event to the queue using the static app config and the cached URLs.
 	notifier.worker.AddInNotifyQueue(event, w.app.Client.ApiKey, w.app.Client.Secret, notifier.urls)
 	return nil
@@ -287,20 +311,27 @@ func (w *WebhookNotifier) ForceToPutInQueue(event *plugnmeet.CommonNotifyEvent) 
 		return
 	}
 
+	roomInfo, _ := w.ds.GetRoomInfoBySid(event.Room.GetSid(), nil)
+
 	var urls []string
 	if w.defaultUrl != "" {
 		urls = append(urls, w.defaultUrl)
 	}
 
-	if w.enabledForPerMeeting {
-		roomInfo, _ := w.ds.GetRoomInfoBySid(event.Room.GetSid(), nil)
-		if roomInfo != nil && roomInfo.WebhookUrl != "" {
-			urls = append(urls, roomInfo.WebhookUrl)
-		}
+	if w.enabledForPerMeeting && roomInfo != nil && roomInfo.WebhookUrl != "" {
+		urls = append(urls, roomInfo.WebhookUrl)
 	}
 
 	if len(urls) < 1 {
 		return
+	}
+
+	if roomInfo != nil && roomInfo.IsBreakoutRoom != 0 {
+		if parentRoomId := PlainParentRoomIdFromRef(roomInfo.ParentRoomID); parentRoomId != "" {
+			event.Room.IsBreakoutRoom = new(true)
+			event.Room.BreakoutRoomId = new(event.Room.GetRoomId())
+			event.Room.RoomId = new(parentRoomId)
+		}
 	}
 
 	notifier := webhook.NewNotifier(w.ctx, 1, 2, w.logger)

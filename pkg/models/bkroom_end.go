@@ -7,6 +7,7 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 )
 
 func (m *BreakoutRoomModel) EndBreakoutRoom(ctx context.Context, r *plugnmeet.EndBreakoutRoomReq) error {
@@ -137,7 +138,7 @@ func (m *BreakoutRoomModel) PostTaskAfterRoomEndWebhook(ctx context.Context, roo
 	if meta.IsBreakoutRoom {
 		// the metadata reference is "<parent roomId>:<parent table id>"; the
 		// plain room id is required as the Redis hash key.
-		parentRoomId, _, perr := ParseBreakoutParentRoomRef(meta.ParentRoomId)
+		parentRoomId, _, perr := helpers.ParseBreakoutParentRoomRef(meta.ParentRoomId)
 		if perr != nil {
 			log.WithError(perr).Error("Failed to parse parent room reference, skipping breakout room cleanup")
 			return perr

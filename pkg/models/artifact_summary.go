@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/sirupsen/logrus"
 )
@@ -102,7 +103,7 @@ func (m *ArtifactModel) CreateMeetingSummaryArtifact(roomTableId uint64, summary
 	usageRoomId, usageRoomSid, usageTableId := roomInfo.RoomId, roomInfo.Sid, roomTableId
 	isBreakout := roomInfo.IsBreakoutRoom != 0
 	if isBreakout {
-		parentRoomId, parentTableId, perr := ParseBreakoutParentRoomRef(roomInfo.ParentRoomID)
+		parentRoomId, parentTableId, perr := helpers.ParseBreakoutParentRoomRef(roomInfo.ParentRoomID)
 		if perr != nil {
 			return fmt.Errorf("failed to parse parent room reference of %s for meeting summary usage artifact: %w", roomInfo.RoomId, perr)
 		}

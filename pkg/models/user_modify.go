@@ -6,6 +6,7 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -192,7 +193,7 @@ func (m *UserModel) notifyAdminsOutsideBreakoutRoom(roomId, userId string) {
 	}
 
 	// metadata stores "<parent roomId>:<parent table id>"; only the plain room id can be used as a room key.
-	parentRoomId, _, err := ParseBreakoutParentRoomRef(metadata.ParentRoomId)
+	parentRoomId, _, err := helpers.ParseBreakoutParentRoomRef(metadata.ParentRoomId)
 	if err != nil {
 		log.WithError(err).Warnln("failed to parse parent room reference, skipping breakout raise-hand notice")
 		return

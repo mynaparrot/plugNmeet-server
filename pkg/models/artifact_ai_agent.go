@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/sirupsen/logrus"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
@@ -31,13 +32,31 @@ func (m *ArtifactModel) CreateAIAgentSessionSummaryArtifact(roomTableId uint64, 
 		return nil, fmt.Errorf("room not found for room %d", roomTableId)
 	}
 
+	// Breakout session artifacts are owned by the parent room, exactly like the
+	// meeting summary usage artifact. Resolve the owner before building the file
+	// path so both the summary and its usage live under the parent room.
+	ownerRoomId, ownerRoomSid, ownerTableId := roomId, roomSid, roomTableId
+	isBreakout := roomInfo.IsBreakoutRoom != 0
+	if isBreakout {
+		parentRoomId, parentTableId, perr := helpers.ParseBreakoutParentRoomRef(roomInfo.ParentRoomID)
+		if perr != nil {
+			log.WithError(perr).Error("failed to parse the parent room reference, keeping the ai agent artifacts in the breakout room")
+			isBreakout = false
+		} else if parentInfo, perr := m.ds.GetRoomInfoByTableId(parentTableId); perr != nil || parentInfo == nil || parentInfo.RoomId != parentRoomId {
+			log.WithError(perr).Error("failed to resolve the parent room, keeping the ai agent artifacts in the breakout room")
+			isBreakout = false
+		} else {
+			ownerRoomId, ownerRoomSid, ownerTableId = parentInfo.RoomId, parentInfo.Sid, parentInfo.ID
+		}
+	}
+
 	content, err := json.MarshalIndent(summary, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal the ai agent session summary: %w", err)
 	}
 
 	fileName := fmt.Sprintf("ai_agent_summary_%s-%d.json", roomSid, time.Now().UnixMilli())
-	relativePath, absolutePath, err := m.buildPath(fileName, roomId, plugnmeet.RoomArtifactType_AI_AGENT_SESSION_SUMMARY)
+	relativePath, absolutePath, err := m.buildPath(fileName, ownerRoomId, plugnmeet.RoomArtifactType_AI_AGENT_SESSION_SUMMARY)
 	if err != nil {
 		return nil, err
 	}
@@ -52,36 +71,36 @@ func (m *ArtifactModel) CreateAIAgentSessionSummaryArtifact(roomTableId uint64, 
 			MimeType: "application/json",
 		},
 	}
-	fileArtifact, err := m.createAndSaveArtifact(roomId, roomSid, roomTableId, plugnmeet.RoomArtifactType_AI_AGENT_SESSION_SUMMARY, fileMetadata, true, log)
+	m.setUsageArtifactProvenance(fileMetadata, roomInfo.ID, isBreakout)
+	if summary.Session.UserID != "" {
+		fileMetadata.UserInfo = &plugnmeet.RoomArtifactUserInfo{
+			UserId: summary.Session.UserID,
+			Name:   optionalString(summary.Session.UserName),
+		}
+	}
+	fileArtifact, err := m.createAndSaveArtifact(ownerRoomId, ownerRoomSid, ownerTableId, plugnmeet.RoomArtifactType_AI_AGENT_SESSION_SUMMARY, fileMetadata, true, log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create the ai agent session summary artifact: %w", err)
 	}
 
 	usageMetadata := m.buildAIAgentUsageMetadata(telemetry, summaryPromptTokens, summaryCompletionTokens, summarizeModel, &fileArtifact.ArtifactId, log)
-
-	// Extends the usage-artifact ownership contract: breakout activity is billed
-	// to the parent room, exactly like the meeting summary usage artifact.
-	usageRoomId, usageRoomSid, usageTableId := roomId, roomSid, roomTableId
-	isBreakout := roomInfo.IsBreakoutRoom != 0
-	if isBreakout {
-		parentRoomId, parentTableId, perr := ParseBreakoutParentRoomRef(roomInfo.ParentRoomID)
-		if perr != nil {
-			log.WithError(perr).Error("failed to parse the parent room reference, keeping the usage artifact in the breakout room")
-			isBreakout = false
-		} else if parentInfo, perr := m.ds.GetRoomInfoByTableId(parentTableId); perr != nil || parentInfo == nil || parentInfo.RoomId != parentRoomId {
-			log.WithError(perr).Error("failed to resolve the parent room, keeping the usage artifact in the breakout room")
-			isBreakout = false
-		} else {
-			usageRoomId, usageRoomSid, usageTableId = parentInfo.RoomId, parentInfo.Sid, parentInfo.ID
-		}
-	}
+	usageMetadata.UserInfo = fileMetadata.UserInfo
 	m.setUsageArtifactProvenance(usageMetadata, roomInfo.ID, isBreakout)
 
-	if _, err = m.createAndSaveArtifact(usageRoomId, usageRoomSid, usageTableId, plugnmeet.RoomArtifactType_AI_AGENT_USAGE, usageMetadata, true, log); err != nil {
+	if _, err = m.createAndSaveArtifact(ownerRoomId, ownerRoomSid, ownerTableId, plugnmeet.RoomArtifactType_AI_AGENT_USAGE, usageMetadata, true, log); err != nil {
 		log.WithError(err).Error("failed to create the ai agent usage artifact")
 	}
 
 	return fileArtifact, nil
+}
+
+// optionalString converts an empty string into a nil pointer so that optional
+// proto fields are omitted instead of serialized as an empty value.
+func optionalString(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 // buildAIAgentUsageMetadata combines the session's realtime usage with the extra

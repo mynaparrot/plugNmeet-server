@@ -48,7 +48,6 @@ func (s *DatabaseService) CloneParentRoomInfoForBreakout(parentTableId uint64, i
 	rawRow["recorder_id"] = ""
 	rawRow["is_active_rtmp"] = 0
 	rawRow["rtmp_node_id"] = ""
-	rawRow["webhook_url"] = ""
 
 	rawRow["creation_time"] = time.Now().Unix()
 	rawRow["created"] = time.Now().UTC()

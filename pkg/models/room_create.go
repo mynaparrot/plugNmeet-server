@@ -10,6 +10,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
@@ -495,7 +496,7 @@ func (m *RoomModel) prepareRoomDbInfo(r *plugnmeet.CreateRoomReq, existing *dbmo
 // insert or update.
 func (m *RoomModel) saveRoomDbInfo(r *plugnmeet.CreateRoomReq, info *dbmodels.RoomInfo) error {
 	if r.GetMetadata().GetIsBreakoutRoom() && info.ID == 0 {
-		if _, parentTableId, err := ParseBreakoutParentRoomRef(r.GetMetadata().GetParentRoomId()); err == nil && parentTableId > 0 {
+		if _, parentTableId, err := helpers.ParseBreakoutParentRoomRef(r.GetMetadata().GetParentRoomId()); err == nil && parentTableId > 0 {
 			return m.ds.CloneParentRoomInfoForBreakout(parentTableId, info)
 		}
 	}

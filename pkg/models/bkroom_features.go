@@ -10,6 +10,7 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 )
@@ -38,7 +39,7 @@ func (m *BreakoutRoomModel) hasParentRoomReference(roomId, parentRoomId string) 
 	if err != nil || !meta.GetIsBreakoutRoom() {
 		return false
 	}
-	plainParentRoomId, _, err := ParseBreakoutParentRoomRef(meta.GetParentRoomId())
+	plainParentRoomId, _, err := helpers.ParseBreakoutParentRoomRef(meta.GetParentRoomId())
 
 	return err == nil && plainParentRoomId == parentRoomId
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
@@ -172,7 +173,7 @@ func (m *BreakoutRoomModel) ResolveParentRoomId(roomId string) string {
 		return roomId
 	}
 	if meta.IsBreakoutRoom && meta.ParentRoomId != "" {
-		parentRoomId, _, err := ParseBreakoutParentRoomRef(meta.ParentRoomId)
+		parentRoomId, _, err := helpers.ParseBreakoutParentRoomRef(meta.ParentRoomId)
 		if err != nil {
 			m.logger.WithError(err).WithField("roomId", roomId).
 				Warn("failed to parse parent room reference; falling back to token roomId")

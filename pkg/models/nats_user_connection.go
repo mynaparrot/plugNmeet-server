@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/mynaparrot/plugnmeet-server/pkg/turn"
 	"github.com/sirupsen/logrus"
@@ -65,13 +66,17 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId, calledFrom string) {
 					HsetValue: new(fmt.Sprintf("%d", time.Now().UnixMilli())),
 				})
 
-				roomInfo, err := m.natsService.GetRoomInfo(roomId)
-				if err != nil {
-					log.WithError(err).Error("Failed to get room info")
-				}
-				if roomInfo != nil {
-					if _, err := m.ds.IncrementOrDecrementNumParticipants(roomInfo.GetRoomSid(), "+"); err != nil {
-						log.WithError(err).Error("Failed to increment num participants")
+				// Internal agent bots are not human participants and must not
+				// affect the room's participant counter.
+				if !config.IsUserIdInternal(userId) {
+					roomInfo, err := m.natsService.GetRoomInfo(roomId)
+					if err != nil {
+						log.WithError(err).Error("Failed to get room info")
+					}
+					if roomInfo != nil {
+						if _, err := m.ds.IncrementOrDecrementNumParticipants(roomInfo.GetRoomSid(), "+"); err != nil {
+							log.WithError(err).Error("Failed to increment num participants")
+						}
 					}
 				}
 			}

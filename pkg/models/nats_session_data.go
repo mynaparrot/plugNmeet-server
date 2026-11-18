@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -112,7 +113,7 @@ func (m *NatsModel) canSeedSessionDataTo(parentRoomId, targetRoomId, userId stri
 
 	// metadata stores "<parent roomId>:<parent table id>"; compare only the
 	// plain parent room id against the room the message arrived on.
-	targetParentRoomId, _, pErr := ParseBreakoutParentRoomRef(meta.GetParentRoomId())
+	targetParentRoomId, _, pErr := helpers.ParseBreakoutParentRoomRef(meta.GetParentRoomId())
 	if pErr != nil || targetParentRoomId != parentRoomId {
 		m.logger.Warnf("rejected session data seeding to room %s from user %s; not a breakout room of %s", targetRoomId, userId, parentRoomId)
 		return false

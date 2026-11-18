@@ -4,17 +4,23 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/connections"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
+	dbservice "github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 )
 
 func newTestAnalyticsModel(t *testing.T) (*AnalyticsModel, redis.UniversalClient) {
@@ -39,8 +45,9 @@ func newTestAnalyticsModel(t *testing.T) (*AnalyticsModel, redis.UniversalClient
 	logger.SetLevel(logrus.PanicLevel)
 
 	app := &config.AppConfig{
-		RedisInfo: connections.RedisInfo{DefaultTTL: &ttl},
-		NatsInfo:  config.NatsInfo{DefaultTTL: &ttl},
+		AnalyticsSettings: &config.AnalyticsSettings{Enabled: true},
+		RedisInfo:         connections.RedisInfo{DefaultTTL: &ttl},
+		NatsInfo:          config.NatsInfo{DefaultTTL: &ttl},
 	}
 
 	m := &AnalyticsModel{
@@ -145,5 +152,111 @@ func TestHandleFirstTimeUserJoinedValidExtraData(t *testing.T) {
 
 			checkUserJoined(t, m, usersKey, eventKey, userId, tt.wantAdmin, tt.wantEx)
 		})
+	}
+}
+
+// fakeAnalyticsNats lets the attribution logic be tested without NATS.
+type fakeAnalyticsNats struct {
+	meta *plugnmeet.RoomMetadata
+	err  error
+}
+
+func (f fakeAnalyticsNats) GetRoomMetadataStruct(string) (*plugnmeet.RoomMetadata, error) {
+	return f.meta, f.err
+}
+
+func (f fakeAnalyticsNats) UnmarshalUserMetadata(string) (*plugnmeet.UserMetadata, error) {
+	return &plugnmeet.UserMetadata{}, nil
+}
+
+func (f fakeAnalyticsNats) UnmarshalRoomMetadata(string) (*plugnmeet.RoomMetadata, error) {
+	if f.meta != nil {
+		return f.meta, f.err
+	}
+	return &plugnmeet.RoomMetadata{}, f.err
+}
+
+func TestHandleEventIgnoresInternalAgentUsers(t *testing.T) {
+	m, rc := newTestAnalyticsModel(t)
+	ctx := context.Background()
+	// Keep attribution local so this test does not need NATS.
+	m.natsService = fakeAnalyticsNats{}
+
+	roomId := "room-analytics-internal-agent"
+	usersKey := fmt.Sprintf(analyticsRoomKey+":room", roomId) + ":users"
+	t.Cleanup(func() {
+		rc.Del(ctx, usersKey)
+	})
+
+	internalUserId := config.AgentUserUserIdPrefix + "ai_agent-test"
+	m.HandleEvent(userJoinedMsg(roomId, internalUserId, "AI Agent", "{}"))
+
+	users, err := m.rs.AnalyticsGetAllUsers(usersKey)
+	if err != nil {
+		t.Fatalf("read analytics users: %v", err)
+	}
+	if len(users) != 0 {
+		t.Fatalf("internal agent user was recorded in analytics: %v", users)
+	}
+
+	// A real participant on the same path is still recorded.
+	m.HandleEvent(userJoinedMsg(roomId, "user-1", "User One", "{}"))
+	users, err = m.rs.AnalyticsGetAllUsers(usersKey)
+	if err != nil {
+		t.Fatalf("read analytics users: %v", err)
+	}
+	if _, ok := users["user-1"]; !ok {
+		t.Fatalf("real participant missing from analytics users: %v", users)
+	}
+}
+
+func TestAnalyticsRoomIdUsesBreakoutMetadata(t *testing.T) {
+	parentRoomId := "parent-room"
+	m := &AnalyticsModel{
+		natsService: fakeAnalyticsNats{meta: &plugnmeet.RoomMetadata{
+			IsBreakoutRoom: true,
+			ParentRoomId:   helpers.FormatBreakoutParentRoomRef(parentRoomId, 42),
+		}},
+		logger: logrus.New().WithField("test", "analytics"),
+	}
+
+	if got := m.analyticsRoomId("breakout-room"); got != parentRoomId {
+		t.Fatalf("analyticsRoomId = %q, want %q", got, parentRoomId)
+	}
+
+	// A main room is attributed to itself.
+	m.natsService = fakeAnalyticsNats{meta: &plugnmeet.RoomMetadata{}}
+	if got := m.analyticsRoomId("main-room"); got != "main-room" {
+		t.Fatalf("analyticsRoomId = %q, want main-room", got)
+	}
+}
+
+func TestAnalyticsRoomIdFallsBackToDb(t *testing.T) {
+	ctx := context.Background()
+	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "_"))
+	gdb, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{Logger: gormlogger.Default.LogMode(gormlogger.Silent)})
+	if err != nil {
+		t.Fatalf("failed to open sqlite test db: %v", err)
+	}
+	createTestSchemaFromInstallDump(t, gdb, "room_info")
+	ds := dbservice.New(dbservice.Args{Ctx: ctx, Db: gdb, Logger: logrus.New()})
+
+	parent := createTestRoomRow(t, gdb, "parent-room", false, "")
+	child := createTestRoomRow(t, gdb, "breakout-child", true, helpers.FormatBreakoutParentRoomRef(parent.RoomId, parent.ID))
+
+	m := &AnalyticsModel{
+		ds: ds,
+		// No metadata: this is the state after the breakout room's NATS bucket
+		// has already been removed.
+		natsService: fakeAnalyticsNats{},
+		logger:      logrus.New().WithField("test", "analytics"),
+	}
+
+	if got := m.analyticsRoomId(child.RoomId); got != parent.RoomId {
+		t.Fatalf("analyticsRoomId = %q, want parent %q", got, parent.RoomId)
+	}
+	// Unknown rooms keep their own id.
+	if got := m.analyticsRoomId("unknown-room"); got != "unknown-room" {
+		t.Fatalf("analyticsRoomId = %q, want unknown-room", got)
 	}
 }

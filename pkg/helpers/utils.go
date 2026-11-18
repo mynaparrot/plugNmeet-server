@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/gabriel-vasile/mimetype"
@@ -179,4 +180,37 @@ func ValidateAndGetAbsFilePath(basePath, relativePath string) (string, *mimetype
 	}
 
 	return absJoinedPath, mType, nil
+}
+
+// FormatBreakoutParentRoomRef encodes a parent room reference for persistence
+// in dbmodels.RoomInfo.ParentRoomID. "<parent roomId>:<parent table id>"
+func FormatBreakoutParentRoomRef(parentRoomId string, parentTableId uint64) string {
+	return fmt.Sprintf(config.BreakoutParentRoomRefFormat, parentRoomId, parentTableId)
+}
+
+// ParseBreakoutParentRoomRef decodes a persisted parent room reference. A
+// reference must contain a non-empty room id followed by a colon (:) and a positive
+// uint64 table id e.g. "<parent roomId>:<parent table id>" ; malformed values are rejected.
+func ParseBreakoutParentRoomRef(ref string) (string, uint64, error) {
+	sep := strings.LastIndexByte(ref, ':')
+	if sep <= 0 || sep == len(ref)-1 {
+		return "", 0, fmt.Errorf("invalid parent room reference %q", ref)
+	}
+
+	parentTableId, err := strconv.ParseUint(ref[sep+1:], 10, 64)
+	if err != nil || parentTableId == 0 {
+		return "", 0, fmt.Errorf("invalid parent room reference %q", ref)
+	}
+
+	return ref[:sep], parentTableId, nil
+}
+
+// PlainParentRoomIdFromRef returns only the room id part of a persisted parent
+// room reference, for API responses that expose the plain parent room id.
+func PlainParentRoomIdFromRef(ref string) string {
+	roomId, _, err := ParseBreakoutParentRoomRef(ref)
+	if err != nil {
+		return ""
+	}
+	return roomId
 }

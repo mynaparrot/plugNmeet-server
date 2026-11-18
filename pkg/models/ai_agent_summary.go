@@ -50,6 +50,8 @@ type AIAgentSessionSummary struct {
 }
 
 type AIAgentSummarySession struct {
+	UserID                 string   `json:"user_id,omitempty"`
+	UserName               string   `json:"user_name,omitempty"`
 	RoomID                 string   `json:"room_id"`
 	RoomSid                string   `json:"room_sid"`
 	SessionID              string   `json:"session_id"`
@@ -140,6 +142,7 @@ func (m *AIAgentModel) FinalizeSession(ctx context.Context, roomTableId uint64, 
 
 	quizzes := collectQuizEvaluation(cleanupCtx, m.redisService, roomId)
 	summary := buildDeterministicSessionSummary(roomId, roomSid, telemetry, sortedProgressEntries(progressMap), quizzes)
+	summary.Session.UserID, summary.Session.UserName = m.aiAgentSessionLearner(roomId)
 
 	var promptTokens, completionTokens uint32
 	summarizeModel := m.synthesizeSessionSummary(cleanupCtx, summary, telemetry, &promptTokens, &completionTokens, log)
@@ -153,6 +156,23 @@ func (m *AIAgentModel) FinalizeSession(ctx context.Context, roomTableId uint64, 
 	m.redisService.DeleteAIAgentSessionData(cleanupCtx, roomId)
 	m.cleanupRoomState(cleanupCtx, roomId)
 	return summary
+}
+
+// aiAgentSessionLearner resolves the single learner of a 1-on-1 AI session,
+// together with the display name when the participant is still known to NATS.
+func (m *AIAgentModel) aiAgentSessionLearner(roomId string) (userId, userName string) {
+	if m.natsService == nil {
+		return "", ""
+	}
+	allowed := aiAgentAllowedParticipantIds(m.roomAgentFeatures(roomId))
+	if len(allowed) != 1 {
+		return "", ""
+	}
+	userId = allowed[0]
+	if info, err := m.natsService.GetUserInfo(roomId, userId); err == nil && info != nil {
+		userName = info.GetName()
+	}
+	return userId, userName
 }
 
 // synthesizeSessionSummary lets the configured model refine the deterministic

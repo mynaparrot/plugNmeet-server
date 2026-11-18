@@ -6,6 +6,7 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 )
@@ -84,7 +85,7 @@ func (m *RoomModel) GetActiveRoomInfo(ctx context.Context, r *plugnmeet.GetActiv
 		IsActiveRtmp:       int32(roomDbInfo.IsActiveRtmp),
 		WebhookUrl:         roomDbInfo.WebhookUrl,
 		IsBreakoutRoom:     int32(roomDbInfo.IsBreakoutRoom),
-		ParentRoomId:       plainParentRoomIdFromRef(roomDbInfo.ParentRoomID),
+		ParentRoomId:       helpers.PlainParentRoomIdFromRef(roomDbInfo.ParentRoomID),
 		CreationTime:       roomDbInfo.CreationTime,
 		Metadata:           rrr.Metadata,
 	}
@@ -126,7 +127,7 @@ func (m *RoomModel) GetActiveRoomsInfo(userCtx context.Context) (bool, string, p
 				IsActiveRtmp:       int32(r.IsActiveRtmp),
 				WebhookUrl:         r.WebhookUrl,
 				IsBreakoutRoom:     int32(r.IsBreakoutRoom),
-				ParentRoomId:       plainParentRoomIdFromRef(r.ParentRoomID),
+				ParentRoomId:       helpers.PlainParentRoomIdFromRef(r.ParentRoomID),
 				CreationTime:       r.CreationTime,
 			},
 		}

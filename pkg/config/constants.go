@@ -48,6 +48,12 @@ const (
 
 	// ExternalApiUserId is the created_by marker for polls pushed via the Auth API without a user_id.
 	ExternalApiUserId = "external-api"
+
+	// BreakoutParentRoomRefFormat is the persisted form of
+	// dbmodels.RoomInfo.ParentRoomID for breakout rooms. It stores both the parent
+	// room id and the parent's DB table id so a parent row can be resolved exactly,
+	// even when the same roomId has multiple sessions in room_info.
+	BreakoutParentRoomRefFormat = "%s:%d"
 )
 
 // GetNativeTwinIdentity returns the LiveKit identity of the hybrid native twin

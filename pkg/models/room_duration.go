@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
 )
@@ -126,7 +127,7 @@ func (m *RoomModel) IncreaseRoomDuration(roomId string, duration uint64) (uint64
 			"breakout room has duration, will compare with parent room")
 		// metadata stores "<parent roomId>:<parent table id>"; only the plain
 		// room id can be used as a duration key.
-		parentRoomId, _, pErr := ParseBreakoutParentRoomRef(meta.ParentRoomId)
+		parentRoomId, _, pErr := helpers.ParseBreakoutParentRoomRef(meta.ParentRoomId)
 		if pErr != nil {
 			log.WithError(pErr).Error("failed to parse parent room reference")
 			return 0, config.ErrBkRoomUnexpectedError

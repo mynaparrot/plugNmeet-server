@@ -13,6 +13,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	dbservice "github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/redis/go-redis/v9"
@@ -31,7 +32,7 @@ func TestBreakoutParentRoomRefFormatAndParse(t *testing.T) {
 		wantTable uint64
 		wantErr   bool
 	}{
-		{name: "valid", ref: FormatBreakoutParentRoomRef("room-1", 42), wantRoom: "room-1", wantTable: 42},
+		{name: "valid", ref: helpers.FormatBreakoutParentRoomRef("room-1", 42), wantRoom: "room-1", wantTable: 42},
 		{name: "valid room id with colon", ref: "room:1:7", wantRoom: "room:1", wantTable: 7},
 		{name: "empty", ref: "", wantErr: true},
 		{name: "no separator", ref: "room-1", wantErr: true},
@@ -44,7 +45,7 @@ func TestBreakoutParentRoomRefFormatAndParse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			roomId, tableId, err := ParseBreakoutParentRoomRef(tt.ref)
+			roomId, tableId, err := helpers.ParseBreakoutParentRoomRef(tt.ref)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("expected error for %q, got roomId=%q tableId=%d", tt.ref, roomId, tableId)
@@ -62,13 +63,13 @@ func TestBreakoutParentRoomRefFormatAndParse(t *testing.T) {
 }
 
 func TestPlainParentRoomIdFromRef(t *testing.T) {
-	if got := plainParentRoomIdFromRef(FormatBreakoutParentRoomRef("parent-room", 9)); got != "parent-room" {
+	if got := helpers.PlainParentRoomIdFromRef(helpers.FormatBreakoutParentRoomRef("parent-room", 9)); got != "parent-room" {
 		t.Fatalf("got %q, want parent-room", got)
 	}
-	if got := plainParentRoomIdFromRef(""); got != "" {
+	if got := helpers.PlainParentRoomIdFromRef(""); got != "" {
 		t.Fatalf("got %q, want empty", got)
 	}
-	if got := plainParentRoomIdFromRef("parent-room"); got != "" {
+	if got := helpers.PlainParentRoomIdFromRef("parent-room"); got != "" {
 		t.Fatalf("got %q, want empty for malformed reference", got)
 	}
 }
@@ -78,7 +79,7 @@ func TestPlainParentRoomIdFromRef(t *testing.T) {
 // room creation fills with `<plain roomId>:<parent table id>`); it must not do
 // its own NATS lookup or formatting.
 func TestPrepareRoomDbInfoCopiesParentReference(t *testing.T) {
-	ref := FormatBreakoutParentRoomRef("parent-room", 7)
+	ref := helpers.FormatBreakoutParentRoomRef("parent-room", 7)
 	child := &plugnmeet.CreateRoomReq{
 		RoomId: "parent-room-1",
 		Metadata: &plugnmeet.RoomMetadata{
@@ -98,7 +99,7 @@ func TestPrepareRoomDbInfoCopiesParentReference(t *testing.T) {
 			info.RoomId, info.IsBreakoutRoom, info.ParentRoomID, child.RoomId, ref)
 	}
 
-	parentRoomId, parentTableId, err := ParseBreakoutParentRoomRef(info.ParentRoomID)
+	parentRoomId, parentTableId, err := helpers.ParseBreakoutParentRoomRef(info.ParentRoomID)
 	if err != nil {
 		t.Fatalf("stored parent reference %q is not parseable: %v", info.ParentRoomID, err)
 	}
@@ -166,7 +167,7 @@ func TestUsageArtifactOwnershipUsesExactParentRow(t *testing.T) {
 	// may own the usage artifact.
 	oldParent := createTestRoomRow(t, gdb, "parent-room", false, "")
 	currentParent := createTestRoomRow(t, gdb, "parent-room", false, "")
-	child := createTestRoomRow(t, gdb, "parent-room-1", true, FormatBreakoutParentRoomRef("parent-room", currentParent.ID))
+	child := createTestRoomRow(t, gdb, "parent-room-1", true, helpers.FormatBreakoutParentRoomRef("parent-room", currentParent.ID))
 	seedChatTranslationUsage(t, rc, child.RoomId)
 	artifactType := plugnmeet.RoomArtifactType_CHAT_TRANSLATION_USAGE
 
@@ -354,9 +355,11 @@ func newArtifactTestEnv(t *testing.T) (*ArtifactModel, *gorm.DB, redis.Universal
 	})
 
 	ttl := 2 * time.Minute
+	storagePath := t.TempDir()
 	app := &config.AppConfig{
-		RedisInfo: connections.RedisInfo{DefaultTTL: &ttl},
-		Insights:  &config.InsightsConfig{},
+		RedisInfo:         connections.RedisInfo{DefaultTTL: &ttl},
+		Insights:          &config.InsightsConfig{},
+		ArtifactsSettings: &config.ArtifactsSettings{StoragePath: &storagePath},
 	}
 	rs := redisservice.New(redisservice.Args{Ctx: ctx, Rc: rc, App: app, Logger: logger})
 	analyticsModel := &AnalyticsModel{app: app}
@@ -416,4 +419,93 @@ func decodeArtifactMetadata(t *testing.T, raw string) *plugnmeet.RoomArtifactMet
 		t.Fatalf("failed to decode artifact metadata: %v", err)
 	}
 	return metadata
+}
+
+// TestAIAgentSessionSummaryArtifactBreakoutOwnedByParent locks in that a
+// breakout AI session writes both its summary file artifact and its usage
+// artifact under the parent room, while keeping the breakout provenance and
+// the learner's user info.
+func TestAIAgentSessionSummaryArtifactBreakoutOwnedByParent(t *testing.T) {
+	m, gdb, _ := newArtifactTestEnv(t)
+
+	parent := createTestRoomRow(t, gdb, "parent-room", false, "")
+	child := createTestRoomRow(t, gdb, "parent-room-bk", true, helpers.FormatBreakoutParentRoomRef(parent.RoomId, parent.ID))
+
+	summary := &AIAgentSessionSummary{
+		SchemaVersion: AIAgentSummarySchemaVersion,
+		Session: AIAgentSummarySession{
+			UserID:   "learner-1",
+			UserName: "Learner One",
+			RoomID:   child.RoomId,
+			RoomSid:  child.Sid,
+		},
+	}
+
+	summaryArtifact, err := m.CreateAIAgentSessionSummaryArtifact(child.ID, child.RoomId, child.Sid, summary, nil, 0, 0, "", m.log)
+	if err != nil {
+		t.Fatalf("create ai agent session summary artifact: %v", err)
+	}
+	if summaryArtifact == nil {
+		t.Fatal("expected a summary artifact")
+	}
+
+	summaryType := plugnmeet.RoomArtifactType_AI_AGENT_SESSION_SUMMARY
+	summaries, total, err := m.ds.GetArtifacts([]string{parent.RoomId}, nil, &summaryType, 0, 10, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 1 || len(summaries) != 1 {
+		t.Fatalf("got %d summary artifacts under the parent room, want exactly 1", total)
+	}
+	summaryRow := summaries[0]
+	if summaryRow.RoomId != parent.RoomId || summaryRow.RoomTableID != parent.ID {
+		t.Fatalf("summary owner = (%q, %d), want (%q, %d)", summaryRow.RoomId, summaryRow.RoomTableID, parent.RoomId, parent.ID)
+	}
+
+	summaryMetadata := decodeArtifactMetadata(t, summaryRow.Metadata)
+	if summaryMetadata.OccurredInBreakoutRoom == nil || !*summaryMetadata.OccurredInBreakoutRoom {
+		t.Fatal("expected summary occurredInBreakoutRoom=true")
+	}
+	if summaryMetadata.SourceRoomTableId != child.ID {
+		t.Fatalf("summary source_room_table_id = %d, want %d", summaryMetadata.SourceRoomTableId, child.ID)
+	}
+	if summaryMetadata.UserInfo == nil || summaryMetadata.UserInfo.GetUserId() != "learner-1" || summaryMetadata.UserInfo.GetName() != "Learner One" {
+		t.Fatalf("summary user info = %+v, want learner-1 / Learner One", summaryMetadata.UserInfo)
+	}
+
+	expectedSummaryDir := filepath.Join(strings.ToLower(summaryType.String()), parent.RoomId)
+	if summaryMetadata.FileInfo == nil || !strings.Contains(summaryMetadata.FileInfo.GetFilePath(), expectedSummaryDir) {
+		t.Fatalf("summary file path = %q, want it under %q", summaryMetadata.GetFileInfo().GetFilePath(), expectedSummaryDir)
+	}
+	absolutePath := filepath.Join(*m.app.ArtifactsSettings.StoragePath, summaryMetadata.FileInfo.GetFilePath())
+	if _, err = os.Stat(absolutePath); err != nil {
+		t.Fatalf("summary file %q does not exist: %v", absolutePath, err)
+	}
+
+	usageType := plugnmeet.RoomArtifactType_AI_AGENT_USAGE
+	usages, total, err := m.ds.GetArtifacts([]string{parent.RoomId}, nil, &usageType, 0, 10, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 1 || len(usages) != 1 {
+		t.Fatalf("got %d usage artifacts under the parent room, want exactly 1", total)
+	}
+	usageRow := usages[0]
+	if usageRow.RoomId != parent.RoomId || usageRow.RoomTableID != parent.ID {
+		t.Fatalf("usage owner = (%q, %d), want (%q, %d)", usageRow.RoomId, usageRow.RoomTableID, parent.RoomId, parent.ID)
+	}
+
+	usageMetadata := decodeArtifactMetadata(t, usageRow.Metadata)
+	if usageMetadata.OccurredInBreakoutRoom == nil || !*usageMetadata.OccurredInBreakoutRoom {
+		t.Fatal("expected usage occurredInBreakoutRoom=true")
+	}
+	if usageMetadata.SourceRoomTableId != child.ID {
+		t.Fatalf("usage source_room_table_id = %d, want %d", usageMetadata.SourceRoomTableId, child.ID)
+	}
+	if usageMetadata.UserInfo == nil || usageMetadata.UserInfo.GetUserId() != "learner-1" || usageMetadata.UserInfo.GetName() != "Learner One" {
+		t.Fatalf("usage user info = %+v, want learner-1 / Learner One", usageMetadata.UserInfo)
+	}
+	if usageMetadata.GetReferenceArtifactId() != summaryArtifact.ArtifactId {
+		t.Fatalf("usage reference artifact = %q, want %q", usageMetadata.GetReferenceArtifactId(), summaryArtifact.ArtifactId)
+	}
 }
