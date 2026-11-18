@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"google.golang.org/protobuf/proto"
 )
 
 func preassigned(roomId string, userIds ...string) *plugnmeet.PreassignedBreakoutRoom {
@@ -215,7 +214,7 @@ func TestPrepareAIAgentBreakoutChildAutoStart(t *testing.T) {
 		{
 			name: "an explicit auto start false is inherited",
 			parent: parent(plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_OPEN_PER_USER,
-				&plugnmeet.AIAgentAutoSessionConfig{AutoStartAgent: proto.Bool(false)}),
+				&plugnmeet.AIAgentAutoSessionConfig{AutoStartAgent: new(false)}),
 			wantStart: false,
 		},
 	}

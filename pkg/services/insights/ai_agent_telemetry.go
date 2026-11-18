@@ -64,6 +64,8 @@ func (a *AIAgent) TelemetrySnapshot(endReason string) redisservice.AIAgentSessio
 	transcript := append([]redisservice.AISessionTranscriptTurn(nil), state.transcript...)
 	a.stateMu.Unlock()
 
+	learner := a.Learner()
+
 	var endedAt int64
 	if endReason != "" {
 		endedAt = time.Now().UnixMilli()
@@ -71,6 +73,10 @@ func (a *AIAgent) TelemetrySnapshot(endReason string) redisservice.AIAgentSessio
 
 	return redisservice.AIAgentSessionTelemetry{
 		SessionID:              a.sessionId,
+		UserID:                 learner.UserID,
+		UserName:               learner.UserName,
+		ExUserID:               learner.ExUserID,
+		ExtraData:              learner.ExtraData,
 		AgentName:              a.agentName,
 		Topic:                  a.boundary.Topic,
 		AllowedSubtopics:       append([]string(nil), a.boundary.AllowedSubtopics...),

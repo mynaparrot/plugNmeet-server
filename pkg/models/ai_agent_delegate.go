@@ -9,6 +9,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 )
 
@@ -89,7 +90,22 @@ func (m *AIAgentModel) storeDelegate(ctx context.Context, roomId, userId string)
 	if err := m.rds.Set(ctx, aiAgentKey(roomId, aiAgentKeyDelegate), userId, 0).Err(); err != nil {
 		return "", err
 	}
+	m.recordDelegateLearner(roomId, userId)
 	return userId, nil
+}
+
+// recordDelegateLearner hands the paired participant to the agent this process
+// hosts, so its telemetry carries the identity right away instead of only when
+// the session stops.
+func (m *AIAgentModel) recordDelegateLearner(roomId, userId string) {
+	if userId == "" {
+		return
+	}
+	agent, ok := insightsservice.GetActiveAIAgent(roomId)
+	if !ok {
+		return
+	}
+	agent.SetLearner(aiAgentLearnerIdentity(m.aiAgentParticipantInfo(roomId, userId)))
 }
 
 // IsUserAgentDelegate reports whether userId is the room's current delegate.

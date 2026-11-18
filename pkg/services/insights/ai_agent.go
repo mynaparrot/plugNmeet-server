@@ -149,6 +149,9 @@ type AIAgent struct {
 	stateMu sync.Mutex
 	state   aiAgentRuntimeState
 
+	learnerMu sync.Mutex
+	learner   LearnerIdentity
+
 	pendingMu    sync.Mutex
 	pendingCalls map[string]chan *plugnmeet.AIAgentToolResultMsg
 
@@ -158,6 +161,33 @@ type AIAgent struct {
 	stopOnce     sync.Once
 	wg           sync.WaitGroup
 	done         chan struct{}
+}
+
+// LearnerIdentity is the participant of a 1-on-1 session. It travels with the
+// session so the summary artifact can still name the learner after they left.
+type LearnerIdentity struct {
+	UserID    string
+	UserName  string
+	ExUserID  string
+	ExtraData string
+}
+
+// WithFallback returns the identity where every empty field of next is replaced
+// by the value already known here.
+func (l LearnerIdentity) WithFallback(next LearnerIdentity) LearnerIdentity {
+	if next.UserID == "" {
+		next.UserID = l.UserID
+	}
+	if next.UserName == "" {
+		next.UserName = l.UserName
+	}
+	if next.ExUserID == "" {
+		next.ExUserID = l.ExUserID
+	}
+	if next.ExtraData == "" {
+		next.ExtraData = l.ExtraData
+	}
+	return next
 }
 
 // AIAgentArgs carries everything needed to connect a realtime session and a
@@ -181,6 +211,9 @@ type AIAgentArgs struct {
 	// before the agent joins LiveKit so browsers can resolve the audio track;
 	// when empty a fresh identity is generated.
 	AgentUserId string
+	// Learner is the participant of the 1-on-1 session; the session telemetry
+	// carries it into the summary artifact.
+	Learner LearnerIdentity
 	// Delegate resolves the participant that executes client-delegated tools.
 	Delegate func() (string, error)
 	// OnStopped runs once after the agent has fully stopped.
@@ -204,6 +237,7 @@ type aiAgentCoreArgs struct {
 	OnStopped      func(reason string)
 	SessionId      string
 	AgentUserId    string
+	Learner        LearnerIdentity
 	MaxAudioMinute uint32
 }
 
@@ -279,6 +313,7 @@ func NewAIAgent(args *AIAgentArgs) (*AIAgent, error) {
 		Delegate:       args.Delegate,
 		OnStopped:      args.OnStopped,
 		AgentUserId:    args.AgentUserId,
+		Learner:        args.Learner,
 		MaxAudioMinute: args.Features.GetMaxAudioMinutes(),
 	})
 	if err != nil {
@@ -388,6 +423,7 @@ func newAIAgent(args *aiAgentCoreArgs) (*AIAgent, error) {
 		transport:    args.Transport,
 		delegate:     args.Delegate,
 		onStopped:    args.OnStopped,
+		learner:      args.Learner,
 		maxAudio:     time.Duration(maxAudioMinutes) * time.Minute,
 		redisService: args.RedisService,
 		inAudio:      make(chan mediasdk.PCM16Sample, aiAgentInAudioBuffer),
@@ -433,6 +469,39 @@ func (a *AIAgent) AgentName() string { return a.agentName }
 
 // Done is closed once the agent has fully stopped.
 func (a *AIAgent) Done() <-chan struct{} { return a.done }
+
+// SetLearner records the learner of the session and flushes the telemetry, so
+// the paired participant reaches Redis as soon as the pairing happens. Once the
+// participant is known only missing details are accepted: a supervisor joining
+// to observe must not become the learner, and a partial lookup must not erase
+// the identity captured when the session started.
+func (a *AIAgent) SetLearner(identity LearnerIdentity) {
+	if a == nil {
+		return
+	}
+	a.learnerMu.Lock()
+	if a.learner.UserID != "" && identity.UserID != "" && identity.UserID != a.learner.UserID {
+		a.learnerMu.Unlock()
+		return
+	}
+	updated := identity.WithFallback(a.learner)
+	changed := updated != a.learner
+	a.learner = updated
+	a.learnerMu.Unlock()
+
+	if !changed {
+		return
+	}
+	// persistTelemetry reads the learner, so it cannot run under learnerMu.
+	a.persistTelemetry("")
+}
+
+// Learner returns the learner identity known to the session.
+func (a *AIAgent) Learner() LearnerIdentity {
+	a.learnerMu.Lock()
+	defer a.learnerMu.Unlock()
+	return a.learner
+}
 
 // Start launches the audio input loop, the provider event loop and the session
 // budget timer. It is safe to call once.

@@ -466,7 +466,7 @@ func prepareAIAgentBreakoutChild(parentAiFeatures *plugnmeet.InsightsAIAgentFeat
 	features.SessionMode = plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_CONTROLLED_USERS
 	features.AutoSessionConfig = &plugnmeet.AIAgentAutoSessionConfig{
 		AllowedParticipantIds: []string{userId},
-		AutoStartAgent:        proto.Bool(autoStart),
+		AutoStartAgent:        new(autoStart),
 	}
 	insightsFeatures.AiAgentFeatures = features
 
@@ -475,8 +475,8 @@ func prepareAIAgentBreakoutChild(parentAiFeatures *plugnmeet.InsightsAIAgentFeat
 		locks = new(plugnmeet.LockSettings)
 		meta.DefaultLockSettings = locks
 	}
-	locks.LockWebcam = proto.Bool(true)
-	locks.LockScreenSharing = proto.Bool(true)
+	locks.LockWebcam = new(true)
+	locks.LockScreenSharing = new(true)
 }
 
 // appendBreakoutAIContext preserves the parent's system prompt and appends the

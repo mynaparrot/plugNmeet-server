@@ -15,7 +15,6 @@ import (
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cast"
-	"google.golang.org/protobuf/proto"
 )
 
 func (m *RoomModel) CreateRoom(userCtx context.Context, r *plugnmeet.CreateRoomReq) (plugnmeet.StatusCode, *plugnmeet.ActiveRoomInfo, error) {
@@ -312,10 +311,10 @@ func (m *RoomModel) applyAIAgentRoomDefaults(r *plugnmeet.CreateRoomReq) {
 			r.Metadata.DefaultLockSettings = locks
 		}
 		if locks.LockWebcam == nil {
-			locks.LockWebcam = proto.Bool(true)
+			locks.LockWebcam = new(true)
 		}
 		if locks.LockScreenSharing == nil {
-			locks.LockScreenSharing = proto.Bool(true)
+			locks.LockScreenSharing = new(true)
 		}
 	}
 

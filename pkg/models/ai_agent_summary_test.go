@@ -10,6 +10,7 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/redis/go-redis/v9"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
@@ -127,7 +128,7 @@ func TestCollectQuizEvaluation(t *testing.T) {
 		t.Fatalf("evaluation = %+v, want only the quiz poll", evaluation)
 	}
 	question := evaluation.Questions[0]
-	if question.PollID != "poll-1" || question.CorrectOption != "4" {
+	if question.PollId != "poll-1" || question.CorrectOption != "4" {
 		t.Errorf("question = %+v, want poll-1 with the key answer 4", question)
 	}
 	if question.TotalVotes != 3 || question.CorrectVotes != 2 {
@@ -166,20 +167,23 @@ func TestBuildDeterministicSessionSummary(t *testing.T) {
 		{Concept: "adding fractions", Status: "needs_review"},
 		{Concept: "number line", Status: "practiced"},
 	}
-	quizzes := AIAgentSummaryQuizEvaluation{
+	quizzes := &plugnmeet.AIAgentSummaryQuizEvaluation{
 		TotalQuizzes:     1,
 		TotalResponses:   4,
 		CorrectResponses: 3,
 		AccuracyPercent:  75,
-		Questions: []AIAgentSummaryQuizQuestion{
-			{PollID: "poll-1", Question: "1/2 = 2/4?", Passed: true},
+		Questions: []*plugnmeet.AIAgentSummaryQuizQuestion{
+			{PollId: "poll-1", Question: "1/2 = 2/4?", Passed: true},
 		},
 	}
 
 	summary := buildDeterministicSessionSummary("room-1", "sid-1", telemetry, progress, quizzes)
 
-	if summary.SchemaVersion != AIAgentSummarySchemaVersion || summary.SummarySource != AIAgentSummarySourceLocalFallback {
-		t.Errorf("summary = %+v, want schema %d with the local fallback source", summary, AIAgentSummarySchemaVersion)
+	if summary.SummarySource != AIAgentSummarySourceLocalFallback {
+		t.Errorf("summary = %+v, want the local fallback source", summary)
+	}
+	if summary.UserInfo == nil || summary.UserInfo.GetUserId() != "" {
+		t.Errorf("user info = %+v, want it present and empty without telemetry", summary.UserInfo)
 	}
 	if summary.Session.DurationSeconds != 600 || summary.Session.RoomSid != "sid-1" || summary.Session.EndReason != "room_ended" {
 		t.Errorf("session = %+v, want 600s of room-1/sid-1", summary.Session)
@@ -219,8 +223,8 @@ func TestBuildDeterministicSessionSummary(t *testing.T) {
 	}
 
 	// An empty telemetry must still produce a usable summary.
-	empty := buildDeterministicSessionSummary("room-2", "sid-2", nil, nil, AIAgentSummaryQuizEvaluation{})
-	if empty == nil || empty.Session.RoomID != "room-2" {
+	empty := buildDeterministicSessionSummary("room-2", "sid-2", nil, nil, nil)
+	if empty == nil || empty.Session.RoomId != "room-2" {
 		t.Fatalf("empty summary = %+v", empty)
 	}
 	if empty.Evaluation.MasteryLevel != "beginner" || empty.QuizEvaluation.Questions == nil {
@@ -229,11 +233,11 @@ func TestBuildDeterministicSessionSummary(t *testing.T) {
 }
 
 func TestApplyLLMSummarySynthesis(t *testing.T) {
-	base := func() *AIAgentSessionSummary {
+	base := func() *plugnmeet.AIAgentSessionSummary {
 		return buildDeterministicSessionSummary("room-1", "sid-1",
 			&redisservice.AIAgentSessionTelemetry{Topic: "Fractions", TurnsCount: 4},
 			[]redisservice.AIProgressEntry{{Concept: "halves", Status: "practiced"}},
-			AIAgentSummaryQuizEvaluation{})
+			nil)
 	}
 	transcript := []redisservice.AISessionTranscriptTurn{
 		{Role: "participant", Text: "what is a half"},
@@ -386,7 +390,7 @@ func TestFinalizeSession(t *testing.T) {
 	if summary == nil {
 		t.Fatal("no summary was built for a room with a session")
 	}
-	if summary.Session.RoomID != "room-final" || summary.Session.RoomSid != "sid-final" {
+	if summary.Session.RoomId != "room-final" || summary.Session.RoomSid != "sid-final" {
 		t.Errorf("session = %+v, want the room identity", summary.Session)
 	}
 	if summary.Evaluation.MasteryLevel == "" || summary.Session.DurationSeconds != 300 {
@@ -407,5 +411,252 @@ func TestFinalizeSession(t *testing.T) {
 		if exists, err := rc.Exists(ctx, key).Result(); err != nil || exists != 0 {
 			t.Errorf("key %q survived the finalize (exists %d, err %v)", key, exists, err)
 		}
+	}
+}
+
+// TestAIAgentSessionLearnerTelemetry locks in that the learner recorded in the
+// telemetry wins: it is the only identity that survives a participant leaving
+// the room before the summary is built.
+func TestAIAgentSessionLearnerTelemetry(t *testing.T) {
+	rc := newAIAgentTestRedis(t)
+	m := newAIAgentTestModel(rc)
+	ctx := context.Background()
+
+	telemetry := &redisservice.AIAgentSessionTelemetry{
+		UserID:    "learner-1",
+		UserName:  "Learner One",
+		ExUserID:  "external-1",
+		ExtraData: `{"grade":"4"}`,
+	}
+	// The identity must survive the Redis round trip of the telemetry.
+	if err := m.redisService.SaveAIAgentSessionTelemetry(ctx, "room-learner", *telemetry); err != nil {
+		t.Fatal(err)
+	}
+	stored, err := m.redisService.GetAIAgentSessionTelemetry(ctx, "room-learner")
+	if err != nil || stored == nil {
+		t.Fatalf("stored telemetry = %+v, err %v", stored, err)
+	}
+	if stored.UserID != "learner-1" || stored.UserName != "Learner One" || stored.ExUserID != "external-1" || stored.ExtraData != `{"grade":"4"}` {
+		t.Fatalf("stored learner = %+v, want the whole identity", stored)
+	}
+
+	info := m.aiAgentSessionLearner(ctx, "room-learner", stored)
+	if info.GetUserId() != "learner-1" || info.GetName() != "Learner One" ||
+		info.GetExUserId() != "external-1" || info.GetExtraData() != `{"grade":"4"}` {
+		t.Fatalf("learner info = %+v, want the identity of the telemetry", info)
+	}
+
+	// Without NATS and telemetry the delegate is the only source left.
+	if err := rc.Set(ctx, aiAgentTestKey("room-delegate", "delegate"), "learner-2", 0).Err(); err != nil {
+		t.Fatal(err)
+	}
+	if got := m.aiAgentSessionLearner(ctx, "room-delegate", nil); got.GetUserId() != "learner-2" {
+		t.Fatalf("learner = %+v, want the stored delegate", got)
+	}
+
+	// A room without any trace reports no learner instead of a wrong one.
+	if got := m.aiAgentSessionLearner(ctx, "room-empty", nil); got.GetUserId() != "" {
+		t.Fatalf("learner = %+v, want no learner", got)
+	}
+}
+
+// TestAIAgentBreakoutUserId pins the per-user breakout room naming convention
+// used to recover the learner of a session whose participant already left.
+func TestAIAgentBreakoutUserId(t *testing.T) {
+	cases := []struct {
+		name     string
+		roomId   string
+		expected string
+	}{
+		{"per-user room", "parent-room-learner-1", "learner-1"},
+		{"numbered room", "parent-room-2", ""},
+		{"other parent", "other-room-learner-1", ""},
+		{"the parent itself", "parent-room", ""},
+		{"empty suffix", "parent-room-", ""},
+	}
+	for _, c := range cases {
+		if got := aiAgentBreakoutUserId("parent-room", c.roomId); got != c.expected {
+			t.Errorf("%s: learner = %q, want %q", c.name, got, c.expected)
+		}
+	}
+}
+
+// TestAIAgentBreakoutUserInfo covers the Redis record that still names the
+// participant of a per-user session after their NATS entry is gone.
+func TestAIAgentBreakoutUserInfo(t *testing.T) {
+	rc := newAIAgentTestRedis(t)
+	m := newAIAgentTestModel(rc)
+
+	room := &plugnmeet.BreakoutRoom{
+		Id:    "parent-room-learner-1",
+		Title: "Learner One",
+		Users: []*plugnmeet.BreakoutRoomUser{{Id: "learner-1", Name: "Learner One"}},
+	}
+	encoded, err := protojson.Marshal(room)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = m.redisService.InsertOrUpdateBreakoutRoom("parent-room", room.Id, encoded); err != nil {
+		t.Fatal(err)
+	}
+
+	info := m.aiAgentBreakoutUserInfo("parent-room", room.Id, "")
+	if info.GetUserId() != "learner-1" || info.GetName() != "Learner One" {
+		t.Fatalf("breakout learner = %+v, want learner-1 / Learner One", info)
+	}
+	// A different participant must not be attributed to another session.
+	if info := m.aiAgentBreakoutUserInfo("parent-room", room.Id, "learner-9"); info != nil {
+		t.Fatalf("breakout learner = %+v, want none for an unassigned user", info)
+	}
+	if info := m.aiAgentBreakoutUserInfo("unknown-parent", room.Id, ""); info != nil {
+		t.Fatalf("breakout learner = %+v, want none without a record", info)
+	}
+}
+
+// TestMergeAIAgentUserInfo locks in that a later partial lookup never erases a
+// known identity.
+func TestMergeAIAgentUserInfo(t *testing.T) {
+	info := &plugnmeet.RoomArtifactUserInfo{UserId: "learner-1", Name: optionalString("Learner One")}
+	mergeAIAgentUserInfo(info, nil)
+	mergeAIAgentUserInfo(info, &plugnmeet.RoomArtifactUserInfo{
+		UserId:    "other",
+		Name:      optionalString("Other"),
+		ExUserId:  optionalString("external-1"),
+		ExtraData: optionalString(`{"grade":"4"}`),
+	})
+
+	if info.GetUserId() != "learner-1" || info.GetName() != "Learner One" {
+		t.Fatalf("info = %+v, want the already known identity", info)
+	}
+	if info.GetExUserId() != "external-1" || info.GetExtraData() != `{"grade":"4"}` {
+		t.Fatalf("info = %+v, want the missing fields filled", info)
+	}
+}
+
+// TestApplyAIAgentSessionLearner locks in that the artifact's session block
+// carries the resolved learner.
+func TestApplyAIAgentSessionLearner(t *testing.T) {
+	summary := buildDeterministicSessionSummary("room-1", "sid-1", nil, nil, nil)
+	applyAIAgentSessionLearner(summary, &plugnmeet.RoomArtifactUserInfo{
+		UserId:    "learner-1",
+		Name:      optionalString("Learner One"),
+		ExUserId:  optionalString("external-1"),
+		ExtraData: optionalString(`{"grade":"4"}`),
+	})
+
+	if summary.GetUserInfo().GetUserId() != "learner-1" || summary.GetUserInfo().GetName() != "Learner One" {
+		t.Fatalf("user info = %+v, want the learner identity", summary.GetUserInfo())
+	}
+	if summary.GetUserInfo().GetExUserId() != "external-1" {
+		t.Fatalf("user info = %+v, want the external id", summary.GetUserInfo())
+	}
+	if summary.GetUserInfo().GetExtraData() != `{"grade":"4"}` {
+		t.Fatalf("user info = %+v, want the extra data", summary.GetUserInfo())
+	}
+
+	// A missing learner still leaves an empty, non-nil user_info behind.
+	untouched := buildDeterministicSessionSummary("room-2", "sid-2", nil, nil, nil)
+	applyAIAgentSessionLearner(untouched, &plugnmeet.RoomArtifactUserInfo{})
+	if untouched.GetUserInfo() == nil || untouched.GetUserInfo().GetUserId() != "" {
+		t.Fatalf("user info = %+v, want an empty but present identity", untouched.GetUserInfo())
+	}
+}
+
+// TestMarshalAIAgentSessionSummary locks in the artifact JSON: proto names,
+// zero values, empty lists and empty maps are emitted, while unset optional
+// fields stay omitted.
+func TestMarshalAIAgentSessionSummary(t *testing.T) {
+	summary := buildDeterministicSessionSummary("room-1", "sid-1",
+		&redisservice.AIAgentSessionTelemetry{
+			SessionID:        "session-1",
+			UserID:           "learner-1",
+			Topic:            "Fractions",
+			AllowedSubtopics: []string{"halves"},
+			StartedAt:        1700000000000,
+			EndedAt:          1700000600000,
+			ToolsUsed:        map[string]int{"whiteboard_write_content": 2},
+		},
+		[]redisservice.AIProgressEntry{{Concept: "halves", Status: "mastered"}},
+		nil,
+	)
+	applyAIAgentSessionLearner(summary, &plugnmeet.RoomArtifactUserInfo{
+		UserId: "learner-1",
+		Name:   optionalString("Learner One"),
+	})
+
+	content, err := marshalAIAgentSessionSummary(summary)
+	if err != nil {
+		t.Fatalf("marshal failed: %v", err)
+	}
+	raw := string(content)
+	for _, want := range []string{
+		`"summary_source"`,
+		`"generated_at"`,
+		`"user_info"`,
+		`"user_id"`,
+		`"name"`,
+		`"session"`,
+		`"room_id"`,
+		`"allowed_subtopics"`,
+		`"tools_used"`,
+		`"whiteboard_used"`,
+		`"notepad_used"`,
+		`"concepts_practiced"`,
+		`"questions"`,
+		`"unfinished_subtopics"`,
+		`"narrative_summary"`,
+		`"local_fallback"`,
+		`"learner-1"`,
+	} {
+		if !strings.Contains(raw, want) {
+			t.Errorf("summary JSON does not contain %s:\n%s", want, raw)
+		}
+	}
+	// The learner sits at the top level, right before the session it describes.
+	if info, session := strings.Index(raw, `"user_info"`), strings.Index(raw, `"session"`); info < 0 || session < 0 || info > session {
+		t.Errorf("user_info must come before session:\n%s", raw)
+	}
+	// The structure is the protobuf, so no schema version and no optional
+	// duplicates of the identity are serialized.
+	for _, unwanted := range []string{`"schema_version"`, `"user_name"`, `"ex_user_id"`, `"notes"`, `"null"`} {
+		if strings.Contains(raw, unwanted) {
+			t.Errorf("summary JSON must not contain %s:\n%s", unwanted, raw)
+		}
+	}
+
+	// The artifact must round trip into the protocol type.
+	decoded := new(plugnmeet.AIAgentSessionSummary)
+	if err = protojson.Unmarshal(content, decoded); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if decoded.GetUserInfo().GetUserId() != "learner-1" || decoded.GetUserInfo().GetName() != "Learner One" {
+		t.Fatalf("decoded summary = %+v, want the learner identity at the top level", decoded)
+	}
+	if decoded.GetWorkspaceActivity().GetToolsUsed()["whiteboard_write_content"] != 2 {
+		t.Fatalf("decoded tools used = %+v, want the whiteboard counter", decoded.GetWorkspaceActivity().GetToolsUsed())
+	}
+	if decoded.GetWorkspaceActivity().GetNotepadUsed() {
+		t.Error("notepad must stay unused when the agent never used it")
+	}
+	if len(decoded.GetEvaluation().GetConceptsPracticed()) != 0 || len(decoded.GetQuizEvaluation().GetQuestions()) != 0 {
+		t.Errorf("decoded summary = %+v, want the empty lists kept", decoded)
+	}
+
+	// A session without a learner keeps an empty user_info instead of dropping it.
+	anonymous, err := marshalAIAgentSessionSummary(buildDeterministicSessionSummary("room-2", "sid-2", nil, nil, nil))
+	if err != nil {
+		t.Fatalf("marshal failed: %v", err)
+	}
+	if anon := string(anonymous); !strings.Contains(anon, `"user_info"`) ||
+		strings.Index(anon, `"user_info"`) > strings.Index(anon, `"session"`) {
+		t.Errorf("anonymous summary must keep an empty user_info before the session:\n%s", anon)
+	}
+	for _, unwanted := range []string{`"schema_version"`, `"user_name"`, `"ex_user_id"`} {
+		if strings.Contains(string(anonymous), unwanted) {
+			t.Errorf("anonymous summary must not contain %s:\n%s", unwanted, anonymous)
+		}
+	}
+	if !strings.Contains(string(anonymous), `"tools_used"`) || !strings.Contains(string(anonymous), `{}`) {
+		t.Errorf("anonymous summary must keep the empty tool map:\n%s", anonymous)
 	}
 }

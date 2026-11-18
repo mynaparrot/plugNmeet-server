@@ -722,6 +722,42 @@ func TestAIAgentTelemetryPersistsToRedis(t *testing.T) {
 	}
 }
 
+// TestAIAgentSetLearnerPersistsImmediately locks in that pairing a participant
+// flushes the telemetry at once, so Redis knows the learner long before the
+// session stops.
+func TestAIAgentSetLearnerPersistsImmediately(t *testing.T) {
+	mr := miniredis.RunT(t)
+	ttl := time.Hour
+	store := redisservice.New(redisservice.Args{
+		Ctx:    context.Background(),
+		Rc:     redis.NewClient(&redis.Options{Addr: mr.Addr()}),
+		App:    &config.AppConfig{RedisInfo: connections.RedisInfo{DefaultTTL: &ttl}},
+		Logger: logrus.New(),
+	})
+
+	env := newAgentTestEnv(t, nil, func(args *aiAgentCoreArgs) { args.RedisService = store })
+	ctx := context.Background()
+
+	initial, err := store.GetAIAgentSessionTelemetry(ctx, env.agent.RoomID())
+	if err != nil || initial == nil || initial.UserID != "" {
+		t.Fatalf("unexpected opening snapshot (%+v, err %v)", initial, err)
+	}
+
+	env.agent.SetLearner(LearnerIdentity{UserID: "learner-1", UserName: "Learner One", ExUserID: "external-1"})
+
+	// No Stop: the pairing alone must be enough for Redis to know the learner.
+	saved, err := store.GetAIAgentSessionTelemetry(ctx, env.agent.RoomID())
+	if err != nil || saved == nil {
+		t.Fatalf("the learner was not flushed (%+v, err %v)", saved, err)
+	}
+	if saved.UserID != "learner-1" || saved.UserName != "Learner One" || saved.ExUserID != "external-1" {
+		t.Fatalf("saved learner = %+v, want the paired participant", saved)
+	}
+	if saved.EndedAt != 0 {
+		t.Errorf("endedAt = %d, want a still running session", saved.EndedAt)
+	}
+}
+
 func TestAIAgentStatusReportsRuntimeState(t *testing.T) {
 	env := newAgentTestEnv(t, nil, nil)
 
@@ -731,5 +767,35 @@ func TestAIAgentStatusReportsRuntimeState(t *testing.T) {
 	}
 	if status.GetState().GetSessionId() != "session-1" || status.GetState().GetAgentUserId() != "pnm_agent-ai_agent-test" {
 		t.Fatalf("unexpected state: %+v", status.GetState())
+	}
+}
+
+// TestAIAgentTelemetryLearner locks in that the learner identity given at start
+// reaches the telemetry, and that a later partial lookup only fills the gaps.
+func TestAIAgentTelemetryLearner(t *testing.T) {
+	env := newAgentTestEnv(t, mcp.NewRegistry(), func(args *aiAgentCoreArgs) {
+		args.Learner = LearnerIdentity{UserID: "learner-1", UserName: "Learner One"}
+	})
+
+	snapshot := env.agent.TelemetrySnapshot("")
+	if snapshot.UserID != "learner-1" || snapshot.UserName != "Learner One" {
+		t.Fatalf("learner = %q/%q, want the identity given at start", snapshot.UserID, snapshot.UserName)
+	}
+
+	// Only missing details of the same participant are accepted.
+	env.agent.SetLearner(LearnerIdentity{UserID: "learner-1", ExUserID: "external-1"})
+	snapshot = env.agent.TelemetrySnapshot("")
+	if snapshot.UserID != "learner-1" || snapshot.UserName != "Learner One" {
+		t.Fatalf("learner = %q/%q, want the known identity kept", snapshot.UserID, snapshot.UserName)
+	}
+	if snapshot.ExUserID != "external-1" {
+		t.Fatalf("external id = %q, want the later lookup to fill it", snapshot.ExUserID)
+	}
+
+	// A supervisor joining to observe must not become the learner.
+	env.agent.SetLearner(LearnerIdentity{UserID: "supervisor-1", UserName: "Supervisor"})
+	snapshot = env.agent.TelemetrySnapshot("")
+	if snapshot.UserID != "learner-1" || snapshot.UserName != "Learner One" {
+		t.Fatalf("learner = %q/%q, want the pinned learner", snapshot.UserID, snapshot.UserName)
 	}
 }

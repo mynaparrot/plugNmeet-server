@@ -39,6 +39,12 @@ func (m *AIAgentModel) OnUserJoined(ctx context.Context, roomId, userId string) 
 	if _, err := m.SelectOrGetDelegate(ctx, roomId); err != nil {
 		log.WithError(err).Warn("could not select a delegate")
 	}
+	// A per-user session may start before the learner joins, so a running agent
+	// takes the identity of the participant it talks to. Anyone else (a
+	// supervisor observing) is ignored.
+	if agent, ok := insightsservice.GetActiveAIAgent(roomId); ok && m.CanControlSession(ctx, roomId, userId) {
+		agent.SetLearner(aiAgentLearnerIdentity(m.aiAgentParticipantInfo(roomId, userId)))
+	}
 
 	if !aiAgentAutoStart(features) {
 		return

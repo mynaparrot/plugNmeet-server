@@ -127,8 +127,8 @@ func TestLtiJWTClaimsRoundTrip(t *testing.T) {
 		RoomTitle: "Course 101",
 		LtiCustomParameters: &plugnmeet.LtiCustomParameters{
 			RoomDuration: proto.Uint64(3600),
-			AllowPolls:   proto.Bool(true),
-			MuteOnStart:  proto.Bool(false),
+			AllowPolls:   new(true),
+			MuteOnStart:  new(false),
 			LtiCustomDesign: &plugnmeet.LtiCustomDesign{
 				PrimaryColor: proto.String("#123456"),
 			},

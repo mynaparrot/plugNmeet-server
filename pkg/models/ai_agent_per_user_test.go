@@ -6,10 +6,8 @@ import (
 	"testing"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
-	"github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/proto"
-
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -132,7 +130,7 @@ func TestNormalizeAIAgentFeaturesPerSessionMode(t *testing.T) {
 				SessionMode: mode,
 				AutoSessionConfig: &plugnmeet.AIAgentAutoSessionConfig{
 					AllowedParticipantIds: []string{"u1"},
-					AutoStartAgent:        proto.Bool(false),
+					AutoStartAgent:        new(false),
 				},
 			})
 			if out.GetAutoSessionConfig().GetAutoStartAgent() {
@@ -185,7 +183,7 @@ func TestAIAgentSessionModeHelpers(t *testing.T) {
 			if !aiAgentAutoStart(agentFeatures(true, mode, nil)) {
 				t.Errorf("%s: auto start = false, want the default true", mode)
 			}
-			if aiAgentAutoStart(agentFeatures(true, mode, &plugnmeet.AIAgentAutoSessionConfig{AutoStartAgent: proto.Bool(false)})) {
+			if aiAgentAutoStart(agentFeatures(true, mode, &plugnmeet.AIAgentAutoSessionConfig{AutoStartAgent: new(false)})) {
 				t.Errorf("%s: auto start = true, want the host value false", mode)
 			}
 			if !aiAgentAutoStart(agentFeatures(true, mode, &plugnmeet.AIAgentAutoSessionConfig{})) {
@@ -461,7 +459,7 @@ func TestApplyAIAgentRoomDefaults(t *testing.T) {
 
 	t.Run("an existing lock setting wins", func(t *testing.T) {
 		req := newRequest(agentFeatures(true, modeControlled, controlledConfig("u1")))
-		req.Metadata.DefaultLockSettings = &plugnmeet.LockSettings{LockWebcam: proto.Bool(false)}
+		req.Metadata.DefaultLockSettings = &plugnmeet.LockSettings{LockWebcam: new(false)}
 		(&RoomModel{}).applyAIAgentRoomDefaults(req)
 
 		locks := req.GetMetadata().GetDefaultLockSettings()

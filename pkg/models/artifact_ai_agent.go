@@ -1,7 +1,6 @@
 package models
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -10,6 +9,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
@@ -18,7 +18,7 @@ import (
 
 // CreateAIAgentSessionSummaryArtifact writes the summary JSON as a downloadable
 // file artifact, then records the session's token usage next to it.
-func (m *ArtifactModel) CreateAIAgentSessionSummaryArtifact(roomTableId uint64, roomId, roomSid string, summary *AIAgentSessionSummary, telemetry *redisservice.AIAgentSessionTelemetry, summaryPromptTokens, summaryCompletionTokens uint32, summarizeModel string, log *logrus.Entry) (*dbmodels.RoomArtifact, error) {
+func (m *ArtifactModel) CreateAIAgentSessionSummaryArtifact(roomTableId uint64, roomId, roomSid string, summary *plugnmeet.AIAgentSessionSummary, telemetry *redisservice.AIAgentSessionTelemetry, summaryPromptTokens, summaryCompletionTokens uint32, summarizeModel string, log *logrus.Entry) (*dbmodels.RoomArtifact, error) {
 	log = log.WithField("method", "CreateAIAgentSessionSummaryArtifact")
 	if summary == nil {
 		return nil, fmt.Errorf("ai agent session summary is required")
@@ -50,7 +50,7 @@ func (m *ArtifactModel) CreateAIAgentSessionSummaryArtifact(roomTableId uint64, 
 		}
 	}
 
-	content, err := json.MarshalIndent(summary, "", "  ")
+	content, err := marshalAIAgentSessionSummary(summary)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal the ai agent session summary: %w", err)
 	}
@@ -72,12 +72,7 @@ func (m *ArtifactModel) CreateAIAgentSessionSummaryArtifact(roomTableId uint64, 
 		},
 	}
 	m.setUsageArtifactProvenance(fileMetadata, roomInfo.ID, isBreakout)
-	if summary.Session.UserID != "" {
-		fileMetadata.UserInfo = &plugnmeet.RoomArtifactUserInfo{
-			UserId: summary.Session.UserID,
-			Name:   optionalString(summary.Session.UserName),
-		}
-	}
+	fileMetadata.UserInfo = aiAgentSummaryUserInfo(summary)
 	fileArtifact, err := m.createAndSaveArtifact(ownerRoomId, ownerRoomSid, ownerTableId, plugnmeet.RoomArtifactType_AI_AGENT_SESSION_SUMMARY, fileMetadata, true, log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create the ai agent session summary artifact: %w", err)
@@ -101,6 +96,29 @@ func optionalString(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// marshalAIAgentSessionSummary renders the summary as the artifact's JSON: zero
+// values, empty lists and empty maps are emitted, while unset optional fields
+// stay omitted.
+func marshalAIAgentSessionSummary(summary *plugnmeet.AIAgentSessionSummary) ([]byte, error) {
+	opts := protojson.MarshalOptions{
+		UseProtoNames:     true,
+		EmitDefaultValues: true,
+		Multiline:         true,
+		Indent:            "  ",
+	}
+	return opts.Marshal(summary)
+}
+
+// aiAgentSummaryUserInfo returns the learner identity the artifacts carry. The
+// identity lives on the summary itself, next to the session it belongs to.
+func aiAgentSummaryUserInfo(summary *plugnmeet.AIAgentSessionSummary) *plugnmeet.RoomArtifactUserInfo {
+	userInfo := summary.GetUserInfo()
+	if userInfo.GetUserId() == "" {
+		return nil
+	}
+	return userInfo
 }
 
 // buildAIAgentUsageMetadata combines the session's realtime usage with the extra

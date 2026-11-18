@@ -6,22 +6,22 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 )
 
 const (
-	// AIAgentSummarySchemaVersion is the contract version the host depends on.
-	AIAgentSummarySchemaVersion = 1
-
 	AIAgentSummarySourceLLM           = "llm"
 	AIAgentSummarySourceLocalFallback = "local_fallback"
 
@@ -34,83 +34,10 @@ const (
 	aiAgentSummaryMaxContextRunes    = 1200
 )
 
-// AIAgentSessionSummary is the versioned JSON contract written to the
-// AI_AGENT_SESSION_SUMMARY artifact.
-type AIAgentSessionSummary struct {
-	SchemaVersion     int                             `json:"schema_version"`
-	SummarySource     string                          `json:"summary_source"`
-	GeneratedAt       string                          `json:"generated_at"`
-	Session           AIAgentSummarySession           `json:"session"`
-	Evaluation        AIAgentSummaryEvaluation        `json:"evaluation"`
-	QuizEvaluation    AIAgentSummaryQuizEvaluation    `json:"quiz_evaluation"`
-	ProgressLog       []redisservice.AIProgressEntry  `json:"progress_log"`
-	WorkspaceActivity AIAgentSummaryWorkspaceActivity `json:"workspace_activity"`
-	Continuation      AIAgentSummaryContinuation      `json:"continuation"`
-	NarrativeSummary  string                          `json:"narrative_summary"`
-}
-
-type AIAgentSummarySession struct {
-	UserID                 string   `json:"user_id,omitempty"`
-	UserName               string   `json:"user_name,omitempty"`
-	RoomID                 string   `json:"room_id"`
-	RoomSid                string   `json:"room_sid"`
-	SessionID              string   `json:"session_id"`
-	AgentDisplayName       string   `json:"agent_display_name"`
-	Topic                  string   `json:"topic"`
-	AllowedSubtopics       []string `json:"allowed_subtopics"`
-	StartedAt              int64    `json:"started_at"`
-	EndedAt                int64    `json:"ended_at"`
-	DurationSeconds        int64    `json:"duration_seconds"`
-	EndReason              string   `json:"end_reason"`
-	OffTopicRedirectsCount int      `json:"off_topic_redirects_count"`
-	TurnsCount             int      `json:"turns_count"`
-}
-
-type AIAgentSummaryEvaluation struct {
-	OverallScore         int      `json:"overall_score"`
-	MasteryLevel         string   `json:"mastery_level"`
-	ParticipationLevel   string   `json:"participation_level"`
-	ConceptsMastered     []string `json:"concepts_mastered"`
-	ConceptsPracticed    []string `json:"concepts_practiced"`
-	StruggledWith        []string `json:"struggled_with"`
-	VocabularyOrKeyTerms []string `json:"vocabulary_or_key_terms"`
-	RubricNotes          string   `json:"rubric_notes"`
-}
-
-type AIAgentSummaryQuizEvaluation struct {
-	TotalQuizzes     int                          `json:"total_quizzes"`
-	TotalResponses   int                          `json:"total_responses"`
-	CorrectResponses int                          `json:"correct_responses"`
-	AccuracyPercent  int                          `json:"accuracy_percent"`
-	Questions        []AIAgentSummaryQuizQuestion `json:"questions"`
-}
-
-type AIAgentSummaryQuizQuestion struct {
-	PollID        string `json:"poll_id"`
-	Question      string `json:"question"`
-	CorrectOption string `json:"correct_option"`
-	TotalVotes    uint64 `json:"total_votes"`
-	CorrectVotes  uint64 `json:"correct_votes"`
-	Passed        bool   `json:"passed"`
-}
-
-type AIAgentSummaryWorkspaceActivity struct {
-	ToolsUsed      map[string]int `json:"tools_used"`
-	WhiteboardUsed bool           `json:"whiteboard_used"`
-	NotepadUsed    bool           `json:"notepad_used"`
-}
-
-type AIAgentSummaryContinuation struct {
-	NextSessionFocus             string   `json:"next_session_focus"`
-	RecommendedWarmUp            string   `json:"recommended_warm_up"`
-	UnfinishedSubtopics          []string `json:"unfinished_subtopics"`
-	PreviousSessionContextPrompt string   `json:"previous_session_context_prompt"`
-}
-
 // FinalizeSession stops the room's agent, writes the session summary artifact
 // and drops the Redis state the summary was built from. A room without any
 // agent activity returns nil.
-func (m *AIAgentModel) FinalizeSession(ctx context.Context, roomTableId uint64, roomId, roomSid string) *AIAgentSessionSummary {
+func (m *AIAgentModel) FinalizeSession(ctx context.Context, roomTableId uint64, roomId, roomSid string) *plugnmeet.AIAgentSessionSummary {
 	if m == nil {
 		return nil
 	}
@@ -142,7 +69,11 @@ func (m *AIAgentModel) FinalizeSession(ctx context.Context, roomTableId uint64, 
 
 	quizzes := collectQuizEvaluation(cleanupCtx, m.redisService, roomId)
 	summary := buildDeterministicSessionSummary(roomId, roomSid, telemetry, sortedProgressEntries(progressMap), quizzes)
-	summary.Session.UserID, summary.Session.UserName = m.aiAgentSessionLearner(roomId)
+
+	// The learner identity is resolved once, so the artifact, the file metadata
+	// and the usage artifact all carry the same participant.
+	learner := m.aiAgentSessionLearner(cleanupCtx, roomId, telemetry)
+	applyAIAgentSessionLearner(summary, learner)
 
 	var promptTokens, completionTokens uint32
 	summarizeModel := m.synthesizeSessionSummary(cleanupCtx, summary, telemetry, &promptTokens, &completionTokens, log)
@@ -158,26 +89,212 @@ func (m *AIAgentModel) FinalizeSession(ctx context.Context, roomTableId uint64, 
 	return summary
 }
 
-// aiAgentSessionLearner resolves the single learner of a 1-on-1 AI session,
-// together with the display name when the participant is still known to NATS.
-func (m *AIAgentModel) aiAgentSessionLearner(roomId string) (userId, userName string) {
+// applyAIAgentSessionLearner fills the summary's top-level user_info, which is
+// always present so the host can attribute the artifact. A missing learner
+// leaves an empty object instead of a nil field.
+func applyAIAgentSessionLearner(summary *plugnmeet.AIAgentSessionSummary, learner *plugnmeet.RoomArtifactUserInfo) {
+	if summary == nil {
+		return
+	}
+	if summary.UserInfo == nil {
+		summary.UserInfo = &plugnmeet.RoomArtifactUserInfo{}
+	}
+	mergeAIAgentUserInfo(summary.UserInfo, learner)
+}
+
+// aiAgentLearnerIdentity converts an artifact identity into the session's
+// learner, so a running agent can carry it into its telemetry.
+func aiAgentLearnerIdentity(info *plugnmeet.RoomArtifactUserInfo) insightsservice.LearnerIdentity {
+	if info == nil {
+		return insightsservice.LearnerIdentity{}
+	}
+	return insightsservice.LearnerIdentity{
+		UserID:    info.GetUserId(),
+		UserName:  info.GetName(),
+		ExUserID:  info.GetExUserId(),
+		ExtraData: info.GetExtraData(),
+	}
+}
+
+// aiAgentSessionLearner resolves the participant of a 1-on-1 AI session. The
+// telemetry comes first: it is flushed while the agent runs, so the identity
+// survives a participant leaving or a session restart.
+func (m *AIAgentModel) aiAgentSessionLearner(ctx context.Context, roomId string, telemetry *redisservice.AIAgentSessionTelemetry) *plugnmeet.RoomArtifactUserInfo {
+	info := &plugnmeet.RoomArtifactUserInfo{}
+	if telemetry != nil {
+		info.UserId = telemetry.UserID
+		info.Name = optionalString(telemetry.UserName)
+		info.ExUserId = optionalString(telemetry.ExUserID)
+		info.ExtraData = optionalString(telemetry.ExtraData)
+	}
+	if info.UserId == "" {
+		info.UserId = m.aiAgentLearnerUserId(ctx, roomId)
+	}
+	if info.UserId == "" {
+		return info
+	}
+
+	mergeAIAgentUserInfo(info, m.aiAgentParticipantInfo(roomId, info.UserId))
+	return info
+}
+
+// aiAgentLearnerUserId finds the single participant of a 1-on-1 session: the
+// fixed roster of a controlled session, the current delegate, the only online
+// human, or the user encoded in a per-user breakout room.
+func (m *AIAgentModel) aiAgentLearnerUserId(ctx context.Context, roomId string) string {
+	if m.natsService != nil {
+		if allowed := aiAgentAllowedParticipantIds(m.roomAgentFeatures(roomId)); len(allowed) == 1 {
+			return allowed[0]
+		}
+	}
+	// The delegate key works without NATS and is the identity the agent talks to.
+	if delegate, err := m.rds.Get(ctx, aiAgentKey(roomId, aiAgentKeyDelegate)).Result(); err == nil && delegate != "" {
+		return delegate
+	}
 	if m.natsService == nil {
-		return "", ""
+		return ""
 	}
-	allowed := aiAgentAllowedParticipantIds(m.roomAgentFeatures(roomId))
-	if len(allowed) != 1 {
-		return "", ""
+	if humans := m.onlineHumans(roomId); len(humans) > 0 {
+		return humans[0].GetUserId()
 	}
-	userId = allowed[0]
-	if info, err := m.natsService.GetUserInfo(roomId, userId); err == nil && info != nil {
-		userName = info.GetName()
+	// The room's participant bucket also keeps identities the online listing
+	// missed, e.g. a user who disconnected right before the session finalized.
+	known := make([]string, 0, 4)
+	for _, id := range m.natsService.GetRoomUserIds(roomId) {
+		if id != "" && !config.IsUserIdInternal(id) {
+			known = append(known, id)
+		}
 	}
-	return userId, userName
+	if len(known) > 0 {
+		sort.Strings(known)
+		return known[0]
+	}
+	if parentRoomId := m.aiAgentParentRoomId(roomId); parentRoomId != "" {
+		if userId := aiAgentBreakoutUserId(parentRoomId, roomId); userId != "" {
+			return userId
+		}
+		if info := m.aiAgentBreakoutUserInfo(parentRoomId, roomId, ""); info.GetUserId() != "" {
+			return info.GetUserId()
+		}
+	}
+	return ""
+}
+
+// aiAgentParticipantInfo resolves the artifact identity of one participant: NATS
+// knows them while online, the parent room of a per-user session knows them
+// after they moved into their breakout room, and the breakout room record keeps
+// the name once they left entirely.
+func (m *AIAgentModel) aiAgentParticipantInfo(roomId, userId string) *plugnmeet.RoomArtifactUserInfo {
+	info := &plugnmeet.RoomArtifactUserInfo{UserId: userId}
+	if m.natsService == nil || userId == "" {
+		return info
+	}
+	mergeAIAgentUserInfo(info, m.aiAgentNatsUserInfo(roomId, userId))
+	if parentRoomId := m.aiAgentParentRoomId(roomId); parentRoomId != "" {
+		mergeAIAgentUserInfo(info, m.aiAgentNatsUserInfo(parentRoomId, userId))
+		mergeAIAgentUserInfo(info, m.aiAgentBreakoutUserInfo(parentRoomId, roomId, userId))
+	}
+	return info
+}
+
+// aiAgentParentRoomId reports the parent room of a breakout room, or "" when the
+// room is no breakout room.
+func (m *AIAgentModel) aiAgentParentRoomId(roomId string) string {
+	meta, err := m.natsService.GetRoomMetadataStruct(roomId)
+	if err != nil || !meta.GetIsBreakoutRoom() {
+		return ""
+	}
+	parentRoomId, _, err := helpers.ParseBreakoutParentRoomRef(meta.GetParentRoomId())
+	if err != nil {
+		return ""
+	}
+	return parentRoomId
+}
+
+// aiAgentNatsUserInfo reads the participant's identity from the room's NATS KV.
+func (m *AIAgentModel) aiAgentNatsUserInfo(roomId, userId string) *plugnmeet.RoomArtifactUserInfo {
+	info, err := m.natsService.GetUserInfo(roomId, userId)
+	if err != nil || info.GetUserId() == "" {
+		return nil
+	}
+
+	userInfo := &plugnmeet.RoomArtifactUserInfo{UserId: userId, Name: optionalString(info.GetName())}
+	metadata, err := m.natsService.UnmarshalUserMetadata(info.GetMetadata())
+	if err != nil || metadata == nil {
+		return userInfo
+	}
+	userInfo.ExUserId = optionalString(metadata.GetExUserId())
+	if extra := metadata.GetExtraData(); len(extra) > 0 {
+		if encoded, merr := json.Marshal(extra); merr == nil {
+			userInfo.ExtraData = optionalString(string(encoded))
+		}
+	}
+	return userInfo
+}
+
+// aiAgentBreakoutUserInfo reads a participant from the breakout room record,
+// which outlives the NATS entry of a participant who already left.
+func (m *AIAgentModel) aiAgentBreakoutUserInfo(parentRoomId, roomId, userId string) *plugnmeet.RoomArtifactUserInfo {
+	if m.redisService == nil {
+		return nil
+	}
+	raw, err := m.redisService.GetBreakoutRoom(parentRoomId, roomId)
+	if err != nil || raw == "" {
+		return nil
+	}
+	room := new(plugnmeet.BreakoutRoom)
+	if err = protojson.Unmarshal([]byte(raw), room); err != nil {
+		return nil
+	}
+	for _, user := range room.GetUsers() {
+		if user.GetId() == "" || (userId != "" && user.GetId() != userId) {
+			continue
+		}
+		return &plugnmeet.RoomArtifactUserInfo{UserId: user.GetId(), Name: optionalString(user.GetName())}
+	}
+	return nil
+}
+
+// aiAgentBreakoutUserId decodes the per-user breakout room naming convention
+// "<parent roomId>-<userId>". A numeric suffix is a numbered breakout room and
+// therefore no user.
+func aiAgentBreakoutUserId(parentRoomId, roomId string) string {
+	prefix := fmt.Sprintf(BreakoutRoomFormat, parentRoomId, "")
+	if !strings.HasPrefix(roomId, prefix) {
+		return ""
+	}
+	userId := strings.TrimPrefix(roomId, prefix)
+	if userId == "" {
+		return ""
+	}
+	if _, err := strconv.ParseUint(userId, 10, 64); err == nil {
+		return ""
+	}
+	return userId
+}
+
+// mergeAIAgentUserInfo fills the empty fields of dst from src.
+func mergeAIAgentUserInfo(dst, src *plugnmeet.RoomArtifactUserInfo) {
+	if dst == nil || src == nil {
+		return
+	}
+	if dst.GetUserId() == "" {
+		dst.UserId = src.GetUserId()
+	}
+	if dst.GetName() == "" {
+		dst.Name = src.Name
+	}
+	if dst.GetExUserId() == "" {
+		dst.ExUserId = src.ExUserId
+	}
+	if dst.GetExtraData() == "" {
+		dst.ExtraData = src.ExtraData
+	}
 }
 
 // synthesizeSessionSummary lets the configured model refine the deterministic
 // summary; the returned model name is the one that produced the summary.
-func (m *AIAgentModel) synthesizeSessionSummary(ctx context.Context, summary *AIAgentSessionSummary, telemetry *redisservice.AIAgentSessionTelemetry, promptTokens, completionTokens *uint32, log *logrus.Entry) string {
+func (m *AIAgentModel) synthesizeSessionSummary(ctx context.Context, summary *plugnmeet.AIAgentSessionSummary, telemetry *redisservice.AIAgentSessionTelemetry, promptTokens, completionTokens *uint32, log *logrus.Entry) string {
 	if summary == nil || m.appConfig == nil || m.appConfig.Insights == nil {
 		return ""
 	}
@@ -230,8 +347,8 @@ func sortedProgressEntries(progressMap map[string]redisservice.AIProgressEntry) 
 
 // collectQuizEvaluation aggregates the room's quiz polls: how many answers were
 // correct and whether the group passed each question.
-func collectQuizEvaluation(ctx context.Context, rs *redisservice.RedisService, roomID string) AIAgentSummaryQuizEvaluation {
-	evaluation := AIAgentSummaryQuizEvaluation{Questions: []AIAgentSummaryQuizQuestion{}}
+func collectQuizEvaluation(ctx context.Context, rs *redisservice.RedisService, roomID string) *plugnmeet.AIAgentSummaryQuizEvaluation {
+	evaluation := &plugnmeet.AIAgentSummaryQuizEvaluation{Questions: []*plugnmeet.AIAgentSummaryQuizQuestion{}}
 	if rs == nil {
 		return evaluation
 	}
@@ -278,8 +395,8 @@ func collectQuizEvaluation(ctx context.Context, rs *redisservice.RedisService, r
 		}
 
 		correctOption := info.GetOptions()[correctIndex]
-		question := AIAgentSummaryQuizQuestion{
-			PollID:        info.GetId(),
+		question := &plugnmeet.AIAgentSummaryQuizQuestion{
+			PollId:        info.GetId(),
 			Question:      info.GetQuestion(),
 			CorrectOption: correctOption.GetText(),
 		}
@@ -292,22 +409,25 @@ func collectQuizEvaluation(ctx context.Context, rs *redisservice.RedisService, r
 		question.Passed = question.CorrectVotes > 0 && question.CorrectVotes*2 >= question.TotalVotes
 
 		evaluation.TotalQuizzes++
-		evaluation.TotalResponses += int(question.TotalVotes)
-		evaluation.CorrectResponses += int(question.CorrectVotes)
+		evaluation.TotalResponses += int32(question.TotalVotes)
+		evaluation.CorrectResponses += int32(question.CorrectVotes)
 		evaluation.Questions = append(evaluation.Questions, question)
 	}
 
 	if evaluation.TotalResponses > 0 {
-		evaluation.AccuracyPercent = int(math.Round(float64(evaluation.CorrectResponses) * 100 / float64(evaluation.TotalResponses)))
+		evaluation.AccuracyPercent = int32(math.Round(float64(evaluation.CorrectResponses) * 100 / float64(evaluation.TotalResponses)))
 	}
 	return evaluation
 }
 
 // buildDeterministicSessionSummary builds the local_fallback summary: everything
 // it says is derived from telemetry, progress entries and quiz counters.
-func buildDeterministicSessionSummary(roomID, roomSid string, telemetry *redisservice.AIAgentSessionTelemetry, progress []redisservice.AIProgressEntry, quizzes AIAgentSummaryQuizEvaluation) *AIAgentSessionSummary {
+func buildDeterministicSessionSummary(roomID, roomSid string, telemetry *redisservice.AIAgentSessionTelemetry, progress []redisservice.AIProgressEntry, quizzes *plugnmeet.AIAgentSummaryQuizEvaluation) *plugnmeet.AIAgentSessionSummary {
 	if telemetry == nil {
 		telemetry = &redisservice.AIAgentSessionTelemetry{}
+	}
+	if quizzes == nil {
+		quizzes = &plugnmeet.AIAgentSummaryQuizEvaluation{}
 	}
 
 	endedAt := telemetry.EndedAt
@@ -319,14 +439,21 @@ func buildDeterministicSessionSummary(roomID, roomSid string, telemetry *redisse
 		duration = (endedAt - telemetry.StartedAt) / 1000
 	}
 
-	summary := &AIAgentSessionSummary{
-		SchemaVersion: AIAgentSummarySchemaVersion,
+	summary := &plugnmeet.AIAgentSessionSummary{
 		SummarySource: AIAgentSummarySourceLocalFallback,
 		GeneratedAt:   time.Now().UTC().Format(time.RFC3339),
-		Session: AIAgentSummarySession{
-			RoomID:                 roomID,
+		// The learner is always recorded, even while still unknown: the finalize
+		// step merges the participant it resolves over these values.
+		UserInfo: &plugnmeet.RoomArtifactUserInfo{
+			UserId:    telemetry.UserID,
+			Name:      optionalString(telemetry.UserName),
+			ExUserId:  optionalString(telemetry.ExUserID),
+			ExtraData: optionalString(telemetry.ExtraData),
+		},
+		Session: &plugnmeet.AIAgentSummarySession{
+			RoomId:                 roomID,
 			RoomSid:                roomSid,
-			SessionID:              telemetry.SessionID,
+			SessionId:              telemetry.SessionID,
 			AgentDisplayName:       telemetry.AgentName,
 			Topic:                  telemetry.Topic,
 			AllowedSubtopics:       append([]string(nil), telemetry.AllowedSubtopics...),
@@ -334,15 +461,15 @@ func buildDeterministicSessionSummary(roomID, roomSid string, telemetry *redisse
 			EndedAt:                endedAt,
 			DurationSeconds:        duration,
 			EndReason:              telemetry.EndReason,
-			OffTopicRedirectsCount: telemetry.OffTopicRedirectsCount,
-			TurnsCount:             telemetry.TurnsCount,
+			OffTopicRedirectsCount: int32(telemetry.OffTopicRedirectsCount),
+			TurnsCount:             int32(telemetry.TurnsCount),
 		},
 		QuizEvaluation:    quizzes,
-		ProgressLog:       append([]redisservice.AIProgressEntry{}, progress...),
+		ProgressLog:       buildProgressLog(progress),
 		WorkspaceActivity: buildWorkspaceActivity(telemetry.ToolsUsed),
 	}
 	if summary.QuizEvaluation.Questions == nil {
-		summary.QuizEvaluation.Questions = []AIAgentSummaryQuizQuestion{}
+		summary.QuizEvaluation.Questions = []*plugnmeet.AIAgentSummaryQuizQuestion{}
 	}
 
 	summary.Evaluation, summary.Continuation = buildDeterministicEvaluation(telemetry, progress, quizzes)
@@ -350,10 +477,23 @@ func buildDeterministicSessionSummary(roomID, roomSid string, telemetry *redisse
 	return summary
 }
 
-func buildWorkspaceActivity(toolsUsed map[string]int) AIAgentSummaryWorkspaceActivity {
-	activity := AIAgentSummaryWorkspaceActivity{ToolsUsed: make(map[string]int, len(toolsUsed))}
+// buildProgressLog converts the stored progress entries into the artifact shape.
+func buildProgressLog(progress []redisservice.AIProgressEntry) []*plugnmeet.AIAgentSummaryProgressEntry {
+	entries := make([]*plugnmeet.AIAgentSummaryProgressEntry, 0, len(progress))
+	for _, entry := range progress {
+		entries = append(entries, &plugnmeet.AIAgentSummaryProgressEntry{
+			Concept: entry.Concept,
+			Status:  entry.Status,
+			Notes:   optionalString(entry.Notes),
+		})
+	}
+	return entries
+}
+
+func buildWorkspaceActivity(toolsUsed map[string]int) *plugnmeet.AIAgentSummaryWorkspaceActivity {
+	activity := &plugnmeet.AIAgentSummaryWorkspaceActivity{ToolsUsed: make(map[string]int32, len(toolsUsed))}
 	for name, count := range toolsUsed {
-		activity.ToolsUsed[name] = count
+		activity.ToolsUsed[name] = int32(count)
 		if count <= 0 {
 			continue
 		}
@@ -367,8 +507,11 @@ func buildWorkspaceActivity(toolsUsed map[string]int) AIAgentSummaryWorkspaceAct
 	return activity
 }
 
-func buildDeterministicEvaluation(telemetry *redisservice.AIAgentSessionTelemetry, progress []redisservice.AIProgressEntry, quizzes AIAgentSummaryQuizEvaluation) (AIAgentSummaryEvaluation, AIAgentSummaryContinuation) {
-	evaluation := AIAgentSummaryEvaluation{
+func buildDeterministicEvaluation(telemetry *redisservice.AIAgentSessionTelemetry, progress []redisservice.AIProgressEntry, quizzes *plugnmeet.AIAgentSummaryQuizEvaluation) (*plugnmeet.AIAgentSummaryEvaluation, *plugnmeet.AIAgentSummaryContinuation) {
+	if quizzes == nil {
+		quizzes = &plugnmeet.AIAgentSummaryQuizEvaluation{}
+	}
+	evaluation := &plugnmeet.AIAgentSummaryEvaluation{
 		ConceptsMastered:     []string{},
 		ConceptsPracticed:    []string{},
 		StruggledWith:        []string{},
@@ -400,9 +543,9 @@ func buildDeterministicEvaluation(telemetry *redisservice.AIAgentSessionTelemetr
 	case quizzes.TotalQuizzes > 0:
 		evaluation.OverallScore = quizzes.AccuracyPercent
 	case len(seen) > 0:
-		evaluation.OverallScore = len(evaluation.ConceptsMastered) * 100 / len(seen)
+		evaluation.OverallScore = int32(len(evaluation.ConceptsMastered) * 100 / len(seen))
 	}
-	evaluation.MasteryLevel = masteryLevelForScore(evaluation.OverallScore)
+	evaluation.MasteryLevel = masteryLevelForScore(int(evaluation.OverallScore))
 	evaluation.ParticipationLevel = participationLevelForTurns(telemetry.TurnsCount)
 
 	if len(seen) > 0 || quizzes.TotalResponses > 0 {
@@ -410,7 +553,7 @@ func buildDeterministicEvaluation(telemetry *redisservice.AIAgentSessionTelemetr
 			len(evaluation.ConceptsMastered), len(seen), quizzes.CorrectResponses, quizzes.TotalResponses, quizzes.AccuracyPercent)
 	}
 
-	continuation := AIAgentSummaryContinuation{
+	continuation := &plugnmeet.AIAgentSummaryContinuation{
 		UnfinishedSubtopics: unfinishedSubtopics(telemetry.AllowedSubtopics, evaluation.ConceptsMastered),
 	}
 	switch {
@@ -481,7 +624,7 @@ func unfinishedSubtopics(allowed, mastered []string) []string {
 
 // buildPreviousSessionContextPrompt renders the short blob a host can feed back
 // as previous_session_context on the next room.
-func buildPreviousSessionContextPrompt(topic string, evaluation AIAgentSummaryEvaluation, focus string) string {
+func buildPreviousSessionContextPrompt(topic string, evaluation *plugnmeet.AIAgentSummaryEvaluation, focus string) string {
 	parts := make([]string, 0, 5)
 	if topic = strings.TrimSpace(topic); topic != "" {
 		parts = append(parts, fmt.Sprintf("the topic was %q", topic))
@@ -504,7 +647,7 @@ func buildPreviousSessionContextPrompt(topic string, evaluation AIAgentSummaryEv
 	return truncate("In the previous session "+strings.Join(parts, "; ")+".", aiAgentSummaryMaxContextRunes)
 }
 
-func buildDeterministicNarrative(summary *AIAgentSessionSummary) string {
+func buildDeterministicNarrative(summary *plugnmeet.AIAgentSessionSummary) string {
 	name := firstNonEmptyString(summary.Session.AgentDisplayName, aiAgentDefaultDisplayName)
 	topic := strings.TrimSpace(summary.Session.Topic)
 	subject := fmt.Sprintf("%s ran a session", name)
@@ -530,24 +673,20 @@ func buildDeterministicNarrative(summary *AIAgentSessionSummary) string {
 	return narrative
 }
 
-// aiAgentSummaryOverlay is what the model is allowed to improve on top of the
-// deterministic summary.
-type aiAgentSummaryOverlay struct {
-	Evaluation       *AIAgentSummaryEvaluation   `json:"evaluation"`
-	Continuation     *AIAgentSummaryContinuation `json:"continuation"`
-	NarrativeSummary string                      `json:"narrative_summary"`
-}
-
-// merge copies only the non-empty overlay fields over the deterministic summary.
-func (o *aiAgentSummaryOverlay) merge(summary *AIAgentSessionSummary) {
+// mergeAIAgentSummaryOverlay copies only the non-empty fields of the model's
+// answer over the deterministic summary.
+func mergeAIAgentSummaryOverlay(summary, o *plugnmeet.AIAgentSessionSummary) {
 	if o == nil || summary == nil {
 		return
 	}
 
 	if eval := o.Evaluation; eval != nil {
+		if summary.Evaluation == nil {
+			summary.Evaluation = &plugnmeet.AIAgentSummaryEvaluation{}
+		}
 		if eval.OverallScore > 0 {
 			summary.Evaluation.OverallScore = eval.OverallScore
-			summary.Evaluation.MasteryLevel = masteryLevelForScore(eval.OverallScore)
+			summary.Evaluation.MasteryLevel = masteryLevelForScore(int(eval.OverallScore))
 		}
 		if level := normalizeMasteryLevel(eval.MasteryLevel); level != "" {
 			summary.Evaluation.MasteryLevel = level
@@ -573,6 +712,9 @@ func (o *aiAgentSummaryOverlay) merge(summary *AIAgentSessionSummary) {
 	}
 
 	if continuation := o.Continuation; continuation != nil {
+		if summary.Continuation == nil {
+			summary.Continuation = &plugnmeet.AIAgentSummaryContinuation{}
+		}
 		if focus := strings.TrimSpace(continuation.NextSessionFocus); focus != "" {
 			summary.Continuation.NextSessionFocus = focus
 		}
@@ -641,7 +783,7 @@ func resolveAIAgentSummarizeModel(insightsCfg *config.InsightsConfig) string {
 
 // applyLLMSummarySynthesis lets the model refine the deterministic summary. Any
 // failure keeps the fallback untouched, so the artifact is always written.
-func applyLLMSummarySynthesis(ctx context.Context, provider insights.Provider, summarizeModel string, summary *AIAgentSessionSummary, transcript []redisservice.AISessionTranscriptTurn) (promptTokens, completionTokens uint32, err error) {
+func applyLLMSummarySynthesis(ctx context.Context, provider insights.Provider, summarizeModel string, summary *plugnmeet.AIAgentSessionSummary, transcript []redisservice.AISessionTranscriptTurn) (promptTokens, completionTokens uint32, err error) {
 	if provider == nil || summary == nil {
 		return 0, 0, fmt.Errorf("ai agent summary: missing provider or summary")
 	}
@@ -654,17 +796,18 @@ func applyLLMSummarySynthesis(ctx context.Context, provider insights.Provider, s
 		return promptTokens, completionTokens, err
 	}
 
-	overlay := new(aiAgentSummaryOverlay)
-	if err := json.Unmarshal([]byte(stripJSONFence(text)), overlay); err != nil {
+	overlay := new(plugnmeet.AIAgentSessionSummary)
+	unmarshal := protojson.UnmarshalOptions{DiscardUnknown: true}
+	if err := unmarshal.Unmarshal([]byte(stripJSONFence(text)), overlay); err != nil {
 		return promptTokens, completionTokens, fmt.Errorf("ai agent summary: invalid model JSON: %w", err)
 	}
 
-	overlay.merge(summary)
+	mergeAIAgentSummaryOverlay(summary, overlay)
 	summary.SummarySource = AIAgentSummarySourceLLM
 	return promptTokens, completionTokens, nil
 }
 
-func buildAIAgentSummaryPrompt(summary *AIAgentSessionSummary, transcript []redisservice.AISessionTranscriptTurn) []*plugnmeet.InsightsAITextChatContent {
+func buildAIAgentSummaryPrompt(summary *plugnmeet.AIAgentSessionSummary, transcript []redisservice.AISessionTranscriptTurn) []*plugnmeet.InsightsAITextChatContent {
 	systemPrompt := `You finalize an AI agent session report for the room host.
 Use only the deterministic summary and the transcript; never invent facts.
 Reply with one JSON object and nothing else, using exactly this shape:
@@ -672,7 +815,7 @@ Reply with one JSON object and nothing else, using exactly this shape:
 overall_score is 0-100, mastery_level is advanced|proficient|developing|beginner,
 participation_level is high|medium|low. Omit any field you cannot improve.`
 
-	deterministic, err := json.Marshal(summary)
+	deterministic, err := protojson.MarshalOptions{UseProtoNames: true}.Marshal(summary)
 	if err != nil {
 		deterministic = []byte("{}")
 	}

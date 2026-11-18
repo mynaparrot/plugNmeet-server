@@ -94,6 +94,14 @@ func (m *AIAgentModel) Start(ctx context.Context, roomId string, req *plugnmeet.
 	if err != nil {
 		log.WithError(err).Warn("no delegate could be selected yet")
 	}
+	// Resolve the learner before the agent starts: the session telemetry carries
+	// the identity, so the summary artifact still names them after they left.
+	learner := aiAgentLearnerIdentity(m.aiAgentSessionLearner(ctx, roomId, nil))
+	if learner.UserID == "" && delegate != "" {
+		// The delegate is the participant the agent talks to, so it is the
+		// learner even when the earlier lookups came back empty.
+		learner = aiAgentLearnerIdentity(m.aiAgentParticipantInfo(roomId, delegate))
+	}
 	displayName := boundary.AgentDisplayName
 
 	payload := &insights.InsightsTaskPayload{
@@ -145,6 +153,7 @@ func (m *AIAgentModel) Start(ctx context.Context, roomId string, req *plugnmeet.
 		Features:        features,
 		Boundary:        boundary,
 		Deps:            deps,
+		Learner:         learner,
 		Delegate: func() (string, error) {
 			return m.SelectOrGetDelegate(m.ctx, roomId)
 		},
@@ -334,6 +343,8 @@ func (m *AIAgentModel) afterAgentStopped(roomId, reason string) {
 	// The external MCP configuration and its warmed tools stay in Redis: a stop
 	// is often temporary (pause, empty-room grace) and the same room may restart
 	// the agent. OnRoomEnded removes them together with the rest of the room.
+	// The learner identity is already in the session telemetry, so dropping the
+	// delegate here cannot strand the summary that follows the stop.
 	_ = m.rds.Del(ctx,
 		aiAgentKey(roomId, aiAgentKeyState),
 		aiAgentKey(roomId, aiAgentKeyDelegate),

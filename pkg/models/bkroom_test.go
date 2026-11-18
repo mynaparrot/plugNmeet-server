@@ -431,13 +431,16 @@ func TestAIAgentSessionSummaryArtifactBreakoutOwnedByParent(t *testing.T) {
 	parent := createTestRoomRow(t, gdb, "parent-room", false, "")
 	child := createTestRoomRow(t, gdb, "parent-room-bk", true, helpers.FormatBreakoutParentRoomRef(parent.RoomId, parent.ID))
 
-	summary := &AIAgentSessionSummary{
-		SchemaVersion: AIAgentSummarySchemaVersion,
-		Session: AIAgentSummarySession{
-			UserID:   "learner-1",
-			UserName: "Learner One",
-			RoomID:   child.RoomId,
-			RoomSid:  child.Sid,
+	summary := &plugnmeet.AIAgentSessionSummary{
+		SummarySource: AIAgentSummarySourceLocalFallback,
+		UserInfo: &plugnmeet.RoomArtifactUserInfo{
+			UserId:   "learner-1",
+			Name:     optionalString("Learner One"),
+			ExUserId: optionalString("external-1"),
+		},
+		Session: &plugnmeet.AIAgentSummarySession{
+			RoomId:  child.RoomId,
+			RoomSid: child.Sid,
 		},
 	}
 

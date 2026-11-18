@@ -59,7 +59,13 @@ type AISessionTranscriptTurn struct {
 // AIAgentSessionTelemetry is the session's counters and transcript, flushed
 // while the agent runs so an abrupt crash still leaves usable metadata.
 type AIAgentSessionTelemetry struct {
-	SessionID              string                    `json:"session_id"`
+	SessionID string `json:"session_id"`
+	// Learner identity of the 1-on-1 session, so the summary artifact can still
+	// name the participant after they left the room.
+	UserID                 string                    `json:"user_id,omitempty"`
+	UserName               string                    `json:"user_name,omitempty"`
+	ExUserID               string                    `json:"ex_user_id,omitempty"`
+	ExtraData              string                    `json:"extra_data,omitempty"`
 	AgentName              string                    `json:"agent_name"`
 	Topic                  string                    `json:"topic"`
 	AllowedSubtopics       []string                  `json:"allowed_subtopics,omitempty"`
