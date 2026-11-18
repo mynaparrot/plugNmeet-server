@@ -108,7 +108,7 @@ func (m *AIAgentModel) Start(ctx context.Context, roomId string, req *plugnmeet.
 	}
 	// a 1-on-1 room listens to its named participants only, so a supervisor
 	// joining to observe is never fed to the agent
-	if allowed := features.GetAllowedParticipantIds(); len(allowed) > 0 {
+	if allowed := aiAgentAllowedParticipantIds(features); len(allowed) > 0 {
 		payload.TargetUsers = make(map[string]bool, len(allowed))
 		for _, id := range allowed {
 			payload.TargetUsers[id] = true

@@ -1,8 +1,11 @@
 package models
 
 import (
+	"strings"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -125,10 +128,33 @@ func (m *BreakoutRoomModel) fetchBreakoutRooms(roomId string) ([]*plugnmeet.Brea
 				}
 			}
 		}
+		// an AI session room is only usable once its agent actually joined
+		if room.Started && room.EnableAiAgent {
+			room.AiAgentJoined = m.isAIAgentOnline(room.Id)
+		}
 		breakoutRooms = append(breakoutRooms, room)
 	}
 
 	return breakoutRooms, nil
+}
+
+// isAIAgentOnline reports whether an AI agent participant is currently online in
+// the room. The agent's user id is generated per session, so it is matched by
+// the internal prefix instead of a stored id.
+func (m *BreakoutRoomModel) isAIAgentOnline(roomId string) bool {
+	userIds, err := m.natsService.GetOnlineUsersId(roomId)
+	if err != nil {
+		return false
+	}
+
+	prefix := config.AgentUserUserIdPrefix + string(insights.ServiceTypeAIAgent)
+	for _, id := range userIds {
+		if strings.HasPrefix(id, prefix) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // ResolveParentRoomId returns the plain parent room id for a breakout room.

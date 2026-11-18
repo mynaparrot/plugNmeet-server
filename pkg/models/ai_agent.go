@@ -67,7 +67,9 @@ const (
 	aiAgentMaxSessionSecondsCap = 7200
 
 	// aiAgentMaxAllowedParticipantIds caps the pre-authorized participant list.
-	aiAgentMaxAllowedParticipantIds = 16
+	// It matches the max_items=32 of auto_session_config.allowed_participant_ids
+	// in the protocol.
+	aiAgentMaxAllowedParticipantIds = 32
 
 	// Shape limits of one external MCP server entry.
 	agentMCPMaxKeyChars         = 64
@@ -449,12 +451,97 @@ func NormalizeAIAgentFeatures(f *plugnmeet.InsightsAIAgentFeatures) *plugnmeet.I
 
 	out.McpServers = NormalizeExternalMCPServers(out.GetMcpServers())
 
-	// the pre-authorized participants are host input, the rest is runtime state
-	out.AllowedParticipantIds = cleanAllowedParticipantIds(out.GetAllowedParticipantIds())
+	// the session routing config is host input, the rest is runtime state. Only
+	// the fields of the selected mode survive, so a room that switched modes
+	// never keeps the settings of the previous one.
+	normalizeAIAgentAutoSessionConfig(out)
 	out.IsEnabled = false
 	out.ActiveSessionId = nil
 
 	return out
+}
+
+// normalizeAIAgentAutoSessionConfig keeps only the auto session config that
+// belongs to the selected session mode and applies its documented defaults.
+func normalizeAIAgentAutoSessionConfig(out *plugnmeet.InsightsAIAgentFeatures) {
+	switch out.GetSessionMode() {
+	case plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_CONTROLLED_USERS:
+		if out.AutoSessionConfig == nil {
+			out.AutoSessionConfig = &plugnmeet.AIAgentAutoSessionConfig{}
+		}
+		out.AutoSessionConfig.AllowedParticipantIds = cleanAllowedParticipantIds(out.AutoSessionConfig.GetAllowedParticipantIds())
+		// a controlled roster is a pre-authorization list, not a concurrency
+		// limit: the sessions are capped when they are created
+		out.AutoSessionConfig.MaxConcurrentSessions = 0
+		if out.AutoSessionConfig.AutoStartAgent == nil {
+			out.AutoSessionConfig.AutoStartAgent = new(true)
+		}
+	case plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_OPEN_PER_USER:
+		if out.AutoSessionConfig == nil {
+			out.AutoSessionConfig = &plugnmeet.AIAgentAutoSessionConfig{}
+		}
+		out.AutoSessionConfig.AllowedParticipantIds = nil
+		if out.AutoSessionConfig.AutoStartAgent == nil {
+			out.AutoSessionConfig.AutoStartAgent = new(true)
+		}
+	default:
+		// a normal room routes nothing automatically
+		out.AutoSessionConfig = nil
+	}
+}
+
+// aiAgentAllowedParticipantIds returns the pre-authorized participants of a
+// controlled-users room, and nil in every other mode: only that mode has a
+// fixed roster.
+func aiAgentAllowedParticipantIds(f *plugnmeet.InsightsAIAgentFeatures) []string {
+	if f.GetSessionMode() != plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_CONTROLLED_USERS {
+		return nil
+	}
+	return f.GetAutoSessionConfig().GetAllowedParticipantIds()
+}
+
+// aiAgentMaxConcurrentSessions returns how many 1-on-1 sessions an
+// open-per-user room may run in parallel. 0 means "not configured"; the mode
+// that does not open per-user sessions always reports 0.
+func aiAgentMaxConcurrentSessions(f *plugnmeet.InsightsAIAgentFeatures) uint32 {
+	if f.GetSessionMode() != plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_OPEN_PER_USER {
+		return 0
+	}
+	return f.GetAutoSessionConfig().GetMaxConcurrentSessions()
+}
+
+// aiAgentAutoStart reports whether the agent starts by itself when its session
+// room becomes occupied. It defaults to true in both routing modes and has no
+// meaning in a normal room, where an admin starts the agent explicitly.
+func aiAgentAutoStart(f *plugnmeet.InsightsAIAgentFeatures) bool {
+	switch f.GetSessionMode() {
+	case plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_CONTROLLED_USERS,
+		plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_OPEN_PER_USER:
+		if cfg := f.GetAutoSessionConfig(); cfg != nil && cfg.AutoStartAgent != nil {
+			return cfg.GetAutoStartAgent()
+		}
+		return true
+	default:
+		return false
+	}
+}
+
+// isAutoPerUserAISessionRoom reports whether every participant gets their own
+// 1-on-1 session room: always in open-per-user mode, and in controlled-users
+// mode only when more than one participant is pre-authorized.
+func isAutoPerUserAISessionRoom(f *plugnmeet.InsightsAIAgentFeatures) bool {
+	if !f.GetIsAllow() {
+		return false
+	}
+
+	switch f.GetSessionMode() {
+	case plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_OPEN_PER_USER:
+		return true
+	case plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_CONTROLLED_USERS:
+		return len(f.GetAutoSessionConfig().GetAllowedParticipantIds()) > 1
+	default:
+		return false
+	}
 }
 
 // cleanAllowedParticipantIds trims, dedupes and caps the pre-authorized
@@ -751,7 +838,7 @@ func (m *AIAgentModel) PrepareRoomExternalMCP(ctx context.Context, roomId string
 
 // isOneOnOneAIAgentRoom reports whether the voice agent may run in this room: a
 // breakout room is always a 1-on-1 session room, while a normal room only when
-// it serves a single pre-authorized participant and no per-user sessions.
+// it has exactly one pre-authorized participant and no per-user sessions.
 func isOneOnOneAIAgentRoom(meta *plugnmeet.RoomMetadata) bool {
 	if meta == nil {
 		return false
@@ -764,7 +851,8 @@ func isOneOnOneAIAgentRoom(meta *plugnmeet.RoomMetadata) bool {
 		return true
 	}
 
-	return !aiFeatures.GetAutoCreatePerUserSession() && len(aiFeatures.GetAllowedParticipantIds()) == 1
+	return aiFeatures.GetSessionMode() == plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_CONTROLLED_USERS &&
+		len(aiAgentAllowedParticipantIds(aiFeatures)) == 1
 }
 
 // roomAgentFeatures returns the room's normalized AI agent features, or nil when

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"google.golang.org/protobuf/proto"
 )
 
 func preassigned(roomId string, userIds ...string) *plugnmeet.PreassignedBreakoutRoom {
@@ -132,11 +133,14 @@ func TestAppendBreakoutAIContext(t *testing.T) {
 func TestPrepareAIAgentBreakoutChildKeepsParentPrompt(t *testing.T) {
 	meta := &plugnmeet.RoomMetadata{RoomFeatures: &plugnmeet.RoomCreateFeatures{
 		InsightsFeatures: &plugnmeet.InsightsFeatures{AiAgentFeatures: &plugnmeet.InsightsAIAgentFeatures{
-			IsAllow:               true,
-			IsEnabled:             true,
-			ActiveSessionId:       new("parent-session"),
-			SystemPrompt:          "You are a tutor.",
-			AllowedParticipantIds: []string{"user-1", "user-2"},
+			IsAllow:         true,
+			IsEnabled:       true,
+			ActiveSessionId: new("parent-session"),
+			SystemPrompt:    "You are a tutor.",
+			SessionMode:     plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_CONTROLLED_USERS,
+			AutoSessionConfig: &plugnmeet.AIAgentAutoSessionConfig{
+				AllowedParticipantIds: []string{"user-1", "user-2"},
+			},
 		}},
 	}}
 	// the create loop captures the parent features once, before any child exists
@@ -163,12 +167,85 @@ func TestPrepareAIAgentBreakoutChildKeepsParentPrompt(t *testing.T) {
 		if features.GetActiveSessionId() != "" {
 			t.Errorf("%s: active_session_id = %q, want it cleared", userId, features.GetActiveSessionId())
 		}
-		if features.GetAutoCreatePerUserSession() || !features.GetAutoJoinOnFirstParticipant() {
-			t.Errorf("%s: auto_create_per_user_session=%v auto_join_on_first_participant=%v, want false/true", userId,
-				features.GetAutoCreatePerUserSession(), features.GetAutoJoinOnFirstParticipant())
+		if features.GetSessionMode() != plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_CONTROLLED_USERS {
+			t.Errorf("%s: session_mode = %v, want CONTROLLED_USERS", userId, features.GetSessionMode())
 		}
-		if ids := features.GetAllowedParticipantIds(); len(ids) != 1 || ids[0] != userId {
+		if isAutoPerUserAISessionRoom(features) {
+			t.Errorf("%s: the child room is not a per-user room anymore", userId)
+		}
+		if !aiAgentAutoStart(features) {
+			t.Errorf("%s: auto_start_agent = false, want the inherited default true", userId)
+		}
+		if ids := aiAgentAllowedParticipantIds(features); len(ids) != 1 || ids[0] != userId {
 			t.Errorf("%s: allowed participant ids = %v, want only that user", userId, ids)
 		}
+	}
+}
+
+func TestPrepareAIAgentBreakoutChildAutoStart(t *testing.T) {
+	parent := func(mode plugnmeet.AIAgentSessionMode, cfg *plugnmeet.AIAgentAutoSessionConfig) *plugnmeet.InsightsAIAgentFeatures {
+		return &plugnmeet.InsightsAIAgentFeatures{
+			IsAllow:           true,
+			SystemPrompt:      "You are a tutor.",
+			SessionMode:       mode,
+			AutoSessionConfig: cfg,
+		}
+	}
+
+	tests := []struct {
+		name      string
+		parent    *plugnmeet.InsightsAIAgentFeatures
+		wantStart bool
+	}{
+		{
+			name:      "normal room defaults to auto start",
+			parent:    parent(plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_NORMAL_ROOM, nil),
+			wantStart: true,
+		},
+		{
+			name:      "controlled users defaults to auto start",
+			parent:    parent(plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_CONTROLLED_USERS, nil),
+			wantStart: true,
+		},
+		{
+			name:      "open per user defaults to auto start",
+			parent:    parent(plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_OPEN_PER_USER, nil),
+			wantStart: true,
+		},
+		{
+			name: "an explicit auto start false is inherited",
+			parent: parent(plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_OPEN_PER_USER,
+				&plugnmeet.AIAgentAutoSessionConfig{AutoStartAgent: proto.Bool(false)}),
+			wantStart: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			meta := &plugnmeet.RoomMetadata{RoomFeatures: &plugnmeet.RoomCreateFeatures{
+				InsightsFeatures: &plugnmeet.InsightsFeatures{AiAgentFeatures: tt.parent},
+			}}
+
+			prepareAIAgentBreakoutChild(tt.parent, meta, "user-1", "", "")
+
+			child := meta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()
+			if child.GetSessionMode() != plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_CONTROLLED_USERS {
+				t.Fatalf("child session_mode = %v, want CONTROLLED_USERS", child.GetSessionMode())
+			}
+			cfg := child.GetAutoSessionConfig()
+			if cfg == nil || cfg.AutoStartAgent == nil {
+				t.Fatalf("child auto_session_config = %v, want auto_start_agent to be set", cfg)
+			}
+			if got := cfg.GetAutoStartAgent(); got != tt.wantStart {
+				t.Errorf("child auto_start_agent = %v, want %v", got, tt.wantStart)
+			}
+			if ids := cfg.GetAllowedParticipantIds(); len(ids) != 1 || ids[0] != "user-1" {
+				t.Errorf("child allowed participant ids = %v, want [user-1]", ids)
+			}
+			// the parent's config must never be mutated
+			if tt.parent.GetAutoSessionConfig() == cfg {
+				t.Error("the child reused the parent's auto_session_config instead of its own copy")
+			}
+		})
 	}
 }

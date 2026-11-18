@@ -409,7 +409,7 @@ func (s *InsightsModel) handleAIAgentChatMessage(req *plugnmeet.InsightsAITextCh
 	}
 
 	// a 1-on-1 room only takes turns from its participants and the admins
-	if allowed := aiAgentFeatures.GetAllowedParticipantIds(); len(allowed) > 0 && !containsUserId(allowed, userId) {
+	if allowed := aiAgentAllowedParticipantIds(aiAgentFeatures); len(allowed) > 0 && !containsUserId(allowed, userId) {
 		if info, _ := s.natsService.GetUserInfo(roomId, userId); !info.GetIsAdmin() {
 			logger.Warn("user is not allowed to talk to the AI agent")
 			return config.ErrAIAgentUserNotAllowed

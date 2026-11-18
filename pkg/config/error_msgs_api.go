@@ -194,6 +194,12 @@ var (
 	ErrAIAgentDirectSessionUsers    = errors.New("ai-agent.errors.direct-session-single-user")
 	ErrAIAgentBreakoutOneUser       = errors.New("ai-agent.errors.breakout-one-user")
 	ErrAIAgentUserNotAllowed        = errors.New("ai-agent.errors.user-not-allowed")
+	// ErrAIAgentSessionsFull is returned at join time when every concurrent AI
+	// session slot of the room is already occupied.
+	ErrAIAgentSessionsFull = errors.New("ai-agent.errors.sessions-full")
+	// ErrAIAgentAllowedUsersRequired is returned when a controlled-users room is
+	// configured without any pre-authorized participant.
+	ErrAIAgentAllowedUsersRequired = errors.New("ai-agent.errors.allowed-users-required")
 )
 
 // MsgSuccess is the generic success message of the response envelopes. It is an

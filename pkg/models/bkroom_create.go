@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -42,7 +43,7 @@ func effectiveMaxAISessions(meta *plugnmeet.RoomMetadata) uint32 {
 	if allowed == 0 {
 		allowed = defaultMaxAIBreakoutSessions
 	}
-	if maxConc := meta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures().GetMaxConcurrentSessions(); maxConc > 0 && maxConc < allowed {
+	if maxConc := aiAgentMaxConcurrentSessions(meta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()); maxConc > 0 && maxConc < allowed {
 		return maxConc
 	}
 	return allowed
@@ -455,9 +456,17 @@ func prepareAIAgentBreakoutChild(parentAiFeatures *plugnmeet.InsightsAIAgentFeat
 	features.IsAllow = true
 	features.IsEnabled = false
 	features.ActiveSessionId = nil
-	features.AutoCreatePerUserSession = false
-	features.AutoJoinOnFirstParticipant = true
-	features.AllowedParticipantIds = []string{userId}
+	// the child is a controlled 1-on-1 room for exactly this participant, and it
+	// keeps the auto-start preference of its parent session mode
+	autoStart := true
+	if parentAiFeatures.GetSessionMode() != plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_NORMAL_ROOM {
+		autoStart = aiAgentAutoStart(parentAiFeatures)
+	}
+	features.SessionMode = plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_CONTROLLED_USERS
+	features.AutoSessionConfig = &plugnmeet.AIAgentAutoSessionConfig{
+		AllowedParticipantIds: []string{userId},
+		AutoStartAgent:        proto.Bool(autoStart),
+	}
 	insightsFeatures.AiAgentFeatures = features
 
 	locks := meta.DefaultLockSettings
@@ -536,6 +545,12 @@ func (m *BreakoutRoomModel) EnsurePerUserAIBreakoutRoom(ctx context.Context, par
 		EnableAiAgent:         true,
 	})
 	if err != nil {
+		// every session slot is occupied right now, so the participant must be
+		// told the room is full instead of receiving a generic breakout error
+		if errors.Is(err, config.ErrBkRoomMaxRoomsExceeded) {
+			log.WithError(err).Warn("no AI session slot is currently free")
+			return "", config.ErrAIAgentSessionsFull
+		}
 		log.WithError(err).Error("failed to create the per-user AI breakout room")
 		return "", err
 	}

@@ -40,12 +40,12 @@ func (m *AIAgentModel) OnUserJoined(ctx context.Context, roomId, userId string) 
 		log.WithError(err).Warn("could not select a delegate")
 	}
 
-	if !features.GetAutoJoinOnFirstParticipant() {
+	if !aiAgentAutoStart(features) {
 		return
 	}
 	// in a 1-on-1 room only the named participant starts the session, so an
 	// admin observing the room waits for them
-	if allowed := features.GetAllowedParticipantIds(); len(allowed) > 0 && !containsUserId(allowed, userId) {
+	if allowed := aiAgentAllowedParticipantIds(features); len(allowed) > 0 && !containsUserId(allowed, userId) {
 		return
 	}
 	if _, ok := insightsservice.GetActiveAIAgent(roomId); ok {

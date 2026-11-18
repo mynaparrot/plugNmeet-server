@@ -53,7 +53,7 @@ func (m *AIAgentModel) selectDelegate(ctx context.Context, roomId, preferredUser
 	}
 
 	// A 1-on-1 room names its participants, and one of them owns the session.
-	if allowed := m.roomAgentFeatures(roomId).GetAllowedParticipantIds(); len(allowed) > 0 {
+	if allowed := aiAgentAllowedParticipantIds(m.roomAgentFeatures(roomId)); len(allowed) > 0 {
 		for _, user := range humans {
 			if containsUserId(allowed, user.GetUserId()) {
 				return m.storeDelegate(ctx, roomId, user.GetUserId())
@@ -82,7 +82,7 @@ func (m *AIAgentModel) CanControlSession(ctx context.Context, roomId, userId str
 		return true
 	}
 
-	return containsUserId(m.roomAgentFeatures(roomId).GetAllowedParticipantIds(), userId)
+	return containsUserId(aiAgentAllowedParticipantIds(m.roomAgentFeatures(roomId)), userId)
 }
 
 func (m *AIAgentModel) storeDelegate(ctx context.Context, roomId, userId string) (string, error) {

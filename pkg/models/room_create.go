@@ -286,17 +286,25 @@ func (m *RoomModel) setRoomDefaults(r *plugnmeet.CreateRoomReq) {
 }
 
 // applyAIAgentRoomDefaults prepares a room that hosts the AI agent: the
-// pre-authorized participants get a focused 1-on-1 setup, and per-user sessions
-// need the breakout room infrastructure.
+// session routing config is normalized to its mode, the 1-on-1 participants get
+// a focused setup, and per-user sessions need the breakout room infrastructure.
 func (m *RoomModel) applyAIAgentRoomDefaults(r *plugnmeet.CreateRoomReq) {
-	features := r.GetMetadata().GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()
+	insightsFeatures := r.GetMetadata().GetRoomFeatures().GetInsightsFeatures()
+	features := insightsFeatures.GetAiAgentFeatures()
 	if !features.GetIsAllow() {
 		return
 	}
 
-	// Only the named participants are expected to talk to the agent, so their
-	// camera and screen stay off until they enable them explicitly.
-	if len(features.GetAllowedParticipantIds()) > 0 {
+	// apply the defaults of the selected session mode (auto_start_agent, the
+	// cleaned participant roster, ...) before anything reads them
+	features = NormalizeAIAgentFeatures(features)
+	insightsFeatures.AiAgentFeatures = features
+
+	// Only the participants that talk to the agent are expected to be in the
+	// room, so their camera and screen stay off until they enable them
+	// explicitly. That holds for a fixed roster and for per-user sessions.
+	if len(aiAgentAllowedParticipantIds(features)) > 0 ||
+		features.GetSessionMode() == plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_OPEN_PER_USER {
 		locks := r.Metadata.DefaultLockSettings
 		if locks == nil {
 			locks = new(plugnmeet.LockSettings)
@@ -310,14 +318,8 @@ func (m *RoomModel) applyAIAgentRoomDefaults(r *plugnmeet.CreateRoomReq) {
 		}
 	}
 
-	// a direct 1-on-1 room has a single designated participant, so the agent
-	// starts as soon as that participant joins
-	if !features.GetAutoCreatePerUserSession() && len(features.GetAllowedParticipantIds()) == 1 {
-		features.AutoJoinOnFirstParticipant = true
-	}
-
 	// every participant gets their own room, so the parent needs breakouts
-	if features.GetAutoCreatePerUserSession() && !r.GetMetadata().GetIsBreakoutRoom() {
+	if isAutoPerUserAISessionRoom(features) && !r.GetMetadata().GetIsBreakoutRoom() {
 		if breakout := r.Metadata.RoomFeatures.BreakoutRoomFeatures; breakout != nil {
 			breakout.IsAllow = true
 		}
@@ -349,39 +351,40 @@ func (m *RoomModel) validateAIAgentFeatures(r *plugnmeet.CreateRoomReq, log *log
 	return m.validateAIAgentSessionLimits(r, features, log)
 }
 
-// validateAIAgentSessionLimits refuses session limits that can never be honoured:
-// more concurrent sessions than breakout rooms, and more pre-authorized
-// participants than the concurrent session limit allows.
+// validateAIAgentSessionLimits refuses a session routing config that could never
+// be honoured: a controlled-users room without any pre-authorized participant,
+// or more concurrent sessions than the room can open at once.
 func (m *RoomModel) validateAIAgentSessionLimits(r *plugnmeet.CreateRoomReq, features *plugnmeet.InsightsAIAgentFeatures, log *logrus.Entry) error {
+	// a breakout room inherits its routing from the parent session
+	if r.GetMetadata().GetIsBreakoutRoom() {
+		return nil
+	}
+
 	// allowed_number_rooms is already clamped by the server's own maximum
 	allowedRooms := r.GetMetadata().GetRoomFeatures().GetBreakoutRoomFeatures().GetAllowedNumberRooms()
-	if maxConc := features.GetMaxConcurrentSessions(); maxConc > 0 && allowedRooms > 0 && maxConc > allowedRooms {
-		log.Errorf("max_concurrent_sessions (%d) exceeds allowed_number_rooms (%d)", maxConc, allowedRooms)
-		return config.ErrAIAgentMaxConcurrentSessions
-	}
 
-	allowedParticipantIds := features.GetAllowedParticipantIds()
-	if len(allowedParticipantIds) == 0 || r.GetMetadata().GetIsBreakoutRoom() {
+	switch features.GetSessionMode() {
+	case plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_CONTROLLED_USERS:
+		ids := cleanAllowedParticipantIds(features.GetAutoSessionConfig().GetAllowedParticipantIds())
+		if len(ids) == 0 {
+			log.Error("a controlled-users AI room was configured without allowed_participant_ids")
+			return config.ErrAIAgentAllowedUsersRequired
+		}
+		// The roster is a pre-authorization list, not a concurrency limit: it
+		// may name more participants than the room has session slots. The
+		// concurrency is enforced when the sessions are created at join time.
 		return nil
-	}
-
-	// a direct 1-on-1 session runs in the room itself, so exactly one
-	// participant may be pre-authorized
-	if !features.GetAutoCreatePerUserSession() {
-		if len(allowedParticipantIds) > 1 {
-			log.Errorf("a direct AI session supports 1 allowed_participant_id, got %d", len(allowedParticipantIds))
-			return config.ErrAIAgentDirectSessionUsers
+	case plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_OPEN_PER_USER:
+		// per-user sessions open one breakout room per participant
+		if maxConc := aiAgentMaxConcurrentSessions(features); maxConc > 0 && allowedRooms > 0 && maxConc > allowedRooms {
+			log.Errorf("max_concurrent_sessions (%d) exceeds allowed_number_rooms (%d)", maxConc, allowedRooms)
+			return config.ErrAIAgentMaxConcurrentSessions
 		}
 		return nil
+	default:
+		// a normal room routes nothing automatically
+		return nil
 	}
-
-	// per-user sessions open one breakout room per participant
-	if limit := effectiveMaxAISessions(r.GetMetadata()); uint32(len(allowedParticipantIds)) > limit {
-		log.Errorf("%d allowed_participant_ids exceed the effective session limit (%d)", len(allowedParticipantIds), limit)
-		return config.ErrAIAgentMaxConcurrentSessions
-	}
-
-	return nil
 }
 
 // validateAITextChatMCPServers refuses AI text chat MCP servers that could never

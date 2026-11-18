@@ -151,8 +151,8 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 		// the AI agent's pre-authorized participant never waits; anybody else
 		// may only stay in the waiting room
 		aiFeatures := meta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()
-		if aiFeatures.GetIsAllow() && len(aiFeatures.GetAllowedParticipantIds()) > 0 {
-			if containsUserId(aiFeatures.GetAllowedParticipantIds(), g.GetUserInfo().GetUserId()) {
+		if allowedIds := aiAgentAllowedParticipantIds(aiFeatures); aiFeatures.GetIsAllow() && len(allowedIds) > 0 {
+			if containsUserId(allowedIds, g.GetUserInfo().GetUserId()) {
 				g.UserInfo.UserMetadata.WaitForApproval = false
 			} else if !meta.GetRoomFeatures().GetWaitingRoomFeatures().GetIsActive() {
 				log.Warnln("user is not allowed to join this AI session")
@@ -233,7 +233,7 @@ func (m *UserModel) AssignLockSettingsToUserFromRoom(g *plugnmeet.GenerateTokenR
 // leaving the child room looks the participant up there.
 func (m *UserModel) perUserAISessionRoom(ctx context.Context, g *plugnmeet.GenerateTokenReq, meta *plugnmeet.RoomMetadata, log *logrus.Entry) (string, error) {
 	aiFeatures := meta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()
-	if !aiFeatures.GetIsAllow() || !aiFeatures.GetAutoCreatePerUserSession() {
+	if !isAutoPerUserAISessionRoom(aiFeatures) {
 		return "", nil
 	}
 	// the parent lobby only routes participants, it never hosts them
