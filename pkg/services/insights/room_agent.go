@@ -34,12 +34,46 @@ type trackSubscription interface {
 }
 
 type activePipeline struct {
-	transcoder  *media.Transcoder
-	cancel      context.CancelFunc
-	identity    string
-	trackID     string
-	publication trackSubscription
-	muted       chan bool
+	transcoder     *media.Transcoder
+	cancel         context.CancelFunc
+	identity       string
+	participant    *lksdk.RemoteParticipant
+	participantSID string
+	trackID        string
+	publication    trackSubscription
+	muted          chan bool
+}
+
+// ownsParticipant reports whether the pipeline was built for this participant
+// object. A reconnect can replace the object, so a late event of the old one
+// must not touch the pipeline of the new one.
+func (p *activePipeline) ownsParticipant(rp *lksdk.RemoteParticipant) bool {
+	if p == nil || rp == nil {
+		return false
+	}
+
+	return p.participant == nil || p.participant == rp
+}
+
+// matchesParticipant reports whether the pipeline still serves the current
+// session of the participant. A reconnect can also swap only the SID of the
+// same object, so both the object and the SID have to match.
+func (p *activePipeline) matchesParticipant(rp *lksdk.RemoteParticipant) bool {
+	return p.ownsParticipant(rp) && matchesSID(p.participantSID, rp.SID())
+}
+
+// matchesSID reports whether a recorded SID still identifies the session. An
+// empty SID on either side is unknown, not a mismatch.
+func matchesSID(recorded, current string) bool {
+	return recorded == "" || current == "" || recorded == current
+}
+
+// staleFor reports whether the pipeline belongs to a newer session than the
+// subscription captured with participantSID. A pipeline set up concurrently for
+// a newer session wins, even when the SDK mutated the same participant object
+// in place, so the SID recorded at capture time is compared instead of rp.SID().
+func (p *activePipeline) staleFor(rp *lksdk.RemoteParticipant, participantSID string) bool {
+	return p != nil && (!p.ownsParticipant(rp) || !matchesSID(p.participantSID, participantSID))
 }
 
 // RoomAgent is a LiveKit client that acts on behalf of a specific insights service for a single room.
@@ -183,7 +217,10 @@ func newRoomAgent(args *RoomAgentArgs, task insights.Task) (*RoomAgent, error) {
 			OnTrackMuted:        agent.onTrackMuted,
 			OnTrackUnmuted:      agent.onTrackUnmuted,
 		},
-		OnDisconnected: agent.onDisconnected,
+		OnParticipantConnected:    agent.onParticipantConnected,
+		OnParticipantDisconnected: agent.onParticipantDisconnected,
+		OnReconnected:             agent.onReconnected,
+		OnDisconnected:            agent.onDisconnected,
 	})
 
 	if err := agent.Room.JoinWithToken(agent.conf.LivekitInfo.Host, token, lksdk.WithAutoSubscribe(false)); err != nil {
@@ -192,6 +229,12 @@ func newRoomAgent(args *RoomAgentArgs, task insights.Task) (*RoomAgent, error) {
 	}
 
 	log.Infof("Successfully connected with room %s", args.Payload.RoomId)
+
+	// Room-wide callers (the AI agent) never ask for activation explicitly, so
+	// subscribe participants that are already in the room. It is idempotent.
+	if args.Payload.CaptureAllParticipantsTracks {
+		agent.ActivateRoomWideTask()
+	}
 
 	// Start the synthesis task if enabled
 	if args.Payload.EnabledTranscriptionTransSynthesis && len(args.Payload.AllowedTransLangs) > 0 {
@@ -284,6 +327,9 @@ func (a *RoomAgent) ActivateRoomWideTask() {
 		return
 	}
 	a.logger.Info("activating room-wide track capture")
+	if a.Room == nil {
+		return
+	}
 
 	// Subscribe to all existing participants' microphone tracks only.
 	for _, p := range a.Room.GetRemoteParticipants() {
@@ -431,10 +477,118 @@ func (a *RoomAgent) cleanupFailedPipeline(primaryId string, pipeline *activePipe
 	a.logger.WithField("userId", primaryId).Errorln("insights task failed permanently in room-wide capture mode; transcription for this participant stopped until the track is published again")
 }
 
+// stopStalePipeline cancels a pipeline built on an older session of the
+// participant. A reconnect gives the participant a new object and SID, so the
+// old pipeline can never receive audio again.
+func (a *RoomAgent) stopStalePipeline(rp *lksdk.RemoteParticipant) {
+	if rp == nil {
+		return
+	}
+	primaryId := config.PrimaryIdentityFromNative(rp.Identity())
+
+	a.lock.Lock()
+	pipeline, ok := a.activePipelines[primaryId]
+	if !ok || pipeline.matchesParticipant(rp) {
+		a.lock.Unlock()
+		return
+	}
+	delete(a.activePipelines, primaryId)
+	a.lock.Unlock()
+
+	a.logger.WithFields(logrus.Fields{
+		"userId":        rp.Identity(),
+		"oldSid":        pipeline.participantSID,
+		"newSid":        rp.SID(),
+		"objectChanged": pipeline.participant != rp,
+	}).Infoln("participant reconnected with a new session, stopping previous insights pipeline")
+	pipeline.cancel()
+}
+
+// shouldSubscribeParticipantLocked reports whether this agent owns the
+// participant's microphone tracks.
+func (a *RoomAgent) shouldSubscribeParticipantLocked(identity, primaryId string) bool {
+	if a.payload.CaptureAllParticipantsTracks {
+		return a.isCaptureAllowed(identity)
+	}
+	_, ok := a.activeUserTasks[primaryId]
+
+	return ok
+}
+
+// onParticipantConnected is a LiveKit callback that triggers when a remote
+// participant joins, including after its own reconnect.
+func (a *RoomAgent) onParticipantConnected(rp *lksdk.RemoteParticipant) {
+	if rp == nil || a.isSystemAgent(rp.Identity()) {
+		return
+	}
+
+	a.stopStalePipeline(rp)
+
+	primaryId := config.PrimaryIdentityFromNative(rp.Identity())
+	a.lock.RLock()
+	shouldSubscribe := a.shouldSubscribeParticipantLocked(rp.Identity(), primaryId)
+	pipeline := a.activePipelines[primaryId]
+	a.lock.RUnlock()
+	if !shouldSubscribe {
+		return
+	}
+
+	for _, pub := range rp.TrackPublications() {
+		rt, ok := pub.(*lksdk.RemoteTrackPublication)
+		if !ok || !a.isMicrophoneOpusTrack(rt) {
+			continue
+		}
+		// A pipeline that already consumes this track is left alone.
+		if rt.IsSubscribed() && pipeline.matchesParticipant(rp) && pipeline.trackID == rt.SID() {
+			continue
+		}
+		if err := rt.SetSubscribed(true); err != nil {
+			a.logger.WithError(err).WithField("userId", rp.Identity()).Warn("failed to subscribe to microphone track")
+		}
+	}
+}
+
+// onParticipantDisconnected is a LiveKit callback that triggers when a remote
+// participant leaves. The task activation is kept, so a reconnect resumes it.
+func (a *RoomAgent) onParticipantDisconnected(rp *lksdk.RemoteParticipant) {
+	if rp == nil || a.isSystemAgent(rp.Identity()) {
+		return
+	}
+	primaryId := config.PrimaryIdentityFromNative(rp.Identity())
+
+	a.lock.Lock()
+	pipeline, ok := a.activePipelines[primaryId]
+	// A disconnect means the audio is gone for good, so only an event for a
+	// replaced participant object may be ignored.
+	if !ok || !pipeline.ownsParticipant(rp) {
+		a.lock.Unlock()
+		return
+	}
+	delete(a.activePipelines, primaryId)
+	a.lock.Unlock()
+
+	pipeline.cancel()
+	a.logger.WithField("userId", rp.Identity()).Infoln("stopped insights task pipeline due to participant disconnection")
+}
+
+// onReconnected is a LiveKit callback that triggers after the agent recovered
+// its own connection. The SDK re-creates remote participants, so every session
+// is re-checked and re-subscribed.
+func (a *RoomAgent) onReconnected() {
+	a.logger.Infoln("agent reconnected to room, re-syncing participants")
+	if a.Room == nil {
+		return
+	}
+
+	for _, rp := range a.Room.GetRemoteParticipants() {
+		a.onParticipantConnected(rp)
+	}
+}
+
 // onTrackPublished is a LiveKit callback that triggers when a remote participant publishes a track.
 func (a *RoomAgent) onTrackPublished(publication *lksdk.RemoteTrackPublication, rp *lksdk.RemoteParticipant) {
 	// We only transcribe the microphone track; ignore screen-share or other audio sources.
-	if !a.isMicrophoneOpusTrack(publication) {
+	if !a.isMicrophoneOpusTrack(publication) || rp == nil {
 		return
 	}
 
@@ -450,26 +604,19 @@ func (a *RoomAgent) onTrackPublished(publication *lksdk.RemoteTrackPublication, 
 		return
 	}
 
-	if a.payload.CaptureAllParticipantsTracks {
-		// a targeted room-wide task only captures the participants it names
-		if !a.isCaptureAllowed(rp.Identity()) {
-			log.Infoln("participant is not part of the targeted capture, ignoring track")
-			return
-		}
-		if err := publication.SetSubscribed(true); err != nil {
-			log.WithError(err).Warn("failed to subscribe to microphone track")
-		}
-		return
-	}
-
-	a.lock.RLock()
-	defer a.lock.RUnlock()
+	// This callback usually fires first on a reconnect, so it is the earliest
+	// place to stop a pipeline of a previous participant object or SID.
+	a.stopStalePipeline(rp)
 
 	primaryId := config.PrimaryIdentityFromNative(rp.Identity())
-	if _, ok := a.activeUserTasks[primaryId]; !ok {
+	a.lock.RLock()
+	shouldSubscribe := a.shouldSubscribeParticipantLocked(rp.Identity(), primaryId)
+	a.lock.RUnlock()
+
+	if !shouldSubscribe {
+		log.Infoln("participant is not part of this agent's capture, ignoring track")
 		return
 	}
-	// Intent and action share the lock, so an end cannot interleave.
 	if err := publication.SetSubscribed(true); err != nil {
 		log.WithError(err).Warn("failed to subscribe to microphone track")
 	}
@@ -478,9 +625,15 @@ func (a *RoomAgent) onTrackPublished(publication *lksdk.RemoteTrackPublication, 
 // onTrackSubscribed is a LiveKit callback that triggers when the agent successfully subscribes to a track.
 // It creates the audio processing pipeline and starts the insights.Task.
 func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lksdk.RemoteTrackPublication, rp *lksdk.RemoteParticipant) {
-	if !a.isMicrophoneOpusTrack(publication) {
+	if rp == nil || !a.isMicrophoneOpusTrack(publication) {
 		return
 	}
+
+	// Capture the session before building the transcoder below, which runs
+	// without the lock. The SDK mutates the participant in place on reconnect,
+	// so rp.SID() can already point at a newer session once the lock is taken.
+	participantSID := rp.SID()
+
 	a.logger.WithFields(logrus.Fields{
 		"userId":     rp.Identity(),
 		"kind":       publication.Kind(),
@@ -547,6 +700,24 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 	// If a pipeline already exists for this participant (e.g. track re-negotiation),
 	// cancel the previous one before replacing it to avoid a goroutine leak.
 	if prev, exists := a.activePipelines[primaryId]; exists {
+		if prev.staleFor(rp, participantSID) {
+			// A newer session owns the pipeline (it may have replaced the
+			// participant object or swapped its SID in place), so drop this
+			// subscription instead of cancelling a live pipeline.
+			a.lock.Unlock()
+			a.logger.WithFields(logrus.Fields{
+				"userId":       primaryId,
+				"staleSid":     participantSID,
+				"currentSid":   rp.SID(),
+				"pipelineSid":  prev.participantSID,
+				"staleTrackId": trackID,
+			}).Infoln("dropping track subscription overtaken by a newer participant session")
+			if err := publication.SetSubscribed(false); err != nil {
+				a.logger.WithError(err).WithField("userId", primaryId).Warn("failed to unsubscribe microphone track")
+			}
+			cancel()
+			return
+		}
 		a.logger.WithField("userId", primaryId).Warn("replacing existing insights pipeline for participant")
 		prev.cancel()
 	}
@@ -556,12 +727,14 @@ func (a *RoomAgent) onTrackSubscribed(track *webrtc.TrackRemote, publication *lk
 		muted <- true
 	}
 	pipeline := &activePipeline{
-		transcoder:  transcoder,
-		cancel:      cancel,
-		identity:    primaryId,
-		trackID:     trackID,
-		publication: publication,
-		muted:       muted,
+		transcoder:     transcoder,
+		cancel:         cancel,
+		identity:       primaryId,
+		participant:    rp,
+		participantSID: participantSID,
+		trackID:        trackID,
+		publication:    publication,
+		muted:          muted,
 	}
 	a.activePipelines[primaryId] = pipeline
 
@@ -615,6 +788,13 @@ func (a *RoomAgent) sendMuteState(pub lksdk.TrackPublication, p lksdk.Participan
 	if !ok || pipeline == nil || pipeline.muted == nil {
 		return
 	}
+	// Ignore mute events of a session or track the pipeline no longer consumes.
+	if pipeline.participantSID != "" && p.SID() != "" && pipeline.participantSID != p.SID() {
+		return
+	}
+	if pipeline.trackID != "" && pub.SID() != "" && pipeline.trackID != pub.SID() {
+		return
+	}
 
 	select {
 	case <-pipeline.muted:
@@ -629,29 +809,35 @@ func (a *RoomAgent) sendMuteState(pub lksdk.TrackPublication, p lksdk.Participan
 // onTrackUnsubscribed is a LiveKit callback that triggers when a track is unsubscribed.
 // It cleans up the audio processing pipeline for that track.
 func (a *RoomAgent) onTrackUnsubscribed(track *webrtc.TrackRemote, publication *lksdk.RemoteTrackPublication, rp *lksdk.RemoteParticipant) {
+	if rp == nil || publication == nil {
+		return
+	}
 	a.logger.WithFields(logrus.Fields{
 		"userId": rp.Identity(),
 		"kind":   publication.Kind(),
 		"name":   publication.Name(),
 	}).Infoln("onTrackUnsubscribed fired, closing related pipeline if exists")
 
-	a.lock.Lock()
-	trackID := publication.SID()
-	primaryId := config.PrimaryIdentityFromNative(rp.Identity())
+	a.stopPipelineForTrack(rp, publication.SID())
+}
 
-	pipeline, ok := a.activePipelines[primaryId]
-	if ok && pipeline.trackID == trackID {
-		// Remove from the map of active pipelines.
-		delete(a.activePipelines, primaryId)
-	} else {
-		ok = false
-	}
-	a.lock.Unlock()
-
-	if !ok {
-		// No active pipeline, nothing to do.
+// stopPipelineForTrack stops the pipeline of the participant if it still owns
+// the unsubscribed track. A late unsubscribe of a replaced participant or of
+// another track must not kill the pipeline that is currently running.
+func (a *RoomAgent) stopPipelineForTrack(rp *lksdk.RemoteParticipant, trackID string) {
+	if rp == nil {
 		return
 	}
+	primaryId := config.PrimaryIdentityFromNative(rp.Identity())
+
+	a.lock.Lock()
+	pipeline, ok := a.activePipelines[primaryId]
+	if !ok || pipeline.trackID != trackID || !pipeline.matchesParticipant(rp) {
+		a.lock.Unlock()
+		return
+	}
+	delete(a.activePipelines, primaryId)
+	a.lock.Unlock()
 
 	// Stop the transcoder and associated goroutines.
 	pipeline.cancel()
