@@ -137,6 +137,9 @@ const (
 	MsgAuthAIAgentTopicRequired    = "A topic is required to start the AI Assistant."
 	MsgAuthAIAgentProviderMissing  = "No AI provider is configured for the AI Assistant."
 	MsgAuthAIAgentInvalidMCPServer = "ai_agent_features.mcp_servers contains an invalid or disallowed server configuration"
+	// The session routing refusals of the same CreateRoom flow.
+	MsgAuthAIAgentAllowedUsersRequired  = "ai_agent_features.auto_session_config.allowed_participant_ids requires at least one participant user_id."
+	MsgAuthAIAgentMaxConcurrentSessions = "ai_agent_features.auto_session_config.max_concurrent_sessions is required for open per-user AI sessions."
 )
 
 // LTI (/lti) messages.
@@ -229,6 +232,9 @@ var integratorMsgs = map[string]string{
 	ErrAIAgentTopicRequired.Error():    MsgAuthAIAgentTopicRequired,
 	ErrAIAgentProviderMissing.Error():  MsgAuthAIAgentProviderMissing,
 	ErrAIAgentInvalidMCPServer.Error(): MsgAuthAIAgentInvalidMCPServer,
+	// session routing refusals of the same CreateRoom flow
+	ErrAIAgentAllowedUsersRequired.Error():  MsgAuthAIAgentAllowedUsersRequired,
+	ErrAIAgentMaxConcurrentSessions.Error(): MsgAuthAIAgentMaxConcurrentSessions,
 }
 
 // IntegratorMsg returns the curated English text for a message which was produced

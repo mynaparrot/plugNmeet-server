@@ -2,12 +2,11 @@ package models
 
 import (
 	"fmt"
-	"io"
 	"testing"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -123,6 +122,14 @@ func TestNormalizeAIAgentFeaturesPerSessionMode(t *testing.T) {
 		}
 	})
 
+	t.Run("open per user above the cap is clamped", func(t *testing.T) {
+		out := NormalizeAIAgentFeatures(agentFeatures(true, modeOpenPerUse, openPerUserConfig(utils.AIAgentMaxConcurrentSessionsCap+1)))
+
+		if got := out.GetAutoSessionConfig().GetMaxConcurrentSessions(); got != utils.AIAgentMaxConcurrentSessionsCap {
+			t.Errorf("max_concurrent_sessions = %d, want the cap of %d", got, utils.AIAgentMaxConcurrentSessionsCap)
+		}
+	})
+
 	t.Run("an explicit auto_start_agent false is kept", func(t *testing.T) {
 		for _, mode := range []plugnmeet.AIAgentSessionMode{modeControlled, modeOpenPerUse} {
 			out := NormalizeAIAgentFeatures(&plugnmeet.InsightsAIAgentFeatures{
@@ -202,9 +209,10 @@ func TestIsAutoPerUserAISessionRoom(t *testing.T) {
 		{name: "no features", features: nil, want: false},
 		{name: "agent not allowed", features: agentFeatures(false, modeOpenPerUse, nil), want: false},
 		{name: "normal room", features: agentFeatures(true, modeNormalRoom, nil), want: false},
-		{name: "controlled with one user", features: agentFeatures(true, modeControlled, controlledConfig("u1")), want: false},
+		{name: "controlled with one user", features: agentFeatures(true, modeControlled, controlledConfig("u1")), want: true},
 		{name: "controlled with two users", features: agentFeatures(true, modeControlled, controlledConfig("u1", "u2")), want: true},
 		{name: "controlled without users", features: agentFeatures(true, modeControlled, controlledConfig()), want: false},
+		{name: "controlled without a config", features: agentFeatures(true, modeControlled, nil), want: false},
 		{name: "open per user", features: agentFeatures(true, modeOpenPerUse, nil), want: true},
 	}
 
@@ -231,34 +239,56 @@ func TestEffectiveMaxAISessions(t *testing.T) {
 		want     uint32
 	}{
 		{
-			name:     "no limit anywhere",
+			name:     "no features at all",
 			metadata: &plugnmeet.RoomMetadata{},
-			want:     defaultMaxAIBreakoutSessions,
+			want:     utils.AIAgentMaxConcurrentSessionsCap,
 		},
 		{
-			name:     "allowed rooms only",
-			metadata: withBreakouts(10, agentFeatures(true, modeOpenPerUse, nil)),
-			want:     10,
-		},
-		{
-			name:     "concurrent sessions cap wins",
+			name:     "open per user uses its configured sessions",
 			metadata: withBreakouts(10, agentFeatures(true, modeOpenPerUse, openPerUserConfig(3))),
 			want:     3,
 		},
 		{
-			name:     "concurrent sessions above the room limit is ignored",
+			name:     "allowed rooms below the sessions are ignored",
 			metadata: withBreakouts(2, agentFeatures(true, modeOpenPerUse, openPerUserConfig(9))),
+			want:     9,
+		},
+		{
+			name:     "allowed rooms above the sessions are ignored",
+			metadata: withBreakouts(20, agentFeatures(true, modeOpenPerUse, openPerUserConfig(2))),
 			want:     2,
 		},
 		{
-			name:     "a controlled roster never caps the sessions",
-			metadata: withBreakouts(10, agentFeatures(true, modeControlled, controlledConfig("u1", "u2"))),
-			want:     10,
+			name:     "open per user is capped by the server",
+			metadata: withBreakouts(10, agentFeatures(true, modeOpenPerUse, openPerUserConfig(utils.AIAgentMaxConcurrentSessionsCap+4))),
+			want:     utils.AIAgentMaxConcurrentSessionsCap,
 		},
 		{
-			name:     "concurrent sessions in a normal room are ignored",
+			name:     "open per user without a limit gets the cap",
+			metadata: withBreakouts(4, agentFeatures(true, modeOpenPerUse, nil)),
+			want:     utils.AIAgentMaxConcurrentSessionsCap,
+		},
+		{
+			name:     "a controlled roster gets the cap",
+			metadata: withBreakouts(10, agentFeatures(true, modeControlled, controlledConfig("u1", "u2"))),
+			want:     utils.AIAgentMaxConcurrentSessionsCap,
+		},
+		{
+			name:     "a controlled roster ignores the allowed rooms",
+			metadata: withBreakouts(2, agentFeatures(true, modeControlled, controlledConfig("u1", "u2"))),
+			want:     utils.AIAgentMaxConcurrentSessionsCap,
+		},
+		{
+			name:     "a normal room ignores the concurrent sessions",
 			metadata: withBreakouts(4, agentFeatures(true, modeNormalRoom, openPerUserConfig(2))),
-			want:     4,
+			want:     utils.AIAgentMaxConcurrentSessionsCap,
+		},
+		{
+			name: "a room without breakout features gets the cap",
+			metadata: &plugnmeet.RoomMetadata{RoomFeatures: &plugnmeet.RoomCreateFeatures{
+				InsightsFeatures: &plugnmeet.InsightsFeatures{AiAgentFeatures: agentFeatures(true, modeControlled, controlledConfig("u1"))},
+			}},
+			want: utils.AIAgentMaxConcurrentSessionsCap,
 		},
 	}
 
@@ -299,9 +329,10 @@ func TestIsOneOnOneAIAgentRoom(t *testing.T) {
 		{name: "agent not allowed", meta: agentRoomMetadata(agentFeatures(false, modeControlled, controlledConfig("u1"))), want: false},
 		{name: "breakout room with agent", meta: breakout(agentRoomMetadata(agentFeatures(true, modeControlled, controlledConfig("u1")))), want: true},
 		{name: "breakout room without agent", meta: breakout(agentRoomMetadata(agentFeatures(false, modeNormalRoom, nil))), want: false},
-		{name: "controlled room with one participant", meta: agentRoomMetadata(agentFeatures(true, modeControlled, controlledConfig("u1"))), want: true},
-		{name: "controlled room with two participants", meta: agentRoomMetadata(agentFeatures(true, modeControlled, controlledConfig("u1", "u2"))), want: false},
-		{name: "controlled room without participants", meta: agentRoomMetadata(agentFeatures(true, modeControlled, controlledConfig())), want: false},
+		// a parent lobby never hosts a session, whatever its mode
+		{name: "controlled lobby with one participant", meta: agentRoomMetadata(agentFeatures(true, modeControlled, controlledConfig("u1"))), want: false},
+		{name: "controlled lobby with two participants", meta: agentRoomMetadata(agentFeatures(true, modeControlled, controlledConfig("u1", "u2"))), want: false},
+		{name: "controlled lobby without participants", meta: agentRoomMetadata(agentFeatures(true, modeControlled, controlledConfig())), want: false},
 		{name: "normal room", meta: agentRoomMetadata(agentFeatures(true, modeNormalRoom, nil)), want: false},
 		{name: "parent lobby of per-user sessions", meta: agentRoomMetadata(agentFeatures(true, modeOpenPerUse, nil)), want: false},
 	}
@@ -315,93 +346,50 @@ func TestIsOneOnOneAIAgentRoom(t *testing.T) {
 	}
 }
 
-func TestValidateAIAgentSessionLimits(t *testing.T) {
-	request := func(features *plugnmeet.InsightsAIAgentFeatures, allowedRooms uint32) *plugnmeet.CreateRoomReq {
-		return &plugnmeet.CreateRoomReq{Metadata: &plugnmeet.RoomMetadata{
-			RoomFeatures: &plugnmeet.RoomCreateFeatures{
-				BreakoutRoomFeatures: &plugnmeet.BreakoutRoomFeatures{IsAllow: true, AllowedNumberRooms: allowedRooms},
-				InsightsFeatures:     &plugnmeet.InsightsFeatures{AiAgentFeatures: features},
-			},
-		}}
-	}
-
+func TestValidateAIAgentSessionMode(t *testing.T) {
 	tests := []struct {
-		name    string
-		req     *plugnmeet.CreateRoomReq
-		wantErr error
+		name     string
+		features *plugnmeet.InsightsAIAgentFeatures
+		wantErr  error
 	}{
+		{name: "normal room", features: agentFeatures(true, modeNormalRoom, nil)},
+		{name: "controlled users with a roster", features: agentFeatures(true, modeControlled, controlledConfig("u1"))},
 		{
-			name: "normal room needs no sessions",
-			req:  request(agentFeatures(true, modeNormalRoom, nil), 4),
+			name:     "controlled users without a roster",
+			features: agentFeatures(true, modeControlled, nil),
+			wantErr:  config.ErrAIAgentAllowedUsersRequired,
 		},
 		{
-			name:    "controlled users without a roster",
-			req:     request(agentFeatures(true, modeControlled, nil), 4),
-			wantErr: config.ErrAIAgentAllowedUsersRequired,
+			name:     "controlled users with blank ids",
+			features: agentFeatures(true, modeControlled, controlledConfig("  ", "")),
+			wantErr:  config.ErrAIAgentAllowedUsersRequired,
+		},
+		{name: "open per user with a limit", features: agentFeatures(true, modeOpenPerUse, openPerUserConfig(3))},
+		{name: "open per user at the cap", features: agentFeatures(true, modeOpenPerUse, openPerUserConfig(utils.AIAgentMaxConcurrentSessionsCap))},
+		{
+			name:     "open per user without a limit",
+			features: agentFeatures(true, modeOpenPerUse, openPerUserConfig(0)),
+			wantErr:  config.ErrAIAgentMaxConcurrentSessions,
 		},
 		{
-			name:    "controlled users with an empty roster",
-			req:     request(agentFeatures(true, modeControlled, controlledConfig()), 4),
-			wantErr: config.ErrAIAgentAllowedUsersRequired,
+			// the value is clamped by normalizeAIAgentAutoSessionConfig
+			name:     "open per user above the cap",
+			features: agentFeatures(true, modeOpenPerUse, openPerUserConfig(utils.AIAgentMaxConcurrentSessionsCap+1)),
 		},
 		{
-			name: "controlled users with a single participant",
-			req:  request(agentFeatures(true, modeControlled, controlledConfig("u1")), 4),
-		},
-		{
-			name: "controlled roster larger than the room limit is accepted",
-			req:  request(agentFeatures(true, modeControlled, controlledConfig("u1", "u2", "u3", "u4", "u5")), 2),
-		},
-		{
-			name: "open per user within the room limit",
-			req:  request(agentFeatures(true, modeOpenPerUse, openPerUserConfig(2)), 2),
-		},
-		{
-			name:    "open per user above the room limit",
-			req:     request(agentFeatures(true, modeOpenPerUse, openPerUserConfig(3)), 2),
-			wantErr: config.ErrAIAgentMaxConcurrentSessions,
-		},
-		{
-			name: "open per user without a limit",
-			req:  request(agentFeatures(true, modeOpenPerUse, nil), 1),
+			name:     "an unknown mode",
+			features: agentFeatures(true, plugnmeet.AIAgentSessionMode(9), nil),
+			wantErr:  config.ErrAIAgentInvalidRequest,
 		},
 	}
-
-	logger := logrus.New()
-	logger.SetOutput(io.Discard)
-	log := logger.WithField("test", t.Name())
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := &RoomModel{}
-			err := m.validateAIAgentSessionLimits(tt.req, tt.req.GetMetadata().GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures(), log)
-			if tt.wantErr == nil {
-				if err != nil {
-					t.Fatalf("validateAIAgentSessionLimits() = %v, want nil", err)
-				}
-				return
-			}
+			err := ValidateAIAgentSessionMode(tt.features)
 			if err != tt.wantErr {
-				t.Fatalf("validateAIAgentSessionLimits() = %v, want %v", err, tt.wantErr)
+				t.Fatalf("ValidateAIAgentSessionMode() = %v, want %v", err, tt.wantErr)
 			}
 		})
-	}
-}
-
-func TestValidateAIAgentSessionLimitsSkipsBreakoutRooms(t *testing.T) {
-	req := &plugnmeet.CreateRoomReq{Metadata: &plugnmeet.RoomMetadata{
-		IsBreakoutRoom: true,
-		RoomFeatures: &plugnmeet.RoomCreateFeatures{
-			InsightsFeatures: &plugnmeet.InsightsFeatures{AiAgentFeatures: agentFeatures(true, modeControlled, nil)},
-		},
-	}}
-
-	logger := logrus.New()
-	logger.SetOutput(io.Discard)
-
-	m := &RoomModel{}
-	if err := m.validateAIAgentSessionLimits(req, req.GetMetadata().GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures(), logger.WithField("test", t.Name())); err != nil {
-		t.Fatalf("validateAIAgentSessionLimits() = %v, want nil for a breakout room", err)
 	}
 }
 
@@ -415,8 +403,12 @@ func TestApplyAIAgentRoomDefaults(t *testing.T) {
 		}}
 	}
 
-	t.Run("a normal room is left alone", func(t *testing.T) {
+	t.Run("a normal room only gets its breakout rooms enabled", func(t *testing.T) {
 		req := newRequest(agentFeatures(true, modeNormalRoom, controlledConfig("u1", "u2")))
+		req.Metadata.RoomFeatures.AllowWebcams = true
+		req.Metadata.RoomFeatures.AllowScreenShare = true
+		req.Metadata.RoomFeatures.AllowRaiseHand = new(true)
+		req.Metadata.RoomFeatures.AllowReactions = new(true)
 		(&RoomModel{}).applyAIAgentRoomDefaults(req)
 
 		features := req.GetMetadata().GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()
@@ -426,48 +418,111 @@ func TestApplyAIAgentRoomDefaults(t *testing.T) {
 		if req.GetMetadata().GetDefaultLockSettings() != nil {
 			t.Error("default lock settings were applied to a normal room")
 		}
-		if req.GetMetadata().GetRoomFeatures().GetBreakoutRoomFeatures().GetIsAllow() {
-			t.Error("breakout rooms were enabled for a normal room")
+		roomFeatures := req.GetMetadata().GetRoomFeatures()
+		if !roomFeatures.GetAllowWebcams() || !roomFeatures.GetAllowScreenShare() ||
+			!roomFeatures.GetAllowRaiseHand() || !roomFeatures.GetAllowReactions() {
+			t.Errorf("room features = %v, want the host values untouched", roomFeatures)
+		}
+		if !req.GetMetadata().GetRoomFeatures().GetBreakoutRoomFeatures().GetIsAllow() {
+			t.Error("breakout rooms = false, want them enabled for an AI agent room")
 		}
 	})
 
-	t.Run("a controlled roster locks the device defaults", func(t *testing.T) {
+	t.Run("a controlled roster disables the unused room features", func(t *testing.T) {
 		req := newRequest(agentFeatures(true, modeControlled, controlledConfig("u1")))
 		(&RoomModel{}).applyAIAgentRoomDefaults(req)
 
-		locks := req.GetMetadata().GetDefaultLockSettings()
-		if !locks.GetLockWebcam() || !locks.GetLockScreenSharing() {
-			t.Errorf("locks = %v, want webcam and screen sharing locked", locks)
-		}
-		if req.GetMetadata().GetRoomFeatures().GetBreakoutRoomFeatures().GetIsAllow() {
-			t.Error("breakout rooms were enabled for a single-participant room")
+		assertAIAgentSessionRoomFeatures(t, req.GetMetadata())
+		if !req.GetMetadata().GetRoomFeatures().GetBreakoutRoomFeatures().GetIsAllow() {
+			t.Error("breakout rooms = false, want them enabled for an AI agent room")
 		}
 	})
 
-	t.Run("per-user sessions need breakout rooms", func(t *testing.T) {
+	t.Run("a disabled breakout room is enabled without a room limit", func(t *testing.T) {
 		req := newRequest(agentFeatures(true, modeOpenPerUse, openPerUserConfig(2)))
 		(&RoomModel{}).applyAIAgentRoomDefaults(req)
 
-		locks := req.GetMetadata().GetDefaultLockSettings()
-		if !locks.GetLockWebcam() || !locks.GetLockScreenSharing() {
-			t.Errorf("locks = %v, want webcam and screen sharing locked", locks)
+		assertAIAgentSessionRoomFeatures(t, req.GetMetadata())
+		breakout := req.GetMetadata().GetRoomFeatures().GetBreakoutRoomFeatures()
+		if !breakout.GetIsAllow() {
+			t.Error("breakout rooms = false, want them enabled")
 		}
-		if !req.GetMetadata().GetRoomFeatures().GetBreakoutRoomFeatures().GetIsAllow() {
-			t.Error("breakout rooms were not enabled for per-user sessions")
+		if breakout.GetAllowedNumberRooms() != 0 {
+			t.Errorf("allowed_number_rooms = %d, want the host value 0 untouched", breakout.GetAllowedNumberRooms())
 		}
+	})
+
+	t.Run("the host room limit is never touched", func(t *testing.T) {
+		for _, allowed := range []uint32{2, 8} {
+			req := newRequest(agentFeatures(true, modeOpenPerUse, openPerUserConfig(9)))
+			req.Metadata.RoomFeatures.BreakoutRoomFeatures = &plugnmeet.BreakoutRoomFeatures{IsAllow: true, AllowedNumberRooms: allowed}
+			(&RoomModel{}).applyAIAgentRoomDefaults(req)
+
+			if got := req.GetMetadata().GetRoomFeatures().GetBreakoutRoomFeatures().GetAllowedNumberRooms(); got != allowed {
+				t.Errorf("allowed_number_rooms = %d, want the host value %d", got, allowed)
+			}
+		}
+	})
+
+	t.Run("a breakout room keeps its features", func(t *testing.T) {
+		req := newRequest(agentFeatures(true, modeOpenPerUse, openPerUserConfig(4)))
+		req.Metadata.IsBreakoutRoom = true
+		(&RoomModel{}).applyAIAgentRoomDefaults(req)
+
+		if req.GetMetadata().GetRoomFeatures().GetBreakoutRoomFeatures().GetIsAllow() {
+			t.Error("breakout rooms were enabled inside a breakout room")
+		}
+	})
+
+	t.Run("an active waiting room is disabled", func(t *testing.T) {
+		req := newRequest(agentFeatures(true, modeControlled, controlledConfig("u1")))
+		req.Metadata.RoomFeatures.WaitingRoomFeatures = &plugnmeet.WaitingRoomFeatures{IsActive: true}
+		(&RoomModel{}).applyAIAgentRoomDefaults(req)
+
+		assertAIAgentSessionRoomFeatures(t, req.GetMetadata())
 	})
 
 	t.Run("an existing lock setting wins", func(t *testing.T) {
 		req := newRequest(agentFeatures(true, modeControlled, controlledConfig("u1")))
-		req.Metadata.DefaultLockSettings = &plugnmeet.LockSettings{LockWebcam: new(false)}
+		req.Metadata.DefaultLockSettings = &plugnmeet.LockSettings{LockWebcam: new(true)}
 		(&RoomModel{}).applyAIAgentRoomDefaults(req)
 
 		locks := req.GetMetadata().GetDefaultLockSettings()
-		if locks.GetLockWebcam() {
-			t.Error("lock_webcam = true, want the host value false")
+		if !locks.GetLockWebcam() {
+			t.Error("lock_webcam = false, want the host value true")
 		}
-		if !locks.GetLockScreenSharing() {
-			t.Error("lock_screen_sharing = false, want the default true")
+		if !locks.GetLockPrivateChat() {
+			t.Error("lock_private_chat = false, want the default true")
 		}
 	})
+}
+
+// assertAIAgentSessionRoomFeatures checks the feature set an AI agent session
+// room must carry: the unused features and the waiting room are disabled and
+// private chat is locked.
+func assertAIAgentSessionRoomFeatures(t *testing.T, meta *plugnmeet.RoomMetadata) {
+	t.Helper()
+	rf := meta.GetRoomFeatures()
+	if rf.GetAllowWebcams() {
+		t.Error("allow_webcams = true, want it disabled")
+	}
+	if rf.GetWaitingRoomFeatures().GetIsActive() {
+		t.Error("waiting_room_features.is_active = true, want it disabled")
+	}
+	if rf.GetAllowScreenShare() {
+		t.Error("allow_screen_share = true, want it disabled")
+	}
+	if rf.GetAllowRaiseHand() {
+		t.Error("allow_raise_hand = true, want it disabled")
+	}
+	if rf.GetAllowReactions() {
+		t.Error("allow_reactions = true, want it disabled")
+	}
+	locks := meta.GetDefaultLockSettings()
+	if !locks.GetLockPrivateChat() {
+		t.Error("lock_private_chat = false, want it locked")
+	}
+	if locks.GetLockWebcam() || locks.GetLockScreenSharing() {
+		t.Errorf("locks = %v, want the webcam and screen share disabled via room features, not locked", locks)
+	}
 }

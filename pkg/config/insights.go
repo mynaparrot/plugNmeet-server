@@ -135,9 +135,11 @@ func (c *InsightsConfig) GetProviderAccountForService(serviceType insights.Servi
 	return nil, nil, fmt.Errorf("account with id '%s' not found for provider '%s'", serviceConfig.ID, serviceConfig.Provider)
 }
 
-// GetServiceModelPricing is a helper to get pricing for a specific model within a service.
-// If a price for the specific modelName is not found, it will fall back to looking for a "default" price.
-func (c *InsightsConfig) GetServiceModelPricing(serviceType insights.ServiceType, modelName string) (*ModelPricing, error) {
+// GetServiceModelPricing returns the pricing of the first pricing key that is
+// configured for the service, in the given order. A service can price usage by
+// role (e.g. "realtime_model") or by concrete model name. If none of the keys
+// matches, it falls back to the "default" price.
+func (c *InsightsConfig) GetServiceModelPricing(serviceType insights.ServiceType, pricingKeys ...string) (*ModelPricing, error) {
 	// 1. Get the service configuration
 	serviceConfig, configOk := c.Services[serviceType]
 	if !configOk {
@@ -149,16 +151,21 @@ func (c *InsightsConfig) GetServiceModelPricing(serviceType insights.ServiceType
 		return nil, fmt.Errorf("pricing config block not found for service '%s'", serviceType)
 	}
 
-	// 3. Find the pricing for the specific model.
-	if pricing, ok := serviceConfig.Pricing[modelName]; ok {
-		// Make a safe copy to return to avoid returning a pointer to local range/map temporary copy
-		return new(pricing), nil
+	// 3. Find the pricing for the first configured key.
+	for _, key := range pricingKeys {
+		if key == "" {
+			continue
+		}
+		if pricing, ok := serviceConfig.Pricing[key]; ok {
+			// Make a safe copy to return to avoid returning a pointer to local range/map temporary copy
+			return new(pricing), nil
+		}
 	}
 
-	// 4. If a specific model price is not found, fall back to "default".
+	// 4. If no key is priced, fall back to "default".
 	if pricing, ok := serviceConfig.Pricing["default"]; ok {
 		return new(pricing), nil
 	}
 
-	return nil, fmt.Errorf("pricing config not found for model '%s' (or default) in service '%s'", modelName, serviceType)
+	return nil, fmt.Errorf("pricing config not found for %v (or default) in service '%s'", pricingKeys, serviceType)
 }

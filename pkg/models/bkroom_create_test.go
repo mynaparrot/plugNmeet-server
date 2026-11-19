@@ -129,8 +129,138 @@ func TestAppendBreakoutAIContext(t *testing.T) {
 	}
 }
 
+// TestApplyBreakoutChildRoomFeatures covers the difference between an auto
+// per-user 1-on-1 AI session room and a regular breakout room: only the former
+// keeps the learner inside and keeps the parent's logout url.
+func TestApplyBreakoutChildRoomFeatures(t *testing.T) {
+	parentFeatures := func(mode plugnmeet.AIAgentSessionMode, allowedIds ...string) *plugnmeet.InsightsAIAgentFeatures {
+		return &plugnmeet.InsightsAIAgentFeatures{
+			IsAllow:     mode != plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_NORMAL_ROOM,
+			SessionMode: mode,
+			AutoSessionConfig: &plugnmeet.AIAgentAutoSessionConfig{
+				AllowedParticipantIds: allowedIds,
+			},
+		}
+	}
+	logoutUrl := "https://example.com/exit"
+	normal := plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_NORMAL_ROOM
+	controlled := plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_CONTROLLED_USERS
+	openPerUser := plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_OPEN_PER_USER
+
+	tests := []struct {
+		name                  string
+		req                   *plugnmeet.CreateBreakoutRoomsReq
+		parent                *plugnmeet.InsightsAIAgentFeatures
+		wantAllowReturnToMain bool
+		wantAllowSelfSelect   bool
+		wantIsPerUserAiSess   bool
+		wantLogoutUrl         string
+	}{
+		{
+			name: "normal breakout room",
+			req: &plugnmeet.CreateBreakoutRoomsReq{
+				AllowReturnToMainRoom: true,
+				AllowSelfSelect:       true,
+			},
+			parent:                parentFeatures(normal),
+			wantAllowReturnToMain: true,
+			wantAllowSelfSelect:   true,
+		},
+		{
+			name: "normal-session AI breakout room keeps returning allowed",
+			req: &plugnmeet.CreateBreakoutRoomsReq{
+				AllowReturnToMainRoom: true,
+				EnableAiAgent:         true,
+			},
+			parent:                parentFeatures(normal),
+			wantAllowReturnToMain: true,
+			wantAllowSelfSelect:   false,
+		},
+		{
+			name: "normal-session AI breakout room keeps returning disabled",
+			req: &plugnmeet.CreateBreakoutRoomsReq{
+				AllowReturnToMainRoom: false,
+				EnableAiAgent:         true,
+			},
+			parent:                parentFeatures(normal),
+			wantAllowReturnToMain: false,
+			wantAllowSelfSelect:   false,
+		},
+		{
+			name: "auto per-user AI session room",
+			req: &plugnmeet.CreateBreakoutRoomsReq{
+				AllowReturnToMainRoom: true,
+				EnableAiAgent:         true,
+			},
+			parent:                parentFeatures(openPerUser),
+			wantAllowReturnToMain: false,
+			wantAllowSelfSelect:   false,
+			wantIsPerUserAiSess:   true,
+			wantLogoutUrl:         logoutUrl,
+		},
+		{
+			name: "controlled users with several participants is a per-user session",
+			req: &plugnmeet.CreateBreakoutRoomsReq{
+				AllowReturnToMainRoom: true,
+				EnableAiAgent:         true,
+			},
+			parent:                parentFeatures(controlled, "u1", "u2"),
+			wantAllowReturnToMain: false,
+			wantAllowSelfSelect:   false,
+			wantIsPerUserAiSess:   true,
+			wantLogoutUrl:         logoutUrl,
+		},
+		{
+			name: "controlled users with a single participant is a per-user session",
+			req: &plugnmeet.CreateBreakoutRoomsReq{
+				AllowReturnToMainRoom: true,
+				EnableAiAgent:         true,
+			},
+			parent:                parentFeatures(controlled, "u1"),
+			wantAllowReturnToMain: false,
+			wantAllowSelfSelect:   false,
+			wantIsPerUserAiSess:   true,
+			wantLogoutUrl:         logoutUrl,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			meta := &plugnmeet.RoomMetadata{
+				LogoutUrl:    new(logoutUrl),
+				RoomFeatures: &plugnmeet.RoomCreateFeatures{},
+			}
+			isPerUserAISession := tt.req.GetEnableAiAgent() && isAutoPerUserAISessionRoom(tt.parent)
+
+			applyBreakoutChildRoomFeatures(meta, tt.req, isPerUserAISession)
+
+			features := meta.GetRoomFeatures().GetBreakoutRoomFeatures()
+			if features.GetIsAllow() {
+				t.Error("a breakout child room must not host its own breakout rooms")
+			}
+			if got := features.GetAllowReturnToMainRoom(); got != tt.wantAllowReturnToMain {
+				t.Errorf("allow_return_to_main_room = %v, want %v", got, tt.wantAllowReturnToMain)
+			}
+			if got := features.GetAllowSelfSelect(); got != tt.wantAllowSelfSelect {
+				t.Errorf("allow_self_select = %v, want %v", got, tt.wantAllowSelfSelect)
+			}
+			if got := features.GetIsPerUserAiSession(); got != tt.wantIsPerUserAiSess {
+				t.Errorf("is_per_user_ai_session = %v, want %v", got, tt.wantIsPerUserAiSess)
+			}
+			if got := meta.GetLogoutUrl(); got != tt.wantLogoutUrl {
+				t.Errorf("logout_url = %q, want %q", got, tt.wantLogoutUrl)
+			}
+		})
+	}
+}
+
 func TestPrepareAIAgentBreakoutChildKeepsParentPrompt(t *testing.T) {
-	meta := &plugnmeet.RoomMetadata{RoomFeatures: &plugnmeet.RoomCreateFeatures{
+	// the create loop marks the shared child metadata as a breakout room first
+	meta := &plugnmeet.RoomMetadata{IsBreakoutRoom: true, RoomFeatures: &plugnmeet.RoomCreateFeatures{
+		AllowWebcams:     true,
+		AllowScreenShare: true,
+		AllowRaiseHand:   new(true),
+		AllowReactions:   new(true),
 		InsightsFeatures: &plugnmeet.InsightsFeatures{AiAgentFeatures: &plugnmeet.InsightsAIAgentFeatures{
 			IsAllow:         true,
 			IsEnabled:       true,
@@ -169,9 +299,6 @@ func TestPrepareAIAgentBreakoutChildKeepsParentPrompt(t *testing.T) {
 		if features.GetSessionMode() != plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_CONTROLLED_USERS {
 			t.Errorf("%s: session_mode = %v, want CONTROLLED_USERS", userId, features.GetSessionMode())
 		}
-		if isAutoPerUserAISessionRoom(features) {
-			t.Errorf("%s: the child room is not a per-user room anymore", userId)
-		}
 		if !aiAgentAutoStart(features) {
 			t.Errorf("%s: auto_start_agent = false, want the inherited default true", userId)
 		}
@@ -179,6 +306,10 @@ func TestPrepareAIAgentBreakoutChildKeepsParentPrompt(t *testing.T) {
 			t.Errorf("%s: allowed participant ids = %v, want only that user", userId, ids)
 		}
 	}
+	if !isOneOnOneAIAgentRoom(meta) {
+		t.Error("the child room is not a 1-on-1 AI session room")
+	}
+	assertAIAgentSessionRoomFeatures(t, meta)
 }
 
 func TestPrepareAIAgentBreakoutChildAutoStart(t *testing.T) {
@@ -222,11 +353,16 @@ func TestPrepareAIAgentBreakoutChildAutoStart(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			meta := &plugnmeet.RoomMetadata{RoomFeatures: &plugnmeet.RoomCreateFeatures{
+				AllowWebcams:     true,
+				AllowScreenShare: true,
+				AllowRaiseHand:   new(true),
+				AllowReactions:   new(true),
 				InsightsFeatures: &plugnmeet.InsightsFeatures{AiAgentFeatures: tt.parent},
 			}}
 
 			prepareAIAgentBreakoutChild(tt.parent, meta, "user-1", "", "")
 
+			assertAIAgentSessionRoomFeatures(t, meta)
 			child := meta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()
 			if child.GetSessionMode() != plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_CONTROLLED_USERS {
 				t.Fatalf("child session_mode = %v, want CONTROLLED_USERS", child.GetSessionMode())

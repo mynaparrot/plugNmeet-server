@@ -44,6 +44,30 @@ func (m *BreakoutRoomModel) hasParentRoomReference(roomId, parentRoomId string) 
 	return err == nil && plainParentRoomId == parentRoomId
 }
 
+// breakoutBlocksReturnToMainRoom reports whether a learner may not return to the
+// main room right now. A per-user 1-on-1 AI session room never returns to its
+// parent, because its learner started there. In a normal session only a running
+// breakout room can hold a learner back, so once the room has ended (the host
+// ended it or its duration ran out) the learner always gets back to the main room.
+func breakoutBlocksReturnToMainRoom(parentMeta, childMeta *plugnmeet.RoomMetadata, childActive bool) bool {
+	if childMeta == nil {
+		return false
+	}
+	if isAutoPerUserAISessionRoom(parentMeta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()) {
+		return true
+	}
+	// the child metadata carries the same decision, so both sides always agree
+	if childMeta.GetRoomFeatures().GetBreakoutRoomFeatures().GetIsPerUserAiSession() {
+		return true
+	}
+	if !childActive {
+		return false
+	}
+	features := childMeta.GetRoomFeatures().GetBreakoutRoomFeatures()
+
+	return !features.GetAllowReturnToMainRoom() && !features.GetAllowSelfSelect()
+}
+
 // BackToMainRoom issues a fresh parent-room join token for a participant
 // returning from a breakout room. The parent comes from the client-supplied parent_room_id.
 func (m *BreakoutRoomModel) BackToMainRoom(ctx context.Context, r *plugnmeet.BackToMainRoomReq) (string, error) {
@@ -94,6 +118,21 @@ func (m *BreakoutRoomModel) BackToMainRoom(ctx context.Context, r *plugnmeet.Bac
 	if p == nil || pmeta == nil {
 		log.Error("failed to get user info from main room")
 		return "", config.ErrBkRoomUnexpectedError
+	}
+	// A learner of a per-user 1-on-1 AI session (or of a breakout room that is
+	// still running with returning disabled) must not mint a main room token;
+	// an admin may always return.
+	if !pmeta.GetIsAdmin() {
+		childRoom, childMeta, cErr := m.natsService.GetRoomInfoWithMetadata(r.RoomId)
+		if cErr != nil || childMeta == nil {
+			log.WithError(cErr).Error("failed to get the breakout room info")
+			return "", config.ErrBkRoomUnexpectedError
+		}
+		childActive := childRoom != nil && m.natsService.IsRoomStatusActive(childRoom.Status)
+		if breakoutBlocksReturnToMainRoom(mainMeta, childMeta, childActive) {
+			log.Warn("return to main room is not allowed for this participant")
+			return "", config.ErrBkRoomReturnToMainRoomNotAllowed
+		}
 	}
 	// let GetPNMJoinToken to set IsPresenter value
 	pmeta.IsPresenter = false

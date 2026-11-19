@@ -14,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/nats-io/nats.go"
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
@@ -481,6 +482,11 @@ func normalizeAIAgentAutoSessionConfig(out *plugnmeet.InsightsAIAgentFeatures) {
 			out.AutoSessionConfig = &plugnmeet.AIAgentAutoSessionConfig{}
 		}
 		out.AutoSessionConfig.AllowedParticipantIds = nil
+		// the server opens at most the cap sessions, so a higher host value is
+		// clamped instead of refused
+		if out.AutoSessionConfig.GetMaxConcurrentSessions() > utils.AIAgentMaxConcurrentSessionsCap {
+			out.AutoSessionConfig.MaxConcurrentSessions = utils.AIAgentMaxConcurrentSessionsCap
+		}
 		if out.AutoSessionConfig.AutoStartAgent == nil {
 			out.AutoSessionConfig.AutoStartAgent = new(true)
 		}
@@ -528,7 +534,7 @@ func aiAgentAutoStart(f *plugnmeet.InsightsAIAgentFeatures) bool {
 
 // isAutoPerUserAISessionRoom reports whether every participant gets their own
 // 1-on-1 session room: always in open-per-user mode, and in controlled-users
-// mode only when more than one participant is pre-authorized.
+// mode whenever at least one participant is pre-authorized.
 func isAutoPerUserAISessionRoom(f *plugnmeet.InsightsAIAgentFeatures) bool {
 	if !f.GetIsAllow() {
 		return false
@@ -538,7 +544,7 @@ func isAutoPerUserAISessionRoom(f *plugnmeet.InsightsAIAgentFeatures) bool {
 	case plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_OPEN_PER_USER:
 		return true
 	case plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_CONTROLLED_USERS:
-		return len(f.GetAutoSessionConfig().GetAllowedParticipantIds()) > 1
+		return len(f.GetAutoSessionConfig().GetAllowedParticipantIds()) > 0
 	default:
 		return false
 	}
@@ -658,7 +664,30 @@ func (m *AIAgentModel) ValidateAIAgentFeatures(f *plugnmeet.InsightsAIAgentFeatu
 		return err
 	}
 
-	return nil
+	return ValidateAIAgentSessionMode(f)
+}
+
+// ValidateAIAgentSessionMode enforces the session routing rules: the mode must be
+// known, and the auto session config it needs must be usable.
+func ValidateAIAgentSessionMode(f *plugnmeet.InsightsAIAgentFeatures) error {
+	switch f.GetSessionMode() {
+	case plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_NORMAL_ROOM:
+		return nil
+	case plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_CONTROLLED_USERS:
+		if len(cleanAllowedParticipantIds(f.GetAutoSessionConfig().GetAllowedParticipantIds())) == 0 {
+			return config.ErrAIAgentAllowedUsersRequired
+		}
+		return nil
+	case plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_OPEN_PER_USER:
+		// a value above the cap is clamped, only a missing one is refused
+		if aiAgentMaxConcurrentSessions(f) == 0 {
+			return config.ErrAIAgentMaxConcurrentSessions
+		}
+		return nil
+	default:
+		// a mode this server does not know can never be routed
+		return config.ErrAIAgentInvalidRequest
+	}
 }
 
 // ValidateExternalMCPServers only checks the shape of the endpoints: https, port
@@ -836,23 +865,12 @@ func (m *AIAgentModel) PrepareRoomExternalMCP(ctx context.Context, roomId string
 	mcp.WarmRoomExternalMCP(ctx, m.redisService, roomId, servers, agentFeatures.GetMaxSessionSeconds(), m.logger)
 }
 
-// isOneOnOneAIAgentRoom reports whether the voice agent may run in this room: a
-// breakout room is always a 1-on-1 session room, while a normal room only when
-// it has exactly one pre-authorized participant and no per-user sessions.
+// isOneOnOneAIAgentRoom reports whether the voice agent may run in this room.
+// Every AI session runs inside its own 1-on-1 breakout room, so a group room and
+// the parent lobby of per-user sessions are never session rooms.
 func isOneOnOneAIAgentRoom(meta *plugnmeet.RoomMetadata) bool {
-	if meta == nil {
-		return false
-	}
-	aiFeatures := meta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()
-	if !aiFeatures.GetIsAllow() {
-		return false
-	}
-	if meta.GetIsBreakoutRoom() {
-		return true
-	}
-
-	return aiFeatures.GetSessionMode() == plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_CONTROLLED_USERS &&
-		len(aiAgentAllowedParticipantIds(aiFeatures)) == 1
+	return meta.GetIsBreakoutRoom() &&
+		meta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures().GetIsAllow()
 }
 
 // roomAgentFeatures returns the room's normalized AI agent features, or nil when

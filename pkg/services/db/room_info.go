@@ -78,6 +78,35 @@ func (s *DatabaseService) GetActiveRoomsInfo(ctx context.Context) ([]dbmodels.Ro
 	return rooms, nil
 }
 
+// GetActiveBreakoutRoomsByParentRef returns the running breakout rooms of the
+// parent room identified by parentRoomRef, which must be built with
+// helpers.FormatBreakoutParentRoomRef so that only the children of that exact
+// parent row are matched.
+func (s *DatabaseService) GetActiveBreakoutRoomsByParentRef(ctx context.Context, parentRoomRef string) ([]dbmodels.RoomInfo, error) {
+	// an empty reference would be dropped from the struct condition as a zero
+	// value, turning the query into "all running breakout rooms"
+	if parentRoomRef == "" {
+		return nil, nil
+	}
+
+	var rooms []dbmodels.RoomInfo
+	cond := &dbmodels.RoomInfo{
+		IsRunning:      1,
+		IsBreakoutRoom: 1,
+		ParentRoomID:   parentRoomRef,
+	}
+
+	result := s.db.WithContext(ctx).Where(cond).Find(&rooms)
+	switch {
+	case errors.Is(result.Error, gorm.ErrRecordNotFound):
+		return nil, nil
+	case result.Error != nil:
+		return nil, result.Error
+	}
+
+	return rooms, nil
+}
+
 func (s *DatabaseService) GetPastRooms(ctx context.Context, roomIds []string, offset, limit uint64, direction *string) ([]dbmodels.RoomInfo, int64, error) {
 	var roomsInfo []dbmodels.RoomInfo
 	var total int64

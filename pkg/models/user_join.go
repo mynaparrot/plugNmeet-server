@@ -148,13 +148,10 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 			g.UserInfo.UserMetadata.WaitForApproval = true
 		}
 
-		// the AI agent's pre-authorized participant never waits; anybody else
-		// may only stay in the waiting room
+		// only the pre-authorized participants of an AI agent session may join
 		aiFeatures := meta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()
 		if allowedIds := aiAgentAllowedParticipantIds(aiFeatures); aiFeatures.GetIsAllow() && len(allowedIds) > 0 {
-			if containsUserId(allowedIds, g.GetUserInfo().GetUserId()) {
-				g.UserInfo.UserMetadata.WaitForApproval = false
-			} else if !meta.GetRoomFeatures().GetWaitingRoomFeatures().GetIsActive() {
+			if !containsUserId(allowedIds, g.GetUserInfo().GetUserId()) {
 				log.Warnln("user is not allowed to join this AI session")
 				return plugnmeet.StatusCode_INVALID_PARAMETERS, "", config.ErrAIAgentUserNotAllowed
 			}
@@ -167,24 +164,26 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 
 	// Step 9: a per-user AI session runs in the participant's own 1-on-1 room,
 	// so the token must target that room instead of the parent lobby.
-	perUserRoomId, err := m.perUserAISessionRoom(ctx, g, meta, log)
-	if err != nil {
-		log.WithError(err).Errorln("failed to prepare the per-user AI session room")
-		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, "", err
-	}
-	if perUserRoomId != "" {
-		g.RoomId = perUserRoomId
-		log = log.WithField("room_id", perUserRoomId)
-		// the 1-on-1 room carries its own, stricter lock settings
-		m.AssignLockSettingsToUserFromRoom(g)
-		// a rejoin must not leave the previous connection in the room behind
-		if status, sErr := m.natsService.GetRoomUserStatus(perUserRoomId, g.GetUserInfo().GetUserId()); sErr == nil && status == natsservice.UserStatusOnline {
-			_, _ = m.RemoveParticipant(&plugnmeet.RemoveParticipantReq{
-				RoomId: perUserRoomId,
-				UserId: g.GetUserInfo().GetUserId(),
-				Msg:    "notifications.room-disconnected-duplicate-entry",
-			})
-			m.waitForUserToBeOffline(ctx, perUserRoomId, g.GetUserInfo().GetUserId(), log)
+	if !backToMainRoom {
+		perUserRoomId, perUserErr := m.perUserAISessionRoom(ctx, g, meta, log)
+		if perUserErr != nil {
+			log.WithError(perUserErr).Errorln("failed to prepare the per-user AI session room")
+			return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, "", perUserErr
+		}
+		if perUserRoomId != "" {
+			g.RoomId = perUserRoomId
+			log = log.WithField("room_id", perUserRoomId)
+			// the 1-on-1 room carries its own, stricter lock settings
+			m.AssignLockSettingsToUserFromRoom(g)
+			// a rejoin must not leave the previous connection in the room behind
+			if status, sErr := m.natsService.GetRoomUserStatus(perUserRoomId, g.GetUserInfo().GetUserId()); sErr == nil && status == natsservice.UserStatusOnline {
+				_, _ = m.RemoveParticipant(&plugnmeet.RemoveParticipantReq{
+					RoomId: perUserRoomId,
+					UserId: g.GetUserInfo().GetUserId(),
+					Msg:    "notifications.room-disconnected-duplicate-entry",
+				})
+				m.waitForUserToBeOffline(ctx, perUserRoomId, g.GetUserInfo().GetUserId(), log)
+			}
 		}
 	}
 
@@ -227,17 +226,18 @@ func (m *UserModel) AssignLockSettingsToUserFromRoom(g *plugnmeet.GenerateTokenR
 	m.AssignLockSettingsToUser(meta, g)
 }
 
-// perUserAISessionRoom returns the participant's own 1-on-1 AI room when the
-// room runs per-user sessions. An empty result means the user joins the room
-// itself. The user is registered in the parent room first, because joining or
-// leaving the child room looks the participant up there.
+// adminAISessionPreCreate reports whether an admin's own 1-on-1 room should be
+// pre-created: only when the room runs auto per-user sessions and the admin is
+// explicitly pre-authorized. An observer admin must not hold a session slot.
+func adminAISessionPreCreate(f *plugnmeet.InsightsAIAgentFeatures, userId string) bool {
+	return isAutoPerUserAISessionRoom(f) && containsUserId(aiAgentAllowedParticipantIds(f), userId)
+}
+
+// perUserAISessionRoom returns the participant's own 1-on-1 AI room of an auto
+// per-user session, or an empty id when the participant joins the requested room.
 func (m *UserModel) perUserAISessionRoom(ctx context.Context, g *plugnmeet.GenerateTokenReq, meta *plugnmeet.RoomMetadata, log *logrus.Entry) (string, error) {
 	aiFeatures := meta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()
-	if !isAutoPerUserAISessionRoom(aiFeatures) {
-		return "", nil
-	}
-	// the parent lobby only routes participants, it never hosts them
-	if meta.GetIsBreakoutRoom() || g.GetUserInfo().GetIsAdmin() || g.GetUserInfo().GetUserMetadata().GetWaitForApproval() {
+	if !isAutoPerUserAISessionRoom(aiFeatures) || meta.GetIsBreakoutRoom() {
 		return "", nil
 	}
 	if config.IsUserIdInternal(g.GetUserInfo().GetUserId()) {
@@ -249,6 +249,18 @@ func (m *UserModel) perUserAISessionRoom(ctx context.Context, g *plugnmeet.Gener
 	}
 
 	parentRoomId := g.GetRoomId()
+	if g.GetUserInfo().GetIsAdmin() {
+		// the admin stays in the lobby; their own room is only prepared ahead of
+		// time, and a failure here must not block the lobby join
+		if adminAISessionPreCreate(aiFeatures, g.GetUserInfo().GetUserId()) {
+			if _, err := m.breakoutModel.EnsurePerUserAIBreakoutRoom(ctx, parentRoomId, g.GetUserInfo().GetUserId(), g.GetUserInfo().GetName()); err != nil {
+				log.WithError(err).Warnln("failed to pre-create the admin's 1-on-1 AI session room")
+			}
+		}
+		return "", nil
+	}
+
+	// the child room looks the participant up in the parent room
 	if err := m.natsService.AddUser(parentRoomId, g.UserInfo.UserId, g.UserInfo.Name, g.UserInfo.IsAdmin, g.UserInfo.UserMetadata.IsPresenter, g.UserInfo.UserMetadata, g.UserInfo.ClientType); err != nil {
 		log.WithError(err).Errorln("failed to add user to the parent room")
 		return "", config.ErrUserUnexpectedError

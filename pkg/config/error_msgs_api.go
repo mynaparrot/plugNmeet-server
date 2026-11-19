@@ -116,6 +116,7 @@ var (
 	ErrBkRoomUserNotOnline               = errors.New("breakout-room.notifications.user-not-online")
 	ErrBkRoomUserAlreadyInMain           = errors.New("breakout-room.notifications.user-already-in-main")
 	ErrBkRoomUserAlreadyInRoom           = errors.New("breakout-room.notifications.user-already-in-room")
+	ErrBkRoomReturnToMainRoomNotAllowed  = errors.New("breakout-room.notifications.return-to-main-room-not-allowed")
 )
 
 // Auth errors of the browser facing endpoints are returned to clients (HTTP body

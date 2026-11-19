@@ -358,7 +358,10 @@ func (m *AIAgentModel) afterAgentStopped(roomId, reason string) {
 
 // closeBreakoutRoomAfterStop saves the session summary of a breakout room and
 // then ends the room, so its session slot is freed and the room disappears from
-// the parent's list of active breakout rooms.
+// the parent's list of active breakout rooms. Only the 1-on-1 room of an auto
+// per-user session exists solely for its session; an AI breakout room of a
+// normal session is a regular breakout room, whose lifecycle belongs to its
+// duration or to the host who created it.
 func (m *AIAgentModel) closeBreakoutRoomAfterStop(roomId, reason string) {
 	if m.bkRoomModel == nil {
 		return
@@ -374,6 +377,18 @@ func (m *AIAgentModel) closeBreakoutRoomAfterStop(roomId, reason string) {
 	}
 
 	log := m.logger.WithFields(logrus.Fields{"roomId": roomId, "parentRoomId": parentRoomId, "reason": reason})
+
+	// the parent decides: a normal session keeps its AI breakout rooms open
+	parentMeta, err := m.natsService.GetRoomMetadataStruct(parentRoomId)
+	if err != nil {
+		log.WithError(err).Warn("could not get the parent room metadata, keeping the breakout room open")
+		return
+	}
+	if !isAutoPerUserAISessionRoom(parentMeta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()) {
+		log.Info("breakout room does not belong to an auto per-user ai session, keeping it open")
+		return
+	}
+
 	go func() {
 		ctx, cancel := context.WithTimeout(m.ctx, aiAgentRoomCloseTimeout)
 		defer cancel()

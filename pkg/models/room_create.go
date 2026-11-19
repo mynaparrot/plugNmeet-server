@@ -287,7 +287,8 @@ func (m *RoomModel) setRoomDefaults(r *plugnmeet.CreateRoomReq) {
 
 // applyAIAgentRoomDefaults prepares a room that hosts the AI agent: the
 // session routing config is normalized to its mode, the 1-on-1 participants get
-// a focused setup, and per-user sessions need the breakout room infrastructure.
+// a focused setup and the breakout rooms every session runs in are enabled with
+// room for each concurrent session.
 func (m *RoomModel) applyAIAgentRoomDefaults(r *plugnmeet.CreateRoomReq) {
 	insightsFeatures := r.GetMetadata().GetRoomFeatures().GetInsightsFeatures()
 	features := insightsFeatures.GetAiAgentFeatures()
@@ -301,90 +302,65 @@ func (m *RoomModel) applyAIAgentRoomDefaults(r *plugnmeet.CreateRoomReq) {
 	insightsFeatures.AiAgentFeatures = features
 
 	// Only the participants that talk to the agent are expected to be in the
-	// room, so their camera and screen stay off until they enable them
-	// explicitly. That holds for a fixed roster and for per-user sessions.
+	// room, so the media and interaction features they do not need are off.
+	// That holds for a fixed roster and for per-user sessions.
 	if len(aiAgentAllowedParticipantIds(features)) > 0 ||
 		features.GetSessionMode() == plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_OPEN_PER_USER {
-		locks := r.Metadata.DefaultLockSettings
-		if locks == nil {
-			locks = new(plugnmeet.LockSettings)
-			r.Metadata.DefaultLockSettings = locks
-		}
-		if locks.LockWebcam == nil {
-			locks.LockWebcam = new(true)
-		}
-		if locks.LockScreenSharing == nil {
-			locks.LockScreenSharing = new(true)
-		}
+		applyAIAgentSessionRoomFeatures(r.Metadata)
 	}
 
-	// every participant gets their own room, so the parent needs breakouts
-	if isAutoPerUserAISessionRoom(features) && !r.GetMetadata().GetIsBreakoutRoom() {
-		if breakout := r.Metadata.RoomFeatures.BreakoutRoomFeatures; breakout != nil {
-			breakout.IsAllow = true
+	// Every AI session runs in its own breakout room, so a parent room can never
+	// disable them. The concurrent sessions are capped separately by
+	// effectiveMaxAISessions, so allowed_number_rooms stays a host setting. A
+	// breakout room only inherits the routing of the parent.
+	if r.GetMetadata().IsBreakoutRoom {
+		return
+	}
+	r.Metadata.RoomFeatures.BreakoutRoomFeatures.IsAllow = true
+}
+
+// applyAIAgentSessionRoomFeatures disables the features and the waiting room an
+// AI agent session never needs and locks the private chat nobody else is in the
+// room for.
+func applyAIAgentSessionRoomFeatures(meta *plugnmeet.RoomMetadata) {
+	if meta == nil {
+		return
+	}
+	if rf := meta.GetRoomFeatures(); rf != nil {
+		rf.AllowWebcams = false
+		rf.AllowScreenShare = false
+		rf.AllowRaiseHand = new(false)
+		rf.AllowReactions = new(false)
+		if rf.WaitingRoomFeatures != nil {
+			rf.WaitingRoomFeatures.IsActive = false
 		}
 	}
+	if meta.DefaultLockSettings == nil {
+		meta.DefaultLockSettings = new(plugnmeet.LockSettings)
+	}
+	meta.DefaultLockSettings.LockPrivateChat = new(true)
 }
 
 // validateAIAgentFeatures refuses an AI agent room that could never run safely:
-// a missing prompt or topic, an unreadable E2EE key, or a missing provider.
+// a missing prompt or topic, an unreadable E2EE key, an unusable session mode or
+// a missing provider. ValidateAIAgentFeatures also enforces the session mode,
+// which a breakout child with its single controlled participant passes.
 func (m *RoomModel) validateAIAgentFeatures(r *plugnmeet.CreateRoomReq, log *logrus.Entry) error {
 	features := r.GetMetadata().GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()
 	if !features.GetIsAllow() {
 		return nil
 	}
-	if m.aiAgentModel == nil {
-		log.Warn("ai_agent_features.is_allow rejected: the AI agent is not available")
-		return config.ErrAIAgentNotAllowed
-	}
 
-	err := m.aiAgentModel.ValidateAIAgentFeatures(
+	if err := m.aiAgentModel.ValidateAIAgentFeatures(
 		features,
 		r.GetMetadata().GetRoomFeatures().GetEndToEndEncryptionFeatures(),
 		r.GetMetadata().GetRoomFeatures().GetInsightsFeatures().GetIsAllow(),
-	)
-	if err != nil {
+	); err != nil {
 		log.WithError(err).Warn("ai_agent_features was refused")
 		return err
 	}
 
-	return m.validateAIAgentSessionLimits(r, features, log)
-}
-
-// validateAIAgentSessionLimits refuses a session routing config that could never
-// be honoured: a controlled-users room without any pre-authorized participant,
-// or more concurrent sessions than the room can open at once.
-func (m *RoomModel) validateAIAgentSessionLimits(r *plugnmeet.CreateRoomReq, features *plugnmeet.InsightsAIAgentFeatures, log *logrus.Entry) error {
-	// a breakout room inherits its routing from the parent session
-	if r.GetMetadata().GetIsBreakoutRoom() {
-		return nil
-	}
-
-	// allowed_number_rooms is already clamped by the server's own maximum
-	allowedRooms := r.GetMetadata().GetRoomFeatures().GetBreakoutRoomFeatures().GetAllowedNumberRooms()
-
-	switch features.GetSessionMode() {
-	case plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_CONTROLLED_USERS:
-		ids := cleanAllowedParticipantIds(features.GetAutoSessionConfig().GetAllowedParticipantIds())
-		if len(ids) == 0 {
-			log.Error("a controlled-users AI room was configured without allowed_participant_ids")
-			return config.ErrAIAgentAllowedUsersRequired
-		}
-		// The roster is a pre-authorization list, not a concurrency limit: it
-		// may name more participants than the room has session slots. The
-		// concurrency is enforced when the sessions are created at join time.
-		return nil
-	case plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_OPEN_PER_USER:
-		// per-user sessions open one breakout room per participant
-		if maxConc := aiAgentMaxConcurrentSessions(features); maxConc > 0 && allowedRooms > 0 && maxConc > allowedRooms {
-			log.Errorf("max_concurrent_sessions (%d) exceeds allowed_number_rooms (%d)", maxConc, allowedRooms)
-			return config.ErrAIAgentMaxConcurrentSessions
-		}
-		return nil
-	default:
-		// a normal room routes nothing automatically
-		return nil
-	}
+	return nil
 }
 
 // validateAITextChatMCPServers refuses AI text chat MCP servers that could never

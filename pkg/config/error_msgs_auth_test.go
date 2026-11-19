@@ -16,6 +16,8 @@ func TestIntegratorAIAgentCreateRoomMsgs(t *testing.T) {
 		{ErrAIAgentTopicRequired, MsgAuthAIAgentTopicRequired},
 		{ErrAIAgentProviderMissing, MsgAuthAIAgentProviderMissing},
 		{ErrAIAgentInvalidMCPServer, MsgAuthAIAgentInvalidMCPServer},
+		{ErrAIAgentAllowedUsersRequired, MsgAuthAIAgentAllowedUsersRequired},
+		{ErrAIAgentMaxConcurrentSessions, MsgAuthAIAgentMaxConcurrentSessions},
 	}
 
 	for _, tt := range tests {

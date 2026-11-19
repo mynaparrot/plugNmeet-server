@@ -22,7 +22,7 @@ require (
 	github.com/livekit/protocol v1.53.0
 	github.com/livekit/server-sdk-go/v2 v2.20.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
-	github.com/mynaparrot/plugnmeet-protocol v1.6.4-0.20261118165208-67d1ad708aa8
+	github.com/mynaparrot/plugnmeet-protocol v1.6.4-0.20261119000508-e108f7d0f351
 	github.com/nats-io/jwt/v2 v2.8.3
 	github.com/nats-io/nats.go v1.56.0
 	github.com/nats-io/nkeys v0.4.17
@@ -158,7 +158,3 @@ require (
 replace github.com/pion/webrtc/v4 => github.com/livekit/webrtc-pion/v4 v4.2.25-warp.3
 
 replace github.com/pion/ice/v4 => github.com/livekit/ice/v4 v4.4.8-warp.4
-
-replace (
-	github.com/mynaparrot/plugnmeet-protocol => ../protocol
-)

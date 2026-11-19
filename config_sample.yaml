@@ -363,9 +363,12 @@ insights:
         # or to a deterministic local summary when no text model is available.
         summarize_model: "gemini-3.1-flash-lite"
       pricing:
-        default:
+        realtime_model:
           input_price_per_million_tokens: 3.50
           output_price_per_million_tokens: 10.50
+        summarize_model:
+          input_price_per_million_tokens: 0.25
+          output_price_per_million_tokens: 1.50
 
     # OpenAI: use provider "openai" with an account from the accounts section.
     # Models prefixed with "gpt-live" use the Live SDK (Responses delegation);

@@ -50,6 +50,10 @@ func (m *ArtifactModel) CreateAIAgentSessionSummaryArtifact(roomTableId uint64, 
 		}
 	}
 
+	// the written JSON and the returned summary both carry the separated usage
+	// of this learner's session
+	summary.Usage = m.buildAIAgentSessionUsages(telemetry, summaryPromptTokens, summaryCompletionTokens, summarizeModel, log)
+
 	content, err := marshalAIAgentSessionSummary(summary)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal the ai agent session summary: %w", err)
@@ -121,6 +125,86 @@ func aiAgentSummaryUserInfo(summary *plugnmeet.AIAgentSessionSummary) *plugnmeet
 	return userInfo
 }
 
+// buildAIAgentSessionUsages separates the realtime session usage from the tokens
+// the summary synthesis spent, so each entry is priced at its own model rate.
+func (m *ArtifactModel) buildAIAgentSessionUsages(telemetry *redisservice.AIAgentSessionTelemetry, summaryPromptTokens, summaryCompletionTokens uint32, summarizeModel string, log *logrus.Entry) []*plugnmeet.RoomArtifactTokenUsage {
+	var sessionInput, sessionOutput uint64
+	if telemetry != nil {
+		sessionInput, sessionOutput = telemetry.InputTokens, telemetry.OutputTokens
+	}
+
+	usages := make([]*plugnmeet.RoomArtifactTokenUsage, 0, 2)
+	if sessionInput > 0 || sessionOutput > 0 {
+		realtimeModel := m.aiAgentRealtimeModel(log)
+		promptCost := m.estimateTokensCost(insights.ServiceTypeAIAgent, sessionInput, true, log, aiAgentRealtimePricingKey, realtimeModel)
+		completionCost := m.estimateTokensCost(insights.ServiceTypeAIAgent, sessionOutput, false, log, aiAgentRealtimePricingKey, realtimeModel)
+
+		breakdown := map[string]int64{
+			"session_prompt_tokens":     int64(sessionInput),
+			"session_completion_tokens": int64(sessionOutput),
+		}
+		if telemetry != nil && telemetry.AudioMillis > 0 {
+			breakdown["audio_millis"] = int64(telemetry.AudioMillis)
+		}
+
+		usages = append(usages, &plugnmeet.RoomArtifactTokenUsage{
+			PromptTokens:                  clampToUint32(sessionInput),
+			CompletionTokens:              clampToUint32(sessionOutput),
+			TotalTokens:                   clampToUint32(sessionInput + sessionOutput),
+			Breakdown:                     breakdown,
+			PromptTokensEstimatedCost:     roundAndPointer(promptCost, 6),
+			CompletionTokensEstimatedCost: roundAndPointer(completionCost, 6),
+			TotalTokensEstimatedCost:      roundAndPointer(promptCost+completionCost, 6),
+		})
+	}
+
+	if summaryPromptTokens > 0 || summaryCompletionTokens > 0 {
+		promptCost := m.estimateTokensCost(insights.ServiceTypeAIAgent, uint64(summaryPromptTokens), true, log, aiAgentSummarizePricingKey, summarizeModel)
+		completionCost := m.estimateTokensCost(insights.ServiceTypeAIAgent, uint64(summaryCompletionTokens), false, log, aiAgentSummarizePricingKey, summarizeModel)
+
+		usages = append(usages, &plugnmeet.RoomArtifactTokenUsage{
+			PromptTokens:     summaryPromptTokens,
+			CompletionTokens: summaryCompletionTokens,
+			TotalTokens:      clampToUint32(uint64(summaryPromptTokens) + uint64(summaryCompletionTokens)),
+			Breakdown: map[string]int64{
+				"summary_prompt_tokens":     int64(summaryPromptTokens),
+				"summary_completion_tokens": int64(summaryCompletionTokens),
+			},
+			PromptTokensEstimatedCost:     roundAndPointer(promptCost, 6),
+			CompletionTokensEstimatedCost: roundAndPointer(completionCost, 6),
+			TotalTokensEstimatedCost:      roundAndPointer(promptCost+completionCost, 6),
+		})
+	}
+
+	return usages
+}
+
+// Pricing keys of the ai_agent service. Like the options of the same name, the
+// realtime and the summarize role can be priced directly, so operators do not
+// have to repeat the concrete model name; a specific model name and the
+// "default" entry are used as fallbacks.
+const (
+	aiAgentRealtimePricingKey  = "realtime_model"
+	aiAgentSummarizePricingKey = "summarize_model"
+)
+
+// aiAgentRealtimeModel returns the model of the realtime session, "default" when
+// no ai_agent provider account is configured.
+func (m *ArtifactModel) aiAgentRealtimeModel(log *logrus.Entry) string {
+	if m.app == nil || m.app.Insights == nil {
+		return "default"
+	}
+	_, service, err := m.app.Insights.GetProviderAccountForService(insights.ServiceTypeAIAgent)
+	if err != nil {
+		log.WithError(err).Debug("could not get the ai_agent service config for pricing")
+		return "default"
+	}
+	if model := service.GetOptionsString("realtime_model", ""); model != "" {
+		return model
+	}
+	return "default"
+}
+
 // buildAIAgentUsageMetadata combines the session's realtime usage with the extra
 // tokens the summary synthesis spent.
 func (m *ArtifactModel) buildAIAgentUsageMetadata(telemetry *redisservice.AIAgentSessionTelemetry, summaryPromptTokens, summaryCompletionTokens uint32, summarizeModel string, fileArtifactId *string, log *logrus.Entry) *plugnmeet.RoomArtifactMetadata {
@@ -131,25 +215,12 @@ func (m *ArtifactModel) buildAIAgentUsageMetadata(telemetry *redisservice.AIAgen
 	totalPrompt := sessionInput + uint64(summaryPromptTokens)
 	totalCompletion := sessionOutput + uint64(summaryCompletionTokens)
 
-	realtimeModel := "default"
-	if m.app.Insights != nil {
-		_, service, err := m.app.Insights.GetProviderAccountForService(insights.ServiceTypeAIAgent)
-		if err != nil {
-			log.WithError(err).Debug("could not get the ai_agent service config for pricing")
-		} else if service != nil {
-			if model := service.GetOptionsString("realtime_model", ""); model != "" {
-				realtimeModel = model
-			}
-		}
-	}
-	if summarizeModel == "" {
-		summarizeModel = "default"
-	}
+	realtimeModel := m.aiAgentRealtimeModel(log)
 
-	promptCost := m.estimateTokensCost(insights.ServiceTypeAIAgent, realtimeModel, sessionInput, true, log) +
-		m.estimateTokensCost(insights.ServiceTypeAIAgent, summarizeModel, uint64(summaryPromptTokens), true, log)
-	completionCost := m.estimateTokensCost(insights.ServiceTypeAIAgent, realtimeModel, sessionOutput, false, log) +
-		m.estimateTokensCost(insights.ServiceTypeAIAgent, summarizeModel, uint64(summaryCompletionTokens), false, log)
+	promptCost := m.estimateTokensCost(insights.ServiceTypeAIAgent, sessionInput, true, log, aiAgentRealtimePricingKey, realtimeModel) +
+		m.estimateTokensCost(insights.ServiceTypeAIAgent, uint64(summaryPromptTokens), true, log, aiAgentSummarizePricingKey, summarizeModel)
+	completionCost := m.estimateTokensCost(insights.ServiceTypeAIAgent, sessionOutput, false, log, aiAgentRealtimePricingKey, realtimeModel) +
+		m.estimateTokensCost(insights.ServiceTypeAIAgent, uint64(summaryCompletionTokens), false, log, aiAgentSummarizePricingKey, summarizeModel)
 
 	breakdown := make(map[string]int64, 4)
 	if sessionInput > 0 {
@@ -181,15 +252,16 @@ func (m *ArtifactModel) buildAIAgentUsageMetadata(telemetry *redisservice.AIAgen
 	}
 }
 
-// estimateTokensCost returns the estimated price of tokens at the model's rate,
-// 0 when the pricing block is missing.
-func (m *ArtifactModel) estimateTokensCost(serviceType insights.ServiceType, modelName string, tokens uint64, prompt bool, log *logrus.Entry) float64 {
+// estimateTokensCost returns the estimated price of tokens at the rate of the
+// first pricing key that is configured for the service, 0 when no pricing
+// block matches.
+func (m *ArtifactModel) estimateTokensCost(serviceType insights.ServiceType, tokens uint64, prompt bool, log *logrus.Entry, pricingKeys ...string) float64 {
 	if tokens == 0 || m.app.Insights == nil {
 		return 0
 	}
-	pricing, err := m.app.Insights.GetServiceModelPricing(serviceType, modelName)
+	pricing, err := m.app.Insights.GetServiceModelPricing(serviceType, pricingKeys...)
 	if err != nil {
-		log.WithError(err).Warnf("could not calculate the cost for %s model %s", serviceType, modelName)
+		log.WithError(err).Warnf("could not calculate the cost for %s with pricing keys %v", serviceType, pricingKeys)
 		return 0
 	}
 	if prompt {

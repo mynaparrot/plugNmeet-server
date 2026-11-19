@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/sirupsen/logrus"
@@ -32,22 +33,17 @@ const (
 	// aiBreakoutDefaultDurationMinutes is how long a per-user 1-on-1 AI room
 	// lives when the parent room has no duration limit of its own.
 	aiBreakoutDefaultDurationMinutes = 60
-	// defaultMaxAIBreakoutSessions applies when a room does not limit its
-	// breakout rooms explicitly.
-	defaultMaxAIBreakoutSessions = 6
 )
 
 // effectiveMaxAISessions reports how many AI sessions a parent room may run in
-// parallel: its allowed breakout rooms, capped by max_concurrent_sessions.
+// parallel: the configured max_concurrent_sessions of an open-per-user room,
+// otherwise the server cap. allowed_number_rooms never applies here.
 func effectiveMaxAISessions(meta *plugnmeet.RoomMetadata) uint32 {
-	allowed := meta.GetRoomFeatures().GetBreakoutRoomFeatures().GetAllowedNumberRooms()
-	if allowed == 0 {
-		allowed = defaultMaxAIBreakoutSessions
+	maxConc := aiAgentMaxConcurrentSessions(meta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures())
+	if maxConc == 0 {
+		return utils.AIAgentMaxConcurrentSessionsCap
 	}
-	if maxConc := aiAgentMaxConcurrentSessions(meta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()); maxConc > 0 && maxConc < allowed {
-		return maxConc
-	}
-	return allowed
+	return clampUint32(maxConc, 1, utils.AIAgentMaxConcurrentSessionsCap)
 }
 
 func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plugnmeet.CreateBreakoutRoomsReq) ([]*plugnmeet.BreakoutRoom, error) {
@@ -84,20 +80,19 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 		return nil, config.ErrBkRoomCannotCreateInsideBreakout
 	}
 
-	// enforce the allowed number of breakout rooms for this parent room.
-	// AllowedNumberRooms == 0 means "not explicitly limited" (unlimited), so we
-	// only reject when a positive limit is set and the request exceeds it.
-	if meta.RoomFeatures != nil && meta.RoomFeatures.BreakoutRoomFeatures != nil {
+	// AI agent rooms are limited by the concurrent AI sessions of the parent,
+	// regular breakout rooms by its allowed number of breakout rooms.
+	if r.EnableAiAgent {
+		if err := m.validateAIAgentBreakoutRequest(r, meta, log); err != nil {
+			return nil, err
+		}
+	} else if meta.RoomFeatures != nil && meta.RoomFeatures.BreakoutRoomFeatures != nil {
+		// AllowedNumberRooms == 0 means "not explicitly limited" (unlimited), so
+		// we only reject when a positive limit is set and the request exceeds it.
 		allowedRooms := meta.RoomFeatures.BreakoutRoomFeatures.AllowedNumberRooms
 		if allowedRooms > 0 && uint32(len(r.Rooms)) > allowedRooms {
 			log.WithField("allowedRooms", allowedRooms).Error("number of breakout rooms exceeds the allowed limit")
 			return nil, config.ErrBkRoomMaxRoomsExceeded
-		}
-	}
-
-	if r.EnableAiAgent {
-		if err := m.validateAIAgentBreakoutRequest(r, meta, log); err != nil {
-			return nil, err
 		}
 	}
 
@@ -157,19 +152,19 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	// this is crucial as breakout room should not generate userID
 	meta.RoomFeatures.AutoGenUserId = new(false)
 
+	// captured once, before any child is prepared: every child clones the parent
+	// configuration, never an already-prepared sibling.
+	parentAiFeatures := meta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()
+	// only an auto per-user AI session turns a child into a 1-on-1 session room;
+	// an admin-created AI breakout room of a normal session is a regular breakout
+	isPerUserAISession := r.GetEnableAiAgent() && isAutoPerUserAISessionRoom(parentAiFeatures)
+
 	// disable few features
 	meta.RoomFeatures.WaitingRoomFeatures.IsActive = false
-	// children can never host their own breakouts.
-	meta.RoomFeatures.BreakoutRoomFeatures = &plugnmeet.BreakoutRoomFeatures{
-		IsAllow:               false,
-		AllowReturnToMainRoom: r.AllowReturnToMainRoom,
-		AllowSelfSelect:       r.AllowSelfSelect,
-	}
+	applyBreakoutChildRoomFeatures(meta, r, isPerUserAISession)
 	// we'll disable now. in the future, we can think about those
 	meta.RoomFeatures.RecordingFeatures.IsAllow = false
 	meta.RoomFeatures.ExternalBroadcastingFeatures.IsAllow = false
-	meta.WebhookUrl = nil
-	meta.LogoutUrl = nil
 	meta.RoomFeatures.EnableAnalytics = false
 
 	// force-disable meeting summarization for agent-based insights in breakout rooms
@@ -237,13 +232,6 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 	// creation-time snapshot of the pre-assignments that were actually created;
 	// written to the parent's metadata below, superseding the API-seeded list.
 	createdPreassigned := make([]*plugnmeet.PreassignedBreakoutRoom, 0, len(r.Rooms))
-
-	// capture the parent's agent features once, before the loop: every child
-	// must clone the parent configuration, never an already-prepared sibling.
-	var parentAiFeatures *plugnmeet.InsightsAIAgentFeatures
-	if r.EnableAiAgent {
-		parentAiFeatures = meta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()
-	}
 
 	for _, room := range r.Rooms {
 		bRoomId := fmt.Sprintf(BreakoutRoomFormat, r.RoomId, room.Id)
@@ -343,14 +331,18 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 		return createdRooms, config.ErrBkRoomUnexpectedError
 	}
 	origMeta.RoomFeatures.BreakoutRoomFeatures.IsActive = true
-	// save create-time snapshot so that can be populated again
-	origMeta.RoomFeatures.BreakoutRoomFeatures.AllowReturnToMainRoom = r.AllowReturnToMainRoom
-	origMeta.RoomFeatures.BreakoutRoomFeatures.AllowSelfSelect = r.AllowSelfSelect
-	// A user-driven create replaces the whole set with the create-time snapshot.
 	// Auto-created per-user AI rooms have no requester and are additive: they are
 	// merged by room id so that when the next participant joins, the previously
-	// created (still active) rooms keep their preassignment.
-	if r.RequestedUserId == "" || r.EnableAiAgent {
+	// created (still active) rooms keep their preassignment, and they never touch
+	// the host's own breakout preferences. Every other create (including an
+	// admin's AI breakout rooms in a normal session) saves the create-time
+	// snapshot and replaces the whole preassigned set.
+	perUserCreate := r.RequestedUserId == "" || isPerUserAISession
+	if !perUserCreate {
+		origMeta.RoomFeatures.BreakoutRoomFeatures.AllowReturnToMainRoom = r.AllowReturnToMainRoom
+		origMeta.RoomFeatures.BreakoutRoomFeatures.AllowSelfSelect = r.AllowSelfSelect
+	}
+	if perUserCreate {
 		origMeta.RoomFeatures.BreakoutRoomFeatures.PreassignedRooms = mergePreassignedBreakoutRooms(origMeta.RoomFeatures.BreakoutRoomFeatures.GetPreassignedRooms(), createdPreassigned)
 	} else {
 		origMeta.RoomFeatures.BreakoutRoomFeatures.PreassignedRooms = createdPreassigned
@@ -441,6 +433,30 @@ func (m *BreakoutRoomModel) validateAIAgentBreakoutRequest(r *plugnmeet.CreateBr
 	return nil
 }
 
+// applyBreakoutChildRoomFeatures narrows the child metadata to what a breakout
+// room may offer. Only an auto per-user 1-on-1 AI session room keeps the learner
+// inside and keeps the parent's logout url; every other child (an admin-created
+// breakout room of a normal session, with or without the AI agent) returns to
+// the main room when it ends and therefore never redirects on its own.
+func applyBreakoutChildRoomFeatures(meta *plugnmeet.RoomMetadata, r *plugnmeet.CreateBreakoutRoomsReq, isPerUserAISession bool) {
+	features := &plugnmeet.BreakoutRoomFeatures{
+		IsAllow:               false,
+		AllowReturnToMainRoom: r.GetAllowReturnToMainRoom(),
+		AllowSelfSelect:       r.GetAllowSelfSelect(),
+		IsPerUserAiSession:    isPerUserAISession,
+	}
+	if r.GetEnableAiAgent() {
+		// a 1-on-1 AI breakout room is created for exactly one participant
+		features.AllowSelfSelect = false
+	}
+	if isPerUserAISession {
+		features.AllowReturnToMainRoom = false
+	} else {
+		meta.LogoutUrl = nil
+	}
+	meta.RoomFeatures.BreakoutRoomFeatures = features
+}
+
 // prepareAIAgentBreakoutChild narrows the shared child metadata down to the one
 // participant this 1-on-1 room is created for. parentAiFeatures is the parent
 // room's configuration, captured before the create loop, so every child starts
@@ -469,14 +485,7 @@ func prepareAIAgentBreakoutChild(parentAiFeatures *plugnmeet.InsightsAIAgentFeat
 		AutoStartAgent:        new(autoStart),
 	}
 	insightsFeatures.AiAgentFeatures = features
-
-	locks := meta.DefaultLockSettings
-	if locks == nil {
-		locks = new(plugnmeet.LockSettings)
-		meta.DefaultLockSettings = locks
-	}
-	locks.LockWebcam = new(true)
-	locks.LockScreenSharing = new(true)
+	applyAIAgentSessionRoomFeatures(meta)
 }
 
 // appendBreakoutAIContext preserves the parent's system prompt and appends the
@@ -538,11 +547,13 @@ func (m *BreakoutRoomModel) EnsurePerUserAIBreakoutRoom(ctx context.Context, par
 	// neither seeds a parent whiteboard nor may promote anybody to presenter in
 	// the parent room.
 	_, err = m.CreateBreakoutRooms(ctx, &plugnmeet.CreateBreakoutRoomsReq{
-		RoomId:                parentRoomId,
-		RequestedUserId:       "",
-		Duration:              m.perUserAIBreakoutDuration(parentRoomId),
-		Rooms:                 []*plugnmeet.BreakoutRoom{perUserAIBreakoutRoom(userId, userName)},
-		AllowReturnToMainRoom: meta.GetRoomFeatures().GetBreakoutRoomFeatures().GetAllowReturnToMainRoom(),
+		RoomId:          parentRoomId,
+		RequestedUserId: "", // important as request isn't from client
+		Duration:        m.perUserAIBreakoutDuration(parentRoomId),
+		Rooms:           []*plugnmeet.BreakoutRoom{perUserAIBreakoutRoom(userId, userName)},
+		// a learner of a 1-on-1 AI session never returns on their own
+		AllowReturnToMainRoom: false,
+		AllowSelfSelect:       false,
 		EnableAiAgent:         true,
 	})
 	if err != nil {

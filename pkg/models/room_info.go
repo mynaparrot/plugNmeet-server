@@ -6,6 +6,7 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
@@ -74,25 +75,64 @@ func (m *RoomModel) GetActiveRoomInfo(ctx context.Context, r *plugnmeet.GetActiv
 		return false, config.ErrRoomNotActive.Error(), plugnmeet.StatusCode_ROOM_NOT_ACTIVE, nil
 	}
 
-	res := new(plugnmeet.ActiveRoomWithParticipant)
-	res.RoomInfo = &plugnmeet.ActiveRoomInfo{
-		RoomTitle:          roomDbInfo.RoomTitle,
-		RoomId:             roomDbInfo.RoomId,
-		Sid:                roomDbInfo.Sid,
-		JoinedParticipants: roomDbInfo.JoinedParticipants,
-		IsRunning:          int32(roomDbInfo.IsRunning),
-		IsRecording:        int32(roomDbInfo.IsRecording),
-		IsActiveRtmp:       int32(roomDbInfo.IsActiveRtmp),
-		WebhookUrl:         roomDbInfo.WebhookUrl,
-		IsBreakoutRoom:     int32(roomDbInfo.IsBreakoutRoom),
-		ParentRoomId:       helpers.PlainParentRoomIdFromRef(roomDbInfo.ParentRoomID),
-		CreationTime:       roomDbInfo.CreationTime,
-		Metadata:           rrr.Metadata,
+	res := m.buildActiveRoomWithParticipant(ctx, roomDbInfo, rrr)
+
+	// an active parent room reports its running breakout rooms, and its own
+	// participant count spans all of them, so online learners in 1-on-1 AI
+	// sessions show up right away instead of after the next janitor pass.
+	if roomDbInfo.IsBreakoutRoom == 0 {
+		parentRef := helpers.FormatBreakoutParentRoomRef(roomDbInfo.RoomId, roomDbInfo.ID)
+		childRows, cErr := m.ds.GetActiveBreakoutRoomsByParentRef(ctx, parentRef)
+		if cErr != nil {
+			log.WithError(cErr).Errorln("failed to get active breakout rooms")
+		}
+		for i := range childRows {
+			childDbInfo := &childRows[i]
+			childNatsInfo, cErr := m.natsService.GetRoomInfo(childDbInfo.RoomId)
+			if cErr != nil || childNatsInfo == nil || !m.natsService.IsRoomStatusActive(childNatsInfo.Status) {
+				continue
+			}
+			res.BreakoutRooms = append(res.BreakoutRooms, m.buildActiveRoomWithParticipant(ctx, childDbInfo, childNatsInfo))
+		}
+		if live := countJoinedHumanParticipants(roomWithBreakouts(res)...); live > 0 {
+			res.RoomInfo.JoinedParticipants = live
+		}
 	}
 
-	if participants, err := m.lk.LoadParticipants(ctx, roomDbInfo.RoomId); err == nil && participants != nil && len(participants) > 0 {
+	return true, config.MsgSuccess, plugnmeet.StatusCode_SUCCESS, res
+}
+
+// newActiveRoomInfo builds the reported info of a room from its DB row and its
+// NATS state.
+func newActiveRoomInfo(room *dbmodels.RoomInfo, rInfo *plugnmeet.NatsKvRoomInfo) *plugnmeet.ActiveRoomInfo {
+	return &plugnmeet.ActiveRoomInfo{
+		RoomTitle:          room.RoomTitle,
+		RoomId:             room.RoomId,
+		Sid:                room.Sid,
+		JoinedParticipants: room.JoinedParticipants,
+		IsRunning:          int32(room.IsRunning),
+		IsRecording:        int32(room.IsRecording),
+		IsActiveRtmp:       int32(room.IsActiveRtmp),
+		WebhookUrl:         room.WebhookUrl,
+		IsBreakoutRoom:     int32(room.IsBreakoutRoom),
+		ParentRoomId:       helpers.PlainParentRoomIdFromRef(room.ParentRoomID),
+		CreationTime:       room.CreationTime,
+		Metadata:           rInfo.GetMetadata(),
+	}
+}
+
+// buildActiveRoomWithParticipant assembles a room with its live participants.
+// Internal system users (ingress, sip, agent bots) are not participants, so they
+// are left out of the list and of the count.
+func (m *RoomModel) buildActiveRoomWithParticipant(ctx context.Context, room *dbmodels.RoomInfo, rInfo *plugnmeet.NatsKvRoomInfo) *plugnmeet.ActiveRoomWithParticipant {
+	res := &plugnmeet.ActiveRoomWithParticipant{RoomInfo: newActiveRoomInfo(room, rInfo)}
+
+	if participants, err := m.lk.LoadParticipants(ctx, room.RoomId); err == nil && len(participants) > 0 {
 		for _, participant := range participants {
-			entry, err := m.natsService.GetUserKeyValue(roomDbInfo.RoomId, participant.Identity, natsservice.UserMetadataKey)
+			if participant == nil || config.IsUserIdInternal(participant.Identity) {
+				continue
+			}
+			entry, err := m.natsService.GetUserKeyValue(room.RoomId, participant.Identity, natsservice.UserMetadataKey)
 			if err != nil || entry == nil {
 				continue
 			}
@@ -101,7 +141,41 @@ func (m *RoomModel) GetActiveRoomInfo(ctx context.Context, r *plugnmeet.GetActiv
 		}
 	}
 
-	return true, config.MsgSuccess, plugnmeet.StatusCode_SUCCESS, res
+	// the live count is only trusted when somebody is actually online, so a room
+	// that is still being filled keeps the value the janitor wrote
+	if live := countJoinedHumanParticipants(res); live > 0 {
+		res.RoomInfo.JoinedParticipants = live
+	}
+
+	return res
+}
+
+// countJoinedHumanParticipants returns the deduplicated number of human
+// participants across the given rooms.
+func countJoinedHumanParticipants(rooms ...*plugnmeet.ActiveRoomWithParticipant) int64 {
+	seen := make(map[string]struct{})
+	for _, room := range rooms {
+		for _, participant := range room.GetParticipantsInfo() {
+			identity := participant.GetIdentity()
+			if identity == "" || config.IsUserIdInternal(identity) {
+				continue
+			}
+			seen[identity] = struct{}{}
+		}
+	}
+	return int64(len(seen))
+}
+
+// roomWithBreakouts returns the room followed by its breakout rooms.
+func roomWithBreakouts(room *plugnmeet.ActiveRoomWithParticipant) []*plugnmeet.ActiveRoomWithParticipant {
+	return append([]*plugnmeet.ActiveRoomWithParticipant{room}, room.GetBreakoutRooms()...)
+}
+
+// childRoom keeps a breakout room together with the parent reference it was
+// stored with, so it can be attached to that exact parent row.
+type childRoom struct {
+	parentRef string
+	room      *plugnmeet.ActiveRoomWithParticipant
 }
 
 func (m *RoomModel) GetActiveRoomsInfo(userCtx context.Context) (bool, string, plugnmeet.StatusCode, []*plugnmeet.ActiveRoomWithParticipant) {
@@ -113,46 +187,52 @@ func (m *RoomModel) GetActiveRoomsInfo(userCtx context.Context) (bool, string, p
 	if roomsInfo == nil || len(roomsInfo) == 0 {
 		return false, config.ErrNoActiveRoomFound.Error(), plugnmeet.StatusCode_NOT_FOUND, nil
 	}
-	res := make([]*plugnmeet.ActiveRoomWithParticipant, 0, len(roomsInfo))
+	rooms := make([]*plugnmeet.ActiveRoomWithParticipant, 0, len(roomsInfo))
+	children := make([]childRoom, 0)
+	// parentsByRef is keyed by the reference stored in the children's
+	// ParentRoomID, so a child only attaches to the exact parent row it was
+	// created for, even if the room id has been reused since
+	parentsByRef := make(map[string]*plugnmeet.ActiveRoomWithParticipant, len(roomsInfo))
 
-	for _, r := range roomsInfo {
-		i := &plugnmeet.ActiveRoomWithParticipant{
-			RoomInfo: &plugnmeet.ActiveRoomInfo{
-				RoomTitle:          r.RoomTitle,
-				RoomId:             r.RoomId,
-				Sid:                r.Sid,
-				JoinedParticipants: r.JoinedParticipants,
-				IsRunning:          int32(r.IsRunning),
-				IsRecording:        int32(r.IsRecording),
-				IsActiveRtmp:       int32(r.IsActiveRtmp),
-				WebhookUrl:         r.WebhookUrl,
-				IsBreakoutRoom:     int32(r.IsBreakoutRoom),
-				ParentRoomId:       helpers.PlainParentRoomIdFromRef(r.ParentRoomID),
-				CreationTime:       r.CreationTime,
-			},
-		}
-
+	for i := range roomsInfo {
+		r := &roomsInfo[i]
 		rri, err := m.natsService.GetRoomInfo(r.RoomId)
 		if err != nil || rri == nil {
 			continue
 		}
-		i.RoomInfo.Metadata = rri.Metadata
 
-		if participants, err := m.lk.LoadParticipants(userCtx, r.RoomId); err == nil && participants != nil && len(participants) > 0 {
-			for _, participant := range participants {
-				entry, err := m.natsService.GetUserKeyValue(r.RoomId, participant.Identity, natsservice.UserMetadataKey)
-				if err != nil || entry == nil {
-					continue
-				}
-				participant.Metadata = string(entry.Value())
-				i.ParticipantsInfo = append(i.ParticipantsInfo, participant)
-			}
+		room := m.buildActiveRoomWithParticipant(userCtx, r, rri)
+		if r.IsBreakoutRoom == 1 && r.ParentRoomID != "" {
+			children = append(children, childRoom{parentRef: r.ParentRoomID, room: room})
+			continue
 		}
-
-		res = append(res, i)
+		rooms = append(rooms, room)
+		parentsByRef[helpers.FormatBreakoutParentRoomRef(r.RoomId, r.ID)] = room
 	}
 
-	return true, config.MsgSuccess, plugnmeet.StatusCode_SUCCESS, res
+	// a breakout room belongs to its parent, so it is reported there instead of
+	// as a room of its own
+	for _, child := range children {
+		parent, ok := parentsByRef[child.parentRef]
+		if !ok {
+			// keep a running room whose parent is gone instead of dropping it
+			rooms = append(rooms, child.room)
+			continue
+		}
+		parent.BreakoutRooms = append(parent.BreakoutRooms, child.room)
+	}
+
+	// a parent room is occupied as long as anybody is in it or in a breakout
+	for _, room := range rooms {
+		if len(room.GetBreakoutRooms()) == 0 {
+			continue
+		}
+		if live := countJoinedHumanParticipants(roomWithBreakouts(room)...); live > 0 {
+			room.RoomInfo.JoinedParticipants = live
+		}
+	}
+
+	return true, config.MsgSuccess, plugnmeet.StatusCode_SUCCESS, rooms
 }
 
 func (m *RoomModel) FetchPastRooms(userCtx context.Context, r *plugnmeet.FetchPastRoomsReq) (plugnmeet.StatusCode, *plugnmeet.FetchPastRoomsResult, error) {
