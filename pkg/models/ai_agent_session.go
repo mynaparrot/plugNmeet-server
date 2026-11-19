@@ -125,6 +125,12 @@ func (m *AIAgentModel) Start(ctx context.Context, roomId string, req *plugnmeet.
 	}
 
 	deps := m.BuildToolDependencies(roomId, delegate, log)
+	// The 1-on-1 voice agent only needs the countdown timer from the room-admin
+	// tool set; breakout, insights, media/recording and participant moderation
+	// belong to the administrator's AI text chat.
+	deps.Breakout = nil
+	deps.Insights = nil
+	deps.Participants = nil
 	// The voice agent owns the ai_agent-scoped external MCP servers; it may
 	// also use the shared ones. The text chat's servers stay invisible here.
 	deps.MCPScope = mcp.MCPScopeAIAgent

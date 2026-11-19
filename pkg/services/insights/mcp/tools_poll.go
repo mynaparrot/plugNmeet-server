@@ -52,9 +52,9 @@ func registerPollTools(reg *Registry, deps ToolDependencies) {
 		Kind: ToolKindServer,
 		Spec: &insights.MCPToolSpec{
 			Name:        ToolCreatePoll,
-			Description: "Open a poll on the participant's screen to check understanding. Keep the question short and use 2-10 options.",
+			Description: "Open a poll on the participant's screen to check understanding; keep the question short with 2-10 options.",
 			InputSchema: objectSchema(map[string]any{
-				"question": stringProp("The question shown on the participant's screen.", 500),
+				"question": stringProp("The question.", 500),
 				"options":  arrayProp("The answer options.", stringProp("", 200), 2, 10),
 			}, "question", "options"),
 		},
@@ -87,13 +87,13 @@ func registerPollTools(reg *Registry, deps ToolDependencies) {
 			Kind: ToolKindServer,
 			Spec: &insights.MCPToolSpec{
 				Name: ToolCreateQuiz,
-				Description: "Open a multiple-choice quiz on the participant's screen. The correct option index is stored server-side " +
-					"so you can give feedback afterwards; do not reveal it in the question.",
+				Description: "Open a multiple-choice quiz on the participant's screen. The correct option is stored " +
+					"server-side for your feedback; never reveal it in the question.",
 				InputSchema: objectSchema(map[string]any{
-					"question":             stringProp("The question shown on the participant's screen.", 500),
+					"question":             stringProp("The question.", 500),
 					"options":              arrayProp("The answer options.", stringProp("", 200), 2, 10),
 					"correct_option_index": intProp("0-based index of the correct option.", 0, 9),
-					"explanation":          stringProp("Optional short explanation to give after the participant answers.", 500),
+					"explanation":          stringProp("Short explanation to give after the answer.", 500),
 				}, "question", "options", "correct_option_index"),
 			},
 			Handler: func(ctx context.Context, call ToolCall) (ToolResult, error) {
@@ -131,9 +131,9 @@ func registerPollTools(reg *Registry, deps ToolDependencies) {
 		Kind: ToolKindServer,
 		Spec: &insights.MCPToolSpec{
 			Name:        ToolClosePoll,
-			Description: "Close an open poll so results are revealed and the participant can no longer answer.",
+			Description: "Close an open poll: results are revealed and no further answers are accepted.",
 			InputSchema: objectSchema(map[string]any{
-				"poll_id": stringProp("The poll id returned when the poll was created.", 120),
+				"poll_id": stringProp("The poll id from create_poll/create_quiz.", 120),
 			}, "poll_id"),
 		},
 		Handler: func(ctx context.Context, call ToolCall) (ToolResult, error) {
@@ -154,11 +154,10 @@ func registerPollTools(reg *Registry, deps ToolDependencies) {
 		Kind: ToolKindServer,
 		Spec: &insights.MCPToolSpec{
 			Name: ToolGetPollResults,
-			Description: "Inspect the room's polls and quizzes: omit poll_id to list every poll with its status and vote counts, " +
-				"or pass one poll_id to get that poll's detailed results. Use it before giving feedback, closing a poll or " +
-				"deciding what to practise next.",
+			Description: "Inspect the room's polls and quizzes: omit poll_id to list every poll with status and vote " +
+				"counts, or pass one poll_id for its detailed results. Use it before feedback or closing a poll.",
 			InputSchema: objectSchema(map[string]any{
-				"poll_id": stringProp("Optional poll id; omit it to list all polls of the room.", 120),
+				"poll_id": stringProp("Optional poll id; omit it to list all polls.", 120),
 			}),
 		},
 		Handler: func(ctx context.Context, call ToolCall) (ToolResult, error) {
@@ -188,20 +187,19 @@ func registerQuizApprovalTools(reg *Registry, deps ToolDependencies) {
 		Kind: ToolKindServer,
 		Spec: &insights.MCPToolSpec{
 			Name: ToolDraftQuiz,
-			Description: "Create a quiz preview/draft to show in chat for admin approval before publishing to participants. " +
-				"Call it once with `questions` for a multi-question quiz, or once per question with the top-level fields. " +
-				"Single-question drafts add up in the room's pending draft, so you can draft a 4-question quiz in 4 calls. " +
-				"Before calling this tool, check if any external MCP lesson/resource tools or notepad content are available to " +
-				"base the questions on. After calling this tool, display every drafted question (numbered options, correct " +
-				"answer, explanation) in chat and ask the user to approve before calling publish_quiz.",
+			Description: "Create a quiz draft to preview in chat for admin approval before publishing. Call it once " +
+				"with `questions` for a multi-question quiz, or once per question with the top-level fields; " +
+				"single-question drafts accumulate in the room's pending draft. Base the questions on any external MCP " +
+				"lesson/resource tools or notepad content. Then display every drafted question (numbered options, " +
+				"correct answer, explanation) in chat and ask for explicit approval before publish_quiz.",
 			InputSchema: objectSchema(map[string]any{
-				"questions": arrayProp("Optional list of 1-10 questions for a multi-question quiz. Preferred over the top-level fields.",
+				"questions": arrayProp("1-10 questions for a multi-question quiz; preferred over the top-level fields.",
 					quizDraftQuestionSchema(), 1, maxQuizDraftQuestions),
-				"question": stringProp("Single-question form: the question shown to the participants once the quiz is published.", 500),
-				"options":  arrayProp("Single-question form: the answer options, in display order.", stringProp("", 200), minQuizDraftOptions, maxQuizDraftOptions),
+				"question": stringProp("Single-question form: the question shown once published.", 500),
+				"options":  arrayProp("Single-question form: the answer options in display order.", stringProp("", 200), minQuizDraftOptions, maxQuizDraftOptions),
 				"correct_option_index": intProp("Single-question form: 0-based index of the correct option.",
 					0, maxQuizDraftIndex),
-				"explanation": stringProp("Single-question form: optional short explanation to give after the participants answer.", 500),
+				"explanation": stringProp("Single-question form: short explanation to give after the answer.", 500),
 			}),
 		},
 		Handler: func(ctx context.Context, call ToolCall) (ToolResult, error) {
@@ -284,11 +282,10 @@ func registerQuizApprovalTools(reg *Registry, deps ToolDependencies) {
 		Kind: ToolKindServer,
 		Spec: &insights.MCPToolSpec{
 			Name: ToolPublishQuiz,
-			Description: "Publish every question of the room's pending quiz draft to the room after the user reviewed and approved " +
-				"the preview in chat. Omit draft_id, or pass \"latest\" or \"all\", to publish all pending drafted questions; " +
-				"a draft_id returned by draft_quiz is also accepted.",
+			Description: "Publish the room's pending quiz draft after the user approved the preview in chat. Omit " +
+				"draft_id (or pass \"latest\"/\"all\") to publish all pending questions.",
 			InputSchema: objectSchema(map[string]any{
-				"draft_id": stringProp("Optional: the draft_id returned by draft_quiz. Omit it, or pass \"latest\"/\"all\", to publish all pending drafted questions.", 120),
+				"draft_id": stringProp("Optional draft_id from draft_quiz; omit or pass \"latest\"/\"all\" for all pending questions.", 120),
 			}),
 		},
 		Handler: func(ctx context.Context, call ToolCall) (ToolResult, error) {

@@ -664,6 +664,32 @@ func TestAdminToolsAreOnlyRegisteredWithTheirBackend(t *testing.T) {
 	}
 }
 
+// A 1-on-1 voice agent keeps only the countdown timer from the room-admin tool
+// set; everything else belongs to the administrator's AI text chat.
+func TestAIAgentScopeSkipsAdminTools(t *testing.T) {
+	deps, _, _, _, _ := adminDeps()
+	deps.Breakout = nil
+	deps.Insights = nil
+	deps.Participants = nil
+	deps.MCPScope = MCPScopeAIAgent
+
+	reg := BuildRoomToolRegistry(fullFeatures(), deps)
+
+	if !hasTool(reg, ToolManageCountdownTimer) {
+		t.Error("manage_countdown_timer must be registered for the voice agent")
+	}
+	for _, name := range []string{
+		ToolCreateBreakoutRooms, ToolManageBreakoutRooms,
+		ToolConfigureSpeechToText, ToolConfigureChatTranslation, ToolConfigureMeetingSummarization,
+		ToolManageExternalMedia, ToolManageRecording,
+		ToolManageParticipants,
+	} {
+		if hasTool(reg, name) {
+			t.Errorf("%s must not be registered for the voice agent", name)
+		}
+	}
+}
+
 func TestAdminBackendErrorsBecomeToolErrors(t *testing.T) {
 	deps, breakout, insightsBackend, roomOps, participants := adminDeps()
 	breakout.createErr = errors.New("no room")

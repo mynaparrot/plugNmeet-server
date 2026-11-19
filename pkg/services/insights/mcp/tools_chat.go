@@ -25,14 +25,13 @@ func registerChatTools(reg *Registry, deps ToolDependencies) {
 		Kind: ToolKindServer,
 		Spec: &insights.MCPToolSpec{
 			Name: ToolSendChatMessage,
-			Description: "Send a written message to the AI Chat box. Use it to share exact spellings, vocabulary lists, " +
-				"short explanations, code/formulas, links, prompts for the participant to reply to in AI Chat, or written " +
-				"replies when a participant messages you in AI Chat. Prefer the whiteboard for visual drawings and the " +
-				"shared notepad for long structured notes.",
+			Description: "Send a written message to the AI Chat box: exact spellings, vocabulary lists, short " +
+				"explanations, code/formulas, links, prompts to reply to, or answers to a participant's message. " +
+				"Prefer the whiteboard for drawings and the shared notepad for long notes.",
 			InputSchema: objectSchema(map[string]any{
-				"markdown_text": stringProp("The message to display in the AI Chat box; markdown is supported.", maxChatMessageChars),
-				"to_user_id": stringProp("Optional target participant user_id for a private reply in their AI Chat box. "+
-					"Leave empty to send to the participant who last messaged you in AI Chat (or to everyone in the room).", maxChatTargetChars),
+				"markdown_text": stringProp("The message; markdown is supported.", maxChatMessageChars),
+				"to_user_id": stringProp("Optional participant user_id for a private reply; leave empty for the "+
+					"participant who last messaged you (or the whole room).", maxChatTargetChars),
 			}, "markdown_text"),
 		},
 		Handler: func(ctx context.Context, call ToolCall) (ToolResult, error) {

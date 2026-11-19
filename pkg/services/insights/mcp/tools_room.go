@@ -70,17 +70,14 @@ func registerWorkspaceLockTool(reg *Registry, deps ToolDependencies) {
 		Kind: ToolKindServer,
 		Spec: &insights.MCPToolSpec{
 			Name: ToolSetWorkspaceLock,
-			Description: "Control the whiteboard or shared notepad for participants. Keep surfaces locked (view-only) while " +
-				"you (the AI agent) are drawing, writing, or explaining — your own tools always work while locked, and " +
-				"calling any drawing or notepad tool automatically opens the surface in view-only mode. Use 'unlock' ONLY " +
-				"when you want the participant to draw or write on the surface themselves; use 'lock' to return the surface " +
-				"to view-only mode after they finish; use 'open' to show the surface in view-only mode without drawing; " +
-				"use 'close' to hide/close the surface.",
+			Description: "Control the whiteboard or shared notepad for participants. Keep surfaces locked (view-only) " +
+				"while you draw, write or explain — your own tools work while locked and open the surface " +
+				"automatically; unlock ONLY for the participant's own turn.",
 			InputSchema: objectSchema(map[string]any{
-				"surface": enumProp("Which workspace surface to control.", "whiteboard", "shared_notepad", "both"),
-				"action": enumProp("'unlock' lets the participant draw/write (use ONLY when it is the participant's turn to draw/write, NEVER for your own drawing), "+
-					"'lock' returns it to view-only mode, 'open' shows it in view-only mode, 'close' hides it.", "unlock", "lock", "open", "close"),
-				"user_id": stringProp("Optional specific participant user_id, or omit/'all' for all participants in the room.", 120),
+				"surface": enumProp("Which surface to control.", "whiteboard", "shared_notepad", "both"),
+				"action": enumProp("'unlock' lets the participant draw/write (ONLY for their turn, NEVER for your own "+
+					"drawing), 'lock' returns it to view-only, 'open' shows it view-only, 'close' hides it.", "unlock", "lock", "open", "close"),
+				"user_id": stringProp("Specific participant user_id, or omit/'all' for everyone.", 120),
 			}, "surface", "action"),
 		},
 		Handler: func(ctx context.Context, call ToolCall) (ToolResult, error) {

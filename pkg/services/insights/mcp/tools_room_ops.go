@@ -31,12 +31,11 @@ func registerRoomOpsTools(reg *Registry, deps ToolDependencies) {
 		Timeout: roomOpsToolTimeout,
 		Spec: &insights.MCPToolSpec{
 			Name: ToolManageCountdownTimer,
-			Description: "Run the countdown timer every participant sees. Use it to time an exercise or a break: " +
-				"start with a duration, then pause, resume, extend or stop it. Say the time out loud so the " +
-				"participants know what the timer is for.",
+			Description: "Run the countdown timer every participant sees, e.g. to time an exercise or a break. " +
+				"Say the time out loud so the participants know what it is for.",
 			InputSchema: objectSchema(map[string]any{
-				"action":           enumProp("What to do with the timer.", "start", "pause", "resume", "extend", "stop"),
-				"duration_seconds": intProp("How long the timer runs (required for start) or how many seconds to add for extend (optional, defaults to 60).", minCountdownTimerSeconds, maxCountdownTimerSeconds),
+				"action":           enumProp("Timer action.", "start", "pause", "resume", "extend", "stop"),
+				"duration_seconds": intProp("Seconds to run (start) or to add (extend, optional, defaults to 60).", minCountdownTimerSeconds, maxCountdownTimerSeconds),
 			}, "action"),
 		},
 		Handler: func(ctx context.Context, call ToolCall) (ToolResult, error) {
@@ -81,18 +80,23 @@ func registerRoomOpsTools(reg *Registry, deps ToolDependencies) {
 		},
 	})
 
+	// The 1-on-1 voice agent only needs the countdown timer; sharing media and
+	// recording are administrator actions of the AI text chat.
+	if deps.MCPScope == MCPScopeAIAgent {
+		return
+	}
+
 	reg.Register(&Tool{
 		Kind:    ToolKindServer,
 		Timeout: roomOpsToolTimeout,
 		Spec: &insights.MCPToolSpec{
 			Name: ToolManageExternalMedia,
-			Description: "Share media with the room: play an audio/video file in the media player, or open a web page " +
-				"in the external link view. Use stop to close whichever surface is open.",
+			Description: "Share media with the room: play an audio/video file in the media player or open a web page " +
+				"in the external link view; use stop to close it.",
 			InputSchema: objectSchema(map[string]any{
-				"action": enumProp("Whether to start or stop the media.", "start", "stop"),
-				"media_type": enumProp("Which surface to use: the media player for a direct media file, the external "+
-					"link view for a web page.", "media_player", "external_link"),
-				"url": stringProp("The https URL to play or open; required for start.", 1000),
+				"action":     enumProp("Start or stop the media.", "start", "stop"),
+				"media_type": enumProp("Media player for a direct media file, external link for a web page.", "media_player", "external_link"),
+				"url":        stringProp("https URL to play or open; required for start.", 1000),
 			}, "action", "media_type"),
 		},
 		Handler: func(ctx context.Context, call ToolCall) (ToolResult, error) {
@@ -141,10 +145,10 @@ func registerRoomOpsTools(reg *Registry, deps ToolDependencies) {
 		Timeout: roomOpsToolTimeout,
 		Spec: &insights.MCPToolSpec{
 			Name: ToolManageRecording,
-			Description: "Start or stop the recording of the meeting. Recording starts and stops for the whole room, so " +
-				"tell the participants before you start it. It is only available when the host enabled recording.",
+			Description: "Start or stop the recording of the whole room. Only available when the host enabled " +
+				"recording; tell the participants before you start it.",
 			InputSchema: objectSchema(map[string]any{
-				"action": enumProp("Whether to start or stop the recording.", "start", "stop"),
+				"action": enumProp("Start or stop the recording.", "start", "stop"),
 			}, "action"),
 		},
 		Handler: func(ctx context.Context, call ToolCall) (ToolResult, error) {
