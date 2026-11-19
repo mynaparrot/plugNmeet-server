@@ -3,6 +3,7 @@ package openai
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
-	openAiSdk "github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/live"
 	"github.com/openai/openai-go/v3/packages/param"
 	"github.com/openai/openai-go/v3/responses"
@@ -19,12 +19,11 @@ import (
 )
 
 const (
-	defaultLiveModel           = string(live.SessionConfigModelGPTLive1)
-	defaultLiveDelegationModel = openAiSdk.ChatModelGPT5_4Mini
-	liveAudioSampleRate        = 24000
-	liveHandshakeTimeout       = 15 * time.Second
-	liveCloseTimeout           = 2 * time.Second
-	liveEventBuffer            = 256
+	defaultLiveModel     = string(live.SessionConfigModelGPTLive1)
+	liveAudioSampleRate  = 24000
+	liveHandshakeTimeout = 15 * time.Second
+	liveCloseTimeout     = 2 * time.Second
+	liveEventBuffer      = 256
 
 	// Live server events.
 	liveEventSessionStarted     = "session.started"
@@ -67,7 +66,12 @@ func (p *OpenAIProvider) createLiveSession(ctx context.Context, model string, op
 		model = defaultLiveModel
 	}
 
-	delegationModel := p.realtimeOption(opts, "delegation_model", defaultLiveDelegationModel)
+	// The speech model never sees the tools: every tool turn runs on the
+	// delegated Responses backend, which therefore must be configured.
+	delegationModel := strings.TrimSpace(p.realtimeOption(opts, "delegation_model", ""))
+	if delegationModel == "" {
+		return nil, fmt.Errorf("openai live session requires delegation_model to be configured")
+	}
 
 	voice := opts.Voice
 	if voice == "" {
@@ -469,6 +473,9 @@ func (s *liveSession) handleResponseEvent(ev live.ResponseEvent) {
 		})
 
 	case liveResponseCompleted:
+		// The completed response reports what the delegated text model spent.
+		s.emitDelegationUsage(ev.Event["response"])
+
 		// A function call turn is answered by the caller through SendToolResult.
 		if !s.setFunctionCallSeen(false) {
 			s.emit(insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete})
@@ -480,6 +487,29 @@ func (s *liveSession) handleResponseEvent(ev live.ResponseEvent) {
 			Err:  errors.New(liveResponseErrorMessage(ev.Event)),
 		})
 	}
+}
+
+// emitDelegationUsage reports the tokens the delegated model spent on one
+// completed response.
+func (s *liveSession) emitDelegationUsage(rawResponse any) {
+	response, ok := rawResponse.(map[string]any)
+	if !ok {
+		return
+	}
+	usage, ok := response["usage"].(map[string]any)
+	if !ok {
+		return
+	}
+
+	inputTokens, outputTokens := nestedUint32(usage, "input_tokens"), nestedUint32(usage, "output_tokens")
+	if inputTokens == 0 && outputTokens == 0 {
+		return
+	}
+	s.emit(insights.RealtimeEvent{
+		Type:                   insights.RealtimeEventUsage,
+		DelegationInputTokens:  inputTokens,
+		DelegationOutputTokens: outputTokens,
+	})
 }
 
 // handleUsageEvent reports the audio consumed since the previous update; the
@@ -524,6 +554,42 @@ func nestedString(m map[string]any, key string) string {
 		return ""
 	}
 	return strings.TrimSpace(value)
+}
+
+// nestedUint32 reads an unsigned count from a decoded JSON object. Decoders
+// differ in the numeric type they produce, so every integer shape is accepted;
+// negative values clamp to 0 and oversized ones to math.MaxUint32.
+func nestedUint32(m map[string]any, key string) uint32 {
+	switch value := m[key].(type) {
+	case float64:
+		return clampUint32(int64(value))
+	case int64:
+		return clampUint32(value)
+	case int:
+		return clampUint32(int64(value))
+	case uint32:
+		return value
+	case uint64:
+		if value > math.MaxUint32 {
+			return math.MaxUint32
+		}
+		return uint32(value)
+	case json.Number:
+		if parsed, err := value.Int64(); err == nil {
+			return clampUint32(parsed)
+		}
+	}
+	return 0
+}
+
+func clampUint32(value int64) uint32 {
+	if value <= 0 {
+		return 0
+	}
+	if value > math.MaxUint32 {
+		return math.MaxUint32
+	}
+	return uint32(value)
 }
 
 func (s *liveSession) readLoop() {

@@ -52,6 +52,11 @@ type RealtimeEvent struct {
 	// InputTokens and OutputTokens are set for RealtimeEventUsage.
 	InputTokens  uint32
 	OutputTokens uint32
+	// DelegationInputTokens and DelegationOutputTokens report the tokens spent by
+	// a delegated text model (e.g. an OpenAI Live Responses delegation), which is
+	// priced apart from the session model.
+	DelegationInputTokens  uint32
+	DelegationOutputTokens uint32
 	// AudioMillis is the agent audio duration covered by a usage event, when known.
 	AudioMillis uint64
 	// TraceID correlates the event with server-side logs.

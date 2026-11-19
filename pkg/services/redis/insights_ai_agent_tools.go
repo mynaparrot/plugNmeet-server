@@ -62,20 +62,23 @@ type AIAgentSessionTelemetry struct {
 	SessionID string `json:"session_id"`
 	// Learner identity of the 1-on-1 session, so the summary artifact can still
 	// name the participant after they left the room.
-	UserID                 string                    `json:"user_id,omitempty"`
-	UserName               string                    `json:"user_name,omitempty"`
-	ExUserID               string                    `json:"ex_user_id,omitempty"`
-	ExtraData              string                    `json:"extra_data,omitempty"`
-	AgentName              string                    `json:"agent_name"`
-	Topic                  string                    `json:"topic"`
-	AllowedSubtopics       []string                  `json:"allowed_subtopics,omitempty"`
-	StartedAt              int64                     `json:"started_at"`
-	EndedAt                int64                     `json:"ended_at"`
-	EndReason              string                    `json:"end_reason,omitempty"`
-	TurnsCount             int                       `json:"turns_count"`
-	OffTopicRedirectsCount int                       `json:"off_topic_redirects_count"`
-	InputTokens            uint64                    `json:"input_tokens"`
-	OutputTokens           uint64                    `json:"output_tokens"`
+	UserID                 string   `json:"user_id,omitempty"`
+	UserName               string   `json:"user_name,omitempty"`
+	ExUserID               string   `json:"ex_user_id,omitempty"`
+	ExtraData              string   `json:"extra_data,omitempty"`
+	AgentName              string   `json:"agent_name"`
+	Topic                  string   `json:"topic"`
+	AllowedSubtopics       []string `json:"allowed_subtopics,omitempty"`
+	StartedAt              int64    `json:"started_at"`
+	EndedAt                int64    `json:"ended_at"`
+	EndReason              string   `json:"end_reason,omitempty"`
+	TurnsCount             int      `json:"turns_count"`
+	OffTopicRedirectsCount int      `json:"off_topic_redirects_count"`
+	InputTokens            uint64   `json:"input_tokens"`
+	OutputTokens           uint64   `json:"output_tokens"`
+	// Tokens spent by the delegated text model of a live session, priced apart.
+	DelegationInputTokens  uint64                    `json:"delegation_input_tokens,omitempty"`
+	DelegationOutputTokens uint64                    `json:"delegation_output_tokens,omitempty"`
 	AudioMillis            uint64                    `json:"audio_millis"`
 	ToolsUsed              map[string]int            `json:"tools_used,omitempty"`
 	Transcript             []AISessionTranscriptTurn `json:"transcript,omitempty"`

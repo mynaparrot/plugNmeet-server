@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -125,17 +126,23 @@ func aiAgentSummaryUserInfo(summary *plugnmeet.AIAgentSessionSummary) *plugnmeet
 	return userInfo
 }
 
-// buildAIAgentSessionUsages separates the realtime session usage from the tokens
-// the summary synthesis spent, so each entry is priced at its own model rate.
+// buildAIAgentSessionUsages separates the session usage, the delegated text
+// model usage and the tokens the summary synthesis spent, so each entry is
+// priced at its own model rate.
 func (m *ArtifactModel) buildAIAgentSessionUsages(telemetry *redisservice.AIAgentSessionTelemetry, summaryPromptTokens, summaryCompletionTokens uint32, summarizeModel string, log *logrus.Entry) []*plugnmeet.RoomArtifactTokenUsage {
-	var sessionInput, sessionOutput uint64
+	var sessionInput, sessionOutput, audioMillis, delegationInput, delegationOutput uint64
 	if telemetry != nil {
 		sessionInput, sessionOutput = telemetry.InputTokens, telemetry.OutputTokens
+		audioMillis = telemetry.AudioMillis
+		delegationInput, delegationOutput = telemetry.DelegationInputTokens, telemetry.DelegationOutputTokens
 	}
 
-	usages := make([]*plugnmeet.RoomArtifactTokenUsage, 0, 2)
-	if sessionInput > 0 || sessionOutput > 0 {
-		realtimeModel := m.aiAgentRealtimeModel(log)
+	realtimeModel := m.aiAgentRealtimeModel(log)
+	usages := make([]*plugnmeet.RoomArtifactTokenUsage, 0, 3)
+
+	switch {
+	case sessionInput > 0 || sessionOutput > 0:
+		// Token-based session (Realtime API, Gemini Live).
 		promptCost := m.estimateTokensCost(insights.ServiceTypeAIAgent, sessionInput, true, log, aiAgentRealtimePricingKey, realtimeModel)
 		completionCost := m.estimateTokensCost(insights.ServiceTypeAIAgent, sessionOutput, false, log, aiAgentRealtimePricingKey, realtimeModel)
 
@@ -143,8 +150,8 @@ func (m *ArtifactModel) buildAIAgentSessionUsages(telemetry *redisservice.AIAgen
 			"session_prompt_tokens":     int64(sessionInput),
 			"session_completion_tokens": int64(sessionOutput),
 		}
-		if telemetry != nil && telemetry.AudioMillis > 0 {
-			breakdown["audio_millis"] = int64(telemetry.AudioMillis)
+		if audioMillis > 0 {
+			breakdown["audio_millis"] = int64(audioMillis)
 		}
 
 		usages = append(usages, &plugnmeet.RoomArtifactTokenUsage{
@@ -152,6 +159,34 @@ func (m *ArtifactModel) buildAIAgentSessionUsages(telemetry *redisservice.AIAgen
 			CompletionTokens:              clampToUint32(sessionOutput),
 			TotalTokens:                   clampToUint32(sessionInput + sessionOutput),
 			Breakdown:                     breakdown,
+			PromptTokensEstimatedCost:     roundAndPointer(promptCost, 6),
+			CompletionTokensEstimatedCost: roundAndPointer(completionCost, 6),
+			TotalTokensEstimatedCost:      roundAndPointer(promptCost+completionCost, 6),
+		})
+
+	case audioMillis > 0:
+		// Minute-based Live session: the speech model reports its own audio
+		// duration and delegates every text turn, so it has no tokens of its own.
+		audioCost := m.estimateAudioMillisCost(insights.ServiceTypeAIAgent, audioMillis, log, aiAgentLivePricingKey, aiAgentRealtimePricingKey, realtimeModel)
+		usages = append(usages, &plugnmeet.RoomArtifactTokenUsage{
+			Breakdown:                map[string]int64{"audio_millis": int64(audioMillis)},
+			TotalTokensEstimatedCost: roundAndPointer(audioCost, 6),
+		})
+	}
+
+	if delegationInput > 0 || delegationOutput > 0 {
+		delegationModel := m.aiAgentDelegationModel(log)
+		promptCost := m.estimateTokensCost(insights.ServiceTypeAIAgent, delegationInput, true, log, aiAgentDelegationPricingKey, delegationModel)
+		completionCost := m.estimateTokensCost(insights.ServiceTypeAIAgent, delegationOutput, false, log, aiAgentDelegationPricingKey, delegationModel)
+
+		usages = append(usages, &plugnmeet.RoomArtifactTokenUsage{
+			PromptTokens:     clampToUint32(delegationInput),
+			CompletionTokens: clampToUint32(delegationOutput),
+			TotalTokens:      clampToUint32(delegationInput + delegationOutput),
+			Breakdown: map[string]int64{
+				"delegation_prompt_tokens":     int64(delegationInput),
+				"delegation_completion_tokens": int64(delegationOutput),
+			},
 			PromptTokensEstimatedCost:     roundAndPointer(promptCost, 6),
 			CompletionTokensEstimatedCost: roundAndPointer(completionCost, 6),
 			TotalTokensEstimatedCost:      roundAndPointer(promptCost+completionCost, 6),
@@ -179,61 +214,93 @@ func (m *ArtifactModel) buildAIAgentSessionUsages(telemetry *redisservice.AIAgen
 	return usages
 }
 
-// Pricing keys of the ai_agent service. Like the options of the same name, the
-// realtime and the summarize role can be priced directly, so operators do not
-// have to repeat the concrete model name; a specific model name and the
-// "default" entry are used as fallbacks.
+// Pricing keys of the ai_agent service. Like the options of the same name, every
+// role can be priced directly, so operators do not have to repeat the concrete
+// model name; a specific model name and the "default" entry are the fallbacks.
 const (
-	aiAgentRealtimePricingKey  = "realtime_model"
-	aiAgentSummarizePricingKey = "summarize_model"
+	aiAgentLivePricingKey       = "live_model"
+	aiAgentRealtimePricingKey   = "realtime_model"
+	aiAgentDelegationPricingKey = "delegation_model"
+	aiAgentSummarizePricingKey  = "summarize_model"
 )
 
-// aiAgentRealtimeModel returns the model of the realtime session, "default" when
-// no ai_agent provider account is configured.
-func (m *ArtifactModel) aiAgentRealtimeModel(log *logrus.Entry) string {
+// aiAgentServiceOption returns one ai_agent option, "" when it is not configured.
+func (m *ArtifactModel) aiAgentServiceOption(key string, log *logrus.Entry) string {
 	if m.app == nil || m.app.Insights == nil {
-		return "default"
+		return ""
 	}
 	_, service, err := m.app.Insights.GetProviderAccountForService(insights.ServiceTypeAIAgent)
 	if err != nil {
 		log.WithError(err).Debug("could not get the ai_agent service config for pricing")
-		return "default"
+		return ""
 	}
-	if model := service.GetOptionsString("realtime_model", ""); model != "" {
+	return strings.TrimSpace(service.GetOptionsString(key, ""))
+}
+
+// aiAgentRealtimeModel returns the model of the session itself: the live model
+// when one is configured, else the realtime model, else "default".
+func (m *ArtifactModel) aiAgentRealtimeModel(log *logrus.Entry) string {
+	if model := m.aiAgentServiceOption("live_model", log); model != "" {
+		return model
+	}
+	if model := m.aiAgentServiceOption("realtime_model", log); model != "" {
 		return model
 	}
 	return "default"
 }
 
-// buildAIAgentUsageMetadata combines the session's realtime usage with the extra
-// tokens the summary synthesis spent.
+// aiAgentDelegationModel returns the model of the delegated text backend of a
+// live session.
+func (m *ArtifactModel) aiAgentDelegationModel(log *logrus.Entry) string {
+	if model := m.aiAgentServiceOption("delegation_model", log); model != "" {
+		return model
+	}
+	return "default"
+}
+
+// buildAIAgentUsageMetadata combines the session usage, the delegated model
+// usage and the extra tokens the summary synthesis spent into one total, each
+// part priced at its own model rate.
 func (m *ArtifactModel) buildAIAgentUsageMetadata(telemetry *redisservice.AIAgentSessionTelemetry, summaryPromptTokens, summaryCompletionTokens uint32, summarizeModel string, fileArtifactId *string, log *logrus.Entry) *plugnmeet.RoomArtifactMetadata {
-	var sessionInput, sessionOutput uint64
+	var sessionInput, sessionOutput, audioMillis, delegationInput, delegationOutput uint64
 	if telemetry != nil {
 		sessionInput, sessionOutput = telemetry.InputTokens, telemetry.OutputTokens
+		audioMillis = telemetry.AudioMillis
+		delegationInput, delegationOutput = telemetry.DelegationInputTokens, telemetry.DelegationOutputTokens
 	}
-	totalPrompt := sessionInput + uint64(summaryPromptTokens)
-	totalCompletion := sessionOutput + uint64(summaryCompletionTokens)
 
 	realtimeModel := m.aiAgentRealtimeModel(log)
+	delegationModel := m.aiAgentDelegationModel(log)
+
+	totalPrompt := sessionInput + delegationInput + uint64(summaryPromptTokens)
+	totalCompletion := sessionOutput + delegationOutput + uint64(summaryCompletionTokens)
 
 	promptCost := m.estimateTokensCost(insights.ServiceTypeAIAgent, sessionInput, true, log, aiAgentRealtimePricingKey, realtimeModel) +
+		m.estimateTokensCost(insights.ServiceTypeAIAgent, delegationInput, true, log, aiAgentDelegationPricingKey, delegationModel) +
 		m.estimateTokensCost(insights.ServiceTypeAIAgent, uint64(summaryPromptTokens), true, log, aiAgentSummarizePricingKey, summarizeModel)
 	completionCost := m.estimateTokensCost(insights.ServiceTypeAIAgent, sessionOutput, false, log, aiAgentRealtimePricingKey, realtimeModel) +
+		m.estimateTokensCost(insights.ServiceTypeAIAgent, delegationOutput, false, log, aiAgentDelegationPricingKey, delegationModel) +
 		m.estimateTokensCost(insights.ServiceTypeAIAgent, uint64(summaryCompletionTokens), false, log, aiAgentSummarizePricingKey, summarizeModel)
 
-	breakdown := make(map[string]int64, 4)
-	if sessionInput > 0 {
-		breakdown["session_prompt_tokens"] = int64(sessionInput)
+	var audioCost float64
+	if sessionInput == 0 && sessionOutput == 0 && audioMillis > 0 {
+		audioCost = m.estimateAudioMillisCost(insights.ServiceTypeAIAgent, audioMillis, log, aiAgentLivePricingKey, aiAgentRealtimePricingKey, realtimeModel)
 	}
-	if sessionOutput > 0 {
-		breakdown["session_completion_tokens"] = int64(sessionOutput)
-	}
-	if summaryPromptTokens > 0 {
-		breakdown["summary_prompt_tokens"] = int64(summaryPromptTokens)
-	}
-	if summaryCompletionTokens > 0 {
-		breakdown["summary_completion_tokens"] = int64(summaryCompletionTokens)
+	totalCost := promptCost + completionCost + audioCost
+
+	breakdown := make(map[string]int64, 7)
+	for key, value := range map[string]uint64{
+		"session_prompt_tokens":        sessionInput,
+		"session_completion_tokens":    sessionOutput,
+		"audio_millis":                 audioMillis,
+		"delegation_prompt_tokens":     delegationInput,
+		"delegation_completion_tokens": delegationOutput,
+		"summary_prompt_tokens":        uint64(summaryPromptTokens),
+		"summary_completion_tokens":    uint64(summaryCompletionTokens),
+	} {
+		if value > 0 {
+			breakdown[key] = int64(value)
+		}
 	}
 
 	return &plugnmeet.RoomArtifactMetadata{
@@ -245,7 +312,7 @@ func (m *ArtifactModel) buildAIAgentUsageMetadata(telemetry *redisservice.AIAgen
 				Breakdown:                     breakdown,
 				PromptTokensEstimatedCost:     roundAndPointer(promptCost, 6),
 				CompletionTokensEstimatedCost: roundAndPointer(completionCost, 6),
-				TotalTokensEstimatedCost:      roundAndPointer(promptCost+completionCost, 6),
+				TotalTokensEstimatedCost:      roundAndPointer(totalCost, 6),
 			},
 		},
 		ReferenceArtifactId: fileArtifactId,
@@ -256,7 +323,7 @@ func (m *ArtifactModel) buildAIAgentUsageMetadata(telemetry *redisservice.AIAgen
 // first pricing key that is configured for the service, 0 when no pricing
 // block matches.
 func (m *ArtifactModel) estimateTokensCost(serviceType insights.ServiceType, tokens uint64, prompt bool, log *logrus.Entry, pricingKeys ...string) float64 {
-	if tokens == 0 || m.app.Insights == nil {
+	if tokens == 0 || m.app == nil || m.app.Insights == nil {
 		return 0
 	}
 	pricing, err := m.app.Insights.GetServiceModelPricing(serviceType, pricingKeys...)
@@ -268,6 +335,27 @@ func (m *ArtifactModel) estimateTokensCost(serviceType insights.ServiceType, tok
 		return (float64(tokens) / 1000000) * pricing.InputPricePerMillionTokens
 	}
 	return (float64(tokens) / 1000000) * pricing.OutputPricePerMillionTokens
+}
+
+// estimateAudioMillisCost returns the estimated price of an audio duration at
+// the per-minute rate of the first pricing key that is configured for the
+// service, falling back to its hourly rate.
+func (m *ArtifactModel) estimateAudioMillisCost(serviceType insights.ServiceType, audioMillis uint64, log *logrus.Entry, pricingKeys ...string) float64 {
+	if audioMillis == 0 || m.app == nil || m.app.Insights == nil {
+		return 0
+	}
+	pricing, err := m.app.Insights.GetServiceModelPricing(serviceType, pricingKeys...)
+	if err != nil {
+		log.WithError(err).Warnf("could not calculate the audio cost for %s with pricing keys %v", serviceType, pricingKeys)
+		return 0
+	}
+	if pricing.PricePerMinute > 0 {
+		return (float64(audioMillis) / 60000.0) * pricing.PricePerMinute
+	}
+	if pricing.PricePerHour > 0 {
+		return (float64(audioMillis) / 3600000.0) * pricing.PricePerHour
+	}
+	return 0
 }
 
 func clampToUint32(v uint64) uint32 {

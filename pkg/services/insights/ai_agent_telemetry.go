@@ -87,6 +87,8 @@ func (a *AIAgent) TelemetrySnapshot(endReason string) redisservice.AIAgentSessio
 		OffTopicRedirectsCount: a.guard.OffTopicRedirectsCount(),
 		InputTokens:            uint64(state.inputTokens),
 		OutputTokens:           uint64(state.outputTokens),
+		DelegationInputTokens:  uint64(state.delegationInputTokens),
+		DelegationOutputTokens: uint64(state.delegationOutputTokens),
 		AudioMillis:            state.audioMillis,
 		ToolsUsed:              toolsUsed,
 		Transcript:             transcript,
@@ -114,10 +116,12 @@ func (a *AIAgent) logUsage() {
 	a.stateMu.Unlock()
 
 	a.logger.WithFields(logrus.Fields{
-		"inputTokens":  state.inputTokens,
-		"outputTokens": state.outputTokens,
-		"audioMillis":  state.audioMillis,
-		"durationMs":   time.Since(a.startedAt).Milliseconds(),
+		"inputTokens":            state.inputTokens,
+		"outputTokens":           state.outputTokens,
+		"delegationInputTokens":  state.delegationInputTokens,
+		"delegationOutputTokens": state.delegationOutputTokens,
+		"audioMillis":            state.audioMillis,
+		"durationMs":             time.Since(a.startedAt).Milliseconds(),
 	}).Info("ai agent: session usage")
 }
 
@@ -125,6 +129,8 @@ func (a *AIAgent) recordUsage(ev insights.RealtimeEvent) {
 	a.stateMu.Lock()
 	a.state.inputTokens += ev.InputTokens
 	a.state.outputTokens += ev.OutputTokens
+	a.state.delegationInputTokens += ev.DelegationInputTokens
+	a.state.delegationOutputTokens += ev.DelegationOutputTokens
 	a.state.audioMillis += ev.AudioMillis
 	audioMillis := a.state.audioMillis
 	a.stateMu.Unlock()

@@ -371,16 +371,21 @@ insights:
           output_price_per_million_tokens: 1.50
 
     # OpenAI: use provider "openai" with an account from the accounts section.
-    # Models prefixed with "gpt-live" use the Live SDK (Responses delegation);
-    # every other model uses the Realtime SDK, including OpenAI-compatible
-    # self-hosted servers.
+    # Models prefixed with "gpt-live" use the Live SDK; every other model uses
+    # the Realtime SDK, including OpenAI-compatible self-hosted servers.
+    # A Realtime session is billed per token, a Live session per minute for the
+    # speech model plus per token for its delegated text model.
     # ai_agent:
     #   provider: "openai"
     #   id: "default-openai-creds"
     #   options:
+    #     # Realtime: the session model prices prompt/completion tokens.
     #     realtime_model: "gpt-realtime-2.1-mini"  # default; "gpt-realtime-2.1" for the full model
-    #     # realtime_model: "gpt-live-1"           # Live SDK
-    #     # delegation_model: "gpt-5.4-mini"       # Live only: Responses backend for tools
+    #     # Live: set live_model instead of realtime_model. The speech model never
+    #     # sees the tools, so delegation_model is required and the server refuses
+    #     # to start without it.
+    #     # live_model: "gpt-live-1"
+    #     # delegation_model: "gpt-5.4-mini"
     #     # Text model used once at room end to refine AI_AGENT_SESSION_SUMMARY.
     #     # summarize_model: "gpt-5.4-mini"
     #     # default_voice: "marin"
@@ -389,7 +394,20 @@ insights:
     #     # turn_detection: "semantic_vad"         # semantic_vad (default), server_vad, none
     #     # input_transcription_model: "gpt-transcribe"  # or "gpt-live-transcribe" (no VAD), "none" disables
     #     # realtime_auth_header: "Authorization"  # e.g. "api-key" for self-hosted gateways
-    #   # pricing uses the same shape as above, keyed per model or "default".
+    #   pricing:
+    #     # Minute-priced: the live speech model reports audio duration only.
+    #     live_model:
+    #       price_per_minute: 0.10
+    #     # Token-priced: the delegated text model of the live session.
+    #     delegation_model:
+    #       input_price_per_million_tokens: 0.25
+    #       output_price_per_million_tokens: 2.00
+    #     # Token-priced: the summary written at room end.
+    #     summarize_model:
+    #       input_price_per_million_tokens: 0.25
+    #       output_price_per_million_tokens: 2.00
+    #     # A token-priced realtime_model entry works the same way for the
+    #     # Realtime SDK; concrete model names and "default" are the fallbacks.
 
 # Custom TURN Server (Optional)
 #turn_server:

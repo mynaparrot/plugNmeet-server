@@ -96,6 +96,10 @@ type aiAgentRuntimeState struct {
 	inputTokens  uint32
 	outputTokens uint32
 	audioMillis  uint64
+	// delegationInputTokens and delegationOutputTokens belong to the delegated
+	// text model of a live session, so they never mix with the session tokens.
+	delegationInputTokens  uint32
+	delegationOutputTokens uint32
 
 	turnsCount int
 	toolsUsed  map[string]int

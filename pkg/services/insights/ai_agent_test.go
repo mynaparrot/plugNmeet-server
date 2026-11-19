@@ -579,6 +579,7 @@ func TestAIAgentTelemetrySnapshot(t *testing.T) {
 		insights.RealtimeEvent{Type: insights.RealtimeEventTranscriptUser, Text: "   ", Final: true},
 		insights.RealtimeEvent{Type: insights.RealtimeEventTranscriptAgent, Text: "one of four equal parts", Final: true},
 		insights.RealtimeEvent{Type: insights.RealtimeEventUsage, InputTokens: 120, OutputTokens: 40, AudioMillis: 2500},
+		insights.RealtimeEvent{Type: insights.RealtimeEventUsage, DelegationInputTokens: 300, DelegationOutputTokens: 90},
 	)
 	waitFor(t, func() bool {
 		return env.agent.TelemetrySnapshot("").TurnsCount == 1
@@ -619,6 +620,10 @@ func TestAIAgentTelemetrySnapshot(t *testing.T) {
 	}
 	if snapshot.InputTokens != 120 || snapshot.OutputTokens != 40 || snapshot.AudioMillis != 2500 {
 		t.Errorf("usage = (%d, %d, %d), want (120, 40, 2500)", snapshot.InputTokens, snapshot.OutputTokens, snapshot.AudioMillis)
+	}
+	// Delegated tokens are tracked apart from the session tokens.
+	if snapshot.DelegationInputTokens != 300 || snapshot.DelegationOutputTokens != 90 {
+		t.Errorf("delegation usage = (%d, %d), want (300, 90)", snapshot.DelegationInputTokens, snapshot.DelegationOutputTokens)
 	}
 	// The sentinel is a redirect, never a tool the agent ran.
 	if got := snapshot.ToolsUsed; len(got) != 1 || got["whiteboard_write_content"] != 1 {

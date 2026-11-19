@@ -73,7 +73,7 @@ func (p *OpenAIProvider) resolveRealtimeModel(model string) string {
 		return model
 	}
 
-	if resolved := p.serviceOption("realtime_model", p.serviceOption("model", "")); resolved != "" {
+	if resolved := p.serviceOption("live_model", p.serviceOption("realtime_model", p.serviceOption("model", ""))); resolved != "" {
 		return resolved
 	}
 

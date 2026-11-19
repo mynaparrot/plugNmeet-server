@@ -3,8 +3,10 @@ package openai
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"strings"
 	"sync"
 	"testing"
@@ -13,6 +15,9 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/openai/openai-go/v3/live"
 )
+
+// testLiveDelegationModel stands in for the configured delegation_model.
+const testLiveDelegationModel = "gpt-5.4-mini"
 
 // fakeLiveConn records writes and replays scripted server events.
 type fakeLiveConn struct {
@@ -114,7 +119,7 @@ func TestBuildLiveSessionConfig(t *testing.T) {
 		},
 	}
 
-	cfg := buildLiveSessionConfig(defaultLiveModel, defaultLiveDelegationModel, "marin", opts)
+	cfg := buildLiveSessionConfig(defaultLiveModel, testLiveDelegationModel, "marin", opts)
 
 	if cfg.Model != live.SessionConfigModelGPTLive1 {
 		t.Fatalf("unexpected model: %s", cfg.Model)
@@ -133,7 +138,7 @@ func TestBuildLiveSessionConfig(t *testing.T) {
 	if delegation == nil {
 		t.Fatal("responses delegation not configured")
 	}
-	if delegation.Responses.Model != defaultLiveDelegationModel {
+	if delegation.Responses.Model != testLiveDelegationModel {
 		t.Fatalf("unexpected delegation model: %s", delegation.Responses.Model)
 	}
 	if len(delegation.Responses.Tools) != 1 || delegation.Responses.Tools[0].OfFunction == nil {
@@ -597,6 +602,86 @@ func TestLiveSessionServerResponseEvents(t *testing.T) {
 	events = drainRealtimeEvents(t, s.Events())
 	if len(events) != 1 || events[0].Type != insights.RealtimeEventError || !strings.Contains(events[0].Err.Error(), "backend exploded") {
 		t.Fatalf("unexpected failure event: %+v", events)
+	}
+}
+
+func TestLiveSessionServerDelegationUsage(t *testing.T) {
+	conn := &fakeLiveConn{}
+	s, err := newLiveSession(conn, nil)
+	if err != nil {
+		t.Fatalf("newLiveSession: %v", err)
+	}
+
+	s.handleServerEvent(live.ServerEventUnion{
+		Type: liveEventResponse,
+		OfResponseEvent: live.ResponseEvent{Event: map[string]any{
+			"type": liveResponseCompleted,
+			"response": map[string]any{
+				"usage": map[string]any{"input_tokens": float64(120), "output_tokens": int64(40)},
+			},
+		}},
+	})
+
+	events := drainRealtimeEvents(t, s.Events())
+	if len(events) != 2 {
+		t.Fatalf("expected a usage event and a turn complete: %+v", events)
+	}
+	usage := events[0]
+	if usage.Type != insights.RealtimeEventUsage || usage.DelegationInputTokens != 120 || usage.DelegationOutputTokens != 40 {
+		t.Fatalf("unexpected usage event: %+v", usage)
+	}
+	if usage.InputTokens != 0 || usage.OutputTokens != 0 {
+		t.Fatalf("delegated tokens must not be reported as session tokens: %+v", usage)
+	}
+	if events[1].Type != insights.RealtimeEventTurnComplete {
+		t.Fatalf("the usage event must precede the turn complete: %+v", events[1])
+	}
+
+	// A response without usage must not report one.
+	s.handleServerEvent(live.ServerEventUnion{
+		Type:            liveEventResponse,
+		OfResponseEvent: live.ResponseEvent{Event: map[string]any{"type": liveResponseCompleted}},
+	})
+	if events = drainRealtimeEvents(t, s.Events()); len(events) != 1 || events[0].Type != insights.RealtimeEventTurnComplete {
+		t.Fatalf("expected only a turn complete: %+v", events)
+	}
+}
+
+func TestNestedUint32(t *testing.T) {
+	tests := []struct {
+		name  string
+		value any
+		want  uint32
+	}{
+		{"missing", nil, 0},
+		{"float64", float64(42), 42},
+		{"int64", int64(42), 42},
+		{"int", 42, 42},
+		{"uint32", uint32(42), 42},
+		{"uint64", uint64(42), 42},
+		{"json number", json.Number("42"), 42},
+		{"negative float", float64(-3), 0},
+		{"negative int", int64(-3), 0},
+		{"oversized", int64(math.MaxUint32) + 10, math.MaxUint32},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			values := map[string]any{}
+			if tt.value != nil {
+				values["key"] = tt.value
+			}
+			if got := nestedUint32(values, "key"); got != tt.want {
+				t.Fatalf("nestedUint32 = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCreateLiveSessionRequiresDelegationModel(t *testing.T) {
+	provider := &OpenAIProvider{}
+
+	if _, err := provider.createLiveSession(context.Background(), "gpt-live-1", &insights.RealtimeSessionOptions{}); err == nil || !strings.Contains(err.Error(), "delegation_model") {
+		t.Fatalf("expected a delegation_model error, got %v", err)
 	}
 }
 
