@@ -32,11 +32,11 @@ func registerRoomOpsTools(reg *Registry, deps ToolDependencies) {
 		Spec: &insights.MCPToolSpec{
 			Name: ToolManageCountdownTimer,
 			Description: "Run the countdown timer every participant sees. Use it to time an exercise or a break: " +
-				"start with a duration, then pause, resume or stop it. Say the time out loud so the participants " +
-				"know what the timer is for.",
+				"start with a duration, then pause, resume, extend or stop it. Say the time out loud so the " +
+				"participants know what the timer is for.",
 			InputSchema: objectSchema(map[string]any{
-				"action":           enumProp("What to do with the timer.", "start", "pause", "resume", "stop"),
-				"duration_seconds": intProp("How long the timer runs; required for start.", minCountdownTimerSeconds, maxCountdownTimerSeconds),
+				"action":           enumProp("What to do with the timer.", "start", "pause", "resume", "extend", "stop"),
+				"duration_seconds": intProp("How long the timer runs (required for start) or how many seconds to add for extend (optional, defaults to 60).", minCountdownTimerSeconds, maxCountdownTimerSeconds),
 			}, "action"),
 		},
 		Handler: func(ctx context.Context, call ToolCall) (ToolResult, error) {
@@ -55,9 +55,17 @@ func registerRoomOpsTools(reg *Registry, deps ToolDependencies) {
 					return errorResult(call, "duration_seconds must be between %d and %d",
 						minCountdownTimerSeconds, maxCountdownTimerSeconds), nil
 				}
+			case "extend":
+				if in.DurationSeconds == 0 {
+					in.DurationSeconds = 60
+				}
+				if in.DurationSeconds < minCountdownTimerSeconds || in.DurationSeconds > maxCountdownTimerSeconds {
+					return errorResult(call, "duration_seconds must be between %d and %d",
+						minCountdownTimerSeconds, maxCountdownTimerSeconds), nil
+				}
 			case "pause", "resume", "stop":
 			default:
-				return errorResult(call, "action must be one of: start, pause, resume, stop"), nil
+				return errorResult(call, "action must be one of: start, pause, resume, extend, stop"), nil
 			}
 
 			err := deps.RoomOps.ManageCountdownTimer(ctx, call.RoomID, call.AgentUserID, action, uint64(in.DurationSeconds))
@@ -66,7 +74,7 @@ func registerRoomOpsTools(reg *Registry, deps ToolDependencies) {
 			}
 
 			out := map[string]any{"ok": true, "action": action}
-			if action == "start" {
+			if action == "start" || action == "extend" {
 				out["duration_seconds"] = in.DurationSeconds
 			}
 			return resultJSON(call, out), nil

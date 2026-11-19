@@ -438,6 +438,33 @@ func TestAIAgentParticipantChatMessageTriggersAnAnswer(t *testing.T) {
 	}
 }
 
+func TestAIAgentSendProactiveContextTriggersAnAnswer(t *testing.T) {
+	env := newAgentTestEnv(t, nil, nil)
+
+	if err := env.agent.SendProactiveContext("The countdown timer has finished.", "countdown_timer"); err != nil {
+		t.Fatalf("send proactive context: %v", err)
+	}
+
+	contexts := env.session.Contexts()
+	if len(contexts) != 1 {
+		t.Fatalf("expected 1 injected context, got %d", len(contexts))
+	}
+	if contexts[0].Role != "user" || !contexts[0].TriggerResponse {
+		t.Fatalf("a proactive context must trigger an answer: %+v", contexts[0])
+	}
+	if !strings.Contains(contexts[0].Text, "[SYSTEM CONTEXT — countdown_timer]") ||
+		!strings.Contains(contexts[0].Text, "The countdown timer has finished.") {
+		t.Fatalf("unexpected proactive context: %s", contexts[0].Text)
+	}
+
+	if err := env.agent.SendProactiveContext("   ", "countdown_timer"); err != nil {
+		t.Fatalf("empty proactive context: %v", err)
+	}
+	if contexts := env.session.Contexts(); len(contexts) != 1 {
+		t.Fatalf("an empty proactive context must be ignored, got %d contexts", len(contexts))
+	}
+}
+
 func TestAIAgentClientToolRPC(t *testing.T) {
 	env := newAgentTestEnv(t, nil, nil)
 

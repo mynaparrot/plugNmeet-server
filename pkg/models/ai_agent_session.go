@@ -228,6 +228,9 @@ func (m *AIAgentModel) SendContext(ctx context.Context, roomId string, req *plug
 	if strings.TrimSpace(req.GetText()) == "" {
 		return config.ErrAIAgentInvalidRequest
 	}
+	if strings.EqualFold(strings.TrimSpace(req.GetSource()), "countdown_timer") {
+		return agent.SendProactiveContext(req.GetText(), req.GetSource())
+	}
 
 	return agent.SendContext(req.GetText(), req.GetSource())
 }

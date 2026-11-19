@@ -410,6 +410,20 @@ func taskError(code plugnmeet.StatusCode, err error) error {
 		return nil
 	}
 
+	// The countdown timer errors are i18n keys; the model needs plain sentences.
+	switch {
+	case errors.Is(err, config.ErrCountdownTimerNotAllowed):
+		return errors.New("the countdown timer is disabled in this room's configuration")
+	case errors.Is(err, config.ErrCountdownTimerNotActive):
+		return errors.New("the countdown timer is not active")
+	case errors.Is(err, config.ErrCountdownTimerInvalidDuration):
+		return errors.New("the countdown timer duration is invalid")
+	case errors.Is(err, config.ErrCountdownTimerNotRunning):
+		return errors.New("the countdown timer is not currently running")
+	case errors.Is(err, config.ErrCountdownTimerNotPaused):
+		return errors.New("the countdown timer is not paused")
+	}
+
 	switch code {
 	case plugnmeet.StatusCode_PERMISSION_DENIED:
 		return errors.New("this feature is not allowed in this room")
@@ -705,10 +719,12 @@ func (b aiAgentRoomOpsBackend) ManageCountdownTimer(_ context.Context, roomID, u
 		task = plugnmeet.CountdownTimerTask_PAUSE_TIMER
 	case "resume":
 		task = plugnmeet.CountdownTimerTask_RESUME_TIMER
+	case "extend":
+		task = plugnmeet.CountdownTimerTask_EXTEND_TIMER
 	case "stop":
 		task = plugnmeet.CountdownTimerTask_STOP_TIMER
 	default:
-		return fmt.Errorf("action must be start, pause, resume or stop")
+		return fmt.Errorf("action must be start, pause, resume, extend or stop")
 	}
 
 	// The timer tasks only apply to an active timer, and the host's toggle is

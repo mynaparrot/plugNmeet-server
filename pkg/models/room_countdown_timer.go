@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	countdownTimerMaxDurationSeconds = 24 * 60 // 1 hour
+	countdownTimerMaxDurationSeconds = 24 * 60 * 60 // 24 hours
 
 	countdownTimerStatusIdle    = "idle"
 	countdownTimerStatusRunning = "running"
@@ -121,6 +121,9 @@ func applyCountdownTimerTask(cf *plugnmeet.CountdownTimerFeatures, req *plugnmee
 		extendSec := req.GetDurationSeconds()
 		if extendSec == 0 {
 			extendSec = 60
+		}
+		if extendSec > countdownTimerMaxDurationSeconds || cf.DurationSeconds > countdownTimerMaxDurationSeconds-extendSec {
+			return plugnmeet.StatusCode_INVALID_PARAMETERS, config.ErrCountdownTimerInvalidDuration
 		}
 		cf.DurationSeconds += extendSec
 		if cf.Status == countdownTimerStatusRunning {

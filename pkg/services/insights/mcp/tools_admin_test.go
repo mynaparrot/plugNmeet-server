@@ -491,6 +491,18 @@ func TestManageCountdownTimerTool(t *testing.T) {
 	if roomOps.action != "pause" {
 		t.Fatalf("timer action = %q, want pause", roomOps.action)
 	}
+
+	res = runTool(t, reg, ToolManageCountdownTimer, `{"action":"extend","duration_seconds":120}`)
+	requireResultKeys(t, res, map[string]any{"ok": true, "action": "extend", "duration_seconds": float64(120)})
+	if roomOps.action != "extend" || roomOps.durationSeconds != 120 {
+		t.Fatalf("timer request = (%q, %d), want (extend, 120)", roomOps.action, roomOps.durationSeconds)
+	}
+
+	res = runTool(t, reg, ToolManageCountdownTimer, `{"action":"extend"}`)
+	requireResultKeys(t, res, map[string]any{"ok": true, "action": "extend", "duration_seconds": float64(60)})
+	if roomOps.action != "extend" || roomOps.durationSeconds != 60 {
+		t.Fatalf("timer request = (%q, %d), want (extend, 60)", roomOps.action, roomOps.durationSeconds)
+	}
 }
 
 func TestManageCountdownTimerToolValidatesArguments(t *testing.T) {
@@ -504,7 +516,9 @@ func TestManageCountdownTimerToolValidatesArguments(t *testing.T) {
 	}{
 		{"duration too short", `{"action":"start","duration_seconds":5}`, "duration_seconds"},
 		{"duration too long", `{"action":"start","duration_seconds":9000}`, "duration_seconds"},
-		{"unknown action", `{"action":"extend"}`, "action must be one of"},
+		{"extend duration too short", `{"action":"extend","duration_seconds":5}`, "duration_seconds"},
+		{"extend duration too long", `{"action":"extend","duration_seconds":9000}`, "duration_seconds"},
+		{"unknown action", `{"action":"reset"}`, "action must be one of"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

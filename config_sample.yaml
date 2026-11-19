@@ -395,9 +395,12 @@ insights:
     #     # input_transcription_model: "gpt-transcribe"  # or "gpt-live-transcribe" (no VAD), "none" disables
     #     # realtime_auth_header: "Authorization"  # e.g. "api-key" for self-hosted gateways
     #   pricing:
+    #     realtime_model:
+    #       input_price_per_million_tokens: 0.60
+    #       output_price_per_million_tokens: 2.40
     #     # Minute-priced: the live speech model reports audio duration only.
     #     live_model:
-    #       price_per_minute: 0.10
+    #       price_per_minute: 0.05
     #     # Token-priced: the delegated text model of the live session.
     #     delegation_model:
     #       input_price_per_million_tokens: 0.25

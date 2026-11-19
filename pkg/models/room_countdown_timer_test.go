@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 )
 
@@ -266,6 +267,61 @@ func TestApplyCountdownTimerExtend(t *testing.T) {
 		}
 	})
 
+	t.Run("extend up to the 24h cap", func(t *testing.T) {
+		cf := newTestCountdownFeatures()
+		cf.IsActive = true
+		cf.Status = countdownTimerStatusRunning
+		cf.DurationSeconds = countdownTimerMaxDurationSeconds - 60
+		cf.EndTime = testNowMs + 100_000
+
+		extend := uint32(60)
+		if _, err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
+			Task:            plugnmeet.CountdownTimerTask_EXTEND_TIMER,
+			DurationSeconds: &extend,
+		}, testNowMs); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if cf.DurationSeconds != countdownTimerMaxDurationSeconds {
+			t.Fatalf("duration = %d, want %d", cf.DurationSeconds, countdownTimerMaxDurationSeconds)
+		}
+	})
+
+	t.Run("extending past the 24h cap is refused", func(t *testing.T) {
+		cf := newTestCountdownFeatures()
+		cf.IsActive = true
+		cf.Status = countdownTimerStatusPaused
+		cf.DurationSeconds = countdownTimerMaxDurationSeconds
+		cf.RemainingSeconds = 120
+
+		extend := uint32(60)
+		code, err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
+			Task:            plugnmeet.CountdownTimerTask_EXTEND_TIMER,
+			DurationSeconds: &extend,
+		}, testNowMs)
+		assertCountdownErr(t, err, config.ErrCountdownTimerInvalidDuration)
+		if code != plugnmeet.StatusCode_INVALID_PARAMETERS {
+			t.Fatalf("status code = %v, want %v", code, plugnmeet.StatusCode_INVALID_PARAMETERS)
+		}
+		if cf.DurationSeconds != countdownTimerMaxDurationSeconds || cf.RemainingSeconds != 120 {
+			t.Fatalf("a refused extend changed the state: %+v", cf)
+		}
+	})
+
+	t.Run("extend larger than the cap is refused", func(t *testing.T) {
+		cf := newTestCountdownFeatures()
+		cf.IsActive = true
+		cf.Status = countdownTimerStatusRunning
+		cf.DurationSeconds = 300
+		cf.EndTime = testNowMs + 300_000
+
+		extend := uint32(countdownTimerMaxDurationSeconds + 1)
+		_, err := applyCountdownTimerTask(cf, &plugnmeet.CountdownTimerReq{
+			Task:            plugnmeet.CountdownTimerTask_EXTEND_TIMER,
+			DurationSeconds: &extend,
+		}, testNowMs)
+		assertCountdownErr(t, err, config.ErrCountdownTimerInvalidDuration)
+	})
+
 	t.Run("idle is not extendable", func(t *testing.T) {
 		cf := newTestCountdownFeatures()
 		cf.IsActive = true
@@ -310,4 +366,27 @@ func TestApplyCountdownTimerUnknownTask(t *testing.T) {
 		Task: plugnmeet.CountdownTimerTask(99),
 	}, testNowMs)
 	assertCountdownErr(t, err, config.ErrCountdownTimerGeneric)
+}
+
+func TestTaskErrorTranslatesCountdownErrors(t *testing.T) {
+	cases := []struct {
+		code plugnmeet.StatusCode
+		err  error
+		want string
+	}{
+		{plugnmeet.StatusCode_PERMISSION_DENIED, config.ErrCountdownTimerNotAllowed, "the countdown timer is disabled in this room's configuration"},
+		{plugnmeet.StatusCode_INVALID_PARAMETERS, config.ErrCountdownTimerNotActive, "the countdown timer is not active"},
+		{plugnmeet.StatusCode_INVALID_PARAMETERS, config.ErrCountdownTimerInvalidDuration, "the countdown timer duration is invalid"},
+		{plugnmeet.StatusCode_INVALID_PARAMETERS, config.ErrCountdownTimerNotRunning, "the countdown timer is not currently running"},
+		{plugnmeet.StatusCode_INVALID_PARAMETERS, config.ErrCountdownTimerNotPaused, "the countdown timer is not paused"},
+	}
+	for _, tc := range cases {
+		if got := taskError(tc.code, tc.err); got == nil || got.Error() != tc.want {
+			t.Fatalf("taskError(%v, %v) = %v, want %q", tc.code, tc.err, got, tc.want)
+		}
+	}
+
+	if err := taskError(plugnmeet.StatusCode_SUCCESS, nil); err != nil {
+		t.Fatalf("a nil error must stay nil, got %v", err)
+	}
 }

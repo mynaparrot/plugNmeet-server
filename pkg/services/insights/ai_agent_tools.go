@@ -27,6 +27,23 @@ func (a *AIAgent) SendContext(text, source string) error {
 	return a.sendContextText(header + "\n" + text)
 }
 
+// SendProactiveContext injects a server-side event and asks the provider to respond immediately.
+func (a *AIAgent) SendProactiveContext(text, source string) error {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return nil
+	}
+	header := "[SYSTEM CONTEXT]"
+	if source = strings.TrimSpace(source); source != "" {
+		header = fmt.Sprintf("[SYSTEM CONTEXT — %s]", source)
+	}
+	session := a.currentSession()
+	if session == nil {
+		return errors.New("ai agent: no active session")
+	}
+	return session.SendContextText("user", header+"\n"+text, true)
+}
+
 // HandleWhiteboardScene hands a canvas snapshot to the provider, framed as
 // untrusted data that also separates the agent's own elements from the
 // participant's. A scene-graph-only snapshot is still delivered as text: the
