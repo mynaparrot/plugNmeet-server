@@ -126,10 +126,17 @@ func aiAgentSummaryUserInfo(summary *plugnmeet.AIAgentSessionSummary) *plugnmeet
 	return userInfo
 }
 
+// Usage keys of the summary, so every cost is labelled with the role behind it.
+const (
+	aiAgentUsageKeySession    = "session"
+	aiAgentUsageKeyDelegation = "delegation"
+	aiAgentUsageKeySummary    = "summary"
+)
+
 // buildAIAgentSessionUsages separates the session usage, the delegated text
 // model usage and the tokens the summary synthesis spent, so each entry is
 // priced at its own model rate.
-func (m *ArtifactModel) buildAIAgentSessionUsages(telemetry *redisservice.AIAgentSessionTelemetry, summaryPromptTokens, summaryCompletionTokens uint32, summarizeModel string, log *logrus.Entry) []*plugnmeet.RoomArtifactTokenUsage {
+func (m *ArtifactModel) buildAIAgentSessionUsages(telemetry *redisservice.AIAgentSessionTelemetry, summaryPromptTokens, summaryCompletionTokens uint32, summarizeModel string, log *logrus.Entry) map[string]*plugnmeet.RoomArtifactTokenUsage {
 	var sessionInput, sessionOutput, audioMillis, delegationInput, delegationOutput uint64
 	if telemetry != nil {
 		sessionInput, sessionOutput = telemetry.InputTokens, telemetry.OutputTokens
@@ -138,7 +145,7 @@ func (m *ArtifactModel) buildAIAgentSessionUsages(telemetry *redisservice.AIAgen
 	}
 
 	realtimeModel := m.aiAgentRealtimeModel(log)
-	usages := make([]*plugnmeet.RoomArtifactTokenUsage, 0, 3)
+	usages := make(map[string]*plugnmeet.RoomArtifactTokenUsage, 3)
 
 	switch {
 	case sessionInput > 0 || sessionOutput > 0:
@@ -154,7 +161,7 @@ func (m *ArtifactModel) buildAIAgentSessionUsages(telemetry *redisservice.AIAgen
 			breakdown["audio_millis"] = int64(audioMillis)
 		}
 
-		usages = append(usages, &plugnmeet.RoomArtifactTokenUsage{
+		usages[aiAgentUsageKeySession] = &plugnmeet.RoomArtifactTokenUsage{
 			PromptTokens:                  clampToUint32(sessionInput),
 			CompletionTokens:              clampToUint32(sessionOutput),
 			TotalTokens:                   clampToUint32(sessionInput + sessionOutput),
@@ -162,16 +169,16 @@ func (m *ArtifactModel) buildAIAgentSessionUsages(telemetry *redisservice.AIAgen
 			PromptTokensEstimatedCost:     roundAndPointer(promptCost, 6),
 			CompletionTokensEstimatedCost: roundAndPointer(completionCost, 6),
 			TotalTokensEstimatedCost:      roundAndPointer(promptCost+completionCost, 6),
-		})
+		}
 
 	case audioMillis > 0:
 		// Minute-based Live session: the speech model reports its own audio
 		// duration and delegates every text turn, so it has no tokens of its own.
 		audioCost := m.estimateAudioMillisCost(insights.ServiceTypeAIAgent, audioMillis, log, aiAgentLivePricingKey, aiAgentRealtimePricingKey, realtimeModel)
-		usages = append(usages, &plugnmeet.RoomArtifactTokenUsage{
+		usages[aiAgentUsageKeySession] = &plugnmeet.RoomArtifactTokenUsage{
 			Breakdown:                map[string]int64{"audio_millis": int64(audioMillis)},
 			TotalTokensEstimatedCost: roundAndPointer(audioCost, 6),
-		})
+		}
 	}
 
 	if delegationInput > 0 || delegationOutput > 0 {
@@ -179,7 +186,7 @@ func (m *ArtifactModel) buildAIAgentSessionUsages(telemetry *redisservice.AIAgen
 		promptCost := m.estimateTokensCost(insights.ServiceTypeAIAgent, delegationInput, true, log, aiAgentDelegationPricingKey, delegationModel)
 		completionCost := m.estimateTokensCost(insights.ServiceTypeAIAgent, delegationOutput, false, log, aiAgentDelegationPricingKey, delegationModel)
 
-		usages = append(usages, &plugnmeet.RoomArtifactTokenUsage{
+		usages[aiAgentUsageKeyDelegation] = &plugnmeet.RoomArtifactTokenUsage{
 			PromptTokens:     clampToUint32(delegationInput),
 			CompletionTokens: clampToUint32(delegationOutput),
 			TotalTokens:      clampToUint32(delegationInput + delegationOutput),
@@ -190,14 +197,14 @@ func (m *ArtifactModel) buildAIAgentSessionUsages(telemetry *redisservice.AIAgen
 			PromptTokensEstimatedCost:     roundAndPointer(promptCost, 6),
 			CompletionTokensEstimatedCost: roundAndPointer(completionCost, 6),
 			TotalTokensEstimatedCost:      roundAndPointer(promptCost+completionCost, 6),
-		})
+		}
 	}
 
 	if summaryPromptTokens > 0 || summaryCompletionTokens > 0 {
 		promptCost := m.estimateTokensCost(insights.ServiceTypeAIAgent, uint64(summaryPromptTokens), true, log, aiAgentSummarizePricingKey, summarizeModel)
 		completionCost := m.estimateTokensCost(insights.ServiceTypeAIAgent, uint64(summaryCompletionTokens), false, log, aiAgentSummarizePricingKey, summarizeModel)
 
-		usages = append(usages, &plugnmeet.RoomArtifactTokenUsage{
+		usages[aiAgentUsageKeySummary] = &plugnmeet.RoomArtifactTokenUsage{
 			PromptTokens:     summaryPromptTokens,
 			CompletionTokens: summaryCompletionTokens,
 			TotalTokens:      clampToUint32(uint64(summaryPromptTokens) + uint64(summaryCompletionTokens)),
@@ -208,7 +215,7 @@ func (m *ArtifactModel) buildAIAgentSessionUsages(telemetry *redisservice.AIAgen
 			PromptTokensEstimatedCost:     roundAndPointer(promptCost, 6),
 			CompletionTokensEstimatedCost: roundAndPointer(completionCost, 6),
 			TotalTokensEstimatedCost:      roundAndPointer(promptCost+completionCost, 6),
-		})
+		}
 	}
 
 	return usages

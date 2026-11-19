@@ -605,6 +605,7 @@ func TestMarshalAIAgentSessionSummary(t *testing.T) {
 		`"questions"`,
 		`"unfinished_subtopics"`,
 		`"narrative_summary"`,
+		`"usage":`,
 		`"local_fallback"`,
 		`"learner-1"`,
 	} {

@@ -22,7 +22,7 @@ require (
 	github.com/livekit/protocol v1.53.0
 	github.com/livekit/server-sdk-go/v2 v2.20.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
-	github.com/mynaparrot/plugnmeet-protocol v1.6.4-0.20261119000508-e108f7d0f351
+	github.com/mynaparrot/plugnmeet-protocol v1.6.4-0.20261119225724-b8fb6e2373ba
 	github.com/nats-io/jwt/v2 v2.8.3
 	github.com/nats-io/nats.go v1.56.0
 	github.com/nats-io/nkeys v0.4.17
@@ -34,7 +34,7 @@ require (
 	github.com/spf13/cast v1.10.0
 	go.uber.org/fx v1.24.0
 	golang.org/x/sync v0.25.0
-	google.golang.org/genai v1.79.0
+	google.golang.org/genai v1.79.1
 	google.golang.org/protobuf v1.36.12
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.31.2

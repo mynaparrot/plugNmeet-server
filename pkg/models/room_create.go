@@ -320,8 +320,8 @@ func (m *RoomModel) applyAIAgentRoomDefaults(r *plugnmeet.CreateRoomReq) {
 }
 
 // applyAIAgentSessionRoomFeatures disables the features and the waiting room an
-// AI agent session never needs and locks the private chat nobody else is in the
-// room for.
+// AI agent session never needs and locks the workspace surfaces only the agent
+// hands out, plus the private chat nobody else is in the room for.
 func applyAIAgentSessionRoomFeatures(meta *plugnmeet.RoomMetadata) {
 	if meta == nil {
 		return
@@ -338,7 +338,11 @@ func applyAIAgentSessionRoomFeatures(meta *plugnmeet.RoomMetadata) {
 	if meta.DefaultLockSettings == nil {
 		meta.DefaultLockSettings = new(plugnmeet.LockSettings)
 	}
+	// the agent owns the whiteboard and the shared notepad, so nobody starts
+	// with the pen, not even an admin or the presenter
 	meta.DefaultLockSettings.LockPrivateChat = new(true)
+	meta.DefaultLockSettings.LockWhiteboard = new(true)
+	meta.DefaultLockSettings.LockSharedNotepad = new(true)
 }
 
 // validateAIAgentFeatures refuses an AI agent room that could never run safely:

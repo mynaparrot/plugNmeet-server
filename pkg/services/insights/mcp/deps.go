@@ -39,16 +39,20 @@ type ChatBackend interface {
 type RoomInfoBackend interface {
 	GetRoomSnapshot(ctx context.Context, roomID string) (*RoomSnapshot, error)
 	SetWorkspaceLock(ctx context.Context, roomID, surface string, locked bool, userID string) error
+	// SetWorkspaceVisibility shows or hides a surface without changing its lock,
+	// so the agent can open or close the whiteboard or shared notepad.
+	SetWorkspaceVisibility(ctx context.Context, roomID, surface string, visible bool) error
 }
 
 // NotepadBackend opens the room's shared notepad, so `notepad_write` and
-// `notepad_read` can land even when nobody has opened it yet.
+// `notepad_read` can land even when nobody has opened it yet. It never unlocks
+// the notepad: the participant stays in view-only mode until the agent unlocks it.
 type NotepadBackend interface {
 	EnsureNotepadActive(ctx context.Context, roomID string) error
 }
 
 // WhiteboardBackend brings the whiteboard into view, so whiteboard calls land
-// on a surface the participant can actually see.
+// on a surface the participant can actually see. It never unlocks the board.
 type WhiteboardBackend interface {
 	EnsureWhiteboardVisible(ctx context.Context, roomID string) error
 }

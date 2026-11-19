@@ -27,6 +27,11 @@ func (m *RoomModel) ChangeVisibility(r *plugnmeet.ChangeVisibilityRes) (plugnmee
 		return plugnmeet.StatusCode_ROOM_NOT_FOUND, config.ErrRoomNotFound
 	}
 
+	if m.aiAgentControlsWorkspace(r.RoomId, roomMeta) {
+		log.Warnln("the ai agent controls the workspace in this room")
+		return plugnmeet.StatusCode_PERMISSION_DENIED, config.ErrAIAgentWorkspaceControlled
+	}
+
 	if r.VisibleWhiteBoard != nil {
 		roomMeta.RoomFeatures.WhiteboardFeatures.Visible = *r.VisibleWhiteBoard
 	}
@@ -40,6 +45,18 @@ func (m *RoomModel) ChangeVisibility(r *plugnmeet.ChangeVisibilityRes) (plugnmee
 	}
 
 	return plugnmeet.StatusCode_SUCCESS, nil
+}
+
+// aiAgentControlsWorkspace reports whether the AI agent owns the whiteboard and
+// shared notepad of the room, so a manual client change must be rejected: in a
+// 1-on-1 session room the agent is the only one who may show, hide or unlock a
+// surface.
+func (m *RoomModel) aiAgentControlsWorkspace(roomId string, roomMeta *plugnmeet.RoomMetadata) bool {
+	if isOneOnOneAIAgentRoom(roomMeta) {
+		return true
+	}
+
+	return m.aiAgentModel != nil && m.aiAgentModel.IsAgentActive(m.ctx, roomId)
 }
 
 func (m *RoomModel) EnableRoomSipDialIn(r *plugnmeet.EnableSipDialInReq) (plugnmeet.StatusCode, error) {
@@ -204,6 +221,11 @@ func (m *RoomModel) ChangeSharedNotepadStatus(r *plugnmeet.ChangeSharedNotepadSt
 	if meta == nil {
 		log.Warnln("room metadata not found")
 		return plugnmeet.StatusCode_ROOM_NOT_FOUND, config.ErrRoomNotFound
+	}
+
+	if m.aiAgentControlsWorkspace(r.RoomId, meta) {
+		log.Warnln("the ai agent controls the workspace in this room")
+		return plugnmeet.StatusCode_PERMISSION_DENIED, config.ErrAIAgentWorkspaceControlled
 	}
 
 	np := meta.GetRoomFeatures().GetSharedNotePadFeatures()

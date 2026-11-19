@@ -59,8 +59,8 @@ func registerRoomTools(reg *Registry, deps ToolDependencies) {
 	})
 }
 
-// registerWorkspaceLockTool exposes an explicit whiteboard / shared-notepad
-// unlock so the agent can open a surface and hand the pen to the participant.
+// registerWorkspaceLockTool exposes explicit whiteboard / shared-notepad control:
+// open, close, unlock and lock, so the agent owns both surfaces for the session.
 func registerWorkspaceLockTool(reg *Registry, deps ToolDependencies) {
 	if deps.Room == nil {
 		return
@@ -70,13 +70,16 @@ func registerWorkspaceLockTool(reg *Registry, deps ToolDependencies) {
 		Kind: ToolKindServer,
 		Spec: &insights.MCPToolSpec{
 			Name: ToolSetWorkspaceLock,
-			Description: "Unlock or lock the whiteboard or shared notepad for participants so they can draw or " +
-				"write (and automatically open/show that surface when unlocking). Call this with action=\"unlock\" " +
-				"whenever you ask a participant to draw on the whiteboard or write in the shared notepad without " +
-				"drawing something yourself first.",
+			Description: "Control the whiteboard or shared notepad for participants. Keep surfaces locked (view-only) while " +
+				"you (the AI agent) are drawing, writing, or explaining — your own tools always work while locked, and " +
+				"calling any drawing or notepad tool automatically opens the surface in view-only mode. Use 'unlock' ONLY " +
+				"when you want the participant to draw or write on the surface themselves; use 'lock' to return the surface " +
+				"to view-only mode after they finish; use 'open' to show the surface in view-only mode without drawing; " +
+				"use 'close' to hide/close the surface.",
 			InputSchema: objectSchema(map[string]any{
-				"surface": enumProp("Which workspace surface to unlock or lock.", "whiteboard", "shared_notepad", "both"),
-				"action":  enumProp("Whether to unlock (allow participant to draw/write) or lock the surface.", "unlock", "lock"),
+				"surface": enumProp("Which workspace surface to control.", "whiteboard", "shared_notepad", "both"),
+				"action": enumProp("'unlock' lets the participant draw/write (use ONLY when it is the participant's turn to draw/write, NEVER for your own drawing), "+
+					"'lock' returns it to view-only mode, 'open' shows it in view-only mode, 'close' hides it.", "unlock", "lock", "open", "close"),
 				"user_id": stringProp("Optional specific participant user_id, or omit/'all' for all participants in the room.", 120),
 			}, "surface", "action"),
 		},
@@ -92,13 +95,27 @@ func registerWorkspaceLockTool(reg *Registry, deps ToolDependencies) {
 
 			surface := strings.ToLower(strings.TrimSpace(in.Surface))
 			action := strings.ToLower(strings.TrimSpace(in.Action))
+
+			if action == "open" || action == "close" {
+				visible := action == "open"
+				if err := deps.Room.SetWorkspaceVisibility(ctx, call.RoomID, surface, visible); err != nil {
+					return errorResult(call, "the surface could not be shown or hidden: %s", err.Error()), nil
+				}
+				return resultJSON(call, map[string]any{
+					"ok":      true,
+					"surface": surface,
+					"action":  action,
+					"visible": visible,
+				}), nil
+			}
+
 			locked := false
 			switch action {
 			case "unlock":
 			case "lock":
 				locked = true
 			default:
-				return errorResult(call, "action must be unlock or lock"), nil
+				return errorResult(call, "action must be unlock, lock, open or close"), nil
 			}
 
 			userID := strings.TrimSpace(in.UserID)

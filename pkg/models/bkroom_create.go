@@ -175,8 +175,8 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 		}
 	}
 
-	// a normal breakout room must never inherit an active AI agent; per-user AI
-	// rooms get their own features below, one per room
+	// Important: a normal breakout room must never inherit an active AI agent; per-user AI
+	// rooms get their own features below, one per room, check isOneOnOneAIAgentRoom method
 	if !r.EnableAiAgent && meta.RoomFeatures.InsightsFeatures != nil && meta.RoomFeatures.InsightsFeatures.AiAgentFeatures != nil {
 		meta.RoomFeatures.InsightsFeatures.AiAgentFeatures.IsAllow = false
 	}

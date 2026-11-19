@@ -156,10 +156,26 @@ func whiteboardPrepare(deps ToolDependencies) func(ctx context.Context, call Too
 }
 
 // prepareManageBoard reveals the whiteboard first and then applies an explicit
-// unlock_board / lock_board request exactly like set_workspace_lock does.
+// unlock_board / lock_board / close_board request exactly like set_workspace_lock
+// does. close_board is the exception: it must hide the board, never reveal it.
 func prepareManageBoard(deps ToolDependencies) func(ctx context.Context, call ToolCall) error {
 	reveal := whiteboardPrepare(deps)
 	return func(ctx context.Context, call ToolCall) error {
+		var in struct {
+			Action string `json:"action"`
+		}
+		action := ""
+		if err := decodeArgs(call, &in); err == nil {
+			action = strings.TrimSpace(in.Action)
+		}
+
+		if action == "close_board" && deps.Room != nil {
+			if err := deps.Room.SetWorkspaceLock(ctx, call.RoomID, "whiteboard", true, "all"); err != nil {
+				return err
+			}
+			return deps.Room.SetWorkspaceVisibility(ctx, call.RoomID, "whiteboard", false)
+		}
+
 		if err := reveal(ctx, call); err != nil {
 			return err
 		}
@@ -167,15 +183,7 @@ func prepareManageBoard(deps ToolDependencies) func(ctx context.Context, call To
 			return nil
 		}
 
-		var in struct {
-			Action string `json:"action"`
-		}
-		if err := decodeArgs(call, &in); err != nil {
-			// The handler reports malformed arguments.
-			return nil
-		}
-
-		switch strings.TrimSpace(in.Action) {
+		switch action {
 		case "unlock_board":
 			return deps.Room.SetWorkspaceLock(ctx, call.RoomID, "whiteboard", false, "all")
 		case "lock_board":
@@ -349,10 +357,12 @@ func registerWhiteboardTools(reg *Registry, deps ToolDependencies) {
 		Spec: &insights.MCPToolSpec{
 			Name: ToolWhiteboardManageBoard,
 			Description: "Manage the board itself: clear it, switch page or file, zoom to elements, undo your own " +
-				"last action, or unlock_board so a participant can draw on it. clear_board requires confirm true; say " +
+				"last action, unlock_board ONLY when it is the participant's turn to draw (never unlock for your own drawing — " +
+				"your drawing tools work while locked and open the board automatically), lock_board to return the board to " +
+				"view-only mode, or close_board to hide/close the whiteboard. clear_board requires confirm true; say " +
 				"out loud that you are clearing the board first.",
 			InputSchema: objectSchema(map[string]any{
-				"action":      enumProp("The board action.", "clear_board", "switch_page", "switch_office_file", "zoom_to_elements", "undo_last_agent_action", "unlock_board", "lock_board"),
+				"action":      enumProp("The board action.", "clear_board", "switch_page", "switch_office_file", "zoom_to_elements", "undo_last_agent_action", "unlock_board", "lock_board", "close_board"),
 				"page":        minIntProp("Page to switch to.", 1),
 				"file_id":     stringProp("Office file id to switch to.", 120),
 				"element_ids": arrayProp("Elements to zoom to.", stringProp("", 120), 0, 50),

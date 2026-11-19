@@ -24,6 +24,7 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
+	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/insights/mcp"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
@@ -138,6 +139,27 @@ type AIAgentModel struct {
 
 	// clientAPISubmitter overrides the browser round-trip in unit tests.
 	clientAPISubmitter func(ctx context.Context, roomID, targetUserID, route string, payload proto.Message) error
+	// activeAgentLookup overrides the hosted-agent registry in unit tests.
+	activeAgentLookup func(roomID string) (aiAgentContextSender, bool)
+}
+
+// aiAgentContextSender is the slice of insightsservice.AIAgent a model hook
+// needs to push a server-side note into the live session.
+type aiAgentContextSender interface {
+	SendProactiveContext(text, source string) error
+}
+
+// hostedAgent returns the agent this process hosts for the room, if any.
+func (m *AIAgentModel) hostedAgent(roomID string) (aiAgentContextSender, bool) {
+	if m.activeAgentLookup != nil {
+		return m.activeAgentLookup(roomID)
+	}
+	agent, ok := insightsservice.GetActiveAIAgent(roomID)
+	if !ok {
+		return nil, false
+	}
+
+	return agent, true
 }
 
 // pendingClientToolCall is one client tool call waiting for the browser of
@@ -375,8 +397,8 @@ func (m *AIAgentModel) BuildToolDependencies(roomID, actorUserID string, log *lo
 		Room:         aiAgentRoomBackend{m: m},
 		Progress:     m.redisService,
 		QuizDrafts:   m.redisService,
-		Notepad:      aiAgentNotepadBackend{m: m},
-		Whiteboard:   aiAgentWhiteboardBackend{m: m},
+		Notepad:      aiAgentNotepadBackend{nats: m.natsService},
+		Whiteboard:   aiAgentWhiteboardBackend{nats: m.natsService},
 		Cache:        m.redisService,
 		Breakout:     aiAgentBreakoutBackend{m: m, actorUserID: actorUserID},
 		Insights:     aiAgentInsightsBackend{m: m, actorUserID: actorUserID},

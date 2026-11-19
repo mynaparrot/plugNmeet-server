@@ -79,10 +79,16 @@ func TestBuildAIAgentSessionUsages(t *testing.T) {
 
 		usages := m.buildAIAgentSessionUsages(telemetry, 200, 100, "summary-model", log)
 		if len(usages) != 2 {
-			t.Fatalf("usages = %d, want one realtime entry and one summary entry", len(usages))
+			t.Fatalf("usages = %d, want one session entry and one summary entry", len(usages))
+		}
+		if _, ok := usages[aiAgentUsageKeyDelegation]; ok {
+			t.Error("no delegation tokens were reported, the delegation entry must be omitted")
 		}
 
-		session := usages[0]
+		session := usages[aiAgentUsageKeySession]
+		if session == nil {
+			t.Fatalf("the session entry is missing: %v", usages)
+		}
 		if session.GetPromptTokens() != 1000 || session.GetCompletionTokens() != 500 || session.GetTotalTokens() != 1500 {
 			t.Errorf("session tokens = (%d, %d, %d), want (1000, 500, 1500)",
 				session.GetPromptTokens(), session.GetCompletionTokens(), session.GetTotalTokens())
@@ -107,7 +113,10 @@ func TestBuildAIAgentSessionUsages(t *testing.T) {
 			t.Errorf("session total cost = %v, want 0.004", session.GetTotalTokensEstimatedCost())
 		}
 
-		summary := usages[1]
+		summary := usages[aiAgentUsageKeySummary]
+		if summary == nil {
+			t.Fatalf("the summary entry is missing: %v", usages)
+		}
 		if summary.GetPromptTokens() != 200 || summary.GetCompletionTokens() != 100 || summary.GetTotalTokens() != 300 {
 			t.Errorf("summary tokens = (%d, %d, %d), want (200, 100, 300)",
 				summary.GetPromptTokens(), summary.GetCompletionTokens(), summary.GetTotalTokens())
@@ -139,9 +148,13 @@ func TestBuildAIAgentSessionUsages(t *testing.T) {
 
 		usages := m.buildAIAgentSessionUsages(telemetry, 0, 0, "", log)
 		if len(usages) != 1 {
-			t.Fatalf("usages = %d, want only the realtime entry", len(usages))
+			t.Fatalf("usages = %d, want only the session entry", len(usages))
 		}
-		if _, ok := usages[0].GetBreakdown()["audio_millis"]; ok {
+		session := usages[aiAgentUsageKeySession]
+		if session == nil {
+			t.Fatalf("the session entry is missing: %v", usages)
+		}
+		if _, ok := session.GetBreakdown()["audio_millis"]; ok {
 			t.Error("audio_millis must be omitted when no audio was reported")
 		}
 	})
@@ -153,12 +166,16 @@ func TestBuildAIAgentSessionUsages(t *testing.T) {
 		if len(usages) != 1 {
 			t.Fatalf("usages = %d, want only the summary entry", len(usages))
 		}
-		// the summarize_model pricing entry applies even without a model name
-		if !floatEquals(usages[0].GetTotalTokensEstimatedCost(), 0.00003) {
-			t.Errorf("summary cost = %v, want 0.00003", usages[0].GetTotalTokensEstimatedCost())
+		summary := usages[aiAgentUsageKeySummary]
+		if summary == nil {
+			t.Fatalf("the summary entry is missing: %v", usages)
 		}
-		if usages[0].GetTotalTokens() != 30 {
-			t.Errorf("summary total tokens = %d, want 30", usages[0].GetTotalTokens())
+		// the summarize_model pricing entry applies even without a model name
+		if !floatEquals(summary.GetTotalTokensEstimatedCost(), 0.00003) {
+			t.Errorf("summary cost = %v, want 0.00003", summary.GetTotalTokensEstimatedCost())
+		}
+		if summary.GetTotalTokens() != 30 {
+			t.Errorf("summary total tokens = %d, want 30", summary.GetTotalTokens())
 		}
 	})
 
@@ -174,8 +191,8 @@ func TestBuildAIAgentSessionUsages(t *testing.T) {
 			t.Fatalf("usages = %d, want only the summary entry", len(usages))
 		}
 		// 1000/1M*5 at the price of the concrete model name
-		if !floatEquals(usages[0].GetPromptTokensEstimatedCost(), 0.005) {
-			t.Errorf("summary prompt cost = %v, want 0.005", usages[0].GetPromptTokensEstimatedCost())
+		if got := usages[aiAgentUsageKeySummary].GetPromptTokensEstimatedCost(); !floatEquals(got, 0.005) {
+			t.Errorf("summary prompt cost = %v, want 0.005", got)
 		}
 
 		service.Pricing = map[string]config.ModelPricing{
@@ -186,8 +203,25 @@ func TestBuildAIAgentSessionUsages(t *testing.T) {
 			t.Fatalf("usages = %d, want only the summary entry", len(usages))
 		}
 		// 1000/1M*9 at the "default" price
-		if !floatEquals(usages[0].GetPromptTokensEstimatedCost(), 0.009) {
-			t.Errorf("summary prompt cost = %v, want the default price 0.009", usages[0].GetPromptTokensEstimatedCost())
+		if got := usages[aiAgentUsageKeySummary].GetPromptTokensEstimatedCost(); !floatEquals(got, 0.009) {
+			t.Errorf("summary prompt cost = %v, want the default price 0.009", got)
+		}
+	})
+
+	t.Run("usage entries are keyed by role", func(t *testing.T) {
+		m := newPricedArtifactModel()
+		telemetry := &redisservice.AIAgentSessionTelemetry{
+			InputTokens:            10,
+			OutputTokens:           5,
+			DelegationInputTokens:  10,
+			DelegationOutputTokens: 5,
+		}
+
+		usages := m.buildAIAgentSessionUsages(telemetry, 10, 5, "", log)
+		for _, key := range []string{"session", "delegation", "summary"} {
+			if usages[key] == nil {
+				t.Errorf("the usage map is missing the %q entry: %v", key, usages)
+			}
 		}
 	})
 
@@ -211,7 +245,10 @@ func TestBuildAIAgentSessionUsagesSeparatedRoles(t *testing.T) {
 			t.Fatalf("usages = %d, want only the live entry", len(usages))
 		}
 
-		live := usages[0]
+		live := usages[aiAgentUsageKeySession]
+		if live == nil {
+			t.Fatalf("the live session entry is missing: %v", usages)
+		}
 		if live.GetTotalTokens() != 0 {
 			t.Errorf("a minute-based live session must not report tokens: %+v", live)
 		}
@@ -233,8 +270,8 @@ func TestBuildAIAgentSessionUsagesSeparatedRoles(t *testing.T) {
 			t.Fatalf("usages = %d, want only the live entry", len(usages))
 		}
 		// 30 minutes at 9 per hour
-		if !floatEquals(usages[0].GetTotalTokensEstimatedCost(), 4.5) {
-			t.Errorf("live cost = %v, want 4.5", usages[0].GetTotalTokensEstimatedCost())
+		if got := usages[aiAgentUsageKeySession].GetTotalTokensEstimatedCost(); !floatEquals(got, 4.5) {
+			t.Errorf("live cost = %v, want 4.5", got)
 		}
 	})
 
@@ -251,11 +288,14 @@ func TestBuildAIAgentSessionUsagesSeparatedRoles(t *testing.T) {
 			t.Fatalf("usages = %d, want a live entry and a delegation entry", len(usages))
 		}
 
-		if !floatEquals(usages[0].GetTotalTokensEstimatedCost(), 1.5) {
-			t.Errorf("live cost = %v, want 1.5", usages[0].GetTotalTokensEstimatedCost())
+		if got := usages[aiAgentUsageKeySession].GetTotalTokensEstimatedCost(); !floatEquals(got, 1.5) {
+			t.Errorf("live cost = %v, want 1.5", got)
 		}
 
-		delegation := usages[1]
+		delegation := usages[aiAgentUsageKeyDelegation]
+		if delegation == nil {
+			t.Fatalf("the delegation entry is missing: %v", usages)
+		}
 		if delegation.GetPromptTokens() != 1000 || delegation.GetCompletionTokens() != 500 || delegation.GetTotalTokens() != 1500 {
 			t.Errorf("delegation tokens = (%d, %d, %d), want (1000, 500, 1500)",
 				delegation.GetPromptTokens(), delegation.GetCompletionTokens(), delegation.GetTotalTokens())
@@ -290,12 +330,16 @@ func TestBuildAIAgentSessionUsagesSeparatedRoles(t *testing.T) {
 
 		usages := m.buildAIAgentSessionUsages(telemetry, 0, 0, "", log)
 		if len(usages) != 2 {
-			t.Fatalf("usages = %d, want a realtime entry and a delegation entry", len(usages))
+			t.Fatalf("usages = %d, want a session entry and a delegation entry", len(usages))
 		}
-		if !floatEquals(usages[0].GetTotalTokensEstimatedCost(), 0.004) {
-			t.Errorf("realtime cost = %v, want 0.004 (tokens only)", usages[0].GetTotalTokensEstimatedCost())
+		session := usages[aiAgentUsageKeySession]
+		if session == nil {
+			t.Fatalf("the session entry is missing: %v", usages)
 		}
-		if got := usages[0].GetBreakdown()["audio_millis"]; got != 60000 {
+		if !floatEquals(session.GetTotalTokensEstimatedCost(), 0.004) {
+			t.Errorf("session cost = %v, want 0.004 (tokens only)", session.GetTotalTokensEstimatedCost())
+		}
+		if got := session.GetBreakdown()["audio_millis"]; got != 60000 {
 			t.Errorf("audio_millis = %d, want 60000", got)
 		}
 	})

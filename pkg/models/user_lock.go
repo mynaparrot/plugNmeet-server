@@ -19,6 +19,21 @@ func (m *UserModel) AssignLockSettingsToUser(meta *plugnmeet.RoomMetadata, g *pl
 	m.applyDefaultLockSettings(meta.DefaultLockSettings, g.UserInfo.UserMetadata.LockSettings)
 }
 
+// lockUpdateTargets returns the online users an all-users lock change must
+// update: the requesting admin already asked for it and the synthetic
+// participants (the agent, the bots) own no lock settings.
+func lockUpdateTargets(userIds []string, requestedUserId string) []string {
+	targets := make([]string, 0, len(userIds))
+	for _, id := range userIds {
+		if id == "" || id == requestedUserId || config.IsUserIdInternal(id) {
+			continue
+		}
+		targets = append(targets, id)
+	}
+
+	return targets
+}
+
 // applyDefaultLockSettings uses reflection to merge default lock settings into a user's lock settings.
 func (m *UserModel) applyDefaultLockSettings(defaultLocks, userLocks *plugnmeet.LockSettings) {
 	defaultVal := reflect.ValueOf(defaultLocks).Elem()
@@ -78,11 +93,7 @@ func (m *UserModel) handleUpdateAllUsersLockSettings(r *plugnmeet.UpdateUserLock
 		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrUserUnexpectedError
 	}
 
-	for _, id := range userIds {
-		if id == r.RequestedUserId {
-			// nothing for requested user as is admin
-			continue
-		}
+	for _, id := range lockUpdateTargets(userIds, r.RequestedUserId) {
 		if _, err := m.updateAndBroadcastUserLock(log, r.RoomId, id, r.Service, r.Direction, true); err != nil {
 			log.WithError(err).WithField("user_id", id).Errorln("failed to update user lock settings during all-user change")
 		}
@@ -110,8 +121,9 @@ func (m *UserModel) updateAndBroadcastUserLock(log *logrus.Entry, roomId, userId
 		return plugnmeet.StatusCode_USER_NOT_FOUND, config.ErrUserNotFound
 	}
 
-	// when target user is admin, we should not allow lock/unlock except for whiteboard
-	if mt.IsAdmin && service != "whiteboard" {
+	// when target user is admin, we should not allow lock/unlock except for the
+	// workspace surfaces the agent may hand to any participant
+	if mt.IsAdmin && service != workspaceWhiteboard && service != workspaceSharedNotepad {
 		if forAllUserTask {
 			// silently skip when setting global locking for all users
 			return plugnmeet.StatusCode_SUCCESS, nil

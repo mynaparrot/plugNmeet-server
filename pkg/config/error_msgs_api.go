@@ -201,6 +201,9 @@ var (
 	// ErrAIAgentAllowedUsersRequired is returned when a controlled-users room is
 	// configured without any pre-authorized participant.
 	ErrAIAgentAllowedUsersRequired = errors.New("ai-agent.errors.allowed-users-required")
+	// ErrAIAgentWorkspaceControlled rejects a manual whiteboard or shared notepad
+	// change while the agent controls those surfaces for the session.
+	ErrAIAgentWorkspaceControlled = errors.New("ai-agent.errors.workspace-controlled")
 )
 
 // MsgSuccess is the generic success message of the response envelopes. It is an

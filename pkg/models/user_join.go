@@ -125,29 +125,24 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 	if g.UserInfo.IsAdmin {
 		g.UserInfo.UserMetadata.IsAdmin = true
 		g.UserInfo.UserMetadata.WaitForApproval = false
-
-		// check current room users to make presenter
-		if err := m.CreateNewPresenter(g); err != nil {
-			log.WithError(err).Errorln("failed to create new presenter")
-			return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, "", config.ErrUserUnexpectedError
-		}
-
-		// by default, no lock for admin user
 		g.UserInfo.UserMetadata.LockSettings = new(plugnmeet.LockSettings)
-		// except for whiteboard, which should follow as room settings for non-presenter
-		// otherwise UI become confusion during allowing other admin to draw on whiteboard
-		// admin can always take over the whiteboard
-		if !g.UserInfo.UserMetadata.GetIsPresenter() {
-			g.UserInfo.UserMetadata.LockSettings.LockWhiteboard = meta.DefaultLockSettings.LockWhiteboard
+
+		if !isOneOnOneAIAgentRoom(meta) {
+			// check current room users to make presenter
+			if err := m.CreateNewPresenter(g); err != nil {
+				log.WithError(err).Errorln("failed to create new presenter")
+				return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, "", config.ErrUserUnexpectedError
+			}
+			// except for whiteboard, which should follow as room settings for non-presenter
+			// otherwise UI become confusion during allowing other admin to draw on whiteboard
+			// admin can always take over the whiteboard
+			if !g.UserInfo.UserMetadata.GetIsPresenter() {
+				if roomLocks := meta.GetDefaultLockSettings(); roomLocks != nil {
+					g.UserInfo.UserMetadata.LockSettings.LockWhiteboard = roomLocks.LockWhiteboard
+				}
+			}
 		}
 	} else {
-		m.AssignLockSettingsToUser(meta, g)
-
-		// if waiting room features active then we won't allow direct access
-		if meta.RoomFeatures.WaitingRoomFeatures.IsActive && !backToMainRoom {
-			g.UserInfo.UserMetadata.WaitForApproval = true
-		}
-
 		// only the pre-authorized participants of an AI agent session may join
 		aiFeatures := meta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()
 		if allowedIds := aiAgentAllowedParticipantIds(aiFeatures); aiFeatures.GetIsAllow() && len(allowedIds) > 0 {
@@ -156,7 +151,17 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 				return plugnmeet.StatusCode_INVALID_PARAMETERS, "", config.ErrAIAgentUserNotAllowed
 			}
 		}
+
+		m.AssignLockSettingsToUser(meta, g)
+
+		// if waiting room features active then we won't allow direct access
+		if meta.RoomFeatures.WaitingRoomFeatures.IsActive && !backToMainRoom {
+			g.UserInfo.UserMetadata.WaitForApproval = true
+		}
 	}
+
+	// a 1-on-1 AI agent room is owned by the agent, whoever joins it
+	lockAIAgentRoomWorkspace(meta, g)
 
 	if g.UserInfo.UserMetadata.RecordWebcam == nil {
 		g.UserInfo.UserMetadata.RecordWebcam = new(true)
@@ -218,12 +223,30 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 // was moved to another room of the same session.
 func (m *UserModel) AssignLockSettingsToUserFromRoom(g *plugnmeet.GenerateTokenReq) {
 	meta, err := m.natsService.GetRoomMetadataStruct(g.GetRoomId())
-	if err != nil || meta.GetDefaultLockSettings() == nil {
+	if err != nil || meta == nil {
 		return
 	}
 
 	g.UserInfo.UserMetadata.LockSettings = new(plugnmeet.LockSettings)
 	m.AssignLockSettingsToUser(meta, g)
+	lockAIAgentRoomWorkspace(meta, g)
+}
+
+// lockAIAgentRoomWorkspace locks the workspace in a 1-on-1 AI agent room, where
+// the agent owns the whiteboard and the notepad. It overrides whatever lock
+// settings the user already carried, e.g. from the parent lobby.
+func lockAIAgentRoomWorkspace(meta *plugnmeet.RoomMetadata, g *plugnmeet.GenerateTokenReq) {
+	if !isOneOnOneAIAgentRoom(meta) {
+		return
+	}
+	if g.UserInfo.UserMetadata.LockSettings == nil {
+		g.UserInfo.UserMetadata.LockSettings = new(plugnmeet.LockSettings)
+	}
+
+	g.UserInfo.UserMetadata.IsPresenter = false
+	g.UserInfo.UserMetadata.WaitForApproval = false
+	g.UserInfo.UserMetadata.LockSettings.LockWhiteboard = new(true)
+	g.UserInfo.UserMetadata.LockSettings.LockSharedNotepad = new(true)
 }
 
 // adminAISessionPreCreate reports whether an admin's own 1-on-1 room should be

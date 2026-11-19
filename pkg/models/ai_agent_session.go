@@ -170,6 +170,10 @@ func (m *AIAgentModel) Start(ctx context.Context, roomId string, req *plugnmeet.
 
 	m.storeState(roomId, agent)
 	m.AcquirePresenterForAgent(m.ctx, roomId, agentUserId)
+	// The agent owns both surfaces for the session: the participant always starts
+	// in view-only mode, even when the room was created with unlocked defaults.
+	_ = m.setWorkspaceLockForRoom(roomId, workspaceWhiteboard, true)
+	_ = m.setWorkspaceLockForRoom(roomId, workspaceSharedNotepad, true)
 	go m.superviseAgent(agent, redisLock)
 
 	log.WithField("agentUserId", agent.AgentUserID()).Info("ai agent started")
@@ -403,6 +407,17 @@ func (m *AIAgentModel) closeBreakoutRoomAfterStop(roomId, reason string) {
 			log.WithError(err).Warn("could not end the breakout room of the stopped session")
 		}
 	}()
+}
+
+// IsAgentActive reports whether an agent session is running in the room, either
+// on this server or on another one.
+func (m *AIAgentModel) IsAgentActive(ctx context.Context, roomId string) bool {
+	if _, ok := insightsservice.GetActiveAIAgent(roomId); ok {
+		return true
+	}
+	state, err := m.readState(ctx, roomId)
+
+	return err == nil && state != nil
 }
 
 // readState returns the room's stored agent session state, or nil when none exists.

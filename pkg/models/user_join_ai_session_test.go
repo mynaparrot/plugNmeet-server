@@ -34,3 +34,76 @@ func TestAdminAISessionPreCreate(t *testing.T) {
 		})
 	}
 }
+
+// TestLockAIAgentRoomWorkspace locks in that every participant of a 1-on-1 AI
+// agent room ends up without presenter rights, without the waiting room, and with
+// a locked whiteboard and notepad, even when the metadata already carried other
+// lock settings, as JoinBreakoutRoom hands the parent room metadata over.
+func TestLockAIAgentRoomWorkspace(t *testing.T) {
+	oneOnOneRoom := agentRoomMetadata(agentFeatures(true, modeControlled, controlledConfig("learner-1")))
+	oneOnOneRoom.IsBreakoutRoom = true
+
+	carriedLocks := func(isAdmin bool) *plugnmeet.UserMetadata {
+		return &plugnmeet.UserMetadata{
+			IsAdmin:         isAdmin,
+			IsPresenter:     true,
+			WaitForApproval: true,
+			LockSettings: &plugnmeet.LockSettings{
+				LockWhiteboard:    new(false),
+				LockSharedNotepad: new(false),
+			},
+		}
+	}
+	newRequest := func(md *plugnmeet.UserMetadata) *plugnmeet.GenerateTokenReq {
+		return &plugnmeet.GenerateTokenReq{
+			UserInfo: &plugnmeet.UserInfo{IsAdmin: md.GetIsAdmin(), UserMetadata: md},
+		}
+	}
+
+	tests := []struct {
+		name string
+		req  *plugnmeet.GenerateTokenReq
+	}{
+		{name: "admin carrying the parent room locks", req: newRequest(carriedLocks(true))},
+		{name: "participant carrying the parent room locks", req: newRequest(carriedLocks(false))},
+		{name: "participant without lock settings", req: newRequest(new(plugnmeet.UserMetadata))},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lockAIAgentRoomWorkspace(oneOnOneRoom, tt.req)
+
+			md := tt.req.GetUserInfo().GetUserMetadata()
+			if md.GetIsPresenter() {
+				t.Error("is_presenter = true, want false")
+			}
+			if md.GetWaitForApproval() {
+				t.Error("wait_for_approval = true, want false")
+			}
+			locks := md.GetLockSettings()
+			if locks == nil {
+				t.Fatal("lock_settings = nil, want them assigned")
+			}
+			if locks.LockWhiteboard == nil || !*locks.LockWhiteboard {
+				t.Errorf("lock_whiteboard = %v, want an explicit true", locks.GetLockWhiteboard())
+			}
+			if locks.LockSharedNotepad == nil || !*locks.LockSharedNotepad {
+				t.Errorf("lock_shared_notepad = %v, want an explicit true", locks.GetLockSharedNotepad())
+			}
+		})
+	}
+
+	// the parent lobby keeps the participant's own settings
+	t.Run("any other room is left untouched", func(t *testing.T) {
+		req := newRequest(carriedLocks(false))
+		lockAIAgentRoomWorkspace(agentRoomMetadata(agentFeatures(true, modeOpenPerUse, openPerUserConfig(3))), req)
+
+		md := req.GetUserInfo().GetUserMetadata()
+		if !md.GetIsPresenter() || !md.GetWaitForApproval() {
+			t.Errorf("is_presenter = %v, wait_for_approval = %v, want both untouched", md.GetIsPresenter(), md.GetWaitForApproval())
+		}
+		if md.GetLockSettings().GetLockWhiteboard() || md.GetLockSettings().GetLockSharedNotepad() {
+			t.Error("lock settings changed, want them untouched")
+		}
+	})
+}

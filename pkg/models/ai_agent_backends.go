@@ -322,13 +322,20 @@ func (m *AIAgentModel) setWorkspaceLockForUser(roomID, userID, service string, l
 	return m.natsService.UpdateAndBroadcastUserMetadata(roomID, userID, userMeta, nil)
 }
 
+// workspaceNats is the slice of the NATS service the workspace surfaces need, so
+// their view-only behaviour stays testable without a NATS server.
+type workspaceNats interface {
+	GetRoomMetadataStruct(roomId string) (*plugnmeet.RoomMetadata, error)
+	UpdateAndBroadcastRoomMetadata(roomId string, meta interface{}) error
+}
+
 // aiAgentNotepadBackend opens the room's shared notepad for the agent's writes.
 type aiAgentNotepadBackend struct {
-	m *AIAgentModel
+	nats workspaceNats
 }
 
 func (b aiAgentNotepadBackend) EnsureNotepadActive(_ context.Context, roomID string) error {
-	meta, err := b.m.natsService.GetRoomMetadataStruct(roomID)
+	meta, err := b.nats.GetRoomMetadataStruct(roomID)
 	if err != nil {
 		return err
 	}
@@ -355,23 +362,24 @@ func (b aiAgentNotepadBackend) EnsureNotepadActive(_ context.Context, roomID str
 		changed = true
 	}
 	if changed {
-		if err := b.m.natsService.UpdateAndBroadcastRoomMetadata(roomID, meta); err != nil {
+		if err := b.nats.UpdateAndBroadcastRoomMetadata(roomID, meta); err != nil {
 			return err
 		}
 	}
 
-	// Writing needs an unlocked notepad, not just a visible one.
-	return b.m.setWorkspaceLockForRoom(roomID, workspaceSharedNotepad, false)
+	// The surface stays locked: the participant keeps view-only mode until the
+	// agent explicitly unlocks it with set_workspace_lock.
+	return nil
 }
 
 // aiAgentWhiteboardBackend brings the whiteboard into view, hiding the floating
 // notepad so it never covers the drawing.
 type aiAgentWhiteboardBackend struct {
-	m *AIAgentModel
+	nats workspaceNats
 }
 
 func (b aiAgentWhiteboardBackend) EnsureWhiteboardVisible(_ context.Context, roomID string) error {
-	meta, err := b.m.natsService.GetRoomMetadataStruct(roomID)
+	meta, err := b.nats.GetRoomMetadataStruct(roomID)
 	if err != nil {
 		return err
 	}
@@ -394,13 +402,15 @@ func (b aiAgentWhiteboardBackend) EnsureWhiteboardVisible(_ context.Context, roo
 		changed = true
 	}
 	if changed {
-		if err := b.m.natsService.UpdateAndBroadcastRoomMetadata(roomID, meta); err != nil {
+		if err := b.nats.UpdateAndBroadcastRoomMetadata(roomID, meta); err != nil {
 			return err
 		}
 	}
 
-	// Drawing needs an unlocked board, not just a visible one.
-	return b.m.setWorkspaceLockForRoom(roomID, workspaceWhiteboard, false)
+	// The board stays locked: the agent's own writes bypass the client's
+	// canWrite() check, so the participant keeps view-only mode until the agent
+	// explicitly unlocks it with set_workspace_lock.
+	return nil
 }
 
 // taskError turns a room task's status code and i18n error key into a message
@@ -977,6 +987,59 @@ func (b aiAgentRoomBackend) GetRoomSnapshot(ctx context.Context, roomID string) 
 	return snapshot, nil
 }
 
+// SetWorkspaceVisibility shows or hides a surface without touching its lock, so
+// the agent can open or close a surface the participant still cannot edit.
+func (b aiAgentRoomBackend) SetWorkspaceVisibility(ctx context.Context, roomID, surface string, visible bool) error {
+	services, err := workspaceLockServices(surface)
+	if err != nil {
+		return err
+	}
+
+	if visible {
+		for _, service := range services {
+			switch service {
+			case workspaceWhiteboard:
+				err = (aiAgentWhiteboardBackend{nats: b.m.natsService}).EnsureWhiteboardVisible(ctx, roomID)
+			case workspaceSharedNotepad:
+				err = (aiAgentNotepadBackend{nats: b.m.natsService}).EnsureNotepadActive(ctx, roomID)
+			}
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	meta, err := b.m.natsService.GetRoomMetadataStruct(roomID)
+	if err != nil {
+		return err
+	}
+	if meta == nil {
+		return errors.New("room not found")
+	}
+
+	changed := false
+	for _, service := range services {
+		switch service {
+		case workspaceWhiteboard:
+			if wb := meta.GetRoomFeatures().GetWhiteboardFeatures(); wb != nil && wb.GetVisible() {
+				wb.Visible = false
+				changed = true
+			}
+		case workspaceSharedNotepad:
+			if np := meta.GetRoomFeatures().GetSharedNotePadFeatures(); np != nil && np.GetVisible() {
+				np.Visible = false
+				changed = true
+			}
+		}
+	}
+	if !changed {
+		return nil
+	}
+
+	return b.m.natsService.UpdateAndBroadcastRoomMetadata(roomID, meta)
+}
+
 // SetWorkspaceLock locks or unlocks a surface for the whole room or for one
 // participant. Unlocking also opens the surface, so the participant can draw or
 // write as soon as the agent asks them to.
@@ -1005,9 +1068,9 @@ func (b aiAgentRoomBackend) SetWorkspaceLock(ctx context.Context, roomID, surfac
 	for _, service := range services {
 		switch service {
 		case workspaceWhiteboard:
-			err = (aiAgentWhiteboardBackend{m: b.m}).EnsureWhiteboardVisible(ctx, roomID)
+			err = (aiAgentWhiteboardBackend{nats: b.m.natsService}).EnsureWhiteboardVisible(ctx, roomID)
 		case workspaceSharedNotepad:
-			err = (aiAgentNotepadBackend{m: b.m}).EnsureNotepadActive(ctx, roomID)
+			err = (aiAgentNotepadBackend{nats: b.m.natsService}).EnsureNotepadActive(ctx, roomID)
 		}
 		if err != nil {
 			return err

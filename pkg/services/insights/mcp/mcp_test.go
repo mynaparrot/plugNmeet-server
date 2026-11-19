@@ -116,6 +116,11 @@ type fakeRoom struct {
 	lockLocked  bool
 	lockUserID  string
 	lockErr     error
+
+	visibilityCalls   int
+	visibilitySurface string
+	visibilityVisible bool
+	visibilityErr     error
 }
 
 func (f *fakeRoom) GetRoomSnapshot(_ context.Context, _ string) (*RoomSnapshot, error) {
@@ -129,6 +134,13 @@ func (f *fakeRoom) SetWorkspaceLock(_ context.Context, _, surface string, locked
 	f.lockLocked = locked
 	f.lockUserID = userID
 	return f.lockErr
+}
+
+func (f *fakeRoom) SetWorkspaceVisibility(_ context.Context, _, surface string, visible bool) error {
+	f.visibilityCalls++
+	f.visibilitySurface = surface
+	f.visibilityVisible = visible
+	return f.visibilityErr
 }
 
 type fakeProgress struct {
@@ -1463,7 +1475,34 @@ func TestSetWorkspaceLockTool(t *testing.T) {
 		t.Fatalf("a targeted lock must reach only that participant: %+v", room)
 	}
 
-	if res := call(`{"surface":"whiteboard","action":"open"}`); !res.IsError {
+	res = call(`{"surface":"shared_notepad","action":"close"}`)
+	if res.IsError {
+		t.Fatalf("close must succeed: %s", res.OutputJSON)
+	}
+	if room.visibilityCalls != 1 || room.visibilitySurface != "shared_notepad" || room.visibilityVisible {
+		t.Fatalf("close must hide the surface: %+v", room)
+	}
+	if room.lockCalls != 2 {
+		t.Fatalf("close must not touch the lock settings: %+v", room)
+	}
+	for _, want := range []string{`"action":"close"`, `"visible":false`} {
+		if !strings.Contains(res.OutputJSON, want) {
+			t.Errorf("result is missing %q: %s", want, res.OutputJSON)
+		}
+	}
+
+	res = call(`{"surface":"whiteboard","action":"open"}`)
+	if res.IsError {
+		t.Fatalf("open must succeed: %s", res.OutputJSON)
+	}
+	if room.visibilitySurface != "whiteboard" || !room.visibilityVisible {
+		t.Fatalf("open must show the surface: %+v", room)
+	}
+	if room.lockCalls != 2 {
+		t.Fatalf("open must not unlock the surface: %+v", room)
+	}
+
+	if res := call(`{"surface":"whiteboard","action":"hide"}`); !res.IsError {
 		t.Errorf("an unknown action must fail: %s", res.OutputJSON)
 	}
 
@@ -1507,13 +1546,17 @@ func TestGetRoomInfoReportsWorkspaceLocks(t *testing.T) {
 
 func TestWhiteboardManageBoardUnlocksTheBoard(t *testing.T) {
 	room := &fakeRoom{}
+	whiteboard := &fakeWhiteboardBackend{}
 	deps := testDeps()
 	deps.Room = room
+	deps.Whiteboard = whiteboard
 	board, _ := BuildRoomToolRegistry(fullFeatures(), deps).Get(ToolWhiteboardManageBoard)
 
 	enum, _ := board.Spec.InputSchema["properties"].(map[string]any)["action"].(map[string]any)["enum"]
-	if got := fmt.Sprint(enum); !strings.Contains(got, "unlock_board") || !strings.Contains(got, "lock_board") {
-		t.Fatalf("action enum = %s, want unlock_board and lock_board", got)
+	for _, want := range []string{"unlock_board", "lock_board", "close_board"} {
+		if got := fmt.Sprint(enum); !strings.Contains(got, want) {
+			t.Fatalf("action enum = %s, want %s", got, want)
+		}
 	}
 
 	if err := board.Prepare(context.Background(), ToolCall{RoomID: "room-1", ArgsJSON: `{"action":"unlock_board"}`}); err != nil {
@@ -1530,6 +1573,21 @@ func TestWhiteboardManageBoardUnlocksTheBoard(t *testing.T) {
 		t.Fatalf("lock_board must lock the whiteboard: %+v", room)
 	}
 
+	// close_board hides the board and locks it without ever revealing it.
+	reveals := whiteboard.calls
+	if err := board.Prepare(context.Background(), ToolCall{RoomID: "room-1", ArgsJSON: `{"action":"close_board"}`}); err != nil {
+		t.Fatalf("close_board prepare: %v", err)
+	}
+	if whiteboard.calls != reveals {
+		t.Fatalf("close_board must not reveal the whiteboard: %+v", whiteboard)
+	}
+	if !room.lockLocked || room.lockSurface != "whiteboard" {
+		t.Fatalf("close_board must lock the whiteboard: %+v", room)
+	}
+	if room.visibilityCalls != 1 || room.visibilitySurface != "whiteboard" || room.visibilityVisible {
+		t.Fatalf("close_board must hide the whiteboard: %+v", room)
+	}
+
 	// Navigation actions must not touch the lock settings.
 	before := room.lockCalls
 	if err := board.Prepare(context.Background(), ToolCall{RoomID: "room-1", ArgsJSON: `{"action":"switch_page","page":2}`}); err != nil {
@@ -1537,5 +1595,8 @@ func TestWhiteboardManageBoardUnlocksTheBoard(t *testing.T) {
 	}
 	if room.lockCalls != before {
 		t.Fatalf("other actions must leave the lock settings alone: %+v", room)
+	}
+	if whiteboard.calls != reveals+1 {
+		t.Fatalf("other actions must still reveal the board: %+v", whiteboard)
 	}
 }

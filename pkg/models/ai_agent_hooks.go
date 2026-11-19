@@ -123,7 +123,7 @@ func (m *AIAgentModel) OnPollResponseSubmitted(ctx context.Context, roomId, poll
 	if m == nil || config.IsUserIdInternal(userId) {
 		return
 	}
-	agent, ok := insightsservice.GetActiveAIAgent(roomId)
+	agent, ok := m.hostedAgent(roomId)
 	if !ok {
 		return
 	}
@@ -135,7 +135,8 @@ func (m *AIAgentModel) OnPollResponseSubmitted(ctx context.Context, roomId, poll
 	if note == "" {
 		return
 	}
-	if err := agent.SendContext(note, "poll"); err != nil {
+	// proactive: the answer alone must make the agent speak up
+	if err := agent.SendProactiveContext(note, "poll"); err != nil {
 		m.logger.WithError(err).Debug("could not send the poll context to the ai agent")
 	}
 }

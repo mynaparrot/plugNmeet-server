@@ -495,11 +495,28 @@ func TestApplyAIAgentRoomDefaults(t *testing.T) {
 			t.Error("lock_private_chat = false, want the default true")
 		}
 	})
+
+	t.Run("a host unlocked workspace is locked again", func(t *testing.T) {
+		req := newRequest(agentFeatures(true, modeOpenPerUse, openPerUserConfig(2)))
+		req.Metadata.DefaultLockSettings = &plugnmeet.LockSettings{
+			LockWhiteboard:    new(false),
+			LockSharedNotepad: new(false),
+		}
+		(&RoomModel{}).applyAIAgentRoomDefaults(req)
+
+		locks := req.GetMetadata().GetDefaultLockSettings()
+		if !locks.GetLockWhiteboard() {
+			t.Error("lock_whiteboard = false, want the agent's locked default")
+		}
+		if !locks.GetLockSharedNotepad() {
+			t.Error("lock_shared_notepad = false, want the agent's locked default")
+		}
+	})
 }
 
 // assertAIAgentSessionRoomFeatures checks the feature set an AI agent session
-// room must carry: the unused features and the waiting room are disabled and
-// private chat is locked.
+// room must carry: the unused features and the waiting room are disabled, and
+// the private chat and both workspace surfaces are locked for everybody.
 func assertAIAgentSessionRoomFeatures(t *testing.T, meta *plugnmeet.RoomMetadata) {
 	t.Helper()
 	rf := meta.GetRoomFeatures()
@@ -521,6 +538,12 @@ func assertAIAgentSessionRoomFeatures(t *testing.T, meta *plugnmeet.RoomMetadata
 	locks := meta.GetDefaultLockSettings()
 	if !locks.GetLockPrivateChat() {
 		t.Error("lock_private_chat = false, want it locked")
+	}
+	if locks.LockWhiteboard == nil || !locks.GetLockWhiteboard() {
+		t.Error("lock_whiteboard = false, want it locked: only the agent hands out the pen")
+	}
+	if locks.LockSharedNotepad == nil || !locks.GetLockSharedNotepad() {
+		t.Error("lock_shared_notepad = false, want it locked: only the agent hands out the pad")
 	}
 	if locks.GetLockWebcam() || locks.GetLockScreenSharing() {
 		t.Errorf("locks = %v, want the webcam and screen share disabled via room features, not locked", locks)
