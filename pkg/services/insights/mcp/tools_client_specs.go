@@ -201,23 +201,24 @@ func registerWhiteboardTools(reg *Registry, deps ToolDependencies) {
 		Spec: &insights.MCPToolSpec{
 			Name: ToolWhiteboardWriteContent,
 			Description: "Write plain text headings/notes, vocabulary cards, sticky notes, or a bordered multi-column " +
-				"comparison table (style=\"comparison_table\" with columns per row) on the whiteboard. Layout is " +
-				"automatic and avoids existing elements; never compute pixel coordinates. For flowcharts, processes, " +
-				"trees, or relational diagrams, prefer whiteboard_draw_diagram (Mermaid) instead. Use color=black for " +
-				"normal teaching content; when writing a correction or suggestion beside a participant's element, use " +
-				"red or another colour that contrasts with the participant's element colour. The whiteboard already " +
-				"renders all text in a handwritten font, so write math formulas or equations using clean Unicode " +
-				"symbols (∫, π, λ, ∑, √, ², ³, ≠, ≤, ≥, ±, ∞, e.g. \"e^(iπ) + 1 = 0\") instead of raw $$...$$ LaTeX.",
+				"table (style=\"comparison_table\" with blocks=[{columns:[\"Header 1\",\"Header 2\"]},{columns:[\"Cell 1\",\"Cell 2\"]}]; " +
+				"leave a cell \"\" for fill-in-the-blank tables) on the whiteboard. Layout is automatic and avoids existing " +
+				"elements; never compute pixel coordinates. For flowcharts, processes, trees, or relational diagrams, prefer " +
+				"whiteboard_draw_diagram (Mermaid) instead. Use color=black for normal teaching content; when writing a " +
+				"correction or suggestion beside a participant's element, use red or another colour that contrasts with the " +
+				"participant's element colour. The whiteboard already renders all text in a handwritten font, so write math " +
+				"formulas or equations using clean Unicode symbols (∫, π, λ, ∑, √, ², ³, ≠, ≤, ≥, ±, ∞, e.g. \"e^(iπ) + 1 = 0\") " +
+				"instead of raw $$...$$ LaTeX.",
 			InputSchema: objectSchema(map[string]any{
 				"layout": enumProp("Where to place the content relative to the page or to anchor_element_id.", "free_space", "inside_element", "below_element", "above_element", "right_of_element", "left_of_element", "page_center"),
 				"anchor_element_id": stringProp(
 					"Required when layout is inside_element, below_element, above_element, right_of_element, or left_of_element.", 120),
 				"style": enumProp("What to render.", "heading", "body", "vocabulary_card", "sticky_note", "comparison_table"),
-				"blocks": arrayProp("The blocks of content.", objectSchema(map[string]any{
-					"text":     stringProp("The text of the block.", 400),
+				"blocks": arrayProp("The blocks of content (or rows of a table).", objectSchema(map[string]any{
+					"text":     stringProp("The text of the block (optional when columns is provided for a table row).", 400),
 					"emphasis": enumProp("Emphasis of the block.", "none", "bold", "highlight", "underline"),
-					"columns":  arrayProp("Columns for a table row (2 to 5 cells).", stringProp("", 200), 0, 5),
-				}, "text"), 1, 12),
+					"columns":  arrayProp("Cells of a table row (2 to 5 cells; use \"\" for an empty/blank cell).", stringProp("", 200), 0, 5),
+				}), 1, 16),
 				"font_size": intProp("Font size in pixels.", 12, 48),
 				"color":     enumProp("Colour: black for normal teaching content, red (or a colour contrasting with the participant's element colour) for corrections beside a participant's work.", "black", "blue", "red", "green", "orange", "violet"),
 			}, "blocks"),
