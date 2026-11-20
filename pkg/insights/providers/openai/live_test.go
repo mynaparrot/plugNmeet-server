@@ -647,6 +647,104 @@ func TestLiveSessionServerDelegationUsage(t *testing.T) {
 	}
 }
 
+func TestLiveSessionServerDelegationUsageDetails(t *testing.T) {
+	conn := &fakeLiveConn{}
+	s, err := newLiveSession(conn, nil)
+	if err != nil {
+		t.Fatalf("newLiveSession: %v", err)
+	}
+
+	s.handleServerEvent(live.ServerEventUnion{
+		Type: liveEventResponse,
+		OfResponseEvent: live.ResponseEvent{Event: map[string]any{
+			"type": liveResponseCompleted,
+			"response": map[string]any{
+				"usage": map[string]any{
+					"input_tokens": float64(1000),
+					"input_tokens_details": map[string]any{
+						"cached_tokens":              float64(200),
+						"cache_write_tokens":         float64(100),
+						"text_tokens":                float64(600),
+						"audio_tokens":               float64(300),
+						"image_tokens":               float64(100),
+						"cached_tokens_details":      map[string]any{"text_tokens": float64(150), "audio_tokens": float64(0), "image_tokens": float64(50)},
+						"cache_write_tokens_details": map[string]any{"text_tokens": float64(100)},
+					},
+					"output_tokens": float64(400),
+					"output_tokens_details": map[string]any{
+						"text_tokens":      float64(280),
+						"audio_tokens":     float64(0),
+						"reasoning_tokens": float64(120),
+					},
+				},
+			},
+		}},
+	})
+
+	events := drainRealtimeEvents(t, s.Events())
+	if len(events) != 2 {
+		t.Fatalf("expected a usage event and a turn complete: %+v", events)
+	}
+	usage := events[0]
+	want := insights.RealtimeEvent{
+		Type:                                insights.RealtimeEventUsage,
+		DelegationInputTokens:               1000,
+		DelegationOutputTokens:              400,
+		DelegationCachedInputTokens:         200,
+		DelegationCacheWriteInputTokens:     100,
+		DelegationTextInputTokens:           600,
+		DelegationAudioInputTokens:          300,
+		DelegationImageInputTokens:          100,
+		DelegationCachedTextInputTokens:     150,
+		DelegationCachedImageInputTokens:    50,
+		DelegationCacheWriteTextInputTokens: 100,
+		DelegationTextOutputTokens:          280,
+		DelegationThinkingOutputTokens:      120,
+	}
+	if usage.DelegationCachedInputTokens != want.DelegationCachedInputTokens ||
+		usage.DelegationCacheWriteInputTokens != want.DelegationCacheWriteInputTokens ||
+		usage.DelegationTextInputTokens != want.DelegationTextInputTokens ||
+		usage.DelegationAudioInputTokens != want.DelegationAudioInputTokens ||
+		usage.DelegationImageInputTokens != want.DelegationImageInputTokens ||
+		usage.DelegationCachedTextInputTokens != want.DelegationCachedTextInputTokens ||
+		usage.DelegationCachedImageInputTokens != want.DelegationCachedImageInputTokens ||
+		usage.DelegationCacheWriteTextInputTokens != want.DelegationCacheWriteTextInputTokens ||
+		usage.DelegationTextOutputTokens != want.DelegationTextOutputTokens ||
+		usage.DelegationThinkingOutputTokens != want.DelegationThinkingOutputTokens {
+		t.Fatalf("usage details = %+v, want %+v", usage, want)
+	}
+	if usage.InputTokens != 0 || usage.OutputTokens != 0 {
+		t.Fatalf("delegated tokens must not be reported as session tokens: %+v", usage)
+	}
+
+	// The "token" spelling and the cache creation name are accepted too.
+	s.handleServerEvent(live.ServerEventUnion{
+		Type: liveEventResponse,
+		OfResponseEvent: live.ResponseEvent{Event: map[string]any{
+			"type": liveResponseCompleted,
+			"response": map[string]any{
+				"usage": map[string]any{
+					"input_tokens": float64(10),
+					"input_token_details": map[string]any{
+						"cached_tokens":               float64(2),
+						"cache_creation_input_tokens": float64(4),
+					},
+					"output_tokens":        float64(5),
+					"output_token_details": map[string]any{"reasoning_tokens": float64(3)},
+				},
+			},
+		}},
+	})
+	events = drainRealtimeEvents(t, s.Events())
+	if len(events) != 2 {
+		t.Fatalf("expected a usage event and a turn complete: %+v", events)
+	}
+	usage = events[0]
+	if usage.DelegationCachedInputTokens != 2 || usage.DelegationCacheWriteInputTokens != 4 || usage.DelegationThinkingOutputTokens != 3 {
+		t.Fatalf("unexpected usage event: %+v", usage)
+	}
+}
+
 func TestNestedUint32(t *testing.T) {
 	tests := []struct {
 		name  string

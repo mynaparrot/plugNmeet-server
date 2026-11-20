@@ -97,11 +97,32 @@ func (a *AIAgent) TelemetrySnapshot(endReason string) redisservice.AIAgentSessio
 		TextOutputTokens:       state.textOutputTokens,
 		AudioOutputTokens:      state.audioOutputTokens,
 		ThinkingOutputTokens:   state.thinkingOutputTokens,
-		DelegationInputTokens:  uint64(state.delegationInputTokens),
-		DelegationOutputTokens: uint64(state.delegationOutputTokens),
-		AudioMillis:            state.audioMillis,
-		ToolsUsed:              toolsUsed,
-		Transcript:             transcript,
+
+		CacheWriteInputTokens:      state.cacheWriteInputTokens,
+		CacheWriteTextInputTokens:  state.cacheWriteTextInputTokens,
+		CacheWriteAudioInputTokens: state.cacheWriteAudioInputTokens,
+		CacheWriteImageInputTokens: state.cacheWriteImageInputTokens,
+
+		DelegationInputTokens:                uint64(state.delegationInputTokens),
+		DelegationOutputTokens:               uint64(state.delegationOutputTokens),
+		DelegationCachedInputTokens:          state.delegationCachedInputTokens,
+		DelegationCacheWriteInputTokens:      state.delegationCacheWriteInputTokens,
+		DelegationTextInputTokens:            state.delegationTextInputTokens,
+		DelegationAudioInputTokens:           state.delegationAudioInputTokens,
+		DelegationImageInputTokens:           state.delegationImageInputTokens,
+		DelegationCachedTextInputTokens:      state.delegationCachedTextInputTokens,
+		DelegationCachedAudioInputTokens:     state.delegationCachedAudioInputTokens,
+		DelegationCachedImageInputTokens:     state.delegationCachedImageInputTokens,
+		DelegationCacheWriteTextInputTokens:  state.delegationCacheWriteTextInputTokens,
+		DelegationCacheWriteAudioInputTokens: state.delegationCacheWriteAudioInputTokens,
+		DelegationCacheWriteImageInputTokens: state.delegationCacheWriteImageInputTokens,
+		DelegationTextOutputTokens:           state.delegationTextOutputTokens,
+		DelegationAudioOutputTokens:          state.delegationAudioOutputTokens,
+		DelegationThinkingOutputTokens:       state.delegationThinkingOutputTokens,
+
+		AudioMillis: state.audioMillis,
+		ToolsUsed:   toolsUsed,
+		Transcript:  transcript,
 	}
 }
 
@@ -129,6 +150,7 @@ func (a *AIAgent) logUsage() {
 		"inputTokens":            state.inputTokens,
 		"outputTokens":           state.outputTokens,
 		"cachedInputTokens":      state.cachedInputTokens,
+		"cacheWriteInputTokens":  state.cacheWriteInputTokens,
 		"delegationInputTokens":  state.delegationInputTokens,
 		"delegationOutputTokens": state.delegationOutputTokens,
 		"audioMillis":            state.audioMillis,
@@ -150,8 +172,26 @@ func (a *AIAgent) recordUsage(ev insights.RealtimeEvent) {
 	a.state.textOutputTokens += uint64(ev.TextOutputTokens)
 	a.state.audioOutputTokens += uint64(ev.AudioOutputTokens)
 	a.state.thinkingOutputTokens += uint64(ev.ThinkingOutputTokens)
+	a.state.cacheWriteInputTokens += uint64(ev.CacheWriteInputTokens)
+	a.state.cacheWriteTextInputTokens += uint64(ev.CacheWriteTextInputTokens)
+	a.state.cacheWriteAudioInputTokens += uint64(ev.CacheWriteAudioInputTokens)
+	a.state.cacheWriteImageInputTokens += uint64(ev.CacheWriteImageInputTokens)
 	a.state.delegationInputTokens += ev.DelegationInputTokens
 	a.state.delegationOutputTokens += ev.DelegationOutputTokens
+	a.state.delegationCachedInputTokens += uint64(ev.DelegationCachedInputTokens)
+	a.state.delegationCacheWriteInputTokens += uint64(ev.DelegationCacheWriteInputTokens)
+	a.state.delegationTextInputTokens += uint64(ev.DelegationTextInputTokens)
+	a.state.delegationAudioInputTokens += uint64(ev.DelegationAudioInputTokens)
+	a.state.delegationImageInputTokens += uint64(ev.DelegationImageInputTokens)
+	a.state.delegationCachedTextInputTokens += uint64(ev.DelegationCachedTextInputTokens)
+	a.state.delegationCachedAudioInputTokens += uint64(ev.DelegationCachedAudioInputTokens)
+	a.state.delegationCachedImageInputTokens += uint64(ev.DelegationCachedImageInputTokens)
+	a.state.delegationCacheWriteTextInputTokens += uint64(ev.DelegationCacheWriteTextInputTokens)
+	a.state.delegationCacheWriteAudioInputTokens += uint64(ev.DelegationCacheWriteAudioInputTokens)
+	a.state.delegationCacheWriteImageInputTokens += uint64(ev.DelegationCacheWriteImageInputTokens)
+	a.state.delegationTextOutputTokens += uint64(ev.DelegationTextOutputTokens)
+	a.state.delegationAudioOutputTokens += uint64(ev.DelegationAudioOutputTokens)
+	a.state.delegationThinkingOutputTokens += uint64(ev.DelegationThinkingOutputTokens)
 	a.state.audioMillis += ev.AudioMillis
 	audioMillis := a.state.audioMillis
 	a.stateMu.Unlock()

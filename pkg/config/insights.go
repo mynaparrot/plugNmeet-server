@@ -32,9 +32,14 @@ type ModelPricing struct {
 	ImageInputPricePerMillionTokens       float64 `yaml:"image_input_price_per_million_tokens"`
 	ImageCachedInputPricePerMillionTokens float64 `yaml:"image_cached_input_price_per_million_tokens"`
 	AudioOutputPricePerMillionTokens      float64 `yaml:"audio_output_price_per_million_tokens"`
-	PricePerMinute                        float64 `yaml:"price_per_minute"`
-	PricePerMillionCharacters             float64 `yaml:"price_per_million_characters"`
-	PricePerHour                          float64 `yaml:"price_per_hour"`
+	// Cache writes are the input tokens a provider stored in its prompt cache;
+	// without a rate of their own they are billed as uncached input.
+	CacheWriteInputPricePerMillionTokens      float64 `yaml:"cache_write_input_price_per_million_tokens"`
+	AudioCacheWriteInputPricePerMillionTokens float64 `yaml:"audio_cache_write_input_price_per_million_tokens"`
+	ImageCacheWriteInputPricePerMillionTokens float64 `yaml:"image_cache_write_input_price_per_million_tokens"`
+	PricePerMinute                            float64 `yaml:"price_per_minute"`
+	PricePerMillionCharacters                 float64 `yaml:"price_per_million_characters"`
+	PricePerHour                              float64 `yaml:"price_per_hour"`
 }
 
 // InsightsConfig is the main config block for the insights feature.

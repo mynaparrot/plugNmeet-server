@@ -55,6 +55,12 @@ type RealtimeEvent struct {
 	// CachedInputTokens is the cached prefix of InputTokens, billed at a
 	// discounted rate when one is configured for the modality.
 	CachedInputTokens uint32
+	// CacheWriteInputTokens is the input that was written to the prompt cache,
+	// billed at the cache write rate when one is configured.
+	CacheWriteInputTokens      uint32
+	CacheWriteTextInputTokens  uint32
+	CacheWriteAudioInputTokens uint32
+	CacheWriteImageInputTokens uint32
 	// Per-modality detail of the counts above, so each rate applies to the
 	// tokens it belongs to. ImageInputTokens covers image and video input, and
 	// TextOutputTokens includes the thinking tokens, which are billed as output.
@@ -69,9 +75,25 @@ type RealtimeEvent struct {
 	ThinkingOutputTokens   uint32
 	// DelegationInputTokens and DelegationOutputTokens report the tokens spent by
 	// a delegated text model (e.g. an OpenAI Live Responses delegation), which is
-	// priced apart from the session model.
+	// priced apart from the session model. The details below split them the same
+	// way the session tokens are split above.
 	DelegationInputTokens  uint32
 	DelegationOutputTokens uint32
+
+	DelegationCachedInputTokens          uint32
+	DelegationCacheWriteInputTokens      uint32
+	DelegationTextInputTokens            uint32
+	DelegationAudioInputTokens           uint32
+	DelegationImageInputTokens           uint32
+	DelegationCachedTextInputTokens      uint32
+	DelegationCachedAudioInputTokens     uint32
+	DelegationCachedImageInputTokens     uint32
+	DelegationCacheWriteTextInputTokens  uint32
+	DelegationCacheWriteAudioInputTokens uint32
+	DelegationCacheWriteImageInputTokens uint32
+	DelegationTextOutputTokens           uint32
+	DelegationAudioOutputTokens          uint32
+	DelegationThinkingOutputTokens       uint32
 	// AudioMillis is the agent audio duration covered by a usage event, when known.
 	AudioMillis uint64
 	// TraceID correlates the event with server-side logs.

@@ -505,10 +505,36 @@ func (s *liveSession) emitDelegationUsage(rawResponse any) {
 	if inputTokens == 0 && outputTokens == 0 {
 		return
 	}
+
+	// The Responses API reports the modality, cached and cache-write split in the
+	// details objects; both the "tokens" and the "token" spellings are accepted.
+	inputDetails := nestedMap(usage, "input_tokens_details", "input_token_details")
+	outputDetails := nestedMap(usage, "output_tokens_details", "output_token_details")
+	cachedDetails := nestedMap(inputDetails, "cached_tokens_details")
+	cacheWriteDetails := nestedMap(inputDetails, "cache_write_tokens_details", "cache_creation_tokens_details")
+
 	s.emit(insights.RealtimeEvent{
 		Type:                   insights.RealtimeEventUsage,
 		DelegationInputTokens:  inputTokens,
 		DelegationOutputTokens: outputTokens,
+
+		DelegationCachedInputTokens:     nestedUint32(inputDetails, "cached_tokens"),
+		DelegationCacheWriteInputTokens: firstNonZero(nestedUint32(inputDetails, "cache_write_tokens"), nestedUint32(inputDetails, "cache_creation_input_tokens")),
+		DelegationTextInputTokens:       nestedUint32(inputDetails, "text_tokens"),
+		DelegationAudioInputTokens:      nestedUint32(inputDetails, "audio_tokens"),
+		DelegationImageInputTokens:      nestedUint32(inputDetails, "image_tokens"),
+
+		DelegationCachedTextInputTokens:  nestedUint32(cachedDetails, "text_tokens"),
+		DelegationCachedAudioInputTokens: nestedUint32(cachedDetails, "audio_tokens"),
+		DelegationCachedImageInputTokens: nestedUint32(cachedDetails, "image_tokens"),
+
+		DelegationCacheWriteTextInputTokens:  nestedUint32(cacheWriteDetails, "text_tokens"),
+		DelegationCacheWriteAudioInputTokens: nestedUint32(cacheWriteDetails, "audio_tokens"),
+		DelegationCacheWriteImageInputTokens: nestedUint32(cacheWriteDetails, "image_tokens"),
+
+		DelegationTextOutputTokens:     nestedUint32(outputDetails, "text_tokens"),
+		DelegationAudioOutputTokens:    nestedUint32(outputDetails, "audio_tokens"),
+		DelegationThinkingOutputTokens: nestedUint32(outputDetails, "reasoning_tokens"),
 	})
 }
 
@@ -554,6 +580,28 @@ func nestedString(m map[string]any, key string) string {
 		return ""
 	}
 	return strings.TrimSpace(value)
+}
+
+// nestedMap reads the first object found under one of the keys; a missing key
+// yields a nil map, which every nested read treats as empty.
+func nestedMap(m map[string]any, keys ...string) map[string]any {
+	for _, key := range keys {
+		if value, ok := m[key].(map[string]any); ok {
+			return value
+		}
+	}
+	return nil
+}
+
+// firstNonZero returns the first count that is set, so a provider that renamed a
+// field still reports it under the old name.
+func firstNonZero(values ...uint32) uint32 {
+	for _, value := range values {
+		if value > 0 {
+			return value
+		}
+	}
+	return 0
 }
 
 // nestedUint32 reads an unsigned count from a decoded JSON object. Decoders

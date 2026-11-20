@@ -108,11 +108,32 @@ type aiAgentRuntimeState struct {
 	textOutputTokens       uint64
 	audioOutputTokens      uint64
 	thinkingOutputTokens   uint64
-	audioMillis            uint64
+	// cacheWriteInputTokens is the input written to the prompt cache, split by
+	// modality like the cached count above.
+	cacheWriteInputTokens      uint64
+	cacheWriteTextInputTokens  uint64
+	cacheWriteAudioInputTokens uint64
+	cacheWriteImageInputTokens uint64
+	audioMillis                uint64
 	// delegationInputTokens and delegationOutputTokens belong to the delegated
 	// text model of a live session, so they never mix with the session tokens.
 	delegationInputTokens  uint32
 	delegationOutputTokens uint32
+	// The delegated tokens carry the same modality and cache split.
+	delegationCachedInputTokens          uint64
+	delegationCacheWriteInputTokens      uint64
+	delegationTextInputTokens            uint64
+	delegationAudioInputTokens           uint64
+	delegationImageInputTokens           uint64
+	delegationCachedTextInputTokens      uint64
+	delegationCachedAudioInputTokens     uint64
+	delegationCachedImageInputTokens     uint64
+	delegationCacheWriteTextInputTokens  uint64
+	delegationCacheWriteAudioInputTokens uint64
+	delegationCacheWriteImageInputTokens uint64
+	delegationTextOutputTokens           uint64
+	delegationAudioOutputTokens          uint64
+	delegationThinkingOutputTokens       uint64
 
 	turnsCount int
 	toolsUsed  map[string]int

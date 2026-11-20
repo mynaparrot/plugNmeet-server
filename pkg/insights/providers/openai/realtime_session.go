@@ -294,6 +294,7 @@ func translateRealtimeResponseDone(ev realtime.ResponseDoneEvent) []insights.Rea
 			InputTokens:            realtimeTokenCount(usage.InputTokens),
 			OutputTokens:           realtimeTokenCount(usage.OutputTokens),
 			CachedInputTokens:      realtimeTokenCount(in.CachedTokens),
+			CacheWriteInputTokens:  realtimeCacheWriteTokens(in),
 			TextInputTokens:        realtimeTokenCount(in.TextTokens),
 			AudioInputTokens:       realtimeTokenCount(in.AudioTokens),
 			ImageInputTokens:       realtimeTokenCount(in.ImageTokens),
@@ -356,6 +357,22 @@ func realtimeTokenCount(v int64) uint32 {
 		return 0
 	}
 	return uint32(v)
+}
+
+// realtimeCacheWriteTokens reads the cache write count of the input details,
+// which the SDK does not model as a field yet.
+func realtimeCacheWriteTokens(in realtime.RealtimeResponseUsageInputTokenDetails) uint32 {
+	for _, name := range []string{"cache_write_tokens", "cache_creation_input_tokens"} {
+		field, ok := in.JSON.ExtraFields[name]
+		if !ok || !field.Valid() {
+			continue
+		}
+		var value int64
+		if err := json.Unmarshal([]byte(field.Raw()), &value); err == nil && value > 0 {
+			return realtimeTokenCount(value)
+		}
+	}
+	return 0
 }
 
 // realtimeAgentSession implements insights.RealtimeSession on top of a Realtime socket.

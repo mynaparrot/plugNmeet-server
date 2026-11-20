@@ -88,12 +88,33 @@ type AIAgentSessionTelemetry struct {
 	TextOutputTokens       uint64 `json:"text_output_tokens,omitempty"`
 	AudioOutputTokens      uint64 `json:"audio_output_tokens,omitempty"`
 	ThinkingOutputTokens   uint64 `json:"thinking_output_tokens,omitempty"`
-	// Tokens spent by the delegated text model of a live session, priced apart.
-	DelegationInputTokens  uint64                    `json:"delegation_input_tokens,omitempty"`
-	DelegationOutputTokens uint64                    `json:"delegation_output_tokens,omitempty"`
-	AudioMillis            uint64                    `json:"audio_millis"`
-	ToolsUsed              map[string]int            `json:"tools_used,omitempty"`
-	Transcript             []AISessionTranscriptTurn `json:"transcript,omitempty"`
+	// Cache write split of the input tokens, billed apart from cached input.
+	CacheWriteInputTokens      uint64 `json:"cache_write_input_tokens,omitempty"`
+	CacheWriteTextInputTokens  uint64 `json:"cache_write_text_input_tokens,omitempty"`
+	CacheWriteAudioInputTokens uint64 `json:"cache_write_audio_input_tokens,omitempty"`
+	CacheWriteImageInputTokens uint64 `json:"cache_write_image_input_tokens,omitempty"`
+	// Tokens spent by the delegated text model of a live session, priced apart,
+	// with the same modality and cache split as the session tokens above.
+	DelegationInputTokens                uint64 `json:"delegation_input_tokens,omitempty"`
+	DelegationOutputTokens               uint64 `json:"delegation_output_tokens,omitempty"`
+	DelegationCachedInputTokens          uint64 `json:"delegation_cached_input_tokens,omitempty"`
+	DelegationCacheWriteInputTokens      uint64 `json:"delegation_cache_write_input_tokens,omitempty"`
+	DelegationTextInputTokens            uint64 `json:"delegation_text_input_tokens,omitempty"`
+	DelegationAudioInputTokens           uint64 `json:"delegation_audio_input_tokens,omitempty"`
+	DelegationImageInputTokens           uint64 `json:"delegation_image_input_tokens,omitempty"`
+	DelegationCachedTextInputTokens      uint64 `json:"delegation_cached_text_input_tokens,omitempty"`
+	DelegationCachedAudioInputTokens     uint64 `json:"delegation_cached_audio_input_tokens,omitempty"`
+	DelegationCachedImageInputTokens     uint64 `json:"delegation_cached_image_input_tokens,omitempty"`
+	DelegationCacheWriteTextInputTokens  uint64 `json:"delegation_cache_write_text_input_tokens,omitempty"`
+	DelegationCacheWriteAudioInputTokens uint64 `json:"delegation_cache_write_audio_input_tokens,omitempty"`
+	DelegationCacheWriteImageInputTokens uint64 `json:"delegation_cache_write_image_input_tokens,omitempty"`
+	DelegationTextOutputTokens           uint64 `json:"delegation_text_output_tokens,omitempty"`
+	DelegationAudioOutputTokens          uint64 `json:"delegation_audio_output_tokens,omitempty"`
+	DelegationThinkingOutputTokens       uint64 `json:"delegation_thinking_output_tokens,omitempty"`
+
+	AudioMillis uint64                    `json:"audio_millis"`
+	ToolsUsed   map[string]int            `json:"tools_used,omitempty"`
+	Transcript  []AISessionTranscriptTurn `json:"transcript,omitempty"`
 }
 
 // GetAIKnowledgeDocument returns the cached document of rawURL, if any.

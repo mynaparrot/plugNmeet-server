@@ -374,12 +374,16 @@ func TestBuildAIAgentUsageMetadataSeparatedRoles(t *testing.T) {
 			t.Errorf("total cost = %v, want 3.00175", usage.GetTotalTokensEstimatedCost())
 		}
 
+		// The delegated model reports no modality detail, so all of its tokens
+		// are text, exactly like an unattributed session token.
 		want := map[string]int64{
-			"audio_millis":                 120000,
-			"delegation_prompt_tokens":     1000,
-			"delegation_completion_tokens": 500,
-			"summary_prompt_tokens":        200,
-			"summary_completion_tokens":    100,
+			"audio_millis":                      120000,
+			"delegation_prompt_tokens":          1000,
+			"delegation_completion_tokens":      500,
+			"delegation_text_prompt_tokens":     1000,
+			"delegation_text_completion_tokens": 500,
+			"summary_prompt_tokens":             200,
+			"summary_completion_tokens":         100,
 		}
 		if len(usage.GetBreakdown()) != len(want) {
 			t.Fatalf("breakdown = %v, want %v", usage.GetBreakdown(), want)
@@ -440,6 +444,33 @@ func TestResolveAIAgentRates(t *testing.T) {
 	explicit := &config.ModelPricing{InputPricePerMillionTokens: 2, CachedInputPricePerMillionTokens: 0.25}
 	if rates, _ := resolveAIAgentRates(explicit); !floatEquals(rates.textCachedInput, 0.25) {
 		t.Errorf("explicit cached text rate = %v, want 0.25", rates.textCachedInput)
+	}
+
+	// Without a cache write rate, a cache write pays the uncached input rate.
+	if !floatEquals(rates.textCacheWriteInput, 2) || !floatEquals(rates.audioCacheWriteInput, 2) ||
+		!floatEquals(rates.imageCacheWriteInput, 2) {
+		t.Errorf("a missing cache write rate must fall back to the input rate: %+v", rates)
+	}
+
+	// A cache write rate of its own is used per modality, in the same order as
+	// the cached rates.
+	luna := &config.ModelPricing{
+		InputPricePerMillionTokens:                0.10,
+		CachedInputPricePerMillionTokens:          0.01,
+		CacheWriteInputPricePerMillionTokens:      0.125,
+		ImageInputPricePerMillionTokens:           0.80,
+		AudioInputPricePerMillionTokens:           10,
+		AudioCacheWriteInputPricePerMillionTokens: 1.5,
+	}
+	rates, _ = resolveAIAgentRates(luna)
+	if !floatEquals(rates.textCacheWriteInput, 0.125) {
+		t.Errorf("text cache write rate = %v, want 0.125", rates.textCacheWriteInput)
+	}
+	if !floatEquals(rates.audioCacheWriteInput, 1.5) {
+		t.Errorf("audio cache write rate = %v, want 1.5", rates.audioCacheWriteInput)
+	}
+	if !floatEquals(rates.imageCacheWriteInput, 0.80) {
+		t.Errorf("image cache write rate = %v, want the image input rate 0.80", rates.imageCacheWriteInput)
 	}
 
 	// A cached rate without an input rate is still a usable rate.
@@ -640,6 +671,189 @@ func TestBuildAIAgentSessionUsagesModalityPricing(t *testing.T) {
 		}
 		if !floatEquals(session.GetCompletionTokensEstimatedCost(), 0.1*12.00) {
 			t.Errorf("session completion cost = %v, want %v", session.GetCompletionTokensEstimatedCost(), 0.1*12.00)
+		}
+	})
+}
+
+// newLunaArtifactModel prices a live session per minute and its delegated model
+// with the full matrix of gpt-6-luna: text, cached, cache write, image and audio.
+func newLunaArtifactModel() *ArtifactModel {
+	m := newLiveArtifactModel()
+	service := m.app.Insights.Services[insights.ServiceTypeAIAgent]
+	service.Options["delegation_model"] = "gpt-6-luna"
+	service.Pricing["live_model"] = config.ModelPricing{PricePerMinute: 0.05}
+	service.Pricing["delegation_model"] = config.ModelPricing{
+		InputPricePerMillionTokens:            0.10,
+		CachedInputPricePerMillionTokens:      0.01,
+		CacheWriteInputPricePerMillionTokens:  0.125,
+		OutputPricePerMillionTokens:           0.50,
+		ImageInputPricePerMillionTokens:       0.80,
+		ImageCachedInputPricePerMillionTokens: 0.08,
+	}
+	return m
+}
+
+func TestBuildAIAgentDelegationModalityPricing(t *testing.T) {
+	log := testLogger()
+
+	t.Run("gpt-6-luna bills every delegated modality, cache read and cache write", func(t *testing.T) {
+		m := newLunaArtifactModel()
+		telemetry := &redisservice.AIAgentSessionTelemetry{
+			AudioMillis:                         60000,
+			DelegationInputTokens:               1000000,
+			DelegationCachedInputTokens:         200000,
+			DelegationCacheWriteInputTokens:     100000,
+			DelegationAudioInputTokens:          300000,
+			DelegationImageInputTokens:          100000,
+			DelegationCachedImageInputTokens:    50000,
+			DelegationCacheWriteTextInputTokens: 100000,
+			DelegationOutputTokens:              400000,
+			DelegationTextOutputTokens:          280000,
+			DelegationThinkingOutputTokens:      120000,
+		}
+
+		usages := m.buildAIAgentSessionUsages(telemetry, 0, 0, "", log)
+		if got := usages[aiAgentUsageKeySession].GetTotalTokensEstimatedCost(); !floatEquals(got, 0.05) {
+			t.Errorf("live cost = %v, want 0.05 (one minute)", got)
+		}
+
+		delegation := usages[aiAgentUsageKeyDelegation]
+		if delegation == nil {
+			t.Fatal("the delegation entry is missing")
+		}
+		// Text 0.35M uncached, 0.15M cached, 0.10M written to the cache; audio
+		// 0.30M at the text input rate; image 0.05M uncached, 0.05M cached.
+		wantPrompt := 0.35*0.10 + 0.15*0.01 + 0.10*0.125 + 0.30*0.10 + 0.05*0.80 + 0.05*0.08
+		if !floatEquals(delegation.GetPromptTokensEstimatedCost(), wantPrompt) {
+			t.Errorf("delegation prompt cost = %v, want %v", delegation.GetPromptTokensEstimatedCost(), wantPrompt)
+		}
+		// The reasoning tokens are part of the output tokens, not extra.
+		if !floatEquals(delegation.GetCompletionTokensEstimatedCost(), 0.40*0.50) {
+			t.Errorf("delegation completion cost = %v, want 0.2", delegation.GetCompletionTokensEstimatedCost())
+		}
+
+		want := map[string]int64{
+			"delegation_prompt_tokens":                  1000000,
+			"delegation_completion_tokens":              400000,
+			"delegation_cached_prompt_tokens":           200000,
+			"delegation_cache_write_prompt_tokens":      100000,
+			"delegation_text_prompt_tokens":             600000,
+			"delegation_audio_prompt_tokens":            300000,
+			"delegation_image_prompt_tokens":            100000,
+			"delegation_cached_text_prompt_tokens":      150000,
+			"delegation_cached_image_prompt_tokens":     50000,
+			"delegation_cache_write_text_prompt_tokens": 100000,
+			"delegation_text_completion_tokens":         400000,
+			"delegation_thinking_completion_tokens":     120000,
+		}
+		for key, value := range want {
+			if got := delegation.GetBreakdown()[key]; got != value {
+				t.Errorf("%s = %d, want %d", key, got, value)
+			}
+		}
+		if _, ok := delegation.GetBreakdown()["delegation_audio_completion_tokens"]; ok {
+			t.Error("no audio output was delegated, the key must be omitted")
+		}
+
+		// The combined usage metadata prices the same tokens the same way.
+		usage := m.buildAIAgentUsageMetadata(telemetry, 0, 0, "", nil, log).GetTokenUsage()
+		if !floatEquals(usage.GetPromptTokensEstimatedCost(), wantPrompt) {
+			t.Errorf("metadata prompt cost = %v, want %v", usage.GetPromptTokensEstimatedCost(), wantPrompt)
+		}
+		if !floatEquals(usage.GetCompletionTokensEstimatedCost(), 0.40*0.50) {
+			t.Errorf("metadata completion cost = %v, want 0.2", usage.GetCompletionTokensEstimatedCost())
+		}
+		if !floatEquals(usage.GetTotalTokensEstimatedCost(), wantPrompt+0.40*0.50+0.05) {
+			t.Errorf("metadata total cost = %v, want the live minute plus the delegated tokens", usage.GetTotalTokensEstimatedCost())
+		}
+		if got := usage.GetBreakdown()["delegation_cache_write_text_prompt_tokens"]; got != 100000 {
+			t.Errorf("metadata delegation_cache_write_text_prompt_tokens = %d, want 100000", got)
+		}
+		if got := usage.GetBreakdown()["audio_millis"]; got != 60000 {
+			t.Errorf("metadata audio_millis = %d, want 60000", got)
+		}
+	})
+}
+
+func TestBuildAIAgentSessionUsagesCacheWritePricing(t *testing.T) {
+	log := testLogger()
+
+	t.Run("session cache writes are billed at their own rate", func(t *testing.T) {
+		m := newMultimodalArtifactModel(config.ModelPricing{
+			InputPricePerMillionTokens:           0.60,
+			CachedInputPricePerMillionTokens:     0.06,
+			CacheWriteInputPricePerMillionTokens: 0.075,
+			OutputPricePerMillionTokens:          2.40,
+		})
+		telemetry := &redisservice.AIAgentSessionTelemetry{
+			InputTokens:           1000000,
+			CachedInputTokens:     300000,
+			CacheWriteInputTokens: 200000,
+			OutputTokens:          500000,
+		}
+
+		session := m.buildAIAgentSessionUsages(telemetry, 0, 0, "", log)[aiAgentUsageKeySession]
+		if session == nil {
+			t.Fatal("the session entry is missing")
+		}
+		// 0.5M uncached, 0.3M cached and 0.2M written to the cache.
+		wantPrompt := 0.5*0.60 + 0.3*0.06 + 0.2*0.075
+		if !floatEquals(session.GetPromptTokensEstimatedCost(), wantPrompt) {
+			t.Errorf("session prompt cost = %v, want %v", session.GetPromptTokensEstimatedCost(), wantPrompt)
+		}
+		want := map[string]int64{
+			"session_prompt_tokens":                  1000000,
+			"session_cached_prompt_tokens":           300000,
+			"session_cache_write_prompt_tokens":      200000,
+			"session_text_prompt_tokens":             1000000,
+			"session_cached_text_prompt_tokens":      300000,
+			"session_cache_write_text_prompt_tokens": 200000,
+			"session_completion_tokens":              500000,
+			"session_text_completion_tokens":         500000,
+		}
+		for key, value := range want {
+			if got := session.GetBreakdown()[key]; got != value {
+				t.Errorf("%s = %d, want %d", key, got, value)
+			}
+		}
+	})
+
+	t.Run("a model without a cache write rate bills cache writes as input", func(t *testing.T) {
+		m := newPricedArtifactModel()
+		telemetry := &redisservice.AIAgentSessionTelemetry{InputTokens: 1000, CacheWriteInputTokens: 400, OutputTokens: 500}
+
+		session := m.buildAIAgentSessionUsages(telemetry, 0, 0, "", log)[aiAgentUsageKeySession]
+		if got := session.GetBreakdown()["session_cache_write_prompt_tokens"]; got != 400 {
+			t.Errorf("session_cache_write_prompt_tokens = %d, want 400", got)
+		}
+		// the whole 1000 prompt tokens pay the input rate 2 per 1M
+		if !floatEquals(session.GetPromptTokensEstimatedCost(), 0.002) {
+			t.Errorf("session prompt cost = %v, want 0.002", session.GetPromptTokensEstimatedCost())
+		}
+	})
+
+	t.Run("cache writes never exceed the tokens they belong to", func(t *testing.T) {
+		m := newMultimodalArtifactModel(config.ModelPricing{
+			InputPricePerMillionTokens:           1,
+			CachedInputPricePerMillionTokens:     0.5,
+			CacheWriteInputPricePerMillionTokens: 0.25,
+		})
+		// More tokens are reported as written than exist: the cached and the
+		// cache-write subsets are clamped to the 100 input tokens, so none is
+		// billed twice and the uncached count never underflows.
+		telemetry := &redisservice.AIAgentSessionTelemetry{
+			InputTokens:           100,
+			CachedInputTokens:     60,
+			CacheWriteInputTokens: 400,
+		}
+
+		session := m.buildAIAgentSessionUsages(telemetry, 0, 0, "", log)[aiAgentUsageKeySession]
+		if got := session.GetBreakdown()["session_cache_write_prompt_tokens"]; got != 400 {
+			t.Errorf("session_cache_write_prompt_tokens = %d, want the reported 400", got)
+		}
+		// 60 cached tokens and the remaining 40 written to the cache.
+		if !floatEquals(session.GetPromptTokensEstimatedCost(), 60*0.5/1e6+40*0.25/1e6) {
+			t.Errorf("session prompt cost = %v, want 60*0.5/1M + 40*0.25/1M", session.GetPromptTokensEstimatedCost())
 		}
 	})
 }

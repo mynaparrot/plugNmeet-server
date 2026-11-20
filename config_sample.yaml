@@ -388,7 +388,7 @@ insights:
     #     # sees the tools, so delegation_model is required and the server refuses
     #     # to start without it.
     #     # live_model: "gpt-live-1"
-    #     # delegation_model: "gpt-5.4-mini"
+    #     # delegation_model: "gpt-6-luna"
     #     # Text model used once at room end to refine AI_AGENT_SESSION_SUMMARY.
     #     # summarize_model: "gpt-5.4-mini"
     #     # default_voice: "marin"
@@ -410,10 +410,14 @@ insights:
     #     # Minute-priced: the live speech model reports audio duration only.
     #     live_model:
     #       price_per_minute: 0.05
-    #     # Token-priced: the delegated text model of the live session.
+    #     # Token-priced: the delegated text model of the live session. Cached
+    #     # and cache-write rates (per modality too) are optional; without them
+    #     # those tokens are billed as uncached input.
     #     delegation_model:
-    #       input_price_per_million_tokens: 0.25
-    #       output_price_per_million_tokens: 2.00
+    #       input_price_per_million_tokens: 0.10
+    #       cached_input_price_per_million_tokens: 0.01
+    #       cache_write_input_price_per_million_tokens: 0.125
+    #       output_price_per_million_tokens: 0.50
     #     # Token-priced: the summary written at room end.
     #     summarize_model:
     #       input_price_per_million_tokens: 0.25

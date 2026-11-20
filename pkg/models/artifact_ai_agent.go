@@ -139,7 +139,8 @@ const (
 // priced at its own model rate.
 func (m *ArtifactModel) buildAIAgentSessionUsages(telemetry *redisservice.AIAgentSessionTelemetry, summaryPromptTokens, summaryCompletionTokens uint32, summarizeModel string, log *logrus.Entry) map[string]*plugnmeet.RoomArtifactTokenUsage {
 	session := newAIAgentSessionTokens(telemetry)
-	audioMillis, delegationInput, delegationOutput := session.audioMillis, session.delegationInput, session.delegationOutput
+	delegation := newAIAgentDelegationTokens(telemetry)
+	audioMillis := session.audioMillis
 
 	realtimeModel := m.aiAgentRealtimeModel(log)
 	usages := make(map[string]*plugnmeet.RoomArtifactTokenUsage, 3)
@@ -147,21 +148,11 @@ func (m *ArtifactModel) buildAIAgentSessionUsages(telemetry *redisservice.AIAgen
 	switch {
 	case session.input > 0 || session.output > 0:
 		// Token-based session (Realtime API, Gemini Live), priced per modality.
-		modalities := session.modalities()
-		promptCost, completionCost := m.estimateSessionTokenCost(modalities, log, aiAgentRealtimePricingKey, realtimeModel)
+		promptCost, completionCost := m.estimateModalitiesTokenCost(session.modalities(), log, aiAgentRealtimePricingKey, realtimeModel)
 
-		breakdown := map[string]int64{
-			"session_prompt_tokens":     int64(session.input),
-			"session_completion_tokens": int64(session.output),
-		}
-		if session.cachedInput > 0 {
-			breakdown["session_cached_prompt_tokens"] = int64(session.cachedInput)
-		}
+		breakdown := session.breakdown(aiAgentUsageKeySession)
 		if audioMillis > 0 {
 			breakdown["audio_millis"] = int64(audioMillis)
-		}
-		for key, value := range modalities.breakdown() {
-			breakdown[key] = value
 		}
 
 		usages[aiAgentUsageKeySession] = &plugnmeet.RoomArtifactTokenUsage{
@@ -184,19 +175,17 @@ func (m *ArtifactModel) buildAIAgentSessionUsages(telemetry *redisservice.AIAgen
 		}
 	}
 
-	if delegationInput > 0 || delegationOutput > 0 {
+	if delegation.input > 0 || delegation.output > 0 {
+		// The delegated text model reports the same token detail as the session,
+		// so it is normalized and priced exactly the same way.
 		delegationModel := m.aiAgentDelegationModel(log)
-		promptCost := m.estimateTokensCost(insights.ServiceTypeAIAgent, delegationInput, true, log, aiAgentDelegationPricingKey, delegationModel)
-		completionCost := m.estimateTokensCost(insights.ServiceTypeAIAgent, delegationOutput, false, log, aiAgentDelegationPricingKey, delegationModel)
+		promptCost, completionCost := m.estimateModalitiesTokenCost(delegation.modalities(), log, aiAgentDelegationPricingKey, delegationModel)
 
 		usages[aiAgentUsageKeyDelegation] = &plugnmeet.RoomArtifactTokenUsage{
-			PromptTokens:     clampToUint32(delegationInput),
-			CompletionTokens: clampToUint32(delegationOutput),
-			TotalTokens:      clampToUint32(delegationInput + delegationOutput),
-			Breakdown: map[string]int64{
-				"delegation_prompt_tokens":     int64(delegationInput),
-				"delegation_completion_tokens": int64(delegationOutput),
-			},
+			PromptTokens:                  clampToUint32(delegation.input),
+			CompletionTokens:              clampToUint32(delegation.output),
+			TotalTokens:                   clampToUint32(delegation.input + delegation.output),
+			Breakdown:                     delegation.breakdown(aiAgentUsageKeyDelegation),
 			PromptTokensEstimatedCost:     roundAndPointer(promptCost, 6),
 			CompletionTokensEstimatedCost: roundAndPointer(completionCost, 6),
 			TotalTokensEstimatedCost:      roundAndPointer(promptCost+completionCost, 6),
@@ -273,21 +262,20 @@ func (m *ArtifactModel) aiAgentDelegationModel(log *logrus.Entry) string {
 // part priced at its own model rate.
 func (m *ArtifactModel) buildAIAgentUsageMetadata(telemetry *redisservice.AIAgentSessionTelemetry, summaryPromptTokens, summaryCompletionTokens uint32, summarizeModel string, fileArtifactId *string, log *logrus.Entry) *plugnmeet.RoomArtifactMetadata {
 	session := newAIAgentSessionTokens(telemetry)
-	audioMillis, delegationInput, delegationOutput := session.audioMillis, session.delegationInput, session.delegationOutput
+	delegation := newAIAgentDelegationTokens(telemetry)
+	audioMillis := session.audioMillis
 
 	realtimeModel := m.aiAgentRealtimeModel(log)
 	delegationModel := m.aiAgentDelegationModel(log)
 
-	totalPrompt := session.input + delegationInput + uint64(summaryPromptTokens)
-	totalCompletion := session.output + delegationOutput + uint64(summaryCompletionTokens)
+	totalPrompt := session.input + delegation.input + uint64(summaryPromptTokens)
+	totalCompletion := session.output + delegation.output + uint64(summaryCompletionTokens)
 
-	modalities := session.modalities()
-	sessionPromptCost, sessionCompletionCost := m.estimateSessionTokenCost(modalities, log, aiAgentRealtimePricingKey, realtimeModel)
-	promptCost := sessionPromptCost +
-		m.estimateTokensCost(insights.ServiceTypeAIAgent, delegationInput, true, log, aiAgentDelegationPricingKey, delegationModel) +
+	sessionPromptCost, sessionCompletionCost := m.estimateModalitiesTokenCost(session.modalities(), log, aiAgentRealtimePricingKey, realtimeModel)
+	delegationPromptCost, delegationCompletionCost := m.estimateModalitiesTokenCost(delegation.modalities(), log, aiAgentDelegationPricingKey, delegationModel)
+	promptCost := sessionPromptCost + delegationPromptCost +
 		m.estimateTokensCost(insights.ServiceTypeAIAgent, uint64(summaryPromptTokens), true, log, aiAgentSummarizePricingKey, summarizeModel)
-	completionCost := sessionCompletionCost +
-		m.estimateTokensCost(insights.ServiceTypeAIAgent, delegationOutput, false, log, aiAgentDelegationPricingKey, delegationModel) +
+	completionCost := sessionCompletionCost + delegationCompletionCost +
 		m.estimateTokensCost(insights.ServiceTypeAIAgent, uint64(summaryCompletionTokens), false, log, aiAgentSummarizePricingKey, summarizeModel)
 
 	var audioCost float64
@@ -296,23 +284,21 @@ func (m *ArtifactModel) buildAIAgentUsageMetadata(telemetry *redisservice.AIAgen
 	}
 	totalCost := promptCost + completionCost + audioCost
 
-	breakdown := make(map[string]int64, 17)
+	breakdown := make(map[string]int64, 32)
+	for key, value := range session.breakdown(aiAgentUsageKeySession) {
+		breakdown[key] = value
+	}
+	for key, value := range delegation.breakdown(aiAgentUsageKeyDelegation) {
+		breakdown[key] = value
+	}
 	for key, value := range map[string]uint64{
-		"session_prompt_tokens":        session.input,
-		"session_completion_tokens":    session.output,
-		"session_cached_prompt_tokens": session.cachedInput,
-		"audio_millis":                 audioMillis,
-		"delegation_prompt_tokens":     delegationInput,
-		"delegation_completion_tokens": delegationOutput,
-		"summary_prompt_tokens":        uint64(summaryPromptTokens),
-		"summary_completion_tokens":    uint64(summaryCompletionTokens),
+		"audio_millis":              audioMillis,
+		"summary_prompt_tokens":     uint64(summaryPromptTokens),
+		"summary_completion_tokens": uint64(summaryCompletionTokens),
 	} {
 		if value > 0 {
 			breakdown[key] = int64(value)
 		}
-	}
-	for key, value := range modalities.breakdown() {
-		breakdown[key] = value
 	}
 
 	return &plugnmeet.RoomArtifactMetadata{
@@ -349,49 +335,81 @@ func (m *ArtifactModel) estimateTokensCost(serviceType insights.ServiceType, tok
 	return (float64(tokens) / 1000000) * pricing.OutputPricePerMillionTokens
 }
 
-// aiAgentSessionTokens is one telemetry snapshot: the session totals plus the
-// modality split the provider reported inside them.
-type aiAgentSessionTokens struct {
-	input, output, cachedInput uint64
+// aiAgentTokenCounts is the token accounting of one role: the session itself or
+// the delegated text model. Both are normalized and priced the same way.
+type aiAgentTokenCounts struct {
+	input, output, cachedInput, cacheWriteInput uint64
 	// Only the media modalities are carried: a token the provider left
 	// unattributed is text, which the totals already count.
-	audioInput, imageInput                              uint64
-	cachedTextInput, cachedAudioInput, cachedImageInput uint64
-	audioOutput, thinkingOutput                         uint64
-	audioMillis, delegationInput, delegationOutput      uint64
+	audioInput, imageInput      uint64
+	audioOutput, thinkingOutput uint64
+	// The cached and the cache-write subset of every modality, as reported.
+	cachedTextInput, cachedAudioInput, cachedImageInput             uint64
+	cacheWriteTextInput, cacheWriteAudioInput, cacheWriteImageInput uint64
+}
+
+// clamped keeps the cached part within the input it belongs to.
+func (s aiAgentTokenCounts) clamped() aiAgentTokenCounts {
+	if s.cachedInput > s.input {
+		s.cachedInput = s.input
+	}
+	return s
+}
+
+// aiAgentSessionTokens is one telemetry snapshot: the session tokens plus the
+// audio duration the live model reports.
+type aiAgentSessionTokens struct {
+	aiAgentTokenCounts
+	audioMillis uint64
 }
 
 func newAIAgentSessionTokens(telemetry *redisservice.AIAgentSessionTelemetry) aiAgentSessionTokens {
 	if telemetry == nil {
 		return aiAgentSessionTokens{}
 	}
-	tokens := aiAgentSessionTokens{
-		input: telemetry.InputTokens, output: telemetry.OutputTokens, cachedInput: telemetry.CachedInputTokens,
-		audioInput: telemetry.AudioInputTokens, imageInput: telemetry.ImageInputTokens,
-		cachedTextInput: telemetry.CachedTextInputTokens, cachedAudioInput: telemetry.CachedAudioInputTokens, cachedImageInput: telemetry.CachedImageInputTokens,
-		audioOutput: telemetry.AudioOutputTokens, thinkingOutput: telemetry.ThinkingOutputTokens,
-		audioMillis:     telemetry.AudioMillis,
-		delegationInput: telemetry.DelegationInputTokens, delegationOutput: telemetry.DelegationOutputTokens,
+	return aiAgentSessionTokens{
+		aiAgentTokenCounts: aiAgentTokenCounts{
+			input: telemetry.InputTokens, output: telemetry.OutputTokens,
+			cachedInput: telemetry.CachedInputTokens, cacheWriteInput: telemetry.CacheWriteInputTokens,
+			audioInput: telemetry.AudioInputTokens, imageInput: telemetry.ImageInputTokens,
+			cachedTextInput: telemetry.CachedTextInputTokens, cachedAudioInput: telemetry.CachedAudioInputTokens, cachedImageInput: telemetry.CachedImageInputTokens,
+			cacheWriteTextInput: telemetry.CacheWriteTextInputTokens, cacheWriteAudioInput: telemetry.CacheWriteAudioInputTokens, cacheWriteImageInput: telemetry.CacheWriteImageInputTokens,
+			audioOutput: telemetry.AudioOutputTokens, thinkingOutput: telemetry.ThinkingOutputTokens,
+		}.clamped(),
+		audioMillis: telemetry.AudioMillis,
 	}
-	if tokens.cachedInput > tokens.input {
-		tokens.cachedInput = tokens.input
+}
+
+// newAIAgentDelegationTokens reads the tokens of the delegated text model, which
+// is priced apart from the session model but accounted the same way.
+func newAIAgentDelegationTokens(telemetry *redisservice.AIAgentSessionTelemetry) aiAgentTokenCounts {
+	if telemetry == nil {
+		return aiAgentTokenCounts{}
 	}
-	return tokens
+	return aiAgentTokenCounts{
+		input: telemetry.DelegationInputTokens, output: telemetry.DelegationOutputTokens,
+		cachedInput: telemetry.DelegationCachedInputTokens, cacheWriteInput: telemetry.DelegationCacheWriteInputTokens,
+		audioInput: telemetry.DelegationAudioInputTokens, imageInput: telemetry.DelegationImageInputTokens,
+		cachedTextInput: telemetry.DelegationCachedTextInputTokens, cachedAudioInput: telemetry.DelegationCachedAudioInputTokens, cachedImageInput: telemetry.DelegationCachedImageInputTokens,
+		cacheWriteTextInput: telemetry.DelegationCacheWriteTextInputTokens, cacheWriteAudioInput: telemetry.DelegationCacheWriteAudioInputTokens, cacheWriteImageInput: telemetry.DelegationCacheWriteImageInputTokens,
+		audioOutput: telemetry.DelegationAudioOutputTokens, thinkingOutput: telemetry.DelegationThinkingOutputTokens,
+	}.clamped()
 }
 
 // aiAgentModalities is the token count of every billed modality, with the cached
-// subset of each. Cached tokens are part of the totals, never extra.
+// and the cache-write subset of each. Both subsets are part of the totals, never
+// extra, so every token is billed exactly once.
 type aiAgentModalities struct {
-	text, textCached        uint64
-	audio, audioCached      uint64
-	image, imageCached      uint64
-	textOutput, audioOutput uint64
-	thinkingOutput          uint64
+	text, textCached, textCacheWrite    uint64
+	audio, audioCached, audioCacheWrite uint64
+	image, imageCached, imageCacheWrite uint64
+	textOutput, audioOutput             uint64
+	thinkingOutput                      uint64
 }
 
 // modalities folds the reported detail into the totals: a token the provider did
 // not attribute to a modality is text, so every token is billed exactly once.
-func (s aiAgentSessionTokens) modalities() aiAgentModalities {
+func (s aiAgentTokenCounts) modalities() aiAgentModalities {
 	var m aiAgentModalities
 	m.audio = min(s.audioInput, s.input)
 	m.image = min(s.imageInput, s.input-m.audio)
@@ -406,26 +424,42 @@ func (s aiAgentSessionTokens) modalities() aiAgentModalities {
 	m.imageCached = min(s.cachedImageInput, m.image)
 	m.textCached = min(cached-m.audioCached-m.imageCached, m.text)
 
+	// A cache write is billed apart from both the cached and the uncached input,
+	// so it is clamped to what is left of its modality, on the same reasoning.
+	cacheWrite := max(s.cacheWriteInput, s.cacheWriteTextInput+s.cacheWriteAudioInput+s.cacheWriteImageInput)
+	m.audioCacheWrite = min(s.cacheWriteAudioInput, m.audio-m.audioCached)
+	m.imageCacheWrite = min(s.cacheWriteImageInput, m.image-m.imageCached)
+	m.textCacheWrite = min(cacheWrite-m.audioCacheWrite-m.imageCacheWrite, m.text-m.textCached)
+
 	m.audioOutput = min(s.audioOutput, s.output)
 	m.textOutput = s.output - m.audioOutput
 	m.thinkingOutput = min(s.thinkingOutput, m.textOutput)
 	return m
 }
 
-// breakdown reports the modality counts that are not zero, so a text-only
-// session carries no audio or image keys.
-func (m aiAgentModalities) breakdown() map[string]int64 {
-	breakdown := make(map[string]int64, 9)
+// breakdown reports the totals and the modality split of one role under the
+// given prefix ("session" or "delegation"), omitting everything that is zero so
+// a text-only usage carries no audio or image keys.
+func (s aiAgentTokenCounts) breakdown(prefix string) map[string]int64 {
+	m := s.modalities()
+	breakdown := make(map[string]int64, 16)
 	for key, value := range map[string]uint64{
-		"session_text_prompt_tokens":         m.text,
-		"session_audio_prompt_tokens":        m.audio,
-		"session_image_prompt_tokens":        m.image,
-		"session_cached_text_prompt_tokens":  m.textCached,
-		"session_cached_audio_prompt_tokens": m.audioCached,
-		"session_cached_image_prompt_tokens": m.imageCached,
-		"session_text_completion_tokens":     m.textOutput,
-		"session_audio_completion_tokens":    m.audioOutput,
-		"session_thinking_completion_tokens": m.thinkingOutput,
+		prefix + "_prompt_tokens":                   s.input,
+		prefix + "_completion_tokens":               s.output,
+		prefix + "_cached_prompt_tokens":            s.cachedInput,
+		prefix + "_cache_write_prompt_tokens":       s.cacheWriteInput,
+		prefix + "_text_prompt_tokens":              m.text,
+		prefix + "_audio_prompt_tokens":             m.audio,
+		prefix + "_image_prompt_tokens":             m.image,
+		prefix + "_cached_text_prompt_tokens":       m.textCached,
+		prefix + "_cached_audio_prompt_tokens":      m.audioCached,
+		prefix + "_cached_image_prompt_tokens":      m.imageCached,
+		prefix + "_cache_write_text_prompt_tokens":  m.textCacheWrite,
+		prefix + "_cache_write_audio_prompt_tokens": m.audioCacheWrite,
+		prefix + "_cache_write_image_prompt_tokens": m.imageCacheWrite,
+		prefix + "_text_completion_tokens":          m.textOutput,
+		prefix + "_audio_completion_tokens":         m.audioOutput,
+		prefix + "_thinking_completion_tokens":      m.thinkingOutput,
 	} {
 		if value > 0 {
 			breakdown[key] = int64(value)
@@ -436,10 +470,10 @@ func (m aiAgentModalities) breakdown() map[string]int64 {
 
 // aiAgentRates is one pricing block resolved into the rate of every modality.
 type aiAgentRates struct {
-	textInput, textCachedInput   float64
-	audioInput, audioCachedInput float64
-	imageInput, imageCachedInput float64
-	textOutput, audioOutput      float64
+	textInput, textCachedInput, textCacheWriteInput    float64
+	audioInput, audioCachedInput, audioCacheWriteInput float64
+	imageInput, imageCachedInput, imageCacheWriteInput float64
+	textOutput, audioOutput                            float64
 }
 
 // resolveAIAgentRates resolves the rates of one pricing block. A modality without
@@ -459,6 +493,10 @@ func resolveAIAgentRates(pricing *config.ModelPricing) (aiAgentRates, bool) {
 	r.textCachedInput = pricing.CachedInputPricePerMillionTokens
 	if r.textCachedInput <= 0 {
 		r.textCachedInput = r.textInput
+	}
+	r.textCacheWriteInput = pricing.CacheWriteInputPricePerMillionTokens
+	if r.textCacheWriteInput <= 0 {
+		r.textCacheWriteInput = r.textInput
 	}
 	if r.audioInput <= 0 {
 		r.audioInput = r.textInput
@@ -489,23 +527,45 @@ func resolveAIAgentRates(pricing *config.ModelPricing) (aiAgentRates, bool) {
 		r.imageCachedInput = r.textCachedInput
 	}
 
+	// A cache write follows the same rule: its own rate, else the uncached rate
+	// of its modality, else the text cache write rate.
+	switch {
+	case pricing.AudioCacheWriteInputPricePerMillionTokens > 0:
+		r.audioCacheWriteInput = pricing.AudioCacheWriteInputPricePerMillionTokens
+	case pricing.AudioInputPricePerMillionTokens > 0:
+		r.audioCacheWriteInput = r.audioInput
+	default:
+		r.audioCacheWriteInput = r.textCacheWriteInput
+	}
+	switch {
+	case pricing.ImageCacheWriteInputPricePerMillionTokens > 0:
+		r.imageCacheWriteInput = pricing.ImageCacheWriteInputPricePerMillionTokens
+	case pricing.ImageInputPricePerMillionTokens > 0:
+		r.imageCacheWriteInput = r.imageInput
+	default:
+		r.imageCacheWriteInput = r.textCacheWriteInput
+	}
+
 	hasRate := r.textInput > 0 || r.textCachedInput > 0 || r.textOutput > 0 ||
-		r.audioInput > 0 || r.imageInput > 0 || r.audioOutput > 0
+		r.audioInput > 0 || r.imageInput > 0 || r.audioOutput > 0 || r.textCacheWriteInput > 0
 	return r, hasRate
 }
 
 // cost returns the price of the prompt and of the completion tokens.
 func (r aiAgentRates) cost(m aiAgentModalities) (prompt, completion float64) {
-	prompt = (float64(m.text-m.textCached)*r.textInput + float64(m.textCached)*r.textCachedInput +
-		float64(m.audio-m.audioCached)*r.audioInput + float64(m.audioCached)*r.audioCachedInput +
-		float64(m.image-m.imageCached)*r.imageInput + float64(m.imageCached)*r.imageCachedInput) / 1000000
+	prompt = (float64(m.text-m.textCached-m.textCacheWrite)*r.textInput +
+		float64(m.textCached)*r.textCachedInput + float64(m.textCacheWrite)*r.textCacheWriteInput +
+		float64(m.audio-m.audioCached-m.audioCacheWrite)*r.audioInput +
+		float64(m.audioCached)*r.audioCachedInput + float64(m.audioCacheWrite)*r.audioCacheWriteInput +
+		float64(m.image-m.imageCached-m.imageCacheWrite)*r.imageInput +
+		float64(m.imageCached)*r.imageCachedInput + float64(m.imageCacheWrite)*r.imageCacheWriteInput) / 1000000
 	completion = (float64(m.textOutput)*r.textOutput + float64(m.audioOutput)*r.audioOutput) / 1000000
 	return prompt, completion
 }
 
-// estimateSessionTokenCost prices the session tokens of one snapshot per
-// modality, 0 when no pricing block matches.
-func (m *ArtifactModel) estimateSessionTokenCost(modalities aiAgentModalities, log *logrus.Entry, pricingKeys ...string) (prompt, completion float64) {
+// estimateModalitiesTokenCost prices the tokens of one role per modality, 0 when
+// no pricing block matches.
+func (m *ArtifactModel) estimateModalitiesTokenCost(modalities aiAgentModalities, log *logrus.Entry, pricingKeys ...string) (prompt, completion float64) {
 	if modalities.text == 0 && modalities.audio == 0 && modalities.image == 0 &&
 		modalities.textOutput == 0 && modalities.audioOutput == 0 {
 		return 0, 0
