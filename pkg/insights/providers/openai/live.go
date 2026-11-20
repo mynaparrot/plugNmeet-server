@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/openai/openai-go/v3/live"
@@ -24,6 +25,19 @@ const (
 	liveHandshakeTimeout = 15 * time.Second
 	liveCloseTimeout     = 2 * time.Second
 	liveEventBuffer      = 256
+
+	// liveBargeInRunes is how many spoken letters or digits must arrive while the
+	// agent speaks before the transcript counts as a barge-in.
+	liveBargeInRunes = 2
+
+	// liveAppendMaxRunes bounds session.commentary.append,
+	// session.instructions.append and session.thinking.append. The Live API rejects
+	// any append above 500 tokens, and a single rune can already cost one token, so
+	// the cap stays far below the limit.
+	liveAppendMaxRunes = 400
+	// liveTruncationNote replaces the dropped tail of a bounded append and tells
+	// the speech model where the full text went.
+	liveTruncationNote = "… [truncated; full text is in the conversation]"
 
 	// Live server events.
 	liveEventSessionStarted     = "session.started"
@@ -48,6 +62,12 @@ const (
 	liveItemTypeFunctionCall = "function_call"
 	liveItemTypeMessage      = "message"
 )
+
+// liveSpeakingIdleTimeout is how long the agent audio may stay silent before the
+// speaking turn counts as finished. Chunks arrive every 20-200ms while the model
+// speaks, so a longer gap means it stopped — even when neither a transcript nor
+// a response event reports the end of the turn. A variable so tests can shorten it.
+var liveSpeakingIdleTimeout = 1200 * time.Millisecond
 
 var errLiveSessionClosed = errors.New("openai: live session is closed")
 
@@ -194,8 +214,17 @@ type liveSession struct {
 
 	// stateMu guards the turn state: transcript callbacks may run on the
 	// grouper's own timer goroutine.
-	stateMu          sync.Mutex
-	speaking         bool
+	stateMu  sync.Mutex
+	speaking bool
+	// turnEnded records that the current speaking turn already reported its
+	// completion, so a turn is closed exactly once.
+	turnEnded bool
+	// speakingTimer closes the turn when the audio stream goes idle; a provider
+	// that never reports the end of a turn would otherwise stay "speaking".
+	speakingTimer *time.Timer
+	// speechRunes counts spoken characters of the current agent turn; noisy
+	// input transcripts must not end the turn on their own.
+	speechRunes      int
 	lastUsageSeconds float64
 	functionCallSeen bool
 
@@ -244,15 +273,58 @@ func (s *liveSession) SendContextText(role, text string, triggerResponse bool) e
 		return nil
 	}
 
+	appendText, truncated := boundLiveAppend(text, liveAppendMaxRunes)
+
+	events := make([]live.ClientEventUnionParam, 0, 2)
+	if truncated {
+		// A whiteboard scene graph or a long message is far beyond what a session
+		// append may carry: only the delegated Responses model holds the tools, so it
+		// gets the full text as a conversation item and the speech model gets the
+		// bounded head of it. The item goes first so the text is in place before an
+		// append can trigger speech.
+		events = append(events, live.ClientEventParamOfResponseItemCreate(responses.ResponseInputItemMessageParam{
+			Type:    liveItemTypeMessage,
+			Role:    liveSpeakerUser,
+			Content: responses.ResponseInputMessageContentListParam{responses.ResponseInputContentParamOfInputText(text)},
+		}))
+	}
+
+	// delegation_id is required but nullable: null marks general session
+	// context, while an empty string is rejected by the API. The convenience
+	// helpers always send a value, so the events are built here.
+	delegationID := param.Null[string]()
+
 	switch {
 	case triggerResponse:
 		// Commentary is spoken to the participant, so it must trigger a response.
-		return s.send(live.ClientEventParamOfSessionCommentaryAppend(text, ""))
+		events = append(events, live.ClientEventUnionParam{
+			OfSessionCommentaryAppend: &live.CommentaryAppendEventParam{Content: appendText, DelegationID: delegationID},
+		})
 	case role == "system" || role == "developer":
-		return s.send(live.ClientEventParamOfSessionInstructionsAppend(text, ""))
+		events = append(events, live.ClientEventUnionParam{
+			OfSessionInstructionsAppend: &live.InstructionsAppendEventParam{Content: appendText, DelegationID: delegationID},
+		})
 	default:
-		return s.send(live.ClientEventParamOfSessionThinkingAppend(text, ""))
+		events = append(events, live.ClientEventUnionParam{
+			OfSessionThinkingAppend: &live.ThinkingAppendEventParam{Content: appendText, DelegationID: delegationID},
+		})
 	}
+
+	return s.send(events...)
+}
+
+// boundLiveAppend shortens text so that a session append can never exceed the
+// Live API's 500 token limit. It reports whether the text was cut.
+func boundLiveAppend(text string, max int) (string, bool) {
+	runes := []rune(text)
+	if len(runes) <= max {
+		return text, false
+	}
+	keep := max - len([]rune(liveTruncationNote)) - 1
+	if keep < 0 {
+		keep = 0
+	}
+	return string(runes[:keep]) + " " + liveTruncationNote, true
 }
 
 func (s *liveSession) SendImage(mimeType string, data []byte, caption string) error {
@@ -363,11 +435,24 @@ func (s *liveSession) onTranscriptUpdate(u live.TranscriptUpdate) {
 	case liveSpeakerUser:
 		s.emit(insights.RealtimeEvent{Type: insights.RealtimeEventTranscriptUser, Text: u.Segment.Text, Final: final})
 	case liveSpeakerAssistant:
+		if !final {
+			s.beginTurn()
+		}
 		s.emit(insights.RealtimeEvent{Type: insights.RealtimeEventTranscriptAgent, Text: u.Segment.Text, Final: final})
-		if final {
-			s.setSpeaking(false)
+		if final && s.endTurn() {
 			s.emit(insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete})
 		}
+	}
+}
+
+// beginTurn reopens the turn bookkeeping for a turn that starts without audio,
+// so a transcript-only turn still reports its completion.
+func (s *liveSession) beginTurn() {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+
+	if !s.speaking {
+		s.turnEnded = false
 	}
 }
 
@@ -377,8 +462,85 @@ func (s *liveSession) setSpeaking(speaking bool) bool {
 	defer s.stateMu.Unlock()
 
 	previous := s.speaking
+	if speaking && !previous {
+		// Each agent turn counts barge-in characters from scratch.
+		s.speechRunes = 0
+		s.turnEnded = false
+	}
 	s.speaking = speaking
 	return previous
+}
+
+// markSpeaking starts or extends the current agent turn and re-arms the idle
+// timer, which closes the turn even when no other event announces its end.
+func (s *liveSession) markSpeaking() {
+	s.setSpeaking(true)
+
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+	if s.speakingTimer != nil {
+		s.speakingTimer.Stop()
+	}
+	s.speakingTimer = time.AfterFunc(liveSpeakingIdleTimeout, s.endIdleTurn)
+}
+
+// endIdleTurn reports the completion of a turn whose audio stream went silent.
+func (s *liveSession) endIdleTurn() {
+	if s.endTurn() {
+		s.emit(insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete})
+	}
+}
+
+// endTurn closes the current agent turn and reports whether this call owns it,
+// so every turn is completed at most once no matter which signal ends it.
+func (s *liveSession) endTurn() bool {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+
+	owned := !s.turnEnded
+	s.speaking = false
+	s.speechRunes = 0
+	if s.speakingTimer != nil {
+		s.speakingTimer.Stop()
+		s.speakingTimer = nil
+	}
+	if owned {
+		s.turnEnded = true
+	}
+	return owned
+}
+
+func (s *liveSession) isSpeaking() bool {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+	return s.speaking
+}
+
+// noteUserSpeech counts the spoken characters of a user input transcript delta
+// and reports whether the agent was interrupted, at most once per agent turn.
+// Clicks, taps and room noise transcribe as whitespace, punctuation or a single
+// stray character, which must not cut the agent off mid-sentence.
+func (s *liveSession) noteUserSpeech(delta string) bool {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+
+	if !s.speaking {
+		return false
+	}
+
+	for _, r := range delta {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			s.speechRunes++
+		}
+	}
+
+	if s.speechRunes < liveBargeInRunes {
+		return false
+	}
+
+	s.speaking = false
+	s.speechRunes = 0
+	return true
 }
 
 // setFunctionCallSeen updates the function-call flag and reports the previous
@@ -399,12 +561,12 @@ func (s *liveSession) handleServerEvent(msg live.ServerEventUnion) {
 		if err != nil || len(pcm) == 0 {
 			return
 		}
-		s.setSpeaking(true)
+		s.markSpeaking()
 		s.emit(insights.RealtimeEvent{Type: insights.RealtimeEventAudioDelta, AudioPCM24k: pcm})
 
 	case liveEventInputTranscript:
 		// The participant spoke over the agent: report the barge-in once.
-		if s.setSpeaking(false) {
+		if s.noteUserSpeech(msg.OfInputTranscriptDeltaEvent.Delta) {
 			s.emit(insights.RealtimeEvent{Type: insights.RealtimeEventInterrupted})
 		}
 		s.pushTranscript(msg, insights.RealtimeEventTranscriptUser, msg.OfInputTranscriptDeltaEvent.Delta)
@@ -477,7 +639,8 @@ func (s *liveSession) handleResponseEvent(ev live.ResponseEvent) {
 		s.emitDelegationUsage(ev.Event["response"])
 
 		// A function call turn is answered by the caller through SendToolResult.
-		if !s.setFunctionCallSeen(false) {
+		// While the agent is talking, the audio stream reports the turn end.
+		if !s.setFunctionCallSeen(false) && !s.isSpeaking() {
 			s.emit(insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete})
 		}
 

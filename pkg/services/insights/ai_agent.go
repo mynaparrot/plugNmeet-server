@@ -47,6 +47,12 @@ const (
 	transcriptRoleAgent       = "agent"
 )
 
+// aiAgentSpeakingIdle is how long the agent may stay silent before the status
+// falls back from SPEAKING to LISTENING. Providers stream audio in 20-200ms
+// chunks, so a longer gap means the turn ended — even when no turn-complete
+// event follows. A variable so tests can shorten it.
+var aiAgentSpeakingIdle = 1500 * time.Millisecond
+
 // AIAgentTransport is the room-facing messaging an AI agent needs.
 // *natsservice.NatsService implements it; tests inject a recorder.
 type AIAgentTransport interface {
@@ -184,8 +190,10 @@ type AIAgent struct {
 	loopMu sync.Mutex
 	loop   *aiAgentLoop
 
-	stateMu sync.Mutex
-	state   aiAgentRuntimeState
+	// speakTimer leaves SPEAKING when the agent audio stops; stateMu guards it.
+	stateMu    sync.Mutex
+	state      aiAgentRuntimeState
+	speakTimer *time.Timer
 
 	learnerMu sync.Mutex
 	learner   LearnerIdentity
@@ -672,6 +680,9 @@ func (a *AIAgent) markSpeaking() {
 	a.state.speaking = true
 	a.state.state = plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_SPEAKING
 	a.state.tool = ""
+	// Every audio chunk postpones the fallback, so only a real gap ends the turn.
+	a.stopSpeakTimerLocked()
+	a.speakTimer = time.AfterFunc(aiAgentSpeakingIdle, a.endIdleSpeaking)
 	snapshot := a.state
 	a.stateMu.Unlock()
 
@@ -680,8 +691,36 @@ func (a *AIAgent) markSpeaking() {
 	}
 }
 
+// endIdleSpeaking restores LISTENING once the agent audio stream has been silent
+// for longer than any gap between chunks, so a trailing delta or a missing
+// turn-complete cannot leave the status stuck on SPEAKING.
+func (a *AIAgent) endIdleSpeaking() {
+	if a.paused.Load() {
+		return
+	}
+
+	a.stateMu.Lock()
+	speaking := a.state.state == plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_SPEAKING
+	a.stateMu.Unlock()
+	if !speaking {
+		return
+	}
+
+	a.setState(plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING, "")
+}
+
+func (a *AIAgent) stopSpeakTimerLocked() {
+	if a.speakTimer != nil {
+		a.speakTimer.Stop()
+		a.speakTimer = nil
+	}
+}
+
 func (a *AIAgent) setState(state plugnmeet.AIAgentRuntimeState, reason string) {
 	a.stateMu.Lock()
+	if state != plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_SPEAKING {
+		a.stopSpeakTimerLocked()
+	}
 	a.state.state = state
 	a.state.speaking = state == plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_SPEAKING
 	a.state.tool = ""

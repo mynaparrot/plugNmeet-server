@@ -85,6 +85,11 @@ func buildRealtimeSessionConfig(model string, opts *insights.RealtimeSessionOpti
 			Input: realtime.RealtimeAudioConfigInputParam{
 				Format:        realtimePCMFormat(),
 				TurnDetection: realtimeTurnDetection(turnDetectionMode),
+				// Near-field suppression keeps keyboard clicks and room noise out
+				// of the VAD, which reacts to them as speech.
+				NoiseReduction: realtime.RealtimeAudioConfigInputNoiseReductionParam{
+					Type: realtime.NoiseReductionTypeNearField,
+				},
 			},
 			Output: realtime.RealtimeAudioConfigOutputParam{
 				Format: realtimePCMFormat(),
@@ -130,13 +135,20 @@ func realtimePCMFormat() realtime.RealtimeAudioFormatsUnionParam {
 func realtimeTurnDetection(mode string) realtime.RealtimeAudioInputTurnDetectionUnionParam {
 	switch strings.ToLower(strings.TrimSpace(mode)) {
 	case transcriptionTurnDetectionServerVAD:
+		// The louder threshold and longer silence window keep short clicks and
+		// taps from ending the user turn before real speech arrives.
 		return realtime.RealtimeAudioInputTurnDetectionUnionParam{OfServerVad: &realtime.RealtimeAudioInputTurnDetectionServerVadParam{
+			Threshold:         param.NewOpt(0.65),
+			PrefixPaddingMs:   param.NewOpt[int64](300),
+			SilenceDurationMs: param.NewOpt[int64](600),
 			CreateResponse:    param.NewOpt(true),
 			InterruptResponse: param.NewOpt(true),
 		}}
 	case "", transcriptionTurnDetectionSemanticVAD:
+		// "low" waits longer for the user to keep speaking, so transient noise
+		// does not interrupt the agent mid-sentence.
 		return realtime.RealtimeAudioInputTurnDetectionUnionParam{OfSemanticVad: &realtime.RealtimeAudioInputTurnDetectionSemanticVadParam{
-			Eagerness:         "auto",
+			Eagerness:         "low",
 			CreateResponse:    param.NewOpt(true),
 			InterruptResponse: param.NewOpt(true),
 		}}

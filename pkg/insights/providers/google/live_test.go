@@ -109,6 +109,19 @@ func TestBuildLiveConnectConfig(t *testing.T) {
 	if cfg.InputAudioTranscription == nil || cfg.OutputAudioTranscription == nil {
 		t.Fatal("transcriptions must be enabled")
 	}
+	if cfg.RealtimeInputConfig == nil || cfg.RealtimeInputConfig.AutomaticActivityDetection == nil {
+		t.Fatalf("automatic activity detection not configured: %+v", cfg.RealtimeInputConfig)
+	}
+	activity := cfg.RealtimeInputConfig.AutomaticActivityDetection
+	if activity.StartOfSpeechSensitivity != genai.StartSensitivityLow {
+		t.Fatalf("unexpected start sensitivity: %s", activity.StartOfSpeechSensitivity)
+	}
+	if activity.PrefixPaddingMs == nil || *activity.PrefixPaddingMs != 300 {
+		t.Fatalf("unexpected prefix padding: %v", activity.PrefixPaddingMs)
+	}
+	if activity.SilenceDurationMs == nil || *activity.SilenceDurationMs != 500 {
+		t.Fatalf("unexpected silence duration: %v", activity.SilenceDurationMs)
+	}
 	if cfg.SystemInstruction == nil || len(cfg.SystemInstruction.Parts) != 1 || cfg.SystemInstruction.Parts[0].Text != "You are a tutor." {
 		t.Fatalf("system instruction not mapped: %+v", cfg.SystemInstruction)
 	}

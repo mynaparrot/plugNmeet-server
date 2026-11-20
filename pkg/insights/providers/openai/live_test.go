@@ -11,6 +11,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/openai/openai-go/v3/live"
@@ -305,6 +306,246 @@ func TestLiveSessionSendContextText(t *testing.T) {
 	}
 }
 
+// The API rejects an empty delegation_id: general session context must send
+// null instead of "".
+func TestLiveSessionContextTextSendsNullDelegationID(t *testing.T) {
+	conn := &fakeLiveConn{}
+	s, err := newLiveSession(conn, nil)
+	if err != nil {
+		t.Fatalf("newLiveSession: %v", err)
+	}
+
+	if err = s.SendContextText("user", "the poll is closed", false); err != nil {
+		t.Fatalf("SendContextText: %v", err)
+	}
+	if err = s.SendContextText("system", "stay on topic", false); err != nil {
+		t.Fatalf("SendContextText: %v", err)
+	}
+	if err = s.SendContextText("user", "read the poll results", true); err != nil {
+		t.Fatalf("SendContextText: %v", err)
+	}
+
+	events := conn.sentEvents()
+	if len(events) != 3 {
+		t.Fatalf("unexpected events: %+v", events)
+	}
+	for _, event := range events {
+		payload, err := json.Marshal(event)
+		if err != nil {
+			t.Fatalf("marshal event: %v", err)
+		}
+		if strings.Contains(string(payload), `"delegation_id":""`) {
+			t.Fatalf("empty delegation_id is rejected by the API: %s", payload)
+		}
+		if !strings.Contains(string(payload), `"delegation_id":null`) {
+			t.Fatalf("general session context requires a null delegation_id: %s", payload)
+		}
+	}
+}
+
+// A whiteboard scene graph is far above the Live API's 500 token append limit:
+// the append must stay bounded while the delegated Responses model still receives
+// the full text.
+func TestLiveSessionSendContextTextBoundsLongAppend(t *testing.T) {
+	scene := `{"type":"excalidraw","elements":[` + strings.Repeat(`{"id":"el","type":"text","x":120,"y":80,"text":"x=42"},`, 200) + `]}`
+	if runes := len([]rune(scene)); runes <= liveAppendMaxRunes {
+		t.Fatalf("the test payload must exceed the append budget: %d runes", runes)
+	}
+
+	cases := []struct {
+		name             string
+		role             string
+		trigger          bool
+		wantCommentary   bool
+		wantInstructions bool
+	}{
+		{name: "thinking", role: "user"},
+		{name: "instructions", role: "system", wantInstructions: true},
+		{name: "commentary", role: "user", trigger: true, wantCommentary: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			conn := &fakeLiveConn{}
+			s, err := newLiveSession(conn, nil)
+			if err != nil {
+				t.Fatalf("newLiveSession: %v", err)
+			}
+
+			if err = s.SendContextText(tc.role, scene, tc.trigger); err != nil {
+				t.Fatalf("SendContextText: %v", err)
+			}
+
+			events := conn.sentEvents()
+			if len(events) != 2 {
+				t.Fatalf("long context must append an item plus one bounded append: %+v", events)
+			}
+
+			item := events[0].OfResponseItemCreate
+			if item == nil || item.Item.OfInputMessage == nil {
+				t.Fatalf("the delegated model must receive the full text first: %+v", events[0])
+			}
+			message := item.Item.OfInputMessage
+			if message.Role != "user" || len(message.Content) != 1 {
+				t.Fatalf("unexpected context item: %+v", message)
+			}
+			if text := message.Content[0].OfInputText; text == nil || text.Text != scene {
+				t.Fatalf("the delegated model must receive the untruncated text")
+			}
+
+			var content string
+			switch {
+			case events[1].OfSessionThinkingAppend != nil:
+				content = events[1].OfSessionThinkingAppend.Content
+			case events[1].OfSessionInstructionsAppend != nil:
+				content = events[1].OfSessionInstructionsAppend.Content
+			case events[1].OfSessionCommentaryAppend != nil:
+				content = events[1].OfSessionCommentaryAppend.Content
+			}
+
+			if content == "" {
+				t.Fatalf("missing session append: %+v", events[1])
+			}
+			if tc.wantCommentary != (events[1].OfSessionCommentaryAppend != nil) {
+				t.Fatalf("triggered context must be commentary: %+v", events[1])
+			}
+			if tc.wantInstructions != (events[1].OfSessionInstructionsAppend != nil) {
+				t.Fatalf("system context must be instructions: %+v", events[1])
+			}
+			// One rune can cost a whole token, so runes are the budget.
+			if runes := len([]rune(content)); runes > liveAppendMaxRunes {
+				t.Fatalf("append content of %d runes exceeds the budget: %q", runes, content)
+			}
+			if liveAppendMaxRunes >= 500 {
+				t.Fatalf("the append budget must stay below the 500 token limit")
+			}
+			if !strings.HasSuffix(content, liveTruncationNote) {
+				t.Fatalf("a cut append must say so: %q", content)
+			}
+		})
+	}
+}
+
+// Short context keeps the old shape: one append, no duplicated conversation item.
+func TestLiveSessionSendContextTextDoesNotDuplicateShortText(t *testing.T) {
+	conn := &fakeLiveConn{}
+	s, err := newLiveSession(conn, nil)
+	if err != nil {
+		t.Fatalf("newLiveSession: %v", err)
+	}
+
+	text := strings.Repeat("a", liveAppendMaxRunes)
+	if err = s.SendContextText("user", text, false); err != nil {
+		t.Fatalf("SendContextText: %v", err)
+	}
+
+	events := conn.sentEvents()
+	if len(events) != 1 || events[0].OfSessionThinkingAppend == nil {
+		t.Fatalf("text at the budget must not be routed twice: %+v", events)
+	}
+	if events[0].OfSessionThinkingAppend.Content != text {
+		t.Fatalf("unexpected append content: %q", events[0].OfSessionThinkingAppend.Content)
+	}
+}
+
+func TestBoundLiveAppend(t *testing.T) {
+	short := "the poll is closed"
+	if got, cut := boundLiveAppend(short, liveAppendMaxRunes); cut || got != short {
+		t.Fatalf("short text must pass through: %q %v", got, cut)
+	}
+
+	// Multi-byte runes must never be split.
+	long := strings.Repeat("计算", 1000)
+	got, cut := boundLiveAppend(long, liveAppendMaxRunes)
+	if !cut {
+		t.Fatalf("long text must be cut")
+	}
+	if runes := len([]rune(got)); runes > liveAppendMaxRunes {
+		t.Fatalf("cut text of %d runes exceeds the budget", runes)
+	}
+	if !utf8.ValidString(got) || !strings.HasSuffix(got, liveTruncationNote) {
+		t.Fatalf("unexpected cut text: %q", got)
+	}
+
+	// A budget below the note length still yields valid text instead of panicking.
+	got, cut = boundLiveAppend("abcdefgh", 4)
+	if !cut || !utf8.ValidString(got) {
+		t.Fatalf("unexpected tiny budget result: %q %v", got, cut)
+	}
+}
+
+func TestLiveSessionAudioIdleCompletesTurn(t *testing.T) {
+	restoreLiveSpeakingIdle(t, 20*time.Millisecond)
+
+	conn := &fakeLiveConn{}
+	s, err := newLiveSession(conn, nil)
+	if err != nil {
+		t.Fatalf("newLiveSession: %v", err)
+	}
+
+	s.handleServerEvent(live.ServerEventUnion{
+		Type:                    liveEventOutputAudioDelta,
+		OfOutputAudioDeltaEvent: live.OutputAudioDeltaEvent{Delta: base64.StdEncoding.EncodeToString([]byte{1, 2})},
+	})
+
+	events := []insights.RealtimeEvent{nextRealtimeEvent(t, s.Events())}
+	if events[0].Type != insights.RealtimeEventAudioDelta {
+		t.Fatalf("expected audio first: %+v", events[0])
+	}
+	events = append(events, nextRealtimeEvent(t, s.Events()))
+	if events[1].Type != insights.RealtimeEventTurnComplete {
+		t.Fatalf("a silent audio stream must complete the turn: %+v", events[1])
+	}
+	if s.isSpeaking() {
+		t.Fatal("an idle audio stream must reset the speaking flag")
+	}
+}
+
+// A trailing chunk after the turn was already completed must not leave the
+// session speaking forever: it opens a new turn that completes on its own.
+func TestLiveSessionTrailingAudioAfterTurnComplete(t *testing.T) {
+	restoreLiveSpeakingIdle(t, 20*time.Millisecond)
+
+	conn := &fakeLiveConn{}
+	s, err := newLiveSession(conn, nil)
+	if err != nil {
+		t.Fatalf("newLiveSession: %v", err)
+	}
+
+	s.handleServerEvent(live.ServerEventUnion{
+		Type:                    liveEventOutputAudioDelta,
+		OfOutputAudioDeltaEvent: live.OutputAudioDeltaEvent{Delta: base64.StdEncoding.EncodeToString([]byte{1, 2})},
+	})
+	s.onTranscriptUpdate(live.TranscriptUpdate{Segment: live.TranscriptSegment{Speaker: "assistant", Text: "hello there"}, Reason: "inactivity"})
+	s.handleServerEvent(live.ServerEventUnion{
+		Type:                    liveEventOutputAudioDelta,
+		OfOutputAudioDeltaEvent: live.OutputAudioDeltaEvent{Delta: base64.StdEncoding.EncodeToString([]byte{3, 4})},
+	})
+
+	var completions int
+	deadline := time.After(2 * time.Second)
+	for completions < 2 {
+		select {
+		case event := <-s.Events():
+			if event.Type == insights.RealtimeEventTurnComplete {
+				completions++
+			}
+		case <-deadline:
+			t.Fatalf("expected one turn completion per speaking turn, got %d", completions)
+		}
+	}
+	if s.isSpeaking() {
+		t.Fatal("the trailing chunk must not leave the session speaking")
+	}
+}
+
+func restoreLiveSpeakingIdle(t *testing.T, idle time.Duration) {
+	t.Helper()
+	previous := liveSpeakingIdleTimeout
+	liveSpeakingIdleTimeout = idle
+	t.Cleanup(func() { liveSpeakingIdleTimeout = previous })
+}
+
 func TestLiveSessionSendImage(t *testing.T) {
 	conn := &fakeLiveConn{}
 	s, err := newLiveSession(conn, nil)
@@ -465,6 +706,53 @@ func TestLiveSessionServerAudioAndBargeIn(t *testing.T) {
 	s.handleServerEvent(live.ServerEventUnion{
 		Type:                        liveEventInputTranscript,
 		OfInputTranscriptDeltaEvent: live.InputTranscriptDeltaEvent{Delta: "a moment"},
+	})
+	events = drainRealtimeEvents(t, s.Events())
+	if len(events) != 1 || events[0].Type != insights.RealtimeEventTranscriptUser {
+		t.Fatalf("barge-in must be reported once: %+v", events)
+	}
+}
+
+func TestLiveSessionNoiseDoesNotBargeIn(t *testing.T) {
+	conn := &fakeLiveConn{}
+	s, err := newLiveSession(conn, nil)
+	if err != nil {
+		t.Fatalf("newLiveSession: %v", err)
+	}
+
+	s.handleServerEvent(live.ServerEventUnion{
+		Type:                    liveEventOutputAudioDelta,
+		OfOutputAudioDeltaEvent: live.OutputAudioDeltaEvent{Delta: base64.StdEncoding.EncodeToString([]byte{1, 2})},
+	})
+	drainRealtimeEvents(t, s.Events())
+
+	// Keyboard clicks transcribe as punctuation, whitespace or a single stray
+	// character: they must not cut the agent off mid-sentence.
+	for _, delta := range []string{".", " ", "...", ",", "?", "a"} {
+		s.handleServerEvent(live.ServerEventUnion{
+			Type:                        liveEventInputTranscript,
+			OfInputTranscriptDeltaEvent: live.InputTranscriptDeltaEvent{Delta: delta},
+		})
+		for _, ev := range drainRealtimeEvents(t, s.Events()) {
+			if ev.Type == insights.RealtimeEventInterrupted {
+				t.Fatalf("noise delta %q must not report a barge-in", delta)
+			}
+		}
+	}
+
+	// Real speech still reports the barge-in, and only once.
+	s.handleServerEvent(live.ServerEventUnion{
+		Type:                        liveEventInputTranscript,
+		OfInputTranscriptDeltaEvent: live.InputTranscriptDeltaEvent{Delta: "wait"},
+	})
+	events := drainRealtimeEvents(t, s.Events())
+	if len(events) != 2 || events[0].Type != insights.RealtimeEventInterrupted {
+		t.Fatalf("expected a single barge-in: %+v", events)
+	}
+
+	s.handleServerEvent(live.ServerEventUnion{
+		Type:                        liveEventInputTranscript,
+		OfInputTranscriptDeltaEvent: live.InputTranscriptDeltaEvent{Delta: "more"},
 	})
 	events = drainRealtimeEvents(t, s.Events())
 	if len(events) != 1 || events[0].Type != insights.RealtimeEventTranscriptUser {

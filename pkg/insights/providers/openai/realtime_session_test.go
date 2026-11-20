@@ -154,9 +154,12 @@ func TestBuildRealtimeSessionConfigDefaults(t *testing.T) {
 	if input.Transcription.Language.Valid() {
 		t.Fatal("empty spoken language must not set a transcription language")
 	}
+	if input.NoiseReduction.Type != realtime.NoiseReductionTypeNearField {
+		t.Fatalf("unexpected noise reduction: %+v", input.NoiseReduction)
+	}
 
 	vad := input.TurnDetection.OfSemanticVad
-	if vad == nil || vad.Eagerness != "auto" {
+	if vad == nil || vad.Eagerness != "low" {
 		t.Fatalf("semantic vad not configured: %+v", vad)
 	}
 	if !vad.CreateResponse.Or(false) || !vad.InterruptResponse.Or(false) {
@@ -212,11 +215,21 @@ func TestBuildRealtimeSessionConfigOptions(t *testing.T) {
 	if cfg.Audio.Input.Transcription.Model != realtime.AudioTranscriptionModel("whisper-1") {
 		t.Fatalf("unexpected transcription model: %s", cfg.Audio.Input.Transcription.Model)
 	}
-	if cfg.Audio.Input.TurnDetection.OfServerVad == nil {
+	serverVad := cfg.Audio.Input.TurnDetection.OfServerVad
+	if serverVad == nil {
 		t.Fatal("server_vad must configure server vad")
 	}
 	if cfg.Audio.Input.TurnDetection.OfSemanticVad != nil {
 		t.Fatal("server_vad must not configure semantic vad")
+	}
+	if got := serverVad.Threshold.Or(0); got != 0.65 {
+		t.Fatalf("unexpected server vad threshold: %v", got)
+	}
+	if got := serverVad.PrefixPaddingMs.Or(0); got != 300 {
+		t.Fatalf("unexpected server vad prefix padding: %v", got)
+	}
+	if got := serverVad.SilenceDurationMs.Or(0); got != 600 {
+		t.Fatalf("unexpected server vad silence duration: %v", got)
 	}
 	if got := cfg.Audio.Output.Speed.Or(0); got != maxRealtimeSpeakingRate {
 		t.Fatalf("speaking rate must be clamped to %v, got %v", maxRealtimeSpeakingRate, got)

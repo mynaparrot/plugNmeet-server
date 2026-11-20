@@ -187,6 +187,24 @@ func TestAIAgentAudioDeltaWritesToPublisherAndMarksSpeaking(t *testing.T) {
 	}, "speaking state broadcast")
 }
 
+// A provider that streams audio and then goes quiet without a turn-complete
+// must not leave the status pill on SPEAKING.
+func TestAIAgentSpeakingFallsBackToListeningWhenAudioStops(t *testing.T) {
+	previous := aiAgentSpeakingIdle
+	aiAgentSpeakingIdle = 30 * time.Millisecond
+	t.Cleanup(func() { aiAgentSpeakingIdle = previous })
+
+	env := newAgentTestEnv(t, nil, nil)
+
+	env.session.Push(insights.RealtimeEvent{Type: insights.RealtimeEventAudioDelta, AudioPCM24k: []byte{1, 2, 3, 4}})
+	waitFor(t, func() bool {
+		return env.transport.lastState() == plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_SPEAKING
+	}, "speaking state broadcast")
+	waitFor(t, func() bool {
+		return env.transport.lastState() == plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING
+	}, "listening state after the audio stopped")
+}
+
 func TestAIAgentBargeInFlushesQueuedAudio(t *testing.T) {
 	env := newAgentTestEnv(t, nil, nil)
 

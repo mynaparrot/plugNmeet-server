@@ -188,7 +188,9 @@ type RealtimeSession interface {
 	SendImage(mimeType string, data []byte, caption string) error
 
 	// SendContextText injects text that must not look like participant speech.
-	// triggerResponse asks the provider to answer immediately.
+	// triggerResponse asks the provider to answer immediately. Providers may bound
+	// how much of a very long text reaches the speech model, but must keep the whole
+	// text available to the model that runs the tools.
 	SendContextText(role string, text string, triggerResponse bool) error
 
 	// SendToolResult answers a RealtimeEventToolCall.

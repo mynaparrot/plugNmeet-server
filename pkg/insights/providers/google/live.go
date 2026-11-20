@@ -63,6 +63,16 @@ func buildLiveConnectConfig(opts *insights.RealtimeSessionOptions) *genai.LiveCo
 		ResponseModalities:       []genai.Modality{genai.ModalityAudio},
 		InputAudioTranscription:  &genai.AudioTranscriptionConfig{},
 		OutputAudioTranscription: &genai.AudioTranscriptionConfig{},
+		// Low start sensitivity plus the prefix padding delay keeps a keyboard
+		// click or a tap from looking like the start of a user turn, which would
+		// cut off the model's own audio mid-sentence.
+		RealtimeInputConfig: &genai.RealtimeInputConfig{
+			AutomaticActivityDetection: &genai.AutomaticActivityDetection{
+				StartOfSpeechSensitivity: genai.StartSensitivityLow,
+				PrefixPaddingMs:          genai.Ptr(int32(300)),
+				SilenceDurationMs:        genai.Ptr(int32(500)),
+			},
+		},
 	}
 
 	if opts.SystemInstruction != "" {

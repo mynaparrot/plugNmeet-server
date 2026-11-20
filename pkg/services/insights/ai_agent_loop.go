@@ -101,7 +101,10 @@ func (a *AIAgent) handleEvent(session insights.RealtimeSession, ev insights.Real
 		}
 
 	case insights.RealtimeEventTurnComplete:
-		a.setState(plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING, "")
+		// A turn that ends while paused must not flip the paused state back.
+		if !a.paused.Load() {
+			a.setState(plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING, "")
+		}
 		if inject, anchor := a.guard.OnTurnComplete(); inject {
 			if err := a.sendContextText(anchor); err != nil {
 				a.logger.WithError(err).Debug("ai agent: failed to inject the topic anchor")
