@@ -239,10 +239,10 @@ func TestApplyLLMSummarySynthesis(t *testing.T) {
 			[]redisservice.AIProgressEntry{{Concept: "halves", Status: "practiced"}},
 			nil)
 	}
-	transcript := []redisservice.AISessionTranscriptTurn{
+	transcript := &redisservice.AIAgentSessionTelemetry{Transcript: []redisservice.AISessionTranscriptTurn{
 		{Role: "participant", Text: "what is a half"},
 		{Role: "agent", Text: "one of two equal parts"},
-	}
+	}}
 
 	t.Run("valid JSON is merged", func(t *testing.T) {
 		provider := &fakeSummaryProvider{text: "```json\n" + `{"evaluation":{"overall_score":90,"concepts_mastered":["halves"]},"continuation":{"next_session_focus":"quarters"},"narrative_summary":"Strong session."}` + "\n```"}
@@ -298,6 +298,23 @@ func TestApplyLLMSummarySynthesis(t *testing.T) {
 			t.Fatal("expected an error for a nil provider")
 		}
 	})
+
+	t.Run("running summary reaches the prompt", func(t *testing.T) {
+		provider := &fakeSummaryProvider{text: "{}"}
+		telemetry := *transcript
+		telemetry.RollingSummary = "Covered halves so far."
+
+		if _, _, err := applyLLMSummarySynthesis(context.Background(), provider, "gpt-4o-mini", base(), &telemetry); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		prompt := provider.history[len(provider.history)-1].GetText()
+		if !strings.Contains(prompt, "Running session summary:\nCovered halves so far.") {
+			t.Errorf("prompt = %q, want the running summary", prompt)
+		}
+		if !strings.Contains(prompt, "participant: what is a half") {
+			t.Errorf("prompt = %q, want the transcript next to it", prompt)
+		}
+	})
 }
 
 func TestResolveAIAgentSummarizeModel(t *testing.T) {
@@ -316,29 +333,73 @@ func TestResolveAIAgentSummarizeModel(t *testing.T) {
 		t.Errorf("model = %q, want none without the ai_agent service", got)
 	}
 
+	// Other text services of the same provider are configured, but none of their
+	// models may be borrowed.
 	cfg := &config.InsightsConfig{Services: map[insights.ServiceType]*config.ServiceConfig{
-		insights.ServiceTypeAIAgent: service(config.ProviderOpenAI, "gpt-4o"),
+		insights.ServiceTypeAIAgent:            service(config.ProviderOpenAI, "gpt-4o"),
+		insights.ServiceTypeAITextChat:         service(config.ProviderOpenAI, "gpt-4o-mini"),
+		insights.ServiceTypeMeetingSummarizing: service(config.ProviderOpenAI, "gpt-4o-audio"),
 	}}
 	if got := resolveAIAgentSummarizeModel(cfg); got != "gpt-4o" {
 		t.Errorf("model = %q, want the ai_agent summarize_model", got)
 	}
 
+	// Without an ai_agent summarize_model there is no synthesis at all.
 	cfg.Services[insights.ServiceTypeAIAgent] = service(config.ProviderOpenAI, "")
-	cfg.Services[insights.ServiceTypeMeetingSummarizing] = service(config.ProviderGoogle, "gemini-1.5")
-	cfg.Services[insights.ServiceTypeAITextChat] = service(config.ProviderOpenAI, "gpt-4o-mini")
-	if got := resolveAIAgentSummarizeModel(cfg); got != "gpt-4o-mini" {
-		t.Errorf("model = %q, want the ai_text_chat fallback of the same provider", got)
-	}
-
-	// A text service of another provider must never be used with these credentials.
-	delete(cfg.Services, insights.ServiceTypeAITextChat)
 	if got := resolveAIAgentSummarizeModel(cfg); got != "" {
-		t.Errorf("model = %q, want no cross-provider fallback", got)
+		t.Errorf("model = %q, want no fallback to ai_text_chat or meeting_summarizing", got)
 	}
 
-	cfg.Services[insights.ServiceTypeMeetingSummarizing] = service(config.ProviderOpenAI, "gpt-4o-audio")
-	if got := resolveAIAgentSummarizeModel(cfg); got != "gpt-4o-audio" {
-		t.Errorf("model = %q, want the meeting_summarizing fallback", got)
+	// The same applies when the ai_agent service is not configured at all.
+	delete(cfg.Services, insights.ServiceTypeAIAgent)
+	if got := resolveAIAgentSummarizeModel(cfg); got != "" {
+		t.Errorf("model = %q, want none without the ai_agent service", got)
+	}
+}
+
+// TestAIAgentSummarizeModelUsesOnlyTheResolvedService locks in that the room's
+// resolved ai_agent service is the only source, so a BYOP room without its own
+// summarize_model keeps the local summary instead of borrowing the platform's.
+func TestAIAgentSummarizeModelUsesOnlyTheResolvedService(t *testing.T) {
+	m := newAIAgentTestModel(newAIAgentTestRedis(t))
+	m.appConfig = &config.AppConfig{Insights: &config.InsightsConfig{
+		Services: map[insights.ServiceType]*config.ServiceConfig{
+			insights.ServiceTypeAIAgent: {
+				Provider: config.ProviderOpenAI,
+				Options:  map[string]interface{}{"summarize_model": "gpt-4o"},
+			},
+			insights.ServiceTypeAITextChat: {
+				Provider: config.ProviderOpenAI,
+				Options:  map[string]interface{}{"summarize_model": "gpt-4o-mini"},
+			},
+			insights.ServiceTypeMeetingSummarizing: {
+				Provider: config.ProviderOpenAI,
+				Options:  map[string]interface{}{"summarize_model": "gpt-4o-audio"},
+			},
+		},
+	}}
+
+	// The server-configured ai_agent service, as returned by resolveAIAgentProvider.
+	if got := m.aiAgentSummarizeModel(m.appConfig.Insights.Services[insights.ServiceTypeAIAgent]); got != "gpt-4o" {
+		t.Errorf("model = %q, want the ai_agent summarize_model", got)
+	}
+	// Without a resolved service the server configuration is read directly.
+	if got := m.aiAgentSummarizeModel(nil); got != "gpt-4o" {
+		t.Errorf("model = %q, want the server ai_agent summarize_model", got)
+	}
+
+	// A BYOP room's own service config never falls back to the platform config.
+	byop := &config.ServiceConfig{
+		Provider: config.ProviderGoogle,
+		Options:  map[string]interface{}{"realtime_model": "gemini-live"},
+	}
+	if got := m.aiAgentSummarizeModel(byop); got != "" {
+		t.Errorf("model = %q, want no fallback to the platform ai_agent service", got)
+	}
+
+	byop.Options["summarize_model"] = " gemini-summary "
+	if got := m.aiAgentSummarizeModel(byop); got != "gemini-summary" {
+		t.Errorf("model = %q, want the trimmed BYOP summarize_model", got)
 	}
 }
 

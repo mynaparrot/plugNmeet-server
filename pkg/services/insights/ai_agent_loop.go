@@ -170,6 +170,15 @@ func (a *AIAgent) redial() {
 		a.readEventLoop(loop)
 	}()
 
+	// The participant keeps talking after the provider reconnected, so the new
+	// socket opens with the conversation so far. The system instruction is left
+	// untouched, so its cached prefix and the tools still hit the cache.
+	if handoff := a.buildReconnectHandoff(); handoff != "" {
+		if err := session.SendContextText("user", handoff, false); err != nil {
+			a.logger.WithError(err).Debug("ai agent: failed to inject the reconnect handoff")
+		}
+	}
+
 	a.setState(plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING, "")
 	a.logger.Info("ai agent: redialled the provider session")
 }

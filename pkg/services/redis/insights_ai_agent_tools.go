@@ -109,6 +109,18 @@ type AIAgentSessionTelemetry struct {
 	AudioMillis uint64                    `json:"audio_millis"`
 	ToolsUsed   map[string]int            `json:"tools_used,omitempty"`
 	Transcript  []AISessionTranscriptTurn `json:"transcript,omitempty"`
+	// RollingSummary is the running summary of the conversation, regenerated in
+	// the background every context_window transcript turns.
+	RollingSummary string `json:"rolling_summary,omitempty"`
+	// SummarizedTurns is how many transcript turns had been recorded when
+	// RollingSummary was last generated.
+	SummarizedTurns int `json:"summarized_turns,omitempty"`
+	// TotalTranscriptTurns counts every turn ever appended, so the unsummarized
+	// tail stays known after the transcript ring buffer dropped the oldest ones.
+	TotalTranscriptTurns int `json:"total_transcript_turns,omitempty"`
+	// Cumulative tokens the rolling summaries spent during the session.
+	SummaryInputTokens  uint64 `json:"summary_input_tokens,omitempty"`
+	SummaryOutputTokens uint64 `json:"summary_output_tokens,omitempty"`
 
 	// CustomProvider is the name of the host's own provider (BYOK) the session
 	// ran on, so the platform never bills its tokens. It is empty when the

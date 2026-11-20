@@ -395,6 +395,22 @@ type realtimeAgentSession struct {
 	events chan insights.RealtimeEvent
 	done   chan struct{}
 
+	// toolMu guards the tool call bookkeeping, which the read loop and the tool
+	// goroutines both touch.
+	toolMu sync.Mutex
+	// queuedToolCalls holds the tool calls of a response that has not reported
+	// its done event yet. Only the read loop touches it.
+	queuedToolCalls []insights.RealtimeEvent
+	// pendingToolCalls holds the call ids that still miss a function_call_output.
+	pendingToolCalls map[string]struct{}
+	// deferredEvents holds context that arrived during a tool turn; it goes out
+	// right before the response.create that resumes the conversation.
+	deferredEvents []realtime.RealtimeClientEventUnionParam
+
+	// emitMu guards eventsClosed, so a send can never race with the close.
+	emitMu       sync.Mutex
+	eventsClosed bool
+
 	// sendMu serialises writes: the websocket accepts one writer at a time.
 	sendMu    sync.Mutex
 	closeOnce sync.Once
@@ -403,10 +419,11 @@ type realtimeAgentSession struct {
 
 func newRealtimeAgentSession(conn realtimeAgentConn, logger *logrus.Entry) *realtimeAgentSession {
 	return &realtimeAgentSession{
-		conn:   conn,
-		logger: logger,
-		events: make(chan insights.RealtimeEvent, realtimeEventBuffer),
-		done:   make(chan struct{}),
+		conn:             conn,
+		logger:           logger,
+		events:           make(chan insights.RealtimeEvent, realtimeEventBuffer),
+		done:             make(chan struct{}),
+		pendingToolCalls: make(map[string]struct{}),
 	}
 }
 
@@ -455,7 +472,7 @@ func (s *realtimeAgentSession) SendContextText(role, text string, triggerRespons
 		events = append(events, realtime.RealtimeClientEventUnionParam{OfResponseCreate: &realtime.ResponseCreateEventParam{}})
 	}
 
-	return s.send(events...)
+	return s.dispatch(events...)
 }
 
 func (s *realtimeAgentSession) SendImage(mimeType string, data []byte, caption string) error {
@@ -479,21 +496,48 @@ func (s *realtimeAgentSession) SendImage(mimeType string, data []byte, caption s
 		})
 	}
 
-	return s.send(realtime.RealtimeClientEventParamOfConversationItemCreate(
+	return s.dispatch(realtime.RealtimeClientEventParamOfConversationItemCreate(
 		realtime.RealtimeConversationItemUserMessageParam{Content: content},
 	))
 }
 
 func (s *realtimeAgentSession) SendToolResult(callID, toolName, resultJSON string, isError bool) error {
-	output := formatToolOutputJSON(resultJSON, isError)
+	item := realtime.RealtimeClientEventParamOfConversationItemCreate(realtime.RealtimeConversationItemFunctionCallOutputParam{
+		CallID: callID,
+		Output: formatToolOutputJSON(resultJSON, isError),
+	})
 
-	return s.send(
-		realtime.RealtimeClientEventParamOfConversationItemCreate(realtime.RealtimeConversationItemFunctionCallOutputParam{
-			CallID: callID,
-			Output: output,
-		}),
-		realtime.RealtimeClientEventUnionParam{OfResponseCreate: &realtime.ResponseCreateEventParam{}},
-	)
+	s.toolMu.Lock()
+	delete(s.pendingToolCalls, callID)
+	// A response that asked for several tools still waits for the others: a
+	// response.create sent now is rejected with function_call_outputs_required.
+	settled := len(s.pendingToolCalls) == 0
+	var deferred []realtime.RealtimeClientEventUnionParam
+	if settled {
+		deferred = s.deferredEvents
+		s.deferredEvents = nil
+	}
+	s.toolMu.Unlock()
+
+	events := make([]realtime.RealtimeClientEventUnionParam, 0, 2+len(deferred))
+	events = append(events, item)
+	events = append(events, deferred...)
+	if settled && !deferredTriggersResponse(deferred) {
+		events = append(events, realtime.RealtimeClientEventUnionParam{OfResponseCreate: &realtime.ResponseCreateEventParam{}})
+	}
+
+	return s.send(events...)
+}
+
+// deferredTriggersResponse reports whether the batch already asks the model to
+// answer: a second response.create would collide with the response it starts.
+func deferredTriggersResponse(events []realtime.RealtimeClientEventUnionParam) bool {
+	for _, ev := range events {
+		if ev.OfResponseCreate != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *realtimeAgentSession) Interrupt() error {
@@ -507,6 +551,48 @@ func (s *realtimeAgentSession) Close() error {
 	err := s.shutdown()
 	s.wg.Wait()
 	return err
+}
+
+// dispatch sends context now, or holds it back while a tool call still misses
+// its function_call_output. A response.create in between would be rejected with
+// function_call_outputs_required.
+func (s *realtimeAgentSession) dispatch(events ...realtime.RealtimeClientEventUnionParam) error {
+	s.toolMu.Lock()
+	defer s.toolMu.Unlock()
+
+	if len(s.pendingToolCalls) > 0 {
+		s.deferredEvents = append(s.deferredEvents, events...)
+		return nil
+	}
+	return s.send(events...)
+}
+
+// completeResponse registers every tool call of the finished response and hands
+// them to the caller. The whole set is registered before the first call is
+// emitted, so a fast tool can never resume the conversation while a sibling call
+// of the same response is still unanswered.
+func (s *realtimeAgentSession) completeResponse(status realtime.RealtimeResponseStatus) []insights.RealtimeEvent {
+	calls := s.queuedToolCalls
+	s.queuedToolCalls = nil
+
+	s.toolMu.Lock()
+	defer s.toolMu.Unlock()
+
+	if status == realtime.RealtimeResponseStatusFailed {
+		// A failed response abandons its tool turn: its calls can no longer be
+		// answered, so waiting for them would block every later turn.
+		s.pendingToolCalls = make(map[string]struct{})
+		s.deferredEvents = nil
+		return nil
+	}
+
+	s.pendingToolCalls = make(map[string]struct{}, len(calls))
+	for _, call := range calls {
+		if call.CallID != "" {
+			s.pendingToolCalls[call.CallID] = struct{}{}
+		}
+	}
+	return calls
 }
 
 func (s *realtimeAgentSession) send(events ...realtime.RealtimeClientEventUnionParam) error {
@@ -545,7 +631,16 @@ func (s *realtimeAgentSession) shutdown() error {
 	return err
 }
 
+// emit publishes one event. The close and the send share emitMu, so a goroutine
+// that fires during shutdown can never write to a closed channel.
 func (s *realtimeAgentSession) emit(ev insights.RealtimeEvent) bool {
+	s.emitMu.Lock()
+	defer s.emitMu.Unlock()
+
+	if s.eventsClosed {
+		return false
+	}
+
 	select {
 	case s.events <- ev:
 		return true
@@ -554,9 +649,22 @@ func (s *realtimeAgentSession) emit(ev insights.RealtimeEvent) bool {
 	}
 }
 
+// closeEvents ends the event stream. It shares emitMu with emit, so it cannot run
+// concurrently with a send.
+func (s *realtimeAgentSession) closeEvents() {
+	s.emitMu.Lock()
+	defer s.emitMu.Unlock()
+
+	if s.eventsClosed {
+		return
+	}
+	s.eventsClosed = true
+	close(s.events)
+}
+
 func (s *realtimeAgentSession) readLoop() {
 	defer s.wg.Done()
-	defer close(s.events)
+	defer s.closeEvents()
 	defer func() {
 		if err := s.shutdown(); err != nil && s.logger != nil {
 			s.logger.WithError(err).Debug("openai realtime session close returned an error")
@@ -571,12 +679,33 @@ func (s *realtimeAgentSession) readLoop() {
 			}
 			return
 		}
-		for _, ev := range translateRealtimeServerEvent(msg) {
-			if !s.emit(ev) {
-				return
+		if !s.handleServerMessage(msg) {
+			return
+		}
+	}
+}
+
+// handleServerMessage translates one server event, holds tool calls back until
+// the response is done and reports whether the loop may continue.
+func (s *realtimeAgentSession) handleServerMessage(msg realtime.RealtimeServerEventUnion) bool {
+	for _, ev := range translateRealtimeServerEvent(msg) {
+		if ev.Type == insights.RealtimeEventToolCall {
+			s.queuedToolCalls = append(s.queuedToolCalls, ev)
+			continue
+		}
+		if !s.emit(ev) {
+			return false
+		}
+	}
+
+	if msg.Type == "response.done" {
+		for _, call := range s.completeResponse(msg.OfResponseDoneEvent.Response.Status) {
+			if !s.emit(call) {
+				return false
 			}
 		}
 	}
+	return true
 }
 
 // supervise closes the session on context cancellation or when the configured

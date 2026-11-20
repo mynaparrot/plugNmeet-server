@@ -321,11 +321,7 @@ func (m *AIAgentModel) synthesizeSessionSummary(ctx context.Context, roomId stri
 		return ""
 	}
 
-	var transcript []redisservice.AISessionTranscriptTurn
-	if telemetry != nil {
-		transcript = telemetry.Transcript
-	}
-	p, c, err := applyLLMSummarySynthesis(ctx, provider, summarizeModel, summary, transcript)
+	p, c, err := applyLLMSummarySynthesis(ctx, provider, summarizeModel, summary, telemetry)
 	*promptTokens, *completionTokens = p, c
 	if err != nil {
 		log.WithError(err).Debug("the llm summary synthesis failed, keeping the local summary")
@@ -752,13 +748,11 @@ func normalizeParticipationLevel(level string) string {
 }
 
 // aiAgentSummarizeModel returns the text model that refines the session summary.
-// The room's resolved provider comes first, so a room with its own provider never
-// falls back to a server model of another provider.
+// The model comes strictly from the room's resolved ai_agent service, so a room
+// with its own provider never borrows a model from another service.
 func (m *AIAgentModel) aiAgentSummarizeModel(serviceCfg *config.ServiceConfig) string {
 	if serviceCfg != nil {
-		if model := strings.TrimSpace(serviceCfg.GetOptionsString("summarize_model", "")); model != "" {
-			return model
-		}
+		return strings.TrimSpace(serviceCfg.GetOptionsString("summarize_model", ""))
 	}
 	if m.appConfig == nil {
 		return ""
@@ -767,8 +761,9 @@ func (m *AIAgentModel) aiAgentSummarizeModel(serviceCfg *config.ServiceConfig) s
 	return resolveAIAgentSummarizeModel(m.appConfig.Insights)
 }
 
-// resolveAIAgentSummarizeModel returns the text model used to refine the session
-// summary. An empty result means "no LLM synthesis, keep the local fallback".
+// resolveAIAgentSummarizeModel returns the summarize_model of the server-configured
+// ai_agent service. An empty result means "no LLM synthesis, keep the local
+// fallback"; it is never borrowed from ai_text_chat or meeting_summarizing.
 func resolveAIAgentSummarizeModel(insightsCfg *config.InsightsConfig) string {
 	if insightsCfg == nil {
 		return ""
@@ -777,29 +772,13 @@ func resolveAIAgentSummarizeModel(insightsCfg *config.InsightsConfig) string {
 	if !ok || agentService == nil {
 		return ""
 	}
-	if model := strings.TrimSpace(agentService.GetOptionsString("summarize_model", "")); model != "" {
-		return model
-	}
-	// Fall back to another text service of the same provider: the credentials
-	// are already known to serve text chat.
-	for _, serviceType := range []insights.ServiceType{
-		insights.ServiceTypeAITextChat,
-		insights.ServiceTypeMeetingSummarizing,
-	} {
-		service, ok := insightsCfg.Services[serviceType]
-		if !ok || service == nil || service.Provider != agentService.Provider {
-			continue
-		}
-		if model := strings.TrimSpace(service.GetOptionsString("summarize_model", "")); model != "" {
-			return model
-		}
-	}
-	return ""
+
+	return strings.TrimSpace(agentService.GetOptionsString("summarize_model", ""))
 }
 
 // applyLLMSummarySynthesis lets the model refine the deterministic summary. Any
 // failure keeps the fallback untouched, so the artifact is always written.
-func applyLLMSummarySynthesis(ctx context.Context, provider insights.Provider, summarizeModel string, summary *plugnmeet.AIAgentSessionSummary, transcript []redisservice.AISessionTranscriptTurn) (promptTokens, completionTokens uint32, err error) {
+func applyLLMSummarySynthesis(ctx context.Context, provider insights.Provider, summarizeModel string, summary *plugnmeet.AIAgentSessionSummary, telemetry *redisservice.AIAgentSessionTelemetry) (promptTokens, completionTokens uint32, err error) {
 	if provider == nil || summary == nil {
 		return 0, 0, fmt.Errorf("ai agent summary: missing provider or summary")
 	}
@@ -807,7 +786,7 @@ func applyLLMSummarySynthesis(ctx context.Context, provider insights.Provider, s
 	sumCtx, cancel := context.WithTimeout(ctx, aiAgentSummaryBudget)
 	defer cancel()
 
-	text, promptTokens, completionTokens, err := provider.AIChatTextSummarize(sumCtx, summarizeModel, buildAIAgentSummaryPrompt(summary, transcript))
+	text, promptTokens, completionTokens, err := provider.AIChatTextSummarize(sumCtx, summarizeModel, buildAIAgentSummaryPrompt(summary, telemetry))
 	if err != nil {
 		return promptTokens, completionTokens, err
 	}
@@ -823,7 +802,7 @@ func applyLLMSummarySynthesis(ctx context.Context, provider insights.Provider, s
 	return promptTokens, completionTokens, nil
 }
 
-func buildAIAgentSummaryPrompt(summary *plugnmeet.AIAgentSessionSummary, transcript []redisservice.AISessionTranscriptTurn) []*plugnmeet.InsightsAITextChatContent {
+func buildAIAgentSummaryPrompt(summary *plugnmeet.AIAgentSessionSummary, telemetry *redisservice.AIAgentSessionTelemetry) []*plugnmeet.InsightsAITextChatContent {
 	systemPrompt := `You finalize an AI agent session report for the room host.
 Use only the deterministic summary and the transcript; never invent facts.
 Reply with one JSON object and nothing else, using exactly this shape:
@@ -836,6 +815,20 @@ participation_level is high|medium|low. Omit any field you cannot improve.`
 		deterministic = []byte("{}")
 	}
 
+	var transcript []redisservice.AISessionTranscriptTurn
+	var rollingSummary string
+	if telemetry != nil {
+		transcript = telemetry.Transcript
+		rollingSummary = strings.TrimSpace(telemetry.RollingSummary)
+	}
+
+	ctx := "Session transcript:\n" + formatSessionTranscript(transcript)
+	if rollingSummary != "" {
+		// The transcript ring buffer drops the oldest turns, so the running summary
+		// is what still knows about the first part of a long session.
+		ctx = "Running session summary:\n" + rollingSummary + "\n\n" + ctx
+	}
+
 	return []*plugnmeet.InsightsAITextChatContent{
 		{
 			Role: plugnmeet.InsightsAITextChatRole_INSIGHTS_AI_TEXT_CHAT_ROLE_SYSTEM,
@@ -843,7 +836,7 @@ participation_level is high|medium|low. Omit any field you cannot improve.`
 		},
 		{
 			Role: plugnmeet.InsightsAITextChatRole_INSIGHTS_AI_TEXT_CHAT_ROLE_USER,
-			Text: "Deterministic summary:\n" + string(deterministic) + "\n\nSession transcript:\n" + formatSessionTranscript(transcript),
+			Text: "Deterministic summary:\n" + string(deterministic) + "\n\n" + ctx,
 		},
 	}
 }

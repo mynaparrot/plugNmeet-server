@@ -357,10 +357,9 @@ insights:
       options:
         # Model used for the bidirectional realtime session (audio in and out).
         realtime_model: "gemini-3.8-live"
-        # Text model used once at room end to refine the AI_AGENT_SESSION_SUMMARY
-        # artifact. Leave it unset and the server falls back to the
-        # summarize_model of ai_text_chat/meeting_summarizing (same provider),
-        # or to a deterministic local summary when no text model is available.
+        # Text model used for rolling conversation summarization and at room end
+        # to refine the AI_AGENT_SESSION_SUMMARY artifact. Leave it unset to use
+        # the deterministic local summary without LLM synthesis.
         summarize_model: "gemini-3.1-flash-lite"
       pricing:
         realtime_model:

@@ -226,7 +226,23 @@ type liveSession struct {
 	// input transcripts must not end the turn on their own.
 	speechRunes      int
 	lastUsageSeconds float64
-	functionCallSeen bool
+
+	// toolMu guards the tool call bookkeeping, which the read loop, the tool
+	// goroutines and the grouper timer all touch.
+	toolMu sync.Mutex
+	// queuedToolCalls holds the function calls of a response that is still
+	// streaming, so they are released together once response.completed names
+	// them all. Only the read loop touches it.
+	queuedToolCalls []insights.RealtimeEvent
+	// pendingToolCalls holds the call ids that still miss a function_call_output.
+	pendingToolCalls map[string]struct{}
+	// deferredEvents holds context that arrived during a tool turn; it goes out
+	// right before the response.create that resumes the conversation.
+	deferredEvents []live.ClientEventUnionParam
+
+	// emitMu guards eventsClosed, so a send can never race with the close.
+	emitMu       sync.Mutex
+	eventsClosed bool
 
 	// sendMu serialises writes: the websocket accepts one writer at a time.
 	sendMu    sync.Mutex
@@ -236,10 +252,11 @@ type liveSession struct {
 
 func newLiveSession(conn liveConn, logger *logrus.Entry) (*liveSession, error) {
 	s := &liveSession{
-		conn:   conn,
-		logger: logger,
-		events: make(chan insights.RealtimeEvent, liveEventBuffer),
-		done:   make(chan struct{}),
+		conn:             conn,
+		logger:           logger,
+		events:           make(chan insights.RealtimeEvent, liveEventBuffer),
+		done:             make(chan struct{}),
+		pendingToolCalls: make(map[string]struct{}),
 	}
 
 	grouper, err := live.NewTranscriptGrouper(live.TranscriptGrouperOptions{OnUpdate: s.onTranscriptUpdate})
@@ -310,7 +327,7 @@ func (s *liveSession) SendContextText(role, text string, triggerResponse bool) e
 		})
 	}
 
-	return s.send(events...)
+	return s.dispatch(events...)
 }
 
 // boundLiveAppend shortens text so that a session append can never exceed the
@@ -344,7 +361,7 @@ func (s *liveSession) SendImage(mimeType string, data []byte, caption string) er
 		content = append(content, responses.ResponseInputContentParamOfInputText(caption))
 	}
 
-	return s.send(live.ClientEventParamOfResponseItemCreate(responses.ResponseInputItemMessageParam{
+	return s.dispatch(live.ClientEventParamOfResponseItemCreate(responses.ResponseInputItemMessageParam{
 		Type:    liveItemTypeMessage,
 		Role:    liveSpeakerUser,
 		Content: content,
@@ -359,10 +376,38 @@ func (s *liveSession) SendToolResult(callID, toolName, resultJSON string, isErro
 	item := responses.ResponseInputItemFunctionCallOutputParam{CallID: param.NewOpt(callID)}
 	item.Output.OfString = param.NewOpt(formatToolOutputJSON(resultJSON, isError))
 
-	return s.send(
-		live.ClientEventParamOfResponseItemCreate(item),
-		live.ClientEventUnionParam{OfResponseCreate: &live.ResponseCreateEventParam{}},
-	)
+	s.toolMu.Lock()
+	delete(s.pendingToolCalls, callID)
+	// A response that asked for several tools still waits for the others: a
+	// response.create sent now is rejected with function_call_outputs_required.
+	settled := len(s.pendingToolCalls) == 0
+	var deferred []live.ClientEventUnionParam
+	if settled {
+		deferred = s.deferredEvents
+		s.deferredEvents = nil
+	}
+	s.toolMu.Unlock()
+
+	events := make([]live.ClientEventUnionParam, 0, 2+len(deferred))
+	events = append(events, live.ClientEventParamOfResponseItemCreate(item))
+	events = append(events, deferred...)
+	if settled && needsResponseCreate(deferred) {
+		events = append(events, live.ClientEventUnionParam{OfResponseCreate: &live.ResponseCreateEventParam{}})
+	}
+
+	return s.send(events...)
+}
+
+// needsResponseCreate reports whether no event of the batch already asks the
+// model to answer: a commentary append triggers a response on its own, and a
+// second trigger collides with the response it started.
+func needsResponseCreate(events []live.ClientEventUnionParam) bool {
+	for _, ev := range events {
+		if ev.OfSessionCommentaryAppend != nil {
+			return false
+		}
+	}
+	return true
 }
 
 // Interrupt is a no-op: the Live model reacts to barge-in server side.
@@ -374,6 +419,85 @@ func (s *liveSession) Close() error {
 	err := s.shutdown()
 	s.wg.Wait()
 	return err
+}
+
+// dispatch sends context now, or holds it back while a delegated tool call still
+// misses its function_call_output. Any event that would make the delegated model
+// answer in between is rejected with function_call_outputs_required.
+func (s *liveSession) dispatch(events ...live.ClientEventUnionParam) error {
+	s.toolMu.Lock()
+	defer s.toolMu.Unlock()
+
+	if len(s.pendingToolCalls) > 0 {
+		s.deferredEvents = append(s.deferredEvents, events...)
+		return nil
+	}
+	return s.send(events...)
+}
+
+// completeResponse registers every tool call of the finished response and
+// reports the ones to hand to the caller. The whole set is registered before the
+// first call is emitted, so a fast tool can never resume the conversation while a
+// sibling call of the same response is still unanswered.
+func (s *liveSession) completeResponse(rawResponse any) []insights.RealtimeEvent {
+	calls := s.queuedToolCalls
+	s.queuedToolCalls = nil
+
+	// response.completed repeats the output items; any call that was not streamed
+	// separately is picked up here.
+	response, _ := rawResponse.(map[string]any)
+	output, _ := response["output"].([]any)
+	seen := make(map[string]struct{}, len(calls))
+	for _, call := range calls {
+		seen[call.CallID] = struct{}{}
+	}
+	for _, rawItem := range output {
+		item, ok := rawItem.(map[string]any)
+		if !ok || nestedString(item, "type") != liveItemTypeFunctionCall {
+			continue
+		}
+		call := newLiveToolCallEvent(item)
+		if _, ok = seen[call.CallID]; ok {
+			continue
+		}
+		seen[call.CallID] = struct{}{}
+		calls = append(calls, call)
+	}
+
+	s.toolMu.Lock()
+	defer s.toolMu.Unlock()
+	s.pendingToolCalls = make(map[string]struct{}, len(calls))
+	for _, call := range calls {
+		if call.CallID != "" {
+			s.pendingToolCalls[call.CallID] = struct{}{}
+		}
+	}
+	return calls
+}
+
+// resetToolTurn drops the bookkeeping of a failed response: its calls can no
+// longer be answered, so waiting for them would block every later turn.
+func (s *liveSession) resetToolTurn() {
+	s.toolMu.Lock()
+	defer s.toolMu.Unlock()
+
+	s.queuedToolCalls = nil
+	s.pendingToolCalls = make(map[string]struct{})
+	s.deferredEvents = nil
+}
+
+// newLiveToolCallEvent builds the tool call event of one function_call item.
+func newLiveToolCallEvent(item map[string]any) insights.RealtimeEvent {
+	callID := nestedString(item, "call_id")
+	if callID == "" {
+		callID = nestedString(item, "id")
+	}
+	return insights.RealtimeEvent{
+		Type:     insights.RealtimeEventToolCall,
+		CallID:   callID,
+		ToolName: nestedString(item, "name"),
+		ArgsJSON: defaultArgsJSON(nestedString(item, "arguments")),
+	}
 }
 
 func (s *liveSession) send(events ...live.ClientEventUnionParam) error {
@@ -412,19 +536,42 @@ func (s *liveSession) shutdown() error {
 		_ = s.conn.Send(ctx, live.ClientEventUnionParam{OfSessionClose: &live.SessionCloseEventParam{}})
 
 		close(s.done)
+		s.stopSpeakingTimer()
 		s.grouper.Close()
 		err = s.conn.Close()
 	})
 	return err
 }
 
+// emit publishes one event. The close and the send share emitMu, so a timer or
+// callback that fires during shutdown can never write to a closed channel.
 func (s *liveSession) emit(ev insights.RealtimeEvent) bool {
+	s.emitMu.Lock()
+	defer s.emitMu.Unlock()
+
+	if s.eventsClosed {
+		return false
+	}
+
 	select {
 	case s.events <- ev:
 		return true
 	case <-s.done:
 		return false
 	}
+}
+
+// closeEvents ends the event stream. It shares emitMu with emit, so it cannot
+// run concurrently with a send.
+func (s *liveSession) closeEvents() {
+	s.emitMu.Lock()
+	defer s.emitMu.Unlock()
+
+	if s.eventsClosed {
+		return
+	}
+	s.eventsClosed = true
+	close(s.events)
 }
 
 // onTranscriptUpdate is called by the grouper outside its lock.
@@ -478,10 +625,25 @@ func (s *liveSession) markSpeaking() {
 
 	s.stateMu.Lock()
 	defer s.stateMu.Unlock()
+	if s.isClosed() {
+		// A closed session must not leave a timer behind.
+		return
+	}
 	if s.speakingTimer != nil {
 		s.speakingTimer.Stop()
 	}
 	s.speakingTimer = time.AfterFunc(liveSpeakingIdleTimeout, s.endIdleTurn)
+}
+
+// stopSpeakingTimer disarms the idle timer, so no callback fires after shutdown.
+func (s *liveSession) stopSpeakingTimer() {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+
+	if s.speakingTimer != nil {
+		s.speakingTimer.Stop()
+		s.speakingTimer = nil
+	}
 }
 
 // endIdleTurn reports the completion of a turn whose audio stream went silent.
@@ -541,17 +703,6 @@ func (s *liveSession) noteUserSpeech(delta string) bool {
 	s.speaking = false
 	s.speechRunes = 0
 	return true
-}
-
-// setFunctionCallSeen updates the function-call flag and reports the previous
-// value, so a completed response knows which turn it closes.
-func (s *liveSession) setFunctionCallSeen(seen bool) bool {
-	s.stateMu.Lock()
-	defer s.stateMu.Unlock()
-
-	previous := s.functionCallSeen
-	s.functionCallSeen = seen
-	return previous
 }
 
 func (s *liveSession) handleServerEvent(msg live.ServerEventUnion) {
@@ -622,29 +773,29 @@ func (s *liveSession) handleResponseEvent(ev live.ResponseEvent) {
 		if !ok || nestedString(item, "type") != liveItemTypeFunctionCall {
 			return
 		}
-		s.setFunctionCallSeen(true)
-		callID := nestedString(item, "call_id")
-		if callID == "" {
-			callID = nestedString(item, "id")
-		}
-		s.emit(insights.RealtimeEvent{
-			Type:     insights.RealtimeEventToolCall,
-			CallID:   callID,
-			ToolName: nestedString(item, "name"),
-			ArgsJSON: defaultArgsJSON(nestedString(item, "arguments")),
-		})
+		// The response may still emit further calls, so the batch stays queued
+		// until response.completed names all of them.
+		s.queuedToolCalls = append(s.queuedToolCalls, newLiveToolCallEvent(item))
 
 	case liveResponseCompleted:
 		// The completed response reports what the delegated text model spent.
 		s.emitDelegationUsage(ev.Event["response"])
 
-		// A function call turn is answered by the caller through SendToolResult.
+		if calls := s.completeResponse(ev.Event["response"]); len(calls) > 0 {
+			// A function call turn is answered by the caller through SendToolResult.
+			for _, call := range calls {
+				s.emit(call)
+			}
+			return
+		}
+
 		// While the agent is talking, the audio stream reports the turn end.
-		if !s.setFunctionCallSeen(false) && !s.isSpeaking() {
+		if !s.isSpeaking() {
 			s.emit(insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete})
 		}
 
 	case liveResponseFailed, liveEventError:
+		s.resetToolTurn()
 		s.emit(insights.RealtimeEvent{
 			Type: insights.RealtimeEventError,
 			Err:  errors.New(liveResponseErrorMessage(ev.Event)),
@@ -805,7 +956,7 @@ func clampUint32(value int64) uint32 {
 
 func (s *liveSession) readLoop() {
 	defer s.wg.Done()
-	defer close(s.events)
+	defer s.closeEvents()
 	defer func() {
 		if err := s.shutdown(); err != nil && s.logger != nil {
 			s.logger.WithError(err).Debug("openai live session close returned an error")

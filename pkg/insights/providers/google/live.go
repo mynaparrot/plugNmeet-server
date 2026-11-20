@@ -292,6 +292,10 @@ type liveSession struct {
 	events chan insights.RealtimeEvent
 	done   chan struct{}
 
+	// emitMu guards eventsClosed, so a send can never race with the close.
+	emitMu       sync.Mutex
+	eventsClosed bool
+
 	// sendMu serialises writes: the websocket accepts one writer at a time.
 	sendMu    sync.Mutex
 	closeOnce sync.Once
@@ -418,7 +422,16 @@ func (s *liveSession) shutdown() error {
 	return err
 }
 
+// emit publishes one event. The close and the send share emitMu, so a goroutine
+// that fires during shutdown can never write to a closed channel.
 func (s *liveSession) emit(ev insights.RealtimeEvent) bool {
+	s.emitMu.Lock()
+	defer s.emitMu.Unlock()
+
+	if s.eventsClosed {
+		return false
+	}
+
 	select {
 	case s.events <- ev:
 		return true
@@ -427,9 +440,22 @@ func (s *liveSession) emit(ev insights.RealtimeEvent) bool {
 	}
 }
 
+// closeEvents ends the event stream. It shares emitMu with emit, so it cannot run
+// concurrently with a send.
+func (s *liveSession) closeEvents() {
+	s.emitMu.Lock()
+	defer s.emitMu.Unlock()
+
+	if s.eventsClosed {
+		return
+	}
+	s.eventsClosed = true
+	close(s.events)
+}
+
 func (s *liveSession) readLoop() {
 	defer s.wg.Done()
-	defer close(s.events)
+	defer s.closeEvents()
 	defer func() {
 		if err := s.shutdown(); err != nil && s.logger != nil {
 			s.logger.WithError(err).Debug("gemini live session close returned an error")

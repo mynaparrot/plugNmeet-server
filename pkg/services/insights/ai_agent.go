@@ -42,6 +42,12 @@ const (
 	maxTranscriptTurnChars = 240
 	// aiAgentTelemetryTimeout bounds the flush that outlives a cancelled session.
 	aiAgentTelemetryTimeout = 3 * time.Second
+	// defaultAISummarizeWindow is how many unsummarized transcript turns trigger
+	// the background summary: eight turns are four question-answer exchanges.
+	defaultAISummarizeWindow = 8
+	// aiAgentSummarizeTimeout bounds one background summary, so a slow model can
+	// never hold the session.
+	aiAgentSummarizeTimeout = 5 * time.Second
 
 	transcriptRoleParticipant = "participant"
 	transcriptRoleAgent       = "agent"
@@ -144,6 +150,16 @@ type aiAgentRuntimeState struct {
 	turnsCount int
 	toolsUsed  map[string]int
 	transcript []redisservice.AISessionTranscriptTurn
+	// totalTranscriptTurns counts every turn ever appended, even after the
+	// transcript ring buffer dropped the oldest ones.
+	totalTranscriptTurns int
+	// rollingSummary is the running summary of the conversation so far and
+	// summarizedTurns the turn count it covered.
+	rollingSummary  string
+	summarizedTurns int
+	// The rolling summaries are billed apart from the session tokens.
+	summaryInputTokens  uint64
+	summaryOutputTokens uint64
 }
 
 // aiAgentLoop ties one provider session to its event stream so a redial can
@@ -177,6 +193,21 @@ type AIAgent struct {
 	maxAudio  time.Duration
 	// redisService persists the session telemetry; nil in tests without a store.
 	redisService *redisservice.RedisService
+
+	// summarize rolls the conversation summary forward in the background; nil
+	// when the service configures no summarize model.
+	summarize func(ctx context.Context, history []*plugnmeet.InsightsAITextChatContent) (summary string, promptTokens, completionTokens uint32, err error)
+	// summarizeWindow is how many unsummarized turns trigger summarize.
+	summarizeWindow int
+	summarizing     atomic.Bool
+	// summarizeMu guards the group, because a turn can arrive from a chat
+	// handler outside the event loop while Stop is already waiting.
+	summarizeMu   sync.Mutex
+	summarizeWg   sync.WaitGroup
+	summarizeStop bool
+	// resuming marks an agent that continues an earlier session of the room, so
+	// Start hands the new provider socket the conversation so far.
+	resuming bool
 
 	roomAgent *RoomAgent
 	publisher audioPublisher
@@ -271,6 +302,12 @@ type AIAgentArgs struct {
 	Delegate func() (string, error)
 	// OnStopped runs once after the agent has fully stopped.
 	OnStopped func(reason string)
+	// SummarizeModel refines the running conversation summary; an empty model
+	// disables the background summarization.
+	SummarizeModel string
+	// PreviousTelemetry is the room's earlier session. A restart in the same
+	// room continues its conversation and its token usage instead of wiping them.
+	PreviousTelemetry *redisservice.AIAgentSessionTelemetry
 }
 
 // aiAgentCoreArgs is everything the agent needs that does not depend on a
@@ -295,6 +332,12 @@ type aiAgentCoreArgs struct {
 	// CustomProvider names the host's provider the session runs on, empty when
 	// the server's platform provider serves it.
 	CustomProvider string
+	// Summarize rolls the running conversation summary forward.
+	Summarize func(ctx context.Context, history []*plugnmeet.InsightsAITextChatContent) (summary string, promptTokens, completionTokens uint32, err error)
+	// SummarizeWindow is how many unsummarized turns trigger Summarize.
+	SummarizeWindow int
+	// PreviousTelemetry continues an earlier session of the same room.
+	PreviousTelemetry *redisservice.AIAgentSessionTelemetry
 }
 
 // NewAIAgent connects a realtime provider session plus a visible LiveKit
@@ -355,23 +398,35 @@ func NewAIAgent(args *AIAgentArgs) (*AIAgent, error) {
 		return nil, fmt.Errorf("ai agent: failed to open realtime session: %w", err)
 	}
 
+	// The running summary is a background text call, so the voice session never
+	// waits on it.
+	var summarize func(ctx context.Context, history []*plugnmeet.InsightsAITextChatContent) (string, uint32, uint32, error)
+	if model := firstNonEmpty(args.SummarizeModel, args.ServiceConfig.GetOptionsString("summarize_model", "")); model != "" {
+		summarize = func(sumCtx context.Context, history []*plugnmeet.InsightsAITextChatContent) (string, uint32, uint32, error) {
+			return provider.AIChatTextSummarize(sumCtx, model, history)
+		}
+	}
+
 	agent, err := newAIAgent(&aiAgentCoreArgs{
-		Ctx:            args.Ctx,
-		Payload:        args.Payload,
-		Features:       args.Features,
-		Boundary:       boundary,
-		Session:        session,
-		NewSession:     newSession,
-		Transport:      args.Transport,
-		RedisService:   args.RedisService,
-		Logger:         log,
-		Registry:       registry,
-		Delegate:       args.Delegate,
-		OnStopped:      args.OnStopped,
-		AgentUserId:    args.AgentUserId,
-		Learner:        args.Learner,
-		MaxAudioMinute: args.Features.GetMaxAudioMinutes(),
-		CustomProvider: args.CustomProvider,
+		Ctx:               args.Ctx,
+		Payload:           args.Payload,
+		Features:          args.Features,
+		Boundary:          boundary,
+		Session:           session,
+		NewSession:        newSession,
+		Transport:         args.Transport,
+		RedisService:      args.RedisService,
+		Logger:            log,
+		Registry:          registry,
+		Delegate:          args.Delegate,
+		OnStopped:         args.OnStopped,
+		AgentUserId:       args.AgentUserId,
+		Learner:           args.Learner,
+		MaxAudioMinute:    args.Features.GetMaxAudioMinutes(),
+		CustomProvider:    args.CustomProvider,
+		Summarize:         summarize,
+		SummarizeWindow:   args.ServiceConfig.GetIntOption("context_window", defaultAISummarizeWindow),
+		PreviousTelemetry: args.PreviousTelemetry,
 	})
 	if err != nil {
 		_ = session.Close()
@@ -466,33 +521,44 @@ func newAIAgent(args *aiAgentCoreArgs) (*AIAgent, error) {
 	}
 
 	agent := &AIAgent{
-		ctx:            ctx,
-		cancel:         cancel,
-		logger:         log,
-		roomId:         args.Payload.RoomId,
-		sessionId:      sessionId,
-		agentUserId:    agentUserId,
-		agentName:      boundary.AgentDisplayName,
-		startedAt:      time.Now(),
-		boundary:       boundary,
-		features:       features,
-		guard:          guard,
-		transport:      args.Transport,
-		delegate:       args.Delegate,
-		onStopped:      args.OnStopped,
-		learner:        args.Learner,
-		maxAudio:       time.Duration(maxAudioMinutes) * time.Minute,
-		redisService:   args.RedisService,
-		customProvider: args.CustomProvider,
-		inAudio:        make(chan mediasdk.PCM16Sample, aiAgentInAudioBuffer),
-		session:        args.Session,
-		newSession:     args.NewSession,
-		pendingCalls:   make(map[string]chan *plugnmeet.AIAgentToolResultMsg),
-		done:           make(chan struct{}),
+		ctx:             ctx,
+		cancel:          cancel,
+		logger:          log,
+		roomId:          args.Payload.RoomId,
+		sessionId:       sessionId,
+		agentUserId:     agentUserId,
+		agentName:       boundary.AgentDisplayName,
+		startedAt:       time.Now(),
+		boundary:        boundary,
+		features:        features,
+		guard:           guard,
+		transport:       args.Transport,
+		delegate:        args.Delegate,
+		onStopped:       args.OnStopped,
+		learner:         args.Learner,
+		maxAudio:        time.Duration(maxAudioMinutes) * time.Minute,
+		redisService:    args.RedisService,
+		customProvider:  args.CustomProvider,
+		summarize:       args.Summarize,
+		summarizeWindow: args.SummarizeWindow,
+		inAudio:         make(chan mediasdk.PCM16Sample, aiAgentInAudioBuffer),
+		session:         args.Session,
+		newSession:      args.NewSession,
+		pendingCalls:    make(map[string]chan *plugnmeet.AIAgentToolResultMsg),
+		done:            make(chan struct{}),
 		state: aiAgentRuntimeState{
 			state:     plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_CONNECTING,
 			toolsUsed: make(map[string]int),
 		},
+	}
+	if agent.summarizeWindow <= 0 {
+		agent.summarizeWindow = defaultAISummarizeWindow
+	}
+	// A restart in the same room continues the earlier session, so the opening
+	// telemetry flush carries its usage and conversation instead of zeroes.
+	if prev := args.PreviousTelemetry; prev != nil {
+		agent.resuming = true
+		agent.seedStateFromTelemetry(prev)
 	}
 
 	// The sentinel tool is declared to the provider and handled inline by the loop.
@@ -584,6 +650,16 @@ func (a *AIAgent) Start() {
 			a.readEventLoop(loop)
 		}()
 
+		// A session restarted in the same room opens with the conversation so far,
+		// so the agent continues it instead of introducing itself again.
+		if a.resuming {
+			if handoff := a.buildReconnectHandoff(); handoff != "" {
+				if err := a.sendContextText(handoff); err != nil {
+					a.logger.WithError(err).Debug("ai agent: failed to inject the reconnect handoff")
+				}
+			}
+		}
+
 		if budget := a.sessionBudget(); budget > 0 {
 			a.sessionTimer = time.AfterFunc(budget, func() {
 				a.logger.Info("ai agent: session budget reached")
@@ -603,6 +679,12 @@ func (a *AIAgent) Stop(reason string) {
 		if a.sessionTimer != nil {
 			a.sessionTimer.Stop()
 		}
+		// No summary may join after this point, and the cancelled context ends the
+		// one still running.
+		a.summarizeMu.Lock()
+		a.summarizeStop = true
+		a.summarizeMu.Unlock()
+
 		a.cancel()
 
 		if session := a.currentSession(); session != nil {
@@ -624,6 +706,9 @@ func (a *AIAgent) Stop(reason string) {
 
 		unregisterActiveAIAgent(a)
 		a.wg.Wait()
+		// A summary still in flight updates the state, so wait for it before the
+		// closing flush reads it.
+		a.summarizeWg.Wait()
 		// Flush before logUsage so the stored snapshot matches what is logged.
 		a.persistTelemetry(reason)
 		a.logUsage()

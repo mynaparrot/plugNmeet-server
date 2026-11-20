@@ -2,9 +2,11 @@ package insightsservice
 
 import (
 	"context"
+	"math"
 	"strings"
 	"time"
 
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/sirupsen/logrus"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
@@ -28,9 +30,8 @@ func (a *AIAgent) recordTranscriptTurn(role, text string) {
 	}
 
 	a.stateMu.Lock()
-	defer a.stateMu.Unlock()
-
 	a.state.transcript = append(a.state.transcript, redisservice.AISessionTranscriptTurn{Role: role, Text: text})
+	a.state.totalTranscriptTurns++
 	if excess := len(a.state.transcript) - maxSessionTranscriptTurns; excess > 0 {
 		kept := make([]redisservice.AISessionTranscriptTurn, maxSessionTranscriptTurns)
 		copy(kept, a.state.transcript[excess:])
@@ -39,6 +40,108 @@ func (a *AIAgent) recordTranscriptTurn(role, text string) {
 	if role == transcriptRoleParticipant {
 		a.state.turnsCount++
 	}
+	pending := a.state.totalTranscriptTurns - a.state.summarizedTurns
+	a.stateMu.Unlock()
+
+	a.requestSummary(pending)
+}
+
+// requestSummary rolls the running summary forward once enough unsummarized
+// turns have accumulated, one background summary at a time.
+func (a *AIAgent) requestSummary(pending int) {
+	if a.summarize == nil || pending < a.summarizeWindow {
+		return
+	}
+	if !a.summarizing.CompareAndSwap(false, true) {
+		return
+	}
+
+	// Stop waits for this group, so a turn arriving from a chat handler can never
+	// join it once the session is over.
+	a.summarizeMu.Lock()
+	if a.summarizeStop {
+		a.summarizeMu.Unlock()
+		a.summarizing.Store(false)
+		return
+	}
+	a.summarizeWg.Add(1)
+	a.summarizeMu.Unlock()
+
+	go func() {
+		defer a.summarizeWg.Done()
+		defer a.summarizing.Store(false)
+		a.summarizeConversation()
+	}()
+}
+
+// summarizeConversation folds the unsummarized turns into the running summary.
+// The reported tokens are recorded even when the model fails, so the usage stays
+// exact.
+func (a *AIAgent) summarizeConversation() {
+	a.stateMu.Lock()
+	prevSummary := strings.TrimSpace(a.state.rollingSummary)
+	targetTurnCount := a.state.totalTranscriptTurns
+	pending := targetTurnCount - a.state.summarizedTurns
+	transcript := append([]redisservice.AISessionTranscriptTurn(nil), a.state.transcript...)
+	a.stateMu.Unlock()
+
+	recent := recentTranscriptTurns(transcript, pending, a.summarizeWindow)
+	if len(recent) == 0 {
+		return
+	}
+
+	history := make([]*plugnmeet.InsightsAITextChatContent, 0, len(recent)+1)
+	if prevSummary != "" {
+		history = append(history, &plugnmeet.InsightsAITextChatContent{
+			Role: plugnmeet.InsightsAITextChatRole_INSIGHTS_AI_TEXT_CHAT_ROLE_SYSTEM,
+			Text: "This is the running summary of the session so far: " + prevSummary,
+		})
+	}
+	for _, turn := range recent {
+		role := plugnmeet.InsightsAITextChatRole_INSIGHTS_AI_TEXT_CHAT_ROLE_USER
+		if turn.Role == transcriptRoleAgent {
+			role = plugnmeet.InsightsAITextChatRole_INSIGHTS_AI_TEXT_CHAT_ROLE_MODEL
+		}
+		history = append(history, &plugnmeet.InsightsAITextChatContent{Role: role, Text: turn.Text})
+	}
+
+	sumCtx, cancel := context.WithTimeout(a.ctx, aiAgentSummarizeTimeout)
+	defer cancel()
+	summary, promptTokens, completionTokens, err := a.summarize(sumCtx, history)
+
+	a.stateMu.Lock()
+	a.state.summaryInputTokens += uint64(promptTokens)
+	a.state.summaryOutputTokens += uint64(completionTokens)
+	updated := err == nil && strings.TrimSpace(summary) != ""
+	if updated {
+		a.state.rollingSummary = strings.TrimSpace(summary)
+		a.state.summarizedTurns = targetTurnCount
+	}
+	a.stateMu.Unlock()
+
+	if err != nil {
+		a.logger.WithError(err).Debug("ai agent: the rolling summary failed")
+		return
+	}
+	if updated {
+		// A crash must not lose the summary the session already paid for.
+		a.persistTelemetry("")
+	}
+}
+
+// recentTranscriptTurns returns the tail of turns the summary still has to
+// cover, bounded by the window and by the turns the ring buffer kept.
+func recentTranscriptTurns(transcript []redisservice.AISessionTranscriptTurn, pending, window int) []redisservice.AISessionTranscriptTurn {
+	if pending <= 0 || len(transcript) == 0 {
+		return nil
+	}
+	if pending > len(transcript) {
+		pending = len(transcript)
+	}
+	if window > 0 && pending > window {
+		pending = window
+	}
+	return transcript[len(transcript)-pending:]
 }
 
 // recordToolUse counts the tools the agent actually ran. The off-topic sentinel
@@ -120,12 +223,99 @@ func (a *AIAgent) TelemetrySnapshot(endReason string) redisservice.AIAgentSessio
 		DelegationAudioOutputTokens:          state.delegationAudioOutputTokens,
 		DelegationThinkingOutputTokens:       state.delegationThinkingOutputTokens,
 
-		AudioMillis: state.audioMillis,
-		ToolsUsed:   toolsUsed,
-		Transcript:  transcript,
+		AudioMillis:          state.audioMillis,
+		ToolsUsed:            toolsUsed,
+		Transcript:           transcript,
+		RollingSummary:       state.rollingSummary,
+		SummarizedTurns:      state.summarizedTurns,
+		TotalTranscriptTurns: state.totalTranscriptTurns,
+		SummaryInputTokens:   state.summaryInputTokens,
+		SummaryOutputTokens:  state.summaryOutputTokens,
 
 		CustomProvider: a.customProvider,
 	}
+}
+
+// seedStateFromTelemetry continues the session an earlier agent left behind in
+// the same room, so a restart keeps its conversation and its cumulative usage.
+func (a *AIAgent) seedStateFromTelemetry(t *redisservice.AIAgentSessionTelemetry) {
+	if t == nil {
+		return
+	}
+
+	a.stateMu.Lock()
+	defer a.stateMu.Unlock()
+
+	state := &a.state
+	state.turnsCount = t.TurnsCount
+	state.inputTokens = clampUint32(t.InputTokens)
+	state.outputTokens = clampUint32(t.OutputTokens)
+	state.cachedInputTokens = t.CachedInputTokens
+	state.textInputTokens = t.TextInputTokens
+	state.audioInputTokens = t.AudioInputTokens
+	state.imageInputTokens = t.ImageInputTokens
+	state.cachedTextInputTokens = t.CachedTextInputTokens
+	state.cachedAudioInputTokens = t.CachedAudioInputTokens
+	state.cachedImageInputTokens = t.CachedImageInputTokens
+	state.textOutputTokens = t.TextOutputTokens
+	state.audioOutputTokens = t.AudioOutputTokens
+	state.thinkingOutputTokens = t.ThinkingOutputTokens
+	state.cacheWriteInputTokens = t.CacheWriteInputTokens
+	state.cacheWriteTextInputTokens = t.CacheWriteTextInputTokens
+	state.cacheWriteAudioInputTokens = t.CacheWriteAudioInputTokens
+	state.cacheWriteImageInputTokens = t.CacheWriteImageInputTokens
+	state.delegationInputTokens = clampUint32(t.DelegationInputTokens)
+	state.delegationOutputTokens = clampUint32(t.DelegationOutputTokens)
+	state.delegationCachedInputTokens = t.DelegationCachedInputTokens
+	state.delegationCacheWriteInputTokens = t.DelegationCacheWriteInputTokens
+	state.delegationTextInputTokens = t.DelegationTextInputTokens
+	state.delegationAudioInputTokens = t.DelegationAudioInputTokens
+	state.delegationImageInputTokens = t.DelegationImageInputTokens
+	state.delegationCachedTextInputTokens = t.DelegationCachedTextInputTokens
+	state.delegationCachedAudioInputTokens = t.DelegationCachedAudioInputTokens
+	state.delegationCachedImageInputTokens = t.DelegationCachedImageInputTokens
+	state.delegationCacheWriteTextInputTokens = t.DelegationCacheWriteTextInputTokens
+	state.delegationCacheWriteAudioInputTokens = t.DelegationCacheWriteAudioInputTokens
+	state.delegationCacheWriteImageInputTokens = t.DelegationCacheWriteImageInputTokens
+	state.delegationTextOutputTokens = t.DelegationTextOutputTokens
+	state.delegationAudioOutputTokens = t.DelegationAudioOutputTokens
+	state.delegationThinkingOutputTokens = t.DelegationThinkingOutputTokens
+	state.audioMillis = t.AudioMillis
+	state.summaryInputTokens = t.SummaryInputTokens
+	state.summaryOutputTokens = t.SummaryOutputTokens
+
+	state.toolsUsed = make(map[string]int, len(t.ToolsUsed))
+	for name, count := range t.ToolsUsed {
+		state.toolsUsed[name] = count
+	}
+	state.transcript = append([]redisservice.AISessionTranscriptTurn(nil), t.Transcript...)
+	state.rollingSummary = t.RollingSummary
+	state.summarizedTurns = t.SummarizedTurns
+	state.totalTranscriptTurns = t.TotalTranscriptTurns
+	if state.totalTranscriptTurns < len(state.transcript) {
+		state.totalTranscriptTurns = len(state.transcript)
+	}
+}
+
+// clampUint32 keeps a stored counter within the runtime type; a session never
+// reaches the limit in practice.
+func clampUint32(v uint64) uint32 {
+	if v > math.MaxUint32 {
+		return math.MaxUint32
+	}
+	return uint32(v)
+}
+
+// buildReconnectHandoff renders the context a reconnected or restarted session
+// opens with, so the agent continues the conversation instead of starting over.
+func (a *AIAgent) buildReconnectHandoff() string {
+	a.stateMu.Lock()
+	rollingSummary := a.state.rollingSummary
+	transcript := append([]redisservice.AISessionTranscriptTurn(nil), a.state.transcript...)
+	unsummarized := a.state.totalTranscriptTurns - a.state.summarizedTurns
+	a.stateMu.Unlock()
+
+	return BuildSessionReconnectHandoff(rollingSummary, transcript, unsummarized)
 }
 
 // persistTelemetry writes the snapshot with a context of its own: Stop cancels

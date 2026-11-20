@@ -849,3 +849,154 @@ func TestAIAgentTelemetryLearner(t *testing.T) {
 		t.Fatalf("learner = %q/%q, want the pinned learner", snapshot.UserID, snapshot.UserName)
 	}
 }
+
+// TestAIAgentRollingSummaryRunsInBackground locks in that the conversation is
+// summarized in the background once the window fills, and that the summary and
+// its tokens are carried by the telemetry.
+func TestAIAgentRollingSummaryRunsInBackground(t *testing.T) {
+	var mu sync.Mutex
+	var histories [][]*plugnmeet.InsightsAITextChatContent
+
+	env := newAgentTestEnv(t, nil, func(args *aiAgentCoreArgs) {
+		args.SummarizeWindow = 2
+		args.Summarize = func(_ context.Context, history []*plugnmeet.InsightsAITextChatContent) (string, uint32, uint32, error) {
+			mu.Lock()
+			histories = append(histories, history)
+			mu.Unlock()
+			return "the learner practised halves", 30, 10, nil
+		}
+	})
+
+	env.session.Push(
+		insights.RealtimeEvent{Type: insights.RealtimeEventTranscriptUser, Text: "what is a half", Final: true},
+		insights.RealtimeEvent{Type: insights.RealtimeEventTranscriptAgent, Text: "one of two equal parts", Final: true},
+	)
+	waitFor(t, func() bool {
+		return env.agent.TelemetrySnapshot("").RollingSummary != ""
+	}, "rolling summary stored")
+
+	snapshot := env.agent.TelemetrySnapshot("")
+	if snapshot.RollingSummary != "the learner practised halves" {
+		t.Errorf("rolling summary = %q", snapshot.RollingSummary)
+	}
+	if snapshot.SummarizedTurns != 2 || snapshot.TotalTranscriptTurns != 2 {
+		t.Errorf("turns = %d/%d, want (2, 2)", snapshot.SummarizedTurns, snapshot.TotalTranscriptTurns)
+	}
+	if snapshot.SummaryInputTokens != 30 || snapshot.SummaryOutputTokens != 10 {
+		t.Errorf("summary tokens = (%d, %d), want (30, 10)", snapshot.SummaryInputTokens, snapshot.SummaryOutputTokens)
+	}
+
+	mu.Lock()
+	first := histories[0]
+	mu.Unlock()
+	if len(first) != 2 {
+		t.Fatalf("history = %d entries, want the two turns", len(first))
+	}
+	if first[0].GetRole() != plugnmeet.InsightsAITextChatRole_INSIGHTS_AI_TEXT_CHAT_ROLE_USER ||
+		first[1].GetRole() != plugnmeet.InsightsAITextChatRole_INSIGHTS_AI_TEXT_CHAT_ROLE_MODEL {
+		t.Errorf("roles = %v/%v, want USER/MODEL", first[0].GetRole(), first[1].GetRole())
+	}
+
+	// The next window folds into the previous summary instead of starting over.
+	env.session.Push(
+		insights.RealtimeEvent{Type: insights.RealtimeEventTranscriptUser, Text: "what is a quarter", Final: true},
+		insights.RealtimeEvent{Type: insights.RealtimeEventTranscriptAgent, Text: "one of four equal parts", Final: true},
+	)
+	waitFor(t, func() bool {
+		return env.agent.TelemetrySnapshot("").SummarizedTurns == 4
+	}, "the second window summarized")
+
+	mu.Lock()
+	last := histories[len(histories)-1]
+	mu.Unlock()
+	if last[0].GetRole() != plugnmeet.InsightsAITextChatRole_INSIGHTS_AI_TEXT_CHAT_ROLE_SYSTEM ||
+		!strings.Contains(last[0].GetText(), "the learner practised halves") {
+		t.Fatalf("history = %v, want the running summary first", last[0])
+	}
+	if snapshot := env.agent.TelemetrySnapshot(""); snapshot.SummaryInputTokens != 60 || snapshot.SummaryOutputTokens != 20 {
+		t.Errorf("summary tokens = (%d, %d), want the cumulative (60, 20)",
+			snapshot.SummaryInputTokens, snapshot.SummaryOutputTokens)
+	}
+}
+
+// TestAIAgentRedialInjectsReconnectHandoff locks in that a provider reconnect
+// hands the new socket the conversation so far, so the agent does not start over.
+func TestAIAgentRedialInjectsReconnectHandoff(t *testing.T) {
+	next := fake.NewSession()
+	env := newAgentTestEnv(t, nil, func(args *aiAgentCoreArgs) {
+		args.NewSession = func(context.Context) (insights.RealtimeSession, error) { return next, nil }
+	})
+
+	env.session.Push(
+		insights.RealtimeEvent{Type: insights.RealtimeEventTranscriptUser, Text: "what is a quarter", Final: true},
+		insights.RealtimeEvent{Type: insights.RealtimeEventTranscriptAgent, Text: "one of four equal parts", Final: true},
+	)
+	waitFor(t, func() bool {
+		return env.agent.TelemetrySnapshot("").TotalTranscriptTurns == 2
+	}, "turns recorded")
+
+	env.session.Push(insights.RealtimeEvent{Type: insights.RealtimeEventGoAway})
+	waitFor(t, func() bool {
+		return env.agent.currentSession() == next
+	}, "session replaced")
+
+	waitFor(t, func() bool {
+		for _, injected := range next.Contexts() {
+			if len(injected.Text) > 0 && strings.Contains(injected.Text, reconnectHandoffHeader) &&
+				strings.Contains(injected.Text, "participant: what is a quarter") &&
+				strings.Contains(injected.Text, "agent: one of four equal parts") {
+				return true
+			}
+		}
+		return false
+	}, "reconnect handoff injected")
+}
+
+// TestAIAgentResumesPreviousSession locks in that a restart in the same room
+// carries the earlier usage and conversation forward instead of wiping them.
+func TestAIAgentResumesPreviousSession(t *testing.T) {
+	previous := &redisservice.AIAgentSessionTelemetry{
+		SessionID:            "session-0",
+		TurnsCount:           3,
+		InputTokens:          1200,
+		OutputTokens:         400,
+		CachedInputTokens:    300,
+		AudioMillis:          45000,
+		ToolsUsed:            map[string]int{"whiteboard_write_content": 2},
+		Transcript:           []redisservice.AISessionTranscriptTurn{{Role: "participant", Text: "earlier question"}, {Role: "agent", Text: "earlier answer"}},
+		RollingSummary:       "the session covered halves",
+		SummarizedTurns:      2,
+		TotalTranscriptTurns: 6,
+		SummaryInputTokens:   50,
+		SummaryOutputTokens:  20,
+	}
+
+	env := newAgentTestEnv(t, nil, func(args *aiAgentCoreArgs) { args.PreviousTelemetry = previous })
+
+	snapshot := env.agent.TelemetrySnapshot("")
+	if snapshot.TurnsCount != 3 || snapshot.InputTokens != 1200 || snapshot.OutputTokens != 400 ||
+		snapshot.CachedInputTokens != 300 || snapshot.AudioMillis != 45000 {
+		t.Errorf("usage = %+v, want the earlier session's counters", snapshot)
+	}
+	if snapshot.SummaryInputTokens != 50 || snapshot.SummaryOutputTokens != 20 {
+		t.Errorf("summary tokens = (%d, %d), want (50, 20)", snapshot.SummaryInputTokens, snapshot.SummaryOutputTokens)
+	}
+	if snapshot.RollingSummary != "the session covered halves" || snapshot.SummarizedTurns != 2 ||
+		snapshot.TotalTranscriptTurns != 6 {
+		t.Errorf("summary state = %+v, want the earlier session's", snapshot)
+	}
+	if len(snapshot.Transcript) != 2 || snapshot.ToolsUsed["whiteboard_write_content"] != 2 {
+		t.Errorf("transcript/tools = %+v/%+v, want the earlier session's", snapshot.Transcript, snapshot.ToolsUsed)
+	}
+
+	waitFor(t, func() bool {
+		for _, injected := range env.session.Contexts() {
+			if len(injected.Text) > 0 && strings.Contains(injected.Text, reconnectHandoffHeader) &&
+				strings.Contains(injected.Text, "the session covered halves") &&
+				strings.Contains(injected.Text, "agent: earlier answer") {
+				return true
+			}
+		}
+		return false
+	}, "reconnect handoff injected on start")
+}

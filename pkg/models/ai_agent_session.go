@@ -155,23 +155,32 @@ func (m *AIAgentModel) Start(ctx context.Context, roomId string, req *plugnmeet.
 		customProvider = string(serviceConfig.Provider)
 	}
 
+	// A restart in the same room (reconnect, crash, or an explicit stop) continues
+	// the earlier session instead of wiping its usage and conversation.
+	prevTelemetry, err := m.redisService.GetAIAgentSessionTelemetry(ctx, roomId)
+	if err != nil {
+		log.WithError(err).Debug("could not read the previous ai agent session telemetry")
+	}
+
 	agent, err := insightsservice.NewAIAgent(&insightsservice.AIAgentArgs{
-		Ctx:             m.ctx,
-		AppConf:         m.appConfig,
-		AgentUserId:     agentUserId,
-		NatsConn:        m.natsConn,
-		Transport:       m.natsService,
-		NatsService:     m.natsService,
-		RedisService:    m.redisService,
-		ServiceConfig:   serviceConfig,
-		ProviderAccount: account,
-		CustomProvider:  customProvider,
-		Logger:          log,
-		Payload:         payload,
-		Features:        features,
-		Boundary:        boundary,
-		Deps:            deps,
-		Learner:         learner,
+		Ctx:               m.ctx,
+		AppConf:           m.appConfig,
+		AgentUserId:       agentUserId,
+		NatsConn:          m.natsConn,
+		Transport:         m.natsService,
+		NatsService:       m.natsService,
+		RedisService:      m.redisService,
+		ServiceConfig:     serviceConfig,
+		ProviderAccount:   account,
+		CustomProvider:    customProvider,
+		Logger:            log,
+		Payload:           payload,
+		Features:          features,
+		Boundary:          boundary,
+		Deps:              deps,
+		Learner:           learner,
+		SummarizeModel:    m.aiAgentSummarizeModel(serviceConfig),
+		PreviousTelemetry: prevTelemetry,
 		Delegate: func() (string, error) {
 			return m.SelectOrGetDelegate(m.ctx, roomId)
 		},

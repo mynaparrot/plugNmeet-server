@@ -626,6 +626,222 @@ func TestLiveSessionSendToolResult(t *testing.T) {
 	}
 }
 
+// liveToolCallEvents feeds one response that calls the given tools and returns
+// the tool call events the session published.
+func liveToolCallEvents(t *testing.T, s *liveSession, calls ...[2]string) []insights.RealtimeEvent {
+	t.Helper()
+
+	output := make([]any, 0, len(calls))
+	for _, call := range calls {
+		item := map[string]any{
+			"type":      liveItemTypeFunctionCall,
+			"call_id":   call[0],
+			"name":      call[1],
+			"arguments": `{"a":1}`,
+		}
+		output = append(output, item)
+		s.handleServerEvent(live.ServerEventUnion{
+			Type:            liveEventResponse,
+			OfResponseEvent: live.ResponseEvent{Event: map[string]any{"type": liveResponseOutputItemDone, "item": item}},
+		})
+	}
+
+	s.handleServerEvent(live.ServerEventUnion{
+		Type: liveEventResponse,
+		OfResponseEvent: live.ResponseEvent{Event: map[string]any{
+			"type":     liveResponseCompleted,
+			"response": map[string]any{"output": output},
+		}},
+	})
+
+	return drainRealtimeEvents(t, s.Events())
+}
+
+// A response may call several tools at once: response.create must wait until the
+// last function_call_output is on the wire, and any context that arrives in
+// between must not jump the queue.
+func TestLiveSessionMultipleToolCallsWaitForAllOutputs(t *testing.T) {
+	conn := &fakeLiveConn{}
+	s, err := newLiveSession(conn, nil)
+	if err != nil {
+		t.Fatalf("newLiveSession: %v", err)
+	}
+
+	events := liveToolCallEvents(t, s,
+		[2]string{"call_1", "whiteboard_manage_board"},
+		[2]string{"call_2", "whiteboard_write_content"},
+	)
+	if len(events) != 2 {
+		t.Fatalf("both tool calls of the response must be released together: %+v", events)
+	}
+	if events[0].CallID != "call_1" || events[1].CallID != "call_2" {
+		t.Fatalf("unexpected tool calls: %+v", events)
+	}
+
+	// The first tool finished while the second one still runs.
+	if err = s.SendToolResult("call_1", "whiteboard_manage_board", `{"ok":true}`, false); err != nil {
+		t.Fatalf("SendToolResult: %v", err)
+	}
+	sent := conn.sentEvents()
+	if len(sent) != 1 {
+		t.Fatalf("an unanswered sibling call must withhold response.create: %+v", sent)
+	}
+	if callID := sent[0].OfResponseItemCreate.Item.OfFunctionCallOutput.CallID.Or(""); callID != "call_1" {
+		t.Fatalf("unexpected function call output: %+v", sent[0])
+	}
+
+	// Whiteboard context that arrives while the second tool runs waits too.
+	if err = s.SendContextText("user", "the board now shows x=42", false); err != nil {
+		t.Fatalf("SendContextText: %v", err)
+	}
+	if err = s.SendImage("image/webp", []byte("img"), "the board"); err != nil {
+		t.Fatalf("SendImage: %v", err)
+	}
+	if sent = conn.sentEvents(); len(sent) != 1 {
+		t.Fatalf("context must wait for the pending tool output: %+v", sent)
+	}
+
+	if err = s.SendToolResult("call_2", "whiteboard_write_content", `{"ok":true}`, false); err != nil {
+		t.Fatalf("SendToolResult: %v", err)
+	}
+	sent = conn.sentEvents()
+	if len(sent) != 5 {
+		t.Fatalf("expected the second output, both deferred events and response.create: %+v", sent)
+	}
+	if callID := sent[1].OfResponseItemCreate.Item.OfFunctionCallOutput.CallID.Or(""); callID != "call_2" {
+		t.Fatalf("unexpected second function call output: %+v", sent[1])
+	}
+	if sent[2].OfSessionThinkingAppend == nil || sent[2].OfSessionThinkingAppend.Content != "the board now shows x=42" {
+		t.Fatalf("deferred context must follow the last output: %+v", sent[2])
+	}
+	if sent[3].OfResponseItemCreate.Item.OfInputMessage == nil {
+		t.Fatalf("the deferred image must follow the context: %+v", sent[3])
+	}
+	if sent[4].OfResponseCreate == nil {
+		t.Fatalf("response.create must stay last: %+v", sent[4])
+	}
+}
+
+// A response that reports its calls only in response.completed must still be
+// registered, so the tool result cannot resume the conversation too early.
+func TestLiveSessionToolCallsFromCompletedResponse(t *testing.T) {
+	conn := &fakeLiveConn{}
+	s, err := newLiveSession(conn, nil)
+	if err != nil {
+		t.Fatalf("newLiveSession: %v", err)
+	}
+
+	s.handleServerEvent(live.ServerEventUnion{
+		Type: liveEventResponse,
+		OfResponseEvent: live.ResponseEvent{Event: map[string]any{
+			"type": liveResponseCompleted,
+			"response": map[string]any{"output": []any{
+				map[string]any{"type": "message"},
+				map[string]any{"type": liveItemTypeFunctionCall, "call_id": "call_9", "name": "whiteboard_capture_snapshot", "arguments": `{"include_image":false}`},
+			}},
+		}},
+	})
+
+	events := drainRealtimeEvents(t, s.Events())
+	if len(events) != 1 {
+		t.Fatalf("a completed response must release its tool calls: %+v", events)
+	}
+	if events[0].Type != insights.RealtimeEventToolCall || events[0].CallID != "call_9" {
+		t.Fatalf("unexpected tool call: %+v", events[0])
+	}
+
+	if err = s.SendToolResult("call_9", "whiteboard_capture_snapshot", `{"ok":true}`, false); err != nil {
+		t.Fatalf("SendToolResult: %v", err)
+	}
+	if sent := conn.sentEvents(); len(sent) != 2 || sent[1].OfResponseCreate == nil {
+		t.Fatalf("the only pending call must resume the conversation: %+v", sent)
+	}
+}
+
+// The last function_call_output releases the context held back during the turn.
+func TestLiveSessionDeferredContextFollowsToolOutput(t *testing.T) {
+	conn := &fakeLiveConn{}
+	s, err := newLiveSession(conn, nil)
+	if err != nil {
+		t.Fatalf("newLiveSession: %v", err)
+	}
+
+	if events := liveToolCallEvents(t, s, [2]string{"call_1", "set_workspace_lock"}); len(events) != 1 {
+		t.Fatalf("unexpected tool calls: %+v", events)
+	}
+	if err = s.SendContextText("user", "the room is locked", false); err != nil {
+		t.Fatalf("SendContextText: %v", err)
+	}
+	if err = s.SendToolResult("call_1", "set_workspace_lock", `{"ok":true}`, false); err != nil {
+		t.Fatalf("SendToolResult: %v", err)
+	}
+
+	sent := conn.sentEvents()
+	if len(sent) != 3 {
+		t.Fatalf("expected the output, the deferred context and response.create: %+v", sent)
+	}
+	if sent[1].OfSessionThinkingAppend == nil || sent[2].OfResponseCreate == nil {
+		t.Fatalf("unexpected order: %+v", sent)
+	}
+}
+
+// A deferred commentary append triggers the response on its own, so the tool
+// result must not send a second response.create on top of it.
+func TestLiveSessionDeferredCommentaryTriggersResponseOnce(t *testing.T) {
+	conn := &fakeLiveConn{}
+	s, err := newLiveSession(conn, nil)
+	if err != nil {
+		t.Fatalf("newLiveSession: %v", err)
+	}
+
+	if events := liveToolCallEvents(t, s, [2]string{"call_1", "whiteboard_capture_snapshot"}); len(events) != 1 {
+		t.Fatalf("unexpected tool calls: %+v", events)
+	}
+	if err = s.SendContextText("user", "read the board out loud", true); err != nil {
+		t.Fatalf("SendContextText: %v", err)
+	}
+	if err = s.SendToolResult("call_1", "whiteboard_capture_snapshot", `{"ok":true}`, false); err != nil {
+		t.Fatalf("SendToolResult: %v", err)
+	}
+
+	sent := conn.sentEvents()
+	if len(sent) != 2 {
+		t.Fatalf("expected the output and the deferred commentary only: %+v", sent)
+	}
+	if sent[1].OfSessionCommentaryAppend == nil {
+		t.Fatalf("the deferred commentary must follow the output: %+v", sent[1])
+	}
+}
+
+// A failed response abandons its tool turn, so a later tool result must not be
+// blocked by calls that can never be answered.
+func TestLiveSessionFailedResponseResetsToolTurn(t *testing.T) {
+	conn := &fakeLiveConn{}
+	s, err := newLiveSession(conn, nil)
+	if err != nil {
+		t.Fatalf("newLiveSession: %v", err)
+	}
+
+	if events := liveToolCallEvents(t, s, [2]string{"call_1", "whiteboard_manage_board"}); len(events) != 1 {
+		t.Fatalf("unexpected tool calls: %+v", events)
+	}
+	s.handleServerEvent(live.ServerEventUnion{
+		Type: liveEventResponse,
+		OfResponseEvent: live.ResponseEvent{Event: map[string]any{
+			"type":     liveResponseFailed,
+			"response": map[string]any{"error": map[string]any{"message": "backend exploded"}},
+		}},
+	})
+	drainRealtimeEvents(t, s.Events())
+
+	if err = s.SendToolResult("call_1", "whiteboard_manage_board", `{"ok":true}`, false); err != nil {
+		t.Fatalf("SendToolResult: %v", err)
+	}
+	if events := conn.sentEvents(); len(events) != 2 || events[1].OfResponseCreate == nil {
+		t.Fatalf("a dropped tool turn must not block the next result: %+v", events)
+	}
+}
+
 func TestLiveSessionClose(t *testing.T) {
 	conn := &fakeLiveConn{}
 	s, err := newLiveSession(conn, nil)
@@ -867,13 +1083,22 @@ func TestLiveSessionServerResponseEvents(t *testing.T) {
 		t.Fatalf("expected turn complete: %+v", events)
 	}
 
-	// An item without an id still yields a tool call with default arguments.
+	// A tool call is only released once its response completed, and an item
+	// without an id still yields the default arguments.
 	s.handleServerEvent(live.ServerEventUnion{
 		Type: liveEventResponse,
 		OfResponseEvent: live.ResponseEvent{Event: map[string]any{
 			"type": liveResponseOutputItemDone,
 			"item": map[string]any{"type": liveItemTypeFunctionCall, "id": "call-2", "name": "create_quiz_or_poll"},
 		}},
+	})
+	if events = drainRealtimeEvents(t, s.Events()); len(events) != 0 {
+		t.Fatalf("a tool call must wait for the completed response: %+v", events)
+	}
+
+	s.handleServerEvent(live.ServerEventUnion{
+		Type:            liveEventResponse,
+		OfResponseEvent: live.ResponseEvent{Event: map[string]any{"type": liveResponseCompleted}},
 	})
 	events = drainRealtimeEvents(t, s.Events())
 	if len(events) != 1 || events[0].CallID != "call-2" || events[0].ArgsJSON != "{}" {
@@ -1196,6 +1421,48 @@ func TestLiveSessionReadLoop(t *testing.T) {
 
 	if err = s.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
+	}
+}
+
+// Closing while the idle timer and the grouper can still fire must neither panic
+// with a send on a closed channel nor race on the event stream.
+func TestLiveSessionCloseWithCallbacksInFlight(t *testing.T) {
+	restoreLiveSpeakingIdle(t, time.Millisecond)
+
+	conn := &fakeLiveConn{block: make(chan struct{})}
+	s, err := newLiveSession(conn, nil)
+	if err != nil {
+		t.Fatalf("newLiveSession: %v", err)
+	}
+	s.wg.Add(1)
+	go s.readLoop()
+	go s.supervise(context.Background(), 0)
+
+	audio := live.ServerEventUnion{
+		Type:                    liveEventOutputAudioDelta,
+		OfOutputAudioDeltaEvent: live.OutputAudioDeltaEvent{Delta: base64.StdEncoding.EncodeToString([]byte{1, 2})},
+	}
+	transcript := live.ServerEventUnion{
+		Type:                         liveEventOutputTranscript,
+		OfOutputTranscriptDeltaEvent: live.OutputTranscriptDeltaEvent{EventID: "evt_1", Delta: "hi", StartMs: 0, EndMs: 200},
+	}
+	for i := 0; i < 20; i++ {
+		s.handleServerEvent(audio)
+		s.handleServerEvent(transcript)
+	}
+
+	if err = s.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	for range s.Events() {
+	}
+
+	// Callbacks that fire after the stream is closed must stay harmless.
+	s.handleServerEvent(audio)
+	s.onTranscriptUpdate(live.TranscriptUpdate{Segment: live.TranscriptSegment{Speaker: "assistant", Text: "bye"}, Reason: "inactivity"})
+	s.endIdleTurn()
+	if s.isSpeaking() {
+		t.Fatal("a closed session must not stay speaking")
 	}
 }
 

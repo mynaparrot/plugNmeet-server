@@ -47,6 +47,22 @@ func (m *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) (plugnmeet.
 	})
 	log.Infoln("Request to switch presenter received")
 
+	rInfo, meta, err := m.natsService.GetRoomInfoWithMetadata(r.GetRoomId())
+	if err != nil {
+		log.WithError(err).Errorln("failed to get room info with metadata")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrUserUnexpectedError
+	}
+
+	if rInfo == nil || meta == nil {
+		log.Warnln("did not find correct room info")
+		return plugnmeet.StatusCode_ROOM_NOT_FOUND, config.ErrUserRoomInfoNotFound
+	}
+
+	if isOneOnOneAIAgentRoom(meta) {
+		log.Error("The room is on the AI agent")
+		return plugnmeet.StatusCode_PERMISSION_DENIED, config.ErrAIAgentWorkspaceControlled
+	}
+
 	var newPresenterId, oldPresenterId string
 
 	if r.Task == plugnmeet.SwitchPresenterTask_PROMOTE {

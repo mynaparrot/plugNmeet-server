@@ -231,20 +231,24 @@ func (m *ArtifactModel) buildAIAgentSessionUsages(telemetry *redisservice.AIAgen
 		}
 	}
 
-	if summaryPromptTokens > 0 || summaryCompletionTokens > 0 {
+	// The background rolling summaries and the end-of-session synthesis are the
+	// same role, so they share one entry and one model rate.
+	summaryPrompt, summaryCompletion := summaryTokensIncludingRolling(telemetry, summaryPromptTokens, summaryCompletionTokens)
+	if summaryPrompt > 0 || summaryCompletion > 0 {
 		var promptCost, completionCost float64
 		if !custom {
-			promptCost = m.estimateTokensCost(insights.ServiceTypeAIAgent, uint64(summaryPromptTokens), true, log, aiAgentSummarizePricingKey, summarizeModel)
-			completionCost = m.estimateTokensCost(insights.ServiceTypeAIAgent, uint64(summaryCompletionTokens), false, log, aiAgentSummarizePricingKey, summarizeModel)
+			summaryModel := m.aiAgentSummaryModel(summarizeModel, log)
+			promptCost = m.estimateTokensCost(insights.ServiceTypeAIAgent, summaryPrompt, true, log, aiAgentSummarizePricingKey, summaryModel)
+			completionCost = m.estimateTokensCost(insights.ServiceTypeAIAgent, summaryCompletion, false, log, aiAgentSummarizePricingKey, summaryModel)
 		}
 
 		usages[aiAgentUsageKeySummary] = &plugnmeet.RoomArtifactTokenUsage{
-			PromptTokens:     summaryPromptTokens,
-			CompletionTokens: summaryCompletionTokens,
-			TotalTokens:      clampToUint32(uint64(summaryPromptTokens) + uint64(summaryCompletionTokens)),
+			PromptTokens:     clampToUint32(summaryPrompt),
+			CompletionTokens: clampToUint32(summaryCompletion),
+			TotalTokens:      clampToUint32(summaryPrompt + summaryCompletion),
 			Breakdown: map[string]int64{
-				"summary_prompt_tokens":     int64(summaryPromptTokens),
-				"summary_completion_tokens": int64(summaryCompletionTokens),
+				"summary_prompt_tokens":     int64(summaryPrompt),
+				"summary_completion_tokens": int64(summaryCompletion),
 			},
 			PromptTokensEstimatedCost:     costPointer(promptCost, custom),
 			CompletionTokensEstimatedCost: costPointer(completionCost, custom),
@@ -253,6 +257,30 @@ func (m *ArtifactModel) buildAIAgentSessionUsages(telemetry *redisservice.AIAgen
 	}
 
 	return usages
+}
+
+// summaryTokensIncludingRolling combines the tokens of the end-of-session
+// synthesis with the ones the background rolling summaries spent.
+func summaryTokensIncludingRolling(telemetry *redisservice.AIAgentSessionTelemetry, summaryPromptTokens, summaryCompletionTokens uint32) (prompt, completion uint64) {
+	prompt, completion = uint64(summaryPromptTokens), uint64(summaryCompletionTokens)
+	if telemetry != nil {
+		prompt += telemetry.SummaryInputTokens
+		completion += telemetry.SummaryOutputTokens
+	}
+	return prompt, completion
+}
+
+// aiAgentSummaryModel names the model the summary tokens are priced at: the one
+// that synthesized the summary, else the configured one, because a session whose
+// only summaries were the rolling ones still has to be priced.
+func (m *ArtifactModel) aiAgentSummaryModel(summarizeModel string, log *logrus.Entry) string {
+	if model := strings.TrimSpace(summarizeModel); model != "" {
+		return model
+	}
+	if model := m.aiAgentServiceOption(aiAgentSummarizePricingKey, log); model != "" {
+		return model
+	}
+	return "default"
 }
 
 // Pricing keys of the ai_agent service. Like the options of the same name, every
@@ -313,17 +341,21 @@ func (m *ArtifactModel) buildAIAgentUsageMetadata(telemetry *redisservice.AIAgen
 	realtimeModel := m.aiAgentRealtimeModel(log)
 	delegationModel := m.aiAgentDelegationModel(log)
 
-	totalPrompt := session.input + delegation.input + uint64(summaryPromptTokens)
-	totalCompletion := session.output + delegation.output + uint64(summaryCompletionTokens)
+	// The rolling summaries of the session count towards the same summary role as
+	// the end-of-session synthesis.
+	summaryPrompt, summaryCompletion := summaryTokensIncludingRolling(telemetry, summaryPromptTokens, summaryCompletionTokens)
+	totalPrompt := session.input + delegation.input + summaryPrompt
+	totalCompletion := session.output + delegation.output + summaryCompletion
 
 	var promptCost, completionCost, totalCost float64
 	if !custom {
+		summaryModel := m.aiAgentSummaryModel(summarizeModel, log)
 		sessionPromptCost, sessionCompletionCost := m.estimateModalitiesTokenCost(session.modalities(), log, aiAgentRealtimePricingKey, realtimeModel)
 		delegationPromptCost, delegationCompletionCost := m.estimateModalitiesTokenCost(delegation.modalities(), log, aiAgentDelegationPricingKey, delegationModel)
 		promptCost = sessionPromptCost + delegationPromptCost +
-			m.estimateTokensCost(insights.ServiceTypeAIAgent, uint64(summaryPromptTokens), true, log, aiAgentSummarizePricingKey, summarizeModel)
+			m.estimateTokensCost(insights.ServiceTypeAIAgent, summaryPrompt, true, log, aiAgentSummarizePricingKey, summaryModel)
 		completionCost = sessionCompletionCost + delegationCompletionCost +
-			m.estimateTokensCost(insights.ServiceTypeAIAgent, uint64(summaryCompletionTokens), false, log, aiAgentSummarizePricingKey, summarizeModel)
+			m.estimateTokensCost(insights.ServiceTypeAIAgent, summaryCompletion, false, log, aiAgentSummarizePricingKey, summaryModel)
 
 		var audioCost float64
 		if session.input == 0 && session.output == 0 && audioMillis > 0 {
@@ -341,8 +373,8 @@ func (m *ArtifactModel) buildAIAgentUsageMetadata(telemetry *redisservice.AIAgen
 	}
 	for key, value := range map[string]uint64{
 		"audio_millis":              audioMillis,
-		"summary_prompt_tokens":     uint64(summaryPromptTokens),
-		"summary_completion_tokens": uint64(summaryCompletionTokens),
+		"summary_prompt_tokens":     summaryPrompt,
+		"summary_completion_tokens": summaryCompletion,
 	} {
 		if value > 0 {
 			breakdown[key] = int64(value)

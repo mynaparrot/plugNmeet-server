@@ -667,6 +667,154 @@ func TestRealtimeAgentSessionSendToolResult(t *testing.T) {
 	}
 }
 
+func realtimeToolCallEvent(callID, name string) realtime.RealtimeServerEventUnion {
+	return realtime.RealtimeServerEventUnion{
+		Type: "response.function_call_arguments.done",
+		OfResponseFunctionCallArgumentsDoneEvent: realtime.ResponseFunctionCallArgumentsDoneEvent{
+			CallID:    callID,
+			Name:      name,
+			Arguments: `{"a":1}`,
+		},
+	}
+}
+
+// A response may call several tools at once: response.create must wait until the
+// last function_call_output is on the wire, and context that arrives in between
+// must not jump the queue.
+func TestRealtimeAgentSessionMultipleToolCallsWaitForAllOutputs(t *testing.T) {
+	conn := &fakeRealtimeAgentConn{}
+	s := newRealtimeAgentSession(conn, nil)
+
+	if !s.handleServerMessage(realtimeToolCallEvent("call_1", "whiteboard_manage_board")) {
+		t.Fatal("the read loop must keep running")
+	}
+	s.handleServerMessage(realtimeToolCallEvent("call_2", "whiteboard_write_content"))
+	if events := drainRealtimeEvents(t, s.Events()); len(events) != 0 {
+		t.Fatalf("tool calls must wait for response.done: %+v", events)
+	}
+
+	s.handleServerMessage(realtime.RealtimeServerEventUnion{
+		Type: "response.done",
+		OfResponseDoneEvent: realtime.ResponseDoneEvent{Response: realtime.RealtimeResponse{
+			Status: realtime.RealtimeResponseStatusCompleted,
+			Output: []realtime.ConversationItemUnion{{Type: "function_call"}},
+		}},
+	})
+
+	events := drainRealtimeEvents(t, s.Events())
+	if len(events) != 2 || events[0].CallID != "call_1" || events[1].CallID != "call_2" {
+		t.Fatalf("both tool calls of the response must be released together: %+v", events)
+	}
+
+	// The first tool finished while the second one still runs.
+	if err := s.SendToolResult("call_1", "whiteboard_manage_board", `{"ok":true}`, false); err != nil {
+		t.Fatalf("SendToolResult: %v", err)
+	}
+	sent := conn.sentEvents()
+	if len(sent) != 1 {
+		t.Fatalf("an unanswered sibling call must withhold response.create: %+v", sent)
+	}
+	if callID := sent[0].OfConversationItemCreate.Item.OfFunctionCallOutput.CallID; callID != "call_1" {
+		t.Fatalf("unexpected function call output: %+v", sent[0])
+	}
+
+	// Whiteboard context that arrives while the second tool runs waits too.
+	if err := s.SendContextText("user", "the board now shows x=42", false); err != nil {
+		t.Fatalf("SendContextText: %v", err)
+	}
+	if err := s.SendImage("image/webp", []byte("img"), "the board"); err != nil {
+		t.Fatalf("SendImage: %v", err)
+	}
+	if sent = conn.sentEvents(); len(sent) != 1 {
+		t.Fatalf("context must wait for the pending tool output: %+v", sent)
+	}
+
+	if err := s.SendToolResult("call_2", "whiteboard_write_content", `{"ok":true}`, false); err != nil {
+		t.Fatalf("SendToolResult: %v", err)
+	}
+	sent = conn.sentEvents()
+	if len(sent) != 5 {
+		t.Fatalf("expected the second output, both deferred events and response.create: %+v", sent)
+	}
+	if callID := sent[1].OfConversationItemCreate.Item.OfFunctionCallOutput.CallID; callID != "call_2" {
+		t.Fatalf("unexpected second function call output: %+v", sent[1])
+	}
+	if sent[2].OfConversationItemCreate == nil || sent[3].OfConversationItemCreate == nil {
+		t.Fatalf("deferred context must follow the last output: %+v", sent)
+	}
+	if sent[4].OfResponseCreate == nil {
+		t.Fatalf("response.create must stay last: %+v", sent[4])
+	}
+}
+
+// Deferred context that asked for a response already carries its own
+// response.create, so the tool result must not add a second one.
+func TestRealtimeAgentSessionDeferredContextTriggersResponseOnce(t *testing.T) {
+	conn := &fakeRealtimeAgentConn{}
+	s := newRealtimeAgentSession(conn, nil)
+
+	s.handleServerMessage(realtimeToolCallEvent("call_1", "whiteboard_capture_snapshot"))
+	s.handleServerMessage(realtime.RealtimeServerEventUnion{
+		Type: "response.done",
+		OfResponseDoneEvent: realtime.ResponseDoneEvent{Response: realtime.RealtimeResponse{
+			Status: realtime.RealtimeResponseStatusCompleted,
+			Output: []realtime.ConversationItemUnion{{Type: "function_call"}},
+		}},
+	})
+	drainRealtimeEvents(t, s.Events())
+
+	if err := s.SendContextText("user", "read the board out loud", true); err != nil {
+		t.Fatalf("SendContextText: %v", err)
+	}
+	if err := s.SendToolResult("call_1", "whiteboard_capture_snapshot", `{"ok":true}`, false); err != nil {
+		t.Fatalf("SendToolResult: %v", err)
+	}
+
+	sent := conn.sentEvents()
+	if len(sent) != 3 {
+		t.Fatalf("expected the output, the deferred item and its response.create: %+v", sent)
+	}
+	if sent[1].OfConversationItemCreate == nil || sent[2].OfResponseCreate == nil {
+		t.Fatalf("unexpected order: %+v", sent)
+	}
+}
+
+// A failed response abandons its tool turn, so a later tool result must not be
+// blocked by calls that can never be answered.
+func TestRealtimeAgentSessionFailedResponseResetsToolTurn(t *testing.T) {
+	conn := &fakeRealtimeAgentConn{}
+	s := newRealtimeAgentSession(conn, nil)
+
+	s.handleServerMessage(realtimeToolCallEvent("call_1", "whiteboard_manage_board"))
+	s.handleServerMessage(realtime.RealtimeServerEventUnion{
+		Type: "response.done",
+		OfResponseDoneEvent: realtime.ResponseDoneEvent{Response: realtime.RealtimeResponse{
+			Status: realtime.RealtimeResponseStatusCompleted,
+			Output: []realtime.ConversationItemUnion{{Type: "function_call"}},
+		}},
+	})
+	drainRealtimeEvents(t, s.Events())
+
+	if err := s.SendContextText("user", "the board is open", false); err != nil {
+		t.Fatalf("SendContextText: %v", err)
+	}
+	s.handleServerMessage(realtime.RealtimeServerEventUnion{
+		Type: "response.done",
+		OfResponseDoneEvent: realtime.ResponseDoneEvent{Response: realtime.RealtimeResponse{
+			Status: realtime.RealtimeResponseStatusFailed,
+		}},
+	})
+	drainRealtimeEvents(t, s.Events())
+
+	if err := s.SendToolResult("call_1", "whiteboard_manage_board", `{"ok":true}`, false); err != nil {
+		t.Fatalf("SendToolResult: %v", err)
+	}
+	events := conn.sentEvents()
+	if len(events) != 2 || events[1].OfResponseCreate == nil {
+		t.Fatalf("a dropped tool turn must not block the next result: %+v", events)
+	}
+}
+
 func TestRealtimeAgentSessionInterrupt(t *testing.T) {
 	conn := &fakeRealtimeAgentConn{}
 	s := newRealtimeAgentSession(conn, nil)
@@ -741,6 +889,24 @@ func TestRealtimeAgentSessionReadLoop(t *testing.T) {
 
 	if err := s.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
+	}
+}
+
+// A goroutine that emits after the read loop closed the stream must not panic.
+func TestRealtimeAgentSessionEmitAfterClose(t *testing.T) {
+	conn := &fakeRealtimeAgentConn{block: make(chan struct{})}
+	s := newRealtimeAgentSession(conn, nil)
+	s.wg.Add(1)
+	go s.readLoop()
+
+	if err := s.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	for range s.Events() {
+	}
+
+	if s.emit(insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete}) {
+		t.Fatal("emit after close must report the closed stream")
 	}
 }
 

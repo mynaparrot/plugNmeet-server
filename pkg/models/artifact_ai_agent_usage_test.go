@@ -937,3 +937,67 @@ func TestBuildAIAgentUsageCachedPromptTokens(t *testing.T) {
 		}
 	})
 }
+
+// TestBuildAIAgentSessionUsagesIncludesRollingSummaryTokens locks in that the
+// tokens of the mid-session rolling summaries and the end-of-session synthesis
+// share one summary entry and one model rate.
+func TestBuildAIAgentSessionUsagesIncludesRollingSummaryTokens(t *testing.T) {
+	log := testLogger()
+	m := newPricedArtifactModel()
+	telemetry := &redisservice.AIAgentSessionTelemetry{
+		InputTokens:         1000,
+		OutputTokens:        500,
+		SummaryInputTokens:  2000,
+		SummaryOutputTokens: 400,
+	}
+
+	// Only background rolling summaries ran, so no model name was decided here.
+	usages := m.buildAIAgentSessionUsages(telemetry, 0, 0, "", log)
+	summary := usages[aiAgentUsageKeySummary]
+	if summary == nil {
+		t.Fatalf("the summary entry is missing: %v", usages)
+	}
+	if summary.GetPromptTokens() != 2000 || summary.GetCompletionTokens() != 400 || summary.GetTotalTokens() != 2400 {
+		t.Errorf("summary tokens = (%d, %d, %d), want (2000, 400, 2400)",
+			summary.GetPromptTokens(), summary.GetCompletionTokens(), summary.GetTotalTokens())
+	}
+	if got := summary.GetBreakdown()["summary_prompt_tokens"]; got != 2000 {
+		t.Errorf("summary_prompt_tokens = %d, want 2000", got)
+	}
+	// 2000/1M*1 and 400/1M*3 at the summarize rate of the configured pricing.
+	if !floatEquals(summary.GetPromptTokensEstimatedCost(), 0.002) {
+		t.Errorf("summary prompt cost = %v, want 0.002", summary.GetPromptTokensEstimatedCost())
+	}
+	if !floatEquals(summary.GetCompletionTokensEstimatedCost(), 0.0012) {
+		t.Errorf("summary completion cost = %v, want 0.0012", summary.GetCompletionTokensEstimatedCost())
+	}
+
+	// The end-of-session synthesis adds to the same entry.
+	usages = m.buildAIAgentSessionUsages(telemetry, 200, 100, "summary-model", log)
+	summary = usages[aiAgentUsageKeySummary]
+	if summary.GetPromptTokens() != 2200 || summary.GetCompletionTokens() != 500 || summary.GetTotalTokens() != 2700 {
+		t.Errorf("summary tokens = (%d, %d, %d), want (2200, 500, 2700)",
+			summary.GetPromptTokens(), summary.GetCompletionTokens(), summary.GetTotalTokens())
+	}
+
+	// The metadata total counts both parts at the same rate.
+	usage := m.buildAIAgentUsageMetadata(telemetry, 200, 100, "summary-model", nil, log).GetTokenUsage()
+	if usage.GetPromptTokens() != 3200 || usage.GetCompletionTokens() != 1000 {
+		t.Errorf("metadata tokens = (%d, %d), want (3200, 1000)",
+			usage.GetPromptTokens(), usage.GetCompletionTokens())
+	}
+	if got := usage.GetBreakdown()["summary_prompt_tokens"]; got != 2200 {
+		t.Errorf("summary_prompt_tokens = %d, want 2200", got)
+	}
+	if got := usage.GetBreakdown()["summary_completion_tokens"]; got != 500 {
+		t.Errorf("summary_completion_tokens = %d, want 500", got)
+	}
+	// 1000/1M*2 (session) + 2200/1M*1 (summary)
+	if !floatEquals(usage.GetPromptTokensEstimatedCost(), 0.0042) {
+		t.Errorf("prompt cost = %v, want 0.0042", usage.GetPromptTokensEstimatedCost())
+	}
+	// 500/1M*4 (session) + 500/1M*3 (summary)
+	if !floatEquals(usage.GetCompletionTokensEstimatedCost(), 0.0035) {
+		t.Errorf("completion cost = %v, want 0.0035", usage.GetCompletionTokensEstimatedCost())
+	}
+}
