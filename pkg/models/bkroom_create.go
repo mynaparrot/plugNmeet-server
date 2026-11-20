@@ -247,6 +247,14 @@ func (m *BreakoutRoomModel) CreateBreakoutRooms(userCtx context.Context, r *plug
 			prepareAIAgentBreakoutChild(parentAiFeatures, meta, room.Users[0].Id, r.GetAiAgentContext(), room.GetAiAgentContext())
 		}
 		bRoom.Metadata = meta
+		// The child inherits the parent's server-side AI agent configuration
+		// before the room is created: the normal create path only keeps keys that
+		// came from the metadata, and the metadata deliberately carries none of
+		// them. One MGet + one pipeline clone the provider credentials, the
+		// external MCP servers and their warmed tools to the child room.
+		if r.EnableAiAgent {
+			m.rs.CopyAIAgentRoomConfig(userCtx, r.RoomId, bRoom.RoomId, aiAgentCustomProviderTTL(parentAiFeatures.GetMaxSessionSeconds()))
+		}
 		// Step 6: capture the returned roomSid so it flows into the Redis hash,
 		// the create response, and downstream listRooms/myRooms consumers.
 		_, ari, err := m.rm.CreateRoom(userCtx, bRoom)

@@ -123,6 +123,8 @@ func (a *AIAgent) TelemetrySnapshot(endReason string) redisservice.AIAgentSessio
 		AudioMillis: state.audioMillis,
 		ToolsUsed:   toolsUsed,
 		Transcript:  transcript,
+
+		CustomProvider: a.customProvider,
 	}
 }
 

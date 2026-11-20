@@ -76,7 +76,7 @@ func (m *AIAgentModel) FinalizeSession(ctx context.Context, roomTableId uint64, 
 	applyAIAgentSessionLearner(summary, learner)
 
 	var promptTokens, completionTokens uint32
-	summarizeModel := m.synthesizeSessionSummary(cleanupCtx, summary, telemetry, &promptTokens, &completionTokens, log)
+	summarizeModel := m.synthesizeSessionSummary(cleanupCtx, roomId, summary, telemetry, &promptTokens, &completionTokens, log)
 
 	if m.artifactModel != nil && roomTableId > 0 {
 		if _, err := m.artifactModel.CreateAIAgentSessionSummaryArtifact(roomTableId, roomId, roomSid, summary, telemetry, promptTokens, completionTokens, summarizeModel, m.logger); err != nil {
@@ -294,18 +294,18 @@ func mergeAIAgentUserInfo(dst, src *plugnmeet.RoomArtifactUserInfo) {
 
 // synthesizeSessionSummary lets the configured model refine the deterministic
 // summary; the returned model name is the one that produced the summary.
-func (m *AIAgentModel) synthesizeSessionSummary(ctx context.Context, summary *plugnmeet.AIAgentSessionSummary, telemetry *redisservice.AIAgentSessionTelemetry, promptTokens, completionTokens *uint32, log *logrus.Entry) string {
-	if summary == nil || m.appConfig == nil || m.appConfig.Insights == nil {
-		return ""
-	}
-	summarizeModel := resolveAIAgentSummarizeModel(m.appConfig.Insights)
-	if summarizeModel == "" {
+func (m *AIAgentModel) synthesizeSessionSummary(ctx context.Context, roomId string, summary *plugnmeet.AIAgentSessionSummary, telemetry *redisservice.AIAgentSessionTelemetry, promptTokens, completionTokens *uint32, log *logrus.Entry) string {
+	if summary == nil {
 		return ""
 	}
 
-	account, serviceCfg, err := m.appConfig.Insights.GetProviderAccountForService(insights.ServiceTypeAIAgent)
+	account, serviceCfg, _, err := m.resolveAIAgentProvider(ctx, roomId)
 	if err != nil || account == nil {
 		log.WithError(err).Debug("no provider account for the ai agent summary")
+		return ""
+	}
+	summarizeModel := m.aiAgentSummarizeModel(serviceCfg)
+	if summarizeModel == "" {
 		return ""
 	}
 	provider, err := insightsservice.NewProvider(&insightsservice.ProviderArgs{
@@ -749,6 +749,22 @@ func normalizeParticipationLevel(level string) string {
 		return level
 	}
 	return ""
+}
+
+// aiAgentSummarizeModel returns the text model that refines the session summary.
+// The room's resolved provider comes first, so a room with its own provider never
+// falls back to a server model of another provider.
+func (m *AIAgentModel) aiAgentSummarizeModel(serviceCfg *config.ServiceConfig) string {
+	if serviceCfg != nil {
+		if model := strings.TrimSpace(serviceCfg.GetOptionsString("summarize_model", "")); model != "" {
+			return model
+		}
+	}
+	if m.appConfig == nil {
+		return ""
+	}
+
+	return resolveAIAgentSummarizeModel(m.appConfig.Insights)
 }
 
 // resolveAIAgentSummarizeModel returns the text model used to refine the session

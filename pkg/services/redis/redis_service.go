@@ -72,3 +72,13 @@ func (s *RedisService) ScanKeys(pattern string) ([]string, error) {
 	}
 	return allKeys, nil
 }
+
+// resolveTTL returns the TTL a write should use: the caller's value when it is
+// positive, otherwise the configured default. It keeps every key of the service
+// expiring, as a zero TTL would make the key permanent.
+func (s *RedisService) resolveTTL(ttl time.Duration) time.Duration {
+	if ttl <= 0 {
+		return s.defaultTTL
+	}
+	return ttl
+}

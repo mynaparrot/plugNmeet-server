@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -78,7 +79,38 @@ const (
 	agentMCPMaxURLChars         = 1024
 	agentMCPMaxAllowedTools     = 8
 	agentMCPMaxAllowedToolChars = 128
+
+	// Shape limits of the host-supplied custom provider (BYOK/BYOP).
+	aiAgentCustomProviderGoogle      = "google"
+	aiAgentCustomProviderOpenAI      = "openai"
+	aiAgentCustomProviderMaxProvider = 32
+	aiAgentCustomProviderMaxAPIKey   = 512
+	aiAgentCustomProviderMaxEndpoint = 512
+	aiAgentCustomProviderMaxHeader   = 128
+	aiAgentCustomProviderMaxModel    = 128
+
+	// Model defaults of a custom provider, used when the host set no override
+	// and the server config has no ai_agent service for the same provider.
+	aiAgentCustomGoogleLiveModel = "gemini-3.1-flash-live-preview"
+	aiAgentCustomGoogleTextModel = "gemini-3.1-flash-lite-preview"
+	aiAgentCustomOpenAILiveModel = "gpt-realtime-1.5"
+	aiAgentCustomOpenAITextModel = "gpt-5.4-mini"
 )
+
+// aiAgentForbiddenAuthHeaders are the headers a custom provider key must never be
+// injected into: request-shaping and hop-by-hop headers belong to the transport.
+var aiAgentForbiddenAuthHeaders = map[string]struct{}{
+	"host":              {},
+	"content-length":    {},
+	"transfer-encoding": {},
+	"connection":        {},
+	"upgrade":           {},
+	"cookie":            {},
+	"keep-alive":        {},
+	"te":                {},
+	"trailer":           {},
+	"proxy-connection":  {},
+}
 
 // Client API routes are submitted by the Admin's browser through the
 // client_api_submit tool so that the request is validated by the auth router.
@@ -216,9 +248,6 @@ func (s userClientRPCSender) CallClientTool(ctx context.Context, call mcp.ToolCa
 // uses to reach targetUserID's browser, e.g. the administrator who runs an AI
 // text chat session.
 func (m *AIAgentModel) NewUserClientRPCSender(targetUserID string) mcp.ClientRPCSender {
-	if m == nil {
-		return nil
-	}
 	return userClientRPCSender{model: m, targetUserID: targetUserID}
 }
 
@@ -285,13 +314,8 @@ func (m *AIAgentModel) CallClientToolForUser(ctx context.Context, targetUserID s
 	}
 }
 
-// sendClientToolCall delivers the call to the participant's browser. A model
-// without a NATS service (unit tests, a partially wired server) has no
-// transport, so nothing is delivered.
+// sendClientToolCall delivers the call to the participant's browser.
 func (m *AIAgentModel) sendClientToolCall(roomId, targetUserID string, msg *plugnmeet.AIAgentToolCallMsg) error {
-	if m.natsService == nil {
-		return nil
-	}
 	return m.natsService.SendAIAgentToolCallToUser(roomId, targetUserID, msg)
 }
 
@@ -473,6 +497,7 @@ func NormalizeAIAgentFeatures(f *plugnmeet.InsightsAIAgentFeatures) *plugnmeet.I
 	}
 
 	out.McpServers = NormalizeExternalMCPServers(out.GetMcpServers())
+	out.CustomProvider = NormalizeAIAgentCustomProvider(out.GetCustomProvider())
 
 	// the session routing config is host input, the rest is runtime state. Only
 	// the fields of the selected mode survive, so a room that switched modes
@@ -659,9 +684,132 @@ func NormalizeExternalMCPServers(servers map[string]*plugnmeet.ExternalMCPServer
 	return out
 }
 
+// NormalizeAIAgentCustomProvider trims the host-supplied provider credentials to
+// their documented shape. An optional field left empty is dropped so the server
+// defaults apply, and every secret is capped before it reaches Redis.
+func NormalizeAIAgentCustomProvider(in *plugnmeet.InsightsAIAgentCustomProvider) *plugnmeet.InsightsAIAgentCustomProvider {
+	if in == nil {
+		return nil
+	}
+
+	out := proto.Clone(in).(*plugnmeet.InsightsAIAgentCustomProvider)
+	out.Provider = truncate(strings.ToLower(strings.TrimSpace(out.GetProvider())), aiAgentCustomProviderMaxProvider)
+	out.ApiKey = truncate(strings.TrimSpace(out.GetApiKey()), aiAgentCustomProviderMaxAPIKey)
+	out.Endpoint = optionalTrimmedString(out.GetEndpoint(), aiAgentCustomProviderMaxEndpoint)
+	out.AuthHeader = optionalTrimmedString(out.GetAuthHeader(), aiAgentCustomProviderMaxHeader)
+	out.RealtimeModel = optionalTrimmedString(out.GetRealtimeModel(), aiAgentCustomProviderMaxModel)
+	out.DelegationModel = optionalTrimmedString(out.GetDelegationModel(), aiAgentCustomProviderMaxModel)
+	out.SummarizeModel = optionalTrimmedString(out.GetSummarizeModel(), aiAgentCustomProviderMaxModel)
+
+	return out
+}
+
+// optionalTrimmedString trims and caps an optional string, and returns nil when
+// nothing is left so the proto field is omitted instead of sent empty.
+func optionalTrimmedString(value string, max int) *string {
+	value = truncate(strings.TrimSpace(value), max)
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
+// validateAIAgentCustomProvider enforces what a usable custom provider needs: a
+// known provider, a clean API key, a safe gateway endpoint, a header name the
+// key may travel in, and a delegation model for a gpt-live realtime model, which
+// cannot answer a turn on its own.
+func validateAIAgentCustomProvider(cp *plugnmeet.InsightsAIAgentCustomProvider) error {
+	provider := strings.ToLower(strings.TrimSpace(cp.GetProvider()))
+	switch provider {
+	case aiAgentCustomProviderGoogle, aiAgentCustomProviderOpenAI:
+	default:
+		return config.ErrAIAgentInvalidRequest
+	}
+
+	apiKey := strings.TrimSpace(cp.GetApiKey())
+	if apiKey == "" || strings.ContainsAny(apiKey, "\r\n") {
+		return config.ErrAIAgentInvalidRequest
+	}
+
+	if endpoint := strings.TrimSpace(cp.GetEndpoint()); endpoint != "" && !isAllowedAgentCustomProviderEndpoint(endpoint) {
+		return config.ErrAIAgentInvalidRequest
+	}
+	if header := strings.TrimSpace(cp.GetAuthHeader()); header != "" && !isAllowedAgentCustomProviderAuthHeader(header) {
+		return config.ErrAIAgentInvalidRequest
+	}
+
+	// A gpt-live session delegates every text turn to another model. The
+	// ephemeral service config always carries the provider's default delegation
+	// model, so nothing is missing unless the host overrode every source of one.
+	if provider == aiAgentCustomProviderOpenAI &&
+		strings.HasPrefix(strings.ToLower(strings.TrimSpace(cp.GetRealtimeModel())), "gpt-live") &&
+		strings.TrimSpace(cp.GetDelegationModel()) == "" &&
+		strings.TrimSpace(aiAgentCustomProviderModelDefaults(config.ProviderOpenAI)["delegation_model"]) == "" {
+		return config.ErrAIAgentInvalidRequest
+	}
+
+	return nil
+}
+
+// isAllowedAgentCustomProviderEndpoint checks the shape of a custom gateway
+// endpoint: https, no credentials, no query and no fragment, a valid port, and no
+// obviously internal IP literal. Like the external MCP endpoints, the DNS lookup
+// is left to the dialer so creating a room never waits on a resolver.
+func isAllowedAgentCustomProviderEndpoint(raw string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || parsed.Scheme != "https" || parsed.User != nil || parsed.Fragment != "" || parsed.RawQuery != "" {
+		return false
+	}
+	host := parsed.Hostname()
+	if host == "" {
+		return false
+	}
+	if port := parsed.Port(); port != "" {
+		value, err := strconv.Atoi(port)
+		if err != nil || value < 1 || value > 65535 {
+			return false
+		}
+	}
+	if ip := net.ParseIP(host); ip != nil && mcp.IsBlockedExternalIP(ip) {
+		return false
+	}
+
+	return true
+}
+
+// isAllowedAgentCustomProviderAuthHeader accepts a plain HTTP header token name
+// that may carry the API key. Pseudo headers and the request-shaping or
+// hop-by-hop headers a transport owns are refused.
+func isAllowedAgentCustomProviderAuthHeader(header string) bool {
+	if header == "" || len(header) > aiAgentCustomProviderMaxHeader {
+		return false
+	}
+	for i := 0; i < len(header); i++ {
+		c := header[i]
+		switch {
+		case c >= 'A' && c <= 'Z', c >= 'a' && c <= 'z', c >= '0' && c <= '9', c == '-', c == '_':
+		default:
+			return false
+		}
+	}
+	if _, forbidden := aiAgentForbiddenAuthHeaders[strings.ToLower(header)]; forbidden {
+		return false
+	}
+
+	return true
+}
+
 // ValidateAIAgentFeatures enforces the activation rules that must hold both when
 // a room is created and when the agent is started manually.
 func (m *AIAgentModel) ValidateAIAgentFeatures(f *plugnmeet.InsightsAIAgentFeatures, e2ee *plugnmeet.EndToEndEncryptionFeatures, insightsAllowed bool) error {
+	return m.validateAIAgentFeatures(f, e2ee, insightsAllowed, false)
+}
+
+// validateAIAgentFeatures is the shared validator of a room's agent features.
+// hasRoomProvider reports that the room manages its own provider server-side,
+// which is always the case at start time: the credentials are stripped from the
+// metadata during room creation, so they can never be part of f.
+func (m *AIAgentModel) validateAIAgentFeatures(f *plugnmeet.InsightsAIAgentFeatures, e2ee *plugnmeet.EndToEndEncryptionFeatures, insightsAllowed, hasRoomProvider bool) error {
 	if f == nil || !f.GetIsAllow() {
 		return config.ErrAIAgentNotAllowed
 	}
@@ -679,8 +827,19 @@ func (m *AIAgentModel) ValidateAIAgentFeatures(f *plugnmeet.InsightsAIAgentFeatu
 	if strings.TrimSpace(f.GetTopic()) == "" {
 		return config.ErrAIAgentTopicRequired
 	}
-	if _, _, err := m.appConfig.Insights.GetProviderAccountForService(insights.ServiceTypeAIAgent); err != nil {
-		return config.ErrAIAgentProviderMissing
+	// a room that brings its own provider does not need the server-configured
+	// ai_agent service at all
+	if cp := f.GetCustomProvider(); cp != nil {
+		if err := validateAIAgentCustomProvider(cp); err != nil {
+			return err
+		}
+	} else if !hasRoomProvider {
+		if m.appConfig.Insights == nil {
+			return config.ErrAIAgentProviderMissing
+		}
+		if _, _, err := m.appConfig.Insights.GetProviderAccountForService(insights.ServiceTypeAIAgent); err != nil {
+			return config.ErrAIAgentProviderMissing
+		}
 	}
 	if err := ValidateExternalMCPServers(f.GetMcpServers()); err != nil {
 		return err
@@ -846,9 +1005,6 @@ func sortedMCPServerKeys(servers map[string]*plugnmeet.ExternalMCPServerConfig) 
 // before the metadata is published. The optional text chat features carry the
 // servers of the AI text chat, which share the room's server budget.
 func (m *AIAgentModel) PrepareRoomExternalMCP(ctx context.Context, roomId string, agentFeatures *plugnmeet.InsightsAIAgentFeatures, textChatFeatures ...*plugnmeet.InsightsAITextChatFeatures) {
-	if m == nil {
-		return
-	}
 	var chatFeatures *plugnmeet.InsightsAITextChatFeatures
 	if len(textChatFeatures) > 0 {
 		chatFeatures = textChatFeatures[0]
@@ -869,13 +1025,8 @@ func (m *AIAgentModel) PrepareRoomExternalMCP(ctx context.Context, roomId string
 
 	servers, err := MergeExternalMCPServers(agentServers, textChatServers)
 	if err != nil {
-		if m.logger != nil {
-			m.logger.WithError(err).WithField("room_id", roomId).Warn("external mcp servers were not warmed")
-		}
+		m.logger.WithError(err).WithField("room_id", roomId).Warn("external mcp servers were not warmed")
 		servers = nil
-	}
-	if m.redisService == nil {
-		return
 	}
 	if len(servers) == 0 {
 		// A room recreated without external servers must not inherit the state

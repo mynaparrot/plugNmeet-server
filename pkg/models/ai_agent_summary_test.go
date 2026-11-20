@@ -93,7 +93,7 @@ func newSummaryQuizPoll(t *testing.T, rs *redisservice.RedisService, rc redis.Un
 
 func TestCollectQuizEvaluation(t *testing.T) {
 	rc := newAIAgentTestRedis(t)
-	m := newAIAgentTestModel(rc)
+	m := newAIAgentTestModelWithNats(rc)
 	ctx := context.Background()
 
 	newSummaryQuizPoll(t, m.redisService, rc, "room-quiz", "poll-1", "2 + 2?",
@@ -344,7 +344,7 @@ func TestResolveAIAgentSummarizeModel(t *testing.T) {
 
 func TestFinalizeSession(t *testing.T) {
 	rc := newAIAgentTestRedis(t)
-	m := newAIAgentTestModel(rc)
+	m := newAIAgentTestModelWithNats(rc)
 	ctx := context.Background()
 
 	// A room where no agent ran has nothing to summarize.
@@ -419,7 +419,7 @@ func TestFinalizeSession(t *testing.T) {
 // the room before the summary is built.
 func TestAIAgentSessionLearnerTelemetry(t *testing.T) {
 	rc := newAIAgentTestRedis(t)
-	m := newAIAgentTestModel(rc)
+	m := newAIAgentTestModelWithNats(rc)
 	ctx := context.Background()
 
 	telemetry := &redisservice.AIAgentSessionTelemetry{
@@ -485,7 +485,7 @@ func TestAIAgentBreakoutUserId(t *testing.T) {
 // participant of a per-user session after their NATS entry is gone.
 func TestAIAgentBreakoutUserInfo(t *testing.T) {
 	rc := newAIAgentTestRedis(t)
-	m := newAIAgentTestModel(rc)
+	m := newAIAgentTestModelWithNats(rc)
 
 	room := &plugnmeet.BreakoutRoom{
 		Id:    "parent-room-learner-1",

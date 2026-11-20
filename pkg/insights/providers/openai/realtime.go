@@ -54,6 +54,12 @@ func newRealtimeClient(account *config.ProviderAccount, service *config.ServiceC
 	}, nil
 }
 
+// authHeader resolves the header that carries the API key for the websocket
+// handshake.
+func (c *realtimeClient) authHeader() string {
+	return resolveAuthHeader(c.account, c.service)
+}
+
 func (c *realtimeClient) CreateTranscription(mainCtx context.Context, roomId, userId string, opts *insights.TranscriptionOptions) (insights.TranscriptionStream, error) {
 	log := c.log.WithFields(logrus.Fields{
 		"method":     "CreateTranscription",
@@ -111,10 +117,8 @@ func (c *realtimeClient) createTranscriptionSession(wsURL string, stream *openai
 	stream.transcriptionMaxBufferedSilenceSamples = samplesForDuration(defaultRealtimeSampleRate, maxBufferedSilenceMs)
 	stream.transcriptionSpeechRMSThreshold = float64(speechRMS)
 
-	authHeader := c.service.GetOptionsString("realtime_auth_header", "Authorization")
-
 	header := http.Header{}
-	setOpenAIRealtimeHeaders(header, c.account.Credentials.APIKey, authHeader)
+	setOpenAIRealtimeHeaders(header, c.account.Credentials.APIKey, c.authHeader())
 
 	endpoint := strings.TrimSuffix(wsURL, "/") + "/realtime?intent=transcription"
 

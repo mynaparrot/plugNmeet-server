@@ -41,7 +41,7 @@ func (s *RedisService) SaveExternalMCPConfig(ctx context.Context, roomId string,
 	if err != nil {
 		return err
 	}
-	return s.rc.Set(ctx, aiAgentMCPConfigKey(roomId), string(encoded), ttl).Err()
+	return s.rc.Set(ctx, aiAgentMCPConfigKey(roomId), string(encoded), s.resolveTTL(ttl)).Err()
 }
 
 // LoadExternalMCPConfig returns the stored servers, or nil when the room has
@@ -67,7 +67,7 @@ func (s *RedisService) SaveExternalMCPTools(ctx context.Context, roomId string, 
 	if err != nil {
 		return err
 	}
-	return s.rc.Set(ctx, aiAgentMCPToolsKey(roomId), string(encoded), ttl).Err()
+	return s.rc.Set(ctx, aiAgentMCPToolsKey(roomId), string(encoded), s.resolveTTL(ttl)).Err()
 }
 
 // LoadExternalMCPTools returns the pre-warmed tools, or nil when the room has
@@ -128,7 +128,7 @@ func (s *RedisService) SaveExternalMCPCachedOutput(ctx context.Context, roomId, 
 	if err := s.rc.HSet(ctx, key, field, value).Err(); err != nil {
 		return
 	}
-	_ = s.rc.Expire(ctx, key, ttl).Err()
+	_ = s.rc.Expire(ctx, key, s.resolveTTL(ttl)).Err()
 }
 
 // CleanupRoomExternalMCP drops every external MCP key of a room, including the

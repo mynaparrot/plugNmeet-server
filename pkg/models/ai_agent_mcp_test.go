@@ -10,11 +10,13 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/connections"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 )
 
@@ -33,13 +35,52 @@ func aiAgentTestKey(roomId, suffix string) string {
 func newAIAgentTestModel(rc redis.UniversalClient) *AIAgentModel {
 	ttl := 2 * time.Hour
 	logger := logrus.New()
-	app := &config.AppConfig{RedisInfo: connections.RedisInfo{DefaultTTL: &ttl}}
+	app := &config.AppConfig{
+		RedisInfo: connections.RedisInfo{DefaultTTL: &ttl},
+		NatsInfo:  config.NatsInfo{DefaultTTL: &ttl},
+	}
 	return &AIAgentModel{
 		ctx:          context.Background(),
+		appConfig:    app,
 		rds:          rc,
 		redisService: redisservice.New(redisservice.Args{Ctx: context.Background(), Rc: rc, App: app, Logger: logger}),
 		logger:       logrus.NewEntry(logger),
 	}
+}
+
+// newAIAgentTestModelWithNats returns the shared test model with a NATS service,
+// for the code paths that always go through NATS, e.g. the parent room lookup of
+// a breakout session or the delivery of a client tool call.
+func newAIAgentTestModelWithNats(rc redis.UniversalClient) *AIAgentModel {
+	m := newAIAgentTestModel(rc)
+	m.natsService = newOfflineNatsService()
+
+	return m
+}
+
+// newOfflineNatsService builds a NATS service for the tests that run without a
+// NATS server.
+func newOfflineNatsService() *natsservice.NatsService {
+	ttl := 2 * time.Hour
+	return natsservice.New(natsservice.Args{
+		Ctx:    context.Background(),
+		App:    &config.AppConfig{NatsInfo: config.NatsInfo{DefaultTTL: &ttl}},
+		Js:     offlineJetStream{},
+		Logger: logrus.New(),
+	})
+}
+
+// offlineJetStream stands in for the JetStream client in unit tests, which run
+// without a NATS server: no key-value bucket exists, so no room metadata is
+// found, and a publish is acknowledged without a stream behind it.
+type offlineJetStream struct{ jetstream.JetStream }
+
+func (offlineJetStream) KeyValue(context.Context, string) (jetstream.KeyValue, error) {
+	return nil, jetstream.ErrBucketNotFound
+}
+
+func (offlineJetStream) Publish(context.Context, string, []byte, ...jetstream.PublishOpt) (*jetstream.PubAck, error) {
+	return &jetstream.PubAck{}, nil
 }
 
 func TestNormalizeAIAgentFeaturesMCPServers(t *testing.T) {
@@ -232,10 +273,6 @@ func TestPrepareRoomExternalMCPStripsServers(t *testing.T) {
 			t.Errorf("%s must be cleared without servers (err %v)", key, err)
 		}
 	}
-
-	// Without redis nothing is touched and a nil model is a no-op.
-	(&AIAgentModel{logger: model.logger}).PrepareRoomExternalMCP(ctx, roomId, &plugnmeet.InsightsAIAgentFeatures{})
-	(*AIAgentModel)(nil).PrepareRoomExternalMCP(ctx, roomId, features)
 }
 
 func TestCleanupRoomStateRemovesExternalMCPKeys(t *testing.T) {

@@ -38,10 +38,20 @@ func NewProvider(ctx context.Context, providerAccount *config.ProviderAccount, s
 	}
 	baseURL := providerAccount.GetOptionsString("endpoint", defaultBaseURL)
 
-	client := openAiSdk.NewClient(
+	clientOpts := []option.RequestOption{
 		option.WithAPIKey(providerAccount.Credentials.APIKey),
 		option.WithBaseURL(strings.TrimSuffix(baseURL, "/")),
-	)
+	}
+	// Self-hosted servers may expect the key in a custom header instead of a
+	// bearer token; apply it to REST calls as well as Realtime/Live sockets.
+	if authHeader := resolveAuthHeader(providerAccount, serviceConfig); !strings.EqualFold(authHeader, "Authorization") {
+		clientOpts = append(clientOpts,
+			option.WithHeaderDel("Authorization"),
+			option.WithHeader(authHeader, providerAccount.Credentials.APIKey),
+		)
+	}
+
+	client := openAiSdk.NewClient(clientOpts...)
 
 	return &OpenAIProvider{
 		account:      providerAccount,
@@ -107,8 +117,8 @@ func (p *OpenAIProvider) realtimeOption(opts *insights.RealtimeSessionOptions, k
 // bearer token.
 func (p *OpenAIProvider) realtimeRequestOptions() []option.RequestOption {
 	apiKey := p.account.Credentials.APIKey
-	authHeader := strings.TrimSpace(p.serviceOption("realtime_auth_header", "Authorization"))
-	if authHeader == "" || strings.EqualFold(authHeader, "Authorization") {
+	authHeader := resolveAuthHeader(p.account, p.service)
+	if strings.EqualFold(authHeader, "Authorization") {
 		return []option.RequestOption{option.WithHeader("Authorization", "Bearer "+apiKey)}
 	}
 
@@ -116,6 +126,24 @@ func (p *OpenAIProvider) realtimeRequestOptions() []option.RequestOption {
 		option.WithHeaderDel("Authorization"),
 		option.WithHeader(authHeader, apiKey),
 	}
+}
+
+// resolveAuthHeader resolves the auth header used by REST and Realtime/Live
+// requests. The service-level realtime_auth_header wins over the account-level
+// auth_header; both default to Authorization.
+func resolveAuthHeader(account *config.ProviderAccount, service *config.ServiceConfig) string {
+	if service != nil {
+		if header := strings.TrimSpace(service.GetOptionsString("realtime_auth_header", "")); header != "" {
+			return header
+		}
+	}
+	if account != nil {
+		if header := strings.TrimSpace(account.GetOptionsString("auth_header", "")); header != "" {
+			return header
+		}
+	}
+
+	return "Authorization"
 }
 
 // CreateTranscription initializes a real-time transcription stream using OpenAI's realtime API.

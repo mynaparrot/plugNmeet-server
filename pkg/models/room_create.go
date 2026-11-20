@@ -86,7 +86,7 @@ func (m *RoomModel) CreateRoom(userCtx context.Context, r *plugnmeet.CreateRoomR
 	}
 
 	// an AI agent room is refused loudly instead of silently running without a boundary
-	if err := m.validateAIAgentFeatures(r, log); err != nil {
+	if err := m.validateAIAgentFeatures(userCtx, r, log); err != nil {
 		return plugnmeet.StatusCode_INVALID_PARAMETERS, nil, err
 	}
 
@@ -126,14 +126,23 @@ func (m *RoomModel) CreateRoom(userCtx context.Context, r *plugnmeet.CreateRoomR
 		}
 	}
 
+	// the host-supplied provider credentials and MCP endpoints stay in server-side Redis,
+	// so the broadcast metadata never carries them. A breakout room inherits both from its parent
+	// through a single Redis clone made right before its creation, so an empty inline configuration must not
+	// wipe the keys that were just copied for it.
+	insightsFeatures := r.GetMetadata().GetRoomFeatures().GetInsightsFeatures()
+	agentFeatures := insightsFeatures.GetAiAgentFeatures()
+	textChatFeatures := insightsFeatures.GetAiFeatures().GetAiTextChatFeatures()
+
+	if !r.Metadata.GetIsBreakoutRoom() || agentFeatures.GetCustomProvider() != nil {
+		m.aiAgentModel.PrepareRoomCustomProvider(userCtx, r.RoomId, agentFeatures)
+	}
+
 	// keep the external MCP endpoints and credentials out of the metadata that
 	// every participant receives, and pre-warm their tools for the session
-	m.aiAgentModel.PrepareRoomExternalMCP(
-		userCtx,
-		r.RoomId,
-		r.GetMetadata().GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures(),
-		r.GetMetadata().GetRoomFeatures().GetInsightsFeatures().GetAiFeatures().GetAiTextChatFeatures(),
-	)
+	if !r.Metadata.GetIsBreakoutRoom() || len(agentFeatures.GetMcpServers()) > 0 || len(textChatFeatures.GetMcpServers()) > 0 {
+		m.aiAgentModel.PrepareRoomExternalMCP(userCtx, r.RoomId, agentFeatures, textChatFeatures)
+	}
 
 	// now create room bucket
 	mt, err := m.natsService.AddRoom(roomDbInfo.ID, r.RoomId, sid, r.EmptyTimeout, r.MaxParticipants, r.Metadata)
@@ -349,17 +358,26 @@ func applyAIAgentSessionRoomFeatures(meta *plugnmeet.RoomMetadata) {
 // a missing prompt or topic, an unreadable E2EE key, an unusable session mode or
 // a missing provider. ValidateAIAgentFeatures also enforces the session mode,
 // which a breakout child with its single controlled participant passes.
-func (m *RoomModel) validateAIAgentFeatures(r *plugnmeet.CreateRoomReq, log *logrus.Entry) error {
+func (m *RoomModel) validateAIAgentFeatures(userCtx context.Context, r *plugnmeet.CreateRoomReq, log *logrus.Entry) error {
 	features := r.GetMetadata().GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()
 	if !features.GetIsAllow() {
 		return nil
 	}
 
-	if err := m.aiAgentModel.ValidateAIAgentFeatures(
-		features,
-		r.GetMetadata().GetRoomFeatures().GetEndToEndEncryptionFeatures(),
-		r.GetMetadata().GetRoomFeatures().GetInsightsFeatures().GetIsAllow(),
-	); err != nil {
+	e2ee := r.GetMetadata().GetRoomFeatures().GetEndToEndEncryptionFeatures()
+	insightsAllowed := r.GetMetadata().GetRoomFeatures().GetInsightsFeatures().GetIsAllow()
+
+	var err error
+	// A breakout room inherits the provider credentials and the external MCP
+	// servers of its parent through a Redis clone, never through the metadata, so
+	// it must be validated against the room-scoped configuration that was copied
+	// for it. Any other room is validated from the request itself.
+	if r.GetMetadata().GetIsBreakoutRoom() {
+		err = m.aiAgentModel.ValidateRoomAIAgentFeatures(userCtx, r.RoomId, features, e2ee, insightsAllowed)
+	} else {
+		err = m.aiAgentModel.ValidateAIAgentFeatures(features, e2ee, insightsAllowed)
+	}
+	if err != nil {
 		log.WithError(err).Warn("ai_agent_features was refused")
 		return err
 	}

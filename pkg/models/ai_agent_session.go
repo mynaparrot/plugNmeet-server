@@ -43,7 +43,10 @@ func (m *AIAgentModel) Start(ctx context.Context, roomId string, req *plugnmeet.
 
 	insightsFeatures := metadata.GetRoomFeatures().GetInsightsFeatures()
 	features := NormalizeAIAgentFeatures(insightsFeatures.GetAiAgentFeatures())
-	if err := m.ValidateAIAgentFeatures(features, metadata.GetRoomFeatures().GetEndToEndEncryptionFeatures(), insightsFeatures.GetIsAllow()); err != nil {
+	// A BYOK room stores its provider server-side, so the credentials are no
+	// longer part of the features: the room-aware validation must accept the
+	// stored provider in place of the server configuration.
+	if err := m.ValidateRoomAIAgentFeatures(ctx, roomId, features, metadata.GetRoomFeatures().GetEndToEndEncryptionFeatures(), insightsFeatures.GetIsAllow()); err != nil {
 		log.WithError(err).Warn("ai agent activation refused")
 		return err
 	}
@@ -74,8 +77,8 @@ func (m *AIAgentModel) Start(ctx context.Context, roomId string, req *plugnmeet.
 		log.WithError(err).Warn("room info is not available")
 		return config.ErrRoomNotFound
 	}
-	account, serviceConfig, err := m.appConfig.Insights.GetProviderAccountForService(insights.ServiceTypeAIAgent)
-	if err != nil {
+	account, serviceConfig, isCustomProvider, err := m.resolveAIAgentProvider(ctx, roomId)
+	if err != nil || account == nil {
 		log.WithError(err).Error("ai_agent service is not configured")
 		return config.ErrAIAgentProviderMissing
 	}
@@ -144,6 +147,14 @@ func (m *AIAgentModel) Start(ctx context.Context, roomId string, req *plugnmeet.
 		return config.ErrAIAgentGeneric
 	}
 
+	// A custom provider session carries the provider name into the telemetry, so
+	// the artifacts can break the usage down per provider; the platform provider
+	// stays unnamed.
+	customProvider := ""
+	if isCustomProvider {
+		customProvider = string(serviceConfig.Provider)
+	}
+
 	agent, err := insightsservice.NewAIAgent(&insightsservice.AIAgentArgs{
 		Ctx:             m.ctx,
 		AppConf:         m.appConfig,
@@ -154,6 +165,7 @@ func (m *AIAgentModel) Start(ctx context.Context, roomId string, req *plugnmeet.
 		RedisService:    m.redisService,
 		ServiceConfig:   serviceConfig,
 		ProviderAccount: account,
+		CustomProvider:  customProvider,
 		Logger:          log,
 		Payload:         payload,
 		Features:        features,

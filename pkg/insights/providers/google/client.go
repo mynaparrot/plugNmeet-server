@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
+	"strings"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
@@ -26,9 +28,14 @@ func NewProvider(ctx context.Context, providerAccount *config.ProviderAccount, s
 		return nil, fmt.Errorf("google provider requires api_key")
 	}
 
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+	clientConfig := &genai.ClientConfig{
 		APIKey: providerAccount.Credentials.APIKey,
-	})
+	}
+	if httpOptions := resolveHTTPOptions(providerAccount, serviceConfig); httpOptions != nil {
+		clientConfig.HTTPOptions = *httpOptions
+	}
+
+	client, err := genai.NewClient(ctx, clientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create genai client: %w", err)
 	}
@@ -37,6 +44,39 @@ func NewProvider(ctx context.Context, providerAccount *config.ProviderAccount, s
 		client: client,
 		logger: log,
 	}, nil
+}
+
+// resolveHTTPOptions builds the HTTP options for self-hosted or
+// OpenAI-compatible endpoints. It returns nil when neither an endpoint nor a
+// custom auth header is configured.
+func resolveHTTPOptions(providerAccount *config.ProviderAccount, serviceConfig *config.ServiceConfig) *genai.HTTPOptions {
+	endpoint := strings.TrimSpace(providerAccount.GetOptionsString("endpoint", ""))
+
+	serviceAuthHeader := ""
+	if serviceConfig != nil {
+		serviceAuthHeader = serviceConfig.GetOptionsString("realtime_auth_header", "")
+	}
+	authHeader := strings.TrimSpace(providerAccount.GetOptionsString("auth_header", serviceAuthHeader))
+
+	if endpoint == "" && authHeader == "" {
+		return nil
+	}
+
+	httpOptions := &genai.HTTPOptions{}
+	if endpoint != "" {
+		httpOptions.BaseURL = endpoint
+	}
+
+	if authHeader != "" {
+		httpOptions.Headers = http.Header{}
+		if strings.EqualFold(authHeader, "Authorization") {
+			httpOptions.Headers.Set("Authorization", "Bearer "+providerAccount.Credentials.APIKey)
+		} else {
+			httpOptions.Headers.Set(authHeader, providerAccount.Credentials.APIKey)
+		}
+	}
+
+	return httpOptions
 }
 
 // AITextChatStream delegates to the chat implementation.

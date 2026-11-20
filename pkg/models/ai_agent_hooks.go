@@ -104,8 +104,9 @@ func (m *AIAgentModel) OnRoomEnded(ctx context.Context, roomId string) {
 }
 
 // cleanupRoomState removes every room-scoped key of the agent, including the
-// external MCP configuration, the pre-warmed tools, the output cache and the
-// knowledge cache. The keys also carry a TTL as a safety net.
+// host-supplied provider credentials, the external MCP configuration, the
+// pre-warmed tools, the output cache and the knowledge cache. The keys also
+// carry a TTL as a safety net.
 func (m *AIAgentModel) cleanupRoomState(ctx context.Context, roomId string) {
 	_ = m.rds.Del(ctx,
 		aiAgentKey(roomId, aiAgentKeyState),
@@ -114,6 +115,11 @@ func (m *AIAgentModel) cleanupRoomState(ctx context.Context, roomId string) {
 	).Err()
 	if m.redisService != nil {
 		m.redisService.CleanupRoomExternalMCP(ctx, roomId)
+		// the room's own provider credentials are the most sensitive key of the
+		// room, so they are removed with the rest of its state
+		if err := m.redisService.DeleteAIAgentCustomProvider(ctx, roomId); err != nil {
+			m.logger.WithError(err).WithField("roomId", roomId).Debug("could not delete the custom ai provider configuration")
+		}
 	}
 }
 

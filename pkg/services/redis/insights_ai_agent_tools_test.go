@@ -56,8 +56,8 @@ func TestAIQuizMetadataRoundTrip(t *testing.T) {
 	if err != nil || !found || index != 2 || explanation != "went is irregular" {
 		t.Fatalf("metadata = (%d, %q, %v, %v)", index, explanation, found, err)
 	}
-	if left, err := rc.TTL(ctx, aiAgentQuizKey("room-quiz", "poll-1")).Result(); err != nil || left > AiAgentQuizMetadataTTL || left <= 0 {
-		t.Errorf("ttl = %s (err %v), want at most %s", left, err, AiAgentQuizMetadataTTL)
+	if left, err := rc.TTL(ctx, aiAgentQuizKey("room-quiz", "poll-1")).Result(); err != nil || left > s.defaultTTL || left <= 0 {
+		t.Errorf("ttl = %s (err %v), want at most %s", left, err, s.defaultTTL)
 	}
 	if _, _, found, _ := s.GetAIQuizMetadata(ctx, "room-quiz", "poll-2"); found {
 		t.Error("another poll must not resolve the answer key")
@@ -148,8 +148,8 @@ func TestAIAgentSessionTelemetryRoundTrip(t *testing.T) {
 	if !reflect.DeepEqual(*got, want) {
 		t.Fatalf("telemetry = %+v, want %+v", *got, want)
 	}
-	if left, err := rc.TTL(ctx, aiAgentTelemetryKey("room-telemetry")).Result(); err != nil || left > aiAgentProgressTTL || left <= 0 {
-		t.Errorf("telemetry ttl = %s (err %v), want at most %s", left, err, aiAgentProgressTTL)
+	if left, err := rc.TTL(ctx, aiAgentTelemetryKey("room-telemetry")).Result(); err != nil || left > s.defaultTTL || left <= 0 {
+		t.Errorf("telemetry ttl = %s (err %v), want at most %s", left, err, s.defaultTTL)
 	}
 
 	// A later flush replaces the previous snapshot rather than piling up.

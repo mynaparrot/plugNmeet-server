@@ -49,7 +49,7 @@ func (s *RedisService) NewLock(key string, ttl time.Duration) *Lock {
 		s:     s,
 		key:   key,
 		value: uuid.New().String(), // Each lock instance gets a unique value.
-		ttl:   ttl,
+		ttl:   s.resolveTTL(ttl),
 	}
 }
 
@@ -101,7 +101,7 @@ func (s *RedisService) LockRoomCreation(ctx context.Context, roomID string, ttl 
 	val := uuid.New().String() // Unique value for this lock instance
 
 	// Atomically SET the key if it Not eXists (NX), with a TTL.
-	ok, err := s.rc.SetNX(ctx, key, val, ttl).Result()
+	ok, err := s.rc.SetNX(ctx, key, val, s.resolveTTL(ttl)).Result()
 	if err != nil {
 		return false, "", fmt.Errorf("redis SetNX error for key %s: %w", key, err)
 	}
@@ -153,7 +153,7 @@ func (s *RedisService) IsRoomCreationLock(ctx context.Context, roomID string) (i
 func (s *RedisService) AcquireJanitorLeaderLock(ctx context.Context, ttl time.Duration) (acquired bool, lockValue string, err error) {
 	val := uuid.New().String()
 
-	ok, err := s.rc.SetNX(ctx, janitorLockKey, val, ttl).Result()
+	ok, err := s.rc.SetNX(ctx, janitorLockKey, val, s.resolveTTL(ttl)).Result()
 	if err != nil {
 		return false, "", fmt.Errorf("redis SetNX error for key %s: %w", janitorLockKey, err)
 	}
@@ -179,7 +179,7 @@ func (s *RedisService) ReleaseJanitorLeadershipLock(ctx context.Context, lockVal
 // RenewJanitorLeadershipLock extends the TTL of a lock if it's still held by the same owner.
 // Returns true if the lock was successfully renewed.
 func (s *RedisService) RenewJanitorLeadershipLock(ctx context.Context, lockValue string, ttl time.Duration) (bool, error) {
-	ttlSeconds := int(ttl.Seconds())
+	ttlSeconds := int(s.resolveTTL(ttl).Seconds())
 	if ttlSeconds < 1 {
 		return false, errors.New("TTL must be at least 1 second")
 	}

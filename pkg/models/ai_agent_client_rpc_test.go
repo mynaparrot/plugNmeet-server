@@ -44,7 +44,7 @@ type clientCallOutcome struct {
 }
 
 func TestCallClientToolForUserResolvesOnlyForTargetedUser(t *testing.T) {
-	model := newAIAgentTestModel(newAIAgentTestRedis(t))
+	model := newAIAgentTestModelWithNats(newAIAgentTestRedis(t))
 	ctx := context.Background()
 
 	done := make(chan clientCallOutcome, 1)
@@ -93,7 +93,7 @@ func TestCallClientToolForUserResolvesOnlyForTargetedUser(t *testing.T) {
 }
 
 func TestCallClientToolForUserReportsBrowserFailure(t *testing.T) {
-	model := newAIAgentTestModel(newAIAgentTestRedis(t))
+	model := newAIAgentTestModelWithNats(newAIAgentTestRedis(t))
 	ctx := context.Background()
 
 	done := make(chan clientCallOutcome, 1)
@@ -122,7 +122,7 @@ func TestCallClientToolForUserReportsBrowserFailure(t *testing.T) {
 }
 
 func TestCallClientToolForUserRejectsBlankTarget(t *testing.T) {
-	model := newAIAgentTestModel(newAIAgentTestRedis(t))
+	model := newAIAgentTestModelWithNats(newAIAgentTestRedis(t))
 
 	if _, err := model.CallClientToolForUser(context.Background(), "", mcp.ToolCall{RoomID: "room-1"}, time.Second); err == nil {
 		t.Error("a blank target user must be rejected")
@@ -136,7 +136,7 @@ func TestCallClientToolForUserRejectsBlankTarget(t *testing.T) {
 }
 
 func TestUserClientRPCSenderReachesTheTargetedUser(t *testing.T) {
-	model := newAIAgentTestModel(newAIAgentTestRedis(t))
+	model := newAIAgentTestModelWithNats(newAIAgentTestRedis(t))
 	ctx := context.Background()
 
 	sender := model.NewUserClientRPCSender("admin-1")
@@ -169,7 +169,7 @@ func TestUserClientRPCSenderReachesTheTargetedUser(t *testing.T) {
 }
 
 func TestCallClientToolForUserStopsWhenTheContextIsDone(t *testing.T) {
-	model := newAIAgentTestModel(newAIAgentTestRedis(t))
+	model := newAIAgentTestModelWithNats(newAIAgentTestRedis(t))
 	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan clientCallOutcome, 1)

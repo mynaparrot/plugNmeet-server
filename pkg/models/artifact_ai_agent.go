@@ -132,7 +132,34 @@ const (
 	aiAgentUsageKeySession    = "session"
 	aiAgentUsageKeyDelegation = "delegation"
 	aiAgentUsageKeySummary    = "summary"
+	// aiAgentUsageKeyCustomProviderPrefix marks a session that ran on the host's
+	// own provider and therefore carries no platform cost. The provider name is
+	// appended, so billing can tell which provider served the session.
+	aiAgentUsageKeyCustomProviderPrefix = "custom_provider_"
 )
+
+// aiAgentUsesCustomProvider reports whether the session ran on the host's own
+// provider (BYOK/BYOP).
+func aiAgentUsesCustomProvider(telemetry *redisservice.AIAgentSessionTelemetry) bool {
+	return telemetry != nil && strings.TrimSpace(telemetry.CustomProvider) != ""
+}
+
+// aiAgentCustomProviderBreakdownKey names the breakdown flag of a BYOK session,
+// e.g. custom_provider_google for a session served by the host's own Google
+// provider.
+func aiAgentCustomProviderBreakdownKey(telemetry *redisservice.AIAgentSessionTelemetry) string {
+	return aiAgentUsageKeyCustomProviderPrefix + strings.ToLower(strings.TrimSpace(telemetry.CustomProvider))
+}
+
+// costPointer prices a usage entry, or completely omits the cost fields when the
+// session ran on the host's own provider: the optional proto fields then never
+// reach the JSON, and the flag in the breakdown is the only cost information.
+func costPointer(cost float64, custom bool) *float64 {
+	if custom {
+		return nil
+	}
+	return roundAndPointer(cost, 6)
+}
 
 // buildAIAgentSessionUsages separates the session usage, the delegated text
 // model usage and the tokens the summary synthesis spent, so each entry is
@@ -141,6 +168,9 @@ func (m *ArtifactModel) buildAIAgentSessionUsages(telemetry *redisservice.AIAgen
 	session := newAIAgentSessionTokens(telemetry)
 	delegation := newAIAgentDelegationTokens(telemetry)
 	audioMillis := session.audioMillis
+	// A room that runs on the host's own provider pays that provider directly, so
+	// the tokens are recorded but the platform never prices them.
+	custom := aiAgentUsesCustomProvider(telemetry)
 
 	realtimeModel := m.aiAgentRealtimeModel(log)
 	usages := make(map[string]*plugnmeet.RoomArtifactTokenUsage, 3)
@@ -148,7 +178,10 @@ func (m *ArtifactModel) buildAIAgentSessionUsages(telemetry *redisservice.AIAgen
 	switch {
 	case session.input > 0 || session.output > 0:
 		// Token-based session (Realtime API, Gemini Live), priced per modality.
-		promptCost, completionCost := m.estimateModalitiesTokenCost(session.modalities(), log, aiAgentRealtimePricingKey, realtimeModel)
+		var promptCost, completionCost float64
+		if !custom {
+			promptCost, completionCost = m.estimateModalitiesTokenCost(session.modalities(), log, aiAgentRealtimePricingKey, realtimeModel)
+		}
 
 		breakdown := session.breakdown(aiAgentUsageKeySession)
 		if audioMillis > 0 {
@@ -160,18 +193,21 @@ func (m *ArtifactModel) buildAIAgentSessionUsages(telemetry *redisservice.AIAgen
 			CompletionTokens:              clampToUint32(session.output),
 			TotalTokens:                   clampToUint32(session.input + session.output),
 			Breakdown:                     breakdown,
-			PromptTokensEstimatedCost:     roundAndPointer(promptCost, 6),
-			CompletionTokensEstimatedCost: roundAndPointer(completionCost, 6),
-			TotalTokensEstimatedCost:      roundAndPointer(promptCost+completionCost, 6),
+			PromptTokensEstimatedCost:     costPointer(promptCost, custom),
+			CompletionTokensEstimatedCost: costPointer(completionCost, custom),
+			TotalTokensEstimatedCost:      costPointer(promptCost+completionCost, custom),
 		}
 
 	case audioMillis > 0:
 		// Minute-based Live session: the speech model reports its own audio
 		// duration and delegates every text turn, so it has no tokens of its own.
-		audioCost := m.estimateAudioMillisCost(insights.ServiceTypeAIAgent, audioMillis, log, aiAgentLivePricingKey, aiAgentRealtimePricingKey, realtimeModel)
+		var audioCost float64
+		if !custom {
+			audioCost = m.estimateAudioMillisCost(insights.ServiceTypeAIAgent, audioMillis, log, aiAgentLivePricingKey, aiAgentRealtimePricingKey, realtimeModel)
+		}
 		usages[aiAgentUsageKeySession] = &plugnmeet.RoomArtifactTokenUsage{
 			Breakdown:                map[string]int64{"audio_millis": int64(audioMillis)},
-			TotalTokensEstimatedCost: roundAndPointer(audioCost, 6),
+			TotalTokensEstimatedCost: costPointer(audioCost, custom),
 		}
 	}
 
@@ -179,22 +215,28 @@ func (m *ArtifactModel) buildAIAgentSessionUsages(telemetry *redisservice.AIAgen
 		// The delegated text model reports the same token detail as the session,
 		// so it is normalized and priced exactly the same way.
 		delegationModel := m.aiAgentDelegationModel(log)
-		promptCost, completionCost := m.estimateModalitiesTokenCost(delegation.modalities(), log, aiAgentDelegationPricingKey, delegationModel)
+		var promptCost, completionCost float64
+		if !custom {
+			promptCost, completionCost = m.estimateModalitiesTokenCost(delegation.modalities(), log, aiAgentDelegationPricingKey, delegationModel)
+		}
 
 		usages[aiAgentUsageKeyDelegation] = &plugnmeet.RoomArtifactTokenUsage{
 			PromptTokens:                  clampToUint32(delegation.input),
 			CompletionTokens:              clampToUint32(delegation.output),
 			TotalTokens:                   clampToUint32(delegation.input + delegation.output),
 			Breakdown:                     delegation.breakdown(aiAgentUsageKeyDelegation),
-			PromptTokensEstimatedCost:     roundAndPointer(promptCost, 6),
-			CompletionTokensEstimatedCost: roundAndPointer(completionCost, 6),
-			TotalTokensEstimatedCost:      roundAndPointer(promptCost+completionCost, 6),
+			PromptTokensEstimatedCost:     costPointer(promptCost, custom),
+			CompletionTokensEstimatedCost: costPointer(completionCost, custom),
+			TotalTokensEstimatedCost:      costPointer(promptCost+completionCost, custom),
 		}
 	}
 
 	if summaryPromptTokens > 0 || summaryCompletionTokens > 0 {
-		promptCost := m.estimateTokensCost(insights.ServiceTypeAIAgent, uint64(summaryPromptTokens), true, log, aiAgentSummarizePricingKey, summarizeModel)
-		completionCost := m.estimateTokensCost(insights.ServiceTypeAIAgent, uint64(summaryCompletionTokens), false, log, aiAgentSummarizePricingKey, summarizeModel)
+		var promptCost, completionCost float64
+		if !custom {
+			promptCost = m.estimateTokensCost(insights.ServiceTypeAIAgent, uint64(summaryPromptTokens), true, log, aiAgentSummarizePricingKey, summarizeModel)
+			completionCost = m.estimateTokensCost(insights.ServiceTypeAIAgent, uint64(summaryCompletionTokens), false, log, aiAgentSummarizePricingKey, summarizeModel)
+		}
 
 		usages[aiAgentUsageKeySummary] = &plugnmeet.RoomArtifactTokenUsage{
 			PromptTokens:     summaryPromptTokens,
@@ -204,9 +246,9 @@ func (m *ArtifactModel) buildAIAgentSessionUsages(telemetry *redisservice.AIAgen
 				"summary_prompt_tokens":     int64(summaryPromptTokens),
 				"summary_completion_tokens": int64(summaryCompletionTokens),
 			},
-			PromptTokensEstimatedCost:     roundAndPointer(promptCost, 6),
-			CompletionTokensEstimatedCost: roundAndPointer(completionCost, 6),
-			TotalTokensEstimatedCost:      roundAndPointer(promptCost+completionCost, 6),
+			PromptTokensEstimatedCost:     costPointer(promptCost, custom),
+			CompletionTokensEstimatedCost: costPointer(completionCost, custom),
+			TotalTokensEstimatedCost:      costPointer(promptCost+completionCost, custom),
 		}
 	}
 
@@ -264,6 +306,9 @@ func (m *ArtifactModel) buildAIAgentUsageMetadata(telemetry *redisservice.AIAgen
 	session := newAIAgentSessionTokens(telemetry)
 	delegation := newAIAgentDelegationTokens(telemetry)
 	audioMillis := session.audioMillis
+	// The host's own provider bills the room directly, so no platform cost is
+	// recorded; the usage stays complete otherwise.
+	custom := aiAgentUsesCustomProvider(telemetry)
 
 	realtimeModel := m.aiAgentRealtimeModel(log)
 	delegationModel := m.aiAgentDelegationModel(log)
@@ -271,18 +316,21 @@ func (m *ArtifactModel) buildAIAgentUsageMetadata(telemetry *redisservice.AIAgen
 	totalPrompt := session.input + delegation.input + uint64(summaryPromptTokens)
 	totalCompletion := session.output + delegation.output + uint64(summaryCompletionTokens)
 
-	sessionPromptCost, sessionCompletionCost := m.estimateModalitiesTokenCost(session.modalities(), log, aiAgentRealtimePricingKey, realtimeModel)
-	delegationPromptCost, delegationCompletionCost := m.estimateModalitiesTokenCost(delegation.modalities(), log, aiAgentDelegationPricingKey, delegationModel)
-	promptCost := sessionPromptCost + delegationPromptCost +
-		m.estimateTokensCost(insights.ServiceTypeAIAgent, uint64(summaryPromptTokens), true, log, aiAgentSummarizePricingKey, summarizeModel)
-	completionCost := sessionCompletionCost + delegationCompletionCost +
-		m.estimateTokensCost(insights.ServiceTypeAIAgent, uint64(summaryCompletionTokens), false, log, aiAgentSummarizePricingKey, summarizeModel)
+	var promptCost, completionCost, totalCost float64
+	if !custom {
+		sessionPromptCost, sessionCompletionCost := m.estimateModalitiesTokenCost(session.modalities(), log, aiAgentRealtimePricingKey, realtimeModel)
+		delegationPromptCost, delegationCompletionCost := m.estimateModalitiesTokenCost(delegation.modalities(), log, aiAgentDelegationPricingKey, delegationModel)
+		promptCost = sessionPromptCost + delegationPromptCost +
+			m.estimateTokensCost(insights.ServiceTypeAIAgent, uint64(summaryPromptTokens), true, log, aiAgentSummarizePricingKey, summarizeModel)
+		completionCost = sessionCompletionCost + delegationCompletionCost +
+			m.estimateTokensCost(insights.ServiceTypeAIAgent, uint64(summaryCompletionTokens), false, log, aiAgentSummarizePricingKey, summarizeModel)
 
-	var audioCost float64
-	if session.input == 0 && session.output == 0 && audioMillis > 0 {
-		audioCost = m.estimateAudioMillisCost(insights.ServiceTypeAIAgent, audioMillis, log, aiAgentLivePricingKey, aiAgentRealtimePricingKey, realtimeModel)
+		var audioCost float64
+		if session.input == 0 && session.output == 0 && audioMillis > 0 {
+			audioCost = m.estimateAudioMillisCost(insights.ServiceTypeAIAgent, audioMillis, log, aiAgentLivePricingKey, aiAgentRealtimePricingKey, realtimeModel)
+		}
+		totalCost = promptCost + completionCost + audioCost
 	}
-	totalCost := promptCost + completionCost + audioCost
 
 	breakdown := make(map[string]int64, 32)
 	for key, value := range session.breakdown(aiAgentUsageKeySession) {
@@ -300,6 +348,12 @@ func (m *ArtifactModel) buildAIAgentUsageMetadata(telemetry *redisservice.AIAgen
 			breakdown[key] = int64(value)
 		}
 	}
+	if custom {
+		// The breakdown is the only free-form usage surface, so downstream
+		// webhooks and billing read the flag here: this session has no platform
+		// token cost, and the key names the provider that served it.
+		breakdown[aiAgentCustomProviderBreakdownKey(telemetry)] = 1
+	}
 
 	return &plugnmeet.RoomArtifactMetadata{
 		UsageDetails: &plugnmeet.RoomArtifactMetadata_TokenUsage{
@@ -308,9 +362,9 @@ func (m *ArtifactModel) buildAIAgentUsageMetadata(telemetry *redisservice.AIAgen
 				CompletionTokens:              clampToUint32(totalCompletion),
 				TotalTokens:                   clampToUint32(totalPrompt + totalCompletion),
 				Breakdown:                     breakdown,
-				PromptTokensEstimatedCost:     roundAndPointer(promptCost, 6),
-				CompletionTokensEstimatedCost: roundAndPointer(completionCost, 6),
-				TotalTokensEstimatedCost:      roundAndPointer(totalCost, 6),
+				PromptTokensEstimatedCost:     costPointer(promptCost, custom),
+				CompletionTokensEstimatedCost: costPointer(completionCost, custom),
+				TotalTokensEstimatedCost:      costPointer(totalCost, custom),
 			},
 		},
 		ReferenceArtifactId: fileArtifactId,

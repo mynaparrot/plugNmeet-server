@@ -12,12 +12,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const (
-	// AiAgentQuizMetadataTTL bounds how long a quiz answer key outlives its poll.
-	AiAgentQuizMetadataTTL = 24 * time.Hour
-	aiAgentProgressTTL     = 24 * time.Hour
-)
-
 // AiAgentKnowledgeCacheKey is the key of one fetched knowledge document. The
 // hash keeps the URL out of the key while staying stable per page.
 func AiAgentKnowledgeCacheKey(roomId, rawURL string) string {
@@ -115,6 +109,11 @@ type AIAgentSessionTelemetry struct {
 	AudioMillis uint64                    `json:"audio_millis"`
 	ToolsUsed   map[string]int            `json:"tools_used,omitempty"`
 	Transcript  []AISessionTranscriptTurn `json:"transcript,omitempty"`
+
+	// CustomProvider is the name of the host's own provider (BYOK) the session
+	// ran on, so the platform never bills its tokens. It is empty when the
+	// session used the server's platform provider.
+	CustomProvider string `json:"custom_provider,omitempty"`
 }
 
 // GetAIKnowledgeDocument returns the cached document of rawURL, if any.
@@ -131,16 +130,17 @@ func (s *RedisService) GetAIKnowledgeDocument(ctx context.Context, roomId, rawUR
 
 // SetAIKnowledgeDocument caches one knowledge document.
 func (s *RedisService) SetAIKnowledgeDocument(ctx context.Context, roomId, rawURL, value string, ttl time.Duration) error {
-	return s.rc.Set(ctx, AiAgentKnowledgeCacheKey(roomId, rawURL), value, ttl).Err()
+	return s.rc.Set(ctx, AiAgentKnowledgeCacheKey(roomId, rawURL), value, s.resolveTTL(ttl)).Err()
 }
 
-// SaveAIQuizMetadata stores the answer key of a quiz next to its poll.
+// SaveAIQuizMetadata stores the answer key of a quiz next to its poll. It
+// outlives the poll only by the service's default TTL.
 func (s *RedisService) SaveAIQuizMetadata(ctx context.Context, roomId, pollId string, correctOptionIndex int, explanation string) error {
 	encoded, err := json.Marshal(AIQuizMetadata{CorrectOptionIndex: correctOptionIndex, Explanation: explanation})
 	if err != nil {
 		return err
 	}
-	return s.rc.Set(ctx, aiAgentQuizKey(roomId, pollId), encoded, AiAgentQuizMetadataTTL).Err()
+	return s.rc.Set(ctx, aiAgentQuizKey(roomId, pollId), encoded, s.defaultTTL).Err()
 }
 
 // GetAIQuizMetadata returns the stored answer key; found is false when the poll
@@ -169,7 +169,7 @@ func (s *RedisService) RecordAILearningProgress(ctx context.Context, roomId stri
 	key := aiAgentProgressKey(roomId)
 	pipe := s.rc.TxPipeline()
 	pipe.HSet(ctx, key, entry.Concept, encoded)
-	pipe.Expire(ctx, key, aiAgentProgressTTL)
+	pipe.Expire(ctx, key, s.defaultTTL)
 	_, err = pipe.Exec(ctx)
 	return err
 }
@@ -197,7 +197,7 @@ func (s *RedisService) SaveAIAgentSessionTelemetry(ctx context.Context, roomId s
 	if err != nil {
 		return err
 	}
-	return s.rc.Set(ctx, aiAgentTelemetryKey(roomId), encoded, aiAgentProgressTTL).Err()
+	return s.rc.Set(ctx, aiAgentTelemetryKey(roomId), encoded, s.defaultTTL).Err()
 }
 
 // GetAIAgentSessionTelemetry returns the room's telemetry; a room without a

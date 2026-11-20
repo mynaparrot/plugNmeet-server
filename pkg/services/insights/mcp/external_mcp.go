@@ -208,18 +208,16 @@ type externalMCPToolTarget struct {
 	IsResourceRead bool
 }
 
-// externalMCPTTL derives the mandatory TTL for every external MCP key.
+// externalMCPTTL derives the TTL for every external MCP key: long enough for
+// the whole session, never longer than externalMCPKeyTTL. Without a known
+// session length it returns 0, which leaves the TTL to RedisService's default
+// instead of pinning a guess.
 func externalMCPTTL(maxSessionSeconds uint32) time.Duration {
-	ttl := externalMCPKeyTTL
-	if maxSessionSeconds > 0 {
-		if extended := time.Duration(maxSessionSeconds)*time.Second + time.Hour; extended < ttl {
-			ttl = extended
-		}
+	if maxSessionSeconds == 0 {
+		return 0
 	}
-	if ttl <= 0 {
-		ttl = externalMCPKeyTTL
-	}
-	return ttl
+
+	return min(time.Duration(maxSessionSeconds)*time.Second+time.Hour, externalMCPKeyTTL)
 }
 
 // ExternalMCPManager discovers, registers and calls external MCP tools.
@@ -244,7 +242,7 @@ func NewExternalMCPManager(store *redisservice.RedisService, deps ToolDependenci
 		logger:            deps.logger(),
 		allowInsecureHTTP: deps.AllowInsecureHTTP,
 		client:            newExternalMCPHTTPClient(deps.HTTPClient, deps.AllowInsecureHTTP),
-		ttl:               externalMCPTTL(0),
+		ttl:               0,
 		scope:             deps.MCPScope,
 	}
 }

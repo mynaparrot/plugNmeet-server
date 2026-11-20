@@ -181,6 +181,10 @@ type AIAgent struct {
 	roomAgent *RoomAgent
 	publisher audioPublisher
 
+	// customProvider names the host's own provider the session runs on, whose
+	// usage has no platform cost; empty for the platform provider.
+	customProvider string
+
 	inAudio chan mediasdk.PCM16Sample
 
 	sessionMu  sync.RWMutex
@@ -248,11 +252,14 @@ type AIAgentArgs struct {
 	RedisService    *redisservice.RedisService
 	ServiceConfig   *config.ServiceConfig
 	ProviderAccount *config.ProviderAccount
-	Logger          *logrus.Entry
-	Payload         *insights.InsightsTaskPayload
-	Features        *plugnmeet.InsightsAIAgentFeatures
-	Boundary        BoundaryConfig
-	Deps            mcp.ToolDependencies
+	// CustomProvider names the host's own provider (BYOK/BYOP), so the session
+	// never carries a platform token cost; empty for the platform provider.
+	CustomProvider string
+	Logger         *logrus.Entry
+	Payload        *insights.InsightsTaskPayload
+	Features       *plugnmeet.InsightsAIAgentFeatures
+	Boundary       BoundaryConfig
+	Deps           mcp.ToolDependencies
 	// AgentUserId is the participant identity. Callers register it in NATS
 	// before the agent joins LiveKit so browsers can resolve the audio track;
 	// when empty a fresh identity is generated.
@@ -285,6 +292,9 @@ type aiAgentCoreArgs struct {
 	AgentUserId    string
 	Learner        LearnerIdentity
 	MaxAudioMinute uint32
+	// CustomProvider names the host's provider the session runs on, empty when
+	// the server's platform provider serves it.
+	CustomProvider string
 }
 
 // NewAIAgent connects a realtime provider session plus a visible LiveKit
@@ -361,6 +371,7 @@ func NewAIAgent(args *AIAgentArgs) (*AIAgent, error) {
 		AgentUserId:    args.AgentUserId,
 		Learner:        args.Learner,
 		MaxAudioMinute: args.Features.GetMaxAudioMinutes(),
+		CustomProvider: args.CustomProvider,
 	})
 	if err != nil {
 		_ = session.Close()
@@ -455,28 +466,29 @@ func newAIAgent(args *aiAgentCoreArgs) (*AIAgent, error) {
 	}
 
 	agent := &AIAgent{
-		ctx:          ctx,
-		cancel:       cancel,
-		logger:       log,
-		roomId:       args.Payload.RoomId,
-		sessionId:    sessionId,
-		agentUserId:  agentUserId,
-		agentName:    boundary.AgentDisplayName,
-		startedAt:    time.Now(),
-		boundary:     boundary,
-		features:     features,
-		guard:        guard,
-		transport:    args.Transport,
-		delegate:     args.Delegate,
-		onStopped:    args.OnStopped,
-		learner:      args.Learner,
-		maxAudio:     time.Duration(maxAudioMinutes) * time.Minute,
-		redisService: args.RedisService,
-		inAudio:      make(chan mediasdk.PCM16Sample, aiAgentInAudioBuffer),
-		session:      args.Session,
-		newSession:   args.NewSession,
-		pendingCalls: make(map[string]chan *plugnmeet.AIAgentToolResultMsg),
-		done:         make(chan struct{}),
+		ctx:            ctx,
+		cancel:         cancel,
+		logger:         log,
+		roomId:         args.Payload.RoomId,
+		sessionId:      sessionId,
+		agentUserId:    agentUserId,
+		agentName:      boundary.AgentDisplayName,
+		startedAt:      time.Now(),
+		boundary:       boundary,
+		features:       features,
+		guard:          guard,
+		transport:      args.Transport,
+		delegate:       args.Delegate,
+		onStopped:      args.OnStopped,
+		learner:        args.Learner,
+		maxAudio:       time.Duration(maxAudioMinutes) * time.Minute,
+		redisService:   args.RedisService,
+		customProvider: args.CustomProvider,
+		inAudio:        make(chan mediasdk.PCM16Sample, aiAgentInAudioBuffer),
+		session:        args.Session,
+		newSession:     args.NewSession,
+		pendingCalls:   make(map[string]chan *plugnmeet.AIAgentToolResultMsg),
+		done:           make(chan struct{}),
 		state: aiAgentRuntimeState{
 			state:     plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_CONNECTING,
 			toolsUsed: make(map[string]int),
