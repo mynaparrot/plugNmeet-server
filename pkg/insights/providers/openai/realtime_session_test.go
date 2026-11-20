@@ -412,6 +412,62 @@ func TestTranslateRealtimeServerEventResponseDone(t *testing.T) {
 	if !strings.Contains(events[0].Err.Error(), "model exploded") {
 		t.Fatalf("unexpected error message: %v", events[0].Err)
 	}
+
+	// Cached prompt tokens arrive nested in input_token_details.
+	var cached realtime.RealtimeServerEventUnion
+	cachedPayload := `{"type":"response.done","event_id":"evt_2","response":{"status":"completed",` +
+		`"usage":{"input_tokens":120,"output_tokens":30,"total_tokens":150,` +
+		`"input_token_details":{"cached_tokens":64,"text_tokens":120,"audio_tokens":0}}}}`
+	if err := json.Unmarshal([]byte(cachedPayload), &cached); err != nil {
+		t.Fatalf("failed to decode cached usage: %v", err)
+	}
+
+	cachedEvents := translateRealtimeServerEvent(cached)
+	if len(cachedEvents) == 0 || cachedEvents[0].Type != insights.RealtimeEventUsage {
+		t.Fatalf("cached usage event missing: %+v", cachedEvents)
+	}
+	if cachedEvents[0].InputTokens != 120 || cachedEvents[0].OutputTokens != 30 || cachedEvents[0].CachedInputTokens != 64 {
+		t.Fatalf("unexpected cached usage: %+v", cachedEvents[0])
+	}
+	if cachedEvents[0].TextInputTokens != 120 || cachedEvents[0].AudioInputTokens != 0 {
+		t.Fatalf("unexpected input modality split: %+v", cachedEvents[0])
+	}
+}
+
+func TestTranslateRealtimeServerEventResponseDoneModalities(t *testing.T) {
+	// Text, audio and image input, the cached subset of each, and the output
+	// split all arrive nested in the response usage.
+	var event realtime.RealtimeServerEventUnion
+	payload := `{"type":"response.done","event_id":"evt_3","response":{"status":"completed",` +
+		`"usage":{"input_tokens":300,"output_tokens":120,"total_tokens":420,` +
+		`"input_token_details":{"cached_tokens":80,"text_tokens":100,"audio_tokens":180,"image_tokens":20,` +
+		`"cached_tokens_details":{"text_tokens":60,"audio_tokens":20,"image_tokens":0}},` +
+		`"output_token_details":{"text_tokens":20,"audio_tokens":100}}}}`
+	if err := json.Unmarshal([]byte(payload), &event); err != nil {
+		t.Fatalf("failed to decode multimodal usage: %v", err)
+	}
+
+	events := translateRealtimeServerEvent(event)
+	if len(events) == 0 || events[0].Type != insights.RealtimeEventUsage {
+		t.Fatalf("usage event missing: %+v", events)
+	}
+
+	usage := events[0]
+	if usage.InputTokens != 300 || usage.OutputTokens != 120 || usage.CachedInputTokens != 80 {
+		t.Errorf("totals = (%d, %d, %d), want (300, 120, 80)",
+			usage.InputTokens, usage.OutputTokens, usage.CachedInputTokens)
+	}
+	if usage.TextInputTokens != 100 || usage.AudioInputTokens != 180 || usage.ImageInputTokens != 20 {
+		t.Errorf("input split = (%d, %d, %d), want (100, 180, 20)",
+			usage.TextInputTokens, usage.AudioInputTokens, usage.ImageInputTokens)
+	}
+	if usage.CachedTextInputTokens != 60 || usage.CachedAudioInputTokens != 20 || usage.CachedImageInputTokens != 0 {
+		t.Errorf("cached split = (%d, %d, %d), want (60, 20, 0)",
+			usage.CachedTextInputTokens, usage.CachedAudioInputTokens, usage.CachedImageInputTokens)
+	}
+	if usage.TextOutputTokens != 20 || usage.AudioOutputTokens != 100 {
+		t.Errorf("output split = (%d, %d), want (20, 100)", usage.TextOutputTokens, usage.AudioOutputTokens)
+	}
 }
 
 func TestTranslateRealtimeServerEventError(t *testing.T) {

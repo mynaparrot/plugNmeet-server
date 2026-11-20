@@ -195,11 +195,7 @@ func translateServerMessage(msg *genai.LiveServerMessage) []insights.RealtimeEve
 	}
 
 	if um := msg.UsageMetadata; um != nil {
-		events = append(events, insights.RealtimeEvent{
-			Type:         insights.RealtimeEventUsage,
-			InputTokens:  tokenCount(um.PromptTokenCount),
-			OutputTokens: tokenCount(um.ResponseTokenCount),
-		})
+		events = append(events, translateUsageMetadata(um))
 	}
 
 	if msg.GoAway != nil {
@@ -210,6 +206,65 @@ func translateServerMessage(msg *genai.LiveServerMessage) []insights.RealtimeEve
 	}
 
 	return events
+}
+
+// translateUsageMetadata turns one usage report into the provider-agnostic
+// event. Gemini reports tool results and thinking tokens beside the prompt and
+// the response, while billing them as input and as output.
+func translateUsageMetadata(um *genai.UsageMetadata) insights.RealtimeEvent {
+	thinking := tokenCount(um.ThoughtsTokenCount)
+	ev := insights.RealtimeEvent{
+		Type:                 insights.RealtimeEventUsage,
+		InputTokens:          tokenCount(um.PromptTokenCount) + tokenCount(um.ToolUsePromptTokenCount),
+		OutputTokens:         tokenCount(um.ResponseTokenCount) + thinking,
+		CachedInputTokens:    tokenCount(um.CachedContentTokenCount),
+		ThinkingOutputTokens: thinking,
+	}
+
+	// The details name the media modalities of each count; whatever they leave
+	// unattributed is text, which keeps the split equal to the totals.
+	for _, details := range [][]*genai.ModalityTokenCount{um.PromptTokensDetails, um.ToolUsePromptTokensDetails} {
+		for _, d := range details {
+			if d == nil {
+				continue
+			}
+			switch d.Modality {
+			case genai.MediaModalityAudio:
+				ev.AudioInputTokens += tokenCount(d.TokenCount)
+			case genai.MediaModalityImage, genai.MediaModalityVideo:
+				ev.ImageInputTokens += tokenCount(d.TokenCount)
+			}
+		}
+	}
+	for _, d := range um.CacheTokensDetails {
+		if d == nil {
+			continue
+		}
+		switch d.Modality {
+		case genai.MediaModalityAudio:
+			ev.CachedAudioInputTokens += tokenCount(d.TokenCount)
+		case genai.MediaModalityImage, genai.MediaModalityVideo:
+			ev.CachedImageInputTokens += tokenCount(d.TokenCount)
+		}
+	}
+	for _, d := range um.ResponseTokensDetails {
+		if d != nil && d.Modality == genai.MediaModalityAudio {
+			ev.AudioOutputTokens += tokenCount(d.TokenCount)
+		}
+	}
+
+	ev.AudioInputTokens = min(ev.AudioInputTokens, ev.InputTokens)
+	ev.ImageInputTokens = min(ev.ImageInputTokens, ev.InputTokens-ev.AudioInputTokens)
+	ev.TextInputTokens = ev.InputTokens - ev.AudioInputTokens - ev.ImageInputTokens
+
+	ev.CachedAudioInputTokens = min(ev.CachedAudioInputTokens, ev.CachedInputTokens)
+	ev.CachedImageInputTokens = min(ev.CachedImageInputTokens, ev.CachedInputTokens-ev.CachedAudioInputTokens)
+	ev.CachedTextInputTokens = ev.CachedInputTokens - ev.CachedAudioInputTokens - ev.CachedImageInputTokens
+
+	ev.AudioOutputTokens = min(ev.AudioOutputTokens, ev.OutputTokens)
+	ev.TextOutputTokens = ev.OutputTokens - ev.AudioOutputTokens
+
+	return ev
 }
 
 func tokenCount(v int32) uint32 {

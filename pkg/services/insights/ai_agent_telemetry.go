@@ -87,6 +87,16 @@ func (a *AIAgent) TelemetrySnapshot(endReason string) redisservice.AIAgentSessio
 		OffTopicRedirectsCount: a.guard.OffTopicRedirectsCount(),
 		InputTokens:            uint64(state.inputTokens),
 		OutputTokens:           uint64(state.outputTokens),
+		CachedInputTokens:      state.cachedInputTokens,
+		TextInputTokens:        state.textInputTokens,
+		AudioInputTokens:       state.audioInputTokens,
+		ImageInputTokens:       state.imageInputTokens,
+		CachedTextInputTokens:  state.cachedTextInputTokens,
+		CachedAudioInputTokens: state.cachedAudioInputTokens,
+		CachedImageInputTokens: state.cachedImageInputTokens,
+		TextOutputTokens:       state.textOutputTokens,
+		AudioOutputTokens:      state.audioOutputTokens,
+		ThinkingOutputTokens:   state.thinkingOutputTokens,
 		DelegationInputTokens:  uint64(state.delegationInputTokens),
 		DelegationOutputTokens: uint64(state.delegationOutputTokens),
 		AudioMillis:            state.audioMillis,
@@ -118,6 +128,7 @@ func (a *AIAgent) logUsage() {
 	a.logger.WithFields(logrus.Fields{
 		"inputTokens":            state.inputTokens,
 		"outputTokens":           state.outputTokens,
+		"cachedInputTokens":      state.cachedInputTokens,
 		"delegationInputTokens":  state.delegationInputTokens,
 		"delegationOutputTokens": state.delegationOutputTokens,
 		"audioMillis":            state.audioMillis,
@@ -129,6 +140,16 @@ func (a *AIAgent) recordUsage(ev insights.RealtimeEvent) {
 	a.stateMu.Lock()
 	a.state.inputTokens += ev.InputTokens
 	a.state.outputTokens += ev.OutputTokens
+	a.state.cachedInputTokens += uint64(ev.CachedInputTokens)
+	a.state.textInputTokens += uint64(ev.TextInputTokens)
+	a.state.audioInputTokens += uint64(ev.AudioInputTokens)
+	a.state.imageInputTokens += uint64(ev.ImageInputTokens)
+	a.state.cachedTextInputTokens += uint64(ev.CachedTextInputTokens)
+	a.state.cachedAudioInputTokens += uint64(ev.CachedAudioInputTokens)
+	a.state.cachedImageInputTokens += uint64(ev.CachedImageInputTokens)
+	a.state.textOutputTokens += uint64(ev.TextOutputTokens)
+	a.state.audioOutputTokens += uint64(ev.AudioOutputTokens)
+	a.state.thinkingOutputTokens += uint64(ev.ThinkingOutputTokens)
 	a.state.delegationInputTokens += ev.DelegationInputTokens
 	a.state.delegationOutputTokens += ev.DelegationOutputTokens
 	a.state.audioMillis += ev.AudioMillis

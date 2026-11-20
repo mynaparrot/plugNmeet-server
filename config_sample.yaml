@@ -364,8 +364,11 @@ insights:
         summarize_model: "gemini-3.1-flash-lite"
       pricing:
         realtime_model:
-          input_price_per_million_tokens: 3.50
-          output_price_per_million_tokens: 10.50
+          input_price_per_million_tokens: 0.75        # Text input
+          audio_input_price_per_million_tokens: 3.00  # Audio input
+          image_input_price_per_million_tokens: 1.00  # Image / video input
+          output_price_per_million_tokens: 4.50       # Text & thinking output
+          audio_output_price_per_million_tokens: 12.00 # Audio output
         summarize_model:
           input_price_per_million_tokens: 0.25
           output_price_per_million_tokens: 1.50
@@ -397,7 +400,13 @@ insights:
     #   pricing:
     #     realtime_model:
     #       input_price_per_million_tokens: 0.60
+    #       cached_input_price_per_million_tokens: 0.06
     #       output_price_per_million_tokens: 2.40
+    #       audio_input_price_per_million_tokens: 10.00
+    #       audio_cached_input_price_per_million_tokens: 0.30
+    #       audio_output_price_per_million_tokens: 20.00
+    #       image_input_price_per_million_tokens: 0.80
+    #       image_cached_input_price_per_million_tokens: 0.08
     #     # Minute-priced: the live speech model reports audio duration only.
     #     live_model:
     #       price_per_minute: 0.05

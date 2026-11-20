@@ -76,6 +76,18 @@ type AIAgentSessionTelemetry struct {
 	OffTopicRedirectsCount int      `json:"off_topic_redirects_count"`
 	InputTokens            uint64   `json:"input_tokens"`
 	OutputTokens           uint64   `json:"output_tokens"`
+	CachedInputTokens      uint64   `json:"cached_input_tokens,omitempty"`
+	// Modality split of the session tokens; image_input_tokens also counts video
+	// input, and text_output_tokens includes the thinking tokens.
+	TextInputTokens        uint64 `json:"text_input_tokens,omitempty"`
+	AudioInputTokens       uint64 `json:"audio_input_tokens,omitempty"`
+	ImageInputTokens       uint64 `json:"image_input_tokens,omitempty"`
+	CachedTextInputTokens  uint64 `json:"cached_text_input_tokens,omitempty"`
+	CachedAudioInputTokens uint64 `json:"cached_audio_input_tokens,omitempty"`
+	CachedImageInputTokens uint64 `json:"cached_image_input_tokens,omitempty"`
+	TextOutputTokens       uint64 `json:"text_output_tokens,omitempty"`
+	AudioOutputTokens      uint64 `json:"audio_output_tokens,omitempty"`
+	ThinkingOutputTokens   uint64 `json:"thinking_output_tokens,omitempty"`
 	// Tokens spent by the delegated text model of a live session, priced apart.
 	DelegationInputTokens  uint64                    `json:"delegation_input_tokens,omitempty"`
 	DelegationOutputTokens uint64                    `json:"delegation_output_tokens,omitempty"`

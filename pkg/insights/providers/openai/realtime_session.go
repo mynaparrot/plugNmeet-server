@@ -288,10 +288,20 @@ func translateRealtimeResponseDone(ev realtime.ResponseDoneEvent) []insights.Rea
 	var events []insights.RealtimeEvent
 
 	if usage := ev.Response.Usage; usage.InputTokens > 0 || usage.OutputTokens > 0 {
+		in, out := usage.InputTokenDetails, usage.OutputTokenDetails
 		events = append(events, insights.RealtimeEvent{
-			Type:         insights.RealtimeEventUsage,
-			InputTokens:  realtimeTokenCount(usage.InputTokens),
-			OutputTokens: realtimeTokenCount(usage.OutputTokens),
+			Type:                   insights.RealtimeEventUsage,
+			InputTokens:            realtimeTokenCount(usage.InputTokens),
+			OutputTokens:           realtimeTokenCount(usage.OutputTokens),
+			CachedInputTokens:      realtimeTokenCount(in.CachedTokens),
+			TextInputTokens:        realtimeTokenCount(in.TextTokens),
+			AudioInputTokens:       realtimeTokenCount(in.AudioTokens),
+			ImageInputTokens:       realtimeTokenCount(in.ImageTokens),
+			CachedTextInputTokens:  realtimeTokenCount(in.CachedTokensDetails.TextTokens),
+			CachedAudioInputTokens: realtimeTokenCount(in.CachedTokensDetails.AudioTokens),
+			CachedImageInputTokens: realtimeTokenCount(in.CachedTokensDetails.ImageTokens),
+			TextOutputTokens:       realtimeTokenCount(out.TextTokens),
+			AudioOutputTokens:      realtimeTokenCount(out.AudioTokens),
 		})
 	}
 

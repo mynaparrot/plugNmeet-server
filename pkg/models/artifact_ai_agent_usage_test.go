@@ -409,3 +409,317 @@ func TestBuildAIAgentUsageMetadataSeparatedRoles(t *testing.T) {
 		}
 	})
 }
+
+func TestResolveAIAgentRates(t *testing.T) {
+	if _, ok := resolveAIAgentRates(nil); ok {
+		t.Error("nil pricing must not report a rate")
+	}
+
+	// No token rate at all: minute-priced models report no token cost.
+	if _, ok := resolveAIAgentRates(&config.ModelPricing{PricePerMinute: 1.5}); ok {
+		t.Error("a pricing block without a token rate must report false")
+	}
+
+	// A text-only block: no cached rate, so cached tokens pay the input rate.
+	pricing := &config.ModelPricing{InputPricePerMillionTokens: 2, OutputPricePerMillionTokens: 4}
+	rates, ok := resolveAIAgentRates(pricing)
+	if !ok {
+		t.Fatal("a text rate is a usable rate")
+	}
+	if !floatEquals(rates.textCachedInput, 2) {
+		t.Errorf("cached text rate = %v, want the input rate 2: a missing cached rate must not discount", rates.textCachedInput)
+	}
+	if !floatEquals(rates.audioInput, 2) || !floatEquals(rates.imageInput, 2) || !floatEquals(rates.audioOutput, 4) {
+		t.Errorf("a modality without a rate must be billed as text: %+v", rates)
+	}
+	if !floatEquals(rates.audioCachedInput, 2) || !floatEquals(rates.imageCachedInput, 2) {
+		t.Errorf("cached modality tokens must fall back to the text cached rate: %+v", rates)
+	}
+
+	// An explicit cached rate is the only way to discount cached tokens.
+	explicit := &config.ModelPricing{InputPricePerMillionTokens: 2, CachedInputPricePerMillionTokens: 0.25}
+	if rates, _ := resolveAIAgentRates(explicit); !floatEquals(rates.textCachedInput, 0.25) {
+		t.Errorf("explicit cached text rate = %v, want 0.25", rates.textCachedInput)
+	}
+
+	// A cached rate without an input rate is still a usable rate.
+	if _, ok := resolveAIAgentRates(&config.ModelPricing{CachedInputPricePerMillionTokens: 0.5}); !ok {
+		t.Error("a cached rate alone is a usable rate")
+	}
+
+	// A modality with a rate of its own is discounted only by its own cached
+	// rate; without one its cached tokens pay the uncached modality rate.
+	multimodal := &config.ModelPricing{
+		InputPricePerMillionTokens:       0.60,
+		CachedInputPricePerMillionTokens: 0.06,
+		AudioInputPricePerMillionTokens:  10,
+		OutputPricePerMillionTokens:      2.40,
+	}
+	rates, _ = resolveAIAgentRates(multimodal)
+	if !floatEquals(rates.audioCachedInput, 10) {
+		t.Errorf("audio cached rate = %v, want the uncached audio rate 10", rates.audioCachedInput)
+	}
+	if !floatEquals(rates.imageCachedInput, 0.06) {
+		t.Errorf("image cached rate = %v, want the text cached rate 0.06", rates.imageCachedInput)
+	}
+	// 1000 prompt tokens, 400 of them cached, plus 500 completion tokens.
+	prompt, completion := rates.cost(aiAgentModalities{text: 1000, textCached: 400, textOutput: 500})
+	if !floatEquals(prompt, 600*0.60/1e6+400*0.06/1e6) {
+		t.Errorf("prompt cost = %v, want 600*0.60/1M + 400*0.06/1M", prompt)
+	}
+	if !floatEquals(completion, 500*2.40/1e6) {
+		t.Errorf("completion cost = %v, want 500*2.40/1M", completion)
+	}
+}
+
+// newMultimodalArtifactModel prices the realtime model of an ai_agent session
+// with the given matrix, the way a provider price list does.
+func newMultimodalArtifactModel(pricing config.ModelPricing) *ArtifactModel {
+	m := newPricedArtifactModel()
+	m.app.Insights.Services[insights.ServiceTypeAIAgent].Pricing["realtime_model"] = pricing
+	return m
+}
+
+func TestBuildAIAgentSessionUsagesModalityPricing(t *testing.T) {
+	log := testLogger()
+
+	t.Run("gemini live bills every modality at its own rate", func(t *testing.T) {
+		m := newMultimodalArtifactModel(config.ModelPricing{
+			InputPricePerMillionTokens:       0.75,
+			AudioInputPricePerMillionTokens:  3.00,
+			ImageInputPricePerMillionTokens:  1.00,
+			OutputPricePerMillionTokens:      4.50,
+			AudioOutputPricePerMillionTokens: 12.00,
+		})
+		telemetry := &redisservice.AIAgentSessionTelemetry{
+			InputTokens:          1000000,
+			CachedInputTokens:    100000,
+			TextInputTokens:      400000,
+			AudioInputTokens:     550000,
+			ImageInputTokens:     50000,
+			OutputTokens:         200000,
+			TextOutputTokens:     150000,
+			AudioOutputTokens:    50000,
+			ThinkingOutputTokens: 30000,
+		}
+
+		session := m.buildAIAgentSessionUsages(telemetry, 0, 0, "", log)[aiAgentUsageKeySession]
+		if session == nil {
+			t.Fatal("the session entry is missing")
+		}
+
+		// Text 0.4M uncached plus 0.1M cached, audio 0.55M, image 0.05M. No
+		// cached rate is configured, so the cached text tokens pay 0.75 too.
+		wantPrompt := 0.3*0.75 + 0.1*0.75 + 0.55*3.00 + 0.05*1.00
+		if !floatEquals(session.GetPromptTokensEstimatedCost(), wantPrompt) {
+			t.Errorf("session prompt cost = %v, want %v", session.GetPromptTokensEstimatedCost(), wantPrompt)
+		}
+		// Text 0.15M at the output rate, audio 0.05M at the audio output rate.
+		wantCompletion := 0.15*4.50 + 0.05*12.00
+		if !floatEquals(session.GetCompletionTokensEstimatedCost(), wantCompletion) {
+			t.Errorf("session completion cost = %v, want %v", session.GetCompletionTokensEstimatedCost(), wantCompletion)
+		}
+
+		want := map[string]int64{
+			"session_prompt_tokens":              1000000,
+			"session_completion_tokens":          200000,
+			"session_cached_prompt_tokens":       100000,
+			"session_text_prompt_tokens":         400000,
+			"session_audio_prompt_tokens":        550000,
+			"session_image_prompt_tokens":        50000,
+			"session_cached_text_prompt_tokens":  100000,
+			"session_text_completion_tokens":     150000,
+			"session_audio_completion_tokens":    50000,
+			"session_thinking_completion_tokens": 30000,
+		}
+		if len(session.GetBreakdown()) != len(want) {
+			t.Fatalf("breakdown = %v, want %v", session.GetBreakdown(), want)
+		}
+		for key, value := range want {
+			if got := session.GetBreakdown()[key]; got != value {
+				t.Errorf("%s = %d, want %d", key, got, value)
+			}
+		}
+
+		usage := m.buildAIAgentUsageMetadata(telemetry, 0, 0, "", nil, log).GetTokenUsage()
+		if !floatEquals(usage.GetPromptTokensEstimatedCost(), wantPrompt) ||
+			!floatEquals(usage.GetCompletionTokensEstimatedCost(), wantCompletion) {
+			t.Errorf("metadata costs = (%v, %v), want (%v, %v)",
+				usage.GetPromptTokensEstimatedCost(), usage.GetCompletionTokensEstimatedCost(), wantPrompt, wantCompletion)
+		}
+		if got := usage.GetBreakdown()["session_audio_prompt_tokens"]; got != 550000 {
+			t.Errorf("metadata session_audio_prompt_tokens = %d, want 550000", got)
+		}
+	})
+
+	t.Run("openai realtime bills the cached subset of every modality", func(t *testing.T) {
+		m := newMultimodalArtifactModel(config.ModelPricing{
+			InputPricePerMillionTokens:            0.60,
+			CachedInputPricePerMillionTokens:      0.06,
+			AudioInputPricePerMillionTokens:       10.00,
+			AudioCachedInputPricePerMillionTokens: 0.30,
+			ImageInputPricePerMillionTokens:       0.80,
+			ImageCachedInputPricePerMillionTokens: 0.08,
+			OutputPricePerMillionTokens:           2.40,
+			AudioOutputPricePerMillionTokens:      20.00,
+		})
+		telemetry := &redisservice.AIAgentSessionTelemetry{
+			InputTokens:            1000000,
+			CachedInputTokens:      300000,
+			TextInputTokens:        500000,
+			AudioInputTokens:       450000,
+			ImageInputTokens:       50000,
+			CachedTextInputTokens:  200000,
+			CachedAudioInputTokens: 90000,
+			CachedImageInputTokens: 10000,
+			OutputTokens:           200000,
+			TextOutputTokens:       20000,
+			AudioOutputTokens:      180000,
+		}
+
+		session := m.buildAIAgentSessionUsages(telemetry, 0, 0, "", log)[aiAgentUsageKeySession]
+		if session == nil {
+			t.Fatal("the session entry is missing")
+		}
+
+		wantPrompt := 0.3*0.60 + 0.2*0.06 + 0.36*10.00 + 0.09*0.30 + 0.04*0.80 + 0.01*0.08
+		if !floatEquals(session.GetPromptTokensEstimatedCost(), wantPrompt) {
+			t.Errorf("session prompt cost = %v, want %v", session.GetPromptTokensEstimatedCost(), wantPrompt)
+		}
+		wantCompletion := 0.02*2.40 + 0.18*20.00
+		if !floatEquals(session.GetCompletionTokensEstimatedCost(), wantCompletion) {
+			t.Errorf("session completion cost = %v, want %v", session.GetCompletionTokensEstimatedCost(), wantCompletion)
+		}
+
+		want := map[string]int64{
+			"session_cached_text_prompt_tokens":  200000,
+			"session_cached_audio_prompt_tokens": 90000,
+			"session_cached_image_prompt_tokens": 10000,
+			"session_text_prompt_tokens":         500000,
+			"session_audio_prompt_tokens":        450000,
+			"session_image_prompt_tokens":        50000,
+			"session_text_completion_tokens":     20000,
+			"session_audio_completion_tokens":    180000,
+		}
+		for key, value := range want {
+			if got := session.GetBreakdown()[key]; got != value {
+				t.Errorf("%s = %d, want %d", key, got, value)
+			}
+		}
+		if _, ok := session.GetBreakdown()["session_thinking_completion_tokens"]; ok {
+			t.Error("openai reports no thinking tokens, the key must be omitted")
+		}
+	})
+
+	t.Run("an audio-only turn is not priced as text", func(t *testing.T) {
+		m := newMultimodalArtifactModel(config.ModelPricing{
+			InputPricePerMillionTokens:       0.75,
+			AudioInputPricePerMillionTokens:  3.00,
+			OutputPricePerMillionTokens:      4.50,
+			AudioOutputPricePerMillionTokens: 12.00,
+		})
+		// The provider reported the split of the response, not of the prompt.
+		telemetry := &redisservice.AIAgentSessionTelemetry{
+			InputTokens:       1000000,
+			AudioInputTokens:  600000,
+			OutputTokens:      100000,
+			AudioOutputTokens: 100000,
+		}
+
+		session := m.buildAIAgentSessionUsages(telemetry, 0, 0, "", log)[aiAgentUsageKeySession]
+		if got := session.GetBreakdown()["session_audio_prompt_tokens"]; got != 600000 {
+			t.Errorf("session_audio_prompt_tokens = %d, want 600000", got)
+		}
+		// The unattributed remainder is text, so no token goes unbilled.
+		if got := session.GetBreakdown()["session_text_prompt_tokens"]; got != 400000 {
+			t.Errorf("session_text_prompt_tokens = %d, want 400000", got)
+		}
+		wantPrompt := 0.4*0.75 + 0.6*3.00
+		if !floatEquals(session.GetPromptTokensEstimatedCost(), wantPrompt) {
+			t.Errorf("session prompt cost = %v, want %v", session.GetPromptTokensEstimatedCost(), wantPrompt)
+		}
+		if !floatEquals(session.GetCompletionTokensEstimatedCost(), 0.1*12.00) {
+			t.Errorf("session completion cost = %v, want %v", session.GetCompletionTokensEstimatedCost(), 0.1*12.00)
+		}
+	})
+}
+
+func TestBuildAIAgentUsageCachedPromptTokens(t *testing.T) {
+	log := testLogger()
+
+	t.Run("cached prompt tokens are reported but not discounted by default", func(t *testing.T) {
+		m := newPricedArtifactModel()
+		telemetry := &redisservice.AIAgentSessionTelemetry{InputTokens: 1000, CachedInputTokens: 400, OutputTokens: 500}
+
+		session := m.buildAIAgentSessionUsages(telemetry, 0, 0, "", log)[aiAgentUsageKeySession]
+		if session == nil {
+			t.Fatal("the session entry is missing")
+		}
+		if got := session.GetBreakdown()["session_cached_prompt_tokens"]; got != 400 {
+			t.Errorf("session_cached_prompt_tokens = %d, want 400", got)
+		}
+		// No cached rate is configured, so all 1000 prompt tokens pay 2 per 1M.
+		if !floatEquals(session.GetPromptTokensEstimatedCost(), 0.002) {
+			t.Errorf("session prompt cost = %v, want 0.002", session.GetPromptTokensEstimatedCost())
+		}
+		if !floatEquals(session.GetTotalTokensEstimatedCost(), 0.004) {
+			t.Errorf("session total cost = %v, want 0.004", session.GetTotalTokensEstimatedCost())
+		}
+		if session.GetPromptTokens() != 1000 || session.GetTotalTokens() != 1500 {
+			t.Errorf("cached tokens must stay part of the prompt tokens: %+v", session)
+		}
+
+		usage := m.buildAIAgentUsageMetadata(telemetry, 0, 0, "", nil, log).GetTokenUsage()
+		if got := usage.GetBreakdown()["session_cached_prompt_tokens"]; got != 400 {
+			t.Errorf("metadata session_cached_prompt_tokens = %d, want 400", got)
+		}
+		if !floatEquals(usage.GetPromptTokensEstimatedCost(), 0.002) {
+			t.Errorf("metadata prompt cost = %v, want 0.002", usage.GetPromptTokensEstimatedCost())
+		}
+		if !floatEquals(usage.GetTotalTokensEstimatedCost(), 0.004) {
+			t.Errorf("metadata total cost = %v, want 0.004", usage.GetTotalTokensEstimatedCost())
+		}
+	})
+
+	t.Run("an explicit cached rate discounts the cached tokens", func(t *testing.T) {
+		m := newPricedArtifactModel()
+		m.app.Insights.Services[insights.ServiceTypeAIAgent].Pricing["realtime_model"] = config.ModelPricing{
+			InputPricePerMillionTokens:       2,
+			OutputPricePerMillionTokens:      4,
+			CachedInputPricePerMillionTokens: 0.25,
+		}
+
+		telemetry := &redisservice.AIAgentSessionTelemetry{InputTokens: 1000, CachedInputTokens: 1000}
+		session := m.buildAIAgentSessionUsages(telemetry, 0, 0, "", log)[aiAgentUsageKeySession]
+		if !floatEquals(session.GetPromptTokensEstimatedCost(), 0.00025) {
+			t.Errorf("session prompt cost = %v, want 0.00025", session.GetPromptTokensEstimatedCost())
+		}
+	})
+
+	t.Run("cached tokens never exceed the input tokens", func(t *testing.T) {
+		m := newPricedArtifactModel()
+		telemetry := &redisservice.AIAgentSessionTelemetry{InputTokens: 100, CachedInputTokens: 400}
+
+		session := m.buildAIAgentSessionUsages(telemetry, 0, 0, "", log)[aiAgentUsageKeySession]
+		if got := session.GetBreakdown()["session_cached_prompt_tokens"]; got != 100 {
+			t.Errorf("session_cached_prompt_tokens = %d, want it clamped to 100", got)
+		}
+		// everything cached, at the input rate: 100/1M*2
+		if !floatEquals(session.GetPromptTokensEstimatedCost(), 0.0002) {
+			t.Errorf("session prompt cost = %v, want 0.0002", session.GetPromptTokensEstimatedCost())
+		}
+	})
+
+	t.Run("no cached tokens keeps the breakdown without the key", func(t *testing.T) {
+		m := newPricedArtifactModel()
+		telemetry := &redisservice.AIAgentSessionTelemetry{InputTokens: 1000, OutputTokens: 500}
+
+		session := m.buildAIAgentSessionUsages(telemetry, 0, 0, "", log)[aiAgentUsageKeySession]
+		if _, ok := session.GetBreakdown()["session_cached_prompt_tokens"]; ok {
+			t.Error("session_cached_prompt_tokens must be omitted when nothing was cached")
+		}
+		if !floatEquals(session.GetPromptTokensEstimatedCost(), 0.002) {
+			t.Errorf("session prompt cost = %v, want 0.002", session.GetPromptTokensEstimatedCost())
+		}
+	})
+}

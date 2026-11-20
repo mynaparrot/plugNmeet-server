@@ -95,7 +95,20 @@ type aiAgentRuntimeState struct {
 	reason       string
 	inputTokens  uint32
 	outputTokens uint32
-	audioMillis  uint64
+	// cachedInputTokens is the cached prefix of inputTokens: the provider
+	// billed it at a discounted rate, so it is priced apart.
+	cachedInputTokens uint64
+	// Modality split of the same tokens, so each one is priced at its own rate.
+	textInputTokens        uint64
+	audioInputTokens       uint64
+	imageInputTokens       uint64
+	cachedTextInputTokens  uint64
+	cachedAudioInputTokens uint64
+	cachedImageInputTokens uint64
+	textOutputTokens       uint64
+	audioOutputTokens      uint64
+	thinkingOutputTokens   uint64
+	audioMillis            uint64
 	// delegationInputTokens and delegationOutputTokens belong to the delegated
 	// text model of a live session, so they never mix with the session tokens.
 	delegationInputTokens  uint32

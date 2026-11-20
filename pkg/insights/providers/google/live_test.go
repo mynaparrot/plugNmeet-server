@@ -183,7 +183,7 @@ func TestTranslateServerMessage(t *testing.T) {
 				nil,
 			},
 		},
-		UsageMetadata: &genai.UsageMetadata{PromptTokenCount: 11, ResponseTokenCount: 7},
+		UsageMetadata: &genai.UsageMetadata{PromptTokenCount: 11, ResponseTokenCount: 7, CachedContentTokenCount: 4},
 		GoAway:        &genai.LiveServerGoAway{TimeLeft: 10 * time.Second},
 	}
 
@@ -218,7 +218,7 @@ func TestTranslateServerMessage(t *testing.T) {
 				t.Fatalf("unexpected args: %v", args)
 			}
 		case insights.RealtimeEventUsage:
-			if ev.InputTokens != 11 || ev.OutputTokens != 7 {
+			if ev.InputTokens != 11 || ev.OutputTokens != 7 || ev.CachedInputTokens != 4 {
 				t.Fatalf("unexpected usage: %+v", ev)
 			}
 		}
@@ -242,6 +242,64 @@ func TestTranslateServerMessage(t *testing.T) {
 		if types[i] != want[i] {
 			t.Fatalf("event %d: expected %s, got %s", i, want[i], types[i])
 		}
+	}
+}
+
+func TestTranslateUsageMetadata(t *testing.T) {
+	// Text, audio and video input, the cached subset of text and audio, an
+	// audio-only response, plus thinking and tool result tokens, which Gemini
+	// reports beside the prompt and the response counts.
+	ev := translateUsageMetadata(&genai.UsageMetadata{
+		PromptTokenCount:        100,
+		CachedContentTokenCount: 40,
+		ResponseTokenCount:      20,
+		ThoughtsTokenCount:      5,
+		ToolUsePromptTokenCount: 8,
+		PromptTokensDetails: []*genai.ModalityTokenCount{
+			{Modality: genai.MediaModalityText, TokenCount: 60},
+			{Modality: genai.MediaModalityAudio, TokenCount: 25},
+			{Modality: genai.MediaModalityVideo, TokenCount: 15},
+			nil,
+		},
+		ToolUsePromptTokensDetails: []*genai.ModalityTokenCount{
+			{Modality: genai.MediaModalityText, TokenCount: 8},
+		},
+		CacheTokensDetails: []*genai.ModalityTokenCount{
+			{Modality: genai.MediaModalityText, TokenCount: 30},
+			{Modality: genai.MediaModalityAudio, TokenCount: 10},
+		},
+		ResponseTokensDetails: []*genai.ModalityTokenCount{
+			{Modality: genai.MediaModalityAudio, TokenCount: 20},
+		},
+	})
+
+	if ev.Type != insights.RealtimeEventUsage {
+		t.Fatalf("unexpected event type: %s", ev.Type)
+	}
+	// Tool results are input and thinking tokens are output.
+	if ev.InputTokens != 108 || ev.OutputTokens != 25 || ev.CachedInputTokens != 40 {
+		t.Errorf("totals = (%d, %d, %d), want (108, 25, 40)", ev.InputTokens, ev.OutputTokens, ev.CachedInputTokens)
+	}
+	if ev.TextInputTokens != 68 || ev.AudioInputTokens != 25 || ev.ImageInputTokens != 15 {
+		t.Errorf("input split = (%d, %d, %d), want (68, 25, 15)",
+			ev.TextInputTokens, ev.AudioInputTokens, ev.ImageInputTokens)
+	}
+	if ev.CachedTextInputTokens != 30 || ev.CachedAudioInputTokens != 10 || ev.CachedImageInputTokens != 0 {
+		t.Errorf("cached split = (%d, %d, %d), want (30, 10, 0)",
+			ev.CachedTextInputTokens, ev.CachedAudioInputTokens, ev.CachedImageInputTokens)
+	}
+	if ev.TextOutputTokens != 5 || ev.AudioOutputTokens != 20 || ev.ThinkingOutputTokens != 5 {
+		t.Errorf("output split = (%d, %d, thinking %d), want (5, 20, thinking 5)",
+			ev.TextOutputTokens, ev.AudioOutputTokens, ev.ThinkingOutputTokens)
+	}
+
+	// A text turn reports no detail at all: everything is text.
+	text := translateUsageMetadata(&genai.UsageMetadata{PromptTokenCount: 12, ResponseTokenCount: 7})
+	if text.InputTokens != 12 || text.OutputTokens != 7 || text.TextOutputTokens != 7 {
+		t.Errorf("unexpected text usage: %+v", text)
+	}
+	if text.AudioInputTokens != 0 || text.ImageInputTokens != 0 || text.ThinkingOutputTokens != 0 {
+		t.Errorf("a text turn must not report audio, image or thinking tokens: %+v", text)
 	}
 }
 

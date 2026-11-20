@@ -52,6 +52,21 @@ type RealtimeEvent struct {
 	// InputTokens and OutputTokens are set for RealtimeEventUsage.
 	InputTokens  uint32
 	OutputTokens uint32
+	// CachedInputTokens is the cached prefix of InputTokens, billed at a
+	// discounted rate when one is configured for the modality.
+	CachedInputTokens uint32
+	// Per-modality detail of the counts above, so each rate applies to the
+	// tokens it belongs to. ImageInputTokens covers image and video input, and
+	// TextOutputTokens includes the thinking tokens, which are billed as output.
+	TextInputTokens        uint32
+	AudioInputTokens       uint32
+	ImageInputTokens       uint32
+	CachedTextInputTokens  uint32
+	CachedAudioInputTokens uint32
+	CachedImageInputTokens uint32
+	TextOutputTokens       uint32
+	AudioOutputTokens      uint32
+	ThinkingOutputTokens   uint32
 	// DelegationInputTokens and DelegationOutputTokens report the tokens spent by
 	// a delegated text model (e.g. an OpenAI Live Responses delegation), which is
 	// priced apart from the session model.

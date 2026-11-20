@@ -92,6 +92,48 @@ func TestBuildLockedSystemInstructionTeacherProfile(t *testing.T) {
 	}
 }
 
+// staticPrefix is everything up to and including the [SESSION SCOPE] header,
+// i.e. the part providers can cache across sessions and rooms.
+func staticPrefix(t *testing.T, instruction string) string {
+	idx := strings.Index(instruction, sessionScopeHeader)
+	if idx < 0 {
+		t.Fatalf("instruction has no session scope header:\n%s", instruction)
+	}
+	return instruction[:idx+len(sessionScopeHeader)]
+}
+
+func TestBuildLockedSystemInstructionStaticPrefix(t *testing.T) {
+	teacher := testBoundaryConfig("teacher")
+	product := testBoundaryConfig("product")
+	language := testBoundaryConfig("language")
+	// Even the host prose and the previous-session handoff must not leak into
+	// the cacheable prefix.
+	language.HostSystemPrompt = "Different host prompt entirely."
+	language.PreviousSessionSummary = "We practised numbers last time."
+
+	prefix := staticPrefix(t, BuildLockedSystemInstruction(teacher))
+	for name, other := range map[string]BoundaryConfig{"product": product, "language": language} {
+		if got := staticPrefix(t, BuildLockedSystemInstruction(other)); got != prefix {
+			t.Errorf("the %s profile must share the cacheable prefix:\n--- got ---\n%s\n--- want ---\n%s", name, got, prefix)
+		}
+	}
+
+	if !strings.HasPrefix(prefix, platformBoundaryHeader) {
+		t.Errorf("the prefix must start with the platform boundary header:\n%s", prefix)
+	}
+	for _, leaked := range []string{"Ms. Ada", "Acme Support", "Introduction to fractions", "Acme Cloud billing", "not specified — stay on the primary topic"} {
+		if strings.Contains(prefix, leaked) {
+			t.Errorf("the cacheable prefix must not contain %q:\n%s", leaked, prefix)
+		}
+	}
+
+	// The identity and topic still reach the model, right after the prefix.
+	scope := BuildLockedSystemInstruction(teacher)
+	if !strings.Contains(scope, sessionScopeHeader+"\nAgent Display Name: Ms. Ada\nPrimary Topic: Introduction to fractions\n") {
+		t.Errorf("the session scope must open with the display name and topic:\n%s", scope)
+	}
+}
+
 func TestBuildLockedSystemInstructionProductProfile(t *testing.T) {
 	got := BuildLockedSystemInstruction(testBoundaryConfig("product"))
 

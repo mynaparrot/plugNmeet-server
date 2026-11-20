@@ -16,13 +16,25 @@ const (
 	ProviderOpenAI ProviderType = "openai"
 )
 
-// ModelPricing holds pricing information for a service.
+// ModelPricing holds pricing information for a service. The token rates are a
+// matrix: the input/output rates are the text rates, and every modality with a
+// rate of its own overrides them. A modality without a rate is billed as text,
+// and a cached rate applies only when it is configured, so a missing value
+// never implies a discount.
 type ModelPricing struct {
-	InputPricePerMillionTokens  float64 `yaml:"input_price_per_million_tokens"`
-	OutputPricePerMillionTokens float64 `yaml:"output_price_per_million_tokens"`
-	PricePerMinute              float64 `yaml:"price_per_minute"`
-	PricePerMillionCharacters   float64 `yaml:"price_per_million_characters"`
-	PricePerHour                float64 `yaml:"price_per_hour"`
+	InputPricePerMillionTokens       float64 `yaml:"input_price_per_million_tokens"`
+	OutputPricePerMillionTokens      float64 `yaml:"output_price_per_million_tokens"`
+	CachedInputPricePerMillionTokens float64 `yaml:"cached_input_price_per_million_tokens"`
+	// Audio and image input tokens. image_input_price_per_million_tokens also
+	// covers video input, which every provider prices like an image.
+	AudioInputPricePerMillionTokens       float64 `yaml:"audio_input_price_per_million_tokens"`
+	AudioCachedInputPricePerMillionTokens float64 `yaml:"audio_cached_input_price_per_million_tokens"`
+	ImageInputPricePerMillionTokens       float64 `yaml:"image_input_price_per_million_tokens"`
+	ImageCachedInputPricePerMillionTokens float64 `yaml:"image_cached_input_price_per_million_tokens"`
+	AudioOutputPricePerMillionTokens      float64 `yaml:"audio_output_price_per_million_tokens"`
+	PricePerMinute                        float64 `yaml:"price_per_minute"`
+	PricePerMillionCharacters             float64 `yaml:"price_per_million_characters"`
+	PricePerHour                          float64 `yaml:"price_per_hour"`
 }
 
 // InsightsConfig is the main config block for the insights feature.
