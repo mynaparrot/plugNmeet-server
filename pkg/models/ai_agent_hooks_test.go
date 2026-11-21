@@ -26,12 +26,14 @@ func (r *recordingAgentSender) SendProactiveContext(text, source string) error {
 	return nil
 }
 
+func (r *recordingAgentSender) Stop(string) {}
+
 func pollHookTestModel(t *testing.T) (*AIAgentModel, *recordingAgentSender) {
 	t.Helper()
 
 	model := newAIAgentTestModel(newAIAgentTestRedis(t))
 	sender := new(recordingAgentSender)
-	model.activeAgentLookup = func(string) (aiAgentContextSender, bool) {
+	model.activeAgentLookup = func(string) (aiAgentHandle, bool) {
 		return sender, true
 	}
 
@@ -132,7 +134,7 @@ func TestOnPollResponseSubmittedSkipsWhatItCannotDescribe(t *testing.T) {
 	}
 
 	// without a hosted agent there is no session to push the note into
-	model.activeAgentLookup = func(string) (aiAgentContextSender, bool) {
+	model.activeAgentLookup = func(string) (aiAgentHandle, bool) {
 		return nil, false
 	}
 	model.OnPollResponseSubmitted(context.Background(), "room-1", "poll-1", "u1", "", 2)

@@ -172,17 +172,20 @@ type AIAgentModel struct {
 	// clientAPISubmitter overrides the browser round-trip in unit tests.
 	clientAPISubmitter func(ctx context.Context, roomID, targetUserID, route string, payload proto.Message) error
 	// activeAgentLookup overrides the hosted-agent registry in unit tests.
-	activeAgentLookup func(roomID string) (aiAgentContextSender, bool)
+	activeAgentLookup func(roomID string) (aiAgentHandle, bool)
+	// closeBreakoutRoom overrides the 1-on-1 room teardown in unit tests.
+	closeBreakoutRoom func(roomID, reason string)
 }
 
-// aiAgentContextSender is the slice of insightsservice.AIAgent a model hook
-// needs to push a server-side note into the live session.
-type aiAgentContextSender interface {
+// aiAgentHandle is the slice of insightsservice.AIAgent the model needs: push a
+// server-side note into the live session and stop it.
+type aiAgentHandle interface {
 	SendProactiveContext(text, source string) error
+	Stop(reason string)
 }
 
 // hostedAgent returns the agent this process hosts for the room, if any.
-func (m *AIAgentModel) hostedAgent(roomID string) (aiAgentContextSender, bool) {
+func (m *AIAgentModel) hostedAgent(roomID string) (aiAgentHandle, bool) {
 	if m.activeAgentLookup != nil {
 		return m.activeAgentLookup(roomID)
 	}

@@ -62,9 +62,10 @@ func (m *AIAgentModel) OnUserJoined(ctx context.Context, roomId, userId string) 
 	}
 }
 
-// OnUserLeft runs after a human really left: it re-selects the delegate and stops
-// the agent once the room stays empty for the grace period.
-func (m *AIAgentModel) OnUserLeft(ctx context.Context, roomId, userId string) {
+// OnUserLeft runs after a human really left: it re-selects the delegate and ends
+// the session of an empty room. An intentional leave ends it at once, a dropped
+// connection or refresh only after the grace period.
+func (m *AIAgentModel) OnUserLeft(ctx context.Context, roomId, userId string, intentional ...bool) {
 	if m == nil || config.IsUserIdInternal(userId) {
 		return
 	}
@@ -81,8 +82,33 @@ func (m *AIAgentModel) OnUserLeft(ctx context.Context, roomId, userId string) {
 	if len(m.onlineHumans(roomId)) > 0 {
 		return
 	}
-	// A fast refresh must not kill the session, so stop only after the grace period.
+	m.onRoomEmpty(roomId, len(intentional) > 0 && intentional[0])
+}
+
+// onRoomEmpty reacts to a room without humans: a participant who left on purpose
+// will not come back, so the session is closed at once and its slot is free for
+// the next user. Otherwise the grace period keeps a refresh alive.
+func (m *AIAgentModel) onRoomEmpty(roomId string, intentional bool) {
+	if intentional {
+		m.stopEmptyRoom(roomId)
+		return
+	}
 	m.startStopTimer(roomId)
+}
+
+// stopEmptyRoom stops the hosted agent of an empty room and closes its 1-on-1
+// breakout room.
+func (m *AIAgentModel) stopEmptyRoom(roomId string) {
+	m.cancelStopTimer(roomId)
+
+	agent, ok := m.hostedAgent(roomId)
+	if !ok {
+		// No agent runs here (already stopped or never started), so nothing
+		// triggers afterAgentStopped: the room has to be closed directly.
+		m.closeBreakoutRoomAfterStop(roomId, aiAgentStopReasonEmptyRoom)
+		return
+	}
+	agent.Stop(aiAgentStopReasonEmptyRoom)
 }
 
 // StopForRoomEnd stops the agent because the room is ending. The Redis keys
@@ -225,9 +251,7 @@ func (m *AIAgentModel) startStopTimer(roomId string) {
 		if len(m.onlineHumans(roomId)) > 0 {
 			return
 		}
-		if err := m.Stop(m.ctx, roomId, aiAgentStopReasonEmptyRoom); err != nil {
-			m.logger.WithError(err).Warn("could not stop the ai agent of an empty room")
-		}
+		m.stopEmptyRoom(roomId)
 	})
 }
 

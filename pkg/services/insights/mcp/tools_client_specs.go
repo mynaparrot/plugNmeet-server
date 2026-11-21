@@ -199,6 +199,8 @@ func registerWhiteboardTools(reg *Registry, deps ToolDependencies) {
 			InputSchema: objectSchema(map[string]any{
 				"layout":            enumProp("Placement relative to page or anchor_element_id.", "free_space", "inside_element", "below_element", "above_element", "right_of_element", "left_of_element", "page_center"),
 				"anchor_element_id": stringProp("Target element id for anchored layouts.", 120),
+				"x":                 map[string]any{"type": "number"},
+				"y":                 map[string]any{"type": "number"},
 				"style":             enumProp("Visual style.", "heading", "body", "vocabulary_card", "sticky_note", "comparison_table"),
 				"blocks": arrayProp("Content blocks or table rows.", objectSchema(map[string]any{
 					"text":     stringProp("Block text (optional when columns is set).", 400),

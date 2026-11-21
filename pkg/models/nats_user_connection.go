@@ -202,9 +202,10 @@ func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, disconnecte
 		_ = m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_USER_OFFLINE, roomId, &plugnmeet.NatsKvUserInfo{UserId: userId, RoomId: roomId}, nil)
 	}
 
-	// The user is really gone, so let the AI agent re-select its delegate and
-	// arm its empty-room grace timer.
-	go m.aiAgentModel.OnUserLeft(m.ctx, roomId, userId)
+	// The user is really gone, so let the AI agent re-select its delegate. An
+	// intentional leave (no grace period) ends an empty room at once; otherwise
+	// the empty-room grace timer keeps a refresh alive.
+	go m.aiAgentModel.OnUserLeft(m.ctx, roomId, userId, gracePeriod == 0)
 
 	// If the room ended during Stage 1, skip Stage 2 and go straight to cleanup.
 	if roomEnded {

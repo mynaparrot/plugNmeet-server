@@ -210,11 +210,9 @@ func (m *AIAgentModel) Start(ctx context.Context, roomId string, req *plugnmeet.
 // Stop ends the room's agent session. It is a no-op when this server does not
 // host the agent.
 func (m *AIAgentModel) Stop(ctx context.Context, roomId, reason string) error {
-	agent, ok := insightsservice.GetActiveAIAgent(roomId)
-	if !ok {
-		return nil
+	if agent, ok := m.hostedAgent(roomId); ok {
+		agent.Stop(reason)
 	}
-	agent.Stop(reason)
 	return nil
 }
 
@@ -397,6 +395,10 @@ func (m *AIAgentModel) afterAgentStopped(roomId, reason string) {
 // normal session is a regular breakout room, whose lifecycle belongs to its
 // duration or to the host who created it.
 func (m *AIAgentModel) closeBreakoutRoomAfterStop(roomId, reason string) {
+	if m.closeBreakoutRoom != nil {
+		m.closeBreakoutRoom(roomId, reason)
+		return
+	}
 	if m.bkRoomModel == nil {
 		return
 	}
