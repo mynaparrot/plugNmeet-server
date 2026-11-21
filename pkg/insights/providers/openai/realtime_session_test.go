@@ -14,7 +14,14 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/openai/openai-go/v3/realtime"
+	"github.com/sirupsen/logrus"
 )
+
+// newTestRealtimeAgentSession builds a session with a valid logger, matching
+// the entry the runtime injects.
+func newTestRealtimeAgentSession(conn realtimeAgentConn) *realtimeAgentSession {
+	return newRealtimeAgentSession(conn, logrus.NewEntry(logrus.New()))
+}
 
 // fakeRealtimeAgentConn records writes and replays scripted server events.
 type fakeRealtimeAgentConn struct {
@@ -499,7 +506,7 @@ func TestTranslateRealtimeServerEventError(t *testing.T) {
 
 func TestRealtimeAgentSessionSendAudio(t *testing.T) {
 	conn := &fakeRealtimeAgentConn{}
-	s := newRealtimeAgentSession(conn, nil)
+	s := newTestRealtimeAgentSession(conn)
 
 	// 1600 bytes = 800 samples at 16 kHz, which is 1200 samples at 24 kHz.
 	if err := s.SendAudio(make([]byte, 1600)); err != nil {
@@ -536,7 +543,7 @@ func TestRealtimeAgentSessionSendAudio(t *testing.T) {
 
 func TestRealtimeAgentSessionSendContextText(t *testing.T) {
 	conn := &fakeRealtimeAgentConn{}
-	s := newRealtimeAgentSession(conn, nil)
+	s := newTestRealtimeAgentSession(conn)
 
 	if err := s.SendContextText("system", "the poll is closed", false); err != nil {
 		t.Fatalf("SendContextText: %v", err)
@@ -589,7 +596,7 @@ func TestRealtimeAgentSessionSendContextText(t *testing.T) {
 
 func TestRealtimeAgentSessionSendImage(t *testing.T) {
 	conn := &fakeRealtimeAgentConn{}
-	s := newRealtimeAgentSession(conn, nil)
+	s := newTestRealtimeAgentSession(conn)
 
 	if err := s.SendImage("", []byte("img"), "look at the board"); err != nil {
 		t.Fatalf("SendImage: %v", err)
@@ -632,7 +639,7 @@ func TestRealtimeAgentSessionSendImage(t *testing.T) {
 
 func TestRealtimeAgentSessionSendToolResult(t *testing.T) {
 	conn := &fakeRealtimeAgentConn{}
-	s := newRealtimeAgentSession(conn, nil)
+	s := newTestRealtimeAgentSession(conn)
 
 	if err := s.SendToolResult("call-1", "get_poll_results", `{"votes":3}`, false); err != nil {
 		t.Fatalf("SendToolResult: %v", err)
@@ -683,7 +690,7 @@ func realtimeToolCallEvent(callID, name string) realtime.RealtimeServerEventUnio
 // must not jump the queue.
 func TestRealtimeAgentSessionMultipleToolCallsWaitForAllOutputs(t *testing.T) {
 	conn := &fakeRealtimeAgentConn{}
-	s := newRealtimeAgentSession(conn, nil)
+	s := newTestRealtimeAgentSession(conn)
 
 	if !s.handleServerMessage(realtimeToolCallEvent("call_1", "whiteboard_manage_board")) {
 		t.Fatal("the read loop must keep running")
@@ -751,7 +758,7 @@ func TestRealtimeAgentSessionMultipleToolCallsWaitForAllOutputs(t *testing.T) {
 // response.create, so the tool result must not add a second one.
 func TestRealtimeAgentSessionDeferredContextTriggersResponseOnce(t *testing.T) {
 	conn := &fakeRealtimeAgentConn{}
-	s := newRealtimeAgentSession(conn, nil)
+	s := newTestRealtimeAgentSession(conn)
 
 	s.handleServerMessage(realtimeToolCallEvent("call_1", "whiteboard_capture_snapshot"))
 	s.handleServerMessage(realtime.RealtimeServerEventUnion{
@@ -783,7 +790,7 @@ func TestRealtimeAgentSessionDeferredContextTriggersResponseOnce(t *testing.T) {
 // blocked by calls that can never be answered.
 func TestRealtimeAgentSessionFailedResponseResetsToolTurn(t *testing.T) {
 	conn := &fakeRealtimeAgentConn{}
-	s := newRealtimeAgentSession(conn, nil)
+	s := newTestRealtimeAgentSession(conn)
 
 	s.handleServerMessage(realtimeToolCallEvent("call_1", "whiteboard_manage_board"))
 	s.handleServerMessage(realtime.RealtimeServerEventUnion{
@@ -817,7 +824,7 @@ func TestRealtimeAgentSessionFailedResponseResetsToolTurn(t *testing.T) {
 
 func TestRealtimeAgentSessionInterrupt(t *testing.T) {
 	conn := &fakeRealtimeAgentConn{}
-	s := newRealtimeAgentSession(conn, nil)
+	s := newTestRealtimeAgentSession(conn)
 
 	if err := s.Interrupt(); err != nil {
 		t.Fatalf("Interrupt: %v", err)
@@ -831,7 +838,7 @@ func TestRealtimeAgentSessionInterrupt(t *testing.T) {
 
 func TestRealtimeAgentSessionSendAfterClose(t *testing.T) {
 	conn := &fakeRealtimeAgentConn{}
-	s := newRealtimeAgentSession(conn, nil)
+	s := newTestRealtimeAgentSession(conn)
 
 	if err := s.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
@@ -846,7 +853,7 @@ func TestRealtimeAgentSessionSendAfterClose(t *testing.T) {
 
 func TestRealtimeAgentSessionSendError(t *testing.T) {
 	conn := &fakeRealtimeAgentConn{writeFail: errors.New("socket is broken")}
-	s := newRealtimeAgentSession(conn, nil)
+	s := newTestRealtimeAgentSession(conn)
 
 	if err := s.SendAudio([]byte{1, 2}); err == nil {
 		t.Fatal("send errors must be reported")
@@ -865,7 +872,7 @@ func TestRealtimeAgentSessionReadLoop(t *testing.T) {
 			Status: realtime.RealtimeResponseStatusCompleted,
 		}}},
 	}}
-	s := newRealtimeAgentSession(conn, nil)
+	s := newTestRealtimeAgentSession(conn)
 	s.wg.Add(1)
 	go s.readLoop()
 
@@ -895,7 +902,7 @@ func TestRealtimeAgentSessionReadLoop(t *testing.T) {
 // A goroutine that emits after the read loop closed the stream must not panic.
 func TestRealtimeAgentSessionEmitAfterClose(t *testing.T) {
 	conn := &fakeRealtimeAgentConn{block: make(chan struct{})}
-	s := newRealtimeAgentSession(conn, nil)
+	s := newTestRealtimeAgentSession(conn)
 	s.wg.Add(1)
 	go s.readLoop()
 
@@ -912,7 +919,7 @@ func TestRealtimeAgentSessionEmitAfterClose(t *testing.T) {
 
 func TestRealtimeAgentSessionMaxDurationEmitsGoAway(t *testing.T) {
 	conn := &fakeRealtimeAgentConn{block: make(chan struct{})}
-	s := newRealtimeAgentSession(conn, nil)
+	s := newTestRealtimeAgentSession(conn)
 	s.wg.Add(1)
 	go s.readLoop()
 	go s.supervise(context.Background(), 5*time.Millisecond)

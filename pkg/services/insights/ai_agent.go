@@ -353,7 +353,7 @@ func NewAIAgent(args *AIAgentArgs) (*AIAgent, error) {
 		return nil, errors.New("ai agent: provider is not configured")
 	}
 
-	log := loggerOrDefault(args.Logger).WithFields(logrus.Fields{
+	log := args.Logger.WithFields(logrus.Fields{
 		"service": "ai-agent",
 		"roomId":  args.Payload.RoomId,
 	})
@@ -497,7 +497,7 @@ func newAIAgent(args *aiAgentCoreArgs) (*AIAgent, error) {
 		agentUserId = fmt.Sprintf("%s%s-%s", config.AgentUserUserIdPrefix, insights.ServiceTypeAIAgent, uuid.NewString())
 	}
 	boundary := args.Boundary.withDefaults()
-	log := loggerOrDefault(args.Logger).WithFields(logrus.Fields{
+	log := args.Logger.WithFields(logrus.Fields{
 		"service":     "ai-agent",
 		"roomId":      args.Payload.RoomId,
 		"sessionId":   sessionId,
@@ -570,13 +570,6 @@ func newAIAgent(args *aiAgentCoreArgs) (*AIAgent, error) {
 	})
 
 	return agent, nil
-}
-
-func loggerOrDefault(log *logrus.Entry) *logrus.Entry {
-	if log != nil {
-		return log
-	}
-	return logrus.NewEntry(logrus.StandardLogger())
 }
 
 // RoomID returns the room this agent serves.
@@ -818,6 +811,7 @@ func (a *AIAgent) setState(state plugnmeet.AIAgentRuntimeState, reason string) {
 	if state != plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_SPEAKING {
 		a.stopSpeakTimerLocked()
 	}
+	changed := a.state.state != state || a.state.tool != "" || a.state.reason != reason
 	a.state.state = state
 	a.state.speaking = state == plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_SPEAKING
 	a.state.tool = ""
@@ -825,11 +819,15 @@ func (a *AIAgent) setState(state plugnmeet.AIAgentRuntimeState, reason string) {
 	snapshot := a.state
 	a.stateMu.Unlock()
 
+	if changed {
+		a.logger.WithFields(logrus.Fields{"state": state.String(), "tool": "", "reason": reason}).Debug("ai agent: state changed")
+	}
 	a.broadcast(snapshot)
 }
 
 func (a *AIAgent) setToolState(state plugnmeet.AIAgentRuntimeState, tool string) {
 	a.stateMu.Lock()
+	changed := a.state.state != state || a.state.tool != tool || a.state.reason != ""
 	a.state.state = state
 	a.state.speaking = false
 	a.state.tool = tool
@@ -837,6 +835,9 @@ func (a *AIAgent) setToolState(state plugnmeet.AIAgentRuntimeState, tool string)
 	snapshot := a.state
 	a.stateMu.Unlock()
 
+	if changed {
+		a.logger.WithFields(logrus.Fields{"state": state.String(), "tool": tool, "reason": ""}).Debug("ai agent: state changed")
+	}
 	a.broadcast(snapshot)
 }
 

@@ -333,6 +333,13 @@ func translateRealtimeResponseDone(ev realtime.ResponseDoneEvent) []insights.Rea
 		if !functionCall {
 			events = append(events, insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete})
 		}
+	case realtime.RealtimeResponseStatusIncomplete, realtime.RealtimeResponseStatusCancelled:
+		// The response ended early, so no later event will close the turn: a
+		// function call turn still ends through its tool result, every other
+		// turn is closed here.
+		if !functionCall {
+			events = append(events, insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete})
+		}
 	case realtime.RealtimeResponseStatusFailed:
 		events = append(events, insights.RealtimeEvent{
 			Type: insights.RealtimeEventError,
@@ -362,6 +369,18 @@ func realtimeResponseFailureMessage(resp realtime.RealtimeResponse) string {
 	}
 
 	return "response failed"
+}
+
+// realtimeResponseStatusDetails returns the raw status_details payload, which
+// carries the reason of an incomplete or cancelled response.
+func realtimeResponseStatusDetails(resp realtime.RealtimeResponse) string {
+	if raw := resp.JSON.StatusDetails; raw.Valid() {
+		return raw.Raw()
+	}
+	if status := string(resp.StatusDetails); status != "" {
+		return status
+	}
+	return "unknown"
 }
 
 func realtimeTokenCount(v int64) uint32 {
@@ -508,10 +527,12 @@ func (s *realtimeAgentSession) SendToolResult(callID, toolName, resultJSON strin
 	})
 
 	s.toolMu.Lock()
+	_, pending := s.pendingToolCalls[callID]
 	delete(s.pendingToolCalls, callID)
 	// A response that asked for several tools still waits for the others: a
 	// response.create sent now is rejected with function_call_outputs_required.
 	settled := len(s.pendingToolCalls) == 0
+	pendingRemaining := len(s.pendingToolCalls)
 	var deferred []realtime.RealtimeClientEventUnionParam
 	if settled {
 		deferred = s.deferredEvents
@@ -519,10 +540,28 @@ func (s *realtimeAgentSession) SendToolResult(callID, toolName, resultJSON strin
 	}
 	s.toolMu.Unlock()
 
+	if !pending {
+		s.logger.WithFields(logrus.Fields{
+			"callId": callID,
+			"tool":   toolName,
+		}).Warn("openai realtime: tool result for a call that was not pending")
+	}
+
+	followUp := settled && !deferredTriggersResponse(deferred)
+	s.logger.WithFields(logrus.Fields{
+		"callId":           callID,
+		"tool":             toolName,
+		"isError":          isError,
+		"settled":          settled,
+		"pendingRemaining": pendingRemaining,
+		"deferredFlushed":  len(deferred),
+		"followUpResponse": followUp,
+	}).Debug("openai realtime: sending tool result")
+
 	events := make([]realtime.RealtimeClientEventUnionParam, 0, 2+len(deferred))
 	events = append(events, item)
 	events = append(events, deferred...)
-	if settled && !deferredTriggersResponse(deferred) {
+	if followUp {
 		events = append(events, realtime.RealtimeClientEventUnionParam{OfResponseCreate: &realtime.ResponseCreateEventParam{}})
 	}
 
@@ -666,7 +705,7 @@ func (s *realtimeAgentSession) readLoop() {
 	defer s.wg.Done()
 	defer s.closeEvents()
 	defer func() {
-		if err := s.shutdown(); err != nil && s.logger != nil {
+		if err := s.shutdown(); err != nil {
 			s.logger.WithError(err).Debug("openai realtime session close returned an error")
 		}
 	}()
@@ -691,6 +730,11 @@ func (s *realtimeAgentSession) handleServerMessage(msg realtime.RealtimeServerEv
 	for _, ev := range translateRealtimeServerEvent(msg) {
 		if ev.Type == insights.RealtimeEventToolCall {
 			s.queuedToolCalls = append(s.queuedToolCalls, ev)
+			s.logger.WithFields(logrus.Fields{
+				"callId":  ev.CallID,
+				"tool":    ev.ToolName,
+				"argsLen": len(ev.ArgsJSON),
+			}).Debug("openai realtime: tool call queued")
 			continue
 		}
 		if !s.emit(ev) {
@@ -698,14 +742,41 @@ func (s *realtimeAgentSession) handleServerMessage(msg realtime.RealtimeServerEv
 		}
 	}
 
-	if msg.Type == "response.done" {
-		for _, call := range s.completeResponse(msg.OfResponseDoneEvent.Response.Status) {
+	switch msg.Type {
+	case "response.created":
+		s.logger.WithField("responseId", msg.OfResponseCreatedEvent.Response.ID).Debug("openai realtime: response started")
+
+	case "response.done":
+		response := msg.OfResponseDoneEvent.Response
+		calls := s.completeResponse(response.Status)
+		s.logResponseDone(response, len(calls))
+		for _, call := range calls {
 			if !s.emit(call) {
 				return false
 			}
 		}
 	}
 	return true
+}
+
+// logResponseDone records how a response ended. An early end is the reason a
+// turn can look stuck, so it is reported together with its details.
+func (s *realtimeAgentSession) logResponseDone(response realtime.RealtimeResponse, toolCalls int) {
+	fields := logrus.Fields{
+		"status":    string(response.Status),
+		"toolCalls": toolCalls,
+	}
+
+	switch response.Status {
+	case realtime.RealtimeResponseStatusIncomplete, realtime.RealtimeResponseStatusCancelled:
+		fields["details"] = realtimeResponseStatusDetails(response)
+		s.logger.WithFields(fields).Warn("openai realtime: response ended early")
+	case realtime.RealtimeResponseStatusFailed:
+		fields["error"] = realtimeResponseFailureMessage(response)
+		s.logger.WithFields(fields).Warn("openai realtime: response failed")
+	default:
+		s.logger.WithFields(fields).Debug("openai realtime: response done")
+	}
 }
 
 // supervise closes the session on context cancellation or when the configured

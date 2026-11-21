@@ -94,6 +94,7 @@ func (a *AIAgent) handleEvent(session insights.RealtimeSession, ev insights.Real
 
 	case insights.RealtimeEventTranscriptAgent:
 		if ev.Final && strings.TrimSpace(ev.Text) != "" {
+			a.logger.WithField("text", ev.Text).Debug("ai agent: assistant transcript")
 			a.recordTranscriptTurn(transcriptRoleAgent, ev.Text)
 		}
 		if ev.Final && a.guard.CheckAgentTranscript(ev.Text) {

@@ -15,7 +15,14 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/openai/openai-go/v3/live"
+	"github.com/sirupsen/logrus"
 )
+
+// newTestLiveSession builds a session with a valid logger, matching the entry
+// the runtime injects.
+func newTestLiveSession(conn liveConn) (*liveSession, error) {
+	return newLiveSession(conn, logrus.NewEntry(logrus.New()))
+}
 
 // testLiveDelegationModel stands in for the configured delegation_model.
 const testLiveDelegationModel = "gpt-5.4-mini"
@@ -238,7 +245,7 @@ func TestStartLiveSessionSendFailure(t *testing.T) {
 
 func TestLiveSessionSendAudio(t *testing.T) {
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -269,7 +276,7 @@ func TestLiveSessionSendAudio(t *testing.T) {
 
 func TestLiveSessionSendContextText(t *testing.T) {
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -310,7 +317,7 @@ func TestLiveSessionSendContextText(t *testing.T) {
 // null instead of "".
 func TestLiveSessionContextTextSendsNullDelegationID(t *testing.T) {
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -367,7 +374,7 @@ func TestLiveSessionSendContextTextBoundsLongAppend(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			conn := &fakeLiveConn{}
-			s, err := newLiveSession(conn, nil)
+			s, err := newTestLiveSession(conn)
 			if err != nil {
 				t.Fatalf("newLiveSession: %v", err)
 			}
@@ -429,7 +436,7 @@ func TestLiveSessionSendContextTextBoundsLongAppend(t *testing.T) {
 // Short context keeps the old shape: one append, no duplicated conversation item.
 func TestLiveSessionSendContextTextDoesNotDuplicateShortText(t *testing.T) {
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -478,7 +485,7 @@ func TestLiveSessionAudioIdleCompletesTurn(t *testing.T) {
 	restoreLiveSpeakingIdle(t, 20*time.Millisecond)
 
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -507,7 +514,7 @@ func TestLiveSessionTrailingAudioAfterTurnComplete(t *testing.T) {
 	restoreLiveSpeakingIdle(t, 20*time.Millisecond)
 
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -600,7 +607,7 @@ func TestLiveSessionSilentAudioIgnored(t *testing.T) {
 	restoreLiveSpeakingIdle(t, 20*time.Millisecond)
 
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -640,7 +647,7 @@ func TestLiveSessionContinuousSilenceEndsTurn(t *testing.T) {
 	restoreLiveSpeakingIdle(t, 20*time.Millisecond)
 
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -683,7 +690,7 @@ func TestLiveSessionContinuousSilenceEndsTurn(t *testing.T) {
 
 func TestLiveSessionSendImage(t *testing.T) {
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -724,7 +731,7 @@ func TestLiveSessionSendImage(t *testing.T) {
 
 func TestLiveSessionSendToolResult(t *testing.T) {
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -797,7 +804,7 @@ func liveToolCallEvents(t *testing.T, s *liveSession, calls ...[2]string) []insi
 // between must not jump the queue.
 func TestLiveSessionMultipleToolCallsWaitForAllOutputs(t *testing.T) {
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -861,7 +868,7 @@ func TestLiveSessionMultipleToolCallsWaitForAllOutputs(t *testing.T) {
 // registered, so the tool result cannot resume the conversation too early.
 func TestLiveSessionToolCallsFromCompletedResponse(t *testing.T) {
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -896,7 +903,7 @@ func TestLiveSessionToolCallsFromCompletedResponse(t *testing.T) {
 // The last function_call_output releases the context held back during the turn.
 func TestLiveSessionDeferredContextFollowsToolOutput(t *testing.T) {
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -924,7 +931,7 @@ func TestLiveSessionDeferredContextFollowsToolOutput(t *testing.T) {
 // result must not send a second response.create on top of it.
 func TestLiveSessionDeferredCommentaryTriggersResponseOnce(t *testing.T) {
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -952,7 +959,7 @@ func TestLiveSessionDeferredCommentaryTriggersResponseOnce(t *testing.T) {
 // blocked by calls that can never be answered.
 func TestLiveSessionFailedResponseResetsToolTurn(t *testing.T) {
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -979,7 +986,7 @@ func TestLiveSessionFailedResponseResetsToolTurn(t *testing.T) {
 
 func TestLiveSessionClose(t *testing.T) {
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -1008,7 +1015,7 @@ func TestLiveSessionClose(t *testing.T) {
 
 func TestLiveSessionSendError(t *testing.T) {
 	conn := &fakeLiveConn{writeFail: errors.New("socket is broken")}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -1020,7 +1027,7 @@ func TestLiveSessionSendError(t *testing.T) {
 
 func TestLiveSessionServerAudioAndBargeIn(t *testing.T) {
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -1066,7 +1073,7 @@ func TestLiveSessionServerAudioAndBargeIn(t *testing.T) {
 
 func TestLiveSessionNoiseDoesNotBargeIn(t *testing.T) {
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -1113,7 +1120,7 @@ func TestLiveSessionNoiseDoesNotBargeIn(t *testing.T) {
 
 func TestLiveSessionServerTranscriptGrouping(t *testing.T) {
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -1142,7 +1149,7 @@ func TestLiveSessionServerTranscriptGrouping(t *testing.T) {
 
 func TestLiveSessionTranscriptUpdates(t *testing.T) {
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -1175,7 +1182,7 @@ func TestLiveSessionTranscriptUpdates(t *testing.T) {
 
 func TestLiveSessionServerResponseEvents(t *testing.T) {
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -1255,7 +1262,7 @@ func TestLiveSessionServerResponseEvents(t *testing.T) {
 
 func TestLiveSessionServerDelegationUsage(t *testing.T) {
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -1297,7 +1304,7 @@ func TestLiveSessionServerDelegationUsage(t *testing.T) {
 
 func TestLiveSessionServerDelegationUsageDetails(t *testing.T) {
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -1433,7 +1440,7 @@ func TestCreateLiveSessionRequiresDelegationModel(t *testing.T) {
 
 func TestLiveSessionServerUsage(t *testing.T) {
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -1477,7 +1484,7 @@ func TestLiveSessionServerClosed(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.reason, func(t *testing.T) {
 			conn := &fakeLiveConn{}
-			s, err := newLiveSession(conn, nil)
+			s, err := newTestLiveSession(conn)
 			if err != nil {
 				t.Fatalf("newLiveSession: %v", err)
 			}
@@ -1507,7 +1514,7 @@ func TestLiveSessionServerClosed(t *testing.T) {
 
 func TestLiveSessionServerError(t *testing.T) {
 	conn := &fakeLiveConn{}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -1532,7 +1539,7 @@ func TestLiveSessionReadLoop(t *testing.T) {
 			Delta: base64.StdEncoding.EncodeToString([]byte{9, 9}),
 		}},
 	}}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -1565,7 +1572,7 @@ func TestLiveSessionCloseWithCallbacksInFlight(t *testing.T) {
 	restoreLiveSpeakingIdle(t, time.Millisecond)
 
 	conn := &fakeLiveConn{block: make(chan struct{})}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -1603,7 +1610,7 @@ func TestLiveSessionCloseWithCallbacksInFlight(t *testing.T) {
 
 func TestLiveSessionMaxDurationEmitsGoAway(t *testing.T) {
 	conn := &fakeLiveConn{block: make(chan struct{})}
-	s, err := newLiveSession(conn, nil)
+	s, err := newTestLiveSession(conn)
 	if err != nil {
 		t.Fatalf("newLiveSession: %v", err)
 	}
@@ -1625,5 +1632,128 @@ func TestLiveSessionMaxDurationEmitsGoAway(t *testing.T) {
 
 	if !conn.closed {
 		t.Fatal("max duration must close the socket")
+	}
+}
+
+// An incomplete delegated response without tool calls must abandon the tool
+// turn, otherwise the agent would wait forever for an answer that never comes.
+func TestLiveSessionIncompleteResponseCompletesTurn(t *testing.T) {
+	conn := &fakeLiveConn{}
+	s, err := newTestLiveSession(conn)
+	if err != nil {
+		t.Fatalf("newLiveSession: %v", err)
+	}
+
+	s.handleServerEvent(live.ServerEventUnion{
+		Type: liveEventResponse,
+		OfResponseEvent: live.ResponseEvent{Event: map[string]any{
+			"type": liveResponseIncomplete,
+			"response": map[string]any{
+				"status":             "incomplete",
+				"incomplete_details": map[string]any{"reason": "max_output_tokens"},
+				"usage":              map[string]any{"input_tokens": float64(10), "output_tokens": int64(2)},
+			},
+		}},
+	})
+
+	events := drainRealtimeEvents(t, s.Events())
+	if len(events) != 2 {
+		t.Fatalf("expected the delegation usage and a turn complete: %+v", events)
+	}
+	if events[0].Type != insights.RealtimeEventUsage || events[0].DelegationInputTokens != 10 {
+		t.Fatalf("an incomplete response must still report its usage: %+v", events[0])
+	}
+	if events[1].Type != insights.RealtimeEventTurnComplete {
+		t.Fatalf("an incomplete response must complete the turn: %+v", events[1])
+	}
+	if len(s.pendingToolCalls) != 0 {
+		t.Fatalf("the tool turn must be reset: %+v", s.pendingToolCalls)
+	}
+
+	// The turn is over, so a later context text goes out immediately.
+	if err = s.SendContextText("user", "carry on", true); err != nil {
+		t.Fatalf("SendContextText: %v", err)
+	}
+}
+
+// A call that already finished streaming still runs when the response ends
+// early: it stays pending until its output is sent.
+func TestLiveSessionIncompleteResponseReleasesStreamedToolCall(t *testing.T) {
+	conn := &fakeLiveConn{}
+	s, err := newTestLiveSession(conn)
+	if err != nil {
+		t.Fatalf("newLiveSession: %v", err)
+	}
+
+	s.handleServerEvent(live.ServerEventUnion{
+		Type: liveEventResponse,
+		OfResponseEvent: live.ResponseEvent{Event: map[string]any{
+			"type": liveResponseOutputItemDone,
+			"item": map[string]any{
+				"type":      liveItemTypeFunctionCall,
+				"call_id":   "call_early",
+				"name":      "whiteboard_capture_snapshot",
+				"arguments": `{"include_image":false}`,
+			},
+		}},
+	})
+	if events := drainRealtimeEvents(t, s.Events()); len(events) != 0 {
+		t.Fatalf("a tool call must wait for the response to end: %+v", events)
+	}
+
+	s.handleServerEvent(live.ServerEventUnion{
+		Type: liveEventResponse,
+		OfResponseEvent: live.ResponseEvent{Event: map[string]any{
+			"type":     liveResponseIncomplete,
+			"response": map[string]any{"status": "incomplete"},
+		}},
+	})
+
+	events := drainRealtimeEvents(t, s.Events())
+	if len(events) != 1 || events[0].Type != insights.RealtimeEventToolCall || events[0].CallID != "call_early" {
+		t.Fatalf("a completed tool call must still be released: %+v", events)
+	}
+	if _, ok := s.pendingToolCalls["call_early"]; !ok {
+		t.Fatalf("the released call must stay pending until its output: %+v", s.pendingToolCalls)
+	}
+
+	// Answering the call resumes the conversation instead of leaving it blocked.
+	if err = s.SendToolResult("call_early", "whiteboard_capture_snapshot", `{"ok":true}`, false); err != nil {
+		t.Fatalf("SendToolResult: %v", err)
+	}
+	sent := conn.sentEvents()
+	if len(sent) != 2 || sent[1].OfResponseCreate == nil {
+		t.Fatalf("the only pending call must resume the conversation: %+v", sent)
+	}
+}
+
+// An overlapping response must not drop a call that still misses its output.
+func TestLiveSessionCompleteResponseMergesPendingToolCalls(t *testing.T) {
+	conn := &fakeLiveConn{}
+	s, err := newTestLiveSession(conn)
+	if err != nil {
+		t.Fatalf("newLiveSession: %v", err)
+	}
+
+	if calls := s.completeResponse(map[string]any{"output": []any{
+		map[string]any{"type": liveItemTypeFunctionCall, "call_id": "call_1", "name": "whiteboard_manage_board"},
+	}}); len(calls) != 1 {
+		t.Fatalf("unexpected tool calls: %+v", calls)
+	}
+
+	s.completeResponse(map[string]any{"output": []any{
+		map[string]any{"type": liveItemTypeFunctionCall, "call_id": "call_2", "name": "whiteboard_capture_snapshot"},
+	}})
+
+	if len(s.pendingToolCalls) != 2 {
+		t.Fatalf("the pending call must survive the next response: %+v", s.pendingToolCalls)
+	}
+
+	// Answering only the second call still waits for the first one.
+	if err = s.SendToolResult("call_2", "whiteboard_capture_snapshot", `{"ok":true}`, false); err != nil {
+		t.Fatalf("SendToolResult: %v", err)
+	}
+	if sent := conn.sentEvents(); len(sent) != 1 || sent[0].OfResponseCreate != nil {
+		t.Fatalf("the conversation must stay blocked while a call is open: %+v", sent)
 	}
 }

@@ -54,9 +54,15 @@ const (
 	liveEventResponse           = "response.event"
 	liveEventSessionUsageUpdate = "session.usage.updated"
 
+	// liveEventDelegationCreated reports a turn started on the delegated model.
+	liveEventDelegationCreated = "delegation.created"
+
 	// Responses events nested inside response.event.
+	liveResponseCreated        = "response.created"
 	liveResponseOutputItemDone = "response.output_item.done"
 	liveResponseCompleted      = "response.completed"
+	liveResponseIncomplete     = "response.incomplete"
+	liveResponseCancelled      = "response.cancelled"
 	liveResponseFailed         = "response.failed"
 
 	liveSessionClosedExpired  = "expired"
@@ -386,12 +392,22 @@ func (s *liveSession) SendToolResult(callID, toolName, resultJSON string, isErro
 	// A response that asked for several tools still waits for the others: a
 	// response.create sent now is rejected with function_call_outputs_required.
 	settled := len(s.pendingToolCalls) == 0
+	pendingRemaining := len(s.pendingToolCalls)
 	var deferred []live.ClientEventUnionParam
 	if settled {
 		deferred = s.deferredEvents
 		s.deferredEvents = nil
 	}
 	s.toolMu.Unlock()
+
+	s.logger.WithFields(logrus.Fields{
+		"callId":           callID,
+		"tool":             toolName,
+		"isError":          isError,
+		"settled":          settled,
+		"pendingRemaining": pendingRemaining,
+		"deferredFlushed":  len(deferred),
+	}).Debug("openai live: sending tool result")
 
 	events := make([]live.ClientEventUnionParam, 0, 2+len(deferred))
 	events = append(events, live.ClientEventParamOfResponseItemCreate(item))
@@ -471,7 +487,11 @@ func (s *liveSession) completeResponse(rawResponse any) []insights.RealtimeEvent
 
 	s.toolMu.Lock()
 	defer s.toolMu.Unlock()
-	s.pendingToolCalls = make(map[string]struct{}, len(calls))
+	// Merge instead of replacing: an overlapping response must not drop a call
+	// that is still waiting for its function_call_output.
+	if s.pendingToolCalls == nil {
+		s.pendingToolCalls = make(map[string]struct{}, len(calls))
+	}
 	for _, call := range calls {
 		if call.CallID != "" {
 			s.pendingToolCalls[call.CallID] = struct{}{}
@@ -766,12 +786,19 @@ func (s *liveSession) handleServerEvent(msg live.ServerEventUnion) {
 			s.emit(insights.RealtimeEvent{Type: insights.RealtimeEventError, Err: fmt.Errorf("openai live session closed: %s", reason)})
 		}
 
+	case liveEventDelegationCreated:
+		s.logger.Debug("openai live: delegation created")
+
 	case liveEventError:
 		event := msg.OfErrorEvent
 		s.emit(insights.RealtimeEvent{
 			Type: insights.RealtimeEventError,
 			Err:  fmt.Errorf("openai live: %s (%s)", event.Error.Message, event.Error.Code),
 		})
+
+	default:
+		// Unknown events still show what the delegated model is doing.
+		s.logger.WithField("eventType", msg.Type).Debug("openai live: server event")
 	}
 }
 
@@ -791,6 +818,9 @@ func (s *liveSession) handleResponseEvent(ev live.ResponseEvent) {
 	eventType, _ := ev.Event["type"].(string)
 
 	switch eventType {
+	case liveResponseCreated:
+		s.logger.WithField("responseId", nestedString(nestedMap(ev.Event, "response"), "id")).Debug("openai live: delegated response started")
+
 	case liveResponseOutputItemDone:
 		item, ok := ev.Event["item"].(map[string]any)
 		if !ok || nestedString(item, "type") != liveItemTypeFunctionCall {
@@ -798,13 +828,21 @@ func (s *liveSession) handleResponseEvent(ev live.ResponseEvent) {
 		}
 		// The response may still emit further calls, so the batch stays queued
 		// until response.completed names all of them.
-		s.queuedToolCalls = append(s.queuedToolCalls, newLiveToolCallEvent(item))
+		call := newLiveToolCallEvent(item)
+		s.queuedToolCalls = append(s.queuedToolCalls, call)
+		s.logger.WithFields(logrus.Fields{
+			"callId":  call.CallID,
+			"tool":    call.ToolName,
+			"argsLen": len(call.ArgsJSON),
+		}).Debug("openai live: delegated function call item ready")
 
 	case liveResponseCompleted:
 		// The completed response reports what the delegated text model spent.
 		s.emitDelegationUsage(ev.Event["response"])
 
-		if calls := s.completeResponse(ev.Event["response"]); len(calls) > 0 {
+		calls := s.completeResponse(ev.Event["response"])
+		s.logger.WithField("toolCalls", len(calls)).Debug("openai live: delegated response completed")
+		if len(calls) > 0 {
 			// A function call turn is answered by the caller through SendToolResult.
 			for _, call := range calls {
 				s.emit(call)
@@ -817,8 +855,42 @@ func (s *liveSession) handleResponseEvent(ev live.ResponseEvent) {
 			s.emit(insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete})
 		}
 
+	case liveResponseIncomplete, liveResponseCancelled:
+		// The delegated turn stopped early: report the usage it still spent and
+		// release whatever calls it already completed.
+		response := nestedMap(ev.Event, "response")
+		reason := nestedString(nestedMap(response, "incomplete_details"), "reason")
+		if reason == "" {
+			reason = nestedString(response, "status")
+		}
+		s.emitDelegationUsage(response)
+
+		if calls := s.completeResponse(response); len(calls) > 0 {
+			s.logger.WithFields(logrus.Fields{
+				"eventType": eventType,
+				"reason":    reason,
+				"toolCalls": len(calls),
+			}).Warn("openai live: delegated response ended early but emitted complete tool calls")
+			for _, call := range calls {
+				s.emit(call)
+			}
+			return
+		}
+
+		// Nothing can be answered any more, so waiting for an output would block
+		// every later turn; the agent is told the turn is over instead.
+		s.resetToolTurn()
+		s.logger.WithFields(logrus.Fields{
+			"eventType": eventType,
+			"reason":    reason,
+		}).Warn("openai live: delegated response ended without completing")
+		if !s.isSpeaking() {
+			s.emit(insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete})
+		}
+
 	case liveResponseFailed, liveEventError:
 		s.resetToolTurn()
+		s.logger.WithField("error", liveResponseErrorMessage(ev.Event)).Warn("openai live: delegated response failed")
 		s.emit(insights.RealtimeEvent{
 			Type: insights.RealtimeEventError,
 			Err:  errors.New(liveResponseErrorMessage(ev.Event)),
@@ -981,7 +1053,7 @@ func (s *liveSession) readLoop() {
 	defer s.wg.Done()
 	defer s.closeEvents()
 	defer func() {
-		if err := s.shutdown(); err != nil && s.logger != nil {
+		if err := s.shutdown(); err != nil {
 			s.logger.WithError(err).Debug("openai live session close returned an error")
 		}
 	}()

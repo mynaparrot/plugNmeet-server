@@ -9,10 +9,14 @@ import (
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/sirupsen/logrus"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/insights/mcp"
 )
+
+// aiAgentLogPayloadRunes bounds the tool arguments and output written to the debug log.
+const aiAgentLogPayloadRunes = 300
 
 // SendContext injects a server-side event that must not look like participant speech.
 func (a *AIAgent) SendContext(text, source string) error {
@@ -112,6 +116,7 @@ func (a *AIAgent) HandleClientToolResult(res *plugnmeet.AIAgentToolResultMsg) {
 	a.pendingMu.Unlock()
 
 	if !ok {
+		a.logger.WithFields(logrus.Fields{"callId": res.GetCallId(), "ok": res.GetOk()}).Warn("ai agent: received late or unknown client tool result")
 		return
 	}
 	select {
@@ -143,6 +148,13 @@ func (a *AIAgent) CallClientTool(ctx context.Context, call mcp.ToolCall, timeout
 		delete(a.pendingCalls, call.CallID)
 		a.pendingMu.Unlock()
 	}()
+
+	a.logger.WithFields(logrus.Fields{
+		"callId":       call.CallID,
+		"tool":         call.ToolName,
+		"targetUserId": target,
+		"timeout":      timeout.String(),
+	}).Debug("ai agent: dispatching client tool")
 
 	msg := &plugnmeet.AIAgentToolCallMsg{
 		SessionId:      a.sessionId,
@@ -191,6 +203,12 @@ func (a *AIAgent) handleToolCall(session insights.RealtimeSession, ev insights.R
 		ArgsJSON:    ev.ArgsJSON,
 		TraceID:     ev.TraceID,
 	}
+	a.logger.WithFields(logrus.Fields{
+		"callId":  ev.CallID,
+		"tool":    ev.ToolName,
+		"argsLen": len(ev.ArgsJSON),
+		"args":    truncateRunes(ev.ArgsJSON, aiAgentLogPayloadRunes),
+	}).Debug("ai agent: tool call received")
 	a.recordToolUse(ev.ToolName)
 
 	// The sentinel is inert and instant: run it inline so the refusal that
@@ -209,17 +227,34 @@ func (a *AIAgent) handleToolCall(session insights.RealtimeSession, ev insights.R
 	// Never block the event loop: audio and barge-in keep flowing while a tool runs.
 	go func() {
 		res := a.executor.Execute(a.ctx, call)
-		a.sendToolResult(a.currentSession(), ev.CallID, ev.ToolName, res)
+		fields := logrus.Fields{
+			"callId":     ev.CallID,
+			"tool":       ev.ToolName,
+			"durationMs": res.Duration.Milliseconds(),
+			"output":     truncateRunes(res.OutputJSON, aiAgentLogPayloadRunes),
+		}
+		if res.IsError {
+			a.logger.WithFields(fields).Warn("ai agent: tool call failed")
+		} else {
+			a.logger.WithFields(fields).Debug("ai agent: tool call completed")
+		}
+
+		target := session
+		if target == nil {
+			target = a.currentSession()
+		}
+		a.sendToolResult(target, ev.CallID, ev.ToolName, res)
 		a.restoreListening()
 	}()
 }
 
 func (a *AIAgent) sendToolResult(session insights.RealtimeSession, callID, toolName string, res mcp.ToolResult) {
 	if session == nil {
+		a.logger.WithFields(logrus.Fields{"callId": callID, "tool": toolName}).Warn("ai agent: cannot send tool result, no active session")
 		return
 	}
 	if err := session.SendToolResult(callID, toolName, res.OutputJSON, res.IsError); err != nil {
-		a.logger.WithError(err).Debug("ai agent: failed to send the tool result")
+		a.logger.WithError(err).WithFields(logrus.Fields{"callId": callID, "tool": toolName}).Warn("ai agent: failed to send the tool result")
 	}
 }
 

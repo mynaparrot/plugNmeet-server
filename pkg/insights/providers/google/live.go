@@ -365,6 +365,11 @@ func (s *liveSession) SendToolResult(callID, toolName, resultJSON string, isErro
 	if toolName == "" {
 		return errors.New("google: tool result requires a tool name")
 	}
+	s.logger.WithFields(logrus.Fields{
+		"callId":  callID,
+		"tool":    toolName,
+		"isError": isError,
+	}).Debug("gemini live: sending tool result")
 	return s.send(func() error {
 		return s.conn.SendToolResponse(genai.LiveToolResponseInput{
 			FunctionResponses: []*genai.FunctionResponse{{
@@ -457,7 +462,7 @@ func (s *liveSession) readLoop() {
 	defer s.wg.Done()
 	defer s.closeEvents()
 	defer func() {
-		if err := s.shutdown(); err != nil && s.logger != nil {
+		if err := s.shutdown(); err != nil {
 			s.logger.WithError(err).Debug("gemini live session close returned an error")
 		}
 	}()
@@ -470,10 +475,47 @@ func (s *liveSession) readLoop() {
 			}
 			return
 		}
+		s.logServerMessage(msg)
 		for _, ev := range translateServerMessage(msg) {
 			if !s.emit(ev) {
 				return
 			}
+		}
+	}
+}
+
+// logServerMessage records the control messages that decide how a turn ends.
+func (s *liveSession) logServerMessage(msg *genai.LiveServerMessage) {
+	if msg == nil {
+		return
+	}
+
+	if tc := msg.ToolCall; tc != nil {
+		s.logger.WithField("functionCalls", len(tc.FunctionCalls)).Debug("gemini live: tool call received")
+		for _, fc := range tc.FunctionCalls {
+			if fc == nil {
+				continue
+			}
+			s.logger.WithFields(logrus.Fields{
+				"callId": fc.ID,
+				"tool":   fc.Name,
+			}).Debug("gemini live: tool call function")
+		}
+	}
+
+	if tc := msg.ToolCallCancellation; tc != nil {
+		s.logger.WithField("ids", tc.IDs).Debug("gemini live: tool call cancelled")
+	}
+
+	if sc := msg.ServerContent; sc != nil {
+		if sc.Interrupted {
+			s.logger.Debug("gemini live: interrupted by the participant")
+		}
+		if sc.TurnComplete {
+			s.logger.Debug("gemini live: turn complete")
+		}
+		if sc.GenerationComplete {
+			s.logger.Debug("gemini live: generation complete")
 		}
 	}
 }

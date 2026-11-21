@@ -10,8 +10,15 @@ import (
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/genai"
 )
+
+// newTestLiveSession builds a session with a valid logger, matching the entry
+// the runtime injects.
+func newTestLiveSession(conn liveConn) *liveSession {
+	return newLiveSession(conn, logrus.NewEntry(logrus.New()))
+}
 
 // fakeConn records writes and replays scripted server messages.
 type fakeConn struct {
@@ -347,7 +354,7 @@ func TestFunctionResponsePayload(t *testing.T) {
 
 func TestLiveSessionSend(t *testing.T) {
 	conn := &fakeConn{}
-	s := newLiveSession(conn, nil)
+	s := newTestLiveSession(conn)
 
 	if err := s.SendAudio([]byte{1, 2}); err != nil {
 		t.Fatalf("SendAudio: %v", err)
@@ -417,7 +424,7 @@ func TestLiveSessionSend(t *testing.T) {
 
 func TestLiveSessionSendAfterClose(t *testing.T) {
 	conn := &fakeConn{}
-	s := newLiveSession(conn, nil)
+	s := newTestLiveSession(conn)
 
 	if err := s.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
@@ -432,7 +439,7 @@ func TestLiveSessionSendAfterClose(t *testing.T) {
 
 func TestLiveSessionSendError(t *testing.T) {
 	conn := &fakeConn{writeFail: errors.New("socket is broken")}
-	s := newLiveSession(conn, nil)
+	s := newTestLiveSession(conn)
 
 	if err := s.SendAudio([]byte{1}); err == nil {
 		t.Fatal("send errors must be reported")
@@ -446,7 +453,7 @@ func TestLiveSessionReadLoop(t *testing.T) {
 		}}},
 		{ServerContent: &genai.LiveServerContent{TurnComplete: true}},
 	}}
-	s := newLiveSession(conn, nil)
+	s := newTestLiveSession(conn)
 	s.wg.Add(1)
 	go s.readLoop()
 
@@ -475,7 +482,7 @@ func TestLiveSessionReadLoop(t *testing.T) {
 
 func TestLiveSessionMaxDurationEmitsGoAway(t *testing.T) {
 	conn := &fakeConn{block: make(chan struct{})}
-	s := newLiveSession(conn, nil)
+	s := newTestLiveSession(conn)
 	s.wg.Add(1)
 	go s.readLoop()
 	go s.supervise(context.Background(), 5*time.Millisecond)
