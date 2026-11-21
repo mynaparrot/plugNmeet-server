@@ -51,29 +51,39 @@ func registerPollTools(reg *Registry, deps ToolDependencies) {
 	reg.Register(&Tool{
 		Kind: ToolKindServer,
 		Spec: &insights.MCPToolSpec{
-			Name:        ToolCreatePoll,
-			Description: "Open a poll on the participant's screen to check understanding; keep the question short with 2-10 options.",
+			Name: ToolCreatePoll,
+			Description: "Open a poll on the participant's screen to check understanding or gather responses. Supports " +
+				"choice polls (provide 2-10 options) and free-text answer polls (set is_text_answer=true and omit " +
+				"options so participants type their own text answer).",
 			InputSchema: objectSchema(map[string]any{
-				"question": stringProp("The question.", 500),
-				"options":  arrayProp("The answer options.", stringProp("", 200), 2, 10),
-			}, "question", "options"),
+				"question":       stringProp("The question.", 500),
+				"options":        arrayProp("The answer options for a choice poll (2-10 options). Omit when is_text_answer is true.", stringProp("", 200), 0, 10),
+				"is_text_answer": boolProp("True for a free-text poll where participants type a text answer instead of picking an option."),
+			}, "question"),
 		},
 		Handler: func(ctx context.Context, call ToolCall) (ToolResult, error) {
 			var in struct {
-				Question string   `json:"question"`
-				Options  []string `json:"options"`
+				Question     string   `json:"question"`
+				Options      []string `json:"options"`
+				IsTextAnswer bool     `json:"is_text_answer"`
 			}
 			if err := decodeArgs(call, &in); err != nil {
 				return errorResult(call, "%s", err.Error()), nil
 			}
-			pollID, err := deps.Poll.CreatePoll(ctx, call.RoomID, in.Question, in.Options)
+			if in.IsTextAnswer {
+				in.Options = nil
+			} else if len(in.Options) < 2 {
+				return errorResult(call, "a choice poll requires at least 2 options, or set is_text_answer=true for a free-text poll"), nil
+			}
+			pollID, err := deps.Poll.CreatePoll(ctx, call.RoomID, in.Question, in.Options, in.IsTextAnswer)
 			if err != nil {
 				return errorResult(call, "the poll could not be created: %s", err.Error()), nil
 			}
 			return resultJSON(call, map[string]any{
-				"poll_id": pollID,
-				"is_quiz": false,
-				"opened":  true,
+				"poll_id":        pollID,
+				"is_quiz":        false,
+				"is_text_answer": in.IsTextAnswer,
+				"opened":         true,
 			}), nil
 		},
 	})
@@ -154,8 +164,9 @@ func registerPollTools(reg *Registry, deps ToolDependencies) {
 		Kind: ToolKindServer,
 		Spec: &insights.MCPToolSpec{
 			Name: ToolGetPollResults,
-			Description: "Inspect the room's polls and quizzes: omit poll_id to list every poll with status and vote " +
-				"counts, or pass one poll_id for its detailed results. Use it before feedback or closing a poll.",
+			Description: "Inspect the room's polls and quizzes: omit poll_id to list every poll with status, vote " +
+				"counts, and free-text answers, or pass one poll_id for its detailed results. Use it before feedback " +
+				"or closing a poll.",
 			InputSchema: objectSchema(map[string]any{
 				"poll_id": stringProp("Optional poll id; omit it to list all polls.", 120),
 			}),

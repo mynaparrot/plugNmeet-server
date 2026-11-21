@@ -18,20 +18,22 @@ import (
 )
 
 type fakePoll struct {
-	mu         sync.Mutex
-	questions  []string
-	options    [][]string
-	closed     []string
-	quizzes    []int
-	results    any
-	resultsErr error
+	mu          sync.Mutex
+	questions   []string
+	options     [][]string
+	textAnswers []bool
+	closed      []string
+	quizzes     []int
+	results     any
+	resultsErr  error
 }
 
-func (f *fakePoll) CreatePoll(_ context.Context, _, question string, options []string) (string, error) {
+func (f *fakePoll) CreatePoll(_ context.Context, _, question string, options []string, isTextAnswer bool) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.questions = append(f.questions, question)
 	f.options = append(f.options, options)
+	f.textAnswers = append(f.textAnswers, isTextAnswer)
 	return fmt.Sprintf("poll-%d", len(f.questions)), nil
 }
 
@@ -268,7 +270,7 @@ func TestBuildRoomToolRegistryFeatureGating(t *testing.T) {
 		}
 		for _, name := range []string{
 			ToolCreatePoll, ToolCreateQuiz, ToolClosePoll, ToolGetPollResults, ToolDraftQuiz, ToolPublishQuiz,
-			ToolSendChatMessage,
+			ToolSendAIChatMessage, ToolPublishChatMessage,
 			ToolNotepadWrite, ToolNotepadRead, ToolWhiteboardWriteContent, ToolWhiteboardCaptureSnapshot,
 			ToolFetchExternalKnowledge, ToolSetWorkspaceLock,
 		} {
@@ -282,7 +284,8 @@ func TestBuildRoomToolRegistryFeatureGating(t *testing.T) {
 		reg := BuildRoomToolRegistry(fullFeatures(), testDeps())
 
 		for _, name := range []string{
-			ToolCreatePoll, ToolCreateQuiz, ToolClosePoll, ToolGetPollResults, ToolSendChatMessage,
+			ToolCreatePoll, ToolCreateQuiz, ToolClosePoll, ToolGetPollResults, ToolSendAIChatMessage,
+			ToolPublishChatMessage,
 			ToolGetRoomInfo, ToolRecordLearningProgress, ToolFetchExternalKnowledge,
 			ToolNotepadWrite, ToolNotepadRead, ToolWhiteboardWriteContent, ToolWhiteboardDrawShapes,
 			ToolWhiteboardDrawFreehandSVG, ToolWhiteboardDrawDiagram, ToolWhiteboardLaserPoint,
@@ -295,7 +298,7 @@ func TestBuildRoomToolRegistryFeatureGating(t *testing.T) {
 		if hasTool(reg, ToolDraftQuiz) || hasTool(reg, ToolPublishQuiz) {
 			t.Error("the quiz approval flow must stay off without RequireQuizApproval")
 		}
-		if got, want := len(reg.Specs()), 18; got != want {
+		if got, want := len(reg.Specs()), 19; got != want {
 			t.Errorf("specs = %d, want %d", got, want)
 		}
 	})
@@ -316,8 +319,8 @@ func TestBuildRoomToolRegistryFeatureGating(t *testing.T) {
 		if !hasTool(reg, ToolCreateQuiz) {
 			t.Error("create_quiz must follow allow_polls")
 		}
-		if hasTool(reg, ToolSendChatMessage) {
-			t.Error("send_chat_message must stay gated off")
+		if hasTool(reg, ToolSendAIChatMessage) || hasTool(reg, ToolPublishChatMessage) {
+			t.Error("the chat tools must stay gated off")
 		}
 	})
 
@@ -593,7 +596,7 @@ func TestNotepadReadOpensNotepadFirst(t *testing.T) {
 	}
 }
 
-func TestSendChatMessageTargetsTheAIChatBox(t *testing.T) {
+func TestSendAIChatMessageTargetsTheAIChatBox(t *testing.T) {
 	chat := &fakeChat{}
 	deps := testDeps()
 	deps.Chat = chat
@@ -603,11 +606,11 @@ func TestSendChatMessageTargetsTheAIChatBox(t *testing.T) {
 		CallID:    "call-1",
 		RoomID:    "room-1",
 		SessionID: "s1",
-		ToolName:  ToolSendChatMessage,
+		ToolName:  ToolSendAIChatMessage,
 		ArgsJSON:  `{"markdown_text":"**went** is the past tense of *go*","to_user_id":"user-7"}`,
 	})
 	if res.IsError {
-		t.Fatalf("send_chat_message failed: %s", res.OutputJSON)
+		t.Fatalf("send_ai_chat_message failed: %s", res.OutputJSON)
 	}
 	if len(chat.messages) != 1 || chat.messages[0] != "**went** is the past tense of *go*" {
 		t.Fatalf("unexpected chat messages: %+v", chat)
@@ -621,7 +624,7 @@ func TestSendChatMessageTargetsTheAIChatBox(t *testing.T) {
 		CallID:    "call-2",
 		RoomID:    "room-1",
 		SessionID: "s1",
-		ToolName:  ToolSendChatMessage,
+		ToolName:  ToolSendAIChatMessage,
 		ArgsJSON:  `{"markdown_text":"Homework is on the notepad"}`,
 	})
 	if len(chat.messages) != 2 || chat.userIDs[1] != "" {
@@ -632,11 +635,43 @@ func TestSendChatMessageTargetsTheAIChatBox(t *testing.T) {
 		CallID:    "call-3",
 		RoomID:    "room-1",
 		SessionID: "s1",
-		ToolName:  ToolSendChatMessage,
+		ToolName:  ToolSendAIChatMessage,
 		ArgsJSON:  `{"markdown_text":"   "}`,
 	})
 	if !bad.IsError || !strings.Contains(bad.OutputJSON, "markdown_text") {
 		t.Fatalf("an empty message must be rejected: %s", bad.OutputJSON)
+	}
+}
+
+func TestPublishChatMessageIsAClientTool(t *testing.T) {
+	// The message is posted by the caller's browser, so the AI Chat box backend
+	// is not required.
+	deps := testDeps()
+	deps.Chat = nil
+
+	reg := BuildRoomToolRegistry(&plugnmeet.InsightsAIAgentFeatures{AllowChatMessage: true}, deps)
+	tool, ok := reg.Get(ToolPublishChatMessage)
+	if !ok {
+		t.Fatal("publish_chat_message must be registered")
+	}
+	if tool.Kind != ToolKindClient {
+		t.Fatalf("kind = %q, want %q", tool.Kind, ToolKindClient)
+	}
+	required, _ := tool.Spec.InputSchema["required"].([]string)
+	if len(required) != 1 || required[0] != "message" {
+		t.Fatalf("required = %v, want [message]", required)
+	}
+
+	// Delegated calls still need the browser side.
+	res := NewExecutor(ExecutorOptions{Registry: reg}).Execute(context.Background(), ToolCall{
+		CallID:    "call-1",
+		RoomID:    "room-1",
+		SessionID: "s1",
+		ToolName:  ToolPublishChatMessage,
+		ArgsJSON:  `{"message":"Hello room"}`,
+	})
+	if !res.IsError {
+		t.Fatalf("a client tool without a client must fail: %s", res.OutputJSON)
 	}
 }
 

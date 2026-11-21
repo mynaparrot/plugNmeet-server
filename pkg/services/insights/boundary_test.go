@@ -493,7 +493,7 @@ func TestBuildLockedSystemInstructionExplainsInteractiveSurfaces(t *testing.T) {
 		"AI Chat box",
 		"1. Whiteboard",
 		"2. Shared notepad",
-		"3. AI Chat (send_chat_message)",
+		"3. AI Chat (send_ai_chat_message)",
 		"notepad_write / notepad_read",
 		"cannot see the room's public chat",
 		"automatically opens that surface and brings it into view",

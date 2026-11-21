@@ -726,7 +726,7 @@ func TestBuildAdminTextChatToolRegistry(t *testing.T) {
 
 	want := []string{
 		ToolCreatePoll, ToolDraftQuiz, ToolPublishQuiz, ToolClosePoll, ToolGetPollResults,
-		ToolSendChatMessage, ToolGetRoomInfo, ToolRecordLearningProgress,
+		ToolSendAIChatMessage, ToolPublishChatMessage, ToolGetRoomInfo, ToolRecordLearningProgress,
 		ToolNotepadWrite, ToolNotepadRead,
 		ToolWhiteboardWriteContent, ToolWhiteboardDrawShapes, ToolWhiteboardDrawFreehandSVG,
 		ToolWhiteboardDrawDiagram, ToolWhiteboardLaserPoint, ToolWhiteboardManageBoard,

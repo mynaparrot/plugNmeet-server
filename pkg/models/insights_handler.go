@@ -338,13 +338,11 @@ func (s *InsightsModel) ExecuteAITextChat(req *plugnmeet.InsightsAITextChatConte
 
 	insightsFeatures := metadata.GetRoomFeatures().GetInsightsFeatures()
 
-	// A running AI agent owns the AI Chat box: the participant's message goes to
-	// the agent's live session instead of the text-chat provider.
 	requestFrom := req.GetRequestFrom()
-	if requestFrom == plugnmeet.InsightsAIRequestSource_INSIGHTS_AI_REQUEST_SOURCE_CHAT && insightsFeatures.GetIsAllow() {
-		if aiAgentFeatures := insightsFeatures.GetAiAgentFeatures(); aiAgentFeatures.GetIsAllow() {
-			return s.handleAIAgentChatMessage(req, aiAgentFeatures, roomId, userId)
-		}
+	// A running AI agent owns the AI Chat box of its own 1-on-1 session room, so
+	// the participant's message goes to the agent's live session instead of the text-chat provider.
+	if shouldHandleAIAgentChat(metadata, requestFrom) {
+		return s.handleAIAgentChatMessage(req, insightsFeatures.GetAiAgentFeatures(), roomId, userId)
 	}
 
 	if !insightsFeatures.IsAllow || !insightsFeatures.AiFeatures.IsAllow || !insightsFeatures.AiFeatures.AiTextChatFeatures.IsAllow || !insightsFeatures.AiFeatures.AiTextChatFeatures.IsEnabled {
@@ -395,6 +393,16 @@ func (s *InsightsModel) ExecuteAITextChat(req *plugnmeet.InsightsAITextChatConte
 	}
 
 	return s.AITextChatRequest(roomId, userId, req.Text, streamId, requestFrom)
+}
+
+// shouldHandleAIAgentChat reports whether an AI Chat request belongs to the room's running AI agent.
+// Only a 1-on-1 agent session room owns the AI Chat box, the same check the client mirrors in
+// isAIAgentSessionRoom: a group room and the parent lobby of per-user sessions inherit ai_agent_features.is_allow
+// but never run an agent, so their text chat keeps using the configured provider.
+func shouldHandleAIAgentChat(meta *plugnmeet.RoomMetadata, requestFrom plugnmeet.InsightsAIRequestSource) bool {
+	return requestFrom == plugnmeet.InsightsAIRequestSource_INSIGHTS_AI_REQUEST_SOURCE_CHAT &&
+		meta.GetRoomFeatures().GetInsightsFeatures().GetIsAllow() &&
+		isOneOnOneAIAgentRoom(meta)
 }
 
 // handleAIAgentChatMessage passes a participant's AI Chat message to the room's

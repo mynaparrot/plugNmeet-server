@@ -55,6 +55,36 @@ func TestValidateCreatePollReqChoiceUnchanged(t *testing.T) {
 	}
 }
 
+func TestNewPollCreateReqTextAnswer(t *testing.T) {
+	req := newPollCreateReq("room-1", "Your feedback?", nil, true)
+	if !req.GetIsTextAnswer() {
+		t.Fatal("a free-text poll must set IsTextAnswer")
+	}
+	if req.GetOptions() != nil {
+		t.Fatalf("a free-text poll must not carry options: %+v", req.GetOptions())
+	}
+	if req.GetIsQuiz() || req.GetIsMultiple() {
+		t.Fatalf("a free-text poll must not be a quiz or multi-select: %+v", req)
+	}
+	if req.GetQuestion() != "Your feedback?" || req.GetRoomId() != "room-1" || req.GetUserId() == "" {
+		t.Fatalf("request not filled: %+v", req)
+	}
+}
+
+func TestNewPollCreateReqChoice(t *testing.T) {
+	req := newPollCreateReq("room-1", "Past tense of go?", []string{"goed", "went"}, false)
+	if req.GetIsTextAnswer() {
+		t.Fatal("a choice poll must not set IsTextAnswer")
+	}
+	opts := req.GetOptions()
+	if len(opts) != 2 || opts[0].GetId() != 1 || opts[0].GetText() != "goed" || opts[1].GetId() != 2 || opts[1].GetText() != "went" {
+		t.Fatalf("options not mapped in order: %+v", opts)
+	}
+	if err := validateCreatePollReq(req); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestNormalizeTextAnswer(t *testing.T) {
 	req := &plugnmeet.SubmitPollResponseReq{TextAnswer: "   ", SelectedOptions: []uint64{1}}
 	if err := normalizeTextAnswer(req); !errors.Is(err, config.ErrPollTextAnswerRequired) {

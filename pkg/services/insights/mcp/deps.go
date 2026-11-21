@@ -20,7 +20,9 @@ import (
 // pkg/services/redis stays in one place.
 
 type PollBackend interface {
-	CreatePoll(ctx context.Context, roomID, question string, options []string) (pollID string, err error)
+	// CreatePoll opens a choice poll with the given options, or a free-text
+	// poll when isTextAnswer is true (options are then ignored).
+	CreatePoll(ctx context.Context, roomID, question string, options []string, isTextAnswer bool) (pollID string, err error)
 	// CreateQuiz opens the same poll shape as a quiz: the correct option is
 	// marked server-side before the poll is broadcast, so the board can reveal
 	// the answer when the poll closes.

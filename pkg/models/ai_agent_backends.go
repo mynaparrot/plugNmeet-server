@@ -23,22 +23,33 @@ type aiAgentPollBackend struct {
 	m *AIAgentModel
 }
 
-func (b aiAgentPollBackend) CreatePoll(ctx context.Context, roomID, question string, options []string) (string, error) {
+func (b aiAgentPollBackend) CreatePoll(ctx context.Context, roomID, question string, options []string, isTextAnswer bool) (string, error) {
 	if err := b.ensurePollsActive(roomID); err != nil {
 		return "", err
+	}
+
+	return b.m.pollModel.CreatePoll(newPollCreateReq(roomID, question, options, isTextAnswer))
+}
+
+// newPollCreateReq maps the tool input to the server request: a free-text poll
+// carries no options, a choice poll gets one option per text.
+func newPollCreateReq(roomID, question string, options []string, isTextAnswer bool) *plugnmeet.CreatePollReq {
+	req := &plugnmeet.CreatePollReq{
+		RoomId:       roomID,
+		UserId:       fmt.Sprintf("%s%s", config.AgentUserUserIdPrefix, insights.ServiceTypeAIAgent),
+		Question:     question,
+		IsTextAnswer: isTextAnswer,
+	}
+	if isTextAnswer {
+		return req
 	}
 
 	opts := make([]*plugnmeet.CreatePollOptions, 0, len(options))
 	for i, text := range options {
 		opts = append(opts, &plugnmeet.CreatePollOptions{Id: uint32(i + 1), Text: text})
 	}
-
-	return b.m.pollModel.CreatePoll(&plugnmeet.CreatePollReq{
-		RoomId:   roomID,
-		UserId:   fmt.Sprintf("%s%s", config.AgentUserUserIdPrefix, insights.ServiceTypeAIAgent),
-		Question: question,
-		Options:  opts,
-	})
+	req.Options = opts
+	return req
 }
 
 func (b aiAgentPollBackend) ClosePoll(ctx context.Context, roomID, pollID string) error {
