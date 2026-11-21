@@ -30,6 +30,11 @@ const (
 	// agent speaks before the transcript counts as a barge-in.
 	liveBargeInRunes = 2
 
+	// liveSilencePeak is the loudest absolute sample a PCM16 chunk may carry and
+	// still count as silence. Live streams silent PCM (zeros or a low dither
+	// floor) down the whole session timeline; speech peaks far above it.
+	liveSilencePeak = 200
+
 	// liveAppendMaxRunes bounds session.commentary.append,
 	// session.instructions.append and session.thinking.append. The Live API rejects
 	// any append above 500 tokens, and a single rune can already cost one token, so
@@ -705,11 +710,29 @@ func (s *liveSession) noteUserSpeech(delta string) bool {
 	return true
 }
 
+// hasAudiblePCM16 reports whether a PCM16 little-endian chunk carries speech
+// rather than the silence or dither noise Live streams between turns.
+func hasAudiblePCM16(pcm []byte) bool {
+	for i := 0; i+1 < len(pcm); i += 2 {
+		sample := int16(uint16(pcm[i]) | uint16(pcm[i+1])<<8)
+		if sample >= liveSilencePeak || sample <= -liveSilencePeak {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *liveSession) handleServerEvent(msg live.ServerEventUnion) {
 	switch msg.Type {
 	case liveEventOutputAudioDelta:
 		pcm, err := base64.StdEncoding.DecodeString(msg.OfOutputAudioDeltaEvent.Delta)
 		if err != nil || len(pcm) == 0 {
+			return
+		}
+		// Silence must not re-arm the speaking turn: it would keep the agent in
+		// SPEAKING and reopen a turn that just completed. The publisher pads gaps
+		// with silence on its own, so silent chunks are simply dropped.
+		if !hasAudiblePCM16(pcm) {
 			return
 		}
 		s.markSpeaking()

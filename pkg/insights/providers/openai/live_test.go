@@ -546,6 +546,141 @@ func restoreLiveSpeakingIdle(t *testing.T, idle time.Duration) {
 	t.Cleanup(func() { liveSpeakingIdleTimeout = previous })
 }
 
+func liveAudioDeltaEvent(pcm []byte) live.ServerEventUnion {
+	return live.ServerEventUnion{
+		Type:                    liveEventOutputAudioDelta,
+		OfOutputAudioDeltaEvent: live.OutputAudioDeltaEvent{Delta: base64.StdEncoding.EncodeToString(pcm)},
+	}
+}
+
+// liveSpeechPCM builds a chunk of constant 8000 amplitude samples.
+func liveSpeechPCM(samples int) []byte {
+	pcm := make([]byte, samples*2)
+	for i := 0; i < samples; i++ {
+		pcm[i*2], pcm[i*2+1] = 0x40, 0x1f
+	}
+	return pcm
+}
+
+// liveNoisePCM builds a chunk of low comfort-noise samples.
+func liveNoisePCM(samples int) []byte {
+	pcm := make([]byte, samples*2)
+	for i := 0; i < samples; i++ {
+		pcm[i*2], pcm[i*2+1] = 0x05, 0x00
+	}
+	return pcm
+}
+
+func TestHasAudiblePCM16(t *testing.T) {
+	cases := []struct {
+		name string
+		pcm  []byte
+		want bool
+	}{
+		{name: "nil", pcm: nil},
+		{name: "zero filled", pcm: make([]byte, 480)},
+		{name: "dither floor", pcm: []byte{0x05, 0x00, 0xf6, 0xff}},
+		{name: "single stray byte", pcm: []byte{0x7f}},
+		{name: "just below threshold", pcm: []byte{0xc7, 0x00}},
+		{name: "at threshold", pcm: []byte{0xc8, 0x00}, want: true},
+		{name: "negative threshold", pcm: []byte{0x38, 0xff}, want: true},
+		{name: "speech", pcm: liveSpeechPCM(240), want: true},
+	}
+
+	for _, tc := range cases {
+		if got := hasAudiblePCM16(tc.pcm); got != tc.want {
+			t.Fatalf("%s: hasAudiblePCM16 = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+// Live streams silent audio down the whole session timeline: it must neither be
+// relayed nor flip the agent back to SPEAKING.
+func TestLiveSessionSilentAudioIgnored(t *testing.T) {
+	restoreLiveSpeakingIdle(t, 20*time.Millisecond)
+
+	conn := &fakeLiveConn{}
+	s, err := newLiveSession(conn, nil)
+	if err != nil {
+		t.Fatalf("newLiveSession: %v", err)
+	}
+
+	s.handleServerEvent(liveAudioDeltaEvent(make([]byte, 480)))
+	s.handleServerEvent(liveAudioDeltaEvent(liveNoisePCM(240)))
+
+	if events := drainRealtimeEvents(t, s.Events()); len(events) != 0 {
+		t.Fatalf("silent audio must not be relayed: %+v", events)
+	}
+	if s.isSpeaking() {
+		t.Fatal("silent audio must not open a speaking turn")
+	}
+
+	// Silence after real speech must not reopen the completed turn.
+	s.handleServerEvent(liveAudioDeltaEvent(liveSpeechPCM(2400)))
+	if event := nextRealtimeEvent(t, s.Events()); event.Type != insights.RealtimeEventAudioDelta {
+		t.Fatalf("expected the spoken chunk to be relayed: %+v", event)
+	}
+	if event := nextRealtimeEvent(t, s.Events()); event.Type != insights.RealtimeEventTurnComplete {
+		t.Fatalf("the idle turn must complete: %+v", event)
+	}
+
+	for i := 0; i < 5; i++ {
+		s.handleServerEvent(liveAudioDeltaEvent(make([]byte, 480)))
+	}
+	if events := drainRealtimeEvents(t, s.Events()); len(events) != 0 {
+		t.Fatalf("silence must not reopen a completed turn: %+v", events)
+	}
+	if s.isSpeaking() {
+		t.Fatal("silence must not leave the session speaking")
+	}
+}
+
+// Continuous silence must not postpone the end of a speaking turn.
+func TestLiveSessionContinuousSilenceEndsTurn(t *testing.T) {
+	restoreLiveSpeakingIdle(t, 20*time.Millisecond)
+
+	conn := &fakeLiveConn{}
+	s, err := newLiveSession(conn, nil)
+	if err != nil {
+		t.Fatalf("newLiveSession: %v", err)
+	}
+
+	s.handleServerEvent(liveAudioDeltaEvent(liveSpeechPCM(2400)))
+	if event := nextRealtimeEvent(t, s.Events()); event.Type != insights.RealtimeEventAudioDelta {
+		t.Fatalf("expected the spoken chunk to be relayed: %+v", event)
+	}
+
+	stop := make(chan struct{})
+	stopped := make(chan struct{})
+	go func() {
+		defer close(stopped)
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				s.handleServerEvent(liveAudioDeltaEvent(make([]byte, 480)))
+				time.Sleep(time.Millisecond)
+			}
+		}
+	}()
+
+	event := nextRealtimeEvent(t, s.Events())
+
+	close(stop)
+	<-stopped
+
+	if event.Type != insights.RealtimeEventTurnComplete {
+		t.Fatalf("continuous silence must not block the turn end: %+v", event)
+	}
+	if s.isSpeaking() {
+		t.Fatal("the turn must end while silence keeps streaming")
+	}
+	if events := drainRealtimeEvents(t, s.Events()); len(events) != 0 {
+		t.Fatalf("silence must not be relayed after the turn ended: %+v", events)
+	}
+}
+
 func TestLiveSessionSendImage(t *testing.T) {
 	conn := &fakeLiveConn{}
 	s, err := newLiveSession(conn, nil)
