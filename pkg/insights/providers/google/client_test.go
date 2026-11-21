@@ -24,12 +24,40 @@ func TestResolveHTTPOptions(t *testing.T) {
 		accountOptions map[string]interface{}
 		serviceOptions map[string]interface{}
 		wantNil        bool
+		wantAPIVersion string
 		wantBaseURL    string
 		wantHeaders    map[string]string
 	}{
 		{
-			name:    "returns nil without endpoint and auth header",
+			name:    "returns nil so the SDK default is used when nothing is set",
 			wantNil: true,
+		},
+		{
+			name:           "sets the api version from the account",
+			accountOptions: map[string]interface{}{"api_version": " v1alpha "},
+			wantAPIVersion: "v1alpha",
+		},
+		{
+			name:           "returns nil when the api version is blank",
+			accountOptions: map[string]interface{}{"api_version": "   "},
+			wantNil:        true,
+		},
+		{
+			name:           "falls back to the service api version",
+			serviceOptions: map[string]interface{}{"api_version": " v1beta "},
+			wantAPIVersion: "v1beta",
+		},
+		{
+			name:           "prefers the service api version over the account one",
+			accountOptions: map[string]interface{}{"api_version": "v1alpha"},
+			serviceOptions: map[string]interface{}{"api_version": "v1beta"},
+			wantAPIVersion: "v1beta",
+		},
+		{
+			name:           "keeps the account api version when the service one is blank",
+			accountOptions: map[string]interface{}{"api_version": "v1alpha"},
+			serviceOptions: map[string]interface{}{"api_version": "   "},
+			wantAPIVersion: "v1alpha",
 		},
 		{
 			name:           "sets the custom endpoint only",
@@ -66,6 +94,17 @@ func TestResolveHTTPOptions(t *testing.T) {
 			wantBaseURL: "https://gemini.example.com/",
 			wantHeaders: map[string]string{"api-key": "sk-test"},
 		},
+		{
+			name: "combines api version, endpoint and auth header",
+			accountOptions: map[string]interface{}{
+				"api_version": "v1beta",
+				"endpoint":    "https://gemini.example.com/",
+				"auth_header": "api-key",
+			},
+			wantAPIVersion: "v1beta",
+			wantBaseURL:    "https://gemini.example.com/",
+			wantHeaders:    map[string]string{"api-key": "sk-test"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -86,6 +125,9 @@ func TestResolveHTTPOptions(t *testing.T) {
 				t.Fatal("resolveHTTPOptions() = nil, want HTTP options")
 			}
 
+			if got.APIVersion != tt.wantAPIVersion {
+				t.Errorf("APIVersion = %q, want %q", got.APIVersion, tt.wantAPIVersion)
+			}
 			if got.BaseURL != tt.wantBaseURL {
 				t.Errorf("BaseURL = %q, want %q", got.BaseURL, tt.wantBaseURL)
 			}

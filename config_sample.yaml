@@ -361,6 +361,9 @@ insights:
         # to refine the AI_AGENT_SESSION_SUMMARY artifact. Leave it unset to use
         # the deterministic local summary without LLM synthesis.
         summarize_model: "gemini-3.1-flash-lite"
+        # Optional: Gemini Live (BidiGenerateContent) currently requires "v1beta".
+        # Leave unset to use the genai SDK default.
+        api_version: "v1beta"
       pricing:
         realtime_model:
           input_price_per_million_tokens: 0.75        # Text input

@@ -46,10 +46,21 @@ func NewProvider(ctx context.Context, providerAccount *config.ProviderAccount, s
 	}, nil
 }
 
-// resolveHTTPOptions builds the HTTP options for self-hosted or
-// OpenAI-compatible endpoints. It returns nil when neither an endpoint nor a
-// custom auth header is configured.
+// resolveHTTPOptions builds the HTTP options for the genai client from the
+// provider account options and the service options. The account is shared by
+// every service using it, so a service level api_version overrides the account
+// one. It returns nil when nothing is configured so the genai SDK keeps its own
+// defaults. Note that the Gemini Live WebSocket API (BidiGenerateContent)
+// currently requires "v1beta", so Live users must set api_version on the
+// ai_agent service options explicitly.
 func resolveHTTPOptions(providerAccount *config.ProviderAccount, serviceConfig *config.ServiceConfig) *genai.HTTPOptions {
+	apiVersion := strings.TrimSpace(providerAccount.GetOptionsString("api_version", ""))
+	if serviceConfig != nil {
+		if serviceAPIVersion := strings.TrimSpace(serviceConfig.GetOptionsString("api_version", "")); serviceAPIVersion != "" {
+			apiVersion = serviceAPIVersion
+		}
+	}
+
 	endpoint := strings.TrimSpace(providerAccount.GetOptionsString("endpoint", ""))
 
 	serviceAuthHeader := ""
@@ -58,11 +69,14 @@ func resolveHTTPOptions(providerAccount *config.ProviderAccount, serviceConfig *
 	}
 	authHeader := strings.TrimSpace(providerAccount.GetOptionsString("auth_header", serviceAuthHeader))
 
-	if endpoint == "" && authHeader == "" {
+	if endpoint == "" && authHeader == "" && apiVersion == "" {
 		return nil
 	}
 
 	httpOptions := &genai.HTTPOptions{}
+	if apiVersion != "" {
+		httpOptions.APIVersion = apiVersion
+	}
 	if endpoint != "" {
 		httpOptions.BaseURL = endpoint
 	}
