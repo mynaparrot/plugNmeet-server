@@ -382,9 +382,26 @@ func (m *AIAgentModel) afterAgentStopped(roomId, reason string) {
 		aiAgentKey(roomId, aiAgentKeyDelegate),
 	).Err()
 
+	// Nothing drives the workspace anymore, so the participant gets it back. A
+	// closing room has no participant left to unlock it for.
+	if reason != aiAgentStopReasonEmptyRoom && reason != aiAgentStopReasonBudget {
+		m.unlockWorkspace(roomId)
+	}
+
 	// a 1-on-1 breakout room exists only for its session
 	if reason == aiAgentStopReasonEmptyRoom || reason == aiAgentStopReasonBudget {
 		m.closeBreakoutRoomAfterStop(roomId, reason)
+	}
+}
+
+// unlockWorkspace gives the whiteboard and the shared notepad back to the
+// participant after the agent stopped.
+func (m *AIAgentModel) unlockWorkspace(roomId string) {
+	for _, service := range []string{workspaceWhiteboard, workspaceSharedNotepad} {
+		if err := m.setWorkspaceLockForRoom(roomId, service, false); err != nil {
+			m.logger.WithError(err).WithField("roomId", roomId).
+				Warnln("failed to unlock the workspace after the ai agent stopped")
+		}
 	}
 }
 

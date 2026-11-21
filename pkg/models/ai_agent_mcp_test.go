@@ -32,6 +32,8 @@ func aiAgentTestKey(roomId, suffix string) string {
 	return "pnm:ai_agent:" + roomId + ":" + suffix
 }
 
+// newAIAgentTestModel returns the model the ai agent tests share: an in-memory
+// Redis and a NATS service that finds no room, so nothing needs a NATS server.
 func newAIAgentTestModel(rc redis.UniversalClient) *AIAgentModel {
 	ttl := 2 * time.Hour
 	logger := logrus.New()
@@ -44,18 +46,9 @@ func newAIAgentTestModel(rc redis.UniversalClient) *AIAgentModel {
 		appConfig:    app,
 		rds:          rc,
 		redisService: redisservice.New(redisservice.Args{Ctx: context.Background(), Rc: rc, App: app, Logger: logger}),
+		natsService:  newOfflineNatsService(),
 		logger:       logrus.NewEntry(logger),
 	}
-}
-
-// newAIAgentTestModelWithNats returns the shared test model with a NATS service,
-// for the code paths that always go through NATS, e.g. the parent room lookup of
-// a breakout session or the delivery of a client tool call.
-func newAIAgentTestModelWithNats(rc redis.UniversalClient) *AIAgentModel {
-	m := newAIAgentTestModel(rc)
-	m.natsService = newOfflineNatsService()
-
-	return m
 }
 
 // newOfflineNatsService builds a NATS service for the tests that run without a

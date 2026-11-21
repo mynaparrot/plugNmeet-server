@@ -127,7 +127,7 @@ func TestValidateAIAgentCustomProviderRules(t *testing.T) {
 }
 
 func TestValidateAIAgentFeaturesAcceptsACustomProviderAlone(t *testing.T) {
-	m := newAIAgentTestModelWithNats(newAIAgentTestRedis(t))
+	m := newAIAgentTestModel(newAIAgentTestRedis(t))
 	// a BYOK room needs no ai_agent service in the server config at all
 	m.appConfig = &config.AppConfig{Insights: &config.InsightsConfig{}}
 
@@ -154,7 +154,7 @@ func TestValidateAIAgentFeaturesAcceptsACustomProviderAlone(t *testing.T) {
 // An existing BYOK room keeps its credentials in Redis only, so starting the
 // agent on a server that has no services.ai_agent block must still validate.
 func TestValidateRoomAIAgentFeaturesAcceptsStoredCustomProvider(t *testing.T) {
-	m := newAIAgentTestModelWithNats(newAIAgentTestRedis(t))
+	m := newAIAgentTestModel(newAIAgentTestRedis(t))
 	// a BYOK room needs no ai_agent service in the server config at all
 	m.appConfig = &config.AppConfig{Insights: &config.InsightsConfig{}}
 	ctx := context.Background()
@@ -194,7 +194,7 @@ func TestValidateRoomAIAgentFeaturesAcceptsStoredCustomProvider(t *testing.T) {
 // Redis clone instead of its metadata, so creating the child must validate
 // against the cloned configuration.
 func TestValidateBreakoutAIAgentFeaturesUsesClonedProvider(t *testing.T) {
-	aiModel := newAIAgentTestModelWithNats(newAIAgentTestRedis(t))
+	aiModel := newAIAgentTestModel(newAIAgentTestRedis(t))
 	// a byok breakout room needs no ai_agent service in the server config at all
 	aiModel.appConfig = &config.AppConfig{Insights: &config.InsightsConfig{}}
 	m := &RoomModel{aiAgentModel: aiModel, logger: logrus.NewEntry(logrus.New())}
@@ -246,7 +246,7 @@ func TestValidateBreakoutAIAgentFeaturesUsesClonedProvider(t *testing.T) {
 }
 
 func TestPrepareRoomCustomProviderStoresAndStrips(t *testing.T) {
-	m := newAIAgentTestModelWithNats(newAIAgentTestRedis(t))
+	m := newAIAgentTestModel(newAIAgentTestRedis(t))
 	ctx := context.Background()
 	roomId := "room-byok"
 
@@ -311,7 +311,7 @@ func TestPrepareRoomCustomProviderStoresAndStrips(t *testing.T) {
 }
 
 func TestCustomProviderModelOverrides(t *testing.T) {
-	m := newAIAgentTestModelWithNats(newAIAgentTestRedis(t))
+	m := newAIAgentTestModel(newAIAgentTestRedis(t))
 	ctx := context.Background()
 	roomId := "room-overrides"
 
@@ -353,7 +353,7 @@ func TestCustomProviderModelOverrides(t *testing.T) {
 // A gpt-live session delegates every text turn, so the host's realtime override
 // must come with the provider's default delegation model.
 func TestCustomProviderGPTLiveDelegationDefault(t *testing.T) {
-	m := newAIAgentTestModelWithNats(newAIAgentTestRedis(t))
+	m := newAIAgentTestModel(newAIAgentTestRedis(t))
 	ctx := context.Background()
 
 	m.PrepareRoomCustomProvider(ctx, "room-live", &plugnmeet.InsightsAIAgentFeatures{

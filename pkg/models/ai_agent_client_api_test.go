@@ -5,9 +5,14 @@ import (
 	"encoding/json"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 )
 
 type submittedClientAPI struct {
@@ -18,6 +23,23 @@ type submittedClientAPI struct {
 	argsJSON     string
 }
 
+const aiAgentTestRoomSid = "RM_test_room_1"
+
+// newRoomInfoNatsService returns a NATS service whose bucket holds the info of
+// room-1, so the room lookups of the backends find an active room.
+func newRoomInfoNatsService() *natsservice.NatsService {
+	ttl := 2 * time.Hour
+	return natsservice.New(natsservice.Args{
+		Ctx: context.Background(),
+		App: &config.AppConfig{NatsInfo: config.NatsInfo{DefaultTTL: &ttl}},
+		Js: &memoryJetStream{entries: map[string][]byte{
+			natsservice.RoomInfoKeyPrefix + natsservice.RoomSidKey:    []byte(aiAgentTestRoomSid),
+			natsservice.RoomInfoKeyPrefix + natsservice.RoomStatusKey: []byte(natsservice.RoomStatusActive),
+		}},
+		Logger: logrus.New(),
+	})
+}
+
 // newClientAPITestModel wires the client API submitter to a recorder, so the
 // backends can be tested without a browser round-trip.
 func newClientAPITestModel(t *testing.T) (*AIAgentModel, *[]submittedClientAPI) {
@@ -25,6 +47,7 @@ func newClientAPITestModel(t *testing.T) (*AIAgentModel, *[]submittedClientAPI) 
 
 	calls := make([]submittedClientAPI, 0, 2)
 	model := newAIAgentTestModel(newAIAgentTestRedis(t))
+	model.natsService = newRoomInfoNatsService()
 	model.clientAPISubmitter = func(_ context.Context, roomID, targetUserID, route string, payload proto.Message) error {
 		argsJSON, err := buildClientAPISubmitArgs(route, payload)
 		if err != nil {
@@ -263,10 +286,13 @@ func TestManageRecordingSubmitsClientAPI(t *testing.T) {
 	if req.GetRecordingVariant() != plugnmeet.CloudRecordingVariants_FULL_SCREEN_CLOUD_RECORDING {
 		t.Errorf("variant = %v, want full screen cloud recording", req.GetRecordingVariant())
 	}
+	if req.GetSid() != aiAgentTestRoomSid {
+		t.Errorf("sid = %q, want the sid of the active room", req.GetSid())
+	}
 	// START_RECORDING is the enum default, so protojson omits it and the
 	// browser's schema falls back to it.
 	assertClientAPIArgsJSON(t, call.argsJSON,
-		`{"route":"recording","payload":{"roomId":"room-1","recordingVariant":"FULL_SCREEN_CLOUD_RECORDING"}}`)
+		`{"route":"recording","payload":{"roomId":"room-1","sid":"RM_test_room_1","recordingVariant":"FULL_SCREEN_CLOUD_RECORDING"}}`)
 
 	if err := backend.ManageRecording(ctx, "room-1", "stop"); err != nil {
 		t.Fatalf("unexpected error: %v", err)

@@ -48,10 +48,10 @@ func (a *AIAgentController) canControlSession(ctx context.Context, roomId, userI
 
 // HandleStart activates the agent for the room, skipping the auto-join rule.
 func (a *AIAgentController) HandleStart(c fiber.Ctx) error {
-	ctx, roomId, _, isAdmin := a.roomContext(c)
+	ctx, roomId, userId, isAdmin := a.roomContext(c)
 	res := new(plugnmeet.AIAgentStatusRes)
-	if !isAdmin {
-		res.Msg = config.ErrAIAgentOnlyAdmin.Error()
+	if !a.canControlSession(ctx, roomId, userId, isAdmin) {
+		res.Msg = config.ErrAIAgentNotAllowed.Error()
 		return utils.SendProtobufResponse(c, res)
 	}
 
@@ -75,14 +75,17 @@ func (a *AIAgentController) HandleStart(c fiber.Ctx) error {
 
 // HandleStop ends the session now.
 func (a *AIAgentController) HandleStop(c fiber.Ctx) error {
-	ctx, roomId, _, isAdmin := a.roomContext(c)
+	ctx, roomId, userId, isAdmin := a.roomContext(c)
 	res := new(plugnmeet.AIAgentStatusRes)
-	if !isAdmin {
-		res.Msg = config.ErrAIAgentOnlyAdmin.Error()
+	if !a.canControlSession(ctx, roomId, userId, isAdmin) {
+		res.Msg = config.ErrAIAgentNotAllowed.Error()
 		return utils.SendProtobufResponse(c, res)
 	}
 
 	reason := "host_stopped"
+	if !isAdmin {
+		reason = "user_stopped"
+	}
 	req := new(plugnmeet.AIAgentStopReq)
 	if len(c.Body()) > 0 {
 		if err := proto.Unmarshal(c.Body(), req); err == nil && req.GetReason() != "" {
