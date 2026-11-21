@@ -266,15 +266,11 @@ func (m *UserModel) perUserAISessionRoom(ctx context.Context, g *plugnmeet.Gener
 	if config.IsUserIdInternal(g.GetUserInfo().GetUserId()) {
 		return "", nil
 	}
-	if m.breakoutModel == nil {
-		log.Warnln("per-user AI session requested but the breakout room model is not available")
-		return "", config.ErrBkRoomUnexpectedError
-	}
 
 	parentRoomId := g.GetRoomId()
 	if g.GetUserInfo().GetIsAdmin() {
-		// the admin stays in the lobby; their own room is only prepared ahead of
-		// time, and a failure here must not block the lobby join
+		// the admin stays in the main room; their own room is only prepared ahead
+		// of time, so a failure here must not block the join
 		if adminAISessionPreCreate(aiFeatures, g.GetUserInfo().GetUserId()) {
 			if _, err := m.breakoutModel.EnsurePerUserAIBreakoutRoom(ctx, parentRoomId, g.GetUserInfo().GetUserId(), g.GetUserInfo().GetName()); err != nil {
 				log.WithError(err).Warnln("failed to pre-create the admin's 1-on-1 AI session room")

@@ -159,6 +159,42 @@ func (s *NatsService) UpdateRoomStatus(roomId string, status string) error {
 	return nil
 }
 
+// RefreshRoomEmptyTimeout resets the empty timeout of a room, so that the room
+// stays open for graceSeconds counted from now rather than from the room creation.
+func (s *NatsService) RefreshRoomEmptyTimeout(roomId string, graceSeconds uint64) error {
+	rInfo, err := s.GetRoomInfo(roomId)
+	if err != nil {
+		return err
+	}
+	if rInfo == nil {
+		return nil
+	}
+
+	now := uint64(time.Now().UTC().Unix())
+	var elapsed uint64
+	if now > rInfo.CreatedAt {
+		elapsed = now - rInfo.CreatedAt
+	}
+	newTimeout := fmt.Sprintf("%d", elapsed+graceSeconds)
+
+	kv, err := s.js.KeyValue(s.ctx, s.formatConsolidatedRoomBucket(roomId))
+	if errors.Is(err, jetstream.ErrBucketNotFound) {
+		return fmt.Errorf("no room found with roomId: %s", roomId)
+	} else if err != nil {
+		return err
+	}
+
+	rev, err := kv.PutString(s.ctx, s.formatRoomKey(RoomEmptyTimeoutKey), newTimeout)
+	if err != nil {
+		return fmt.Errorf("failed to update room empty timeout: %w", err)
+	}
+
+	// Manually update the cache to avoid watch latency
+	s.cs.setRoomInfoCache(roomId, RoomEmptyTimeoutKey, newTimeout, rev)
+
+	return nil
+}
+
 // OnAfterSessionEndCleanup is the final, authoritative cleanup process for a room in NATS.
 // It ensures all consumers are deleted, all messages are purged, and the room's KV bucket is removed.
 // This function acts as a safety net to prevent orphaned NATS resources.

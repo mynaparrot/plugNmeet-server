@@ -346,6 +346,37 @@ func TestIsOneOnOneAIAgentRoom(t *testing.T) {
 	}
 }
 
+// TestIsPerUserAISessionParent locks in that only the main room of an auto
+// per-user AI session is treated as the owner of per-participant session rooms,
+// so an unused pre-created room cannot keep it alive.
+func TestIsPerUserAISessionParent(t *testing.T) {
+	breakout := func(meta *plugnmeet.RoomMetadata) *plugnmeet.RoomMetadata {
+		meta.IsBreakoutRoom = true
+		return meta
+	}
+
+	tests := []struct {
+		name string
+		meta *plugnmeet.RoomMetadata
+		want bool
+	}{
+		{name: "no metadata", meta: nil, want: false},
+		{name: "controlled lobby with a roster", meta: agentRoomMetadata(agentFeatures(true, modeControlled, controlledConfig("u1"))), want: true},
+		{name: "open per-user lobby", meta: agentRoomMetadata(agentFeatures(true, modeOpenPerUse, openPerUserConfig(3))), want: true},
+		{name: "normal room", meta: agentRoomMetadata(agentFeatures(true, modeNormalRoom, nil)), want: false},
+		{name: "agent not allowed", meta: agentRoomMetadata(agentFeatures(false, modeOpenPerUse, openPerUserConfig(3))), want: false},
+		{name: "session room itself", meta: breakout(agentRoomMetadata(agentFeatures(true, modeOpenPerUse, openPerUserConfig(3)))), want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isPerUserAISessionParent(tt.meta); got != tt.want {
+				t.Fatalf("isPerUserAISessionParent() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestValidateAIAgentSessionMode(t *testing.T) {
 	tests := []struct {
 		name     string

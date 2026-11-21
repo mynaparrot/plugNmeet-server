@@ -1049,6 +1049,16 @@ func isOneOnOneAIAgentRoom(meta *plugnmeet.RoomMetadata) bool {
 		meta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures().GetIsAllow()
 }
 
+// isPerUserAISessionParent reports whether meta describes the main room of an
+// auto per-user AI session, whose breakout rooms are created one per
+// participant. An unused pre-created session room must not keep that room alive.
+func isPerUserAISessionParent(meta *plugnmeet.RoomMetadata) bool {
+	if meta.GetIsBreakoutRoom() {
+		return false
+	}
+	return isAutoPerUserAISessionRoom(meta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures())
+}
+
 // roomAgentFeatures returns the room's normalized AI agent features, or nil when
 // the agent is not allowed in this room.
 func (m *AIAgentModel) roomAgentFeatures(roomId string) *plugnmeet.InsightsAIAgentFeatures {

@@ -69,9 +69,14 @@ func (m *JanitorModel) activeRoomChecker() {
 			continue
 		}
 
-		// A parent room with active breakout rooms is occupied as long as any
-		// human participant is online in the parent or one of its breakouts.
-		if meta, mErr := m.natsService.GetRoomMetadataStruct(room.RoomId); mErr == nil && isParentWithActiveBreakouts(meta) {
+		meta, mErr := m.natsService.GetRoomMetadataStruct(room.RoomId)
+		if mErr != nil {
+			log.WithError(mErr).Warnln("error getting room metadata")
+		}
+
+		// A parent room with active breakout rooms is occupied as long as
+		// any human participant is online in the parent or one of its breakouts.
+		if isParentWithActiveBreakouts(meta) {
 			userIds = m.collectParentBreakoutHumanUsers(room.RoomId)
 		}
 
@@ -79,19 +84,18 @@ func (m *JanitorModel) activeRoomChecker() {
 			// no user online
 			valid := rInfo.CreatedAt + rInfo.EmptyTimeout
 			if uint64(time.Now().UTC().Unix()) > valid {
-				// Parent rooms with active breakout rooms must not be
-				// empty-closed by the janitor. The same applies to breakout
-				// child rooms whose parent still has active breakouts (they may
-				// legitimately sit empty under self-select).
-				if meta, mErr := m.natsService.GetRoomMetadataStruct(room.RoomId); mErr == nil && meta != nil {
-					if isParentWithActiveBreakouts(meta) {
-						log.Info("skipping empty-close of parent room with active breakout rooms — pausing, session data preserved")
-						continue
-					}
-					if breakoutChildOfActiveParent(m.natsService, meta) {
-						log.Info("skipping empty-close of breakout child room with active parent breakouts")
-						continue
-					}
+				// Parent rooms with active breakout rooms must not be empty-closed by the janitor.
+				// The same applies to breakout child rooms whose parent still has active breakouts
+				// (they may legitimately sit empty under self-select).
+				// But: an auto per-user AI session room is the exception: its breakout rooms are created per participant,
+				// so an unused pre-created room must not keep the empty main room open.
+				if isParentWithActiveBreakouts(meta) && !isPerUserAISessionParent(meta) {
+					log.Info("skipping empty-close of parent room with active breakout rooms — pausing, session data preserved")
+					continue
+				}
+				if breakoutChildOfActiveParent(m.natsService, meta) {
+					log.Info("skipping empty-close of breakout child room with active parent breakouts")
+					continue
 				}
 
 				log.WithFields(logrus.Fields{

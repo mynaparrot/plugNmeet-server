@@ -1,9 +1,11 @@
 package models
 
 import (
+	"context"
 	"testing"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/sirupsen/logrus"
 )
 
 // TestAdminAISessionPreCreate locks in that an admin's own 1-on-1 room is only
@@ -32,6 +34,25 @@ func TestAdminAISessionPreCreate(t *testing.T) {
 				t.Fatalf("adminAISessionPreCreate() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// TestPerUserAISessionRoomAdminStaysInMainRoom locks in that an observer admin,
+// who is not part of the pre-authorized roster, joins the main room without any
+// room being prepared. The nil breakout model would panic if it were touched.
+func TestPerUserAISessionRoomAdminStaysInMainRoom(t *testing.T) {
+	meta := agentRoomMetadata(agentFeatures(true, modeControlled, controlledConfig("learner-1")))
+	req := &plugnmeet.GenerateTokenReq{
+		RoomId:   "room-1",
+		UserInfo: &plugnmeet.UserInfo{UserId: "admin-1", Name: "Admin", IsAdmin: true},
+	}
+
+	roomId, err := new(UserModel).perUserAISessionRoom(context.Background(), req, meta, logrus.NewEntry(logrus.New()))
+	if err != nil {
+		t.Fatalf("perUserAISessionRoom() error = %v, want nil", err)
+	}
+	if roomId != "" {
+		t.Fatalf("perUserAISessionRoom() = %q, want an empty room id", roomId)
 	}
 }
 

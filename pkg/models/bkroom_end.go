@@ -10,6 +10,10 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 )
 
+// parentRoomPostBreakoutEmptyTimeout is the grace period (5 minutes) the parent
+// room gets for its empty timeout whenever a child breakout room ends.
+const parentRoomPostBreakoutEmptyTimeout uint64 = 300
+
 func (m *BreakoutRoomModel) EndBreakoutRoom(ctx context.Context, r *plugnmeet.EndBreakoutRoomReq) error {
 	log := m.logger.WithFields(logrus.Fields{
 		"parentRoomId":   r.RoomId,
@@ -84,6 +88,12 @@ func (m *BreakoutRoomModel) onAfterBkRoomEnded(parentRoomId, bkRoomId string, lo
 		// no room left so, delete breakoutRoomKey key for this room
 		_ = m.rs.DeleteAllBreakoutRoomsByParentRoomId(parentRoomId)
 		_ = m.updateParentRoomMetadata(parentRoomId, log)
+	}
+	// A session has ended in the parent room, so give it a short grace period instead of the timeout it was created with.
+	// This is done for every ended child room, also when pre-created but unused rooms keep the count above
+	// zero: as long as somebody is still online in the parent or in any child room, the parent must not be closed as empty.
+	if err := m.natsService.RefreshRoomEmptyTimeout(parentRoomId, parentRoomPostBreakoutEmptyTimeout); err != nil {
+		log.WithError(err).Warn("failed to refresh parent room empty timeout")
 	}
 	// notify to the room for updating list
 	if err := m.natsService.BroadcastSystemEventToRoom(plugnmeet.NatsMsgServerToClientEvents_BREAKOUT_ROOM_ENDED, parentRoomId, bkRoomId, nil); err != nil {

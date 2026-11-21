@@ -145,7 +145,7 @@ func (m *JanitorModel) runJanitorTasks() {
 
 	// Set initial schedules for less frequent tasks.
 	nextUserCheck := time.Now().Add(time.Minute)
-	nextRoomCheck := time.Now().Add(5 * time.Minute)
+	nextRoomCheck := time.Now().Add(3 * time.Minute)
 	nextBackupCheck := time.Now().Add(time.Hour)
 	nextSummarizeCheck := time.Now().Add(5 * time.Minute)
 
@@ -166,7 +166,7 @@ func (m *JanitorModel) runJanitorTasks() {
 			}
 			if now.After(nextRoomCheck) {
 				m.activeRoomChecker()
-				nextRoomCheck = time.Now().Add(5 * time.Minute)
+				nextRoomCheck = time.Now().Add(3 * time.Minute)
 			}
 			if now.After(nextBackupCheck) {
 				m.checkDelRecordingBackupPath()
