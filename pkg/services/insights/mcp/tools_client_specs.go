@@ -99,16 +99,9 @@ func registerNotepadTools(reg *Registry, deps ToolDependencies) {
 	reg.Register(&Tool{
 		Kind: ToolKindClient,
 		Spec: &insights.MCPToolSpec{
-			Name: ToolNotepadRead,
-			Description: "Read the shared notepad blocks separated by author (\"agent\" vs \"participant\"). " +
-				"Automatically opens the notepad and brings it into view.",
+			Name:        ToolNotepadRead,
+			Description: "Read the shared notepad blocks separated by author (\"agent\" vs \"participant\").",
 			InputSchema: objectSchema(map[string]any{}),
-		},
-		Prepare: func(ctx context.Context, call ToolCall) error {
-			if deps.Notepad == nil {
-				return nil
-			}
-			return deps.Notepad.EnsureNotepadActive(ctx, call.RoomID)
 		},
 	})
 

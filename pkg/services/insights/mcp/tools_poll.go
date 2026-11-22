@@ -200,8 +200,9 @@ func registerQuizApprovalTools(reg *Registry, deps ToolDependencies) {
 			Name: ToolDraftQuiz,
 			Description: "Create a quiz draft to preview in chat for admin approval before publishing. Call it once " +
 				"with `questions` for a multi-question quiz, or once per question with the top-level fields; " +
-				"single-question drafts accumulate in the room's pending draft. Base the questions on any external MCP " +
-				"lesson/resource tools or notepad content. Then display every drafted question (numbered options, " +
+				"single-question drafts accumulate in the room's pending draft. Base the questions on the user's " +
+				"request, or on external MCP lesson/resource tools or notepad content when relevant. Then display " +
+				"every drafted question (numbered options, " +
 				"correct answer, explanation) in chat and ask for explicit approval before publish_quiz.",
 			InputSchema: objectSchema(map[string]any{
 				"questions": arrayProp("1-10 questions for a multi-question quiz; preferred over the top-level fields.",

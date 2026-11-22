@@ -190,8 +190,9 @@ func (s *InsightsModel) adminTextChatToolRunner(ctx context.Context, roomId, use
 const adminTextChatToolsPrompt = "You are the assistant of the room administrator and you can act on the live room " +
 	"through your tools: room settings and lock state, whiteboard, notepad, polls, breakout rooms, insights " +
 	"and any attached external MCP server. Use them instead of telling the administrator to do the work " +
-	"manually, and only for what was asked. Whenever a quiz is requested: first check the attached external " +
-	"lesson/resource tools or the notepad content for the source material, then call draft_quiz so the " +
+	"manually, and only for what was asked. Whenever a quiz is requested: if the user refers to the " +
+	"lesson/notepad or did not provide a topic, check the attached external lesson/resource tools or the " +
+	"notepad content for the source material, then call draft_quiz so the " +
 	"questions, the options and the correct answers are previewed in this chat, and wait for the " +
 	"administrator's explicit approval before calling publish_quiz. For a multi-question quiz, pass all " +
 	"questions in one draft_quiz call using the `questions` array; if you draft them one at a time, every " +

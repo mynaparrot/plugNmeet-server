@@ -568,7 +568,7 @@ func TestNotepadWriteStopsWhenActivationFails(t *testing.T) {
 	}
 }
 
-func TestNotepadReadOpensNotepadFirst(t *testing.T) {
+func TestNotepadReadDoesNotOpenNotepad(t *testing.T) {
 	notepad := &fakeNotepadBackend{}
 	deps := testDeps()
 	deps.Notepad = notepad
@@ -585,14 +585,34 @@ func TestNotepadReadOpensNotepadFirst(t *testing.T) {
 	if res.IsError {
 		t.Fatalf("notepad read failed: %s", res.OutputJSON)
 	}
-	if notepad.calls != 1 || notepad.roomID != "room-1" {
-		t.Fatalf("the notepad must be opened before the read: %+v", notepad)
+	if notepad.calls != 0 {
+		t.Fatalf("reading the notepad must not activate it: %+v", notepad)
 	}
 	if rpc.calls != 1 {
 		t.Fatalf("client rpc not used: %+v", rpc)
 	}
 	if !strings.Contains(res.OutputJSON, "participant_count") {
 		t.Errorf("client result not passed through: %s", res.OutputJSON)
+	}
+
+	// Writing must still activate the notepad so participants see the change.
+	write := &fakeClientRPC{result: ToolResult{OutputJSON: `{"ok":true}`}}
+	exec = NewExecutor(ExecutorOptions{Registry: BuildRoomToolRegistry(fullFeatures(), deps), Client: write})
+	res = exec.Execute(context.Background(), ToolCall{
+		CallID:    "call-2",
+		RoomID:    "room-1",
+		SessionID: "s1",
+		ToolName:  ToolNotepadWrite,
+		ArgsJSON:  `{"markdown":"- item","mode":"append"}`,
+	})
+	if res.IsError {
+		t.Fatalf("notepad write failed: %s", res.OutputJSON)
+	}
+	if notepad.calls != 1 || notepad.roomID != "room-1" {
+		t.Fatalf("the notepad must be opened before the write: %+v", notepad)
+	}
+	if write.calls != 1 {
+		t.Fatalf("client rpc not used: %+v", write)
 	}
 }
 
@@ -1319,15 +1339,20 @@ func TestWhiteboardSchemasGuideMermaidFirst(t *testing.T) {
 func TestNotepadDescriptionsMentionAutoOpen(t *testing.T) {
 	reg := BuildRoomToolRegistry(fullFeatures(), testDeps())
 
-	for _, name := range []string{ToolNotepadRead, ToolNotepadWrite} {
-		tool, ok := reg.Get(name)
-		if !ok {
-			t.Fatalf("%s must be registered", name)
-		}
-		if !strings.Contains(tool.Spec.Description, "brings it into view") &&
-			!strings.Contains(tool.Spec.Description, "brings the shared notepad into view") {
-			t.Errorf("%s must say it opens the notepad: %s", name, tool.Spec.Description)
-		}
+	write, ok := reg.Get(ToolNotepadWrite)
+	if !ok {
+		t.Fatalf("%s must be registered", ToolNotepadWrite)
+	}
+	if !strings.Contains(write.Spec.Description, "brings the shared notepad into view") {
+		t.Errorf("%s must say it opens the notepad: %s", ToolNotepadWrite, write.Spec.Description)
+	}
+
+	read, ok := reg.Get(ToolNotepadRead)
+	if !ok {
+		t.Fatalf("%s must be registered", ToolNotepadRead)
+	}
+	if strings.Contains(read.Spec.Description, "open") || strings.Contains(read.Spec.Description, "into view") {
+		t.Errorf("%s must not claim to open the notepad: %s", ToolNotepadRead, read.Spec.Description)
 	}
 }
 
