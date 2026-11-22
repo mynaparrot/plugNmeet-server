@@ -189,7 +189,9 @@ const whiteboardLayoutPropDesc = "Placement: \"free_space\" (default) or \"page_
 	"directly under/above a specific group, \"inside_element\" draws inside a specific shape."
 
 const whiteboardAnchorPropDesc = "Target element id for anchored layouts: the target group's anchorElementId, its " +
-	"groupId, or any element id inside that group."
+	"groupId, or any element id inside that group. With right_of_element/left_of_element/below_element/" +
+	"above_element it may be omitted (or passed as \"last\"/\"latest\") to anchor to the group drawn most recently " +
+	"on the page, which is what a follow-up beside your previous drawing needs."
 
 const whiteboardGroupResultDesc = " Each call creates one visual group and returns groupId, anchorElementId, " +
 	"elementIds, bbox and pageBounds."

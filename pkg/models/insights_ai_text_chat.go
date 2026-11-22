@@ -207,7 +207,8 @@ const adminTextChatToolsPrompt = "You are the assistant of the room administrato
 	"returns groupId and anchorElementId: group related explanatory cards/notes into a single " +
 	"whiteboard_write_content call, and place items that belong side-by-side (such as explanation notes beside a " +
 	"diagram) with layout=\"right_of_element\" plus anchor_element_id set to the other group's anchorElementId or " +
-	"groupId. Use layout=\"free_space\" for a new or unrelated topic/section so it starts below existing content " +
+	"groupId (for a follow-up you may also omit anchor_element_id or pass \"last\", which anchors to the group " +
+	"drawn most recently). Use layout=\"free_space\" for a new or unrelated topic/section so it starts below existing content " +
 	"with clean spacing instead of beside an unrelated group."
 
 // textChatStream starts the provider stream, using the tool calling variant when
