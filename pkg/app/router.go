@@ -63,14 +63,18 @@ func NewRouter(appConfig *config.AppConfig, ctrl ApplicationControllers, ll *log
 		File: path.Join(assets, "imgs", "favicon.ico"),
 	}))
 
-	app.Use(logger.New(logger.Config{
-		Done: func(c fiber.Ctx, logString []byte) {
-			ll.Debugln(string(logString))
-		},
-		Format:      "| ${status} | ${latency} | ${ip} | ${method} | ${path} | ${error}",
-		ForceColors: true,
-		Stream:      io.Discard,
-	}))
+	lc := logger.New()
+	if appConfig.Client.Debug {
+		lc = logger.New(logger.Config{
+			Done: func(c fiber.Ctx, logString []byte) {
+				ll.Debugln(string(logString))
+			},
+			Format:      "| ${status} | ${latency} | ${ip} | ${method} | ${path} | ${error}",
+			ForceColors: true,
+			Stream:      io.Discard,
+		})
+	}
+	app.Use(lc)
 
 	prometheusConf := appConfig.Client.PrometheusConf
 	if prometheusConf.Enable {
