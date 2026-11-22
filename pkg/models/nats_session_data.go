@@ -220,11 +220,11 @@ func (m *NatsModel) sendSessionDataSaveResponse(roomId, userId string, header *p
 	}
 }
 
-// isAIAgentDelegate reports whether userId currently executes the AI agent's
-// client-delegated tools, which also authorizes its whiteboard and notepad saves.
+// isAIAgentDelegate reports whether userId is the room's AI agent delegate or a pre-authorized 1-on-1 session participant,
+// which authorizes whiteboard and notepad session-data saves (including after the agent stops and unlocks the workspace).
 func (m *NatsModel) isAIAgentDelegate(roomId, userId string) bool {
 	if m.aiAgentModel == nil {
 		return false
 	}
-	return m.aiAgentModel.IsUserAgentDelegate(m.ctx, roomId, userId)
+	return m.aiAgentModel.CanControlSession(m.ctx, roomId, userId)
 }

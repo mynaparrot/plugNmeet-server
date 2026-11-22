@@ -1,9 +1,11 @@
 package models
 
 import (
+	"context"
 	"testing"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -75,5 +77,53 @@ func TestBuildSessionDataSaveAckHeader(t *testing.T) {
 				t.Errorf("round trip lost ack fields: %s", msg)
 			}
 		})
+	}
+}
+
+// After the agent stops, its delegate key is gone but the workspace stays unlocked
+// for the 1-on-1 participant, so their whiteboard and notepad saves must stay
+// authorized.
+func TestIsAIAgentDelegateAuthorizesTheOneOnOneParticipant(t *testing.T) {
+	const roomId, participantId, delegateId = "room-1", "user-1", "user-2"
+
+	meta := &plugnmeet.RoomMetadata{RoomFeatures: &plugnmeet.RoomCreateFeatures{
+		InsightsFeatures: &plugnmeet.InsightsFeatures{
+			AiAgentFeatures: &plugnmeet.InsightsAIAgentFeatures{
+				IsAllow:     true,
+				SessionMode: plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_CONTROLLED_USERS,
+				AutoSessionConfig: &plugnmeet.AIAgentAutoSessionConfig{
+					AllowedParticipantIds: []string{participantId},
+				},
+			},
+		},
+	}}
+	agentModel, _ := newWorkspaceUnlockTestModel(t, meta)
+	m := &NatsModel{
+		ctx:          context.Background(),
+		aiAgentModel: agentModel,
+		logger:       logrus.NewEntry(logrus.New()),
+	}
+
+	delegateKey := aiAgentKey(roomId, aiAgentKeyDelegate)
+	if err := agentModel.rds.Set(m.ctx, delegateKey, delegateId, 0).Err(); err != nil {
+		t.Fatalf("seed delegate: %v", err)
+	}
+	if !m.isAIAgentDelegate(roomId, delegateId) {
+		t.Error("the running delegate must be allowed to save")
+	}
+
+	if err := agentModel.rds.Del(m.ctx, delegateKey).Err(); err != nil {
+		t.Fatalf("clear delegate: %v", err)
+	}
+	if !m.isAIAgentDelegate(roomId, participantId) {
+		t.Error("the pre-authorized session participant must be allowed to save after the agent stopped")
+	}
+	if m.isAIAgentDelegate(roomId, "stranger") {
+		t.Error("an unrelated user must not be allowed to save")
+	}
+
+	withoutAgent := &NatsModel{ctx: context.Background()}
+	if withoutAgent.isAIAgentDelegate(roomId, participantId) {
+		t.Error("no ai agent model means no delegate")
 	}
 }
