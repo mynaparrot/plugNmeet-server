@@ -282,9 +282,11 @@ func (s *transcriptionStream) dispatchFinal(text, lang string) {
 }
 
 func (s *transcriptionStream) result(text string, partial bool, detectedLang string) *plugnmeet.InsightsTranscriptionResult {
-	lang := strings.TrimSpace(detectedLang)
+	// Clients match subtitles against the short locale they selected, so keep
+	// the spoken language when known and normalise the detected code otherwise.
+	lang := GetLocaleFromCode(s.opts.SpokenLang)
 	if lang == "" {
-		lang = s.opts.SpokenLang
+		lang = GetLocaleFromCode(detectedLang)
 	}
 
 	return &plugnmeet.InsightsTranscriptionResult{

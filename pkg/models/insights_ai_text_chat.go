@@ -203,7 +203,12 @@ const adminTextChatToolsPrompt = "You are the assistant of the room administrato
 	"user to click the \"T\" icon in the bottom menu bar, select their spoken language, and click Start, " +
 	"because transcription does not start automatically. When asked to use the whiteboard (or the shared " +
 	"notepad), never switch to the other surface just because a tool call failed once while opening; retry " +
-	"the requested surface's tool once instead."
+	"the requested surface's tool once instead. On the whiteboard, every tool call creates one visual group and " +
+	"returns groupId and anchorElementId: group related explanatory cards/notes into a single " +
+	"whiteboard_write_content call, and place items that belong side-by-side (such as explanation notes beside a " +
+	"diagram) with layout=\"right_of_element\" plus anchor_element_id set to the other group's anchorElementId or " +
+	"groupId. Use layout=\"free_space\" for a new or unrelated topic/section so it starts below existing content " +
+	"with clean spacing instead of beside an unrelated group."
 
 // textChatStream starts the provider stream, using the tool calling variant when
 // an admin runner is present and the provider supports tools.

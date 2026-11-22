@@ -97,16 +97,100 @@ var transcribeLanguages = []plugnmeet.InsightsSupportedLangInfo{
 	{Code: "vi-VN", Name: "Vietnamese", Locale: "vi"},
 }
 
-// ttsLanguages shares the transcription locales: Gemini TTS detects the input
-// language itself and supports 130+ languages, so the codes are only used to
-// key `voice-<lang>` mappings and language selection in the UI.
+// translationLanguages holds one entry per Locale of transcribeLanguages, keyed
+// by that same short locale. Clients translate a spoken language into its
+// locale (e.g. "en-US" -> "en") and then look the locale up as a Code here, so
+// every Locale of transcribeLanguages must exist as a Code in this list.
+var translationLanguages = []plugnmeet.InsightsSupportedLangInfo{
+	{Code: "af", Name: "Afrikaans", Locale: "af"},
+	{Code: "am", Name: "Amharic", Locale: "am"},
+	{Code: "ar", Name: "Arabic", Locale: "ar"},
+	{Code: "hy", Name: "Armenian", Locale: "hy"},
+	{Code: "rup", Name: "Aromanian", Locale: "rup"},
+	{Code: "as", Name: "Assamese", Locale: "as"},
+	{Code: "az", Name: "Azerbaijani", Locale: "az"},
+	{Code: "be", Name: "Belarusian", Locale: "be"},
+	{Code: "bn", Name: "Bengali", Locale: "bn"},
+	{Code: "bs", Name: "Bosnian", Locale: "bs"},
+	{Code: "bg", Name: "Bulgarian", Locale: "bg"},
+	{Code: "my", Name: "Burmese", Locale: "my"},
+	{Code: "yue", Name: "Cantonese", Locale: "yue"},
+	{Code: "ca", Name: "Catalan", Locale: "ca"},
+	{Code: "ceb", Name: "Cebuano", Locale: "ceb"},
+	{Code: "hr", Name: "Croatian", Locale: "hr"},
+	{Code: "cs", Name: "Czech", Locale: "cs"},
+	{Code: "da", Name: "Danish", Locale: "da"},
+	{Code: "nl", Name: "Dutch", Locale: "nl"},
+	{Code: "en", Name: "English", Locale: "en"},
+	{Code: "et", Name: "Estonian", Locale: "et"},
+	{Code: "fa", Name: "Farsi", Locale: "fa"},
+	{Code: "fil", Name: "Filipino", Locale: "fil"},
+	{Code: "fi", Name: "Finnish", Locale: "fi"},
+	{Code: "fr", Name: "French", Locale: "fr"},
+	{Code: "gl", Name: "Galician", Locale: "gl"},
+	{Code: "ka", Name: "Georgian", Locale: "ka"},
+	{Code: "de", Name: "German", Locale: "de"},
+	{Code: "el", Name: "Greek", Locale: "el"},
+	{Code: "gu", Name: "Gujarati", Locale: "gu"},
+	{Code: "ha", Name: "Hausa", Locale: "ha"},
+	{Code: "he", Name: "Hebrew", Locale: "he"},
+	{Code: "hi", Name: "Hindi", Locale: "hi"},
+	{Code: "hu", Name: "Hungarian", Locale: "hu"},
+	{Code: "is", Name: "Icelandic", Locale: "is"},
+	{Code: "id", Name: "Indonesian", Locale: "id"},
+	{Code: "it", Name: "Italian", Locale: "it"},
+	{Code: "ja", Name: "Japanese", Locale: "ja"},
+	{Code: "jv", Name: "Javanese", Locale: "jv"},
+	{Code: "kea", Name: "Kabuverdianu", Locale: "kea"},
+	{Code: "kn", Name: "Kannada", Locale: "kn"},
+	{Code: "kk", Name: "Kazakh", Locale: "kk"},
+	{Code: "km", Name: "Khmer", Locale: "km"},
+	{Code: "ko", Name: "Korean", Locale: "ko"},
+	{Code: "ky", Name: "Kyrgyz", Locale: "ky"},
+	{Code: "lv", Name: "Latvian", Locale: "lv"},
+	{Code: "ln", Name: "Lingala", Locale: "ln"},
+	{Code: "lt", Name: "Lithuanian", Locale: "lt"},
+	{Code: "mk", Name: "Macedonian", Locale: "mk"},
+	{Code: "ms", Name: "Malay", Locale: "ms"},
+	{Code: "ml", Name: "Malayalam", Locale: "ml"},
+	{Code: "mt", Name: "Maltese", Locale: "mt"},
+	{Code: "cmn", Name: "Mandarin Chinese", Locale: "cmn"},
+	{Code: "mr", Name: "Marathi", Locale: "mr"},
+	{Code: "mn", Name: "Mongolian", Locale: "mn"},
+	{Code: "ne", Name: "Nepali", Locale: "ne"},
+	{Code: "nb", Name: "Norwegian", Locale: "nb"},
+	{Code: "or", Name: "Oriya", Locale: "or"},
+	{Code: "pl", Name: "Polish", Locale: "pl"},
+	{Code: "pt", Name: "Portuguese", Locale: "pt"},
+	{Code: "pa", Name: "Punjabi", Locale: "pa"},
+	{Code: "ro", Name: "Romanian", Locale: "ro"},
+	{Code: "ru", Name: "Russian", Locale: "ru"},
+	{Code: "sr", Name: "Serbian", Locale: "sr"},
+	{Code: "sd", Name: "Sindhi", Locale: "sd"},
+	{Code: "sk", Name: "Slovak", Locale: "sk"},
+	{Code: "sl", Name: "Slovenian", Locale: "sl"},
+	{Code: "es", Name: "Spanish", Locale: "es"},
+	{Code: "sw", Name: "Swahili", Locale: "sw"},
+	{Code: "sv", Name: "Swedish", Locale: "sv"},
+	{Code: "tg", Name: "Tajik", Locale: "tg"},
+	{Code: "te", Name: "Telugu", Locale: "te"},
+	{Code: "th", Name: "Thai", Locale: "th"},
+	{Code: "tr", Name: "Turkish", Locale: "tr"},
+	{Code: "uk", Name: "Ukrainian", Locale: "uk"},
+	{Code: "uz", Name: "Uzbek", Locale: "uz"},
+	{Code: "vi", Name: "Vietnamese", Locale: "vi"},
+}
+
+// ttsLanguages shares the translation codes: Gemini TTS detects the input
+// language itself and supports 130+ languages, so the codes only drive the
+// language selection in the UI.
 // Source: https://ai.google.dev/gemini-api/docs/speech-generation#languages
-var ttsLanguages = transcribeLanguages
+var ttsLanguages = translationLanguages
 
 // supportedLanguages holds the static language list per service.
 var supportedLanguages = map[insights.ServiceType][]plugnmeet.InsightsSupportedLangInfo{
 	insights.ServiceTypeTranscription:   transcribeLanguages,
-	insights.ServiceTypeTranslation:     transcribeLanguages,
+	insights.ServiceTypeTranslation:     translationLanguages,
 	insights.ServiceTypeSpeechSynthesis: ttsLanguages,
 }
 
@@ -126,14 +210,17 @@ var transcribeLangAliases = map[string]string{
 }
 
 var (
-	transcribeLangByCode    = make(map[string]string, len(transcribeLanguages))
-	transcribeLangByPrimary = make(map[string]string, len(transcribeLanguages))
+	transcribeLangByCode       = make(map[string]string, len(transcribeLanguages))
+	transcribeLangByPrimary    = make(map[string]string, len(transcribeLanguages))
+	transcribeLangLocaleByCode = make(map[string]string, len(transcribeLanguages))
 )
 
 func init() {
 	for i := range transcribeLanguages {
 		code, locale := transcribeLanguages[i].Code, transcribeLanguages[i].Locale
-		transcribeLangByCode[strings.ToLower(code)] = code
+		lowerCode := strings.ToLower(code)
+		transcribeLangByCode[lowerCode] = code
+		transcribeLangLocaleByCode[lowerCode] = locale
 		// The list is ordered by preference, so the first locale of a language wins.
 		if _, ok := transcribeLangByPrimary[locale]; !ok {
 			transcribeLangByPrimary[locale] = code
@@ -169,4 +256,22 @@ func transcribeLanguageCodes(lang string) []string {
 		return []string{code}
 	}
 	return nil
+}
+
+// GetLocaleFromCode resolves a BCP-47 code or alias to the short locale that
+// plugNmeet clients use (e.g. "en-US" -> "en", "es-419" -> "es",
+// "cmn-Hans-CN" -> "cmn"). Unknown codes fall back to their primary subtag and
+// finally to the trimmed input.
+func GetLocaleFromCode(code string) string {
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return ""
+	}
+	if canonical := normalizeTranscribeLang(code); canonical != "" {
+		return transcribeLangLocaleByCode[strings.ToLower(canonical)]
+	}
+	if primary, _, _ := strings.Cut(strings.ToLower(strings.ReplaceAll(code, "_", "-")), "-"); primary != "" {
+		return primary
+	}
+	return code
 }

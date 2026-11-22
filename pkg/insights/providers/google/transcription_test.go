@@ -252,8 +252,8 @@ func TestTranscriptionEmitsInterimAndFinalResults(t *testing.T) {
 	if partial.Result.Text != "hello" || !partial.Result.IsPartial {
 		t.Errorf("partial result = %+v", partial.Result)
 	}
-	if partial.Result.Lang != "en-US" {
-		t.Errorf("partial language = %q, want the detected en-US", partial.Result.Lang)
+	if partial.Result.Lang != "en" {
+		t.Errorf("partial language = %q, want the short locale en", partial.Result.Lang)
 	}
 
 	final := readEvent(t, stream.Results())
@@ -263,6 +263,9 @@ func TestTranscriptionEmitsInterimAndFinalResults(t *testing.T) {
 	if final.Result.Text != "hello world" || final.Result.IsPartial {
 		t.Errorf("final result = %+v", final.Result)
 	}
+	if final.Result.Lang != "en" {
+		t.Errorf("final language = %q, want the short locale en", final.Result.Lang)
+	}
 	if final.Result.FromUserId != "user-1" || final.Result.FromUserName != "user-1" {
 		t.Errorf("final result attribution = %+v", final.Result)
 	}
@@ -271,6 +274,31 @@ func TestTranscriptionEmitsInterimAndFinalResults(t *testing.T) {
 	}
 	if len(final.Result.Translations) != 0 {
 		t.Errorf("translations = %v, want none", final.Result.Translations)
+	}
+}
+
+func TestTranscriptionNormalisesDetectedLanguageWithoutSpokenLang(t *testing.T) {
+	conn := &fakeConn{
+		block: make(chan struct{}),
+		incoming: []*genai.LiveServerMessage{
+			{ServerContent: &genai.LiveServerContent{
+				InputTranscription: &genai.Transcription{Text: "你好", LanguageCode: "cmn-Hans-CN"},
+			}},
+		},
+	}
+
+	stream := newTranscriptionStream(context.Background(), conn,
+		&insights.TranscriptionOptions{UserName: "user-1"}, newTestProvider(), logrus.NewEntry(logrus.New()))
+	defer func() { _ = stream.Close() }()
+
+	readEvent(t, stream.Results()) // session started
+
+	final := readEvent(t, stream.Results())
+	if final.Type != insights.EventTypeFinalResult || final.Result == nil {
+		t.Fatalf("event = %+v, want a final result", final)
+	}
+	if final.Result.Lang != "cmn" {
+		t.Errorf("language = %q, want the short locale cmn", final.Result.Lang)
 	}
 }
 

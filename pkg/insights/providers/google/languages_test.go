@@ -80,6 +80,51 @@ func TestGetSupportedLanguages(t *testing.T) {
 	}
 }
 
+// TestTranslationCoversEveryTranscriptionLocale mirrors the a-client
+// getSubtitleLangs contract: the locale of every spoken language is looked up
+// as a translation code, so a missing entry hides that language entirely.
+func TestTranslationCoversEveryTranscriptionLocale(t *testing.T) {
+	provider := newTestProvider()
+
+	translationCodes := make(map[string]struct{})
+	for _, lang := range provider.GetSupportedLanguages(insights.ServiceTypeTranslation) {
+		translationCodes[lang.Code] = struct{}{}
+	}
+
+	for _, lang := range provider.GetSupportedLanguages(insights.ServiceTypeTranscription) {
+		if _, ok := translationCodes[lang.Locale]; !ok {
+			t.Errorf("transcription locale %q (from %q) has no translation entry", lang.Locale, lang.Code)
+		}
+	}
+}
+
+func TestGetLocaleFromCode(t *testing.T) {
+	tests := map[string]string{
+		"en-US":       "en",
+		"en-us":       "en",
+		"bn-BD":       "bn",
+		"es-419":      "es",
+		"es-US":       "es",
+		"cmn-Hans-CN": "cmn",
+		"en":          "en",
+		"EN":          "en",
+		"en_IN":       "en",
+		"zh":          "cmn",
+		"no":          "nb",
+		"tl":          "fil",
+		"ceb":         "ceb",
+		"xx-YY":       "xx",
+		"xx":          "xx",
+		"":            "",
+	}
+
+	for input, want := range tests {
+		if got := GetLocaleFromCode(input); got != want {
+			t.Errorf("GetLocaleFromCode(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
 func TestGetSupportedLanguagesReturnsCopies(t *testing.T) {
 	provider := newTestProvider()
 

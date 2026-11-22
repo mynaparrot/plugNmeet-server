@@ -179,6 +179,21 @@ func prepareManageBoard(deps ToolDependencies) func(ctx context.Context, call To
 	}
 }
 
+// whiteboardLayoutPropDesc and whiteboardAnchorPropDesc describe the group-based
+// placement model every whiteboard drawing tool shares.
+const whiteboardLayoutPropDesc = "Placement: \"free_space\" (default) or \"page_center\" always starts a new section " +
+	"row below existing content — use it for a new or unrelated topic/step. \"right_of_element\" or " +
+	"\"left_of_element\" with anchor_element_id (the target group's anchorElementId, its groupId, or any element id " +
+	"in it) places content side-by-side, so use it ONLY for related content (e.g. explanation sticky notes/cards " +
+	"beside a diagram, or two side-by-side examples of the same topic). \"below_element\"/\"above_element\" stacks " +
+	"directly under/above a specific group, \"inside_element\" draws inside a specific shape."
+
+const whiteboardAnchorPropDesc = "Target element id for anchored layouts: the target group's anchorElementId, its " +
+	"groupId, or any element id inside that group."
+
+const whiteboardGroupResultDesc = " Each call creates one visual group and returns groupId, anchorElementId, " +
+	"elementIds, bbox and pageBounds."
+
 func registerWhiteboardTools(reg *Registry, deps ToolDependencies) {
 	prepare := whiteboardPrepare(deps)
 
@@ -188,10 +203,13 @@ func registerWhiteboardTools(reg *Registry, deps ToolDependencies) {
 			Name: ToolWhiteboardWriteContent,
 			Description: "Write text headings/notes, vocabulary cards, sticky notes, or a bordered table " +
 				"(style=\"comparison_table\" with blocks=[{columns:[\"Col 1\",\"Col 2\"]}]; use \"\" for blank cells). " +
-				"Placed automatically; write math in Unicode (∫, π, √, ², ≠, ≤, ≥), never LaTeX.",
+				"Placed automatically; write math in Unicode (∫, π, √, ², ≠, ≤, ≥), never LaTeX." + whiteboardGroupResultDesc +
+				" All blocks in one call form a single group, so related headings/notes/cards that belong together " +
+				"(e.g. a title card plus numbered explanation cards beside a diagram) go in one call, with " +
+				"layout=\"right_of_element\" and anchor_element_id set to the diagram's anchorElementId or groupId.",
 			InputSchema: objectSchema(map[string]any{
-				"layout":            enumProp("Placement relative to page or anchor_element_id.", "free_space", "inside_element", "below_element", "above_element", "right_of_element", "left_of_element", "page_center"),
-				"anchor_element_id": stringProp("Target element id for anchored layouts.", 120),
+				"layout":            enumProp(whiteboardLayoutPropDesc, "free_space", "inside_element", "below_element", "above_element", "right_of_element", "left_of_element", "page_center"),
+				"anchor_element_id": stringProp(whiteboardAnchorPropDesc, 120),
 				"x":                 map[string]any{"type": "number"},
 				"y":                 map[string]any{"type": "number"},
 				"style":             enumProp("Visual style.", "heading", "body", "vocabulary_card", "sticky_note", "comparison_table"),
@@ -213,7 +231,8 @@ func registerWhiteboardTools(reg *Registry, deps ToolDependencies) {
 			Name: ToolWhiteboardDrawShapes,
 			Description: "The ONLY tool for geometric shapes (rectangle, ellipse, diamond, arrow, line), " +
 				"marking/underlining/circling an element via target_element_id (plus target_text for a specific word), " +
-				"or connecting elements via start_element_id/end_element_id. Omit x/y for automatic placement.",
+				"or connecting elements via start_element_id/end_element_id. Omit x/y for automatic placement." +
+				whiteboardGroupResultDesc,
 			InputSchema: objectSchema(map[string]any{
 				"shapes": arrayProp("The shapes to draw.", objectSchema(map[string]any{
 					"type":              enumProp("Shape type.", "rectangle", "ellipse", "diamond", "arrow", "line"),
@@ -231,8 +250,8 @@ func registerWhiteboardTools(reg *Registry, deps ToolDependencies) {
 					"padding":           map[string]any{"type": "number", "minimum": 4, "maximum": 64},
 					"start_element_id":  stringProp("For arrows and lines: bind the start to this element.", 120),
 					"end_element_id":    stringProp("For arrows and lines: bind the end to this element.", 120),
-					"layout":            enumProp("Placement relative to anchor_element_id, target_element_id or the page.", "free_space", "inside_element", "below_element", "above_element", "right_of_element", "left_of_element", "page_center"),
-					"anchor_element_id": stringProp("Element id to place the shape against.", 120),
+					"layout":            enumProp(whiteboardLayoutPropDesc, "free_space", "inside_element", "below_element", "above_element", "right_of_element", "left_of_element", "page_center"),
+					"anchor_element_id": stringProp(whiteboardAnchorPropDesc, 120),
 				}, "type"), 1, 8),
 			}, "shapes"),
 		},
@@ -247,7 +266,7 @@ func registerWhiteboardTools(reg *Registry, deps ToolDependencies) {
 			Description: "Draw an illustration or icon from complete SVG markup (never use for basic geometric " +
 				"shapes or text — use whiteboard_draw_shapes or whiteboard_write_content). Defaults to " +
 				"render_as=\"image\"; pass layout=\"inside_element\" (or beside/above/below) with anchor_element_id to " +
-				"place relative to an existing element. Omit x/y for automatic placement.",
+				"place relative to an existing element. Omit x/y for automatic placement." + whiteboardGroupResultDesc,
 			InputSchema: objectSchema(map[string]any{
 				"svg":               stringProp("Complete SVG markup (path, line, polyline, polygon, circle, ellipse, rect, text, g).", 6000),
 				"render_as":         enumProp("'image' (default): the full SVG as one clean vector image; 'strokes': animated hand-drawn strokes.", "image", "strokes"),
@@ -255,8 +274,8 @@ func registerWhiteboardTools(reg *Registry, deps ToolDependencies) {
 				"y":                 map[string]any{"type": "number"},
 				"width":             map[string]any{"type": "number", "minimum": 40, "maximum": 1200},
 				"height":            map[string]any{"type": "number", "minimum": 40, "maximum": 1200},
-				"layout":            enumProp("Placement relative to the page or anchor_element_id.", "free_space", "inside_element", "below_element", "above_element", "right_of_element", "left_of_element", "page_center"),
-				"anchor_element_id": stringProp("Element id to draw inside, beside, above or below.", 120),
+				"layout":            enumProp(whiteboardLayoutPropDesc, "free_space", "inside_element", "below_element", "above_element", "right_of_element", "left_of_element", "page_center"),
+				"anchor_element_id": stringProp(whiteboardAnchorPropDesc, 120),
 				"animate":           boolProp("Only for render_as=strokes: animate the strokes while drawing."),
 				"stroke_color":      enumProp("Stroke colour (black for teaching; red for corrections).", "black", "blue", "red", "green", "orange", "violet"),
 				"stroke_width":      intProp("Stroke width.", 1, 4),
@@ -274,14 +293,14 @@ func registerWhiteboardTools(reg *Registry, deps ToolDependencies) {
 				"classDiagram, stateDiagram-v2, erDiagram, gantt, quadrantChart, timeline, mindmap). " +
 				"Flowcharts/sequence/class become native shapes; gantt, quadrantChart, timeline and others are " +
 				"inserted as an image. Pass raw Mermaid only (no fences, Unicode math instead of LaTeX) and omit " +
-				"x/y for automatic placement.",
+				"x/y for automatic placement." + whiteboardGroupResultDesc,
 			InputSchema: objectSchema(map[string]any{
 				"mermaid":           stringProp("Raw Mermaid markup (no fences).", 4000),
 				"x":                 map[string]any{"type": "number"},
 				"y":                 map[string]any{"type": "number"},
 				"scale":             map[string]any{"type": "number", "minimum": 0.3, "maximum": 2.0},
-				"layout":            enumProp("Placement relative to the page or anchor_element_id.", "free_space", "inside_element", "below_element", "above_element", "right_of_element", "left_of_element", "page_center"),
-				"anchor_element_id": stringProp("Element id to place the diagram against.", 120),
+				"layout":            enumProp(whiteboardLayoutPropDesc, "free_space", "inside_element", "below_element", "above_element", "right_of_element", "left_of_element", "page_center"),
+				"anchor_element_id": stringProp(whiteboardAnchorPropDesc, 120),
 			}, "mermaid"),
 		},
 		Prepare: prepare,

@@ -5,6 +5,7 @@ import (
 	"io"
 	"path"
 	"runtime"
+	"strings"
 
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v3"
@@ -120,6 +121,10 @@ func (r *Router) registerBaseRoutes() {
 		return c.Render("index", nil)
 	})
 	r.fiberApp.Add([]string{"GET", "HEAD"}, "/login*", func(c fiber.Ctx) error {
+		// the path picks the template: /login-agent* is the AI agent launcher
+		if strings.HasPrefix(c.Path(), "/login-agent") {
+			return c.Render("login-agent", nil)
+		}
 		return c.Render("login", nil)
 	})
 	r.fiberApp.Post("/webhook", r.ctrl.WebhookController.HandleWebhook)
