@@ -506,7 +506,6 @@ func TestBuildLockedSystemInstructionExplainsInteractiveSurfaces(t *testing.T) {
 		`by calling set_workspace_lock with action="unlock"`,
 		`call set_workspace_lock with action="lock"`,
 		`use set_workspace_lock with action="close" or action="open"`,
-		"hides the floating notepad so it never covers the drawing",
 		"whiteboard_draw_diagram (Mermaid) is the default choice for most visuals",
 		"gantt charts, quadrant charts, timelines, mind maps",
 		"whiteboard_draw_shapes is the ONLY tool for geometric shapes",
@@ -523,6 +522,7 @@ func TestBuildLockedSystemInstructionExplainsInteractiveSurfaces(t *testing.T) {
 		"prefer red for mistakes and corrections",
 		"Never mark a participant element in the same colour they used",
 		"Shared notepad Markdown",
+		"Never use # (H1) headings",
 		`mode="replace_block"`,
 	} {
 		if !strings.Contains(got, want) {

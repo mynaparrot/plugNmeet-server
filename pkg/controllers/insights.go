@@ -230,7 +230,7 @@ func (i *InsightsController) HandleGetSupportedLangs(c fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	langs, err := i.insightsModel.GetSupportedLanguagesForService(c.RequestCtx(), serviceType)
+	langs, err := i.insightsModel.GetSupportedLanguagesForService(c.Context(), serviceType)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
@@ -276,7 +276,7 @@ func (i *InsightsController) HandleExecuteChatTranslation(c fiber.Ctx) error {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}
 
-	result, err := i.insightsModel.ExecuteChatTranslation(c.RequestCtx(), req, roomId, requestedUserId)
+	result, err := i.insightsModel.ExecuteChatTranslation(c.Context(), req, roomId, requestedUserId)
 	if err != nil {
 		return utils.SendCommonProtobufResponse(c, false, err.Error())
 	}

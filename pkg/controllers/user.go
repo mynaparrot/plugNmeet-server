@@ -69,7 +69,7 @@ func (uc *UserController) HandleGenerateJoinToken(c fiber.Ctx) error {
 		return utils.SendCommonErrorJsonResponse(c, callerMsg(c, config.ErrRoomNotActive.Error()), rr.GetStatusCode())
 	}
 
-	statusCode, token, err := uc.UserModel.GetPNMJoinToken(c.RequestCtx(), req, false)
+	statusCode, token, err := uc.UserModel.GetPNMJoinToken(c.Context(), req, false)
 	if err != nil {
 		return utils.SendCommonErrorJsonResponse(c, callerMsg(c, err.Error()), statusCode)
 	}
@@ -150,7 +150,7 @@ func (uc *UserController) HandleMuteUnMuteTrack(c fiber.Ctx) error {
 	}
 
 	req.RequestedUserId = requestedUserId
-	if statusCode, err := uc.UserModel.MuteUnMuteTrack(c.RequestCtx(), req); err != nil {
+	if statusCode, err := uc.UserModel.MuteUnMuteTrack(c.Context(), req); err != nil {
 		return utils.SendCommonErrorProtobufResponse(c, err.Error(), statusCode)
 	}
 

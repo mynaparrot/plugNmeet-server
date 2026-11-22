@@ -343,6 +343,16 @@ func applyAIAgentSessionRoomFeatures(meta *plugnmeet.RoomMetadata) {
 		if rf.WaitingRoomFeatures != nil {
 			rf.WaitingRoomFeatures.IsActive = false
 		}
+		// activate the pad the agent may write to, so the client pre-warms the editor and shows the footer icon from
+		// the start of the session; it stays invisible until the agent opens or writes to it
+		if rf.GetInsightsFeatures().GetAiAgentFeatures().GetAllowNotepadWrite() {
+			if np := rf.GetSharedNotePadFeatures(); np != nil && np.GetIsAllow() {
+				if np.NotePadId == "" {
+					np.NotePadId = uuid.NewString()
+				}
+				np.IsActive = true
+			}
+		}
 	}
 	if meta.DefaultLockSettings == nil {
 		meta.DefaultLockSettings = new(plugnmeet.LockSettings)

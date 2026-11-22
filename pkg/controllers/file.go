@@ -175,7 +175,7 @@ func (fc *FileController) HandleDownloadUploadedFile(c fiber.Ctx) error {
 			InputPath:    relativePath,
 			HookFileType: hooks.HookFileTypeRoomFile,
 		}
-		res, err := fc.AppConfig.Hooks.RunDownloadHook(c.RequestCtx(), &req, nil, 0, fc.logger)
+		res, err := fc.AppConfig.Hooks.RunDownloadHook(c.Context(), &req, nil, 0, fc.logger)
 		if err != nil {
 			fc.logger.WithError(err).Error("download hook pipeline failed")
 			return c.Status(fiber.StatusInternalServerError).SendString(config.MsgFileDownloadFailed)
@@ -227,7 +227,7 @@ func (fc *FileController) HandleConvertWhiteboardFile(c fiber.Ctx) error {
 	log := fc.logger.WithField("method", "HandleConvertWhiteboardFile")
 
 	// We'll give 50 seconds to complete the task
-	ctx, cancel := context.WithTimeout(c.RequestCtx(), 50*time.Second)
+	ctx, cancel := context.WithTimeout(c.Context(), 50*time.Second)
 	defer cancel()
 
 	res, err := fc.FileModel.ConvertAndBroadcastWhiteboardFile(ctx, req.RoomId, req.RoomSid, req.FilePath, &requestedUserId, nil, log)

@@ -175,7 +175,7 @@ func (bc *BBBController) HandleBBBCreate(c fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", config.MsgBBBInvalidRequest))
 	}
 
-	_, room, err := bc.RoomModel.CreateRoom(c.RequestCtx(), pnmReq)
+	_, room, err := bc.RoomModel.CreateRoom(c.Context(), pnmReq)
 	if err != nil {
 		// the model logged the operational error
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", config.MsgBBBCreateFailed))
@@ -265,7 +265,7 @@ func (bc *BBBController) HandleBBBJoin(c fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "validationError", config.MsgBBBUserBlocked))
 	}
 
-	_, token, err := bc.UserModel.GetPNMJoinToken(c.RequestCtx(), req, false)
+	_, token, err := bc.UserModel.GetPNMJoinToken(c.Context(), req, false)
 	if err != nil {
 		// the model logged the operational error
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "error", config.MsgBBBJoinFailed))
@@ -338,7 +338,7 @@ func (bc *BBBController) HandleBBBGetMeetingInfo(c fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", config.MsgBBBParsingFailed))
 	}
 
-	status, msg, _, res := bc.RoomModel.GetActiveRoomInfo(c.RequestCtx(), &plugnmeet.GetActiveRoomInfoReq{
+	status, msg, _, res := bc.RoomModel.GetActiveRoomInfo(c.Context(), &plugnmeet.GetActiveRoomInfoReq{
 		RoomId: bbbapiwrapper.CheckMeetingIdToMatchFormat(q.MeetingID),
 	})
 
@@ -362,7 +362,7 @@ func (bc *BBBController) HandleBBBGetMeetingInfo(c fiber.Ctx) error {
 
 // HandleBBBGetMeetings handles BBB getMeetings requests.
 func (bc *BBBController) HandleBBBGetMeetings(c fiber.Ctx) error {
-	_, _, _, rooms := bc.RoomModel.GetActiveRoomsInfo(c.RequestCtx())
+	_, _, _, rooms := bc.RoomModel.GetActiveRoomsInfo(c.Context())
 	if rooms == nil {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("SUCCESS", "noMeetings", "no meetings were found on this server"))
 	}
@@ -393,7 +393,7 @@ func (bc *BBBController) HandleBBBEndMeetings(c fiber.Ctx) error {
 		return c.XML(bbbapiwrapper.CommonResponseMsg("FAILED", "parsingError", config.MsgBBBParsingFailed))
 	}
 
-	status, msg, _ := bc.RoomModel.EndRoom(c.RequestCtx(), &plugnmeet.RoomEndReq{
+	status, msg, _ := bc.RoomModel.EndRoom(c.Context(), &plugnmeet.RoomEndReq{
 		RoomId: bbbapiwrapper.CheckMeetingIdToMatchFormat(q.MeetingID),
 	})
 

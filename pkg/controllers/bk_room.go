@@ -49,7 +49,7 @@ func (brc *BreakoutRoomController) HandleCreateBreakoutRooms(c fiber.Ctx) error 
 	req.RoomId = roomId
 	req.RequestedUserId = requestedUserId
 
-	rooms, err := brc.BreakoutRoomModel.CreateBreakoutRooms(c.RequestCtx(), req)
+	rooms, err := brc.BreakoutRoomModel.CreateBreakoutRooms(c.Context(), req)
 	if err != nil {
 		res.Msg = err.Error()
 		return utils.SendProtobufResponse(c, res)
@@ -81,7 +81,7 @@ func (brc *BreakoutRoomController) HandleJoinBreakoutRoom(c fiber.Ctx) error {
 
 	req.RoomId = roomId
 	req.UserId = requestedUserId
-	token, err := brc.BreakoutRoomModel.JoinBreakoutRoom(c.RequestCtx(), req, isAdmin)
+	token, err := brc.BreakoutRoomModel.JoinBreakoutRoom(c.Context(), req, isAdmin)
 	if err != nil {
 		res.Msg = err.Error()
 		return utils.SendProtobufResponse(c, res)
@@ -217,7 +217,7 @@ func (brc *BreakoutRoomController) HandleEndBreakoutRoom(c fiber.Ctx) error {
 	}
 
 	req.RoomId = roomId
-	if err := brc.BreakoutRoomModel.EndBreakoutRoom(c.RequestCtx(), req); err != nil {
+	if err := brc.BreakoutRoomModel.EndBreakoutRoom(c.Context(), req); err != nil {
 		res.Msg = err.Error()
 		return utils.SendProtobufResponse(c, res)
 	}
@@ -246,7 +246,7 @@ func (brc *BreakoutRoomController) HandleBackToMainRoom(c fiber.Ctx) error {
 	req.RoomId = roomId
 	req.UserId = userId
 
-	token, err := brc.BreakoutRoomModel.BackToMainRoom(c.RequestCtx(), req)
+	token, err := brc.BreakoutRoomModel.BackToMainRoom(c.Context(), req)
 	if err != nil {
 		res.Msg = err.Error()
 		return utils.SendProtobufResponse(c, res)
@@ -270,7 +270,7 @@ func (brc *BreakoutRoomController) HandleEndBreakoutRooms(c fiber.Ctx) error {
 		return utils.SendProtobufResponse(c, res)
 	}
 
-	if err := brc.BreakoutRoomModel.EndAllBreakoutRoomsByParentRoomId(c.RequestCtx(), roomId); err != nil {
+	if err := brc.BreakoutRoomModel.EndAllBreakoutRoomsByParentRoomId(c.Context(), roomId); err != nil {
 		res.Msg = err.Error()
 		return utils.SendProtobufResponse(c, res)
 	}
@@ -301,7 +301,7 @@ func (brc *BreakoutRoomController) HandleReInviteBreakoutRoom(c fiber.Ctx) error
 	}
 
 	req.RoomId = roomId
-	if err := brc.BreakoutRoomModel.ReInviteBreakoutRoom(c.RequestCtx(), req); err != nil {
+	if err := brc.BreakoutRoomModel.ReInviteBreakoutRoom(c.Context(), req); err != nil {
 		res.Msg = err.Error()
 		return utils.SendProtobufResponse(c, res)
 	}
@@ -336,7 +336,7 @@ func (brc *BreakoutRoomController) HandleMoveBreakoutRoomUser(c fiber.Ctx) error
 	// body) and must NOT be overwritten with the requesting admin's id.
 	req.RoomId = roomId
 
-	if err := brc.BreakoutRoomModel.MoveBreakoutRoomUser(c.RequestCtx(), req); err != nil {
+	if err := brc.BreakoutRoomModel.MoveBreakoutRoomUser(c.Context(), req); err != nil {
 		res.Msg = err.Error()
 		return utils.SendProtobufResponse(c, res)
 	}

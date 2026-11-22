@@ -174,7 +174,7 @@ func (lc *LtiV1Controller) HandleLTIV1JoinRoom(c fiber.Ctx) error {
 		}
 	}
 
-	token, err := lc.LtiV1Model.LTIV1JoinRoom(c.RequestCtx(), claim)
+	token, err := lc.LtiV1Model.LTIV1JoinRoom(c.Context(), claim)
 	if err != nil {
 		// the model logged the operational error
 		return sendErrorResponse(c, fiber.StatusInternalServerError, config.MsgLTIRoomJoinFailed)
@@ -199,7 +199,7 @@ func (lc *LtiV1Controller) HandleLTIV1EndRoom(c fiber.Ctx) error {
 	}
 	// the client-facing "room ended" notice is broadcast by the model; the LTI
 	// consumer gets its own curated answer and never sees a client i18n key
-	status, _, _ := lc.RoomModel.EndRoom(c.RequestCtx(), &plugnmeet.RoomEndReq{
+	status, _, _ := lc.RoomModel.EndRoom(c.Context(), &plugnmeet.RoomEndReq{
 		RoomId: roomId,
 	})
 	if !status {

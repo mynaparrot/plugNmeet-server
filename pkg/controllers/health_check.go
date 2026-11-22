@@ -38,11 +38,11 @@ func (h *HealthCheckController) HandleHealthCheck(c fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusServiceUnavailable).SendString("DB connection error")
 	}
-	if err := db.PingContext(c.RequestCtx()); err != nil {
+	if err := db.PingContext(c.Context()); err != nil {
 		return c.Status(fiber.StatusServiceUnavailable).SendString("DB connection error")
 	}
 
-	if _, err := h.rds.Ping(c.RequestCtx()).Result(); err != nil {
+	if _, err := h.rds.Ping(c.Context()).Result(); err != nil {
 		return c.Status(fiber.StatusServiceUnavailable).SendString("Redis connection error")
 	}
 

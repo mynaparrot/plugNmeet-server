@@ -383,8 +383,8 @@ func (b aiAgentNotepadBackend) EnsureNotepadActive(_ context.Context, roomID str
 	return nil
 }
 
-// aiAgentWhiteboardBackend brings the whiteboard into view, hiding the floating
-// notepad so it never covers the drawing.
+// aiAgentWhiteboardBackend brings the whiteboard into view. The shared notepad docks as a side panel next to the board,
+// so opening the whiteboard leaves it visible; the agent can still close either surface with set_workspace_lock.
 type aiAgentWhiteboardBackend struct {
 	nats workspaceNats
 }
@@ -406,10 +406,6 @@ func (b aiAgentWhiteboardBackend) EnsureWhiteboardVisible(_ context.Context, roo
 	changed := false
 	if !wb.GetVisible() {
 		wb.Visible = true
-		changed = true
-	}
-	if np := meta.GetRoomFeatures().GetSharedNotePadFeatures(); np != nil && np.GetVisible() {
-		np.Visible = false
 		changed = true
 	}
 	if changed {

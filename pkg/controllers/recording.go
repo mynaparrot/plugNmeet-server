@@ -106,7 +106,7 @@ func (rc *RecordingController) HandleMergeRecordings(c fiber.Ctx) error {
 		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthInvalidRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
-	statusCode, err := rc.recordingModel.MergeRecordings(c.RequestCtx(), req)
+	statusCode, err := rc.recordingModel.MergeRecordings(c.Context(), req)
 	if err != nil {
 		if errors.Is(err, config.NotFoundErr) {
 			return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthRecordingNotFound, plugnmeet.StatusCode_NOT_FOUND)

@@ -109,11 +109,13 @@ func registerNotepadTools(reg *Registry, deps ToolDependencies) {
 		Kind: ToolKindClient,
 		Spec: &insights.MCPToolSpec{
 			Name: ToolNotepadWrite,
-			Description: "Write or mark Markdown in the shared notepad (automatically opens and brings the shared " +
-				"notepad into view). To mark mistakes inline, call notepad_read for block ids, then use " +
-				"mode=\"replace_block\" with block_id (e.g. \"~~wrong~~ **correct**\").",
+			Description: "Write or mark compact Markdown in the shared notepad (automatically opens and brings the " +
+				"shared notepad into view). Never use # (H1) headings — the panel is compact; use ### or ## for " +
+				"section headings and **bold** for sub-labels. To mark mistakes inline, call notepad_read for block " +
+				"ids, then use mode=\"replace_block\" with block_id (e.g. \"~~wrong~~ **correct**\").",
 			InputSchema: objectSchema(map[string]any{
-				"markdown": stringProp("Markdown content.", 8000),
+				"markdown": stringProp("Markdown content. Never use # (H1) headings; use ### or ## for section "+
+					"headings and **bold** for sub-labels.", 8000),
 				"mode": enumProp("Write mode: 'append', 'insert_section' (under heading), 'replace_block' (update "+
 					"block_id in-place), or 'replace' (overwrite all).",
 					"replace", "append", "insert_section", "replace_block"),

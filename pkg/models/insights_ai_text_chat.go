@@ -209,7 +209,8 @@ const adminTextChatToolsPrompt = "You are the assistant of the room administrato
 	"diagram) with layout=\"right_of_element\" plus anchor_element_id set to the other group's anchorElementId or " +
 	"groupId (for a follow-up you may also omit anchor_element_id or pass \"last\", which anchors to the group " +
 	"drawn most recently). Use layout=\"free_space\" for a new or unrelated topic/section so it starts below existing content " +
-	"with clean spacing instead of beside an unrelated group."
+	"with clean spacing instead of beside an unrelated group. In the shared notepad, never use # (H1) headings — use " +
+	"### (H3) or ## (H2) for section titles and **bold** for sub-labels."
 
 // textChatStream starts the provider stream, using the tool calling variant when
 // an admin runner is present and the provider supports tools.

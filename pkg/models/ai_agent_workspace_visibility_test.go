@@ -49,9 +49,9 @@ func TestEnsureWhiteboardVisibleKeepsTheBoardLocked(t *testing.T) {
 	if !meta.RoomFeatures.WhiteboardFeatures.Visible {
 		t.Error("the whiteboard must become visible")
 	}
-	// The floating notepad is hidden so it never covers the drawing.
-	if meta.RoomFeatures.SharedNotePadFeatures.Visible {
-		t.Error("the shared notepad must be hidden when the whiteboard opens")
+	// The notepad docks beside the board, so it stays visible side-by-side.
+	if !meta.RoomFeatures.SharedNotePadFeatures.Visible {
+		t.Error("the shared notepad must stay visible when the whiteboard opens")
 	}
 	// Opening the board must never hand the pen to the participant.
 	if meta.DefaultLockSettings.GetLockWhiteboard() {

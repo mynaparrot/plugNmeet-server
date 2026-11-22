@@ -498,6 +498,36 @@ func TestApplyAIAgentRoomDefaults(t *testing.T) {
 		}
 	})
 
+	t.Run("an agent writable notepad is pre-activated", func(t *testing.T) {
+		features := agentFeatures(true, modeControlled, controlledConfig("u1"))
+		features.AllowNotepadWrite = true
+		req := newRequest(features)
+		req.Metadata.RoomFeatures.SharedNotePadFeatures = &plugnmeet.SharedNotePadFeatures{IsAllow: true}
+		(&RoomModel{}).applyAIAgentRoomDefaults(req)
+
+		np := req.GetMetadata().GetRoomFeatures().GetSharedNotePadFeatures()
+		if !np.GetIsActive() {
+			t.Error("shared notepad is_active = false, want it pre-activated for the agent")
+		}
+		if np.GetNotePadId() == "" {
+			t.Error("note_pad_id is empty, want a fresh pad id")
+		}
+		// it stays hidden until the agent opens or writes to it
+		if np.GetVisible() {
+			t.Error("shared notepad visible = true, want it hidden at session start")
+		}
+	})
+
+	t.Run("a notepad the agent cannot write stays inactive", func(t *testing.T) {
+		req := newRequest(agentFeatures(true, modeControlled, controlledConfig("u1")))
+		req.Metadata.RoomFeatures.SharedNotePadFeatures = &plugnmeet.SharedNotePadFeatures{IsAllow: true}
+		(&RoomModel{}).applyAIAgentRoomDefaults(req)
+
+		if req.GetMetadata().GetRoomFeatures().GetSharedNotePadFeatures().GetIsActive() {
+			t.Error("shared notepad is_active = true, want it untouched")
+		}
+	})
+
 	t.Run("a disabled breakout room is enabled without a room limit", func(t *testing.T) {
 		req := newRequest(agentFeatures(true, modeOpenPerUse, openPerUserConfig(2)))
 		(&RoomModel{}).applyAIAgentRoomDefaults(req)

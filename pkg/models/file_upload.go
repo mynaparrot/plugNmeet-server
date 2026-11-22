@@ -368,7 +368,7 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 
 	// Lock to prevent concurrent processing in the same room
 	lock := m.redisService.NewLock(fmt.Sprintf("whiteboardUploadLock-%s", rf.RoomId), 5*time.Minute)
-	locked, err := lock.TryLock(c.RequestCtx())
+	locked, err := lock.TryLock(c.Context())
 	if err != nil {
 		log.WithError(err).Error("failed to acquire lock")
 		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, config.MsgFileUploadFailed)
@@ -418,7 +418,7 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 				return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, config.MsgFileConversionFailed)
 			}
 			gLog.Info("File successfully processed")
-		case <-c.RequestCtx().Done():
+		case <-c.Context().Done():
 			// The handler's timeout was reached.
 			gLog.Warn("Handler timeout reached, conversion will continue in background")
 		}
@@ -463,7 +463,7 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 	}
 
 	// now we're good to for start converting, ConvertAndBroadcastWhiteboardFile expect savePath not full path
-	if _, err := m.ConvertAndBroadcastWhiteboardFile(c.RequestCtx(), rf.RoomId, rf.RoomSid, savePath, nil, lock, log); err != nil {
+	if _, err := m.ConvertAndBroadcastWhiteboardFile(c.Context(), rf.RoomId, rf.RoomSid, savePath, nil, lock, log); err != nil {
 		if errors.Is(err, config.ErrConversionTimeout) {
 			// process will continue in background
 			return plugnmeet.StatusCode_SUCCESS, nil
