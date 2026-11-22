@@ -28,6 +28,8 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights/media"
 )
 
+const mimeTypeAudioRed = "audio/red"
+
 // trackSubscription is the publication method the agent needs (fakeable in tests).
 type trackSubscription interface {
 	SetSubscribed(subscribed bool) error
@@ -898,14 +900,22 @@ func (a *RoomAgent) isCaptureAllowed(identity string) bool {
 	return a.payload.TargetUsers[config.PrimaryIdentityFromNative(identity)]
 }
 
-// isMicrophoneOpusTrack checks if the given track publication is a microphone source and of Opus codec.
+// isMicrophoneOpusTrack checks if the given track publication is a microphone
+// audio source encoded as Opus (directly or wrapped in RED).
+// Browsers publishing with red: true send Opus inside RED, so the SFU reports
+// "audio/red" while still delivering plain Opus RTP to this subscriber.
 func (a *RoomAgent) isMicrophoneOpusTrack(pub lksdk.TrackPublication) bool {
 	if pub == nil {
 		return false
 	}
-	return pub.Kind() == lksdk.TrackKindAudio &&
-		pub.Source() == livekit.TrackSource_MICROPHONE &&
-		strings.EqualFold(pub.MimeType(), webrtc.MimeTypeOpus)
+	if pub.Kind() != lksdk.TrackKindAudio || pub.Source() != livekit.TrackSource_MICROPHONE {
+		return false
+	}
+	// An empty mime type means the initial signaling has not populated it yet.
+	mime := strings.TrimSpace(pub.MimeType())
+	return mime == "" ||
+		strings.EqualFold(mime, webrtc.MimeTypeOpus) ||
+		strings.EqualFold(mime, mimeTypeAudioRed)
 }
 
 func copyBytes(src []byte) []byte {

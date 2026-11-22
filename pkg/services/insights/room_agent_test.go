@@ -453,3 +453,47 @@ func TestUnsubscribePipelineTrackReplacementRace(t *testing.T) {
 		}
 	}
 }
+
+// fakePublication only fills the fields isMicrophoneOpusTrack inspects.
+type fakePublication struct {
+	lksdk.TrackPublication
+	kind   lksdk.TrackKind
+	source livekit.TrackSource
+	mime   string
+}
+
+func (f fakePublication) Kind() lksdk.TrackKind       { return f.kind }
+func (f fakePublication) Source() livekit.TrackSource { return f.source }
+func (f fakePublication) MimeType() string            { return f.mime }
+
+// Browsers publishing with red: true send Opus wrapped in RED, which makes the
+// SFU report "audio/red" even though plain Opus RTP arrives. An empty mime type
+// shows up before the initial signaling populates it.
+func TestIsMicrophoneOpusTrack(t *testing.T) {
+	agent := &RoomAgent{}
+	microphone := livekit.TrackSource_MICROPHONE
+
+	tests := []struct {
+		name string
+		pub  lksdk.TrackPublication
+		want bool
+	}{
+		{name: "opus microphone", pub: fakePublication{kind: lksdk.TrackKindAudio, source: microphone, mime: "audio/opus"}, want: true},
+		{name: "red wrapped opus", pub: fakePublication{kind: lksdk.TrackKindAudio, source: microphone, mime: "audio/red"}, want: true},
+		{name: "case insensitive codec", pub: fakePublication{kind: lksdk.TrackKindAudio, source: microphone, mime: "AUDIO/OPUS"}, want: true},
+		{name: "empty mime before signaling", pub: fakePublication{kind: lksdk.TrackKindAudio, source: microphone}, want: true},
+		{name: "blank mime", pub: fakePublication{kind: lksdk.TrackKindAudio, source: microphone, mime: "  "}, want: true},
+		{name: "screen share audio", pub: fakePublication{kind: lksdk.TrackKindAudio, source: livekit.TrackSource_SCREEN_SHARE_AUDIO, mime: "audio/opus"}, want: false},
+		{name: "camera track", pub: fakePublication{kind: lksdk.TrackKindVideo, source: livekit.TrackSource_CAMERA, mime: "video/vp8"}, want: false},
+		{name: "unsupported audio codec", pub: fakePublication{kind: lksdk.TrackKindAudio, source: microphone, mime: "audio/pcmu"}, want: false},
+		{name: "nil publication", pub: nil, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := agent.isMicrophoneOpusTrack(tt.pub); got != tt.want {
+				t.Fatalf("isMicrophoneOpusTrack() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

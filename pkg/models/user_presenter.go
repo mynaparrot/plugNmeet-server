@@ -58,7 +58,8 @@ func (m *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) (plugnmeet.
 		return plugnmeet.StatusCode_ROOM_NOT_FOUND, config.ErrUserRoomInfoNotFound
 	}
 
-	if isOneOnOneAIAgentRoom(meta) {
+	// In a 1-on-1 agent room only the agent itself may take the presenter role.
+	if isOneOnOneAIAgentRoom(meta) && !isInternalAgentPromotion(r) {
 		log.Error("The room is on the AI agent")
 		return plugnmeet.StatusCode_PERMISSION_DENIED, config.ErrAIAgentWorkspaceControlled
 	}
@@ -99,6 +100,13 @@ func (m *UserModel) SwitchPresenter(r *plugnmeet.SwitchPresenterReq) (plugnmeet.
 
 	log.Info("Presenter switch process completed successfully")
 	return plugnmeet.StatusCode_SUCCESS, nil
+}
+
+// isInternalAgentPromotion reports whether an internal identity (the AI agent or
+// one of its workers) promotes itself, which AcquirePresenterForAgent relies on
+// inside a 1-on-1 agent room.
+func isInternalAgentPromotion(r *plugnmeet.SwitchPresenterReq) bool {
+	return r.GetTask() == plugnmeet.SwitchPresenterTask_PROMOTE && config.IsUserIdInternal(r.GetUserId())
 }
 
 // FindCurrentPresenter check all the online users to find the current presenter

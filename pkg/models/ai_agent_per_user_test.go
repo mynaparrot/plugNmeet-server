@@ -346,6 +346,35 @@ func TestIsOneOnOneAIAgentRoom(t *testing.T) {
 	}
 }
 
+// TestIsInternalAgentPromotion locks in that AcquirePresenterForAgent can promote
+// the agent inside a 1-on-1 agent room, while a human or a demotion stays blocked.
+func TestIsInternalAgentPromotion(t *testing.T) {
+	agentUserId := config.AgentUserUserIdPrefix + "ai_agent-uuid"
+
+	tests := []struct {
+		name string
+		req  *plugnmeet.SwitchPresenterReq
+		want bool
+	}{
+		{name: "agent promotes itself", req: &plugnmeet.SwitchPresenterReq{UserId: agentUserId, Task: plugnmeet.SwitchPresenterTask_PROMOTE}, want: true},
+		{name: "tts agent promotes itself", req: &plugnmeet.SwitchPresenterReq{UserId: config.TTSAgentUserIdPrefix + "1", Task: plugnmeet.SwitchPresenterTask_PROMOTE}, want: true},
+		{name: "ingress promotes itself", req: &plugnmeet.SwitchPresenterReq{UserId: config.IngressUserIdPrefix + "1", Task: plugnmeet.SwitchPresenterTask_PROMOTE}, want: true},
+		{name: "human promotes itself", req: &plugnmeet.SwitchPresenterReq{UserId: "user-1", Task: plugnmeet.SwitchPresenterTask_PROMOTE}, want: false},
+		{name: "agent demotes", req: &plugnmeet.SwitchPresenterReq{UserId: agentUserId, RequestedUserId: agentUserId, Task: plugnmeet.SwitchPresenterTask_DEMOTE}, want: false},
+		// PROMOTE is the zero value of the enum.
+		{name: "unset task is promote", req: &plugnmeet.SwitchPresenterReq{UserId: agentUserId}, want: true},
+		{name: "nil request", req: nil, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isInternalAgentPromotion(tt.req); got != tt.want {
+				t.Fatalf("isInternalAgentPromotion() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 // TestIsPerUserAISessionParent locks in that only the main room of an auto
 // per-user AI session is treated as the owner of per-participant session rooms,
 // so an unused pre-created room cannot keep it alive.
