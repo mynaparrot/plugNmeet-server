@@ -300,6 +300,24 @@ insights:
         default: # Corresponds to the model name in options
           price_per_hour: 1.00
 
+    # Google Gemini: live streaming speech-to-text. The live models read the
+    # participant's audio as it arrives; gemini-3.5-transcribe (without -live)
+    # only accepts uploaded files.
+    # transcription:
+    #   provider: "google"
+    #   id: "default-gemini-creds"
+    #   options:
+    #     model: "gemini-3.5-transcribe-live"  # default
+    #     # VERBATIM (default) keeps fillers; SMART cleans the text up but can
+    #     # rewrite what the participant said.
+    #     transcribe_mode: "VERBATIM"
+    #     # Gemini Live (BidiGenerateContent) currently requires "v1beta".
+    #     api_version: "v1beta"
+    #     max_selected_trans_langs: 2
+    #   pricing:
+    #     default:
+    #       price_per_hour: 0.60
+
     translation:
       provider: "azure"
       id: "transGlobal"
@@ -308,6 +326,21 @@ insights:
       pricing:
         default: # A generic key for services with one pricing model
           price_per_million_characters: 10.00 # Example for Standard tier
+
+    # Google Gemini: text translation for the translation service and for the
+    # multi-language output of a transcription.
+    # translation:
+    #   provider: "google"
+    #   id: "default-gemini-creds"
+    #   options:
+    #     translate_model: "gemini-3.1-flash-lite"  # default
+    #     # Without translate_model, "model" is used only when it is a text
+    #     # model; a transcribe/live/tts model falls back to the default above.
+    #     max_selected_trans_langs: 5
+    #   pricing:
+    #     translate_model:
+    #       input_price_per_million_tokens: 0.10
+    #       output_price_per_million_tokens: 0.40
 
     speech-synthesis:
       provider: "azure"
@@ -321,6 +354,20 @@ insights:
       pricing:
         default: # A generic key for services with one pricing model
           price_per_million_characters: 16.00 # Example for Neural voice
+
+    # Google Gemini: the TTS models read the language from the text, so only
+    # the voice matters. Output is raw 16-bit PCM at tts_sample_rate.
+    # speech-synthesis:
+    #   provider: "google"
+    #   id: "default-gemini-creds"
+    #   options:
+    #     model: "gemini-3.8-flash-tts"  # default
+    #     default_voice: "Kore"          # default; 30 prebuilt voices, e.g. Puck, Aoede
+    #     tts_sample_rate: 16000         # 8000, 16000 (default) or 24000
+    #     api_version: "v1beta"          # required by the Interactions API
+    #   pricing:
+    #     default:
+    #       price_per_million_characters: 15.00
 
     ai_text_chat:
       provider: "google"

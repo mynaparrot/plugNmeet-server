@@ -16,6 +16,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var _ insights.Provider = (*AzureProvider)(nil)
+
 // AzureProvider is the main struct that implements the insights.Provider interface.
 type AzureProvider struct {
 	account *config.ProviderAccount
@@ -162,9 +164,14 @@ func (p *AzureProvider) SynthesizeText(ctx context.Context, options []byte) (io.
 // It looks up the service name in the hard-coded map from languages.go.
 func (p *AzureProvider) GetSupportedLanguages(serviceType insights.ServiceType) []*plugnmeet.InsightsSupportedLangInfo {
 	if langs, ok := supportedLanguages[serviceType]; ok {
+		// Return freshly allocated entries so callers cannot mutate the shared list.
 		service := make([]*plugnmeet.InsightsSupportedLangInfo, len(langs))
 		for i := range langs {
-			service[i] = &langs[i]
+			service[i] = &plugnmeet.InsightsSupportedLangInfo{
+				Code:   langs[i].Code,
+				Name:   langs[i].Name,
+				Locale: langs[i].Locale,
+			}
 		}
 		return service
 	}
@@ -173,22 +180,27 @@ func (p *AzureProvider) GetSupportedLanguages(serviceType insights.ServiceType) 
 	return make([]*plugnmeet.InsightsSupportedLangInfo, 0)
 }
 
+// AITextChatStream is not supported by the Azure provider.
 func (p *AzureProvider) AITextChatStream(ctx context.Context, chatModel string, history []*plugnmeet.InsightsAITextChatContent) (<-chan *plugnmeet.InsightsAITextChatStreamResult, error) {
-	return nil, nil
+	return nil, fmt.Errorf("AITextChatStream is not supported for the azure provider")
 }
 
+// AIChatTextSummarize is not supported by the Azure provider.
 func (p *AzureProvider) AIChatTextSummarize(ctx context.Context, summarizeModel string, history []*plugnmeet.InsightsAITextChatContent) (summaryText string, promptTokens uint32, completionTokens uint32, err error) {
-	return "", 0, 0, nil
+	return "", 0, 0, fmt.Errorf("AIChatTextSummarize is not supported for the azure provider")
 }
 
-func (p *AzureProvider) StartBatchSummarizeAudioFile(ctx context.Context, filePath, summarizeModel, summarizationContext string) (string, string, error) {
-	return "", "", nil
+// StartBatchSummarizeAudioFile is not supported by the Azure provider.
+func (p *AzureProvider) StartBatchSummarizeAudioFile(ctx context.Context, filePath, summarizeModel, userPrompt string) (string, string, error) {
+	return "", "", fmt.Errorf("StartBatchSummarizeAudioFile is not supported for the azure provider")
 }
 
+// CheckBatchJobStatus is not supported by the Azure provider.
 func (p *AzureProvider) CheckBatchJobStatus(ctx context.Context, jobId string) (*insights.BatchJobResponse, error) {
-	return nil, nil
+	return nil, fmt.Errorf("CheckBatchJobStatus is not supported for the azure provider")
 }
 
+// DeleteUploadedFile is not supported by the Azure provider; callers only log the error.
 func (p *AzureProvider) DeleteUploadedFile(ctx context.Context, fileName string) error {
-	return nil
+	return fmt.Errorf("DeleteUploadedFile is not supported for the azure provider")
 }

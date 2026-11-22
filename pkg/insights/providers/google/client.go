@@ -2,6 +2,7 @@ package google
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,8 +17,25 @@ import (
 
 // GoogleProvider implements the insights.Provider interface for Google's AI services.
 type GoogleProvider struct {
-	client *genai.Client
-	logger *logrus.Entry
+	client  *genai.Client
+	account *config.ProviderAccount
+	service *config.ServiceConfig
+	logger  *logrus.Entry
+
+	// transcribeDial and translate are replaced in tests to avoid real calls.
+	transcribeDial liveTranscriptionDialer
+	translate      translationRunner
+}
+
+// translationRunner translates one final transcript into the requested languages.
+type translationRunner func(ctx context.Context, text, sourceLang string, targetLangs []string) (*plugnmeet.InsightsTextTranslationResult, error)
+
+// runTranslation uses the injected runner when a test provided one.
+func (p *GoogleProvider) runTranslation(ctx context.Context, text, sourceLang string, targetLangs []string) (*plugnmeet.InsightsTextTranslationResult, error) {
+	if p.translate != nil {
+		return p.translate(ctx, text, sourceLang, targetLangs)
+	}
+	return p.TranslateText(ctx, text, sourceLang, targetLangs)
 }
 
 var _ insights.ToolTextChatProvider = (*GoogleProvider)(nil)
@@ -41,9 +59,30 @@ func NewProvider(ctx context.Context, providerAccount *config.ProviderAccount, s
 	}
 
 	return &GoogleProvider{
-		client: client,
-		logger: log,
+		client:  client,
+		account: providerAccount,
+		service: serviceConfig,
+		logger:  log,
 	}, nil
+}
+
+// serviceOption reads an option without requiring a configured service block.
+func (p *GoogleProvider) serviceOption(key, defaultValue string) string {
+	return serviceOptionString(p.service, key, defaultValue)
+}
+
+func serviceOptionString(service *config.ServiceConfig, key, defaultValue string) string {
+	if service == nil {
+		return defaultValue
+	}
+	return service.GetOptionsString(key, defaultValue)
+}
+
+func serviceOptionInt(service *config.ServiceConfig, key string, fallback int) int {
+	if service == nil {
+		return fallback
+	}
+	return service.GetIntOption(key, fallback)
 }
 
 // resolveHTTPOptions builds the HTTP options for the genai client from the
@@ -108,18 +147,38 @@ func (p *GoogleProvider) AIChatTextSummarize(ctx context.Context, summarizeModel
 	return summarize(ctx, p.client, summarizeModel, history)
 }
 
-func (p *GoogleProvider) CreateTranscription(ctx context.Context, roomId, userId string, options []byte) (insights.TranscriptionStream, error) {
-	return nil, fmt.Errorf("CreateTranscription is not implemented for the google provider")
-}
-
+// TranslateText performs stateless translation with a Gemini text model.
 func (p *GoogleProvider) TranslateText(ctx context.Context, text, sourceLang string, targetLangs []string) (*plugnmeet.InsightsTextTranslationResult, error) {
-	return nil, fmt.Errorf("TranslateText is not implemented for the google provider")
+	return translateText(ctx, p.client, p.service, text, sourceLang, targetLangs)
 }
 
+// SynthesizeText performs stateless text-to-speech synthesis.
 func (p *GoogleProvider) SynthesizeText(ctx context.Context, options []byte) (io.ReadCloser, error) {
-	return nil, fmt.Errorf("SynthesizeText is not implemented for the google provider")
+	opts := &insights.SynthesisTaskOptions{}
+	if len(options) > 0 {
+		if err := json.Unmarshal(options, opts); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal synthesis options: %w", err)
+		}
+	}
+
+	return synthesizeText(ctx, p.client, p.service, opts)
 }
 
+// GetSupportedLanguages implements the insights.Provider interface.
 func (p *GoogleProvider) GetSupportedLanguages(serviceType insights.ServiceType) []*plugnmeet.InsightsSupportedLangInfo {
-	return nil // Not applicable
+	langs, ok := supportedLanguages[serviceType]
+	if !ok {
+		return []*plugnmeet.InsightsSupportedLangInfo{}
+	}
+
+	// Return freshly allocated entries so callers cannot mutate the shared list.
+	serviceLangs := make([]*plugnmeet.InsightsSupportedLangInfo, len(langs))
+	for i := range langs {
+		serviceLangs[i] = &plugnmeet.InsightsSupportedLangInfo{
+			Code:   langs[i].Code,
+			Name:   langs[i].Name,
+			Locale: langs[i].Locale,
+		}
+	}
+	return serviceLangs
 }
