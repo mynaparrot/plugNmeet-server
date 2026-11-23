@@ -8,6 +8,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/webhook"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/db"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/nats-io/nats.go"
@@ -21,6 +22,7 @@ type roomNotifier struct {
 	urls           []string
 	isBreakoutRoom bool
 	parentRoomId   string
+	parentRoomSid  string
 }
 
 type WebhookNotifier struct {
@@ -44,6 +46,7 @@ type webhookRedisFields struct {
 	PerformDeleting bool     `json:"perform_deleting"`
 	IsBreakoutRoom  bool     `json:"is_breakout_room,omitempty"`
 	ParentRoomId    string   `json:"parent_room_id,omitempty"`
+	ParentRoomSid   string   `json:"parent_room_sid,omitempty"`
 }
 
 type WebhookNotifierArgs struct {
@@ -132,6 +135,7 @@ func (w *WebhookNotifier) getOrCreateNotifier(roomId string) *roomNotifier {
 		urls:           d.Urls,
 		isBreakoutRoom: d.IsBreakoutRoom,
 		parentRoomId:   d.ParentRoomId,
+		parentRoomSid:  d.ParentRoomSid,
 	}
 
 	// Lock again to safely add to the map.
@@ -162,6 +166,39 @@ func (w *WebhookNotifier) cleanupNotifier(roomId string) {
 			"room_id": roomId,
 			"method":  "cleanupNotifier",
 		}).Info("cleaned up webhook queue for room")
+	}
+}
+
+// resolveParentRoomInfo returns the parent room details of a breakout room.
+// For non-breakout rooms (or invalid references) all values are empty.
+func (w *WebhookNotifier) resolveParentRoomInfo(roomInfo *dbmodels.RoomInfo) (isBreakoutRoom bool, parentRoomId, parentRoomSid string) {
+	if roomInfo == nil || roomInfo.IsBreakoutRoom == 0 {
+		return false, "", ""
+	}
+
+	parentRoomId, parentTableId, err := ParseBreakoutParentRoomRef(roomInfo.ParentRoomID)
+	if err != nil || parentRoomId == "" {
+		return false, "", ""
+	}
+
+	isBreakoutRoom = true
+	if parentTableId > 0 && w.ds != nil {
+		parentInfo, pErr := w.ds.GetRoomInfoByTableId(parentTableId)
+		if pErr == nil && parentInfo != nil && parentInfo.RoomId == parentRoomId {
+			parentRoomSid = parentInfo.Sid
+		}
+	}
+
+	return isBreakoutRoom, parentRoomId, parentRoomSid
+}
+
+// setBreakoutParentFields attaches the parent reference to a breakout room event.
+// The event keeps the breakout room's own room_id and sid.
+func setBreakoutParentFields(room *plugnmeet.NotifyEventRoom, parentRoomId, parentRoomSid string) {
+	room.IsBreakoutRoom = new(true)
+	room.ParentRoomId = new(parentRoomId)
+	if parentRoomSid != "" {
+		room.ParentRoomSid = new(parentRoomSid)
 	}
 }
 
@@ -205,12 +242,7 @@ func (w *WebhookNotifier) RegisterWebhook(roomId, sid string) {
 		Urls:            urls,
 		PerformDeleting: false,
 	}
-	if roomInfo != nil && roomInfo.IsBreakoutRoom != 0 {
-		if parentRoomId := PlainParentRoomIdFromRef(roomInfo.ParentRoomID); parentRoomId != "" {
-			d.IsBreakoutRoom = true
-			d.ParentRoomId = parentRoomId
-		}
-	}
+	d.IsBreakoutRoom, d.ParentRoomId, d.ParentRoomSid = w.resolveParentRoomInfo(roomInfo)
 
 	err := w.saveData(roomId, d)
 	if err != nil {
@@ -286,12 +318,9 @@ func (w *WebhookNotifier) SendWebhookEvent(event *plugnmeet.CommonNotifyEvent) e
 		return nil
 	}
 
-	// Breakout room activity is reported as parent room activity, while the
-	// breakout room id remains available to the consumer.
+	// A breakout room event keeps the breakout room's own room_id and sid and only carries the parent room reference.
 	if notifier.isBreakoutRoom && notifier.parentRoomId != "" {
-		event.Room.IsBreakoutRoom = new(true)
-		event.Room.BreakoutRoomId = new(roomId)
-		event.Room.RoomId = new(notifier.parentRoomId)
+		setBreakoutParentFields(event.Room, notifier.parentRoomId, notifier.parentRoomSid)
 	}
 
 	// Send the event to the queue using the static app config and the cached URLs.
@@ -326,12 +355,8 @@ func (w *WebhookNotifier) ForceToPutInQueue(event *plugnmeet.CommonNotifyEvent) 
 		return
 	}
 
-	if roomInfo != nil && roomInfo.IsBreakoutRoom != 0 {
-		if parentRoomId := PlainParentRoomIdFromRef(roomInfo.ParentRoomID); parentRoomId != "" {
-			event.Room.IsBreakoutRoom = new(true)
-			event.Room.BreakoutRoomId = new(event.Room.GetRoomId())
-			event.Room.RoomId = new(parentRoomId)
-		}
+	if isBreakoutRoom, parentRoomId, parentRoomSid := w.resolveParentRoomInfo(roomInfo); isBreakoutRoom {
+		setBreakoutParentFields(event.Room, parentRoomId, parentRoomSid)
 	}
 
 	notifier := webhook.NewNotifier(w.ctx, 1, 2, w.logger)
