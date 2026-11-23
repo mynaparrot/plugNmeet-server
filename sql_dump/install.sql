@@ -5,7 +5,7 @@ USE `plugnmeet`;
 CREATE TABLE IF NOT EXISTS `pnm_room_info` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `room_title` varchar(255) NOT NULL DEFAULT '',
-  `roomId` varchar(64) NOT NULL,
+  `roomId` varchar(255) NOT NULL,
   `sid` varchar(64) NOT NULL,
   `joined_participants` int(10) NOT NULL DEFAULT 0,
   `is_running` int(1) NOT NULL DEFAULT 0,
@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS `pnm_room_info` (
   `rtmp_node_id` varchar(36) NOT NULL DEFAULT '',
   `webhook_url` varchar(255) NOT NULL DEFAULT '',
   `is_breakout_room` int(1) NOT NULL DEFAULT 0,
-  `parent_room_id` varchar(128) NOT NULL DEFAULT '',
+  `parent_room_id` varchar(255) NOT NULL DEFAULT '',
   `creation_time` int(10) NOT NULL DEFAULT 0,
   `created` datetime NOT NULL DEFAULT current_timestamp(),
   `ended` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS `pnm_room_info` (
 CREATE TABLE IF NOT EXISTS `pnm_recordings` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `record_id` varchar(64) NOT NULL,
-  `room_id` varchar(64) NOT NULL,
+  `room_id` varchar(255) NOT NULL,
   `room_sid` varchar(64) NOT NULL,
   `recorder_id` varchar(36) NOT NULL,
   `file_path` varchar(255) NOT NULL,
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS `pnm_recordings` (
 CREATE TABLE IF NOT EXISTS `pnm_room_analytics` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `room_table_id` int(11) NOT NULL,
-  `room_id` varchar(64) NOT NULL,
+  `room_id` varchar(255) NOT NULL,
   `file_id` varchar(255) NOT NULL,
   `file_name` varchar(255) NOT NULL,
   `file_size` double UNSIGNED NOT NULL,

@@ -10,7 +10,7 @@ import (
 type Recording struct {
 	ID               uint64         `gorm:"column:id;type:int(11);primarykey;autoIncrement"`
 	RecordID         string         `gorm:"column:record_id;type:varchar(64);not null;uniqueIndex:idx_record_id"`
-	RoomID           string         `gorm:"column:room_id;type:varchar(64);not null;index:idx_room_id"`
+	RoomID           string         `gorm:"column:room_id;type:varchar(255);not null;index:idx_room_id"`
 	RoomSid          sql.NullString `gorm:"column:room_sid;type:varchar(64);not null"`
 	RecorderID       string         `gorm:"column:recorder_id;type:varchar(36);not null"`
 	FilePath         string         `gorm:"column:file_path;type:varchar(255);not null"`
