@@ -272,7 +272,7 @@ func (m *UserModel) perUserAISessionRoom(ctx context.Context, g *plugnmeet.Gener
 		// the admin stays in the main room; their own room is only prepared ahead
 		// of time, so a failure here must not block the join
 		if adminAISessionPreCreate(aiFeatures, g.GetUserInfo().GetUserId()) {
-			if _, err := m.breakoutModel.EnsurePerUserAIBreakoutRoom(ctx, parentRoomId, g.GetUserInfo().GetUserId(), g.GetUserInfo().GetName()); err != nil {
+			if _, err := m.breakoutModel.EnsurePerUserAIBreakoutRoom(ctx, parentRoomId, g.GetUserInfo().GetUserId(), g.GetUserInfo().GetName(), g.GetUserInfo().GetUserMetadata().GetPreviousSessionContext()); err != nil {
 				log.WithError(err).Warnln("failed to pre-create the admin's 1-on-1 AI session room")
 			}
 		}
@@ -285,7 +285,7 @@ func (m *UserModel) perUserAISessionRoom(ctx context.Context, g *plugnmeet.Gener
 		return "", config.ErrUserUnexpectedError
 	}
 
-	return m.breakoutModel.EnsurePerUserAIBreakoutRoom(ctx, parentRoomId, g.GetUserInfo().GetUserId(), g.GetUserInfo().GetName())
+	return m.breakoutModel.EnsurePerUserAIBreakoutRoom(ctx, parentRoomId, g.GetUserInfo().GetUserId(), g.GetUserInfo().GetName(), g.GetUserInfo().GetUserMetadata().GetPreviousSessionContext())
 }
 
 // waitForUserToBeOffline polls until the user's status is no longer "online".

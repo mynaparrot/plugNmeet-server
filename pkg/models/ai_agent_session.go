@@ -87,11 +87,7 @@ func (m *AIAgentModel) Start(ctx context.Context, roomId string, req *plugnmeet.
 	if req.GetSystemPrompt() != "" {
 		boundary.HostSystemPrompt = req.GetSystemPrompt()
 	}
-	if req.GetPreviousSessionContext() != "" {
-		boundary.PreviousSessionSummary = req.GetPreviousSessionContext()
-	}
 	features.SystemPrompt = boundary.HostSystemPrompt
-	features.PreviousSessionContext = &boundary.PreviousSessionSummary
 
 	delegate, err := m.SelectOrGetDelegate(ctx, roomId)
 	if err != nil {

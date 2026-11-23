@@ -635,7 +635,6 @@ func TestBoundaryConfigFromFeaturesNormalization(t *testing.T) {
 		StrictTopicEnforcement:   true,
 		TopicAnchorIntervalTurns: 40,
 		SystemPrompt:             " Teach German. ",
-		PreviousSessionContext:   &previous,
 		AgentDisplayName:         &name,
 		SpokenLang:               &spoken,
 		InstructionLang:          &instruction,
@@ -659,8 +658,11 @@ func TestBoundaryConfigFromFeaturesNormalization(t *testing.T) {
 	if cfg.InstructionLang != "de" {
 		t.Errorf("InstructionLang = %q, want fallback to spoken lang de", cfg.InstructionLang)
 	}
-	if cfg.PreviousSessionSummary != "We covered verbs." {
-		t.Errorf("PreviousSessionSummary = %q, want trimmed", cfg.PreviousSessionSummary)
+	if cfg.PreviousSessionSummary != "" {
+		t.Errorf("PreviousSessionSummary = %q, want empty from room features", cfg.PreviousSessionSummary)
+	}
+	if summary := (BoundaryConfig{PreviousSessionSummary: previous}).withDefaults().PreviousSessionSummary; summary != "We covered verbs." {
+		t.Errorf("PreviousSessionSummary = %q, want trimmed", summary)
 	}
 	if cfg.SpeakingRate != rate {
 		t.Errorf("SpeakingRate = %v, want %v", cfg.SpeakingRate, rate)
@@ -913,12 +915,10 @@ func TestFormatPreviousSessionContextFromSummaryJSON(t *testing.T) {
 		t.Errorf("context = %q, want invalid JSON returned as-is", got)
 	}
 
-	// Passing the artifact back on the next CreateRoom call must work directly.
+	// Passing the artifact back as the learner's previous session context must
+	// work directly.
 	previous := "\n" + raw + "\n"
-	cfg := BoundaryConfigFromFeatures(&plugnmeet.InsightsAIAgentFeatures{
-		Topic:                  "Fractions review",
-		PreviousSessionContext: &previous,
-	})
+	cfg := (BoundaryConfig{Topic: "Fractions review", PreviousSessionSummary: previous}).withDefaults()
 	if strings.Contains(cfg.PreviousSessionSummary, "{") {
 		t.Errorf("PreviousSessionSummary = %q, want the compact handoff", cfg.PreviousSessionSummary)
 	}

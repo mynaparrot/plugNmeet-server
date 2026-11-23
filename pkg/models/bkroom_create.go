@@ -496,26 +496,16 @@ func prepareAIAgentBreakoutChild(parentAiFeatures *plugnmeet.InsightsAIAgentFeat
 	applyAIAgentSessionRoomFeatures(meta)
 }
 
-// appendBreakoutAIContext preserves the parent's system prompt and appends the
-// extra context of a 1-on-1 breakout session. Without any extra context the
-// prompt is returned unchanged.
+// appendBreakoutAIContext preserves the parent's system prompt and appends the extra context of a 1-on-1 breakout session.
+// A per-user context wins over the global one; without any extra context the prompt is returned unchanged.
 func appendBreakoutAIContext(basePrompt, globalContext, roomContext string) string {
 	basePrompt = strings.TrimSpace(basePrompt)
-	globalContext = strings.TrimSpace(globalContext)
-	roomContext = strings.TrimSpace(roomContext)
-	if globalContext == "" && roomContext == "" {
+	ctx := firstNonEmptyString(roomContext, globalContext)
+	if ctx == "" {
 		return basePrompt
 	}
 
-	sessionContext := []string{"Breakout Session Context:"}
-	if globalContext != "" {
-		sessionContext = append(sessionContext, globalContext)
-	}
-	if roomContext != "" {
-		sessionContext = append(sessionContext, roomContext)
-	}
-
-	section := strings.Join(sessionContext, "\n")
+	section := "Breakout Session Context:\n" + ctx
 	if basePrompt == "" {
 		return section
 	}
@@ -526,7 +516,7 @@ func appendBreakoutAIContext(basePrompt, globalContext, roomContext string) stri
 // EnsurePerUserAIBreakoutRoom returns the participant's own 1-on-1 AI breakout
 // room, creating it on first call. The child room id is derived from the user id
 // so repeated joins resolve to the same room.
-func (m *BreakoutRoomModel) EnsurePerUserAIBreakoutRoom(ctx context.Context, parentRoomId, userId, userName string) (string, error) {
+func (m *BreakoutRoomModel) EnsurePerUserAIBreakoutRoom(ctx context.Context, parentRoomId, userId, userName, previousSessionContext string) (string, error) {
 	childRoomId := fmt.Sprintf(BreakoutRoomFormat, parentRoomId, userId)
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId":  parentRoomId,
@@ -558,7 +548,7 @@ func (m *BreakoutRoomModel) EnsurePerUserAIBreakoutRoom(ctx context.Context, par
 		RoomId:          parentRoomId,
 		RequestedUserId: "", // important as request isn't from client
 		Duration:        m.perUserAIBreakoutDuration(parentRoomId),
-		Rooms:           []*plugnmeet.BreakoutRoom{perUserAIBreakoutRoom(userId, userName)},
+		Rooms:           []*plugnmeet.BreakoutRoom{perUserAIBreakoutRoom(userId, userName, previousSessionContext)},
 		// a learner of a 1-on-1 AI session never returns on their own
 		AllowReturnToMainRoom: false,
 		AllowSelfSelect:       false,
@@ -579,15 +569,21 @@ func (m *BreakoutRoomModel) EnsurePerUserAIBreakoutRoom(ctx context.Context, par
 	return childRoomId, nil
 }
 
-// perUserAIBreakoutRoom builds the single 1-on-1 room of one participant.
-func perUserAIBreakoutRoom(userId, userName string) *plugnmeet.BreakoutRoom {
-	return &plugnmeet.BreakoutRoom{
+// perUserAIBreakoutRoom builds the single 1-on-1 room of one participant. The
+// participant's previous session context, when present, becomes the room's AI
+// agent context and therefore wins over the global context of the parent.
+func perUserAIBreakoutRoom(userId, userName, previousSessionContext string) *plugnmeet.BreakoutRoom {
+	room := &plugnmeet.BreakoutRoom{
 		Id:    userId,
 		Title: fmt.Sprintf("%s (AI Session)", userName),
 		Users: []*plugnmeet.BreakoutRoomUser{
 			{Id: userId, Name: userName},
 		},
 	}
+	if ctx := strings.TrimSpace(previousSessionContext); ctx != "" {
+		room.AiAgentContext = &ctx
+	}
+	return room
 }
 
 // perUserAIBreakoutDuration returns the child's duration: the default, clamped

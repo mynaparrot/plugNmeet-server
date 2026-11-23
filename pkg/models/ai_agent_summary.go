@@ -186,7 +186,7 @@ func (m *AIAgentModel) aiAgentLearnerUserId(ctx context.Context, roomId string) 
 // the name once they left entirely.
 func (m *AIAgentModel) aiAgentParticipantInfo(roomId, userId string) *plugnmeet.RoomArtifactUserInfo {
 	info := &plugnmeet.RoomArtifactUserInfo{UserId: userId}
-	if m.natsService == nil || userId == "" {
+	if userId == "" {
 		return info
 	}
 	mergeAIAgentUserInfo(info, m.aiAgentNatsUserInfo(roomId, userId))

@@ -106,11 +106,18 @@ func TestAppendBreakoutAIContext(t *testing.T) {
 			want:        "You are a tutor.\n\nBreakout Session Context:\nLearner: Ana",
 		},
 		{
-			name:          "both contexts",
+			name:          "per-user context wins over the global context",
 			basePrompt:    "You are a tutor.",
 			globalContext: "Lesson: fractions",
 			roomContext:   "Learner: Ana",
-			want:          "You are a tutor.\n\nBreakout Session Context:\nLesson: fractions\nLearner: Ana",
+			want:          "You are a tutor.\n\nBreakout Session Context:\nLearner: Ana",
+		},
+		{
+			name:          "blank per-user context falls back to the global context",
+			basePrompt:    "You are a tutor.",
+			globalContext: "Lesson: fractions",
+			roomContext:   "  ",
+			want:          "You are a tutor.\n\nBreakout Session Context:\nLesson: fractions",
 		},
 		{
 			name:          "no parent prompt",
@@ -124,6 +131,37 @@ func TestAppendBreakoutAIContext(t *testing.T) {
 			got := appendBreakoutAIContext(tt.basePrompt, tt.globalContext, tt.roomContext)
 			if got != tt.want {
 				t.Fatalf("appendBreakoutAIContext() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPerUserAIBreakoutRoomCarriesPreviousSessionContext(t *testing.T) {
+	tests := []struct {
+		name    string
+		prevCtx string
+		want    string
+	}{
+		{name: "context is carried", prevCtx: "Learner: Ana", want: "Learner: Ana"},
+		{name: "context is trimmed", prevCtx: "  Learner: Ana  ", want: "Learner: Ana"},
+		{name: "empty context stays unset", prevCtx: ""},
+		{name: "whitespace context stays unset", prevCtx: "   "},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			room := perUserAIBreakoutRoom("user-1", "Ana", tt.prevCtx)
+			if room.GetId() != "user-1" || room.GetTitle() != "Ana (AI Session)" {
+				t.Fatalf("room = %q/%q, want user-1/Ana (AI Session)", room.GetId(), room.GetTitle())
+			}
+			if len(room.GetUsers()) != 1 || room.GetUsers()[0].GetId() != "user-1" {
+				t.Fatalf("room users = %v, want only user-1", room.GetUsers())
+			}
+			if got := room.GetAiAgentContext(); got != tt.want {
+				t.Fatalf("ai_agent_context = %q, want %q", got, tt.want)
+			}
+			if tt.want == "" && room.AiAgentContext != nil {
+				t.Error("ai_agent_context must stay nil when there is no context")
 			}
 		})
 	}
@@ -280,11 +318,12 @@ func TestPrepareAIAgentBreakoutChildKeepsParentPrompt(t *testing.T) {
 	prepareAIAgentBreakoutChild(parentAiFeatures, meta, "user-2", "Lesson: fractions", "Learner: Ben")
 	second := meta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()
 
-	wantFirst := "You are a tutor.\n\nBreakout Session Context:\nLesson: fractions\nLearner: Ana"
+	// the per-user context wins, so the global context is dropped for each child
+	wantFirst := "You are a tutor.\n\nBreakout Session Context:\nLearner: Ana"
 	if first.GetSystemPrompt() != wantFirst {
 		t.Fatalf("first child prompt = %q, want %q", first.GetSystemPrompt(), wantFirst)
 	}
-	wantSecond := "You are a tutor.\n\nBreakout Session Context:\nLesson: fractions\nLearner: Ben"
+	wantSecond := "You are a tutor.\n\nBreakout Session Context:\nLearner: Ben"
 	if second.GetSystemPrompt() != wantSecond {
 		t.Fatalf("second child prompt = %q, want %q (it must not inherit the first child's context)", second.GetSystemPrompt(), wantSecond)
 	}

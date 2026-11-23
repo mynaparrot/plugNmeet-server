@@ -137,18 +137,17 @@ func BoundaryConfigFromFeatures(f *plugnmeet.InsightsAIAgentFeatures) BoundaryCo
 	}
 
 	cfg := BoundaryConfig{
-		AgentDisplayName:       f.GetAgentDisplayName(),
-		Topic:                  f.GetTopic(),
-		AllowedSubtopics:       cleanStringList(f.GetAllowedSubtopics()),
-		ForbiddenTopics:        cleanStringList(f.GetForbiddenTopics()),
-		StrictEnforcement:      f.GetStrictTopicEnforcement(),
-		AnchorIntervalTurns:    int(f.GetTopicAnchorIntervalTurns()),
-		HostSystemPrompt:       f.GetSystemPrompt(),
-		PreviousSessionSummary: f.GetPreviousSessionContext(),
-		SpokenLang:             f.GetSpokenLang(),
-		TargetLang:             f.GetTargetLang(),
-		InstructionLang:        f.GetInstructionLang(),
-		SpeakingRate:           f.GetSpeakingRate(),
+		AgentDisplayName:    f.GetAgentDisplayName(),
+		Topic:               f.GetTopic(),
+		AllowedSubtopics:    cleanStringList(f.GetAllowedSubtopics()),
+		ForbiddenTopics:     cleanStringList(f.GetForbiddenTopics()),
+		StrictEnforcement:   f.GetStrictTopicEnforcement(),
+		AnchorIntervalTurns: int(f.GetTopicAnchorIntervalTurns()),
+		HostSystemPrompt:    f.GetSystemPrompt(),
+		SpokenLang:          f.GetSpokenLang(),
+		TargetLang:          f.GetTargetLang(),
+		InstructionLang:     f.GetInstructionLang(),
+		SpeakingRate:        f.GetSpeakingRate(),
 	}
 
 	return cfg.withDefaults()
