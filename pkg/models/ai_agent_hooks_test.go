@@ -143,6 +143,54 @@ func TestOnPollResponseSubmittedSkipsWhatItCannotDescribe(t *testing.T) {
 	}
 }
 
+func TestBuildPollNoteRemediatesAWrongQuizAnswer(t *testing.T) {
+	model, _ := pollHookTestModel(t)
+	createTestPoll(t, model, newChoicePoll("room-1", "poll-1", "What is 2+2?"))
+	// the answer key marks option index 1 ("4") as correct
+	if err := model.redisService.SaveAIQuizMetadata(context.Background(), "room-1", "poll-1", 1, "four is 2+2"); err != nil {
+		t.Fatalf("save quiz metadata: %v", err)
+	}
+	// the participant picked option index 0 ("3"), which is wrong
+	answerTestPoll(t, model, &plugnmeet.SubmitPollResponseReq{
+		RoomId: "room-1", PollId: "poll-1", UserId: "u1", Name: "Sam",
+		SelectedOptions: []uint64{1},
+	})
+
+	note := model.buildPollNote(context.Background(), "room-1", "poll-1", "u1", "Sam", 1)
+
+	for _, want := range []string{
+		`option 2 ("4") is correct`,
+		"explain clearly why their answer is wrong",
+		"shared notepad notes",
+		"whiteboard drawing",
+	} {
+		if !strings.Contains(note, want) {
+			t.Errorf("note %q does not mention %q", note, want)
+		}
+	}
+	if strings.Contains(note, "React in one short sentence") {
+		t.Errorf("a wrong answer must not be brushed aside in one sentence: %q", note)
+	}
+}
+
+func TestBuildPollNoteKeepsAShortReactionForACorrectAnswer(t *testing.T) {
+	model, _ := pollHookTestModel(t)
+	createTestPoll(t, model, newChoicePoll("room-1", "poll-1", "What is 2+2?"))
+	if err := model.redisService.SaveAIQuizMetadata(context.Background(), "room-1", "poll-1", 1, "four is 2+2"); err != nil {
+		t.Fatalf("save quiz metadata: %v", err)
+	}
+	answerTestPoll(t, model, &plugnmeet.SubmitPollResponseReq{
+		RoomId: "room-1", PollId: "poll-1", UserId: "u1", Name: "Sam",
+		SelectedOptions: []uint64{2},
+	})
+
+	note := model.buildPollNote(context.Background(), "room-1", "poll-1", "u1", "Sam", 2)
+
+	if !strings.Contains(note, "That is the correct answer.") || !strings.Contains(note, "React in one short sentence and continue the topic.") {
+		t.Errorf("a correct answer keeps the short reaction: %q", note)
+	}
+}
+
 func TestBuildPollNoteDropsAnAnswerThatIsNoOption(t *testing.T) {
 	model, _ := pollHookTestModel(t)
 	createTestPoll(t, model, newChoicePoll("room-1", "poll-1", "What is 2+2?"))

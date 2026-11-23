@@ -97,8 +97,9 @@ func registerPollTools(reg *Registry, deps ToolDependencies) {
 			Kind: ToolKindServer,
 			Spec: &insights.MCPToolSpec{
 				Name: ToolCreateQuiz,
-				Description: "Open a multiple-choice quiz on the participant's screen. The correct option is stored " +
-					"server-side for your feedback; never reveal it in the question.",
+				Description: "Open ONE multiple-choice quiz question on the participant's screen (never create multiple " +
+					"quizzes at once; go progressively one question at a time and wait for the participant's answer). " +
+					"The correct option is stored server-side for your feedback; never reveal it in the question.",
 				InputSchema: objectSchema(map[string]any{
 					"question":             stringProp("The question.", 500),
 					"options":              arrayProp("The answer options.", stringProp("", 200), 2, 10),

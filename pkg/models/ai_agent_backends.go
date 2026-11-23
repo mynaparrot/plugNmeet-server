@@ -368,7 +368,9 @@ func (b aiAgentNotepadBackend) EnsureNotepadActive(_ context.Context, roomID str
 		np.IsActive = true
 		changed = true
 	}
-	if !np.GetVisible() {
+	// A 1-on-1 session room opens the pad locally, so only normal rooms, where
+	// participants follow the presenter's visibility, need the broadcast.
+	if !isOneOnOneAIAgentRoom(meta) && !np.GetVisible() {
 		np.Visible = true
 		changed = true
 	}

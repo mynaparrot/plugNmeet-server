@@ -524,6 +524,10 @@ func TestBuildLockedSystemInstructionExplainsInteractiveSurfaces(t *testing.T) {
 		"Shared notepad Markdown",
 		"Never use # (H1) headings",
 		`mode="replace_block"`,
+		"Polls and quizzes (create_quiz / create_poll)",
+		"open ONLY ONE quiz or poll at a time",
+		"never create multiple polls or quizzes in a single turn",
+		"explain clearly WHY the chosen option is wrong",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("surface guidance is missing %q\n---\n%s", want, got)

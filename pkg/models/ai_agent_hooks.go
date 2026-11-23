@@ -173,6 +173,8 @@ func (m *AIAgentModel) OnPollResponseSubmitted(ctx context.Context, roomId, poll
 	}
 }
 
+const wrongQuizAnswerFollowUp = "Do not drop this concept or move on yet: explain clearly why their answer is wrong and why the correct option works using a concrete example, shared notepad notes, or a whiteboard drawing before asking the next progressive question."
+
 // buildPollNote renders the [SYSTEM CONTEXT] note for a submitted answer. It
 // returns "" when the answer cannot be described (e.g. anonymous polls).
 func (m *AIAgentModel) buildPollNote(ctx context.Context, roomId, pollId, userId, userName string, selectedOption int) string {
@@ -219,12 +221,19 @@ func (m *AIAgentModel) buildPollNote(ctx context.Context, roomId, pollId, userId
 	}
 
 	verdict := ""
+	// A wrong quiz answer needs remediation before the next question, not a
+	// one-sentence acknowledgement that brushes the mistake aside.
+	followUp := "React in one short sentence and continue the topic."
 	if m.redisService != nil {
 		if correct, explanation, found, err := m.redisService.GetAIQuizMetadata(ctx, roomId, pollId); err == nil && found {
 			if correct == answerIndex {
 				verdict = "That is the correct answer."
+			} else if options := info.GetOptions(); correct >= 0 && correct < len(options) {
+				verdict = fmt.Sprintf("That is not the correct answer; option %d (%q) is correct.", correct+1, options[correct].GetText())
+				followUp = wrongQuizAnswerFollowUp
 			} else {
 				verdict = fmt.Sprintf("That is not the correct answer; option %d is correct.", correct+1)
+				followUp = wrongQuizAnswerFollowUp
 			}
 			if explanation = strings.TrimSpace(explanation); explanation != "" {
 				verdict += " Explanation to give if useful: " + explanation
@@ -232,8 +241,8 @@ func (m *AIAgentModel) buildPollNote(ctx context.Context, roomId, pollId, userId
 		}
 	}
 
-	return fmt.Sprintf("%s answered option %d (%q) of the quiz %q. %s React in one short sentence and continue the topic.",
-		who, answerIndex+1, answerText, info.GetQuestion(), verdict)
+	return fmt.Sprintf("%s answered option %d (%q) of the quiz %q. %s %s",
+		who, answerIndex+1, answerText, info.GetQuestion(), verdict, followUp)
 }
 
 func (m *AIAgentModel) startStopTimer(roomId string) {

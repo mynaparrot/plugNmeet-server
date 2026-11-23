@@ -85,6 +85,7 @@ func TestEnsureNotepadActiveKeepsTheNotepadLocked(t *testing.T) {
 	if np.NotePadId == "" {
 		t.Error("the shared notepad needs an id")
 	}
+	// A normal room's participants follow the presenter's visibility.
 	if !np.IsActive || !np.Visible {
 		t.Errorf("the shared notepad must be active and visible: %+v", np)
 	}
@@ -93,6 +94,31 @@ func TestEnsureNotepadActiveKeepsTheNotepadLocked(t *testing.T) {
 	}
 	if meta.DefaultLockSettings.LockSharedNotepad == nil || *meta.DefaultLockSettings.LockSharedNotepad {
 		t.Error("the shared notepad lock value must stay untouched")
+	}
+	if nats.broadcast != 1 {
+		t.Errorf("broadcast = %d, want 1", nats.broadcast)
+	}
+}
+
+func TestEnsureNotepadActiveSkipsVisibilityInAISessionRoom(t *testing.T) {
+	meta := roomWithWorkspaceSurfaces()
+	meta.IsBreakoutRoom = true
+	meta.RoomFeatures.InsightsFeatures = &plugnmeet.InsightsFeatures{
+		AiAgentFeatures: &plugnmeet.InsightsAIAgentFeatures{IsAllow: true},
+	}
+	nats := &fakeWorkspaceNats{meta: meta}
+
+	if err := (aiAgentNotepadBackend{nats: nats}).EnsureNotepadActive(context.Background(), "room-1"); err != nil {
+		t.Fatalf("EnsureNotepadActive: %v", err)
+	}
+
+	np := meta.RoomFeatures.SharedNotePadFeatures
+	if !np.IsActive {
+		t.Error("the shared notepad must become active")
+	}
+	// The 1-on-1 session room opens the pad locally instead of broadcasting it.
+	if np.Visible {
+		t.Error("a 1-on-1 ai session room must not broadcast the notepad visibility")
 	}
 	if nats.broadcast != 1 {
 		t.Errorf("broadcast = %d, want 1", nats.broadcast)
