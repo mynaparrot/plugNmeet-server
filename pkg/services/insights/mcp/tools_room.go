@@ -25,6 +25,7 @@ type ParticipantSummary struct {
 // RoomSnapshot is the read-only room state the agent may look at.
 type RoomSnapshot struct {
 	RoomTitle            string               `json:"room_title"`
+	WelcomeMessage       string               `json:"welcome_message,omitempty"`
 	Participants         []ParticipantSummary `json:"participants"`
 	ActiveWhiteboardPage int                  `json:"active_whiteboard_page"`
 	ActivePollID         string               `json:"active_poll_id,omitempty"`
@@ -42,8 +43,8 @@ func registerRoomTools(reg *Registry, deps ToolDependencies) {
 		Essential: true,
 		Spec: &insights.MCPToolSpec{
 			Name: ToolGetRoomInfo,
-			Description: "Read the current room state: room title, participants, the whiteboard page the participant sees " +
-				"and the poll that is currently open.",
+			Description: "Read the current room state: room title, welcome message, participants, the whiteboard page " +
+				"the participant sees and the poll that is currently open.",
 			InputSchema: objectSchema(map[string]any{}),
 		},
 		Handler: func(ctx context.Context, call ToolCall) (ToolResult, error) {

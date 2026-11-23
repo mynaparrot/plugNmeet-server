@@ -965,6 +965,7 @@ func (b aiAgentRoomBackend) GetRoomSnapshot(ctx context.Context, roomID string) 
 	var roomLocks *plugnmeet.LockSettings
 	if metadata, err := b.m.natsService.GetRoomMetadataStruct(roomID); err == nil && metadata != nil {
 		snapshot.RoomTitle = metadata.GetRoomTitle()
+		snapshot.WelcomeMessage = strings.TrimSpace(metadata.GetWelcomeMessage())
 		roomLocks = metadata.GetDefaultLockSettings()
 	}
 	if users, err := b.m.natsService.GetOnlineUsersList(roomID); err == nil {

@@ -832,3 +832,17 @@ func TestExternalMCPWarmRetriesWhenServerReturns(t *testing.T) {
 		t.Errorf("the retried tools must be cached for the session (err %v, tools %+v)", err, tools)
 	}
 }
+
+func TestExternalMCPDescriptionCarriesGroundingCue(t *testing.T) {
+	const cue = "instead of guessing"
+
+	if got := externalMCPDescription("docs", "search_docs", "Search the handbook."); !strings.Contains(got, cue) {
+		t.Errorf("the description must carry the grounding cue: %q", got)
+	}
+	if got := externalMCPDescription("docs", "search_docs", ""); !strings.Contains(got, "documentation server") || !strings.Contains(got, cue) {
+		t.Errorf("the fallback description must carry the grounding cue: %q", got)
+	}
+	if got := externalMCPDescription("docs", "search_docs", strings.Repeat("long description ", 100)); utf8.RuneCountInString(got) != MaxExternalMCPDescriptionChars {
+		t.Errorf("the description is %d chars, want %d", utf8.RuneCountInString(got), MaxExternalMCPDescriptionChars)
+	}
+}

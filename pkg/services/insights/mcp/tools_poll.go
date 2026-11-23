@@ -99,7 +99,10 @@ func registerPollTools(reg *Registry, deps ToolDependencies) {
 				Name: ToolCreateQuiz,
 				Description: "Open ONE multiple-choice quiz question on the participant's screen (never create multiple " +
 					"quizzes at once; go progressively one question at a time and wait for the participant's answer). " +
-					"The correct option is stored server-side for your feedback; never reveal it in the question.",
+					"Ground the question in connected external MCP tools (ext_*) / fetch_external_knowledge first, or in " +
+					"the active whiteboard, shared notepad, existing polls (get_poll_results), and room title/welcome " +
+					"message (get_room_info), bridging any adjacent requested topic back to the session topic. The correct option " +
+					"is stored server-side for your feedback; never reveal it in the question.",
 				InputSchema: objectSchema(map[string]any{
 					"question":             stringProp("The question.", 500),
 					"options":              arrayProp("The answer options.", stringProp("", 200), 2, 10),
@@ -201,10 +204,15 @@ func registerQuizApprovalTools(reg *Registry, deps ToolDependencies) {
 			Name: ToolDraftQuiz,
 			Description: "Create a quiz draft to preview in chat for admin approval before publishing. Call it once " +
 				"with `questions` for a multi-question quiz, or once per question with the top-level fields; " +
-				"single-question drafts accumulate in the room's pending draft. Base the questions on the user's " +
-				"request, or on external MCP lesson/resource tools or notepad content when relevant. Then display " +
-				"every drafted question (numbered options, " +
-				"correct answer, explanation) in chat and ask for explicit approval before publish_quiz.",
+				"single-question drafts accumulate in the room's pending draft. Ground the questions in the room's " +
+				"context in priority order: (1) connected external MCP tools (ext_*, such as a question bank or " +
+				"lesson PDF/chapter pages) or fetch_external_knowledge when available, (2) active discussion on the " +
+				"whiteboard (whiteboard_capture_snapshot), shared notepad (call notepad_read only when the user " +
+				"refers to the notepad or no topic/MCP source was given), existing polls (get_poll_results), and the " +
+				"meeting title/welcome message (get_room_info). If the admin asks for a different topic than the room's " +
+				"session topic (e.g. HTML in a PHP room), relate the questions to both (e.g. PHP + HTML) so they stay relevant to " +
+				"the session. Then display every drafted question (numbered options, correct answer, explanation) in " +
+				"chat and ask for explicit approval before publish_quiz.",
 			InputSchema: objectSchema(map[string]any{
 				"questions": arrayProp("1-10 questions for a multi-question quiz; preferred over the top-level fields.",
 					quizDraftQuestionSchema(), 1, maxQuizDraftQuestions),

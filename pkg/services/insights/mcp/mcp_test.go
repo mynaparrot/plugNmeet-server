@@ -734,6 +734,50 @@ func TestCreateQuizStoresAnswerKey(t *testing.T) {
 	}
 }
 
+func TestQuizToolDescriptionsRequireExternalSourceFirst(t *testing.T) {
+	createDeps := testDeps()
+	createDeps.Poll = &fakePoll{}
+	createDeps.Quiz = &fakeQuiz{}
+	create, ok := BuildRoomToolRegistry(fullFeatures(), createDeps).Get(ToolCreateQuiz)
+	if !ok {
+		t.Fatal("create_quiz must be registered")
+	}
+	for _, want := range []string{
+		"never create multiple",
+		"Ground the question in connected external MCP tools (ext_*) / fetch_external_knowledge first",
+		"existing polls (get_poll_results), and room title/welcome message (get_room_info)",
+		"bridging any adjacent requested topic back to the session topic",
+		"never reveal it in the question",
+	} {
+		if !strings.Contains(create.Spec.Description, want) {
+			t.Errorf("create_quiz description is missing %q: %s", want, create.Spec.Description)
+		}
+	}
+
+	draftDeps := testDeps()
+	draftDeps.Poll = &fakePoll{}
+	draftDeps.Quiz = &fakeQuiz{}
+	draftDeps.RequireQuizApproval = true
+	draftDeps.QuizDrafts = &memoryQuizDraftStore{drafts: map[string]memoryQuizDraft{}}
+	draft, ok := BuildRoomToolRegistry(fullFeatures(), draftDeps).Get(ToolDraftQuiz)
+	if !ok {
+		t.Fatal("draft_quiz must be registered when approval is required")
+	}
+	for _, want := range []string{
+		"Ground the questions in the room's context in priority order",
+		"connected external MCP tools (ext_*, such as a question bank",
+		"whiteboard (whiteboard_capture_snapshot)",
+		"call notepad_read only when the user refers to the notepad",
+		"existing polls (get_poll_results), and the meeting title/welcome message (get_room_info)",
+		"(e.g. PHP + HTML) so they stay relevant to the session",
+		"ask for explicit approval before publish_quiz",
+	} {
+		if !strings.Contains(draft.Spec.Description, want) {
+			t.Errorf("draft_quiz description is missing %q: %s", want, draft.Spec.Description)
+		}
+	}
+}
+
 func TestDraftQuizMustBePublishedAfterApproval(t *testing.T) {
 	polls := &fakePoll{}
 	quizzes := &fakeQuiz{}
@@ -1581,7 +1625,8 @@ func TestSetWorkspaceLockTool(t *testing.T) {
 func TestGetRoomInfoReportsWorkspaceLocks(t *testing.T) {
 	deps := testDeps()
 	deps.Room = &fakeRoom{snapshot: &RoomSnapshot{
-		RoomTitle: "Fractions 101",
+		RoomTitle:      "Fractions 101",
+		WelcomeMessage: "Today we compare fractions",
 		Participants: []ParticipantSummary{
 			{UserID: "u1", Name: "Ada", WhiteboardLocked: true, SharedNotepadLocked: false},
 		},
@@ -1597,7 +1642,7 @@ func TestGetRoomInfoReportsWorkspaceLocks(t *testing.T) {
 	if res.IsError {
 		t.Fatalf("get_room_info failed: %s", res.OutputJSON)
 	}
-	for _, want := range []string{`"whiteboard_locked":true`, `"shared_notepad_locked":false`} {
+	for _, want := range []string{`"welcome_message":"Today we compare fractions"`, `"whiteboard_locked":true`, `"shared_notepad_locked":false`} {
 		if !strings.Contains(res.OutputJSON, want) {
 			t.Errorf("snapshot is missing %q: %s", want, res.OutputJSON)
 		}

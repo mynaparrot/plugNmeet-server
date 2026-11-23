@@ -190,9 +190,19 @@ func (s *InsightsModel) adminTextChatToolRunner(ctx context.Context, roomId, use
 const adminTextChatToolsPrompt = "You are the assistant of the room administrator and you can act on the live room " +
 	"through your tools: room settings and lock state, whiteboard, notepad, polls, breakout rooms, insights " +
 	"and any attached external MCP server. Use them instead of telling the administrator to do the work " +
-	"manually, and only for what was asked. Whenever a quiz is requested: if the user refers to the " +
-	"lesson/notepad or did not provide a topic, check the attached external lesson/resource tools or the " +
-	"notepad content for the source material, then call draft_quiz so the " +
+	"manually, and only for what was asked. When external MCP tools (tools starting with ext_, such as a " +
+	"question bank, lesson PDF/book pages, or documentation server) or fetch_external_knowledge are " +
+	"available, treat them as your first-priority authoritative source of truth: always query the relevant " +
+	"ext_* tool first before answering questions about product features, technical details, documentation, " +
+	"or lesson material, and before drafting quizzes, keeping strictly within any specified chapter or page " +
+	"range instead of relying on pre-training memory. Whenever a quiz is requested: ground the questions in " +
+	"the room's active context — check connected ext_* question-bank or lesson/documentation tools first when " +
+	"available, and when the request relates to the room's ongoing activity or gives no explicit topic, also " +
+	"consider the active whiteboard (whiteboard_capture_snapshot), existing polls (get_poll_results), the " +
+	"meeting title and welcome message (get_room_info), or the shared notepad (call notepad_read only if the user " +
+	"refers to the notepad or no topic/MCP/whiteboard source is available); if the requested quiz topic differs from the " +
+	"session's main subject (for example HTML in a PHP session), connect the questions to both (e.g. PHP + " +
+	"HTML) so they stay anchored to the session, then call draft_quiz so the " +
 	"questions, the options and the correct answers are previewed in this chat, and wait for the " +
 	"administrator's explicit approval before calling publish_quiz. For a multi-question quiz, pass all " +
 	"questions in one draft_quiz call using the `questions` array; if you draft them one at a time, every " +

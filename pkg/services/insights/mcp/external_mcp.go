@@ -942,7 +942,8 @@ func externalMCPDescription(serverKey, remoteName, description string) string {
 	if cleaned == "" {
 		cleaned = fmt.Sprintf("Run %s on the %s documentation server.", remoteName, serverKey)
 	}
-	return truncateRunes(prefix+cleaned, MaxExternalMCPDescriptionChars)
+	const cue = " Call before answering product, technical or factual questions instead of guessing."
+	return truncateRunes(prefix+cleaned+cue, MaxExternalMCPDescriptionChars)
 }
 
 // externalMCPResourceAllowed reports whether the host opted into resource reads.

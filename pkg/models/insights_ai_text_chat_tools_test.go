@@ -132,7 +132,7 @@ func TestAITextChatAttachesToolsOnlyForAdmin(t *testing.T) {
 				t.Errorf("first provider message role = %s, want system", got)
 			}
 			prompt := request.History[0].GetText()
-			for _, want := range []string{"draft_quiz", "publish_quiz", "approval", "Speech-to-Text", "\"T\" icon", "spoken language"} {
+			for _, want := range []string{"draft_quiz", "publish_quiz", "approval", "Speech-to-Text", "\"T\" icon", "spoken language", "first-priority authoritative source of truth", "keeping strictly within any specified chapter or page range", "ground the questions in the room's active context", "check connected ext_* question-bank or lesson/documentation tools first", "active whiteboard (whiteboard_capture_snapshot), existing polls (get_poll_results)", "meeting title and welcome message (get_room_info)", "connect the questions to both (e.g. PHP + HTML) so they stay anchored to the session"} {
 				if !strings.Contains(prompt, want) {
 					t.Errorf("the admin tool instructions must mention %q", want)
 				}
