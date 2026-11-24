@@ -25,6 +25,10 @@ func (j *memoryJetStream) KeyValue(context.Context, string) (jetstream.KeyValue,
 	return memoryKV{entries: j.entries}, nil
 }
 
+func (j *memoryJetStream) CreateOrUpdateKeyValue(context.Context, jetstream.KeyValueConfig) (jetstream.KeyValue, error) {
+	return memoryKV{entries: j.entries}, nil
+}
+
 func (j *memoryJetStream) Publish(context.Context, string, []byte, ...jetstream.PublishOpt) (*jetstream.PubAck, error) {
 	return &jetstream.PubAck{}, nil
 }

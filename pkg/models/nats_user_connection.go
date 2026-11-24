@@ -214,6 +214,9 @@ func (m *NatsModel) handleDelayedOfflineTasks(roomId, userId string, disconnecte
 	// the empty-room grace timer keeps a refresh alive.
 	go m.aiAgentModel.OnUserLeft(m.ctx, roomId, userId, gracePeriod == 0)
 
+	// a participant left the queue or a session room, so refresh the waiting queue
+	go m.breakoutModel.TryAdmitWaitingAISessionUsers(m.ctx, roomId)
+
 	// If the room ended during Stage 1, skip Stage 2 and go straight to cleanup.
 	if roomEnded {
 		log.Info("Room ended during grace period, skipping second wait and proceeding to final cleanup")

@@ -263,7 +263,8 @@ func (m *ArtifactModel) isDownloadable(artifactType plugnmeet.RoomArtifactType) 
 	switch artifactType {
 	case plugnmeet.RoomArtifactType_MEETING_ANALYTICS,
 		plugnmeet.RoomArtifactType_MEETING_SUMMARY,
-		plugnmeet.RoomArtifactType_SPEECH_TRANSCRIPTION:
+		plugnmeet.RoomArtifactType_SPEECH_TRANSCRIPTION,
+		plugnmeet.RoomArtifactType_AI_AGENT_SESSION_SUMMARY:
 		return true
 	}
 

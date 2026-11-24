@@ -62,6 +62,7 @@ func (m *RoomModel) approveUser(roomId, userId, metadata string) error {
 		return err
 	}
 	mt.WaitForApproval = false // this mean doesn't need to wait anymore
+	mt.WaitingQueueInfo = nil
 
 	if err := m.natsService.UpdateAndBroadcastUserMetadata(roomId, userId, mt, nil); err != nil {
 		return err

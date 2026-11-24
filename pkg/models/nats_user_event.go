@@ -66,6 +66,18 @@ func (m *NatsModel) HandleInitialData(roomId, userId string) {
 		rInfo.Metadata = redactedMeta
 	}
 
+	// a queued participant of an open per-user AI session gets its position right away
+	if userMeta.GetWaitForApproval() {
+		if info := m.breakoutModel.WaitingAISessionQueueInfo(roomId, userId); info != nil {
+			userMeta.WaitingQueueInfo = info
+			if md, err := m.natsService.UpdateUserMetadata(roomId, userId, userMeta); err == nil {
+				userInfo.Metadata = md
+			} else {
+				log.WithError(err).Warnln("error updating the waiting queue info")
+			}
+		}
+	}
+
 	initial := &plugnmeet.NatsInitialData{
 		Room:      rInfo,
 		LocalUser: userInfo,
