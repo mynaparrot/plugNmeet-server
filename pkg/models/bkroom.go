@@ -1,6 +1,8 @@
 package models
 
 import (
+	"sync"
+
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
@@ -22,6 +24,8 @@ type BreakoutRoomModel struct {
 	analyticsModel *AnalyticsModel
 	um             *UserModel
 	logger         *logrus.Entry
+	// serializes the admission of waiting AI session participants
+	aiAdmissionMu sync.Mutex
 }
 
 type BreakoutRoomModelArgs struct {

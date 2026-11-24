@@ -47,7 +47,7 @@ func TestPerUserAISessionRoomAdminStaysInMainRoom(t *testing.T) {
 		UserInfo: &plugnmeet.UserInfo{UserId: "admin-1", Name: "Admin", IsAdmin: true},
 	}
 
-	roomId, err := new(UserModel).perUserAISessionRoom(context.Background(), req, meta, logrus.NewEntry(logrus.New()))
+	roomId, err := new(UserModel).perUserAISessionRoom(context.Background(), req, meta, nil, logrus.NewEntry(logrus.New()))
 	if err != nil {
 		t.Fatalf("perUserAISessionRoom() error = %v, want nil", err)
 	}

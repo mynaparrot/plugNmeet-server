@@ -51,6 +51,13 @@ func (m *NatsModel) OnAfterUserJoined(roomId, userId, calledFrom string) {
 				log.WithError(err).Error("Failed to broadcast USER_JOINED event")
 			}
 
+			// a participant waiting for a free AI session slot may get one now
+			if m.breakoutModel != nil {
+				if meta, mErr := m.natsService.UnmarshalUserMetadata(userInfo.GetMetadata()); mErr == nil && meta.GetWaitForApproval() {
+					go m.breakoutModel.TryAdmitWaitingAISessionUsers(m.ctx, roomId)
+				}
+			}
+
 			// `status` is the state before this join: "added" on first join, "offline" on
 			// rejoin after the grace period, or "disconnected" on a quick reconnect.
 			// A quick reconnect means USER_LEFT was never recorded, so the USER_JOINED

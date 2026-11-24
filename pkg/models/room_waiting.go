@@ -52,6 +52,11 @@ func (m *RoomModel) ApproveWaitingUsers(r *plugnmeet.ApproveWaitingUsersReq) (pl
 }
 
 func (m *RoomModel) approveUser(roomId, userId, metadata string) error {
+	// the lobby of an open per-user AI session approves into the participant's own room
+	if roomMeta, err := m.natsService.GetRoomMetadataStruct(roomId); err == nil && IsOpenPerUserAISessionParent(roomMeta) && m.breakoutModel != nil {
+		return m.breakoutModel.AdmitWaitingAISessionUser(m.ctx, roomId, userId)
+	}
+
 	mt, err := m.natsService.UnmarshalUserMetadata(metadata)
 	if err != nil {
 		return err

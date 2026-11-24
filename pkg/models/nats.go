@@ -28,6 +28,7 @@ type NatsModel struct {
 	userModel      *UserModel
 	analyticsModel *AnalyticsModel
 	aiAgentModel   *AIAgentModel
+	breakoutModel  *BreakoutRoomModel
 	logger         *logrus.Entry
 	sfGroup        *singleflight.Group
 }
@@ -64,6 +65,11 @@ func NewNatsModel(args NatsModelArgs) *NatsModel {
 		logger:         args.Logger.WithField("model", "nats"),
 		sfGroup:        new(singleflight.Group),
 	}
+}
+
+// SetBreakoutRoomModel wires the breakout room model after construction.
+func (m *NatsModel) SetBreakoutRoomModel(bm *BreakoutRoomModel) {
+	m.breakoutModel = bm
 }
 
 func (m *NatsModel) HandleFromClientToServerReq(roomId, userId string, req *plugnmeet.NatsMsgClientToServer) {

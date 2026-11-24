@@ -76,12 +76,16 @@ func (m *BreakoutRoomModel) proceedToEndBkRoom(ctx context.Context, bkRoomId, pa
 		roomLog.WithError(err).Error("Failed to delete breakout room from nats")
 	}
 
-	m.onAfterBkRoomEnded(parentRoomId, bkRoomId, roomLog)
+	m.onAfterBkRoomEnded(ctx, parentRoomId, bkRoomId, roomLog)
 }
 
-func (m *BreakoutRoomModel) onAfterBkRoomEnded(parentRoomId, bkRoomId string, log *logrus.Entry) {
+func (m *BreakoutRoomModel) onAfterBkRoomEnded(ctx context.Context, parentRoomId, bkRoomId string, log *logrus.Entry) {
 	log = log.WithField("method", "onAfterBkRoomEnded")
 	log.Info("Performing post-end tasks for breakout room")
+
+	// a participant waiting for an AI session slot may take the freed one right
+	// away, which keeps the parent's breakout room feature active
+	m.TryAdmitWaitingAISessionUsers(ctx, parentRoomId)
 
 	if c, err := m.rs.CountBreakoutRooms(parentRoomId); err == nil && c == 0 {
 		log.Info("Last breakout room ended, cleaning up parent room metadata")
@@ -155,7 +159,7 @@ func (m *BreakoutRoomModel) PostTaskAfterRoomEndWebhook(ctx context.Context, roo
 		}
 		log.Info("Breakout room ended, cleaning up its records")
 		_ = m.rs.DeleteBreakoutRoom(parentRoomId, roomId)
-		m.onAfterBkRoomEnded(parentRoomId, roomId, log)
+		m.onAfterBkRoomEnded(ctx, parentRoomId, roomId, log)
 	} else {
 		log.Info("Parent room ended, ending all associated breakout rooms")
 		if err = m.EndAllBreakoutRoomsByParentRoomId(ctx, roomId); err != nil {

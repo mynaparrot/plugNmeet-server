@@ -81,6 +81,48 @@ func TestPrepareRoomMetadataForWaitingUser(t *testing.T) {
 	}
 }
 
+// TestRedactRoomMetadataForWaitingUserKeepsAIAgentFeatures locks in that a
+// waiting participant of an open per-user AI session still learns that they are
+// in an AI session lobby, without exposing the prompt or the roster.
+func TestRedactRoomMetadataForWaitingUserKeepsAIAgentFeatures(t *testing.T) {
+	s := &NatsService{}
+
+	meta := &plugnmeet.RoomMetadata{RoomFeatures: &plugnmeet.RoomCreateFeatures{
+		InsightsFeatures: &plugnmeet.InsightsFeatures{
+			AiAgentFeatures: &plugnmeet.InsightsAIAgentFeatures{
+				IsAllow:      true,
+				SystemPrompt: "You are a tutor.",
+				SessionMode:  plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_OPEN_PER_USER,
+				AutoSessionConfig: &plugnmeet.AIAgentAutoSessionConfig{
+					AllowedParticipantIds: []string{"learner-1"},
+					MaxConcurrentSessions: 2,
+				},
+			},
+		},
+	}}
+
+	out, err := s.RedactRoomMetadataForWaitingUser(meta)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	redacted := new(plugnmeet.RoomMetadata)
+	if err := protojson.Unmarshal([]byte(out), redacted); err != nil {
+		t.Fatalf("failed to unmarshal redacted metadata: %v", err)
+	}
+
+	ai := redacted.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()
+	if ai == nil {
+		t.Fatal("ai agent features missing in the redacted metadata")
+	}
+	if !ai.GetIsAllow() || ai.GetSessionMode() != plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_OPEN_PER_USER {
+		t.Fatalf("ai agent features = %v, want the allow flag and the session mode", ai)
+	}
+	if ai.GetSystemPrompt() != "" || ai.GetAutoSessionConfig() != nil {
+		t.Errorf("ai agent settings leaked: %s", out)
+	}
+}
+
 func TestPrepareRoomMetadataForWaitingUser_InvalidInput(t *testing.T) {
 	s := &NatsService{}
 	if _, err := s.PrepareRoomMetadataForWaitingUser("{invalid"); err == nil {

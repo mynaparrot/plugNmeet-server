@@ -517,7 +517,7 @@ func appendBreakoutAIContext(basePrompt, globalContext, roomContext string) stri
 // room, creating it on first call. The child room id is derived from the user id
 // so repeated joins resolve to the same room.
 func (m *BreakoutRoomModel) EnsurePerUserAIBreakoutRoom(ctx context.Context, parentRoomId, userId, userName, previousSessionContext string) (string, error) {
-	childRoomId := fmt.Sprintf(BreakoutRoomFormat, parentRoomId, userId)
+	childRoomId := perUserAIBreakoutRoomId(parentRoomId, userId)
 	log := m.logger.WithFields(logrus.Fields{
 		"roomId":  parentRoomId,
 		"userId":  userId,

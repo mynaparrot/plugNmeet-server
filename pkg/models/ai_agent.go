@@ -1049,6 +1049,17 @@ func isOneOnOneAIAgentRoom(meta *plugnmeet.RoomMetadata) bool {
 		meta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures().GetIsAllow()
 }
 
+// IsOpenPerUserAISessionParent reports whether meta is the lobby of an open
+// per-user AI session, where the free session slots, not max_participants,
+// govern who may join.
+func IsOpenPerUserAISessionParent(meta *plugnmeet.RoomMetadata) bool {
+	if meta.GetIsBreakoutRoom() {
+		return false
+	}
+	ai := meta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()
+	return ai.GetIsAllow() && ai.GetSessionMode() == plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_OPEN_PER_USER
+}
+
 // isPerUserAISessionParent reports whether meta describes the main room of an
 // auto per-user AI session, whose breakout rooms are created one per
 // participant. An unused pre-created session room must not keep that room alive.

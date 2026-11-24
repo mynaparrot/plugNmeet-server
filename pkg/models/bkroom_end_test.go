@@ -134,7 +134,7 @@ func TestOnAfterBkRoomEndedRefreshesParentRoomEmptyTimeout(t *testing.T) {
 				}
 			}
 
-			m.onAfterBkRoomEnded(bkRoomEndTestRoomId, bkRoomEndTestRoomId+"-1", m.logger.WithField("method", "test"))
+			m.onAfterBkRoomEnded(context.Background(), bkRoomEndTestRoomId, bkRoomEndTestRoomId+"-1", m.logger.WithField("method", "test"))
 
 			assertRefreshedEmptyTimeout(t, js, createdAt, parentRoomPostBreakoutEmptyTimeout)
 

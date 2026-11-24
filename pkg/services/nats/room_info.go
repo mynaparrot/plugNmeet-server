@@ -126,6 +126,15 @@ func (s *NatsService) RedactRoomMetadataForWaitingUser(meta *plugnmeet.RoomMetad
 		},
 	}
 
+	if ai := rf.GetInsightsFeatures().GetAiAgentFeatures(); ai != nil {
+		redacted.RoomFeatures.InsightsFeatures = &plugnmeet.InsightsFeatures{
+			AiAgentFeatures: &plugnmeet.InsightsAIAgentFeatures{
+				IsAllow:     ai.GetIsAllow(),
+				SessionMode: ai.GetSessionMode(),
+			},
+		}
+	}
+
 	// only expose the flags, never the encryption key or the included scopes
 	if e2ee := rf.GetEndToEndEncryptionFeatures(); e2ee != nil {
 		redacted.RoomFeatures.EndToEndEncryptionFeatures = &plugnmeet.EndToEndEncryptionFeatures{

@@ -226,8 +226,9 @@ func (ac *AuthController) HandleVerifyToken(c fiber.Ctx) error {
 		return ac.sendVerifyTokenError(c, config.ErrAuthRoomNotActive, plugnmeet.StatusCode_ROOM_NOT_ACTIVE)
 	}
 
-	// rInfo and meta are guaranteed to be non-nil if IsActive is true.
-	if rInfo.MaxParticipants > 0 {
+	// rInfo and meta are guaranteed to be non-nil if IsActive is true. The lobby of an open per-user AI session
+	// is limited by its free session slots instead, participants wait there for one to open up.
+	if rInfo.MaxParticipants > 0 && !models.IsOpenPerUserAISessionParent(meta) {
 		onlineUsers, err := ac.NatsService.GetOnlineUsersId(roomId)
 		if err != nil {
 			ac.logAuthFailure(roomId, requestedUserId, "failed to fetch online users", err)
