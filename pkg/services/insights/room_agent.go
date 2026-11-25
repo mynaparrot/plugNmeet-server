@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	lkauth "github.com/livekit/protocol/auth"
 	"github.com/livekit/protocol/livekit"
-	"github.com/mynaparrot/plugnmeet-protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
@@ -129,6 +129,33 @@ func roomAgentIdentity(payload *insights.InsightsTaskPayload, agentUserId string
 	return fmt.Sprintf("%s%s-%s", config.AgentUserUserIdPrefix, payload.ServiceType, uuid.NewString())
 }
 
+// mintRoomAgentLiveKitAccessToken mints the join token of a RoomAgent
+// participant. It is built directly from the LiveKit auth package rather than
+// through the shared protocol helper so the agent always joins with
+// kind PARTICIPANT_KIND_AGENT, even before plugnmeet-protocol is re-tagged with
+// the same behaviour: agent SDK workers such as livekit-agents'
+// DataStreamAudioReceiver wait for a remote participant of that kind and time
+// out (60s) when only a STANDARD participant joins.
+func mintRoomAgentLiveKitAccessToken(apiKey, secret string, tokenValidity time.Duration, c *plugnmeet.PlugNmeetTokenClaims) (string, error) {
+	at := lkauth.NewAccessToken(apiKey, secret)
+	grant := &lkauth.VideoGrant{
+		RoomJoin:     true,
+		Room:         c.RoomId,
+		RoomAdmin:    c.IsAdmin,
+		Hidden:       c.IsHidden,
+		CanPublish:   new(true),
+		CanSubscribe: new(true),
+	}
+
+	at.SetVideoGrant(grant).
+		SetIdentity(c.UserId).
+		SetName(c.Name).
+		SetValidFor(tokenValidity).
+		SetKind(livekit.ParticipantInfo_AGENT)
+
+	return at.ToJWT()
+}
+
 // NewRoomAgent creates and connects a new RoomAgent to a LiveKit room.
 func NewRoomAgent(args *RoomAgentArgs) (*RoomAgent, error) {
 	return newRoomAgent(args, nil)
@@ -204,7 +231,7 @@ func newRoomAgent(args *RoomAgentArgs, task insights.Task) (*RoomAgent, error) {
 	}
 
 	// token validity can be short to 5~10 minutes as SDK will renew it periodically
-	token, err := auth.GenerateLivekitAccessToken(agent.conf.LivekitInfo.ApiKey, agent.conf.LivekitInfo.Secret, time.Minute*5, c, true, true, "")
+	token, err := mintRoomAgentLiveKitAccessToken(agent.conf.LivekitInfo.ApiKey, agent.conf.LivekitInfo.Secret, time.Minute*5, c)
 	if err != nil {
 		cancel()
 		return nil, err

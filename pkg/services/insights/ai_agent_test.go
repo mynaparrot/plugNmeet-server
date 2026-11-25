@@ -14,6 +14,7 @@ import (
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/livekit/media-sdk"
 	lkauth "github.com/livekit/protocol/auth"
+	"github.com/livekit/protocol/livekit"
 	"github.com/mynaparrot/plugnmeet-protocol/connections"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/redis/go-redis/v9"
@@ -1155,17 +1156,7 @@ func TestMintAvatarLiveKitAccessTokenCarriesTheOriginalUserId(t *testing.T) {
 		t.Fatalf("mint the avatar token: %v", err)
 	}
 
-	tok, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.HS256})
-	if err != nil {
-		t.Fatalf("parse the avatar token: %v", err)
-	}
-
-	var cl jwt.Claims
-	var grants lkauth.ClaimGrants
-	// passing the secret as the key verifies the signature as it decodes
-	if err := tok.Claims([]byte(secret), &cl, &grants); err != nil {
-		t.Fatalf("verify the avatar token: %v", err)
-	}
+	cl, grants := decodeLiveKitTokenClaims(t, token, secret)
 
 	if err := cl.Validate(jwt.Expected{Issuer: apiKey, Subject: twinIdentity, Time: time.Now().UTC()}); err != nil {
 		t.Fatalf("the avatar token is not valid: %v", err)
@@ -1194,4 +1185,90 @@ func TestMintAvatarLiveKitAccessTokenCarriesTheOriginalUserId(t *testing.T) {
 			t.Errorf("attribute %q = %q, want %q", key, got, agentUserId)
 		}
 	}
+	// livekit-plugins-bey sets .with_kind("agent") on the avatar token; a
+	// STANDARD twin would not be recognised as an agent participant.
+	if got := grants.GetParticipantKind(); got != livekit.ParticipantInfo_AGENT {
+		t.Errorf("participant kind = %v, want %v", got, livekit.ParticipantInfo_AGENT)
+	}
+}
+
+// The RoomAgent itself has to join with kind AGENT: agent SDK workers (such as
+// livekit-agents' DataStreamAudioReceiver) wait for a remote participant of
+// that kind and time out when only a STANDARD participant joins.
+func TestMintRoomAgentLiveKitAccessTokenJoinsAsAgent(t *testing.T) {
+	const (
+		apiKey        = "test-api-key"
+		secret        = "test-secret-that-is-long-enough-for-hmac-sha256"
+		roomId        = "room-01"
+		agentUserId   = "pnm_agent-ai_agent-01"
+		agentName     = "Arjun"
+		tokenValidity = time.Hour
+	)
+
+	token, err := mintRoomAgentLiveKitAccessToken(apiKey, secret, tokenValidity, &plugnmeet.PlugNmeetTokenClaims{
+		RoomId:   roomId,
+		UserId:   agentUserId,
+		Name:     agentName,
+		IsAdmin:  true,
+		IsHidden: true,
+	})
+	if err != nil {
+		t.Fatalf("mint the room agent token: %v", err)
+	}
+
+	cl, grants := decodeLiveKitTokenClaims(t, token, secret)
+
+	if err := cl.Validate(jwt.Expected{Issuer: apiKey, Subject: agentUserId, Time: time.Now().UTC()}); err != nil {
+		t.Fatalf("the room agent token is not valid: %v", err)
+	}
+	if cl.Expiry == nil || time.Until(cl.Expiry.Time()) < 30*time.Minute {
+		t.Errorf("expiry = %v, want the requested hour", cl.Expiry)
+	}
+	if got := grants.GetParticipantKind(); got != livekit.ParticipantInfo_AGENT {
+		t.Errorf("participant kind = %v, want %v", got, livekit.ParticipantInfo_AGENT)
+	}
+	if grants.Identity != agentUserId {
+		t.Errorf("identity = %q, want %q", grants.Identity, agentUserId)
+	}
+	if grants.Name != agentName {
+		t.Errorf("name = %q, want %q", grants.Name, agentName)
+	}
+	if grants.Video == nil {
+		t.Fatal("the token carries no video grant")
+	}
+	if grants.Video.Room != roomId || !grants.Video.RoomJoin {
+		t.Errorf("video grant = %+v, want room join for %q", grants.Video, roomId)
+	}
+	if !grants.Video.RoomAdmin {
+		t.Error("the room agent must be a room admin")
+	}
+	if !grants.Video.Hidden {
+		t.Error("the room agent must stay hidden")
+	}
+	if grants.Video.CanPublish == nil || !*grants.Video.CanPublish {
+		t.Error("the room agent must be allowed to publish")
+	}
+	if grants.Video.CanSubscribe == nil || !*grants.Video.CanSubscribe {
+		t.Error("the room agent must be allowed to subscribe")
+	}
+}
+
+// decodeLiveKitTokenClaims verifies a token signature with the LiveKit secret
+// and returns both the standard claims and the LiveKit grant claims.
+func decodeLiveKitTokenClaims(t *testing.T, token, secret string) (*jwt.Claims, *lkauth.ClaimGrants) {
+	t.Helper()
+
+	tok, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.HS256})
+	if err != nil {
+		t.Fatalf("parse the LiveKit token: %v", err)
+	}
+
+	var cl jwt.Claims
+	var grants lkauth.ClaimGrants
+	// passing the secret as the key verifies the signature as it decodes
+	if err := tok.Claims([]byte(secret), &cl, &grants); err != nil {
+		t.Fatalf("verify the LiveKit token: %v", err)
+	}
+
+	return &cl, &grants
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	mediasdk "github.com/livekit/media-sdk"
 	lkauth "github.com/livekit/protocol/auth"
+	"github.com/livekit/protocol/livekit"
 	lksdk "github.com/livekit/server-sdk-go/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/nats-io/nats.go"
@@ -608,7 +609,9 @@ func startAgentAudioPublisher(args *AIAgentArgs, agent *AIAgent, room *lksdk.Roo
 // so the twin always carries both attributes even before the released protocol
 // package knows about them: original_user_id is how the webhooks recognise the
 // twin, and lk.publish_on_behalf is how LiveKit attributes the avatar's track to
-// the agent instead of to the twin.
+// the agent instead of to the twin. The twin also joins as kind AGENT, matching
+// livekit-plugins-bey which sets .with_kind("agent") on the avatar token, so
+// LiveKit treats the avatar as an agent participant.
 func mintAvatarLiveKitAccessToken(apiKey, secret string, tokenValidity time.Duration, roomId, twinIdentity, displayName, agentUserId string) (string, error) {
 	at := lkauth.NewAccessToken(apiKey, secret)
 	grant := &lkauth.VideoGrant{
@@ -622,6 +625,7 @@ func mintAvatarLiveKitAccessToken(apiKey, secret string, tokenValidity time.Dura
 		SetIdentity(twinIdentity).
 		SetName(displayName).
 		SetValidFor(tokenValidity).
+		SetKind(livekit.ParticipantInfo_AGENT).
 		SetAttributes(map[string]string{
 			"original_user_id":     agentUserId,
 			"lk.publish_on_behalf": agentUserId,
