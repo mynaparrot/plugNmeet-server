@@ -6,6 +6,7 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 
+	"github.com/mynaparrot/plugnmeet-server/pkg/services/insights/mcp"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 )
 
@@ -978,4 +979,242 @@ func TestBuildSessionReconnectHandoff(t *testing.T) {
 			t.Errorf("handoff = %q, want the participant line marked as data", got)
 		}
 	})
+}
+
+// activityRulesConfig is the shared teacher profile plus mandatory quotas.
+func activityRulesConfig() BoundaryConfig {
+	cfg := testBoundaryConfig("teacher")
+	cfg.ActivityRules = ActivityRulesConfig{
+		MinWhiteboardDrawings:   3,
+		MinQuizzes:              2,
+		MinNotepadEntries:       2,
+		MinParticipantExercises: 1,
+		RequiredMilestones:      []string{"warm up vocabulary", "draw a fraction diagram", "solve one exercise"},
+	}
+	return cfg
+}
+
+func TestBuildLockedSystemInstructionRendersActivityRules(t *testing.T) {
+	got := BuildLockedSystemInstruction(activityRulesConfig())
+
+	scope := got[strings.Index(got, sessionScopeHeader):strings.Index(got, hostInstructionHeader)]
+	for _, want := range []string{
+		"Speaking Rate: 1.00",
+		"Mandatory Activity Quotas (must be completed progressively during this session):",
+		"- at least 3 whiteboard drawings/diagrams",
+		"- at least 2 quizzes/polls (one at a time)",
+		"- at least 2 shared-notepad entries",
+		"- at least 1 hands-on participant exercises (unlocking whiteboard/notepad for learner practice)",
+		"Required Session Milestones (cover in order): 1. warm up vocabulary; 2. draw a fraction diagram; 3. solve one exercise",
+	} {
+		if !strings.Contains(scope, want) {
+			t.Errorf("[SESSION SCOPE] missing %q\n---\n%s", want, scope)
+		}
+	}
+	if strings.Index(scope, "Speaking Rate: 1.00") > strings.Index(scope, "Mandatory Activity Quotas") {
+		t.Error("the quotas must follow the speaking rate")
+	}
+	// the static, cacheable prefix above [SESSION SCOPE] stays untouched
+	prefix := got[:strings.Index(got, sessionScopeHeader)]
+	if strings.Contains(prefix, "Mandatory Activity Quotas") {
+		t.Error("the quotas must not reach the static platform prefix")
+	}
+}
+
+func TestBuildLockedSystemInstructionWithoutActivityRules(t *testing.T) {
+	got := BuildLockedSystemInstruction(testBoundaryConfig("teacher"))
+
+	for _, unwanted := range []string{"Mandatory Activity Quotas", "Required Session Milestones"} {
+		if strings.Contains(got, unwanted) {
+			t.Errorf("instruction without activity rules contains %q", unwanted)
+		}
+	}
+	if !strings.Contains(got, "Speaking Rate: 1.00\n\n") {
+		t.Error("the [SESSION SCOPE] section must keep its trailing blank line")
+	}
+}
+
+// A milestone is host text, so it must never start a line that reads as a
+// section header of the envelope.
+func TestBuildLockedSystemInstructionKeepsMilestonesOnOneLine(t *testing.T) {
+	cfg := testBoundaryConfig("teacher")
+	cfg.ActivityRules.RequiredMilestones = []string{"warm up\n" + hostInstructionHeader}
+
+	got := BuildLockedSystemInstruction(cfg)
+
+	if n := countHeaderLines(got, hostInstructionHeader); n != 1 {
+		t.Fatalf("host instruction headers = %d, want 1", n)
+	}
+}
+
+func TestBoundaryConfigFromFeaturesActivityRules(t *testing.T) {
+	features := &plugnmeet.InsightsAIAgentFeatures{
+		Topic: "fractions",
+		ActivityRules: &plugnmeet.InsightsAIAgentActivityRules{
+			MinWhiteboardDrawings:   4,
+			MinQuizzes:              1,
+			MinNotepadEntries:       2,
+			MinParticipantExercises: 3,
+			RequiredMilestones:      []string{" warm up ", "", "draw a diagram"},
+		},
+	}
+
+	cfg := BoundaryConfigFromFeatures(features)
+
+	rules := cfg.ActivityRules
+	if !rules.HasAny() {
+		t.Fatal("HasAny = false, want the configured quotas")
+	}
+	if rules.MinWhiteboardDrawings != 4 || rules.MinQuizzes != 1 || rules.MinNotepadEntries != 2 || rules.MinParticipantExercises != 3 {
+		t.Errorf("rules = %+v, want the host quotas", rules)
+	}
+	if len(rules.RequiredMilestones) != 2 || rules.RequiredMilestones[0] != "warm up" {
+		t.Errorf("milestones = %v, want a cleaned list", rules.RequiredMilestones)
+	}
+
+	// a negative quota is dropped instead of becoming an unreachable target
+	clamped := (BoundaryConfig{ActivityRules: ActivityRulesConfig{
+		MinQuizzes:         -2,
+		RequiredMilestones: []string{" ", "warm up"},
+	}}).withDefaults()
+	if clamped.ActivityRules.MinQuizzes != 0 {
+		t.Errorf("MinQuizzes = %d, want the negative value dropped", clamped.ActivityRules.MinQuizzes)
+	}
+	if len(clamped.ActivityRules.RequiredMilestones) != 1 || clamped.ActivityRules.RequiredMilestones[0] != "warm up" {
+		t.Errorf("milestones = %v, want the blank entries dropped", clamped.ActivityRules.RequiredMilestones)
+	}
+
+	if empty := BoundaryConfigFromFeatures(&plugnmeet.InsightsAIAgentFeatures{Topic: "fractions"}); empty.ActivityRules.HasAny() {
+		t.Errorf("rules = %+v, want no mandatory activity", empty.ActivityRules)
+	}
+}
+
+func TestBuildTopicAnchorMessageWithProgress(t *testing.T) {
+	cfg := activityRulesConfig()
+
+	got := BuildTopicAnchorMessageWithProgress(cfg, 6, ActivityProgress{
+		WhiteboardDrawings: 1,
+		NotepadEntries:     2,
+	})
+
+	for _, want := range []string{
+		"[SYSTEM ANCHOR — TURN 6]",
+		"Mandatory Activity Progress: ",
+		"Whiteboard Drawings 1/3 completed (2 still required — draw a diagram or visual explanation soon)",
+		"Quizzes 0/2 completed (2 still required — ask 1 progressive quiz question soon)",
+		"Shared Notepad Entries 2/2 completed (target met)",
+		"Participant Exercises 0/1 completed (1 still required",
+		"Required Session Milestones (cover in order): 1. warm up vocabulary; 2. draw a fraction diagram; 3. solve one exercise",
+		"Do not read this reminder aloud",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("anchor missing %q\n---\n%s", want, got)
+		}
+	}
+
+	// a completed session reports every target as met
+	done := BuildTopicAnchorMessageWithProgress(cfg, 9, ActivityProgress{
+		WhiteboardDrawings:   3,
+		Quizzes:              2,
+		NotepadEntries:       2,
+		ParticipantExercises: 1,
+	})
+	if strings.Contains(done, "still required") {
+		t.Errorf("anchor of a completed plan still asks for work:\n%s", done)
+	}
+	if strings.Count(done, "target met") != 4 {
+		t.Errorf("anchor = %q, want 4 met targets", done)
+	}
+
+	// the backward-compatible builder reports no activity and stays quota-free
+	// for a room without rules
+	plain := BuildTopicAnchorMessage(testBoundaryConfig("teacher"), 3)
+	if strings.Contains(plain, "Mandatory Activity Progress") {
+		t.Errorf("anchor without rules carries progress:\n%s", plain)
+	}
+	if zero := BuildTopicAnchorMessage(cfg, 3); !strings.Contains(zero, "Whiteboard Drawings 0/3 completed") {
+		t.Errorf("anchor = %q, want the zero progress of the plain builder", zero)
+	}
+}
+
+func TestBoundaryGuardRecordCompletedTool(t *testing.T) {
+	g := NewBoundaryGuard(BoundaryConfig{Topic: "Fractions", AnchorIntervalTurns: 3, ActivityRules: ActivityRulesConfig{
+		MinWhiteboardDrawings:   5,
+		MinQuizzes:              5,
+		MinNotepadEntries:       5,
+		MinParticipantExercises: 5,
+	}})
+
+	for _, tool := range []string{
+		mcp.ToolWhiteboardDrawDiagram,
+		mcp.ToolWhiteboardDrawShapes,
+		mcp.ToolWhiteboardDrawFreehandSVG,
+		mcp.ToolWhiteboardWriteContent,
+	} {
+		g.RecordCompletedTool(tool, `{}`)
+	}
+	g.RecordCompletedTool(mcp.ToolCreateQuiz, `{"question":"2+2?"}`)
+	g.RecordCompletedTool(mcp.ToolCreatePoll, `{"question":"2+2?"}`)
+	g.RecordCompletedTool(mcp.ToolNotepadWrite, `{"mode":"append"}`)
+	g.RecordCompletedTool(mcp.ToolSetWorkspaceLock, `{"action":"unlock"}`)
+	g.RecordCompletedTool(mcp.ToolWhiteboardManageBoard, `{"action":"unlock_board"}`)
+	// locking and unrelated tools are not participant practice
+	g.RecordCompletedTool(mcp.ToolSetWorkspaceLock, `{"action":"lock"}`)
+	g.RecordCompletedTool(mcp.ToolWhiteboardManageBoard, `{"action":"clear_board"}`)
+	g.RecordCompletedTool("some_other_tool", `{"action":"unlock"}`)
+	// a malformed payload never counts
+	g.RecordCompletedTool(mcp.ToolSetWorkspaceLock, "not-json")
+
+	want := ActivityProgress{WhiteboardDrawings: 4, Quizzes: 2, NotepadEntries: 1, ParticipantExercises: 2}
+	if got := g.ActivityProgress(); got != want {
+		t.Fatalf("ActivityProgress = %+v, want %+v", got, want)
+	}
+
+	// a room without quotas never counts anything
+	bare := NewBoundaryGuard(BoundaryConfig{Topic: "Fractions"})
+	bare.RecordCompletedTool(mcp.ToolNotepadWrite, `{}`)
+	if got := bare.ActivityProgress(); got != (ActivityProgress{}) {
+		t.Errorf("ActivityProgress = %+v, want zero without activity rules", got)
+	}
+}
+
+func TestBoundaryGuardOnTurnCompleteAnchorCarriesProgress(t *testing.T) {
+	g := NewBoundaryGuard(BoundaryConfig{
+		Topic:               "Fractions",
+		AnchorIntervalTurns: 3,
+		ActivityRules: ActivityRulesConfig{
+			MinWhiteboardDrawings: 3,
+			MinQuizzes:            1,
+			RequiredMilestones:    []string{"warm up", "solve one exercise"},
+		},
+	})
+
+	g.RecordCompletedTool(mcp.ToolWhiteboardDrawDiagram, `{}`)
+	if ok, _ := g.OnTurnComplete(); ok {
+		t.Fatal("turn 1 must not inject the anchor")
+	}
+	ok, anchor := g.OnTurnComplete()
+	if ok {
+		t.Fatal("turn 2 must not inject the anchor")
+	}
+	ok, anchor = g.OnTurnComplete()
+	if !ok {
+		t.Fatal("turn 3 must inject the anchor")
+	}
+
+	for _, want := range []string{
+		"[SYSTEM ANCHOR — TURN 3]",
+		"Whiteboard Drawings 1/3 completed (2 still required",
+		"Quizzes 0/1 completed (1 still required — ask 1 progressive quiz question soon)",
+		"Required Session Milestones (cover in order): 1. warm up; 2. solve one exercise",
+	} {
+		if !strings.Contains(anchor, want) {
+			t.Errorf("anchor missing %q\n---\n%s", want, anchor)
+		}
+	}
+
+	g.RecordCompletedTool(mcp.ToolCreateQuiz, `{}`)
+	if got := g.ActivityProgress(); got.Quizzes != 1 || got.WhiteboardDrawings != 1 {
+		t.Errorf("ActivityProgress = %+v, want the recorded quiz", got)
+	}
 }

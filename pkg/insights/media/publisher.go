@@ -105,6 +105,11 @@ func (p *AudioPublisher) WriteSample(sample media.PCM16Sample) error {
 	return p.track.WriteSample(sample)
 }
 
+// EndSegment is a no-op for a track publisher: a live audio track is a single
+// continuous stream, so there is no segment to close. It exists so AudioPublisher
+// and DataStreamAudioPublisher share one interface.
+func (p *AudioPublisher) EndSegment() {}
+
 // Flush drops queued PCM that has not reached the room yet. Used for barge-in so
 // the agent stops talking the instant a participant speaks. ClearQueue takes the
 // track's own lock, so Flush is safe alongside WriteSample and Close.

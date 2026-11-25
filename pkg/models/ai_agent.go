@@ -27,6 +27,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/insights/mcp"
+	livekitservice "github.com/mynaparrot/plugnmeet-server/pkg/services/livekit"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 )
@@ -74,6 +75,13 @@ const (
 	// in the protocol.
 	aiAgentMaxAllowedParticipantIds = 32
 
+	// Shape limits of the host-supplied activity quotas. They mirror the
+	// uint32.lte=20 and repeated.max_items=16 constraints of activity_rules in
+	// the protocol.
+	aiAgentMaxActivityQuota  = 20
+	maxAIAgentMilestoneItems = 16
+	maxAIAgentMilestoneRunes = 240
+
 	// Shape limits of one external MCP server entry.
 	agentMCPMaxKeyChars         = 64
 	agentMCPMaxURLChars         = 1024
@@ -88,6 +96,11 @@ const (
 	aiAgentCustomProviderMaxEndpoint = 512
 	aiAgentCustomProviderMaxHeader   = 128
 	aiAgentCustomProviderMaxModel    = 128
+
+	// Shape limits of the host-supplied realtime avatar config.
+	aiAgentAvatarMaxProvider = 64
+	aiAgentAvatarMaxID       = 256
+	aiAgentAvatarMaxMinutes  = 240
 
 	// Model defaults of a custom provider, used when the host set no override
 	// and the server config has no ai_agent service for the same provider.
@@ -137,6 +150,9 @@ type aiAgentRoomState struct {
 	StartedAt   int64                         `json:"started_at"`
 	State       plugnmeet.AIAgentRuntimeState `json:"state"`
 	Reason      string                        `json:"reason,omitempty"`
+	// AvatarProvider is set when the session runs a realtime avatar, whose bot
+	// participant has to leave LiveKit with the agent.
+	AvatarProvider string `json:"avatar_provider,omitempty"`
 }
 
 // AIAgentModel owns the AI agent lifecycle of a room: activation, delegate
@@ -150,6 +166,7 @@ type AIAgentModel struct {
 	natsService  *natsservice.NatsService
 	pollModel    *PollModel
 	userModel    *UserModel
+	lk           *livekitservice.LivekitService
 	logger       *logrus.Entry
 
 	// Wired through initializers (see wireCircularModels): RoomModel already
@@ -215,6 +232,7 @@ type AIAgentModelArgs struct {
 	NatsService  *natsservice.NatsService
 	PollModel    *PollModel
 	UserModel    *UserModel
+	Lk           *livekitservice.LivekitService
 	Logger       *logrus.Logger
 }
 
@@ -228,6 +246,7 @@ func NewAIAgentModel(args AIAgentModelArgs) *AIAgentModel {
 		natsService:  args.NatsService,
 		pollModel:    args.PollModel,
 		userModel:    args.UserModel,
+		lk:           args.Lk,
 		logger:       args.Logger.WithField("model", "aiAgent"),
 		stopTimers:   make(map[string]*time.Timer),
 
@@ -465,6 +484,16 @@ func NormalizeAIAgentFeatures(f *plugnmeet.InsightsAIAgentFeatures) *plugnmeet.I
 	out.ForbiddenTopics = cleanAgentList(out.ForbiddenTopics, 160)
 	out.AllowedSubtopics = cleanAgentList(out.AllowedSubtopics, 160, out.ForbiddenTopics...)
 
+	// The required milestones are an ordered agenda, so they are cleaned like
+	// the topic lists while keeping the host's order.
+	if rules := out.GetActivityRules(); rules != nil {
+		milestones := cleanAgentList(rules.GetRequiredMilestones(), maxAIAgentMilestoneRunes)
+		if len(milestones) > maxAIAgentMilestoneItems {
+			milestones = milestones[:maxAIAgentMilestoneItems]
+		}
+		rules.RequiredMilestones = milestones
+	}
+
 	if out.GetVisionDebounceMs() == 0 {
 		out.VisionDebounceMs = aiAgentDefaultVisionDebounceMs
 	}
@@ -501,6 +530,7 @@ func NormalizeAIAgentFeatures(f *plugnmeet.InsightsAIAgentFeatures) *plugnmeet.I
 
 	out.McpServers = NormalizeExternalMCPServers(out.GetMcpServers())
 	out.CustomProvider = NormalizeAIAgentCustomProvider(out.GetCustomProvider())
+	out.Avatar = NormalizeAIAgentAvatarConfig(out.GetAvatar())
 
 	// the session routing config is host input, the rest is runtime state. Only
 	// the fields of the selected mode survive, so a room that switched modes
@@ -707,6 +737,28 @@ func NormalizeAIAgentCustomProvider(in *plugnmeet.InsightsAIAgentCustomProvider)
 	return out
 }
 
+// NormalizeAIAgentAvatarConfig trims the host-supplied realtime avatar config to
+// its documented shape. A disabled avatar is dropped entirely, so an avatar that
+// was turned off never lingers in the room metadata.
+func NormalizeAIAgentAvatarConfig(in *plugnmeet.InsightsAIAgentAvatarConfig) *plugnmeet.InsightsAIAgentAvatarConfig {
+	if in == nil || !in.GetIsEnabled() {
+		return nil
+	}
+
+	out := proto.Clone(in).(*plugnmeet.InsightsAIAgentAvatarConfig)
+	out.Provider = optionalTrimmedString(strings.ToLower(strings.TrimSpace(out.GetProvider())), aiAgentAvatarMaxProvider)
+	out.AvatarId = optionalTrimmedString(out.GetAvatarId(), aiAgentAvatarMaxID)
+	out.ApiKey = optionalTrimmedString(out.GetApiKey(), aiAgentCustomProviderMaxAPIKey)
+	out.Endpoint = optionalTrimmedString(out.GetEndpoint(), aiAgentCustomProviderMaxEndpoint)
+	out.AuthHeader = optionalTrimmedString(out.GetAuthHeader(), aiAgentCustomProviderMaxHeader)
+	if out.GetMaxAvatarMinutes() > aiAgentAvatarMaxMinutes {
+		minutes := uint32(aiAgentAvatarMaxMinutes)
+		out.MaxAvatarMinutes = &minutes
+	}
+
+	return out
+}
+
 // optionalTrimmedString trims and caps an optional string, and returns nil when
 // nothing is left so the proto field is omitted instead of sent empty.
 func optionalTrimmedString(value string, max int) *string {
@@ -805,14 +857,15 @@ func isAllowedAgentCustomProviderAuthHeader(header string) bool {
 // ValidateAIAgentFeatures enforces the activation rules that must hold both when
 // a room is created and when the agent is started manually.
 func (m *AIAgentModel) ValidateAIAgentFeatures(f *plugnmeet.InsightsAIAgentFeatures, e2ee *plugnmeet.EndToEndEncryptionFeatures, insightsAllowed bool) error {
-	return m.validateAIAgentFeatures(f, e2ee, insightsAllowed, false)
+	return m.validateAIAgentFeatures(context.Background(), "", f, e2ee, insightsAllowed, false)
 }
 
 // validateAIAgentFeatures is the shared validator of a room's agent features.
 // hasRoomProvider reports that the room manages its own provider server-side,
 // which is always the case at start time: the credentials are stripped from the
-// metadata during room creation, so they can never be part of f.
-func (m *AIAgentModel) validateAIAgentFeatures(f *plugnmeet.InsightsAIAgentFeatures, e2ee *plugnmeet.EndToEndEncryptionFeatures, insightsAllowed, hasRoomProvider bool) error {
+// metadata during room creation, so they can never be part of f. roomId is the
+// room whose stored credentials a stripped feature set resolves against.
+func (m *AIAgentModel) validateAIAgentFeatures(ctx context.Context, roomId string, f *plugnmeet.InsightsAIAgentFeatures, e2ee *plugnmeet.EndToEndEncryptionFeatures, insightsAllowed, hasRoomProvider bool) error {
 	if f == nil || !f.GetIsAllow() {
 		return config.ErrAIAgentNotAllowed
 	}
@@ -820,7 +873,11 @@ func (m *AIAgentModel) validateAIAgentFeatures(f *plugnmeet.InsightsAIAgentFeatu
 		return config.ErrAIAgentNotAllowed
 	}
 	// A room-managed key is fine (the agent receives the key), a self-inserted
-	// per-device key can never be read by the server.
+	// per-device key can never be read by the server. The avatar is a server-side
+	// media endpoint too, so it is just as unable to read an encrypted stream.
+	if e2ee.GetIsEnabled() && f.GetAvatar().GetIsEnabled() {
+		return config.ErrAIAgentE2EEUnsupported
+	}
 	if e2ee.GetIsEnabled() && e2ee.GetEnabledSelfInsertEncryptionKey() {
 		return config.ErrAIAgentE2EEUnsupported
 	}
@@ -844,11 +901,53 @@ func (m *AIAgentModel) validateAIAgentFeatures(f *plugnmeet.InsightsAIAgentFeatu
 			return config.ErrAIAgentProviderMissing
 		}
 	}
+	// the avatar is either fully resolvable or the room could never show one
+	if f.GetAvatar().GetIsEnabled() {
+		if _, _, _, _, _, _, err := m.resolveAIAgentAvatarConfig(ctx, roomId, f); err != nil {
+			return err
+		}
+	}
 	if err := ValidateExternalMCPServers(f.GetMcpServers()); err != nil {
+		return err
+	}
+	if err := validateAIAgentActivityRules(f); err != nil {
 		return err
 	}
 
 	return ValidateAIAgentSessionMode(f)
+}
+
+// validateAIAgentActivityRules checks the host-supplied mandatory activity
+// quotas: every quota stays inside its documented ceiling, and no quota may ask
+// for a capability the host disabled.
+func validateAIAgentActivityRules(f *plugnmeet.InsightsAIAgentFeatures) error {
+	rules := f.GetActivityRules()
+	if rules == nil {
+		return nil
+	}
+
+	if rules.GetMinWhiteboardDrawings() > aiAgentMaxActivityQuota ||
+		rules.GetMinQuizzes() > aiAgentMaxActivityQuota ||
+		rules.GetMinNotepadEntries() > aiAgentMaxActivityQuota ||
+		rules.GetMinParticipantExercises() > aiAgentMaxActivityQuota ||
+		len(rules.GetRequiredMilestones()) > maxAIAgentMilestoneItems {
+		return config.ErrAIAgentInvalidRequest
+	}
+
+	// A quota the agent could never fulfil would only produce an unreachable
+	// instruction.
+	switch {
+	case rules.GetMinWhiteboardDrawings() > 0 && !f.GetAllowWhiteboardWrite():
+		return config.ErrAIAgentInvalidRequest
+	case rules.GetMinQuizzes() > 0 && !f.GetAllowPolls():
+		return config.ErrAIAgentInvalidRequest
+	case rules.GetMinNotepadEntries() > 0 && !f.GetAllowNotepadWrite():
+		return config.ErrAIAgentInvalidRequest
+	case rules.GetMinParticipantExercises() > 0 && !f.GetAllowWhiteboardWrite() && !f.GetAllowNotepadWrite():
+		return config.ErrAIAgentInvalidRequest
+	}
+
+	return nil
 }
 
 // ValidateAIAgentSessionMode enforces the session routing rules: the mode must be

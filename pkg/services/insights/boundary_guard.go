@@ -1,6 +1,7 @@
 package insightsservice
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -8,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
+	"github.com/mynaparrot/plugnmeet-server/pkg/services/insights/mcp"
 )
 
 const (
@@ -44,6 +46,8 @@ type BoundaryGuard struct {
 	offTopicCount      int
 	consecutiveStrikes int
 	toolScopeLocked    bool
+	// activityProgress counts the mandatory activities completed so far.
+	activityProgress ActivityProgress
 }
 
 func NewBoundaryGuard(cfg BoundaryConfig) *BoundaryGuard {
@@ -75,9 +79,61 @@ func (g *BoundaryGuard) IsToolScopeLocked() bool {
 	return g.toolScopeLocked
 }
 
+// ActivityProgress returns the mandatory activities completed so far.
+func (g *BoundaryGuard) ActivityProgress() ActivityProgress {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.activityProgress
+}
+
+// RecordCompletedTool counts a successfully executed tool towards the host's
+// mandatory activity quotas. A participant exercise counts when the agent hands
+// a workspace surface to the participant.
+func (g *BoundaryGuard) RecordCompletedTool(toolName, argsJSON string) {
+	if !g.cfg.ActivityRules.HasAny() {
+		return
+	}
+
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	switch toolName {
+	case mcp.ToolWhiteboardDrawDiagram, mcp.ToolWhiteboardDrawShapes, mcp.ToolWhiteboardDrawFreehandSVG, mcp.ToolWhiteboardWriteContent:
+		g.activityProgress.WhiteboardDrawings++
+	case mcp.ToolCreateQuiz, mcp.ToolCreatePoll:
+		g.activityProgress.Quizzes++
+	case mcp.ToolNotepadWrite:
+		g.activityProgress.NotepadEntries++
+	case mcp.ToolSetWorkspaceLock:
+		if strings.EqualFold(toolAction(argsJSON), "unlock") {
+			g.activityProgress.ParticipantExercises++
+		}
+	case mcp.ToolWhiteboardManageBoard:
+		if strings.EqualFold(toolAction(argsJSON), "unlock_board") {
+			g.activityProgress.ParticipantExercises++
+		}
+	}
+}
+
+// toolAction extracts the "action" argument of a tool call; an unparsable or
+// action-less payload reports an empty action.
+func toolAction(argsJSON string) string {
+	if strings.TrimSpace(argsJSON) == "" {
+		return ""
+	}
+	var args struct {
+		Action string `json:"action"`
+	}
+	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+		return ""
+	}
+	return args.Action
+}
+
 // OnTurnComplete counts one finished turn and reports whether a Layer 2 anchor is
 // due. A productive turn also decays the strike window, and recovering to zero
-// strikes releases the tool scope lock.
+// strikes releases the tool scope lock. The anchor carries the live progress
+// against the host's mandatory activity quotas.
 func (g *BoundaryGuard) OnTurnComplete() (shouldInjectAnchor bool, anchorText string) {
 	g.mu.Lock()
 	g.turnCount++
@@ -89,12 +145,13 @@ func (g *BoundaryGuard) OnTurnComplete() (shouldInjectAnchor bool, anchorText st
 	}
 	turn := g.turnCount
 	interval := g.cfg.AnchorIntervalTurns
+	progress := g.activityProgress
 	g.mu.Unlock()
 
 	if interval <= 0 || turn%interval != 0 {
 		return false, ""
 	}
-	return true, BuildTopicAnchorMessage(g.cfg, turn)
+	return true, BuildTopicAnchorMessageWithProgress(g.cfg, turn, progress)
 }
 
 // RecordOffTopicAttempt counts an off-topic or jailbreak attempt and returns the

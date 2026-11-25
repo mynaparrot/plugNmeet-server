@@ -126,6 +126,12 @@ type AIAgentSessionTelemetry struct {
 	// ran on, so the platform never bills its tokens. It is empty when the
 	// session used the server's platform provider.
 	CustomProvider string `json:"custom_provider,omitempty"`
+
+	// The realtime avatar of the session, billed per minute of generated video.
+	// An avatar the room brought its own key for is recorded but never priced.
+	AvatarMillis         uint64 `json:"avatar_millis,omitempty"`
+	AvatarProvider       string `json:"avatar_provider,omitempty"`
+	CustomAvatarProvider string `json:"custom_avatar_provider,omitempty"`
 }
 
 // GetAIKnowledgeDocument returns the cached document of rawURL, if any.

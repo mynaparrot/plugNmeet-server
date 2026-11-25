@@ -158,6 +158,26 @@ func (m *AIAgentModel) Start(ctx context.Context, roomId string, req *plugnmeet.
 		log.WithError(err).Debug("could not read the previous ai agent session telemetry")
 	}
 
+	// The avatar is either fully resolvable or the session never gets one: a
+	// half configured provider would only fail once the agent is already live.
+	var avatar *insightsservice.AIAgentAvatarConfig
+	if features.GetAvatar().GetIsEnabled() {
+		provider, avatarID, apiKey, endpoint, authHeader, isCustomAvatar, err := m.resolveAIAgentAvatarConfig(ctx, roomId, features)
+		if err != nil {
+			log.WithError(err).Warn("the ai agent avatar could not be resolved")
+			return err
+		}
+		avatar = &insightsservice.AIAgentAvatarConfig{
+			Provider:   provider,
+			AvatarID:   avatarID,
+			APIKey:     apiKey,
+			Endpoint:   endpoint,
+			AuthHeader: authHeader,
+			IsCustom:   isCustomAvatar,
+			MaxMinutes: features.GetAvatar().GetMaxAvatarMinutes(),
+		}
+	}
+
 	agent, err := insightsservice.NewAIAgent(&insightsservice.AIAgentArgs{
 		Ctx:               m.ctx,
 		AppConf:           m.appConfig,
@@ -177,6 +197,7 @@ func (m *AIAgentModel) Start(ctx context.Context, roomId string, req *plugnmeet.
 		Learner:           learner,
 		SummarizeModel:    m.aiAgentSummarizeModel(serviceConfig),
 		PreviousTelemetry: prevTelemetry,
+		Avatar:            avatar,
 		Delegate: func() (string, error) {
 			return m.SelectOrGetDelegate(m.ctx, roomId)
 		},
@@ -187,6 +208,11 @@ func (m *AIAgentModel) Start(ctx context.Context, roomId string, req *plugnmeet.
 	if err != nil {
 		log.WithError(err).Error("failed to start the ai agent")
 		m.removeAgentParticipant(roomId, agentUserId, displayName)
+		if avatar != nil {
+			// A failed start may already have brought the avatar bot into the
+			// room, and it would keep publishing video on its own.
+			m.removeAgentAvatarTwin(roomId, agentUserId)
+		}
 		return config.ErrAIAgentGeneric
 	}
 	started = true
@@ -234,12 +260,13 @@ func (m *AIAgentModel) Status(ctx context.Context, roomId string) (*plugnmeet.AI
 		Status: true,
 		Msg:    config.MsgSuccess,
 		State: &plugnmeet.AIAgentStateMsg{
-			SessionId:   state.SessionId,
-			AgentUserId: state.AgentUserId,
-			AgentName:   state.AgentName,
-			State:       state.State,
-			StartedAt:   state.StartedAt,
-			Reason:      state.Reason,
+			SessionId:      state.SessionId,
+			AgentUserId:    state.AgentUserId,
+			AgentName:      state.AgentName,
+			State:          state.State,
+			StartedAt:      state.StartedAt,
+			Reason:         state.Reason,
+			AvatarProvider: optionalString(state.AvatarProvider),
 		},
 	}, nil
 }
@@ -319,11 +346,12 @@ func (m *AIAgentModel) HandleWhiteboardScene(ctx context.Context, roomId, userId
 
 func (m *AIAgentModel) storeState(roomId string, agent *insightsservice.AIAgent) {
 	state := &aiAgentRoomState{
-		SessionId:   agent.SessionID(),
-		AgentUserId: agent.AgentUserID(),
-		AgentName:   agent.AgentName(),
-		StartedAt:   time.Now().UnixMilli(),
-		State:       plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING,
+		SessionId:      agent.SessionID(),
+		AgentUserId:    agent.AgentUserID(),
+		AgentName:      agent.AgentName(),
+		StartedAt:      time.Now().UnixMilli(),
+		State:          plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING,
+		AvatarProvider: agent.AvatarProvider(),
 	}
 	encoded, err := json.Marshal(state)
 	if err != nil {
@@ -366,6 +394,9 @@ func (m *AIAgentModel) afterAgentStopped(roomId, reason string) {
 
 	if state, err := m.readState(ctx, roomId); err == nil && state != nil {
 		m.removeAgentParticipant(roomId, state.AgentUserId, state.AgentName)
+		if state.AvatarProvider != "" {
+			m.removeAgentAvatarTwin(roomId, state.AgentUserId)
+		}
 	}
 	m.RestorePreviousPresenter(ctx, roomId)
 	// The external MCP configuration and its warmed tools stay in Redis: a stop
@@ -477,6 +508,27 @@ func (m *AIAgentModel) readState(ctx context.Context, roomId string) (*aiAgentRo
 		return nil, err
 	}
 	return state, nil
+}
+
+// removeAgentAvatarTwin takes the avatar bot out of LiveKit. The bot joins as
+// the agent's native twin, while shutting the room connection of the agent down
+// only disconnects the agent itself: without this the avatar would keep
+// publishing video to a room that no longer has an agent.
+func (m *AIAgentModel) removeAgentAvatarTwin(roomId, agentUserId string) {
+	if m.lk == nil || roomId == "" || agentUserId == "" {
+		return
+	}
+	twinIdentity := config.GetNativeTwinIdentity(agentUserId)
+	if twinIdentity == agentUserId {
+		return
+	}
+	if _, err := m.lk.RemoveParticipant(roomId, twinIdentity); err != nil {
+		m.logger.WithError(err).WithFields(logrus.Fields{
+			"roomId":       roomId,
+			"agentUserId":  agentUserId,
+			"twinIdentity": twinIdentity,
+		}).Debug("could not remove the ai agent avatar from livekit")
+	}
 }
 
 // removeAgentParticipant takes the agent out of the room's participant list.

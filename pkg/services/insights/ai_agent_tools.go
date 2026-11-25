@@ -237,6 +237,10 @@ func (a *AIAgent) handleToolCall(session insights.RealtimeSession, ev insights.R
 			a.logger.WithFields(fields).Warn("ai agent: tool call failed")
 		} else {
 			a.logger.WithFields(fields).Debug("ai agent: tool call completed")
+			// Only a completed call counts towards the mandatory activity quotas.
+			if a.guard != nil {
+				a.guard.RecordCompletedTool(ev.ToolName, ev.ArgsJSON)
+			}
 		}
 
 		target := session

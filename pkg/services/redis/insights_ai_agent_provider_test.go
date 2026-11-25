@@ -2,6 +2,8 @@ package redisservice
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -44,6 +46,73 @@ func TestAIAgentCustomProviderRoundTrip(t *testing.T) {
 	}
 	if stored, err := s.LoadAIAgentCustomProvider(ctx, "room-a"); err != nil || stored != nil {
 		t.Fatalf("stored = %+v (err %v), want it deleted", stored, err)
+	}
+}
+
+func TestAIAgentCustomProviderAvatarKeyRoundTrip(t *testing.T) {
+	s, _ := newMCPTestService(t)
+	ctx := context.Background()
+	ttl := time.Hour
+
+	// an avatar-only room (server-configured LLM provider) still needs its
+	// provider, key, gateway endpoint and auth header
+	avatarOnly := AIAgentCustomProviderConfig{
+		AvatarProvider:   "anam",
+		AvatarAPIKey:     "avatar-secret",
+		AvatarEndpoint:   "https://avatar-gw.example.com",
+		AvatarAuthHeader: "x-avatar-key",
+	}
+	if err := s.SaveAIAgentCustomProvider(ctx, "room-avatar", avatarOnly, ttl); err != nil {
+		t.Fatal(err)
+	}
+	stored, err := s.LoadAIAgentCustomProvider(ctx, "room-avatar")
+	if err != nil || stored == nil || *stored != avatarOnly {
+		t.Fatalf("stored = %+v (err %v), want %+v", stored, err, avatarOnly)
+	}
+	if stored.AvatarProvider != "anam" {
+		t.Errorf("avatar provider = %q, want the stored one", stored.AvatarProvider)
+	}
+	if stored.AvatarEndpoint != "https://avatar-gw.example.com" {
+		t.Errorf("avatar endpoint = %q, want the stored one", stored.AvatarEndpoint)
+	}
+	if stored.AvatarAuthHeader != "x-avatar-key" {
+		t.Errorf("avatar auth header = %q, want the stored one", stored.AvatarAuthHeader)
+	}
+
+	// the avatar provider, key, endpoint and header travel alongside a BYOK
+	// provider in the same room key
+	both := AIAgentCustomProviderConfig{
+		Provider:         "openai",
+		APIKey:           "sk-secret",
+		AvatarProvider:   "beyond_presence",
+		AvatarAPIKey:     "avatar-secret",
+		AvatarEndpoint:   "https://avatar-gw.example.com",
+		AvatarAuthHeader: "Authorization",
+	}
+	if err := s.SaveAIAgentCustomProvider(ctx, "room-both", both, ttl); err != nil {
+		t.Fatal(err)
+	}
+	stored, err = s.LoadAIAgentCustomProvider(ctx, "room-both")
+	if err != nil || stored == nil || *stored != both {
+		t.Fatalf("stored = %+v (err %v), want %+v", stored, err, both)
+	}
+
+	// fields the room does not set are omitted, never sent empty
+	encoded, err := json.Marshal(AIAgentCustomProviderConfig{APIKey: "sk-secret"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{"avatar_api_key", "avatar_provider", "avatar_endpoint", "avatar_auth_header"} {
+		if strings.Contains(string(encoded), field) {
+			t.Errorf("encoded = %s, want %q omitted", encoded, field)
+		}
+	}
+
+	// the 1-on-1 child room inherits it with the rest of the configuration
+	s.CopyAIAgentRoomConfig(ctx, "room-both", "room-both-1", ttl)
+	child, err := s.LoadAIAgentCustomProvider(ctx, "room-both-1")
+	if err != nil || child == nil || *child != both {
+		t.Fatalf("child = %+v (err %v), want %+v", child, err, both)
 	}
 }
 

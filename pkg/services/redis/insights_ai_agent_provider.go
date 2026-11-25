@@ -21,6 +21,13 @@ type AIAgentCustomProviderConfig struct {
 	RealtimeModel   string `json:"realtime_model,omitempty"`
 	DelegationModel string `json:"delegation_model,omitempty"`
 	SummarizeModel  string `json:"summarize_model,omitempty"`
+	// AvatarProvider, AvatarAPIKey, AvatarEndpoint and AvatarAuthHeader belong
+	// to the room's own realtime avatar. They share the key with the LLM
+	// provider because both belong to the room and share its lifetime.
+	AvatarProvider   string `json:"avatar_provider,omitempty"`
+	AvatarAPIKey     string `json:"avatar_api_key,omitempty"`
+	AvatarEndpoint   string `json:"avatar_endpoint,omitempty"`
+	AvatarAuthHeader string `json:"avatar_auth_header,omitempty"`
 }
 
 // aiAgentProviderConfigKey is the room-scoped key of the custom provider. It

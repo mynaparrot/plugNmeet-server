@@ -102,6 +102,10 @@ func (a *AIAgent) handleEvent(session insights.RealtimeSession, ev insights.Real
 		}
 
 	case insights.RealtimeEventTurnComplete:
+		// The utterance is over, so the client is told where the segment ends.
+		if a.publisher != nil {
+			a.publisher.EndSegment()
+		}
 		// A turn that ends while paused must not flip the paused state back.
 		if !a.paused.Load() {
 			a.setState(plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING, "")
@@ -113,6 +117,10 @@ func (a *AIAgent) handleEvent(session insights.RealtimeSession, ev insights.Real
 		}
 
 	case insights.RealtimeEventToolCall:
+		// A tool may take a while and speak afterwards, so the speech before it is closed as its own segment.
+		if a.publisher != nil {
+			a.publisher.EndSegment()
+		}
 		a.handleToolCall(session, ev)
 
 	case insights.RealtimeEventGoAway:

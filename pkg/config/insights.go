@@ -14,6 +14,11 @@ const (
 	ProviderAzure  ProviderType = "azure"
 	ProviderGoogle ProviderType = "google"
 	ProviderOpenAI ProviderType = "openai"
+
+	// avatar providers, consumed by the realtime avatar of the AI agent
+	ProviderAnam           ProviderType = "anam"
+	ProviderBeyondPresence ProviderType = "beyond_presence"
+	ProviderSimli          ProviderType = "simli"
 )
 
 // ModelPricing holds pricing information for a service. The token rates are a
@@ -45,7 +50,8 @@ type ModelPricing struct {
 // InsightsConfig is the main config block for the insights feature.
 type InsightsConfig struct {
 	Enabled bool `yaml:"enabled"`
-	// The key is the provider type ("azure", "google", "openai"), the value is a list of accounts.
+	// The key is the provider type ("azure", "google", "openai", "beyond_presence",
+	// "anam", "simli"), the value is a list of accounts.
 	Providers map[ProviderType][]ProviderAccount      `yaml:"providers"`
 	Services  map[insights.ServiceType]*ServiceConfig `yaml:"services"`
 }
@@ -150,6 +156,28 @@ func (c *InsightsConfig) GetProviderAccountForService(serviceType insights.Servi
 	}
 
 	return nil, nil, fmt.Errorf("account with id '%s' not found for provider '%s'", serviceConfig.ID, serviceConfig.Provider)
+}
+
+// GetProviderAccount returns the first configured account for providerType
+// (or the account matching accountID when non-empty).
+func (c *InsightsConfig) GetProviderAccount(providerType ProviderType, accountID string) (*ProviderAccount, error) {
+	if c == nil {
+		return nil, fmt.Errorf("insights config is not enabled")
+	}
+	accounts, ok := c.Providers[providerType]
+	if !ok || len(accounts) == 0 {
+		return nil, fmt.Errorf("provider '%s' is not defined in config", providerType)
+	}
+	if accountID == "" {
+		return &accounts[0], nil
+	}
+	for i := range accounts {
+		if accounts[i].ID == accountID {
+			return &accounts[i], nil
+		}
+	}
+
+	return nil, fmt.Errorf("account with id '%s' not found for provider '%s'", accountID, providerType)
 }
 
 // GetServiceModelPricing returns the pricing of the first pricing key that is

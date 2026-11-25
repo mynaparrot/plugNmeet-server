@@ -224,6 +224,9 @@ func (a *AIAgent) TelemetrySnapshot(endReason string) redisservice.AIAgentSessio
 		DelegationThinkingOutputTokens:       state.delegationThinkingOutputTokens,
 
 		AudioMillis:          state.audioMillis,
+		AvatarMillis:         a.avatarMillis(),
+		AvatarProvider:       a.avatarProvider,
+		CustomAvatarProvider: a.customAvatarProvider,
 		ToolsUsed:            toolsUsed,
 		Transcript:           transcript,
 		RollingSummary:       state.rollingSummary,
@@ -236,11 +239,34 @@ func (a *AIAgent) TelemetrySnapshot(endReason string) redisservice.AIAgentSessio
 	}
 }
 
+// avatarMillis is the avatar duration billed to the room: the current session
+// so far plus the earlier session of the same room. Without a running avatar it
+// is only what the earlier sessions already used.
+func (a *AIAgent) avatarMillis() uint64 {
+	if a.avatarStartedAt.IsZero() {
+		return a.priorAvatarMillis
+	}
+	elapsed := time.Since(a.avatarStartedAt)
+	if elapsed < 0 {
+		return a.priorAvatarMillis
+	}
+	return a.priorAvatarMillis + uint64(elapsed/time.Millisecond)
+}
+
 // seedStateFromTelemetry continues the session an earlier agent left behind in
 // the same room, so a restart keeps its conversation and its cumulative usage.
 func (a *AIAgent) seedStateFromTelemetry(t *redisservice.AIAgentSessionTelemetry) {
 	if t == nil {
 		return
+	}
+
+	// The avatar duration carries over, so a restart continues the budget of the
+	// room instead of granting a fresh one. An avatar configured for this
+	// session wins over the provider the earlier session recorded.
+	a.priorAvatarMillis = t.AvatarMillis
+	if a.avatarProvider == "" {
+		a.avatarProvider = t.AvatarProvider
+		a.customAvatarProvider = t.CustomAvatarProvider
 	}
 
 	a.stateMu.Lock()
@@ -346,6 +372,8 @@ func (a *AIAgent) logUsage() {
 		"delegationInputTokens":  state.delegationInputTokens,
 		"delegationOutputTokens": state.delegationOutputTokens,
 		"audioMillis":            state.audioMillis,
+		"avatarMillis":           a.avatarMillis(),
+		"avatarProvider":         a.avatarProvider,
 		"durationMs":             time.Since(a.startedAt).Milliseconds(),
 	}).Info("ai agent: session usage")
 }

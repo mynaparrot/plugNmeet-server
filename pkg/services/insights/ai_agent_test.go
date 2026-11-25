@@ -24,10 +24,11 @@ import (
 )
 
 type recordingPublisher struct {
-	mu      sync.Mutex
-	written []byte
-	flushes int
-	closed  bool
+	mu       sync.Mutex
+	written  []byte
+	flushes  int
+	segments int
+	closed   bool
 }
 
 func (p *recordingPublisher) Write(data []byte) (int, error) {
@@ -35,6 +36,14 @@ func (p *recordingPublisher) Write(data []byte) (int, error) {
 	defer p.mu.Unlock()
 	p.written = append(p.written, data...)
 	return len(data), nil
+}
+
+// EndSegment records how often the agent closed an utterance, so the tests can
+// assert that a turn boundary reaches the publisher.
+func (p *recordingPublisher) EndSegment() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.segments++
 }
 
 func (p *recordingPublisher) Flush() {
@@ -53,6 +62,12 @@ func (p *recordingPublisher) snapshot() (written []byte, flushes int) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return append([]byte(nil), p.written...), p.flushes
+}
+
+func (p *recordingPublisher) segmentCount() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.segments
 }
 
 type recordingTransport struct {
@@ -82,6 +97,15 @@ func (t *recordingTransport) lastState() plugnmeet.AIAgentRuntimeState {
 		return plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_UNSPECIFIED
 	}
 	return t.states[len(t.states)-1].GetState()
+}
+
+func (t *recordingTransport) lastStateMsg() *plugnmeet.AIAgentStateMsg {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if len(t.states) == 0 {
+		return nil
+	}
+	return t.states[len(t.states)-1]
 }
 
 func (t *recordingTransport) toolCalls() []*plugnmeet.AIAgentToolCallMsg {
@@ -999,4 +1023,111 @@ func TestAIAgentResumesPreviousSession(t *testing.T) {
 		}
 		return false
 	}, "reconnect handoff injected on start")
+}
+
+// A turn boundary is where one agent utterance ends, so the publisher has to be
+// told: a datastream client can only tell two utterances apart by that.
+func TestAIAgentEndsAudioSegmentAtTurnComplete(t *testing.T) {
+	env := newAgentTestEnv(t, nil, nil)
+
+	env.session.Push(insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete})
+
+	waitFor(t, func() bool {
+		return env.publisher.segmentCount() == 1
+	}, "the audio segment ended on turn complete")
+}
+
+// A tool call pauses the speech that preceded it, so it closes the segment
+// before the tool runs.
+func TestAIAgentEndsAudioSegmentBeforeToolCall(t *testing.T) {
+	registry := mcp.NewRegistry()
+	registry.Register(echoTool("whiteboard_write_content"))
+	env := newAgentTestEnv(t, registry, nil)
+
+	env.session.Push(insights.RealtimeEvent{
+		Type:     insights.RealtimeEventToolCall,
+		CallID:   "call-segment",
+		ToolName: "whiteboard_write_content",
+		ArgsJSON: `{}`,
+	})
+
+	waitFor(t, func() bool {
+		return len(env.session.ToolResults()) == 1
+	}, "tool result sent")
+	if got := env.publisher.segmentCount(); got != 1 {
+		t.Fatalf("segment ends = %d, want the segment closed before the tool ran", got)
+	}
+}
+
+// The avatar provider reaches the browser, so the session pill can show which
+// avatar is talking.
+func TestAIAgentReportsAvatarProvider(t *testing.T) {
+	env := newAgentTestEnv(t, nil, func(args *aiAgentCoreArgs) {
+		args.Avatar = &AIAgentAvatarConfig{
+			Provider: config.ProviderAnam,
+			AvatarID: "avatar-1",
+		}
+	})
+
+	if got := env.agent.Status().GetState().GetAvatarProvider(); got != string(config.ProviderAnam) {
+		t.Fatalf("status avatar provider = %q, want %q", got, config.ProviderAnam)
+	}
+	waitFor(t, func() bool {
+		return env.transport.lastStateMsg().GetAvatarProvider() == string(config.ProviderAnam)
+	}, "the avatar provider was broadcast")
+
+	// without an avatar the optional field stays absent
+	plain := newAgentTestEnv(t, nil, nil)
+	if got := plain.agent.Status().GetState().GetAvatarProvider(); got != "" {
+		t.Fatalf("status avatar provider = %q, want it empty without an avatar", got)
+	}
+	if plain.agent.Status().GetState().AvatarProvider != nil {
+		t.Fatal("the avatar provider must stay unset without an avatar")
+	}
+}
+
+// The avatar budget is spent across restarts of the same room, and the duration
+// it burned reaches the telemetry with the provider that served it.
+func TestAIAgentAvatarBudgetStopsSession(t *testing.T) {
+	mr := miniredis.RunT(t)
+	ttl := time.Hour
+	store := redisservice.New(redisservice.Args{
+		Ctx:    context.Background(),
+		Rc:     redis.NewClient(&redis.Options{Addr: mr.Addr()}),
+		App:    &config.AppConfig{RedisInfo: connections.RedisInfo{DefaultTTL: &ttl}},
+		Logger: logrus.New(),
+	})
+
+	// The earlier session already spent almost the whole minute, so this one has
+	// a couple of hundred milliseconds left.
+	previous := &redisservice.AIAgentSessionTelemetry{SessionID: "session-0", AvatarMillis: 59800}
+
+	env := newAgentTestEnv(t, nil, func(args *aiAgentCoreArgs) {
+		args.RedisService = store
+		args.PreviousTelemetry = previous
+		args.Avatar = &AIAgentAvatarConfig{
+			Provider:   config.ProviderBeyondPresence,
+			AvatarID:   "avatar-1",
+			IsCustom:   true,
+			MaxMinutes: 1,
+		}
+	})
+
+	var saved *redisservice.AIAgentSessionTelemetry
+	waitFor(t, func() bool {
+		telemetry, err := store.GetAIAgentSessionTelemetry(context.Background(), env.agent.RoomID())
+		if err != nil || telemetry == nil {
+			return false
+		}
+		saved = telemetry
+		return telemetry.EndReason == "budget"
+	}, "the avatar budget stopped the session")
+
+	if saved.AvatarMillis < 59800 {
+		t.Errorf("avatar_millis = %d, want the earlier session's duration continued", saved.AvatarMillis)
+	}
+	if saved.AvatarProvider != string(config.ProviderBeyondPresence) || saved.CustomAvatarProvider != string(config.ProviderBeyondPresence) {
+		t.Errorf("avatar providers = (%q, %q), want the custom beyond_presence avatar",
+			saved.AvatarProvider, saved.CustomAvatarProvider)
+	}
 }

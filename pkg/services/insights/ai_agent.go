@@ -10,6 +10,8 @@ import (
 
 	"github.com/google/uuid"
 	mediasdk "github.com/livekit/media-sdk"
+	lksdk "github.com/livekit/server-sdk-go/v2"
+	"github.com/mynaparrot/plugnmeet-protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -18,6 +20,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	insightsmedia "github.com/mynaparrot/plugnmeet-server/pkg/insights/media"
+	avatarservice "github.com/mynaparrot/plugnmeet-server/pkg/insights/providers/avatar"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/insights/mcp"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
@@ -67,8 +70,11 @@ type AIAgentTransport interface {
 }
 
 // audioPublisher is the subset of media.AudioPublisher the agent needs.
+// EndSegment closes the current utterance of audio: a datastream publisher
+// streams one segment per turn, while a published track has nothing to close.
 type audioPublisher interface {
 	Write(data []byte) (int, error)
+	EndSegment()
 	Flush()
 	Close()
 }
@@ -216,6 +222,23 @@ type AIAgent struct {
 	// usage has no platform cost; empty for the platform provider.
 	customProvider string
 
+	// The realtime avatar publishing the lip-synced video of the agent. The
+	// provider bot joins the room as the agent's native twin, so the agent audio
+	// reaches it as a datastream instead of a published track.
+	avatarSession avatarservice.Session
+	// avatarProvider names the avatar provider of the session and
+	// customAvatarProvider the same name when the room brought its own key,
+	// which the platform never prices. Both are empty without an avatar.
+	avatarProvider       string
+	customAvatarProvider string
+	// maxAvatar is the avatar budget of the session, zero when unlimited.
+	maxAvatar       time.Duration
+	avatarTimer     *time.Timer
+	avatarStartedAt time.Time
+	// priorAvatarMillis is the avatar duration of the earlier session of the
+	// room, so a restart continues the budget instead of resetting it.
+	priorAvatarMillis uint64
+
 	inAudio chan mediasdk.PCM16Sample
 
 	sessionMu  sync.RWMutex
@@ -308,6 +331,27 @@ type AIAgentArgs struct {
 	// PreviousTelemetry is the room's earlier session. A restart in the same
 	// room continues its conversation and its token usage instead of wiping them.
 	PreviousTelemetry *redisservice.AIAgentSessionTelemetry
+	// Avatar is the realtime avatar of the session; nil when the session runs
+	// without one.
+	Avatar *AIAgentAvatarConfig
+}
+
+// AIAgentAvatarConfig is everything needed to start the realtime avatar of a
+// session. The provider bot joins the room of the agent and publishes the
+// lip-synced video of AvatarID while the agent audio reaches it as a stream.
+type AIAgentAvatarConfig struct {
+	Provider config.ProviderType
+	AvatarID string
+	APIKey   string
+	Endpoint string
+	// AuthHeader is the optional header name that carries the API key; empty
+	// keeps the provider's own default header.
+	AuthHeader string
+	IsCustom   bool
+	MaxMinutes uint32
+	// StartFunc overrides how the avatar session is started; nil uses
+	// avatar.StartSession. Tests inject a fake provider through it.
+	StartFunc func(ctx context.Context, cfg avatarservice.StartConfig) (avatarservice.Session, error)
 }
 
 // aiAgentCoreArgs is everything the agent needs that does not depend on a
@@ -338,6 +382,9 @@ type aiAgentCoreArgs struct {
 	SummarizeWindow int
 	// PreviousTelemetry continues an earlier session of the same room.
 	PreviousTelemetry *redisservice.AIAgentSessionTelemetry
+	// Avatar configures the realtime avatar of the session; nil runs the agent
+	// without one, publishing its voice as a track.
+	Avatar *AIAgentAvatarConfig
 }
 
 // NewAIAgent connects a realtime provider session plus a visible LiveKit
@@ -427,6 +474,7 @@ func NewAIAgent(args *AIAgentArgs) (*AIAgent, error) {
 		Summarize:         summarize,
 		SummarizeWindow:   args.ServiceConfig.GetIntOption("context_window", defaultAISummarizeWindow),
 		PreviousTelemetry: args.PreviousTelemetry,
+		Avatar:            args.Avatar,
 	})
 	if err != nil {
 		_ = session.Close()
@@ -458,11 +506,11 @@ func NewAIAgent(args *AIAgentArgs) (*AIAgent, error) {
 		return nil, fmt.Errorf("ai agent: failed to join the room: %w", err)
 	}
 
-	publisher, err := insightsmedia.NewAudioPublisher(roomAgent.Room, aiAgentTrackName, insightsmedia.DefaultOutputSampleRate24k, 1, payload.RoomE2EEKey)
+	publisher, err := startAgentAudioPublisher(args, agent, roomAgent.Room, displayName)
 	if err != nil {
 		roomAgent.Shutdown()
 		agent.close()
-		return nil, fmt.Errorf("ai agent: failed to publish the voice track: %w", err)
+		return nil, err
 	}
 
 	agent.roomAgent = roomAgent
@@ -476,6 +524,68 @@ func NewAIAgent(args *AIAgentArgs) (*AIAgent, error) {
 	}()
 
 	return agent, nil
+}
+
+// startAgentAudioPublisher opens the way the agent voice reaches the room.
+// Without an avatar the agent publishes a normal microphone track. With one, the avatar provider owns the video:
+// its bot joins the room as the agent's native twin, and the agent audio is streamed to that participant instead of being
+// published, so the lip-sync follows the agent's own speech.
+func startAgentAudioPublisher(args *AIAgentArgs, agent *AIAgent, room *lksdk.Room, displayName string) (audioPublisher, error) {
+	if args.Avatar == nil || args.Avatar.Provider == "" {
+		publisher, err := insightsmedia.NewAudioPublisher(room, aiAgentTrackName, insightsmedia.DefaultOutputSampleRate24k, 1, args.Payload.RoomE2EEKey)
+		if err != nil {
+			return nil, fmt.Errorf("ai agent: failed to publish the voice track: %w", err)
+		}
+		return publisher, nil
+	}
+
+	// The twin joins with its own token, minted after the agent itself is
+	// connected: the twin is what the audio stream is addressed to.
+	twinIdentity := config.GetNativeTwinIdentity(agent.agentUserId)
+	twinClaims := &plugnmeet.PlugNmeetTokenClaims{
+		RoomId:  args.Payload.RoomId,
+		Name:    displayName,
+		UserId:  twinIdentity,
+		IsAdmin: true,
+	}
+	// The twin has to outlive the session, else the avatar drops mid-lesson
+	// while the agent keeps talking.
+	validity := time.Duration(args.Features.GetMaxSessionSeconds())*time.Second + 10*time.Minute
+	if validity < time.Hour {
+		validity = time.Hour
+	}
+	twinToken, err := auth.GenerateLivekitAccessToken(args.AppConf.LivekitInfo.ApiKey, args.AppConf.LivekitInfo.Secret, validity, twinClaims, true, true, agent.agentUserId)
+	if err != nil {
+		return nil, fmt.Errorf("ai agent: failed to mint the avatar participant token: %w", err)
+	}
+
+	startFn := args.Avatar.StartFunc
+	if startFn == nil {
+		startFn = avatarservice.StartSession
+	}
+	avatarSession, err := startFn(agent.ctx, avatarservice.StartConfig{
+		Provider:     args.Avatar.Provider,
+		APIKey:       args.Avatar.APIKey,
+		AvatarID:     args.Avatar.AvatarID,
+		Endpoint:     args.Avatar.Endpoint,
+		AuthHeader:   args.Avatar.AuthHeader,
+		LiveKitURL:   args.AppConf.LivekitInfo.Host,
+		LiveKitToken: twinToken,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("ai agent: failed to start the avatar: %w", err)
+	}
+
+	publisher, err := insightsmedia.NewDataStreamAudioPublisher(room, twinIdentity, avatarSession.SampleRate())
+	if err != nil {
+		_ = avatarSession.Close(context.Background())
+		return nil, fmt.Errorf("ai agent: failed to stream the voice to the avatar: %w", err)
+	}
+
+	agent.avatarSession = avatarSession
+	agent.avatarStartedAt = time.Now()
+
+	return publisher, nil
 }
 
 // newAIAgent builds the provider- and LiveKit-independent runtime.
@@ -554,6 +664,18 @@ func newAIAgent(args *aiAgentCoreArgs) (*AIAgent, error) {
 	if agent.summarizeWindow <= 0 {
 		agent.summarizeWindow = defaultAISummarizeWindow
 	}
+	// An avatar is billed and budgeted from the moment the session starts, so a
+	// caller that builds the core directly tracks its duration too.
+	if args.Avatar != nil && args.Avatar.Provider != "" {
+		agent.avatarProvider = string(args.Avatar.Provider)
+		if args.Avatar.IsCustom {
+			agent.customAvatarProvider = string(args.Avatar.Provider)
+		}
+		if args.Avatar.MaxMinutes > 0 {
+			agent.maxAvatar = time.Duration(args.Avatar.MaxMinutes) * time.Minute
+		}
+		agent.avatarStartedAt = agent.startedAt
+	}
 	// A restart in the same room continues the earlier session, so the opening
 	// telemetry flush carries its usage and conversation instead of zeroes.
 	if prev := args.PreviousTelemetry; prev != nil {
@@ -570,6 +692,15 @@ func newAIAgent(args *aiAgentCoreArgs) (*AIAgent, error) {
 	})
 
 	return agent, nil
+}
+
+// optionalNonEmptyString converts an empty string into a nil pointer, so an
+// optional proto field stays absent instead of serialized as empty.
+func optionalNonEmptyString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }
 
 // RoomID returns the room this agent serves.
@@ -659,6 +790,20 @@ func (a *AIAgent) Start() {
 				a.Stop("budget")
 			})
 		}
+		// The avatar is billed separately and may have less left than the
+		// session itself, so it gets its own budget.
+		if a.maxAvatar > 0 {
+			remaining := a.maxAvatar - time.Duration(a.priorAvatarMillis)*time.Millisecond
+			if remaining <= 0 {
+				a.logger.Info("ai agent: avatar budget reached")
+				a.Stop("budget")
+				return
+			}
+			a.avatarTimer = time.AfterFunc(remaining, func() {
+				a.logger.Info("ai agent: avatar budget reached")
+				a.Stop("budget")
+			})
+		}
 		a.setState(plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING, "")
 	})
 }
@@ -671,6 +816,9 @@ func (a *AIAgent) Stop(reason string) {
 
 		if a.sessionTimer != nil {
 			a.sessionTimer.Stop()
+		}
+		if a.avatarTimer != nil {
+			a.avatarTimer.Stop()
 		}
 		// No summary may join after this point, and the cancelled context ends the
 		// one still running.
@@ -690,6 +838,11 @@ func (a *AIAgent) Stop(reason string) {
 		}
 		if a.publisher != nil {
 			a.publisher.Close()
+		}
+		// The avatar bot leaves with its own session; the shutdown of the room
+		// connection above only disconnects the agent itself.
+		if a.avatarSession != nil {
+			_ = a.avatarSession.Close(context.Background())
 		}
 
 		// Waiters get context.Canceled from the cancelled context.
@@ -739,7 +892,7 @@ func (a *AIAgent) Resume() error {
 		return nil
 	}
 	a.setState(plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING, "")
-	return a.sendContextText(BuildTopicAnchorMessage(a.boundary, a.guard.TurnCount()))
+	return a.sendContextText(BuildTopicAnchorMessageWithProgress(a.boundary, a.guard.TurnCount(), a.guard.ActivityProgress()))
 }
 
 // Status reports the current runtime state of the agent.
@@ -760,9 +913,13 @@ func (a *AIAgent) Status() *plugnmeet.AIAgentStatusRes {
 			ToolInProgress: snapshot.tool,
 			StartedAt:      a.startedAt.UnixMilli(),
 			Reason:         snapshot.reason,
+			AvatarProvider: optionalNonEmptyString(a.avatarProvider),
 		},
 	}
 }
+
+// AvatarProvider returns the avatar provider of the session, empty without one.
+func (a *AIAgent) AvatarProvider() string { return a.avatarProvider }
 
 func (a *AIAgent) markSpeaking() {
 	a.stateMu.Lock()
@@ -868,6 +1025,7 @@ func (a *AIAgent) broadcast(snapshot aiAgentRuntimeState) {
 		ToolInProgress: snapshot.tool,
 		StartedAt:      a.startedAt.UnixMilli(),
 		Reason:         snapshot.reason,
+		AvatarProvider: optionalNonEmptyString(a.avatarProvider),
 	})
 	if err != nil {
 		a.logger.WithError(err).Debug("ai agent: failed to broadcast the agent state")

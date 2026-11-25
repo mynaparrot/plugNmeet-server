@@ -40,26 +40,48 @@ func (m *AIAgentModel) PrepareRoomCustomProvider(ctx context.Context, roomId str
 	}
 
 	custom := NormalizeAIAgentCustomProvider(agentFeatures.GetCustomProvider())
-	// Credentials never travel with the metadata, so they cannot leak through
-	// NATS to the browsers; they are only accepted while creating the room.
+	avatar := agentFeatures.GetAvatar()
+	var avatarProvider, avatarAPIKey, avatarEndpoint, avatarAuthHeader string
+	if avatar != nil {
+		avatarProvider = strings.ToLower(strings.TrimSpace(avatar.GetProvider()))
+		avatarAPIKey = strings.TrimSpace(avatar.GetApiKey())
+		avatarEndpoint = strings.TrimSpace(avatar.GetEndpoint())
+		avatarAuthHeader = strings.TrimSpace(avatar.GetAuthHeader())
+	}
+	// Credentials and gateway overrides never travel with the metadata, so they
+	// cannot leak through NATS to the browsers; they are only accepted while
+	// creating the room.
 	agentFeatures.CustomProvider = nil
+	if agentFeatures.Avatar != nil {
+		agentFeatures.Avatar.ApiKey = nil
+		agentFeatures.Avatar.Endpoint = nil
+		agentFeatures.Avatar.AuthHeader = nil
+	}
 
-	if custom == nil {
+	if custom == nil && avatarAPIKey == "" && avatarProvider == "" && avatarEndpoint == "" && avatarAuthHeader == "" {
 		if err := m.redisService.DeleteAIAgentCustomProvider(ctx, roomId); err != nil {
 			m.logger.WithError(err).WithField("room_id", roomId).Debug("the stale custom ai provider configuration could not be removed")
 		}
 		return
 	}
 
-	err := m.redisService.SaveAIAgentCustomProvider(ctx, roomId, redisservice.AIAgentCustomProviderConfig{
-		Provider:        custom.GetProvider(),
-		APIKey:          custom.GetApiKey(),
-		Endpoint:        custom.GetEndpoint(),
-		AuthHeader:      custom.GetAuthHeader(),
-		RealtimeModel:   custom.GetRealtimeModel(),
-		DelegationModel: custom.GetDelegationModel(),
-		SummarizeModel:  custom.GetSummarizeModel(),
-	}, aiAgentCustomProviderTTL(agentFeatures.GetMaxSessionSeconds()))
+	cfg := redisservice.AIAgentCustomProviderConfig{
+		AvatarProvider:   avatarProvider,
+		AvatarAPIKey:     avatarAPIKey,
+		AvatarEndpoint:   avatarEndpoint,
+		AvatarAuthHeader: avatarAuthHeader,
+	}
+	if custom != nil {
+		cfg.Provider = custom.GetProvider()
+		cfg.APIKey = custom.GetApiKey()
+		cfg.Endpoint = custom.GetEndpoint()
+		cfg.AuthHeader = custom.GetAuthHeader()
+		cfg.RealtimeModel = custom.GetRealtimeModel()
+		cfg.DelegationModel = custom.GetDelegationModel()
+		cfg.SummarizeModel = custom.GetSummarizeModel()
+	}
+
+	err := m.redisService.SaveAIAgentCustomProvider(ctx, roomId, cfg, aiAgentCustomProviderTTL(agentFeatures.GetMaxSessionSeconds()))
 	if err != nil {
 		m.logger.WithError(err).WithField("room_id", roomId).Warn("the custom ai provider configuration could not be stored")
 	}
@@ -71,7 +93,7 @@ func (m *AIAgentModel) PrepareRoomCustomProvider(ctx context.Context, roomId str
 // in Redis only, so a stored provider stands in for the server-configured
 // ai_agent service; without one the service is still required.
 func (m *AIAgentModel) ValidateRoomAIAgentFeatures(ctx context.Context, roomId string, f *plugnmeet.InsightsAIAgentFeatures, e2ee *plugnmeet.EndToEndEncryptionFeatures, insightsAllowed bool) error {
-	return m.validateAIAgentFeatures(f, e2ee, insightsAllowed, m.loadRoomCustomProvider(ctx, roomId) != nil)
+	return m.validateAIAgentFeatures(ctx, roomId, f, e2ee, insightsAllowed, m.loadRoomCustomProvider(ctx, roomId) != nil)
 }
 
 // resolveAIAgentProvider resolves the provider of a room: the host's own
@@ -118,6 +140,195 @@ func (m *AIAgentModel) loadRoomCustomProvider(ctx context.Context, roomId string
 	}
 
 	return parent
+}
+
+// aiAgentStoredAvatarConfig is the avatar part of a room's stored provider
+// configuration: the provider, its key, and the gateway endpoint and header the
+// key travels in when the room brought its own.
+type aiAgentStoredAvatarConfig struct {
+	Provider   string
+	APIKey     string
+	Endpoint   string
+	AuthHeader string
+}
+
+// isEmpty reports that the room stored no avatar configuration of its own.
+func (c aiAgentStoredAvatarConfig) isEmpty() bool {
+	return c.Provider == "" && c.APIKey == "" && c.Endpoint == "" && c.AuthHeader == ""
+}
+
+// storedAvatarConfig returns the normalized avatar part of a stored provider
+// configuration.
+func storedAvatarConfig(custom *redisservice.AIAgentCustomProviderConfig) aiAgentStoredAvatarConfig {
+	if custom == nil {
+		return aiAgentStoredAvatarConfig{}
+	}
+
+	return aiAgentStoredAvatarConfig{
+		Provider:   strings.ToLower(strings.TrimSpace(custom.AvatarProvider)),
+		APIKey:     strings.TrimSpace(custom.AvatarAPIKey),
+		Endpoint:   strings.TrimSpace(custom.AvatarEndpoint),
+		AuthHeader: strings.TrimSpace(custom.AvatarAuthHeader),
+	}
+}
+
+// loadRoomCustomAvatarConfig returns the avatar configuration the room brought
+// itself, or the one of its parent room when the room is a 1-on-1 breakout
+// session. It is empty when the room has no own avatar.
+func (m *AIAgentModel) loadRoomCustomAvatarConfig(ctx context.Context, roomId string) aiAgentStoredAvatarConfig {
+	if roomId == "" {
+		return aiAgentStoredAvatarConfig{}
+	}
+
+	// a room may store the avatar configuration without an LLM provider, so it
+	// is read independently of the provider one
+	if custom := storedAvatarConfig(m.loadRoomCustomAvatarConfigFor(ctx, roomId)); !custom.isEmpty() {
+		return custom
+	}
+
+	parentRoomId := m.parentRoomID(roomId)
+	if parentRoomId == "" {
+		return aiAgentStoredAvatarConfig{}
+	}
+
+	return storedAvatarConfig(m.loadRoomCustomAvatarConfigFor(ctx, parentRoomId))
+}
+
+// loadRoomCustomAvatarConfigFor reads the stored provider configuration of a
+// single room, logging a lookup failure as a warning.
+func (m *AIAgentModel) loadRoomCustomAvatarConfigFor(ctx context.Context, roomId string) *redisservice.AIAgentCustomProviderConfig {
+	custom, err := m.redisService.LoadAIAgentCustomProvider(ctx, roomId)
+	if err != nil {
+		m.logger.WithError(err).WithField("room_id", roomId).Warn("could not read the custom avatar configuration")
+		return nil
+	}
+
+	return custom
+}
+
+// resolveAIAgentAvatarConfig resolves the realtime avatar of a room from the
+// request, the room's stored configuration and the server configuration.
+// isCustom reports that the key belongs to the room instead of the server
+// account.
+func (m *AIAgentModel) resolveAIAgentAvatarConfig(ctx context.Context, roomId string, f *plugnmeet.InsightsAIAgentFeatures) (provider config.ProviderType, avatarID, apiKey, endpoint, authHeader string, isCustom bool, err error) {
+	avatar := f.GetAvatar()
+	if avatar == nil || !avatar.GetIsEnabled() {
+		return "", "", "", "", "", false, config.ErrAIAgentInvalidRequest
+	}
+
+	serviceCfg := m.aiAgentServiceConfig()
+	// A room that already exists keeps its avatar provider and credentials in
+	// Redis only. The lookup is lazy so a request that carries everything never
+	// touches Redis.
+	var stored aiAgentStoredAvatarConfig
+	storedLoaded := false
+	loadStored := func() aiAgentStoredAvatarConfig {
+		if !storedLoaded {
+			stored = m.loadRoomCustomAvatarConfig(ctx, roomId)
+			storedLoaded = true
+		}
+		return stored
+	}
+
+	requestedProvider := strings.ToLower(strings.TrimSpace(avatar.GetProvider()))
+	if requestedProvider == "" {
+		requestedProvider = loadStored().Provider
+	}
+	provider = config.ProviderType(requestedProvider)
+	if provider == "" && serviceCfg != nil {
+		provider = config.ProviderType(strings.ToLower(strings.TrimSpace(serviceCfg.GetOptionsString("avatar_provider", ""))))
+	}
+	if !isAllowedAIAgentAvatarProvider(provider) {
+		return "", "", "", "", "", false, config.ErrAIAgentInvalidRequest
+	}
+
+	var account *config.ProviderAccount
+	if m.appConfig != nil && m.appConfig.Insights != nil {
+		accountID := ""
+		if serviceCfg != nil {
+			accountID = strings.TrimSpace(serviceCfg.GetOptionsString("avatar_account_id", ""))
+		}
+		// the room may run the avatar without any configured account
+		account, _ = m.appConfig.Insights.GetProviderAccount(provider, accountID)
+	}
+
+	avatarID = strings.TrimSpace(avatar.GetAvatarId())
+	if avatarID == "" && serviceCfg != nil {
+		avatarID = strings.TrimSpace(serviceCfg.GetOptionsString("avatar_id", ""))
+	}
+	if avatarID == "" && account != nil {
+		avatarID = strings.TrimSpace(account.GetOptionsString("avatar_id", ""))
+	}
+	if avatarID == "" {
+		return "", "", "", "", "", false, config.ErrAIAgentInvalidRequest
+	}
+
+	// At creation time the key is still part of the request; afterwards it lives
+	// in Redis only, because the metadata is stripped before it is published.
+	apiKey = strings.TrimSpace(avatar.GetApiKey())
+	if apiKey == "" {
+		apiKey = loadStored().APIKey
+	}
+	isCustom = apiKey != ""
+	if apiKey == "" && account != nil {
+		apiKey = strings.TrimSpace(account.Credentials.APIKey)
+	}
+	if apiKey == "" || strings.ContainsAny(apiKey, "\r\n") {
+		return "", "", "", "", "", false, config.ErrAIAgentInvalidRequest
+	}
+
+	// The gateway endpoint and the header that carries the key follow the same
+	// fallback order as the rest: the request, then the room's stored
+	// configuration, then the server account. Both are validated because a
+	// stored value could predate a stricter rule.
+	endpoint = strings.TrimSpace(avatar.GetEndpoint())
+	if endpoint == "" {
+		endpoint = loadStored().Endpoint
+	}
+	if endpoint == "" && account != nil {
+		endpoint = strings.TrimSpace(account.GetOptionsString("endpoint", ""))
+	}
+	if endpoint != "" && !isAllowedAgentCustomProviderEndpoint(endpoint) {
+		return "", "", "", "", "", false, config.ErrAIAgentInvalidRequest
+	}
+
+	authHeader = strings.TrimSpace(avatar.GetAuthHeader())
+	if authHeader == "" {
+		authHeader = loadStored().AuthHeader
+	}
+	if authHeader == "" && account != nil {
+		authHeader = strings.TrimSpace(account.GetOptionsString("auth_header", ""))
+	}
+	if authHeader != "" && !isAllowedAgentCustomProviderAuthHeader(authHeader) {
+		return "", "", "", "", "", false, config.ErrAIAgentInvalidRequest
+	}
+
+	return provider, avatarID, apiKey, endpoint, authHeader, isCustom, nil
+}
+
+// aiAgentServiceConfig returns the server-configured ai_agent service, and nil
+// when the server runs the AI agent with a room-supplied provider only.
+func (m *AIAgentModel) aiAgentServiceConfig() *config.ServiceConfig {
+	if m.appConfig == nil || m.appConfig.Insights == nil {
+		return nil
+	}
+	_, serviceCfg, err := m.appConfig.Insights.GetProviderAccountForService(insights.ServiceTypeAIAgent)
+	if err != nil {
+		return nil
+	}
+
+	return serviceCfg
+}
+
+// isAllowedAIAgentAvatarProvider reports whether the avatar provider is one the
+// server can drive.
+func isAllowedAIAgentAvatarProvider(provider config.ProviderType) bool {
+	switch provider {
+	case config.ProviderBeyondPresence, config.ProviderAnam, config.ProviderSimli:
+		return true
+	}
+
+	return false
 }
 
 // parentRoomID returns the plain room id of a breakout room's parent, and "" for

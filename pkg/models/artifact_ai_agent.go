@@ -55,6 +55,9 @@ func (m *ArtifactModel) CreateAIAgentSessionSummaryArtifact(roomTableId uint64, 
 	// the written JSON and the returned summary both carry the separated usage
 	// of this learner's session
 	summary.Usage = m.buildAIAgentSessionUsages(telemetry, summaryPromptTokens, summaryCompletionTokens, summarizeModel, log)
+	// The realtime avatar is a duration, not a token role, so it is kept apart
+	// from the token usage of the summary.
+	summary.AvatarUsage = m.buildAIAgentAvatarDurationUsage(telemetry, log)
 
 	content, err := marshalAIAgentSessionSummary(summary)
 	if err != nil {
@@ -90,6 +93,16 @@ func (m *ArtifactModel) CreateAIAgentSessionSummaryArtifact(roomTableId uint64, 
 
 	if _, err = m.createAndSaveArtifact(ownerRoomId, ownerRoomSid, ownerTableId, plugnmeet.RoomArtifactType_AI_AGENT_USAGE, usageMetadata, true, log); err != nil {
 		log.WithError(err).Error("failed to create the ai agent usage artifact")
+	}
+
+	// The avatar of the session is billed per minute of generated video, so it
+	// gets its own duration usage artifact instead of a token role.
+	if avatarMetadata := m.buildAIAgentAvatarUsageMetadata(telemetry, &fileArtifact.ArtifactId, log); avatarMetadata != nil {
+		avatarMetadata.UserInfo = fileMetadata.UserInfo
+		m.setUsageArtifactProvenance(avatarMetadata, roomInfo.ID, isBreakout)
+		if _, err = m.createAndSaveArtifact(ownerRoomId, ownerRoomSid, ownerTableId, plugnmeet.RoomArtifactType_AI_AGENT_AVATAR_USAGE, avatarMetadata, true, log); err != nil {
+			log.WithError(err).Error("failed to create the ai agent avatar usage artifact")
+		}
 	}
 
 	return fileArtifact, nil
@@ -136,6 +149,9 @@ const (
 	// own provider and therefore carries no platform cost. The provider name is
 	// appended, so billing can tell which provider served the session.
 	aiAgentUsageKeyCustomProviderPrefix = "custom_provider_"
+	// aiAgentUsageKeyCustomAvatarProviderPrefix does the same for an avatar the
+	// room brought its own key for: the duration is recorded, never priced.
+	aiAgentUsageKeyCustomAvatarProviderPrefix = "custom_avatar_provider_"
 )
 
 // aiAgentUsesCustomProvider reports whether the session ran on the host's own
@@ -149,6 +165,22 @@ func aiAgentUsesCustomProvider(telemetry *redisservice.AIAgentSessionTelemetry) 
 // provider.
 func aiAgentCustomProviderBreakdownKey(telemetry *redisservice.AIAgentSessionTelemetry) string {
 	return aiAgentUsageKeyCustomProviderPrefix + strings.ToLower(strings.TrimSpace(telemetry.CustomProvider))
+}
+
+// aiAgentUsesCustomAvatar reports whether the room brought its own avatar key,
+// so the avatar provider bills the room directly.
+func aiAgentUsesCustomAvatar(telemetry *redisservice.AIAgentSessionTelemetry) bool {
+	return telemetry != nil && strings.TrimSpace(telemetry.CustomAvatarProvider) != ""
+}
+
+// aiAgentCustomAvatarBreakdownKey names the breakdown flag of a room-provided
+// avatar, e.g. custom_avatar_provider_beyond_presence.
+func aiAgentCustomAvatarBreakdownKey(telemetry *redisservice.AIAgentSessionTelemetry) string {
+	provider := strings.ToLower(strings.TrimSpace(telemetry.CustomAvatarProvider))
+	if provider == "" {
+		return ""
+	}
+	return aiAgentUsageKeyCustomAvatarProviderPrefix + provider
 }
 
 // costPointer prices a usage entry, or completely omits the cost fields when the
@@ -256,6 +288,9 @@ func (m *ArtifactModel) buildAIAgentSessionUsages(telemetry *redisservice.AIAgen
 		}
 	}
 
+	// The realtime avatar is not a token or speech-LLM role: it is billed per
+	// minute of generated video and is recorded as its own duration usage (see
+	// buildAIAgentAvatarDurationUsage), so this map stays strictly token-bound.
 	return usages
 }
 
@@ -291,6 +326,8 @@ const (
 	aiAgentRealtimePricingKey   = "realtime_model"
 	aiAgentDelegationPricingKey = "delegation_model"
 	aiAgentSummarizePricingKey  = "summarize_model"
+	// aiAgentAvatarPricingKey prices the avatar per minute of generated video.
+	aiAgentAvatarPricingKey = "avatar_model"
 )
 
 // aiAgentServiceOption returns one ai_agent option, "" when it is not configured.
@@ -364,6 +401,9 @@ func (m *ArtifactModel) buildAIAgentUsageMetadata(telemetry *redisservice.AIAgen
 		totalCost = promptCost + completionCost + audioCost
 	}
 
+	// Only the token roles reach this breakdown: the avatar is a per-minute
+	// duration usage of its own (see buildAIAgentAvatarDurationUsage), so it is
+	// never mixed into the tokens or the total cost.
 	breakdown := make(map[string]int64, 32)
 	for key, value := range session.breakdown(aiAgentUsageKeySession) {
 		breakdown[key] = value
@@ -386,7 +426,6 @@ func (m *ArtifactModel) buildAIAgentUsageMetadata(telemetry *redisservice.AIAgen
 		// token cost, and the key names the provider that served it.
 		breakdown[aiAgentCustomProviderBreakdownKey(telemetry)] = 1
 	}
-
 	return &plugnmeet.RoomArtifactMetadata{
 		UsageDetails: &plugnmeet.RoomArtifactMetadata_TokenUsage{
 			TokenUsage: &plugnmeet.RoomArtifactTokenUsage{
@@ -396,8 +435,66 @@ func (m *ArtifactModel) buildAIAgentUsageMetadata(telemetry *redisservice.AIAgen
 				Breakdown:                     breakdown,
 				PromptTokensEstimatedCost:     costPointer(promptCost, custom),
 				CompletionTokensEstimatedCost: costPointer(completionCost, custom),
-				TotalTokensEstimatedCost:      costPointer(totalCost, custom),
+				// A host-provided LLM hides the platform token cost entirely.
+				TotalTokensEstimatedCost: costPointer(totalCost, custom),
 			},
+		},
+		ReferenceArtifactId: fileArtifactId,
+	}
+}
+
+// buildAIAgentAvatarDurationUsage prices the realtime video avatar of the
+// session. The avatar is billed per minute of generated video, so it is a
+// duration usage of its own rather than a token role. A room that brought its
+// own avatar key pays the provider directly, so only its duration is recorded.
+func (m *ArtifactModel) buildAIAgentAvatarDurationUsage(telemetry *redisservice.AIAgentSessionTelemetry, log *logrus.Entry) *plugnmeet.RoomArtifactDurationUsage {
+	if telemetry == nil || telemetry.AvatarMillis == 0 {
+		return nil
+	}
+
+	// The exact duration stays in the breakdown; the seconds are rounded down so
+	// that anything below one second is still reported as a started second.
+	durationSec := clampToUint32(telemetry.AvatarMillis / 1000)
+	if durationSec == 0 {
+		durationSec = 1
+	}
+
+	breakdown := map[string]int64{"avatar_millis": int64(telemetry.AvatarMillis)}
+	customAvatar := aiAgentUsesCustomAvatar(telemetry)
+
+	var avatarCost float64
+	if customAvatar {
+		// The avatar ran on the room's own key, so only its duration counts.
+		breakdown[aiAgentCustomAvatarBreakdownKey(telemetry)] = 1
+	} else {
+		// Only the first configured key is used, so a concrete provider name goes
+		// first: it overrides the generic role key when the operator priced the
+		// providers apart, while the role key still prices everything else.
+		pricingKeys := make([]string, 0, 2)
+		if provider := strings.ToLower(strings.TrimSpace(telemetry.AvatarProvider)); provider != "" {
+			pricingKeys = append(pricingKeys, provider)
+		}
+		pricingKeys = append(pricingKeys, aiAgentAvatarPricingKey)
+		avatarCost = m.estimateAudioMillisCost(insights.ServiceTypeAIAgent, telemetry.AvatarMillis, log, pricingKeys...)
+	}
+
+	return &plugnmeet.RoomArtifactDurationUsage{
+		DurationSec:              durationSec,
+		Breakdown:                breakdown,
+		DurationSecEstimatedCost: costPointer(avatarCost, customAvatar),
+	}
+}
+
+// buildAIAgentAvatarUsageMetadata wraps the avatar duration usage into the
+// metadata of its own artifact, nil when the session had no avatar.
+func (m *ArtifactModel) buildAIAgentAvatarUsageMetadata(telemetry *redisservice.AIAgentSessionTelemetry, fileArtifactId *string, log *logrus.Entry) *plugnmeet.RoomArtifactMetadata {
+	durationUsage := m.buildAIAgentAvatarDurationUsage(telemetry, log)
+	if durationUsage == nil {
+		return nil
+	}
+	return &plugnmeet.RoomArtifactMetadata{
+		UsageDetails: &plugnmeet.RoomArtifactMetadata_DurationUsage{
+			DurationUsage: durationUsage,
 		},
 		ReferenceArtifactId: fileArtifactId,
 	}
