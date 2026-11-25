@@ -10,7 +10,10 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/livekit/media-sdk"
+	lkauth "github.com/livekit/protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/connections"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/redis/go-redis/v9"
@@ -1129,5 +1132,66 @@ func TestAIAgentAvatarBudgetStopsSession(t *testing.T) {
 	if saved.AvatarProvider != string(config.ProviderBeyondPresence) || saved.CustomAvatarProvider != string(config.ProviderBeyondPresence) {
 		t.Errorf("avatar providers = (%q, %q), want the custom beyond_presence avatar",
 			saved.AvatarProvider, saved.CustomAvatarProvider)
+	}
+}
+
+// The avatar twin is the participant the provider joins the room as, so its token
+// must name the agent in both places the proxy and the webhooks look: the
+// plugNmeet attribute and LiveKit's publish-on-behalf attribute.
+func TestMintAvatarLiveKitAccessTokenCarriesTheOriginalUserId(t *testing.T) {
+	const (
+		apiKey       = "test-api-key"
+		secret       = "test-secret-that-is-long-enough-for-hmac-sha256"
+		roomId       = "room-01"
+		twinIdentity = "pnm_agent-ai_agent-01-native"
+		displayName  = "Arjun"
+		agentUserId  = "pnm_agent-ai_agent-01"
+	)
+
+	// go-jose refuses HMAC keys shorter than 32 bytes, and a real LiveKit
+	// secret is much longer than that anyway.
+	token, err := mintAvatarLiveKitAccessToken(apiKey, secret, time.Hour, roomId, twinIdentity, displayName, agentUserId)
+	if err != nil {
+		t.Fatalf("mint the avatar token: %v", err)
+	}
+
+	tok, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.HS256})
+	if err != nil {
+		t.Fatalf("parse the avatar token: %v", err)
+	}
+
+	var cl jwt.Claims
+	var grants lkauth.ClaimGrants
+	// passing the secret as the key verifies the signature as it decodes
+	if err := tok.Claims([]byte(secret), &cl, &grants); err != nil {
+		t.Fatalf("verify the avatar token: %v", err)
+	}
+
+	if err := cl.Validate(jwt.Expected{Issuer: apiKey, Subject: twinIdentity, Time: time.Now().UTC()}); err != nil {
+		t.Fatalf("the avatar token is not valid: %v", err)
+	}
+	if cl.Expiry == nil || time.Until(cl.Expiry.Time()) < 30*time.Minute {
+		t.Errorf("expiry = %v, want the requested hour", cl.Expiry)
+	}
+
+	if grants.Identity != twinIdentity {
+		t.Errorf("identity = %q, want %q", grants.Identity, twinIdentity)
+	}
+	if grants.Name != displayName {
+		t.Errorf("name = %q, want %q", grants.Name, displayName)
+	}
+	if grants.Video == nil {
+		t.Fatal("the token carries no video grant")
+	}
+	if grants.Video.Room != roomId || !grants.Video.RoomJoin {
+		t.Errorf("video grant = %+v, want room join for %q", grants.Video, roomId)
+	}
+	if grants.Video.CanPublish == nil || !*grants.Video.CanPublish {
+		t.Error("the twin must be allowed to publish")
+	}
+	for _, key := range []string{"original_user_id", "lk.publish_on_behalf"} {
+		if got := grants.Attributes[key]; got != agentUserId {
+			t.Errorf("attribute %q = %q, want %q", key, got, agentUserId)
+		}
 	}
 }

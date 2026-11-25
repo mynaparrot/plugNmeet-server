@@ -17,6 +17,12 @@ const (
 	// AudioStreamClearMethod is the RPC a client handles to drop the audio it has
 	// buffered but not played yet. It is how barge-in is delivered.
 	AudioStreamClearMethod = "lk.clear_buffer"
+	// AudioStreamPlaybackFinishedMethod is the RPC a livekit-agents
+	// DataStreamAudioReceiver issues (notify_playback_finished) on the agent
+	// participant at the end of an utterance. b-server registers a no-op handler
+	// so the receiver's call succeeds instead of failing with UNSUPPORTED_METHOD,
+	// which it would otherwise retry three times per segment.
+	AudioStreamPlaybackFinishedMethod = "lk.playback_finished"
 	// clearBufferRPCTimeout bounds the clear RPC so a silent client cannot leave
 	// the call hanging.
 	clearBufferRPCTimeout = 1500 * time.Millisecond
@@ -25,8 +31,8 @@ const (
 	// destination participant has joined the room.
 	DefaultReadyPollInterval = 50 * time.Millisecond
 	// DefaultReadyTimeout bounds how long the first stream open waits for the
-	// destination participant to join and publish video. It matches
-	// livekit-agents' wait_for_join(timeout=30.0).
+	// destination participant to join the room. It matches livekit-agents'
+	// wait_for_join(timeout=30.0).
 	DefaultReadyTimeout = 30 * time.Second
 )
 
@@ -57,10 +63,10 @@ type DataStreamAudioPublisher struct {
 	openStream openByteStreamFunc
 	performRPC performRPCFunc
 
-	// waitReady reports whether the destination participant is in the room and
-	// has published a video track, so the stream opens only once the client can
-	// render it. An avatar bot joins some time after its session API call
-	// returned, so the first stream open waits for it; nil disables the wait.
+	// waitReady reports whether the destination participant is in the room, so
+	// the stream opens only once there is someone to receive it. An avatar bot
+	// joins some time after its session API call returned, so the first stream
+	// open waits for it; nil disables the wait.
 	waitReady func() bool
 	// readyPollInterval and readyTimeout bound that wait. Zero values fall back
 	// to DefaultReadyPollInterval and DefaultReadyTimeout.
@@ -92,6 +98,15 @@ func NewDataStreamAudioPublisher(room *lksdk.Room, destinationIdentity string, t
 	}
 
 	localParticipant := room.LocalParticipant
+	// The avatar worker's DataStreamAudioReceiver calls back on this method after
+	// it finishes playing a segment. Without a handler the call fails with
+	// UNSUPPORTED_METHOD and is retried three times per utterance, so register a
+	// no-op. A duplicate registration (this room already serving another
+	// publisher) is harmless and not fatal for the publisher.
+	_ = room.RegisterRpcMethod(AudioStreamPlaybackFinishedMethod, func(data lksdk.RpcInvocationData) (string, error) {
+		return "", nil
+	})
+
 	return &DataStreamAudioPublisher{
 		destinationIdentity: destinationIdentity,
 		targetSampleRate:    targetSampleRate,
@@ -101,15 +116,15 @@ func NewDataStreamAudioPublisher(room *lksdk.Room, destinationIdentity string, t
 		performRPC: func(params lksdk.PerformRpcParams) (*string, error) {
 			return localParticipant.PerformRpc(params)
 		},
+		// Only the presence of the destination participant is required. Avatar
+		// workers built on livekit-agents' AvatarRunner use _lazy_publish = True
+		// by default, so their Camera/Mic tracks are published only after the
+		// first lk.audio_stream frames arrive; waiting for a video track here
+		// would deadlock against that.
 		waitReady: func() bool {
 			for _, participant := range room.GetRemoteParticipants() {
-				if participant.Identity() != destinationIdentity {
-					continue
-				}
-				for _, pub := range participant.TrackPublications() {
-					if pub.Kind() == lksdk.TrackKindVideo {
-						return true
-					}
+				if participant.Identity() == destinationIdentity {
+					return true
 				}
 			}
 			return false
@@ -120,10 +135,11 @@ func NewDataStreamAudioPublisher(room *lksdk.Room, destinationIdentity string, t
 }
 
 // waitForDestination blocks until the destination participant has joined the
-// room and published a video track, which is what makes the first stream of an
-// avatar session land: the bot joins after its session API call returned. Once
-// the destination has been seen the wait is skipped, and a closed publisher
-// stops waiting immediately.
+// room, which is what makes the first stream of an avatar session land: the bot
+// joins after its session API call returned. The wait deliberately does not
+// require any published track, because AvatarRunner lazily publishes its tracks
+// only after the first audio frames arrive. Once the destination has been seen
+// the wait is skipped, and a closed publisher stops waiting immediately.
 func (p *DataStreamAudioPublisher) waitForDestination() error {
 	if p.waitReady == nil {
 		return nil
@@ -157,7 +173,7 @@ func (p *DataStreamAudioPublisher) waitForDestination() error {
 				return nil
 			}
 		case <-deadline.C:
-			return fmt.Errorf("datastream audio publisher: destination participant %q did not join the room and publish video within %s", p.destinationIdentity, timeout)
+			return fmt.Errorf("datastream audio publisher: destination participant %q did not join the room within %s", p.destinationIdentity, timeout)
 		}
 	}
 }

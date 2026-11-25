@@ -10,8 +10,8 @@ import (
 
 	"github.com/google/uuid"
 	mediasdk "github.com/livekit/media-sdk"
+	lkauth "github.com/livekit/protocol/auth"
 	lksdk "github.com/livekit/server-sdk-go/v2"
-	"github.com/mynaparrot/plugnmeet-protocol/auth"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -389,6 +389,12 @@ type aiAgentCoreArgs struct {
 
 // NewAIAgent connects a realtime provider session plus a visible LiveKit
 // participant and starts the agent's loops.
+//
+// The order matters: the LiveKit participant is registered first, then the
+// voice path is opened (which, with an avatar, dials the avatar provider right
+// away), and only then is the provider session opened. That way a failing
+// avatar API aborts the start before the expensive realtime session exists, and
+// the avatar worker joins the same room right behind the agent.
 func NewAIAgent(args *AIAgentArgs) (*AIAgent, error) {
 	if args == nil || args.Payload == nil || args.Payload.RoomId == "" {
 		return nil, errors.New("ai agent: room id is required")
@@ -440,10 +446,6 @@ func NewAIAgent(args *AIAgentArgs) (*AIAgent, error) {
 	newSession := func(ctx context.Context) (insights.RealtimeSession, error) {
 		return provider.CreateRealtimeSession(ctx, model, opts)
 	}
-	session, err := newSession(args.Ctx)
-	if err != nil {
-		return nil, fmt.Errorf("ai agent: failed to open realtime session: %w", err)
-	}
 
 	// The running summary is a background text call, so the voice session never
 	// waits on it.
@@ -454,12 +456,15 @@ func NewAIAgent(args *AIAgentArgs) (*AIAgent, error) {
 		}
 	}
 
+	// No Session: the provider session is opened after the room participant and
+	// the voice path exist, so the participant is visible immediately and a
+	// broken avatar provider fails before the session is billed.
 	agent, err := newAIAgent(&aiAgentCoreArgs{
 		Ctx:               args.Ctx,
 		Payload:           args.Payload,
 		Features:          args.Features,
 		Boundary:          boundary,
-		Session:           session,
+		Session:           nil,
 		NewSession:        newSession,
 		Transport:         args.Transport,
 		RedisService:      args.RedisService,
@@ -477,7 +482,6 @@ func NewAIAgent(args *AIAgentArgs) (*AIAgent, error) {
 		Avatar:            args.Avatar,
 	})
 	if err != nil {
-		_ = session.Close()
 		return nil, err
 	}
 
@@ -488,6 +492,8 @@ func NewAIAgent(args *AIAgentArgs) (*AIAgent, error) {
 	displayName := boundary.AgentDisplayName
 	payload.AgentName = &displayName
 
+	// Step 1: the agent joins LiveKit first, so its identity is registered and
+	// tracked by livekit-proxy before anything else is dialled.
 	roomAgent, err := newRoomAgent(&RoomAgentArgs{
 		Ctx:             agent.ctx,
 		AppConf:         args.AppConf,
@@ -506,6 +512,9 @@ func NewAIAgent(args *AIAgentArgs) (*AIAgent, error) {
 		return nil, fmt.Errorf("ai agent: failed to join the room: %w", err)
 	}
 
+	// Step 2: open the voice path. With an avatar this dials the avatar provider
+	// immediately, so the avatar worker boots and joins the same room while the
+	// realtime session is still being opened.
 	publisher, err := startAgentAudioPublisher(args, agent, roomAgent.Room, displayName)
 	if err != nil {
 		roomAgent.Shutdown()
@@ -513,6 +522,17 @@ func NewAIAgent(args *AIAgentArgs) (*AIAgent, error) {
 		return nil, err
 	}
 
+	// Step 3: only now open the realtime provider session.
+	session, err := newSession(agent.ctx)
+	if err != nil {
+		publisher.Close()
+		roomAgent.Shutdown()
+		agent.close()
+		return nil, fmt.Errorf("ai agent: failed to open realtime session: %w", err)
+	}
+	agent.session = session
+
+	// Step 4: wire the runtime and start the loops.
 	agent.roomAgent = roomAgent
 	agent.publisher = publisher
 	agent.Start()
@@ -542,19 +562,13 @@ func startAgentAudioPublisher(args *AIAgentArgs, agent *AIAgent, room *lksdk.Roo
 	// The twin joins with its own token, minted after the agent itself is
 	// connected: the twin is what the audio stream is addressed to.
 	twinIdentity := config.GetNativeTwinIdentity(agent.agentUserId)
-	twinClaims := &plugnmeet.PlugNmeetTokenClaims{
-		RoomId:  args.Payload.RoomId,
-		Name:    displayName,
-		UserId:  twinIdentity,
-		IsAdmin: true,
-	}
 	// The twin has to outlive the session, else the avatar drops mid-lesson
 	// while the agent keeps talking.
 	validity := time.Duration(args.Features.GetMaxSessionSeconds())*time.Second + 10*time.Minute
 	if validity < time.Hour {
 		validity = time.Hour
 	}
-	twinToken, err := auth.GenerateLivekitAccessToken(args.AppConf.LivekitInfo.ApiKey, args.AppConf.LivekitInfo.Secret, validity, twinClaims, true, true, agent.agentUserId)
+	twinToken, err := mintAvatarLiveKitAccessToken(args.AppConf.LivekitInfo.ApiKey, args.AppConf.LivekitInfo.Secret, validity, args.Payload.RoomId, twinIdentity, displayName, agent.agentUserId)
 	if err != nil {
 		return nil, fmt.Errorf("ai agent: failed to mint the avatar participant token: %w", err)
 	}
@@ -588,12 +602,42 @@ func startAgentAudioPublisher(args *AIAgentArgs, agent *AIAgent, room *lksdk.Roo
 	return publisher, nil
 }
 
+// mintAvatarLiveKitAccessToken mints the join token for the agent's native twin,
+// which is the participant the avatar provider joins the room as. It is built
+// directly from the LiveKit auth package rather than through the shared helper,
+// so the twin always carries both attributes even before the released protocol
+// package knows about them: original_user_id is how the webhooks recognise the
+// twin, and lk.publish_on_behalf is how LiveKit attributes the avatar's track to
+// the agent instead of to the twin.
+func mintAvatarLiveKitAccessToken(apiKey, secret string, tokenValidity time.Duration, roomId, twinIdentity, displayName, agentUserId string) (string, error) {
+	at := lkauth.NewAccessToken(apiKey, secret)
+	grant := &lkauth.VideoGrant{
+		RoomJoin:     true,
+		Room:         roomId,
+		RoomAdmin:    true,
+		CanPublish:   new(true),
+		CanSubscribe: new(true),
+	}
+	at.SetVideoGrant(grant).
+		SetIdentity(twinIdentity).
+		SetName(displayName).
+		SetValidFor(tokenValidity).
+		SetAttributes(map[string]string{
+			"original_user_id":     agentUserId,
+			"lk.publish_on_behalf": agentUserId,
+		})
+	return at.ToJWT()
+}
+
 // newAIAgent builds the provider- and LiveKit-independent runtime.
+// It may be built before the provider session is open: with args.NewSession set
+// the caller opens the session later and assigns it before calling Start, which
+// is what puts the LiveKit participant and the avatar ahead of the provider.
 func newAIAgent(args *aiAgentCoreArgs) (*AIAgent, error) {
 	if args == nil || args.Payload == nil || args.Payload.RoomId == "" {
 		return nil, errors.New("ai agent: room id is required")
 	}
-	if args.Session == nil {
+	if args.Session == nil && args.NewSession == nil {
 		return nil, errors.New("ai agent: a realtime session is required")
 	}
 
