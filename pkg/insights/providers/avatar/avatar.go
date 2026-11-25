@@ -75,6 +75,7 @@ func StartSession(ctx context.Context, cfg StartConfig) (Session, error) {
 	if cfg.LiveKitToken == "" {
 		return nil, fmt.Errorf("avatar: livekit token is required")
 	}
+	cfg.LiveKitURL = normalizeLiveKitURL(cfg.LiveKitURL)
 
 	client := cfg.HTTPClient
 	if client == nil {
@@ -91,6 +92,31 @@ func StartSession(ctx context.Context, cfg StartConfig) (Session, error) {
 	default:
 		return nil, fmt.Errorf("avatar: unsupported provider %q", cfg.Provider)
 	}
+}
+
+// normalizeLiveKitURL returns the LiveKit room URL in the websocket form the
+// providers expect: surrounding whitespace and trailing slashes are trimmed,
+// https becomes wss, http becomes ws and a URL without a scheme gets wss.
+func normalizeLiveKitURL(raw string) string {
+	url := strings.TrimSpace(raw)
+	if url == "" {
+		return ""
+	}
+
+	lower := strings.ToLower(url)
+	scheme, host := "wss://", url
+	switch {
+	case strings.HasPrefix(lower, "https://"):
+		host = url[len("https://"):]
+	case strings.HasPrefix(lower, "http://"):
+		scheme, host = "ws://", url[len("http://"):]
+	case strings.HasPrefix(lower, "wss://"):
+		host = url[len("wss://"):]
+	case strings.HasPrefix(lower, "ws://"):
+		scheme, host = "ws://", url[len("ws://"):]
+	}
+
+	return scheme + strings.TrimRight(host, "/")
 }
 
 // endpointOrDefault trims the trailing slash of an endpoint override and falls
@@ -152,10 +178,16 @@ type beyondPresenceStartResponse struct {
 }
 
 func startBeyondPresence(ctx context.Context, client *http.Client, cfg StartConfig, endpoint string) (Session, error) {
+	// Beyond Presence renamed the transport fields of /v1/sessions: the legacy
+	// transport_type/livekit_url/livekit_token names became transport/url/token.
+	// Both sets are sent so either v1 schema works.
 	payload := map[string]any{
 		"avatar_id":      cfg.AvatarID,
+		"transport":      "livekit",
 		"transport_type": "livekit",
+		"url":            cfg.LiveKitURL,
 		"livekit_url":    cfg.LiveKitURL,
+		"token":          cfg.LiveKitToken,
 		"livekit_token":  cfg.LiveKitToken,
 	}
 	headers := apiKeyHeaders(cfg, "x-api-key", false)

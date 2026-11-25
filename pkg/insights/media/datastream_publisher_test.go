@@ -3,6 +3,7 @@ package media
 import (
 	"encoding/binary"
 	"math"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -247,8 +248,15 @@ func TestNewDataStreamAudioPublisherValidation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if p.openStream == nil || p.performRPC == nil {
+	if p.openStream == nil || p.performRPC == nil || p.waitReady == nil {
 		t.Fatal("expected room-backed callbacks to be wired")
+	}
+	if p.readyPollInterval != DefaultReadyPollInterval || p.readyTimeout != DefaultReadyTimeout {
+		t.Fatalf("unexpected readiness timings: %s/%s", p.readyPollInterval, p.readyTimeout)
+	}
+	// Nobody has joined the empty room yet, so the destination is not ready.
+	if p.waitReady() {
+		t.Fatal("expected the destination to be missing in an empty room")
 	}
 	if p.targetSampleRate != DefaultSampleRate16k || p.destinationIdentity != "user-1" {
 		t.Fatalf("unexpected publisher fields: %+v", p)
@@ -308,6 +316,120 @@ func TestDataStreamAudioPublisherLazyOpenAndReuse(t *testing.T) {
 	writes, _, _ = streams.writerAt(t, 0).snapshot()
 	if len(writes) != 2 {
 		t.Fatalf("expected 2 writes on the same stream, got %d", len(writes))
+	}
+}
+
+// newTestPublisherWithReadiness builds a publisher whose readiness comes from
+// waitReady, with a short poll interval so tests stay fast.
+func newTestPublisherWithReadiness(t *testing.T, streams *fakeStreamFactory, waitReady func() bool, timeout time.Duration) *DataStreamAudioPublisher {
+	t.Helper()
+	p := newTestDataStreamPublisher(t, DefaultSampleRate16k, streams, newFakeRPC().call)
+	p.waitReady = waitReady
+	p.readyPollInterval = time.Millisecond
+	p.readyTimeout = timeout
+	return p
+}
+
+// The avatar bot joins after its session API call returned, so the first write
+// must wait until the destination participant is in the room instead of opening
+// a stream nobody receives.
+func TestDataStreamAudioPublisherWaitsForDestination(t *testing.T) {
+	streams := &fakeStreamFactory{}
+	var calls int
+	p := newTestPublisherWithReadiness(t, streams, func() bool {
+		calls++
+		return calls >= 3
+	}, 5*time.Second)
+
+	if _, err := p.Write(make([]byte, 480)); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if calls < 3 {
+		t.Fatalf("waitReady called %d times, want the poll loop to retry", calls)
+	}
+	if !p.ready {
+		t.Fatal("expected the publisher to remember the destination was seen")
+	}
+	if streams.openedCount() != 1 {
+		t.Fatalf("expected exactly one stream, got %d", streams.openedCount())
+	}
+}
+
+// Once the destination has been seen, later segments must not wait again.
+func TestDataStreamAudioPublisherSkipsWaitAfterDestinationReady(t *testing.T) {
+	streams := &fakeStreamFactory{}
+	var calls int
+	p := newTestPublisherWithReadiness(t, streams, func() bool {
+		calls++
+		return true
+	}, 5*time.Second)
+
+	if _, err := p.Write(make([]byte, 480)); err != nil {
+		t.Fatalf("unexpected error on first write: %v", err)
+	}
+	p.EndSegment()
+	if _, err := p.Write(make([]byte, 480)); err != nil {
+		t.Fatalf("unexpected error on second write: %v", err)
+	}
+
+	if calls != 1 {
+		t.Fatalf("waitReady called %d times, want only the first stream to wait", calls)
+	}
+	if streams.openedCount() != 2 {
+		t.Fatalf("expected two streams, got %d", streams.openedCount())
+	}
+}
+
+// A destination that never joins must not block the caller forever.
+func TestDataStreamAudioPublisherDestinationTimeout(t *testing.T) {
+	streams := &fakeStreamFactory{}
+	p := newTestPublisherWithReadiness(t, streams, func() bool { return false }, 30*time.Millisecond)
+
+	n, err := p.Write(make([]byte, 480))
+	if err == nil {
+		t.Fatal("expected a timeout error")
+	}
+	if n != 0 {
+		t.Errorf("Write returned %d bytes, want 0", n)
+	}
+	if !strings.Contains(err.Error(), "did not join") {
+		t.Errorf("error = %q, want it to mention the missing destination", err)
+	}
+	if streams.openedCount() != 0 {
+		t.Fatalf("a timed out write must not open a stream, got %d", streams.openedCount())
+	}
+	if p.ready {
+		t.Fatal("a timed out write must not mark the destination ready")
+	}
+}
+
+// Close must interrupt a write that is still waiting for the destination.
+func TestDataStreamAudioPublisherWaitStopsWhenClosed(t *testing.T) {
+	streams := &fakeStreamFactory{}
+	p := newTestPublisherWithReadiness(t, streams, func() bool { return false }, 10*time.Second)
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := p.Write(make([]byte, 480))
+		done <- err
+	}()
+
+	time.Sleep(20 * time.Millisecond)
+	p.Close()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("expected an error after Close")
+		}
+		if !strings.Contains(err.Error(), "closed") {
+			t.Errorf("error = %q, want it to report the closed publisher", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Write did not return after Close")
+	}
+	if streams.openedCount() != 0 {
+		t.Fatalf("a closed publisher must not open streams, got %d", streams.openedCount())
 	}
 }
 

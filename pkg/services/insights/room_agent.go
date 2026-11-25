@@ -134,9 +134,8 @@ func NewRoomAgent(args *RoomAgentArgs) (*RoomAgent, error) {
 	return newRoomAgent(args, nil)
 }
 
-// newRoomAgent connects a RoomAgent to the LiveKit room. When task is nil, a
-// task is created from the payload's service type; callers that own the task
-// (the AI agent) pass it in so their own audio pipeline runs unchanged.
+// newRoomAgent connects a RoomAgent to the LiveKit room. When task is nil, a task is created from the payload's service type;
+// callers that own the task (the AI agent) pass it in so their own audio pipeline runs unchanged.
 func newRoomAgent(args *RoomAgentArgs, task insights.Task) (*RoomAgent, error) {
 	ctx, cancel := context.WithCancel(args.Ctx)
 	log := args.Logger.WithFields(logrus.Fields{

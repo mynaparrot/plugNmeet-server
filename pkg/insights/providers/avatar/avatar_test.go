@@ -71,10 +71,15 @@ func TestStartSessionBeyondPresence(t *testing.T) {
 	if gotContentType != "application/json" {
 		t.Errorf("unexpected Content-Type header: %q", gotContentType)
 	}
+	// Both the current and the legacy transport field names must be present so
+	// either version of the /v1/sessions schema is accepted.
 	wantBody := map[string]any{
 		"avatar_id":      testAvatarID,
+		"transport":      "livekit",
 		"transport_type": "livekit",
+		"url":            testLiveKitURL,
 		"livekit_url":    testLiveKitURL,
+		"token":          testLiveKitToken,
 		"livekit_token":  testLiveKitToken,
 	}
 	for key, want := range wantBody {
@@ -444,6 +449,101 @@ func TestStartSessionMissingResponseFields(t *testing.T) {
 				t.Fatal("expected an error")
 			} else if !strings.Contains(err.Error(), tt.want) {
 				t.Errorf("error = %q, want it to contain %q", err, tt.want)
+			}
+		})
+	}
+}
+
+// recordedLiveKitURL returns the LiveKit URL carried by a provider request
+// body. Anam nests it in the environment object, the others send it flat.
+func recordedLiveKitURL(body map[string]any) (string, bool) {
+	if environment, ok := body["environment"].(map[string]any); ok {
+		body = environment
+	}
+	for _, key := range []string{"livekit_url", "livekitUrl"} {
+		if value, ok := body[key].(string); ok {
+			return value, true
+		}
+	}
+	return "", false
+}
+
+// The providers only accept a websocket room URL, so StartSession must convert
+// an http(s) URL to ws(s) and trim a trailing slash.
+func TestStartSessionNormalizesLiveKitURL(t *testing.T) {
+	urlTests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"https becomes wss and the trailing slash is trimmed", "https://livekit.example.com/", "wss://livekit.example.com"},
+		{"http becomes ws", "http://localhost:7880", "ws://localhost:7880"},
+	}
+
+	for _, provider := range []config.ProviderType{
+		config.ProviderBeyondPresence,
+		config.ProviderAnam,
+		config.ProviderSimli,
+	} {
+		for _, tt := range urlTests {
+			t.Run(string(provider)+"/"+tt.name, func(t *testing.T) {
+				var gotURL string
+				var gotURLSet bool
+
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if value, ok := recordedLiveKitURL(decodeBody(t, r)); ok {
+						gotURL, gotURLSet = value, true
+					}
+					w.Header().Set("Content-Type", "application/json")
+					switch r.URL.Path {
+					case "/v1/sessions":
+						_, _ = w.Write([]byte(`{"id":"bp-session-1"}`))
+					case "/v1/engine/session":
+						_, _ = w.Write([]byte(`{"sessionId":"anam-session-1"}`))
+					case "/compose/token":
+						_, _ = w.Write([]byte(`{"session_token":"simli-session-token"}`))
+					default:
+						_, _ = w.Write([]byte(`{"session_id":"simli-session-1"}`))
+					}
+				}))
+				defer srv.Close()
+
+				cfg := newTestConfig(provider, srv.URL)
+				cfg.LiveKitURL = tt.in
+				if _, err := StartSession(context.Background(), cfg); err != nil {
+					t.Fatalf("StartSession returned error: %v", err)
+				}
+				if !gotURLSet {
+					t.Fatal("no request carried a livekit url")
+				}
+				if gotURL != tt.want {
+					t.Errorf("livekit url = %q, want %q", gotURL, tt.want)
+				}
+			})
+		}
+	}
+}
+
+func TestNormalizeLiveKitURL(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"https with slash", "https://livekit.example.com/", "wss://livekit.example.com"},
+		{"http with port", "http://localhost:7880", "ws://localhost:7880"},
+		{"wss is kept", "wss://livekit.example.com", "wss://livekit.example.com"},
+		{"ws is kept", "ws://localhost:7880", "ws://localhost:7880"},
+		{"no scheme gets wss", "livekit.example.com", "wss://livekit.example.com"},
+		{"whitespace is trimmed", "  wss://livekit.example.com/  ", "wss://livekit.example.com"},
+		{"scheme is case insensitive", "HTTPS://LiveKit.Example.com/", "wss://LiveKit.Example.com"},
+		{"empty stays empty", "   ", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := normalizeLiveKitURL(tt.in); got != tt.want {
+				t.Errorf("normalizeLiveKitURL(%q) = %q, want %q", tt.in, got, tt.want)
 			}
 		})
 	}

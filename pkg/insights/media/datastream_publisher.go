@@ -20,6 +20,14 @@ const (
 	// clearBufferRPCTimeout bounds the clear RPC so a silent client cannot leave
 	// the call hanging.
 	clearBufferRPCTimeout = 1500 * time.Millisecond
+
+	// DefaultReadyPollInterval is how often the publisher re-checks whether the
+	// destination participant has joined the room.
+	DefaultReadyPollInterval = 50 * time.Millisecond
+	// DefaultReadyTimeout bounds how long the first stream open waits for the
+	// destination participant to join and publish video. It matches
+	// livekit-agents' wait_for_join(timeout=30.0).
+	DefaultReadyTimeout = 30 * time.Second
 )
 
 // byteStreamWriter is the subset of *lksdk.ByteStreamWriter the publisher needs,
@@ -48,6 +56,21 @@ type DataStreamAudioPublisher struct {
 
 	openStream openByteStreamFunc
 	performRPC performRPCFunc
+
+	// waitReady reports whether the destination participant is in the room and
+	// has published a video track, so the stream opens only once the client can
+	// render it. An avatar bot joins some time after its session API call
+	// returned, so the first stream open waits for it; nil disables the wait.
+	waitReady func() bool
+	// readyPollInterval and readyTimeout bound that wait. Zero values fall back
+	// to DefaultReadyPollInterval and DefaultReadyTimeout.
+	readyPollInterval time.Duration
+	readyTimeout      time.Duration
+
+	// readyMu serializes the wait for the destination, so one goroutine polls
+	// while the others block until it has been seen. ready is guarded by it.
+	readyMu sync.Mutex
+	ready   bool
 
 	mu     sync.Mutex
 	writer byteStreamWriter
@@ -78,15 +101,99 @@ func NewDataStreamAudioPublisher(room *lksdk.Room, destinationIdentity string, t
 		performRPC: func(params lksdk.PerformRpcParams) (*string, error) {
 			return localParticipant.PerformRpc(params)
 		},
+		waitReady: func() bool {
+			for _, participant := range room.GetRemoteParticipants() {
+				if participant.Identity() != destinationIdentity {
+					continue
+				}
+				for _, pub := range participant.TrackPublications() {
+					if pub.Kind() == lksdk.TrackKindVideo {
+						return true
+					}
+				}
+			}
+			return false
+		},
+		readyPollInterval: DefaultReadyPollInterval,
+		readyTimeout:      DefaultReadyTimeout,
 	}, nil
+}
+
+// waitForDestination blocks until the destination participant has joined the
+// room and published a video track, which is what makes the first stream of an
+// avatar session land: the bot joins after its session API call returned. Once
+// the destination has been seen the wait is skipped, and a closed publisher
+// stops waiting immediately.
+func (p *DataStreamAudioPublisher) waitForDestination() error {
+	if p.waitReady == nil {
+		return nil
+	}
+
+	p.readyMu.Lock()
+	defer p.readyMu.Unlock()
+
+	if p.ready {
+		return nil
+	}
+	if p.waitReady() {
+		p.ready = true
+		return nil
+	}
+
+	interval, timeout := p.readyWaitTimings()
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	deadline := time.NewTimer(timeout)
+	defer deadline.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			if p.isClosed() {
+				return errors.New("datastream audio publisher is closed")
+			}
+			if p.waitReady() {
+				p.ready = true
+				return nil
+			}
+		case <-deadline.C:
+			return fmt.Errorf("datastream audio publisher: destination participant %q did not join the room and publish video within %s", p.destinationIdentity, timeout)
+		}
+	}
+}
+
+// readyWaitTimings returns the effective poll interval and timeout, so a zero
+// valued publisher still gets the package defaults.
+func (p *DataStreamAudioPublisher) readyWaitTimings() (interval, timeout time.Duration) {
+	interval, timeout = p.readyPollInterval, p.readyTimeout
+	if interval <= 0 {
+		interval = DefaultReadyPollInterval
+	}
+	if timeout <= 0 {
+		timeout = DefaultReadyTimeout
+	}
+	return interval, timeout
+}
+
+// isClosed reports whether Close has been called.
+func (p *DataStreamAudioPublisher) isClosed() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.closed
 }
 
 // Write accepts 24 kHz 16-bit mono little-endian PCM (DefaultOutputSampleRate24k)
 // and forwards it to the destination participant, resampling when the stream is
-// expected at 16 kHz. The stream is opened lazily on the first write of a segment.
+// expected at 16 kHz. The stream is opened lazily on the first write of a segment,
+// waiting for the destination participant to join the room if needed.
 func (p *DataStreamAudioPublisher) Write(pcm24k []byte) (int, error) {
 	if len(pcm24k) < 2 {
 		return len(pcm24k), nil
+	}
+
+	// Waits outside p.mu so Close can still interrupt the wait.
+	if err := p.waitForDestination(); err != nil {
+		return 0, err
 	}
 
 	p.mu.Lock()
