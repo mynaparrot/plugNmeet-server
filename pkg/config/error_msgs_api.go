@@ -140,6 +140,18 @@ var (
 	ErrAuthMaxParticipants  = errors.New("notifications.max-num-participates-exceeded")
 )
 
+// ErrAuthS2S* are the API-KEY/HASH-SIGNATURE failures of the server-to-server
+// /auth endpoints. Their keys are only used to identify the failure; an
+// integrator receives the curated English text that auth_error_msgs.go maps to
+// them, so these keys never reach a browser locale.
+var (
+	ErrAuthS2SApiKeyMissing       = errors.New("auth.errors.api-key-missing")
+	ErrAuthS2SApiKeyInvalid       = errors.New("auth.errors.api-key-invalid")
+	ErrAuthS2SSignatureMissing    = errors.New("auth.errors.signature-missing")
+	ErrAuthS2SSignatureInvalid    = errors.New("auth.errors.signature-invalid")
+	ErrAuthS2SRoomIdHeaderMissing = errors.New("auth.errors.room-id-header-missing")
+)
+
 // File errors are returned to browser clients; their values are i18n keys the
 // client resolves via t(), never raw operational error text. Models log
 // operational errors and return ErrFileUnexpected for them.
@@ -151,11 +163,17 @@ var (
 	ErrFileChunksNotFound = errors.New("file.errors.chunks-not-found")
 	ErrFileUploadFailed   = errors.New("file.errors.upload-failed")
 	ErrFileMergeFailed    = errors.New("file.errors.merge-failed")
-	ErrFilePathRequired   = errors.New("file.errors.file-path-required")
-	ErrFileInvalidPath    = errors.New("file.errors.invalid-path")
-	ErrFilePathNotFound   = errors.New("file.errors.not-found")
-	ErrFileOnlyPresenter  = errors.New("file.errors.only-presenter")
-	ErrFileUnexpected     = errors.New("file.errors.unexpected")
+	// ErrFileUploadInProgress, ErrFileInvalidDocumentLink and ErrFileConversionFailed
+	// are the whiteboard upload failures of the /auth file endpoint; auth_error_msgs.go
+	// maps them to curated English text for the integrator.
+	ErrFileUploadInProgress    = errors.New("file.errors.upload-in-progress")
+	ErrFileInvalidDocumentLink = errors.New("file.errors.invalid-document-link")
+	ErrFileConversionFailed    = errors.New("file.errors.conversion-failed")
+	ErrFilePathRequired        = errors.New("file.errors.file-path-required")
+	ErrFileInvalidPath         = errors.New("file.errors.invalid-path")
+	ErrFilePathNotFound        = errors.New("file.errors.not-found")
+	ErrFileOnlyPresenter       = errors.New("file.errors.only-presenter")
+	ErrFileUnexpected          = errors.New("file.errors.unexpected")
 )
 
 // Recording errors are returned to browser clients by the /api recording and
@@ -174,6 +192,22 @@ var (
 	ErrRecordingNotRunning         = errors.New("notifications.recording-not-running")
 	ErrRecordingRtmpAlreadyRunning = errors.New("notifications.rtmp-already-running")
 	ErrRecordingRtmpNotRunning     = errors.New("notifications.rtmp-not-running")
+	// ErrRecordingFetchFailed and friends are the /auth recording endpoint failures;
+	// auth_error_msgs.go maps them to curated English text for the integrator.
+	ErrRecordingFetchFailed         = errors.New("recording.errors.fetch-failed")
+	ErrRecordingUpdateFailed        = errors.New("recording.errors.update-failed")
+	ErrRecordingDeleteFailed        = errors.New("recording.errors.delete-failed")
+	ErrRecordingMergeFailed         = errors.New("recording.errors.merge-failed")
+	ErrRecordingDownloadTokenFailed = errors.New("recording.errors.download-token-failed")
+	// a merge that is already running for the room, or a merge of fewer than
+	// two recordings
+	ErrRecordingMergeInProgress    = errors.New("recording.errors.merge-in-progress")
+	ErrRecordingMergeMinRecordings = errors.New("recording.errors.merge-min-recordings")
+	// the tenant limits of the cloud edition (pnmmanager), which answers the
+	// /api recording endpoints with them. They are catalogued here so every
+	// client locale key has a single source.
+	ErrRecordingMaxTaskExceeded    = errors.New("recording.errors.max-recorder-limit-reached")
+	ErrRecordingMaxStorageExceeded = errors.New("recording.errors.max-storage-capacity-exceeded")
 )
 
 // AI agent errors are returned to clients by the /api/aiAgent endpoints; their
@@ -189,6 +223,9 @@ var (
 	ErrAIAgentTopicRequired   = errors.New("ai-agent.errors.topic-required")
 	ErrAIAgentNoDelegate      = errors.New("ai-agent.errors.no-delegate")
 	ErrAIAgentGeneric         = errors.New("ai-agent.errors.generic")
+	// ErrAIAgentInvalidMCPServer is the CreateRoom refusal of an external MCP server
+	// configuration which can never be dialled safely.
+	ErrAIAgentInvalidMCPServer = errors.New("ai-agent.errors.invalid-mcp-server")
 	// 1-on-1 session errors: a misconfigured session limit, or a caller that is
 	// not one of the participants the agent may talk to.
 	ErrAIAgentMaxConcurrentSessions = errors.New("ai-agent.errors.max-concurrent-sessions")
@@ -201,10 +238,39 @@ var (
 	// ErrAIAgentAllowedUsersRequired is returned when a controlled-users room is
 	// configured without any pre-authorized participant.
 	ErrAIAgentAllowedUsersRequired = errors.New("ai-agent.errors.allowed-users-required")
+	// ErrAIAgentAutoGenUserIdUnsupported rejects a controlled-users room that also
+	// auto-generates participant ids, which would bypass the roster.
+	ErrAIAgentAutoGenUserIdUnsupported = errors.New("ai-agent.errors.auto-gen-user-id-unsupported")
 	// ErrAIAgentWorkspaceControlled rejects a manual whiteboard or shared notepad
 	// change while the agent controls those surfaces for the session.
 	ErrAIAgentWorkspaceControlled = errors.New("ai-agent.errors.workspace-controlled")
 )
+
+// Artifact and analytics errors are returned by the /auth artifact and analytics
+// endpoints; their values are i18n keys that auth_error_msgs.go maps to curated
+// English text for the integrator.
+var (
+	ErrArtifactInvalidRequest      = errors.New("artifact.errors.invalid-request")
+	ErrArtifactNotFound            = errors.New("artifact.errors.not-found")
+	ErrArtifactFetchFailed         = errors.New("artifact.errors.fetch-failed")
+	ErrArtifactDeleteFailed        = errors.New("artifact.errors.delete-failed")
+	ErrArtifactDownloadTokenFailed = errors.New("artifact.errors.download-token-failed")
+	// artifact types which can be listed but neither downloaded nor deleted
+	ErrArtifactNotDownloadable    = errors.New("artifact.errors.not-downloadable")
+	ErrArtifactNoDownloadableFile = errors.New("artifact.errors.no-downloadable-file")
+	ErrArtifactDeleteNotAllowed   = errors.New("artifact.errors.delete-not-allowed")
+	ErrAnalyticsFetchFailed       = errors.New("analytics.errors.fetch-failed")
+	// the remaining analytics keys are the /auth analytics failures of the cloud
+	// edition (pnmmanager), catalogued here for the same reason
+	ErrAnalyticsInvalidRequest      = errors.New("analytics.errors.invalid-request")
+	ErrAnalyticsNotFound            = errors.New("analytics.errors.not-found")
+	ErrAnalyticsDeleteFailed        = errors.New("analytics.errors.delete-failed")
+	ErrAnalyticsDownloadTokenFailed = errors.New("analytics.errors.download-token-failed")
+)
+
+// ErrIngressNotAllowed is the /api/ingress/create refusal of the cloud edition
+// (pnmmanager) for a tenant without an ingress capacity.
+var ErrIngressNotAllowed = errors.New("ingress.errors.not-allowed")
 
 // MsgSuccess is the generic success message of the response envelopes. It is an
 // i18n key the client resolves via t(), never English text.

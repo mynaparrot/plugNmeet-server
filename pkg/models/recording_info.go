@@ -115,7 +115,7 @@ func (m *RecordingModel) RecordingInfo(req *plugnmeet.RecordingInfoReq) (*plugnm
 
 	return &plugnmeet.RecordingInfoRes{
 		Status:        true,
-		Msg:           "success",
+		Msg:           config.MsgSuccess,
 		StatusCode:    plugnmeet.StatusCode_SUCCESS,
 		RecordingInfo: recording,
 		RoomInfo:      pastRoomInfo,

@@ -50,6 +50,10 @@ func NewAuthController(args AuthControllerArgs) *AuthController {
 
 // HandleAuthHeaderCheck is a middleware to check API-KEY & HASH-SIGNATURE.
 func (ac *AuthController) HandleAuthHeaderCheck(c fiber.Ctx) error {
+	// this middleware only guards the server-to-server /auth group, so its caller is always an integrator,
+	// even when it is mounted without the route middleware
+	c.Locals(config.LocalsCallerKey, config.CallerIntegrator)
+
 	apiKey := c.Get("API-KEY")
 	signature := c.Get("HASH-SIGNATURE")
 
@@ -161,15 +165,14 @@ func (ac *AuthController) HandleVerifyHeaderToken(c fiber.Ctx) error {
 	return c.Next()
 }
 
-// sendAuthError sends a failed auth response. The HTTP status is non-2xx and
-// derived from the status code, and the body carries the status code. The message
-// comes from the caller: curated English for the server-to-server /auth
-// endpoints, an i18n key for the browser facing /api endpoints.
+// sendAuthError sends a failed auth response. The HTTP status is non-2xx and derived from the status code,
+// and the body carries the status code. The message comes from the caller: curated English plus the i18n key in msg_key
+// for the server-to-server /auth endpoints, the i18n key alone for the browser facing /api endpoints.
 func (ac *AuthController) sendAuthError(c fiber.Ctx, authErr error, statusCode plugnmeet.StatusCode) error {
 	if c.Get(fiber.HeaderContentType) == "application/protobuf" {
-		return utils.SendCommonErrorProtobufResponse(c, authErr.Error(), statusCode)
+		return sendCommonErrorProtobufResponse(c, authErr.Error(), statusCode)
 	}
-	return utils.SendCommonErrorJsonResponse(c, authErr.Error(), statusCode)
+	return sendCommonErrorJsonResponse(c, authErr.Error(), statusCode)
 }
 
 // sendVerifyTokenError sends a failed verify token response. The endpoint always

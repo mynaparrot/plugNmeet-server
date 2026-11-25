@@ -23,9 +23,10 @@ const (
 )
 
 type authJSONResponse struct {
-	Status     bool   `json:"status"`
-	Msg        string `json:"msg"`
-	StatusCode string `json:"status_code"`
+	Status     bool    `json:"status"`
+	Msg        string  `json:"msg"`
+	MsgKey     *string `json:"msg_key"`
+	StatusCode string  `json:"status_code"`
 }
 
 func newAuthTestController() *AuthController {
@@ -101,35 +102,40 @@ func TestHandleAuthHeaderCheckFailures(t *testing.T) {
 		name     string
 		headers  map[string]string
 		wantHTTP int
-		wantMsg  error
+		wantKey  error
+		wantMsg  string
 		wantCode plugnmeet.StatusCode
 	}{
 		{
 			name:     "missing api key",
 			headers:  nil,
 			wantHTTP: fiber.StatusBadRequest,
-			wantMsg:  config.ErrAuthS2SApiKeyMissing,
+			wantKey:  config.ErrAuthS2SApiKeyMissing,
+			wantMsg:  config.MsgAuthS2SApiKeyMissing,
 			wantCode: plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER,
 		},
 		{
 			name:     "invalid api key",
 			headers:  requestHeaders("API-KEY", "wrong-key", "HASH-SIGNATURE", "signature"),
 			wantHTTP: fiber.StatusUnauthorized,
-			wantMsg:  config.ErrAuthS2SApiKeyInvalid,
+			wantKey:  config.ErrAuthS2SApiKeyInvalid,
+			wantMsg:  config.MsgAuthS2SApiKeyInvalid,
 			wantCode: plugnmeet.StatusCode_INVALID_API_KEY,
 		},
 		{
 			name:     "missing signature",
 			headers:  requestHeaders("API-KEY", authTestApiKey),
 			wantHTTP: fiber.StatusBadRequest,
-			wantMsg:  config.ErrAuthS2SSignatureMissing,
+			wantKey:  config.ErrAuthS2SSignatureMissing,
+			wantMsg:  config.MsgAuthS2SSignatureMissing,
 			wantCode: plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER,
 		},
 		{
 			name:     "invalid signature",
 			headers:  requestHeaders("API-KEY", authTestApiKey, "HASH-SIGNATURE", "deadbeef"),
 			wantHTTP: fiber.StatusUnauthorized,
-			wantMsg:  config.ErrAuthS2SSignatureInvalid,
+			wantKey:  config.ErrAuthS2SSignatureInvalid,
+			wantMsg:  config.MsgAuthS2SSignatureInvalid,
 			wantCode: plugnmeet.StatusCode_INVALID_TOKEN_OR_SIGNATURE,
 		},
 		{
@@ -140,7 +146,8 @@ func TestHandleAuthHeaderCheckFailures(t *testing.T) {
 				fiber.HeaderContentType, fiber.MIMEMultipartForm,
 			),
 			wantHTTP: fiber.StatusBadRequest,
-			wantMsg:  config.ErrAuthS2SRoomIdHeaderMissing,
+			wantKey:  config.ErrAuthS2SRoomIdHeaderMissing,
+			wantMsg:  config.MsgAuthS2SRoomIdHeaderMissing,
 			wantCode: plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER,
 		},
 	}
@@ -155,8 +162,11 @@ func TestHandleAuthHeaderCheckFailures(t *testing.T) {
 			if res.Status {
 				t.Fatal("expected status false")
 			}
-			if res.Msg != tt.wantMsg.Error() {
-				t.Fatalf("expected msg %q, got %q", tt.wantMsg.Error(), res.Msg)
+			if res.Msg != tt.wantMsg {
+				t.Fatalf("expected msg %q, got %q", tt.wantMsg, res.Msg)
+			}
+			if res.MsgKey == nil || *res.MsgKey != tt.wantKey.Error() {
+				t.Fatalf("expected msg_key %q, got %v", tt.wantKey.Error(), res.MsgKey)
 			}
 			if want := plugnmeet.StatusCode_name[int32(tt.wantCode)]; res.StatusCode != want {
 				t.Fatalf("expected status_code %q, got %q", want, res.StatusCode)
@@ -187,8 +197,11 @@ func TestHandleAuthHeaderCheckProtobufFailure(t *testing.T) {
 	if res.GetStatus() {
 		t.Fatal("expected status false")
 	}
-	if res.GetMsg() != config.ErrAuthS2SApiKeyMissing.Error() {
-		t.Fatalf("expected msg %q, got %q", config.ErrAuthS2SApiKeyMissing.Error(), res.GetMsg())
+	if res.GetMsg() != config.MsgAuthS2SApiKeyMissing {
+		t.Fatalf("expected msg %q, got %q", config.MsgAuthS2SApiKeyMissing, res.GetMsg())
+	}
+	if res.GetMsgKey() != config.ErrAuthS2SApiKeyMissing.Error() {
+		t.Fatalf("expected msg_key %q, got %q", config.ErrAuthS2SApiKeyMissing.Error(), res.GetMsgKey())
 	}
 	if res.GetStatusCode() != plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER {
 		t.Fatalf("expected status code %s, got %s", plugnmeet.StatusCode_MISSING_REQUIRED_PARAMETER, res.GetStatusCode())
@@ -232,6 +245,9 @@ func TestHandleVerifyHeaderTokenFailures(t *testing.T) {
 			if res.Msg != tt.wantKey.Error() {
 				t.Fatalf("expected msg %q, got %q", tt.wantKey.Error(), res.Msg)
 			}
+			if res.MsgKey != nil {
+				t.Fatalf("expected no msg_key for a browser client, got %q", *res.MsgKey)
+			}
 			if want := plugnmeet.StatusCode_name[int32(tt.wantCode)]; res.StatusCode != want {
 				t.Fatalf("expected status_code %q, got %q", want, res.StatusCode)
 			}
@@ -260,6 +276,9 @@ func TestHandleVerifyHeaderTokenProtobufFailure(t *testing.T) {
 	}
 	if res.GetMsg() != config.ErrAuthTokenInvalid.Error() {
 		t.Fatalf("expected msg %q, got %q", config.ErrAuthTokenInvalid.Error(), res.GetMsg())
+	}
+	if res.MsgKey != nil {
+		t.Fatalf("expected no msg_key for a browser client, got %q", res.GetMsgKey())
 	}
 	if res.GetStatusCode() != plugnmeet.StatusCode_INVALID_TOKEN_OR_SIGNATURE {
 		t.Fatalf("expected status code %s, got %s", plugnmeet.StatusCode_INVALID_TOKEN_OR_SIGNATURE, res.GetStatusCode())
@@ -295,20 +314,31 @@ func TestAuthErrorKeysAreTranslationKeys(t *testing.T) {
 	}
 }
 
-// TestAuthS2SMessagesArePlainEnglish guards the contract of the server-to-server
-// /auth endpoints: curated English text, never an i18n key.
-func TestAuthS2SMessagesArePlainEnglish(t *testing.T) {
-	messages := map[string]error{
-		"api key missing": config.ErrAuthS2SApiKeyMissing,
-		"api key invalid": config.ErrAuthS2SApiKeyInvalid,
-		"signature miss":  config.ErrAuthS2SSignatureMissing,
-		"signature bad":   config.ErrAuthS2SSignatureInvalid,
-		"room id header":  config.ErrAuthS2SRoomIdHeaderMissing,
+// TestAuthS2SMessagesMapToCuratedEnglish guards the contract of the
+// server-to-server /auth endpoints: the sentinels carry i18n keys, and each of
+// them has curated English text so an integrator never sees a key.
+func TestAuthS2SMessagesMapToCuratedEnglish(t *testing.T) {
+	messages := map[string]struct {
+		sentinel error
+		english  string
+	}{
+		"api key missing": {config.ErrAuthS2SApiKeyMissing, config.MsgAuthS2SApiKeyMissing},
+		"api key invalid": {config.ErrAuthS2SApiKeyInvalid, config.MsgAuthS2SApiKeyInvalid},
+		"signature miss":  {config.ErrAuthS2SSignatureMissing, config.MsgAuthS2SSignatureMissing},
+		"signature bad":   {config.ErrAuthS2SSignatureInvalid, config.MsgAuthS2SSignatureInvalid},
+		"room id header":  {config.ErrAuthS2SRoomIdHeaderMissing, config.MsgAuthS2SRoomIdHeaderMissing},
 	}
-	for name, sentinel := range messages {
-		msg := sentinel.Error()
-		if msg == "" || strings.HasPrefix(msg, "notifications.") {
-			t.Errorf("%s: %q must be a plain English message, not a translation key", name, msg)
+	for name, tt := range messages {
+		key := tt.sentinel.Error()
+		if strings.ContainsAny(key, " \t") || !strings.HasPrefix(key, "auth.errors.") {
+			t.Errorf("%s: %q must be an auth.errors translation key", name, key)
+		}
+		got, gotKey := config.IntegratorMsgAndKey(key)
+		if got != tt.english {
+			t.Errorf("%s: english text = %q, want %q", name, got, tt.english)
+		}
+		if gotKey != key {
+			t.Errorf("%s: msg_key = %q, want %q", name, gotKey, key)
 		}
 	}
 }

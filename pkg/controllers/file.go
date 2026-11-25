@@ -57,7 +57,7 @@ func (fc *FileController) HandleFileUpload(c fiber.Ctx) error {
 	req := new(models.ResumableUploadReq)
 	if err := c.Bind().Query(req); err != nil {
 		fc.logger.WithError(err).Warnln("failed to bind resumable upload query")
-		return utils.SendCommonErrorJsonResponse(c, config.ErrFileInvalidRequest.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return sendCommonErrorJsonResponse(c, config.ErrFileInvalidRequest.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	req.RoomId = fiber.Locals[string](c, "roomId")
@@ -65,7 +65,7 @@ func (fc *FileController) HandleFileUpload(c fiber.Ctx) error {
 	req.UserId = fiber.Locals[string](c, "requestedUserId")
 
 	if req.RoomSid == "" || req.RoomId == "" {
-		return utils.SendCommonErrorJsonResponse(c, config.ErrFileInvalidRequest.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return sendCommonErrorJsonResponse(c, config.ErrFileInvalidRequest.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	res, fErr := fc.FileModel.ResumableFileUpload(c, req)
@@ -79,7 +79,7 @@ func (fc *FileController) HandleFileUpload(c fiber.Ctx) error {
 		if fErr.Code >= fiber.StatusInternalServerError {
 			statusCode = plugnmeet.StatusCode_INTERNAL_SERVER_ERROR
 		}
-		return utils.SendCommonErrorJsonResponse(c, fErr.Message, statusCode)
+		return sendCommonErrorJsonResponse(c, fErr.Message, statusCode)
 	}
 
 	if res.FilePath == "part_uploaded" {
@@ -133,24 +133,21 @@ func (fc *FileController) HandleUploadBase64EncodedData(c fiber.Ctx) error {
 func (fc *FileController) HandleUploadWhiteboardFile(c fiber.Ctx) error {
 	roomId := c.Get(config.HeaderRoomId)
 	if roomId == "" {
-		return utils.SendCommonErrorJsonResponse(c, config.MsgRoomIdRequired, plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return sendCommonErrorJsonResponse(c, config.ErrRoomIdRequired.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	res, rf, _ := fc.RoomModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{RoomId: roomId})
 	if !res.GetIsActive() {
-		// integrators do not render the client locales, so the room i18n keys are
-		// replaced by one curated message; only the status code is kept
-		return utils.SendCommonErrorJsonResponse(c, config.MsgFileRoomNotActive, res.GetStatusCode())
+		return sendCommonErrorJsonResponse(c, res.GetMsg(), res.GetStatusCode())
 	}
 
 	statusCode, fErr := fc.FileModel.UploadWhiteboardFileFromAuthApi(c, rf)
 	if fErr != nil {
-		// the model answers with curated MsgFile* text, anything else is unknown
-		msg := config.IntegratorMsg(fErr.Message)
-		return utils.SendCommonErrorJsonResponse(c, msg, statusCode)
+		// the model answers with the client i18n keys of the file block
+		return sendCommonErrorJsonResponse(c, fErr.Message, statusCode)
 	}
 
-	return utils.SendCommonProtoJsonResponse(c, true, config.MsgIntegratorSuccess, plugnmeet.StatusCode_SUCCESS)
+	return sendCommonProtoJsonResponse(c, true, config.MsgSuccess, plugnmeet.StatusCode_SUCCESS)
 }
 
 // HandleDownloadUploadedFile handles downloading an uploaded file.
@@ -205,7 +202,7 @@ func (fc *FileController) HandleConvertWhiteboardFile(c fiber.Ctx) error {
 	req := new(models.ConvertWhiteboardFileReq)
 	if err := c.Bind().Body(req); err != nil {
 		fc.logger.WithError(err).Warnln("failed to bind whiteboard file convert request")
-		return utils.SendCommonErrorJsonResponse(c, config.ErrFileInvalidRequest.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return sendCommonErrorJsonResponse(c, config.ErrFileInvalidRequest.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 	req.RoomId = fiber.Locals[string](c, "roomId")
 	req.RoomSid = fiber.Locals[string](c, "roomSid")
@@ -213,16 +210,16 @@ func (fc *FileController) HandleConvertWhiteboardFile(c fiber.Ctx) error {
 
 	acState, _, _ := fc.RoomModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{RoomId: req.RoomId})
 	if !acState.GetIsActive() {
-		return utils.SendCommonErrorJsonResponse(c, acState.GetMsg(), acState.GetStatusCode())
+		return sendCommonErrorJsonResponse(c, acState.GetMsg(), acState.GetStatusCode())
 	}
 
 	// only the presenter can convert whiteboard files
 	if requestedUserId == "" || !fc.NatsService.IsUserPresenter(req.RoomId, requestedUserId) {
-		return utils.SendCommonErrorJsonResponse(c, config.ErrFileOnlyPresenter.Error(), plugnmeet.StatusCode_PERMISSION_DENIED)
+		return sendCommonErrorJsonResponse(c, config.ErrFileOnlyPresenter.Error(), plugnmeet.StatusCode_PERMISSION_DENIED)
 	}
 
 	if req.FilePath == "" {
-		return utils.SendCommonErrorJsonResponse(c, config.ErrFilePathRequired.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return sendCommonErrorJsonResponse(c, config.ErrFilePathRequired.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 	log := fc.logger.WithField("method", "HandleConvertWhiteboardFile")
 
@@ -235,22 +232,22 @@ func (fc *FileController) HandleConvertWhiteboardFile(c fiber.Ctx) error {
 		if errors.Is(err, config.ErrConversionTimeout) {
 			// not a failure: the conversion keeps running in the background and the
 			// converted file will be announced once it is ready
-			return utils.SendCommonProtoJsonResponse(c, true, config.MsgFileConversionStarted, plugnmeet.StatusCode_SUCCESS)
+			return sendCommonProtoJsonResponse(c, true, config.MsgFileConversionStarted, plugnmeet.StatusCode_SUCCESS)
 		}
 		if errors.Is(err, config.ErrInvalidFilePath) {
 			log.WithError(err).Warnln("invalid whiteboard file path")
-			return utils.SendCommonErrorJsonResponse(c, config.ErrFileInvalidPath.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
+			return sendCommonErrorJsonResponse(c, config.ErrFileInvalidPath.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 		}
 		if errors.Is(err, config.ErrFileNotFound) {
 			log.WithError(err).Warnln("whiteboard file not found")
-			return utils.SendCommonErrorJsonResponse(c, config.ErrFilePathNotFound.Error(), plugnmeet.StatusCode_NOT_FOUND)
+			return sendCommonErrorJsonResponse(c, config.ErrFilePathNotFound.Error(), plugnmeet.StatusCode_NOT_FOUND)
 		}
 		if errors.Is(err, config.ErrFileTypeNotAllowed) {
 			log.WithError(err).Warnln("whiteboard file type is not allowed")
-			return utils.SendCommonErrorJsonResponse(c, config.ErrFileTypeNotAllowed.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
+			return sendCommonErrorJsonResponse(c, config.ErrFileTypeNotAllowed.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 		}
 		log.WithError(err).Errorln("whiteboard file conversion failed")
-		return utils.SendCommonErrorJsonResponse(c, config.ErrFileUnexpected.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
+		return sendCommonErrorJsonResponse(c, config.ErrFileUnexpected.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 
 	return c.JSON(res)
@@ -260,7 +257,7 @@ func (fc *FileController) HandleWhiteboardPdfExportSliceUpload(c fiber.Ctx) erro
 	req := new(models.WhiteboardPdfExportSliceUploadReq)
 	if err := c.Bind().Form(req); err != nil {
 		fc.logger.WithError(err).Warnln("failed to bind whiteboard pdf export slice upload form")
-		return utils.SendCommonErrorJsonResponse(c, config.ErrFileInvalidRequest.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return sendCommonErrorJsonResponse(c, config.ErrFileInvalidRequest.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	req.RoomId = fiber.Locals[string](c, "roomId")
@@ -269,12 +266,12 @@ func (fc *FileController) HandleWhiteboardPdfExportSliceUpload(c fiber.Ctx) erro
 
 	acState, _, _ := fc.RoomModel.IsRoomActive(&plugnmeet.IsRoomActiveReq{RoomId: req.RoomId})
 	if !acState.GetIsActive() {
-		return utils.SendCommonErrorJsonResponse(c, acState.GetMsg(), acState.GetStatusCode())
+		return sendCommonErrorJsonResponse(c, acState.GetMsg(), acState.GetStatusCode())
 	}
 
 	// only the presenter can upload whiteboard PDF export slices
 	if req.UserId == "" || !fc.NatsService.IsUserPresenter(req.RoomId, req.UserId) {
-		return utils.SendCommonErrorJsonResponse(c, config.ErrFileOnlyPresenter.Error(), plugnmeet.StatusCode_PERMISSION_DENIED)
+		return sendCommonErrorJsonResponse(c, config.ErrFileOnlyPresenter.Error(), plugnmeet.StatusCode_PERMISSION_DENIED)
 	}
 
 	if fErr := fc.FileModel.WhiteboardPdfExportSliceUpload(c, req); fErr != nil {
@@ -282,10 +279,10 @@ func (fc *FileController) HandleWhiteboardPdfExportSliceUpload(c fiber.Ctx) erro
 		if fErr.Code >= fiber.StatusInternalServerError {
 			statusCode = plugnmeet.StatusCode_INTERNAL_SERVER_ERROR
 		}
-		return utils.SendCommonErrorJsonResponse(c, fErr.Message, statusCode)
+		return sendCommonErrorJsonResponse(c, fErr.Message, statusCode)
 	}
 
-	return utils.SendCommonProtoJsonResponse(c, true, config.MsgSuccess, plugnmeet.StatusCode_SUCCESS)
+	return sendCommonProtoJsonResponse(c, true, config.MsgSuccess, plugnmeet.StatusCode_SUCCESS)
 }
 
 func (fc *FileController) HandleWhiteboardPdfExportMerge(c fiber.Ctx) error {
@@ -355,9 +352,11 @@ func (fc *FileController) HandleGetClientFiles(c fiber.Ctx) error {
 		jsFiles = fc.AppConfig.ClientFiles["js"]
 	}
 
+	msg, msgKey := callerMsgWithKey(c, config.MsgSuccess)
 	return utils.SendProtoJsonResponse(c, &plugnmeet.GetClientFilesRes{
 		Status:           true,
-		Msg:              callerMsg(c, config.MsgSuccess),
+		Msg:              msg,
+		MsgKey:           msgKey,
 		Css:              cssFiles,
 		Js:               jsFiles,
 		JsFiles:          jsFiles,

@@ -36,20 +36,22 @@ func NewArtifactController(args ArtifactControllerArgs) *ArtifactController {
 func (ac *ArtifactController) HandleFetchArtifacts(c fiber.Ctx) error {
 	req := new(plugnmeet.FetchArtifactsReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthInvalidRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return sendCommonProtoJsonResponse(c, false, config.ErrArtifactInvalidRequest.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	result, err := ac.ArtifactModel.FetchArtifacts(req)
 	if err != nil {
 		if errors.Is(err, config.NotFoundErr) {
-			return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthArtifactNotFound, plugnmeet.StatusCode_NOT_FOUND)
+			return sendCommonProtoJsonResponse(c, false, config.ErrArtifactNotFound.Error(), plugnmeet.StatusCode_NOT_FOUND)
 		}
-		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthArtifactsFetchFailed, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
+		return sendCommonProtoJsonResponse(c, false, config.ErrArtifactFetchFailed.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 
+	msg, msgKey := callerMsgWithKey(c, config.MsgSuccess)
 	r := &plugnmeet.FetchArtifactsRes{
 		Status:     true,
-		Msg:        config.MsgIntegratorSuccess,
+		Msg:        msg,
+		MsgKey:     msgKey,
 		StatusCode: plugnmeet.StatusCode_SUCCESS,
 		Result:     result,
 	}
@@ -60,20 +62,27 @@ func (ac *ArtifactController) HandleFetchArtifacts(c fiber.Ctx) error {
 func (ac *ArtifactController) HandleGetArtifactDownloadToken(c fiber.Ctx) error {
 	req := new(plugnmeet.GetArtifactDownloadTokenReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthInvalidRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return sendCommonProtoJsonResponse(c, false, config.ErrArtifactInvalidRequest.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	token, err := ac.ArtifactModel.GetArtifactDownloadToken(req)
 	if err != nil {
-		if errors.Is(err, config.NotFoundErr) {
-			return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthArtifactNotFound, plugnmeet.StatusCode_NOT_FOUND)
+		switch {
+		case errors.Is(err, config.NotFoundErr):
+			return sendCommonProtoJsonResponse(c, false, config.ErrArtifactNotFound.Error(), plugnmeet.StatusCode_NOT_FOUND)
+		case errors.Is(err, config.ErrArtifactNotDownloadable):
+			return sendCommonProtoJsonResponse(c, false, config.ErrArtifactNotDownloadable.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
+		case errors.Is(err, config.ErrArtifactNoDownloadableFile):
+			return sendCommonProtoJsonResponse(c, false, config.ErrArtifactNoDownloadableFile.Error(), plugnmeet.StatusCode_NOT_FOUND)
 		}
-		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthDownloadTokenFailed, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
+		return sendCommonProtoJsonResponse(c, false, config.ErrArtifactDownloadTokenFailed.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 
+	msg, msgKey := callerMsgWithKey(c, config.MsgSuccess)
 	r := &plugnmeet.GetArtifactDownloadTokenRes{
 		Status:     true,
-		Msg:        config.MsgIntegratorSuccess,
+		Msg:        msg,
+		MsgKey:     msgKey,
 		StatusCode: plugnmeet.StatusCode_SUCCESS,
 		Token:      &token,
 	}
@@ -98,16 +107,17 @@ func (ac *ArtifactController) HandleDownloadArtifact(c fiber.Ctx) error {
 func (ac *ArtifactController) HandleGetArtifactInfo(c fiber.Ctx) error {
 	req := new(plugnmeet.ArtifactInfoReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthInvalidRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return sendCommonProtoJsonResponse(c, false, config.ErrArtifactInvalidRequest.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	res, err := ac.ArtifactModel.GetArtifactInfoByArtifactId(req.ArtifactId)
 	if err != nil {
 		if errors.Is(err, config.NotFoundErr) {
-			return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthArtifactNotFound, plugnmeet.StatusCode_NOT_FOUND)
+			return sendCommonProtoJsonResponse(c, false, config.ErrArtifactNotFound.Error(), plugnmeet.StatusCode_NOT_FOUND)
 		}
-		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthArtifactsFetchFailed, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
+		return sendCommonProtoJsonResponse(c, false, config.ErrArtifactFetchFailed.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
+	res.Msg, res.MsgKey = callerMsgWithKey(c, res.GetMsg())
 	return utils.SendProtoJsonResponse(c, res)
 }
 
@@ -115,15 +125,18 @@ func (ac *ArtifactController) HandleGetArtifactInfo(c fiber.Ctx) error {
 func (ac *ArtifactController) HandleDeleteArtifact(c fiber.Ctx) error {
 	req := new(plugnmeet.DeleteArtifactReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthInvalidRequest, plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return sendCommonProtoJsonResponse(c, false, config.ErrArtifactInvalidRequest.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	if err := ac.ArtifactModel.DeleteArtifact(req); err != nil {
-		if errors.Is(err, config.NotFoundErr) {
-			return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthArtifactNotFound, plugnmeet.StatusCode_NOT_FOUND)
+		switch {
+		case errors.Is(err, config.NotFoundErr):
+			return sendCommonProtoJsonResponse(c, false, config.ErrArtifactNotFound.Error(), plugnmeet.StatusCode_NOT_FOUND)
+		case errors.Is(err, config.ErrArtifactDeleteNotAllowed):
+			return sendCommonProtoJsonResponse(c, false, config.ErrArtifactDeleteNotAllowed.Error(), plugnmeet.StatusCode_PERMISSION_DENIED)
 		}
-		return utils.SendCommonProtoJsonResponse(c, false, config.MsgAuthArtifactDeleteFailed, plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
+		return sendCommonProtoJsonResponse(c, false, config.ErrArtifactDeleteFailed.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR)
 	}
 
-	return utils.SendCommonProtoJsonResponse(c, true, config.MsgIntegratorSuccess, plugnmeet.StatusCode_SUCCESS)
+	return sendCommonProtoJsonResponse(c, true, config.MsgSuccess, plugnmeet.StatusCode_SUCCESS)
 }

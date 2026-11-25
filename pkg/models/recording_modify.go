@@ -10,7 +10,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
@@ -380,11 +379,13 @@ func (m *RecordingModel) MergeRecordings(ctx context.Context, req *plugnmeet.Mer
 			// We also need the room table ID from that session for the transcoding task.
 			roomInfo, err = m.ds.GetRoomInfoBySid(roomSid, nil)
 			if err != nil {
-				return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fmt.Errorf("could not fetch room info for sid: %s", roomSid)
+				log.WithError(err).Error("could not fetch room info for sid")
+				return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrRecordingMergeFailed
 			}
 			// We MUST have roomInfo here.
 			if roomInfo == nil {
-				return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fmt.Errorf("data integrity issue: room session not found for sid %s", roomSid)
+				log.WithField("room_sid", roomSid).Error("data integrity issue: room session not found for sid")
+				return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrRecordingMergeFailed
 			}
 			roomTableId = int64(roomInfo.ID)
 		}
@@ -395,11 +396,11 @@ func (m *RecordingModel) MergeRecordings(ctx context.Context, req *plugnmeet.Mer
 	locked, err := lock.TryLock(ctx)
 	if err != nil {
 		log.WithError(err).Error("failed to acquire lock")
-		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, "failed to acquire lock")
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, config.ErrRecordingMergeFailed
 	}
 	if !locked {
 		log.Warn("another merge request is already in progress")
-		return plugnmeet.StatusCode_CONFLICT, fiber.NewError(fiber.StatusConflict, "another request for this scope already registered, rejecting new one")
+		return plugnmeet.StatusCode_CONFLICT, config.ErrRecordingMergeInProgress
 	}
 	defer func() {
 		if err != nil {
@@ -420,7 +421,7 @@ func (m *RecordingModel) MergeRecordings(ctx context.Context, req *plugnmeet.Mer
 	}
 
 	if len(filePaths) < 2 { // A merge requires at least two files.
-		return plugnmeet.StatusCode_INVALID_PARAMETERS, fmt.Errorf("at least two recordings are required to merge")
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, config.ErrRecordingMergeMinRecordings
 	}
 
 	task := &plugnmeet.TranscodingTask{
@@ -450,7 +451,8 @@ func (m *RecordingModel) MergeRecordings(ctx context.Context, req *plugnmeet.Mer
 		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, err
 	}
 	if pubAck.Duplicate {
-		return plugnmeet.StatusCode_CONFLICT, fmt.Errorf("another request (%d) for this scope already registered, rejecting new one", pubAck.Sequence)
+		log.WithField("sequence", pubAck.Sequence).Warn("another request for this scope already registered, rejecting new one")
+		return plugnmeet.StatusCode_CONFLICT, config.ErrRecordingMergeInProgress
 	}
 
 	log.Infof("Successfully registered new recordings merge task (%d) with %d files", pubAck.Sequence, len(filePaths))

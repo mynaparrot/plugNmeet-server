@@ -3,6 +3,8 @@ package controllers
 import (
 	"buf.build/go/protovalidate"
 	"github.com/gofiber/fiber/v3"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -46,4 +48,53 @@ func callerMsg(c fiber.Ctx, msg string) string {
 		return msg
 	}
 	return config.IntegratorMsg(msg)
+}
+
+// callerMsgWithKey is callerMsg for the response envelopes which carry an
+// optional msg_key: browser clients keep the client-facing i18n key as msg and
+// get no msg_key, integrators get the curated English text and the key itself.
+func callerMsgWithKey(c fiber.Ctx, msg string) (string, *string) {
+	if fiber.Locals[string](c, config.LocalsCallerKey) != config.CallerIntegrator {
+		return msg, nil
+	}
+	text, key := config.IntegratorMsgAndKey(msg)
+	return text, &key
+}
+
+// sendCommonErrorJsonResponse sends a failed CommonResponse as protojson. msg is a
+// client i18n key or a config sentinel; an integrator caller gets the curated
+// English text plus the key in msg_key.
+func sendCommonErrorJsonResponse(c fiber.Ctx, msg string, code plugnmeet.StatusCode) error {
+	text, key := callerMsgWithKey(c, msg)
+	return utils.SendCommonErrorJsonResponse(c, text, code, derefMsgKey(key))
+}
+
+// sendCommonProtoJsonResponse sends a CommonResponse as protojson.
+func sendCommonProtoJsonResponse(c fiber.Ctx, status bool, msg string, code plugnmeet.StatusCode) error {
+	text, key := callerMsgWithKey(c, msg)
+	return utils.SendCommonProtoJsonResponse(c, status, text, code, derefMsgKey(key))
+}
+
+// sendCommonErrorProtobufResponse sends a failed CommonResponse as protobuf.
+func sendCommonErrorProtobufResponse(c fiber.Ctx, msg string, code plugnmeet.StatusCode) error {
+	text, key := callerMsgWithKey(c, msg)
+	res := &plugnmeet.CommonResponse{
+		Status:     false,
+		Msg:        text,
+		StatusCode: code,
+		MsgKey:     key,
+	}
+	marshal, err := proto.Marshal(res)
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderContentType, "application/protobuf")
+	return c.Status(utils.CommonErrorHTTPStatus(code)).Send(marshal)
+}
+
+func derefMsgKey(key *string) string {
+	if key == nil {
+		return ""
+	}
+	return *key
 }

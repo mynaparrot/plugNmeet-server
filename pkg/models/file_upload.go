@@ -371,11 +371,11 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 	locked, err := lock.TryLock(c.Context())
 	if err != nil {
 		log.WithError(err).Error("failed to acquire lock")
-		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, config.MsgFileUploadFailed)
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, config.ErrFileUploadFailed.Error())
 	}
 	if !locked {
 		log.Warn("another whiteboard file upload is already in progress")
-		return plugnmeet.StatusCode_CONFLICT, fiber.NewError(fiber.StatusConflict, config.MsgFileUploadInProgress)
+		return plugnmeet.StatusCode_CONFLICT, fiber.NewError(fiber.StatusConflict, config.ErrFileUploadInProgress.Error())
 	}
 	defer func() {
 		if fiberErr != nil {
@@ -390,7 +390,7 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 	if documentLink != "" {
 		// fast checking and return if error
 		if _, err := url.ParseRequestURI(documentLink); err != nil {
-			return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusBadRequest, config.MsgFileInvalidDocumentLink)
+			return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusBadRequest, config.ErrFileInvalidDocumentLink.Error())
 		}
 
 		gLog := m.logger.WithFields(logrus.Fields{
@@ -415,7 +415,7 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 		case err := <-errChan:
 			if err != nil {
 				gLog.WithError(err).Error("Failed to process file")
-				return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, config.MsgFileConversionFailed)
+				return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, config.ErrFileConversionFailed.Error())
 			}
 			gLog.Info("File successfully processed")
 		case <-c.Context().Done():
@@ -429,23 +429,23 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 	// The rest of the function handles direct file uploads
 	document, err := c.FormFile("document")
 	if err != nil {
-		return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusBadRequest, config.MsgFileInvalidRequest)
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusBadRequest, config.ErrFileInvalidRequest.Error())
 	}
 
 	// Check file size before saving
 	if document.Size > int64(maxSize) {
-		return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusRequestEntityTooLarge, config.MsgFileTooLarge)
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusRequestEntityTooLarge, config.ErrFileTooLarge.Error())
 	}
 
 	f, err := document.Open()
 	if err != nil {
 		log.WithError(err).Error("failed to open the uploaded document")
-		return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusBadRequest, config.MsgFileUploadFailed)
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusBadRequest, config.ErrFileUploadFailed.Error())
 	}
 
 	// detectMimeTypeForValidation will run f.Close() in defer
 	if err := m.detectMimeTypeForValidation(f); err != nil {
-		return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusBadRequest, config.MsgFileTypeNotAllowed)
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, fiber.NewError(fiber.StatusBadRequest, config.ErrFileTypeNotAllowed.Error())
 	}
 
 	fileName := helpers.MakeSafeFilename(document.Filename, true)
@@ -454,12 +454,12 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 
 	if err := os.MkdirAll(filepath.Join(m.app.UploadFileSettings.Path, rf.RoomSid), 0755); err != nil {
 		log.WithError(err).Errorln("failed to create file directory")
-		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, config.MsgFileUploadFailed)
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, config.ErrFileUploadFailed.Error())
 	}
 
 	if err := c.SaveFile(document, finalFile); err != nil {
 		log.WithError(err).Errorln("failed to save the uploaded document")
-		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, config.MsgFileUploadFailed)
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, config.ErrFileUploadFailed.Error())
 	}
 
 	// now we're good to for start converting, ConvertAndBroadcastWhiteboardFile expect savePath not full path
@@ -469,7 +469,7 @@ func (m *FileModel) UploadWhiteboardFileFromAuthApi(c fiber.Ctx, rf *plugnmeet.N
 			return plugnmeet.StatusCode_SUCCESS, nil
 		}
 		log.WithError(err).Errorln("failed to convert the uploaded document")
-		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, config.MsgFileConversionFailed)
+		return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, fiber.NewError(fiber.StatusInternalServerError, config.ErrFileConversionFailed.Error())
 	}
 
 	log.Infof("File %s successfully uploaded and broadcasted", fileName)

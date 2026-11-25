@@ -10,18 +10,18 @@ import (
 // render the client locales: the Auth API (/auth), LTI (/lti) and BBB
 // (/:apiKey/bigbluebutton/api) endpoints. Their callers are integrators, so the
 // text is short English and deliberately not an i18n key. Client-facing i18n keys
-// live in api_error_msgs.go; the two must never be mixed.
+// live in error_msgs_api.go; integratorMsgs maps them to the English text below, so
+// an integrator response can carry the key in msg_key next to the English msg.
 
-// ErrAuthS2S* are the API-KEY/HASH-SIGNATURE failures of the server-to-server
-// /auth endpoints. Their callers are integrators, not browsers, so the messages
-// are short curated English text and deliberately not i18n keys: keep them out of
-// the client locales.
-var (
-	ErrAuthS2SApiKeyMissing       = errors.New("API key is missing")
-	ErrAuthS2SApiKeyInvalid       = errors.New("API key is invalid")
-	ErrAuthS2SSignatureMissing    = errors.New("hash signature is missing")
-	ErrAuthS2SSignatureInvalid    = errors.New("hash signature could not be verified")
-	ErrAuthS2SRoomIdHeaderMissing = errors.New("Room-Id header is missing")
+// MsgAuthS2S* are the curated English text of the API-KEY/HASH-SIGNATURE
+// failures of the server-to-server /auth endpoints. The matching ErrAuthS2S*
+// sentinels live in error_msgs_api.go.
+const (
+	MsgAuthS2SApiKeyMissing       = "API key is missing"
+	MsgAuthS2SApiKeyInvalid       = "API key is invalid"
+	MsgAuthS2SSignatureMissing    = "hash signature is missing"
+	MsgAuthS2SSignatureInvalid    = "hash signature could not be verified"
+	MsgAuthS2SRoomIdHeaderMissing = "Room-Id header is missing"
 )
 
 // The LTI launch errors are internal control sentinels; their text is only logged
@@ -32,19 +32,13 @@ var (
 	UserIdOrEmailRequired = errors.New("either value of user_id or lis_person_contact_email_primary  required")
 )
 
-// ErrAIAgentInvalidMCPServer is the CreateRoom refusal of an external MCP server
-// configuration which can never be dialled safely. Its text is plain English for
-// the same reason as the other integrator messages below.
-var (
-	ErrAIAgentInvalidMCPServer = errors.New(MsgAuthAIAgentInvalidMCPServer)
-)
-
 // MsgRoomIdRequired is the plain error text when an Auth API request omits room_id.
 const MsgRoomIdRequired = "missing required field room_id"
 
-// MsgFile* are the file messages of the endpoints whose callers do not render the
-// client locales: browser file downloads and the Auth API (integrators). They are
-// short curated English text, deliberately not i18n keys.
+// MsgFile* are the plain English file messages of the endpoints whose callers do
+// not render the client locales: browser file downloads and the Auth API
+// (integrators). The Auth API failures are identified by the file.errors.* keys of
+// error_msgs_api.go and mapped to these texts by integratorMsgs.
 const (
 	MsgFileDownloadNotFound      = "File not found."
 	MsgFileDownloadTokenInvalid  = "The download link is invalid or has expired."
@@ -58,7 +52,6 @@ const (
 	MsgFileTypeNotAllowed        = "This file type is not allowed."
 	MsgFileUploadFailed          = "The file upload failed."
 	MsgFileConversionFailed      = "The file could not be converted."
-	MsgFileRoomNotActive         = "The room is not active."
 )
 
 // MsgFileDownloadNotFoundNamed is the browser answer when a verified file has
@@ -124,11 +117,19 @@ const (
 	MsgAuthRecordingUpdateFailed       = "The recording could not be updated."
 	MsgAuthRecordingDeleteFailed       = "The recording could not be deleted."
 	MsgAuthRecordingMergeFailed        = "The recordings could not be merged."
+	// the two merge refusals the model detects before publishing the task
+	MsgAuthRecordingMergeInProgress    = "A recording merge is already in progress for this room."
+	MsgAuthRecordingMergeMinRecordings = "At least two recordings are required to merge."
 	MsgAuthDownloadTokenFailed         = "The download token could not be generated."
 	MsgAuthArtifactNotFound            = "The artifact was not found."
 	MsgAuthArtifactsFetchFailed        = "The artifacts could not be fetched."
 	MsgAuthArtifactDeleteFailed        = "The artifact could not be deleted."
+	MsgAuthArtifactNotDownloadable     = "This artifact type is not downloadable."
+	MsgAuthArtifactNoDownloadableFile  = "The artifact does not have a downloadable file."
+	MsgAuthArtifactDeleteNotAllowed    = "Deleting this artifact type is not allowed."
 	MsgAuthAnalyticsFetchFailed        = "The analytics could not be fetched."
+	MsgAuthAnalyticsNotFound           = "The analytics file was not found."
+	MsgAuthAnalyticsDeleteFailed       = "The analytics file could not be deleted."
 	// The AI agent answers a browser client with an i18n key (api_error_msgs.go),
 	// so every one of these must have a curated integrator text here.
 	MsgAuthAIAgentNotAllowed       = "The AI Assistant is not enabled for this room."
@@ -138,8 +139,12 @@ const (
 	MsgAuthAIAgentProviderMissing  = "No AI provider is configured for the AI Assistant."
 	MsgAuthAIAgentInvalidMCPServer = "ai_agent_features.mcp_servers contains an invalid or disallowed server configuration"
 	// The session routing refusals of the same CreateRoom flow.
-	MsgAuthAIAgentAllowedUsersRequired  = "ai_agent_features.auto_session_config.allowed_participant_ids requires at least one participant user_id."
-	MsgAuthAIAgentMaxConcurrentSessions = "ai_agent_features.auto_session_config.max_concurrent_sessions is required for open per-user AI sessions."
+	MsgAuthAIAgentAllowedUsersRequired     = "ai_agent_features.auto_session_config.allowed_participant_ids requires at least one participant user_id."
+	MsgAuthAIAgentMaxConcurrentSessions    = "ai_agent_features.auto_session_config.max_concurrent_sessions is required for open per-user AI sessions."
+	MsgAuthAIAgentAutoGenUserIdUnsupported = "room_features.auto_gen_user_id cannot be enabled when ai_agent_features.session_mode is set to controlled_users."
+	// the join-time refusals of a 1-on-1 AI session
+	MsgAuthAIAgentUserNotAllowed = "The user is not allowed to join this AI session."
+	MsgAuthAIAgentSessionsFull   = "All AI sessions are currently full. Please try again shortly."
 )
 
 // LTI (/lti) messages.
@@ -233,17 +238,68 @@ var integratorMsgs = map[string]string{
 	ErrAIAgentProviderMissing.Error():  MsgAuthAIAgentProviderMissing,
 	ErrAIAgentInvalidMCPServer.Error(): MsgAuthAIAgentInvalidMCPServer,
 	// session routing refusals of the same CreateRoom flow
-	ErrAIAgentAllowedUsersRequired.Error():  MsgAuthAIAgentAllowedUsersRequired,
-	ErrAIAgentMaxConcurrentSessions.Error(): MsgAuthAIAgentMaxConcurrentSessions,
+	ErrAIAgentAllowedUsersRequired.Error():     MsgAuthAIAgentAllowedUsersRequired,
+	ErrAIAgentMaxConcurrentSessions.Error():    MsgAuthAIAgentMaxConcurrentSessions,
+	ErrAIAgentAutoGenUserIdUnsupported.Error(): MsgAuthAIAgentAutoGenUserIdUnsupported,
+	// join-time refusals of a 1-on-1 AI session
+	ErrAIAgentUserNotAllowed.Error(): MsgAuthAIAgentUserNotAllowed,
+	ErrAIAgentSessionsFull.Error():   MsgAuthAIAgentSessionsFull,
+	// API-KEY/HASH-SIGNATURE failures of the /auth endpoints
+	ErrAuthS2SApiKeyMissing.Error():       MsgAuthS2SApiKeyMissing,
+	ErrAuthS2SApiKeyInvalid.Error():       MsgAuthS2SApiKeyInvalid,
+	ErrAuthS2SSignatureMissing.Error():    MsgAuthS2SSignatureMissing,
+	ErrAuthS2SSignatureInvalid.Error():    MsgAuthS2SSignatureInvalid,
+	ErrAuthS2SRoomIdHeaderMissing.Error(): MsgAuthS2SRoomIdHeaderMissing,
+	ErrAuthUnexpected.Error():             MsgIntegratorUnexpected,
+	// file failures of the /auth upload endpoint
+	ErrFileInvalidRequest.Error():      MsgFileInvalidRequest,
+	ErrFileUploadInProgress.Error():    MsgFileUploadInProgress,
+	ErrFileInvalidDocumentLink.Error(): MsgFileInvalidDocumentLink,
+	ErrFileTooLarge.Error():            MsgFileTooLarge,
+	ErrFileTypeNotAllowed.Error():      MsgFileTypeNotAllowed,
+	ErrFileUploadFailed.Error():        MsgFileUploadFailed,
+	ErrFileConversionFailed.Error():    MsgFileConversionFailed,
+	// recording failures of the /auth recording endpoints
+	ErrRecordingInvalidRequest.Error():      MsgAuthInvalidRequest,
+	ErrRecordingFetchFailed.Error():         MsgAuthRecordingsFetchFailed,
+	ErrRecordingUpdateFailed.Error():        MsgAuthRecordingUpdateFailed,
+	ErrRecordingDeleteFailed.Error():        MsgAuthRecordingDeleteFailed,
+	ErrRecordingMergeFailed.Error():         MsgAuthRecordingMergeFailed,
+	ErrRecordingDownloadTokenFailed.Error(): MsgAuthDownloadTokenFailed,
+	// merge refusals the model detects itself
+	ErrRecordingMergeInProgress.Error():    MsgAuthRecordingMergeInProgress,
+	ErrRecordingMergeMinRecordings.Error(): MsgAuthRecordingMergeMinRecordings,
+	// artifact and analytics failures of the /auth endpoints
+	ErrArtifactInvalidRequest.Error():      MsgAuthInvalidRequest,
+	ErrArtifactNotFound.Error():            MsgAuthArtifactNotFound,
+	ErrArtifactFetchFailed.Error():         MsgAuthArtifactsFetchFailed,
+	ErrArtifactDeleteFailed.Error():        MsgAuthArtifactDeleteFailed,
+	ErrArtifactDownloadTokenFailed.Error(): MsgAuthDownloadTokenFailed,
+	ErrArtifactNotDownloadable.Error():     MsgAuthArtifactNotDownloadable,
+	ErrArtifactNoDownloadableFile.Error():  MsgAuthArtifactNoDownloadableFile,
+	ErrArtifactDeleteNotAllowed.Error():    MsgAuthArtifactDeleteNotAllowed,
+	ErrAnalyticsFetchFailed.Error():        MsgAuthAnalyticsFetchFailed,
+	// the /auth analytics endpoints of the cloud edition (pnmmanager)
+	ErrAnalyticsInvalidRequest.Error():      MsgAuthInvalidRequest,
+	ErrAnalyticsNotFound.Error():            MsgAuthAnalyticsNotFound,
+	ErrAnalyticsDeleteFailed.Error():        MsgAuthAnalyticsDeleteFailed,
+	ErrAnalyticsDownloadTokenFailed.Error(): MsgAuthDownloadTokenFailed,
 }
 
-// IntegratorMsg returns the curated English text for a message which was produced
-// for a browser client, i.e. a client i18n key. Unknown messages, including raw
-// operational error text, fall back to MsgIntegratorUnexpected; handlers must log
-// the raw error server-side before answering.
-func IntegratorMsg(msg string) string {
+// IntegratorMsgAndKey returns the curated English text of msg and its canonical i18n key.
+// Unknown messages, including raw operational error text, fall back to MsgIntegratorUnexpected and the generic error key
+// so internal details never leak into an integrator response.
+func IntegratorMsgAndKey(msg string) (string, string) {
 	if m, ok := integratorMsgs[msg]; ok {
-		return m
+		return m, msg
 	}
-	return MsgIntegratorUnexpected
+	return MsgIntegratorUnexpected, ErrAuthUnexpected.Error()
+}
+
+// IntegratorMsg returns the curated English text for a message which was produced for a browser client,
+// i.e. a client i18n key. Unknown messages, including raw operational error text, fall back to MsgIntegratorUnexpected;
+// handlers must log the raw error server-side before answering.
+func IntegratorMsg(msg string) string {
+	m, _ := IntegratorMsgAndKey(msg)
+	return m
 }

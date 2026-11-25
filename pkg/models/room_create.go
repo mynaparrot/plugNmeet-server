@@ -374,6 +374,13 @@ func (m *RoomModel) validateAIAgentFeatures(userCtx context.Context, r *plugnmee
 		return nil
 	}
 
+	// auto-generated ids would bypass the roster of a controlled-users room
+	if r.GetMetadata().GetRoomFeatures().GetAutoGenUserId() &&
+		features.GetSessionMode() == plugnmeet.AIAgentSessionMode_AI_AGENT_SESSION_MODE_CONTROLLED_USERS {
+		log.WithError(config.ErrAIAgentAutoGenUserIdUnsupported).Warn("ai_agent_features was refused")
+		return config.ErrAIAgentAutoGenUserIdUnsupported
+	}
+
 	e2ee := r.GetMetadata().GetRoomFeatures().GetEndToEndEncryptionFeatures()
 	insightsAllowed := r.GetMetadata().GetRoomFeatures().GetInsightsFeatures().GetIsAllow()
 

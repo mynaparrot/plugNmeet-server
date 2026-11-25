@@ -45,17 +45,17 @@ func NewUserController(args UserControllerArgs) *UserController {
 func (uc *UserController) HandleGenerateJoinToken(c fiber.Ctx) error {
 	req := new(plugnmeet.GenerateTokenReq)
 	if err := parseAndValidateRequest(c.Body(), req); err != nil {
-		return utils.SendCommonErrorJsonResponse(c, callerMsg(c, config.ErrUserInvalidRequest.Error()), plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return sendCommonErrorJsonResponse(c, config.ErrUserInvalidRequest.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	if req.UserInfo == nil {
-		return utils.SendCommonErrorJsonResponse(c, callerMsg(c, config.ErrUserInfoRequired.Error()), plugnmeet.StatusCode_INVALID_PARAMETERS)
+		return sendCommonErrorJsonResponse(c, config.ErrUserInfoRequired.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
 	}
 
 	// don't generate token if user is blocked
 	exist := uc.NatsService.IsUserExistInBlockList(req.RoomId, req.UserInfo.UserId)
 	if exist {
-		return utils.SendCommonErrorJsonResponse(c, callerMsg(c, config.ErrAuthUserBlocked.Error()), plugnmeet.StatusCode_USER_BLOCKED)
+		return sendCommonErrorJsonResponse(c, config.ErrAuthUserBlocked.Error(), plugnmeet.StatusCode_USER_BLOCKED)
 	}
 
 	// Use the single point of truth to check if the room is active.
@@ -66,17 +66,19 @@ func (uc *UserController) HandleGenerateJoinToken(c fiber.Ctx) error {
 	if !rr.GetIsActive() {
 		// the room either does not exist or is not running; the status code
 		// stays accurate for both cases
-		return utils.SendCommonErrorJsonResponse(c, callerMsg(c, config.ErrRoomNotActive.Error()), rr.GetStatusCode())
+		return sendCommonErrorJsonResponse(c, config.ErrRoomNotActive.Error(), rr.GetStatusCode())
 	}
 
 	statusCode, token, err := uc.UserModel.GetPNMJoinToken(c.Context(), req, false)
 	if err != nil {
-		return utils.SendCommonErrorJsonResponse(c, callerMsg(c, err.Error()), statusCode)
+		return sendCommonErrorJsonResponse(c, err.Error(), statusCode)
 	}
 
+	msg, msgKey := callerMsgWithKey(c, config.MsgSuccess)
 	r := &plugnmeet.GenerateTokenRes{
 		Status:     true,
-		Msg:        callerMsg(c, config.MsgSuccess),
+		Msg:        msg,
+		MsgKey:     msgKey,
 		StatusCode: plugnmeet.StatusCode_SUCCESS,
 		Token:      &token,
 	}

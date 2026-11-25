@@ -73,7 +73,7 @@ func (m *ArtifactModel) GetArtifactInfoByArtifactId(artifactId string) (*plugnme
 
 	res := &plugnmeet.ArtifactInfoRes{
 		Status:     true,
-		Msg:        "success",
+		Msg:        config.MsgSuccess,
 		StatusCode: plugnmeet.StatusCode_SUCCESS,
 		ArtifactInfo: &plugnmeet.ArtifactInfo{
 			ArtifactId: dbArtifact.ArtifactId,
@@ -136,13 +136,13 @@ func (m *ArtifactModel) GetArtifactDownloadToken(req *plugnmeet.GetArtifactDownl
 	}
 
 	if !m.isDownloadable(plugnmeet.RoomArtifactType(artifact.Type)) {
-		return "", fmt.Errorf("'%s' artifact type is not downloadable", artifact.Type)
+		return "", config.ErrArtifactNotDownloadable
 	}
 
 	var metadata plugnmeet.RoomArtifactMetadata
 	err = protojson.Unmarshal([]byte(artifact.Metadata), &metadata)
 	if err != nil || metadata.FileInfo == nil || metadata.FileInfo.FilePath == "" {
-		return "", errors.New("artifact has no downloadable file")
+		return "", config.ErrArtifactNoDownloadableFile
 	}
 	// Generate the token with the file path.
 	return m.generateToken(metadata.FileInfo.FilePath)
@@ -224,7 +224,7 @@ func (m *ArtifactModel) DeleteArtifact(req *plugnmeet.DeleteArtifactReq) error {
 
 	// Check if the artifact type is deletable.
 	if !m.ds.IsAllowToDeleteArtifact(plugnmeet.RoomArtifactType(artifact.Type)) {
-		return fmt.Errorf("deleting '%s' artifact type is not allowed", artifact.Type)
+		return config.ErrArtifactDeleteNotAllowed
 	}
 
 	var metadata plugnmeet.RoomArtifactMetadata

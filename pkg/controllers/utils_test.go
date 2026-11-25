@@ -94,6 +94,40 @@ func TestCallerMsgFormatting(t *testing.T) {
 	})
 }
 
+// TestCallerMsgWithKeyFormatting proves the msg/msg_key contract: a browser
+// client keeps the i18n key as msg and gets no msg_key, an integrator gets the
+// curated English text together with the key.
+func TestCallerMsgWithKeyFormatting(t *testing.T) {
+	handler := func(c fiber.Ctx) error {
+		text, key := callerMsgWithKey(c, config.ErrRoomNotFound.Error())
+		if key == nil {
+			return c.SendString(text + "|")
+		}
+		return c.SendString(text + "|" + *key)
+	}
+
+	t.Run("client keeps the key", func(t *testing.T) {
+		got := postCallerTestApp(t, handler, false, "")
+		if want := config.ErrRoomNotFound.Error() + "|"; got != want {
+			t.Fatalf("body = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("integrator gets text and key", func(t *testing.T) {
+		got := postCallerTestApp(t, handler, true, "")
+		if want := config.MsgAuthRoomNotFound + "|" + config.ErrRoomNotFound.Error(); got != want {
+			t.Fatalf("body = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("raw operational text falls back to the generic key", func(t *testing.T) {
+		text, key := config.IntegratorMsgAndKey("redis: connection refused")
+		if text != config.MsgIntegratorUnexpected || key != config.ErrAuthUnexpected.Error() {
+			t.Fatalf("got (%q, %q), want (%q, %q)", text, key, config.MsgIntegratorUnexpected, config.ErrAuthUnexpected.Error())
+		}
+	})
+}
+
 // TestRoomCreateInvalidRequestClassification proves the same handler answers a
 // client caller with an i18n key and an integrator with curated English. The
 // Auth API handlers answer with a protojson body, hence the JSON decoding.
@@ -104,9 +138,15 @@ func TestRoomCreateInvalidRequestClassification(t *testing.T) {
 		name         string
 		asIntegrator bool
 		wantMsg      string
+		wantKey      string
 	}{
 		{name: "client", asIntegrator: false, wantMsg: config.ErrRoomInvalidRequest.Error()},
-		{name: "integrator", asIntegrator: true, wantMsg: config.MsgAuthInvalidRequest},
+		{
+			name:         "integrator",
+			asIntegrator: true,
+			wantMsg:      config.MsgAuthInvalidRequest,
+			wantKey:      config.ErrRoomInvalidRequest.Error(),
+		},
 	}
 
 	for _, tt := range tests {
@@ -131,6 +171,9 @@ func TestRoomCreateInvalidRequestClassification(t *testing.T) {
 			}
 			if res.GetMsg() != tt.wantMsg {
 				t.Fatalf("msg = %q, want %q", res.GetMsg(), tt.wantMsg)
+			}
+			if res.GetMsgKey() != tt.wantKey {
+				t.Fatalf("msg_key = %q, want %q", res.GetMsgKey(), tt.wantKey)
 			}
 			if strings.Contains(res.GetMsg(), "room.errors.") != !tt.asIntegrator {
 				t.Fatalf("msg = %q does not match the caller class", res.GetMsg())

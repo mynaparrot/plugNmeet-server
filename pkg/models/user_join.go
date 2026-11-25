@@ -174,7 +174,12 @@ func (m *UserModel) GetPNMJoinToken(ctx context.Context, g *plugnmeet.GenerateTo
 		perUserRoomId, perUserErr := m.perUserAISessionRoom(ctx, g, meta, m.breakoutModel.EnsurePerUserAIBreakoutRoom, log)
 		if perUserErr != nil {
 			log.WithError(perUserErr).Errorln("failed to prepare the per-user AI session room")
-			return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, "", perUserErr
+			// a full session is user-facing; any other failure is operational and
+			// must not leak a breakout-room sentinel into the join response
+			if errors.Is(perUserErr, config.ErrAIAgentSessionsFull) {
+				return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, "", perUserErr
+			}
+			return plugnmeet.StatusCode_INTERNAL_SERVER_ERROR, "", config.ErrUserUnexpectedError
 		}
 		if perUserRoomId != "" {
 			g.RoomId = perUserRoomId
