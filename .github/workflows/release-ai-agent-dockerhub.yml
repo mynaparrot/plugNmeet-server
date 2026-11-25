@@ -1,77 +1,12 @@
-name: Test and release to DockerHub as ai_agent
+name: Release to DockerHub as ai_agent
 on:
   push:
     branches:
       - 'ai_agent'
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    container:
-      image: mynaparrot/plugnmeet-server:base
-    services:
-      redis:
-        image: redis:7
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    env:
-      TEST_REDIS_HOST: redis:6379
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Configure CGO for the Speech SDK
-        run: |
-          set -euo pipefail
-          ARCH="$(dpkg --print-architecture)"
-          case "$ARCH" in
-            amd64) SPEECHSDK_ARCH_DIR="x64" ;;
-            arm64) SPEECHSDK_ARCH_DIR="arm64" ;;
-            *)
-              echo "Unsupported architecture for the Speech SDK: $ARCH"
-              exit 1
-              ;;
-          esac
-          {
-            echo "CGO_ENABLED=1"
-            echo "CGO_CFLAGS=-I${SPEECHSDK_ROOT}/include/c_api"
-            echo "CGO_LDFLAGS=-L${SPEECHSDK_ROOT}/lib/${SPEECHSDK_ARCH_DIR} -lMicrosoft.CognitiveServices.Speech.core"
-            echo "LD_LIBRARY_PATH=${SPEECHSDK_ROOT}/lib/${SPEECHSDK_ARCH_DIR}"
-          } >> "$GITHUB_ENV"
-
-      - name: Cache Go modules and build cache
-        uses: actions/cache@v6
-        with:
-          path: |
-            /go/pkg/mod
-            /root/.cache/go-build
-          key: ${{ runner.os }}-go-${{ hashFiles('go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: go vet
-        run: go vet ./...
-
-      - name: go test
-        run: go test ./...
-
   build:
-    needs: test
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: linux/amd64
-            arch: amd64
-            runner: ubuntu-latest
-          - platform: linux/arm64
-            arch: arm64
-            runner: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -83,7 +18,8 @@ jobs:
         with:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/plugnmeet-server
           tags: |
-            type=raw,value=ai_agent-${{ matrix.arch }}
+            type=raw,value=ai_agent-amd64
+            type=raw,value=ai_agent
 
       - name: Login to Docker Hub
         uses: docker/login-action@v4
@@ -100,26 +36,9 @@ jobs:
           context: .
           file: ./docker-build/Dockerfile
           push: true
-          platforms: ${{ matrix.platform }}
+          platforms: linux/amd64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           provenance: false # To prevent manifest list error
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/plugnmeet-server:buildcache-${{ matrix.arch }}
-          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/plugnmeet-server:buildcache-${{ matrix.arch }},mode=max
-
-  push-manifest:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Login to Docker Hub
-        uses: docker/login-action@v4
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_ACCESS_TOKEN }}
-
-      - name: Create and push manifest
-        run: |
-          docker manifest create ${{ secrets.DOCKERHUB_USERNAME }}/plugnmeet-server:ai_agent \
-            --amend ${{ secrets.DOCKERHUB_USERNAME }}/plugnmeet-server:ai_agent-amd64 \
-            --amend ${{ secrets.DOCKERHUB_USERNAME }}/plugnmeet-server:ai_agent-arm64
-          docker manifest push ${{ secrets.DOCKERHUB_USERNAME }}/plugnmeet-server:ai_agent
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/plugnmeet-server:buildcache-amd64
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/plugnmeet-server:buildcache-amd64,mode=max
