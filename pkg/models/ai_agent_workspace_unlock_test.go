@@ -2,6 +2,8 @@ package models
 
 import (
 	"context"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,15 +20,25 @@ import (
 // memoryJetStream serves and stores the key-value entries of one room bucket.
 type memoryJetStream struct {
 	jetstream.JetStream
-	entries map[string][]byte
+	mu       sync.Mutex
+	entries  map[string][]byte
+	revision atomic.Uint64
+}
+
+// value returns the stored value for key.
+func (j *memoryJetStream) value(key string) ([]byte, bool) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	value, ok := j.entries[key]
+	return value, ok
 }
 
 func (j *memoryJetStream) KeyValue(context.Context, string) (jetstream.KeyValue, error) {
-	return memoryKV{entries: j.entries}, nil
+	return memoryKV{js: j}, nil
 }
 
 func (j *memoryJetStream) CreateOrUpdateKeyValue(context.Context, jetstream.KeyValueConfig) (jetstream.KeyValue, error) {
-	return memoryKV{entries: j.entries}, nil
+	return memoryKV{js: j}, nil
 }
 
 func (j *memoryJetStream) Publish(context.Context, string, []byte, ...jetstream.PublishOpt) (*jetstream.PubAck, error) {
@@ -35,11 +47,11 @@ func (j *memoryJetStream) Publish(context.Context, string, []byte, ...jetstream.
 
 type memoryKV struct {
 	jetstream.KeyValue
-	entries map[string][]byte
+	js *memoryJetStream
 }
 
 func (kv memoryKV) Get(_ context.Context, key string) (jetstream.KeyValueEntry, error) {
-	value, ok := kv.entries[key]
+	value, ok := kv.js.value(key)
 	if !ok {
 		return nil, jetstream.ErrKeyNotFound
 	}
@@ -47,31 +59,64 @@ func (kv memoryKV) Get(_ context.Context, key string) (jetstream.KeyValueEntry, 
 }
 
 func (kv memoryKV) PutString(_ context.Context, key, value string) (uint64, error) {
-	kv.entries[key] = []byte(value)
-	return 1, nil
+	js := kv.js
+	js.mu.Lock()
+	defer js.mu.Unlock()
+
+	js.entries[key] = []byte(value)
+	return js.revision.Add(1), nil
 }
 
-// WatchAll returns an already closed watcher, so the room cache watcher of the
-// NATS service does not run in tests.
-func (kv memoryKV) WatchAll(context.Context, ...jetstream.WatchOpt) (jetstream.KeyWatcher, error) {
-	return closedKeyWatcher{}, nil
+// WatchAll returns a watcher that closes only when the context is canceled or
+// Stop is called, so the room cache keeps its entries for the test run.
+func (kv memoryKV) WatchAll(ctx context.Context, _ ...jetstream.WatchOpt) (jetstream.KeyWatcher, error) {
+	watcher := &openKeyWatcher{
+		updates: make(chan jetstream.KeyValueEntry),
+		done:    make(chan struct{}),
+	}
+	go func() {
+		defer close(watcher.updates)
+		select {
+		case <-ctx.Done():
+		case <-watcher.done:
+		}
+	}()
+
+	return watcher, nil
 }
 
-type closedKeyWatcher struct{ jetstream.KeyWatcher }
-
-func (closedKeyWatcher) Updates() <-chan jetstream.KeyValueEntry {
-	updates := make(chan jetstream.KeyValueEntry)
-	close(updates)
-	return updates
+type openKeyWatcher struct {
+	jetstream.KeyWatcher
+	updates chan jetstream.KeyValueEntry
+	done    chan struct{}
+	once    sync.Once
 }
 
-func (closedKeyWatcher) Stop() error { return nil }
+func (w *openKeyWatcher) Updates() <-chan jetstream.KeyValueEntry { return w.updates }
+
+func (w *openKeyWatcher) Stop() error {
+	w.once.Do(func() { close(w.done) })
+	return nil
+}
+
+// memoryJetStreamContext is canceled when the test ends, which stops the room
+// watchers of the NATS service.
+func memoryJetStreamContext(t *testing.T) context.Context {
+	t.Helper()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	return ctx
+}
 
 func (kv memoryKV) ListKeys(context.Context, ...jetstream.WatchOpt) (jetstream.KeyLister, error) {
-	keys := make(chan string, len(kv.entries))
-	for key := range kv.entries {
+	kv.js.mu.Lock()
+	keys := make(chan string, len(kv.js.entries))
+	for key := range kv.js.entries {
 		keys <- key
 	}
+	kv.js.mu.Unlock()
 	close(keys)
 
 	return memoryKeyLister{keys: keys}, nil
@@ -107,7 +152,7 @@ func newWorkspaceUnlockTestModel(t *testing.T, meta *plugnmeet.RoomMetadata) (*A
 	m := newAIAgentTestModel(newAIAgentTestRedis(t))
 	m.stopTimers = make(map[string]*time.Timer)
 	m.natsService = natsservice.New(natsservice.Args{
-		Ctx:    context.Background(),
+		Ctx:    memoryJetStreamContext(t),
 		App:    &config.AppConfig{NatsInfo: config.NatsInfo{DefaultTTL: &ttl}},
 		Js:     js,
 		Logger: logrus.New(),
@@ -132,7 +177,7 @@ func lockedWorkspaceRoom() *plugnmeet.RoomMetadata {
 func storedRoomMetadata(t *testing.T, js *memoryJetStream) *plugnmeet.RoomMetadata {
 	t.Helper()
 
-	raw, ok := js.entries[natsservice.RoomInfoKeyPrefix+natsservice.RoomMetadataKey]
+	raw, ok := js.value(natsservice.RoomInfoKeyPrefix + natsservice.RoomMetadataKey)
 	if !ok {
 		t.Fatal("room metadata was not stored")
 	}

@@ -34,7 +34,7 @@ func newBkRoomEndTestNatsService(t *testing.T, createdAt, emptyTimeout uint64) (
 
 	ttl := 2 * time.Hour
 	s := natsservice.New(natsservice.Args{
-		Ctx:    context.Background(),
+		Ctx:    memoryJetStreamContext(t),
 		App:    &config.AppConfig{NatsInfo: config.NatsInfo{DefaultTTL: &ttl}},
 		Js:     js,
 		Logger: logrus.New(),
@@ -48,7 +48,7 @@ func newBkRoomEndTestNatsService(t *testing.T, createdAt, emptyTimeout uint64) (
 func assertRefreshedEmptyTimeout(t *testing.T, js *memoryJetStream, createdAt, graceSeconds uint64) {
 	t.Helper()
 
-	raw, ok := js.entries[natsservice.RoomInfoKeyPrefix+natsservice.RoomEmptyTimeoutKey]
+	raw, ok := js.value(natsservice.RoomInfoKeyPrefix + natsservice.RoomEmptyTimeoutKey)
 	if !ok {
 		t.Fatal("empty timeout was not stored in the room bucket")
 	}

@@ -30,7 +30,7 @@ type aiSessionTestEnv struct {
 func newAISessionTestEnv(t *testing.T) *aiSessionTestEnv {
 	t.Helper()
 
-	ctx := context.Background()
+	ctx := memoryJetStreamContext(t)
 	ttl := 2 * time.Hour
 	logger := logrus.New()
 	logger.SetLevel(logrus.PanicLevel)
