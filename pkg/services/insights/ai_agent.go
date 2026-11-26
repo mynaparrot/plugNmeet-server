@@ -254,7 +254,15 @@ type AIAgent struct {
 	learner   LearnerIdentity
 
 	pendingMu    sync.Mutex
-	pendingCalls map[string]chan *plugnmeet.AIAgentToolResultMsg
+	pendingCalls map[string]pendingClientCall
+
+	// lastAutoVisionAt throttles the automatic participant_edit snapshots.
+	lastAutoVisionAt atomic.Int64
+
+	// redialMu guards the consecutive redial budget of a flapping provider.
+	redialMu           sync.Mutex
+	consecutiveRedials int
+	sessionOpenedAt    time.Time
 
 	paused       atomic.Bool
 	sessionTimer *time.Timer
@@ -602,12 +610,14 @@ func startAgentAudioPublisher(args *AIAgentArgs, agent *AIAgent, room *lksdk.Roo
 // lk.publish_on_behalf, and joins as kind AGENT (very important!).
 func mintAvatarLiveKitAccessToken(apiKey, secret string, tokenValidity time.Duration, roomId, twinIdentity, displayName, agentUserId string) (string, error) {
 	at := lkauth.NewAccessToken(apiKey, secret)
+	// The twin only streams the voice and the data of the agent, so it joins with
+	// media permissions and no room administration.
 	grant := &lkauth.VideoGrant{
-		RoomJoin:     true,
-		Room:         roomId,
-		RoomAdmin:    true,
-		CanPublish:   new(true),
-		CanSubscribe: new(true),
+		RoomJoin:       true,
+		Room:           roomId,
+		CanPublish:     new(true),
+		CanPublishData: new(true),
+		CanSubscribe:   new(true),
 	}
 	at.SetVideoGrant(grant).
 		SetIdentity(twinIdentity).
@@ -674,6 +684,7 @@ func newAIAgent(args *aiAgentCoreArgs) (*AIAgent, error) {
 		agentUserId:     agentUserId,
 		agentName:       boundary.AgentDisplayName,
 		startedAt:       time.Now(),
+		sessionOpenedAt: time.Now(),
 		boundary:        boundary,
 		features:        features,
 		guard:           guard,
@@ -689,7 +700,7 @@ func newAIAgent(args *aiAgentCoreArgs) (*AIAgent, error) {
 		inAudio:         make(chan mediasdk.PCM16Sample, aiAgentInAudioBuffer),
 		session:         args.Session,
 		newSession:      args.NewSession,
-		pendingCalls:    make(map[string]chan *plugnmeet.AIAgentToolResultMsg),
+		pendingCalls:    make(map[string]pendingClientCall),
 		done:            make(chan struct{}),
 		state: aiAgentRuntimeState{
 			state:     plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_CONNECTING,
@@ -882,8 +893,14 @@ func (a *AIAgent) Stop(reason string) {
 
 		// Waiters get context.Canceled from the cancelled context.
 		a.pendingMu.Lock()
-		a.pendingCalls = make(map[string]chan *plugnmeet.AIAgentToolResultMsg)
+		a.pendingCalls = make(map[string]pendingClientCall)
 		a.pendingMu.Unlock()
+
+		// The tool serialization lock is keyed by the provider session id of the
+		// calls, so it goes with the session.
+		if a.executor != nil {
+			a.executor.ReleaseSession(a.sessionId)
+		}
 
 		unregisterActiveAIAgent(a)
 		a.wg.Wait()
@@ -906,6 +923,9 @@ func (a *AIAgent) close() {
 	a.cancel()
 	if session := a.currentSession(); session != nil {
 		_ = session.Close()
+	}
+	if a.executor != nil {
+		a.executor.ReleaseSession(a.sessionId)
 	}
 }
 

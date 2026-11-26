@@ -187,15 +187,16 @@ func (m *AIAgentModel) buildPollNote(ctx context.Context, roomId, pollId, userId
 		return ""
 	}
 
-	who := firstNonEmptyString(userName, respondent.GetName(), "the participant")
+	who := sanitizePollField(firstNonEmptyString(userName, respondent.GetName(), "the participant"))
+	question := sanitizePollField(info.GetQuestion())
 
 	if info.GetIsTextAnswer() {
-		answer := truncate(strings.TrimSpace(respondent.GetTextAnswer()), 300)
+		answer := truncate(sanitizePollField(respondent.GetTextAnswer()), 300)
 		if answer == "" {
 			return ""
 		}
 		return fmt.Sprintf("%s answered the question %q with: %q. React in one short sentence and continue the topic.",
-			who, info.GetQuestion(), answer)
+			who, question, answer)
 	}
 
 	optionIds := respondent.GetOptionIds()
@@ -208,7 +209,7 @@ func (m *AIAgentModel) buildPollNote(ctx context.Context, roomId, pollId, userId
 	for _, id := range optionIds {
 		for i, option := range info.GetOptions() {
 			if option.GetId() == uint32(id) {
-				answerIndex, answerText = i, option.GetText()
+				answerIndex, answerText = i, sanitizePollField(option.GetText())
 				break
 			}
 		}
@@ -229,20 +230,27 @@ func (m *AIAgentModel) buildPollNote(ctx context.Context, roomId, pollId, userId
 			if correct == answerIndex {
 				verdict = "That is the correct answer."
 			} else if options := info.GetOptions(); correct >= 0 && correct < len(options) {
-				verdict = fmt.Sprintf("That is not the correct answer; option %d (%q) is correct.", correct+1, options[correct].GetText())
+				verdict = fmt.Sprintf("That is not the correct answer; option %d (%q) is correct.", correct+1, sanitizePollField(options[correct].GetText()))
 				followUp = wrongQuizAnswerFollowUp
 			} else {
 				verdict = fmt.Sprintf("That is not the correct answer; option %d is correct.", correct+1)
 				followUp = wrongQuizAnswerFollowUp
 			}
-			if explanation = strings.TrimSpace(explanation); explanation != "" {
+			if explanation = sanitizePollField(explanation); explanation != "" {
 				verdict += " Explanation to give if useful: " + explanation
 			}
 		}
 	}
 
 	return fmt.Sprintf("%s answered option %d (%q) of the quiz %q. %s %s",
-		who, answerIndex+1, answerText, info.GetQuestion(), verdict, followUp)
+		who, answerIndex+1, answerText, question, verdict, followUp)
+}
+
+// sanitizePollField flattens participant-supplied text so it cannot break the
+// [SYSTEM CONTEXT] frame it is quoted in.
+func sanitizePollField(s string) string {
+	s = strings.NewReplacer("\r", " ", "\n", " ", "[", "(", "]", ")").Replace(s)
+	return strings.Join(strings.Fields(s), " ")
 }
 
 func (m *AIAgentModel) startStopTimer(roomId string) {

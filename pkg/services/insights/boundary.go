@@ -816,6 +816,29 @@ func neutralizeBlock(text string, maxRunes int) string {
 	return b.String()
 }
 
+const (
+	maxSystemContextSourceRunes = 64
+	maxSystemContextTextRunes   = 8000
+)
+
+// SanitizeSystemContextFrame cleans a [SYSTEM CONTEXT] source label and body so
+// neither can close its own frame.
+func SanitizeSystemContextFrame(source, text string) (cleanSource, cleanText string) {
+	cleanSource = strings.Map(func(r rune) rune {
+		if r == '[' || r == ']' || r < 0x20 || r == 0x7f {
+			return ' '
+		}
+		return r
+	}, source)
+	cleanSource = strings.Join(strings.Fields(cleanSource), " ")
+	if runes := []rune(cleanSource); len(runes) > maxSystemContextSourceRunes {
+		cleanSource = strings.TrimSpace(string(runes[:maxSystemContextSourceRunes]))
+	}
+
+	cleanText = defuseFrameBreakers(neutralizeBlock(text, maxSystemContextTextRunes))
+	return cleanSource, cleanText
+}
+
 // startsLikeHeader reports whether a line imitates a header, fence, or role tag.
 func startsLikeHeader(line string) bool {
 	for _, prefix := range []string{"[", "==", "<<<", ">>>", "###", "```", "-[", "SYSTEM", "DEVELOPER", "ASSISTANT:"} {

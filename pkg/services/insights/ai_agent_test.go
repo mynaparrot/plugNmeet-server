@@ -1180,6 +1180,13 @@ func TestMintAvatarLiveKitAccessTokenCarriesTheOriginalUserId(t *testing.T) {
 	if grants.Video.CanPublish == nil || !*grants.Video.CanPublish {
 		t.Error("the twin must be allowed to publish")
 	}
+	if grants.Video.CanPublishData == nil || !*grants.Video.CanPublishData {
+		t.Error("the twin must be allowed to publish its data stream")
+	}
+	// The twin only plays the voice of the agent; room administration is not its job.
+	if grants.Video.RoomAdmin {
+		t.Error("the avatar twin must not be a room admin")
+	}
 	for _, key := range []string{"original_user_id", "lk.publish_on_behalf"} {
 		if got := grants.Attributes[key]; got != agentUserId {
 			t.Errorf("attribute %q = %q, want %q", key, got, agentUserId)

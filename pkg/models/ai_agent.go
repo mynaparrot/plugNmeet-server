@@ -97,6 +97,10 @@ const (
 	aiAgentCustomProviderMaxHeader   = 128
 	aiAgentCustomProviderMaxModel    = 128
 
+	// aiAgentEndpointResolveTimeout bounds the DNS lookup of a custom provider
+	// host, so creating a room never waits on a slow resolver.
+	aiAgentEndpointResolveTimeout = 2 * time.Second
+
 	// Shape limits of the host-supplied realtime avatar config.
 	aiAgentAvatarMaxProvider = 64
 	aiAgentAvatarMaxID       = 256
@@ -124,6 +128,10 @@ var aiAgentForbiddenAuthHeaders = map[string]struct{}{
 	"trailer":           {},
 	"proxy-connection":  {},
 }
+
+// aiAgentLookupIP resolves a custom provider host for the endpoint guard. Tests
+// replace it to keep the check deterministic.
+var aiAgentLookupIP = net.DefaultResolver.LookupIPAddr
 
 // Client API routes are submitted by the Admin's browser through the
 // client_api_submit tool so that the request is validated by the auth router.
@@ -807,9 +815,9 @@ func validateAIAgentCustomProvider(cp *plugnmeet.InsightsAIAgentCustomProvider) 
 }
 
 // isAllowedAgentCustomProviderEndpoint checks the shape of a custom gateway
-// endpoint: https, no credentials, no query and no fragment, a valid port, and no
-// obviously internal IP literal. Like the external MCP endpoints, the DNS lookup
-// is left to the dialer so creating a room never waits on a resolver.
+// endpoint: https, no credentials, no query and no fragment, a valid port, and a
+// host that does not point into the internal network. Custom https ports stay
+// allowed, because a self-hosted gateway usually listens on one.
 func isAllowedAgentCustomProviderEndpoint(raw string) bool {
 	parsed, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil || parsed.Scheme != "https" || parsed.User != nil || parsed.Fragment != "" || parsed.RawQuery != "" {
@@ -825,11 +833,44 @@ func isAllowedAgentCustomProviderEndpoint(raw string) bool {
 			return false
 		}
 	}
-	if ip := net.ParseIP(host); ip != nil && mcp.IsBlockedExternalIP(ip) {
+	if ip := net.ParseIP(host); ip != nil {
+		return !mcp.IsBlockedExternalIP(ip)
+	}
+	if isInternalAgentProviderHost(host) {
 		return false
 	}
 
+	// Resolve now so a public-looking name that points at an internal address is
+	// refused before the API key ever travels there. A lookup failure is not
+	// fatal: the dialer checks the address it actually connects to again.
+	ctx, cancel := context.WithTimeout(context.Background(), aiAgentEndpointResolveTimeout)
+	defer cancel()
+	addresses, err := aiAgentLookupIP(ctx, host)
+	if err != nil {
+		return true
+	}
+	for _, address := range addresses {
+		if mcp.IsBlockedExternalIP(address.IP) {
+			return false
+		}
+	}
+
 	return true
+}
+
+// isInternalAgentProviderHost rejects the hostnames that can never name a public gateway, without a DNS lookup.
+func isInternalAgentProviderHost(host string) bool {
+	host = strings.ToLower(strings.TrimSuffix(host, "."))
+	if host == "localhost" || !strings.Contains(host, ".") {
+		return true
+	}
+	for _, suffix := range []string{".localhost", ".local", ".internal"} {
+		if strings.HasSuffix(host, suffix) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // isAllowedAgentCustomProviderAuthHeader accepts a plain HTTP header token name
@@ -1120,7 +1161,9 @@ func (m *AIAgentModel) PrepareRoomExternalMCP(ctx context.Context, roomId string
 	// Credentials never travel with the metadata, so they cannot leak through
 	// NATS to the browsers. Neither feature set keeps them: the servers are only
 	// accepted while creating the room, never hydrated back into the metadata.
-	agentFeatures.McpServers = nil
+	if agentFeatures != nil {
+		agentFeatures.McpServers = nil
+	}
 	if chatFeatures != nil {
 		chatFeatures.McpServers = nil
 	}

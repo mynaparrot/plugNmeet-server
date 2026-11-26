@@ -140,3 +140,14 @@ func (e *Executor) lockSession(sessionID string) func() {
 	lock.Lock()
 	return lock.Unlock
 }
+
+// ReleaseSession drops the serialization lock of a finished session, so a long
+// lived executor never accumulates one mutex per past room session.
+func (e *Executor) ReleaseSession(sessionID string) {
+	if sessionID == "" {
+		return
+	}
+	e.mu.Lock()
+	delete(e.sessions, sessionID)
+	e.mu.Unlock()
+}

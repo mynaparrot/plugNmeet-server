@@ -64,6 +64,11 @@ func (a *AIAgentController) HandleStart(c fiber.Ctx) error {
 		}
 	}
 
+	// Only the host owns the room prompt; a participant cannot override it.
+	if !isAdmin {
+		req.SystemPrompt = nil
+	}
+
 	if err := a.aiAgentModel.Start(ctx, roomId, req); err != nil {
 		a.logger.WithError(err).WithField("roomId", roomId).Warnln("failed to start the ai agent")
 		res.Msg = err.Error()
@@ -82,15 +87,10 @@ func (a *AIAgentController) HandleStop(c fiber.Ctx) error {
 		return utils.SendProtobufResponse(c, res)
 	}
 
+	// The reason is derived from who stopped the session, never from the body.
 	reason := "host_stopped"
 	if !isAdmin {
 		reason = "user_stopped"
-	}
-	req := new(plugnmeet.AIAgentStopReq)
-	if len(c.Body()) > 0 {
-		if err := proto.Unmarshal(c.Body(), req); err == nil && req.GetReason() != "" {
-			reason = req.GetReason()
-		}
 	}
 
 	if err := a.aiAgentModel.Stop(ctx, roomId, reason); err != nil {

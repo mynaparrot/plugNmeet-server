@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -14,6 +15,11 @@ import (
 	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 )
 
+// clampAIAgentChatText trims a participant's AI Chat message and caps it at the same bound as the server-side context injection.
+func clampAIAgentChatText(text string) string {
+	return truncate(strings.TrimSpace(text), aiAgentSendContextMaxRunes)
+}
+
 func (s *InsightsModel) TranscriptionConfigure(req *plugnmeet.InsightsTranscriptionConfigReq, roomId string) error {
 	roomInfo, metadata, err := s.natsService.GetRoomInfoWithMetadata(roomId)
 	if err != nil {
@@ -23,8 +29,8 @@ func (s *InsightsModel) TranscriptionConfigure(req *plugnmeet.InsightsTranscript
 		return fmt.Errorf("empty room medata")
 	}
 
-	endToEndEncryptionFeatures := metadata.RoomFeatures.EndToEndEncryptionFeatures
-	if endToEndEncryptionFeatures.EnabledSelfInsertEncryptionKey {
+	endToEndEncryptionFeatures := metadata.GetRoomFeatures().GetEndToEndEncryptionFeatures()
+	if endToEndEncryptionFeatures.GetEnabledSelfInsertEncryptionKey() {
 		return fmt.Errorf("insights.feature-disable-while-e2ee-self-key-enabled")
 	}
 
@@ -125,8 +131,8 @@ func (s *InsightsModel) TranscriptionUserSession(req *plugnmeet.InsightsTranscri
 			return fmt.Errorf("empty room medata")
 		}
 
-		endToEndEncryptionFeatures := metadata.RoomFeatures.EndToEndEncryptionFeatures
-		if endToEndEncryptionFeatures.EnabledSelfInsertEncryptionKey {
+		endToEndEncryptionFeatures := metadata.GetRoomFeatures().GetEndToEndEncryptionFeatures()
+		if endToEndEncryptionFeatures.GetEnabledSelfInsertEncryptionKey() {
 			return fmt.Errorf("insights.feature-disable-while-e2ee-self-key-enabled")
 		}
 
@@ -214,13 +220,13 @@ func (s *InsightsModel) ChatTranslationConfigure(req *plugnmeet.InsightsChatTran
 		return fmt.Errorf("empty room medata")
 	}
 
-	insightsFeatures := metadata.RoomFeatures.InsightsFeatures
+	insightsFeatures := metadata.GetRoomFeatures().GetInsightsFeatures()
 	chatTranslationFeatures := insightsFeatures.GetChatTranslationFeatures()
-	if !insightsFeatures.IsAllow || !chatTranslationFeatures.GetIsAllow() {
+	if !insightsFeatures.GetIsAllow() || !chatTranslationFeatures.GetIsAllow() {
 		return fmt.Errorf("insights feature wasn't enabled")
 	}
 
-	if len(req.AllowedTransLangs) > int(chatTranslationFeatures.MaxSelectedTransLangs) {
+	if len(req.AllowedTransLangs) > int(chatTranslationFeatures.GetMaxSelectedTransLangs()) {
 		return fmt.Errorf("max allowed selected languages exceeded")
 	}
 
@@ -243,8 +249,9 @@ func (s *InsightsModel) ExecuteChatTranslation(ctx context.Context, req *plugnme
 		return nil, fmt.Errorf("empty room medata")
 	}
 
-	insightsFeatures := metadata.RoomFeatures.InsightsFeatures
-	if !insightsFeatures.IsAllow || !insightsFeatures.ChatTranslationFeatures.IsAllow || !insightsFeatures.ChatTranslationFeatures.IsEnabled {
+	insightsFeatures := metadata.GetRoomFeatures().GetInsightsFeatures()
+	chatTranslationFeatures := insightsFeatures.GetChatTranslationFeatures()
+	if !insightsFeatures.GetIsAllow() || !chatTranslationFeatures.GetIsAllow() || !chatTranslationFeatures.GetIsEnabled() {
 		return nil, fmt.Errorf("feature wasn't enabled")
 	}
 
@@ -345,12 +352,13 @@ func (s *InsightsModel) ExecuteAITextChat(req *plugnmeet.InsightsAITextChatConte
 		return s.handleAIAgentChatMessage(req, insightsFeatures.GetAiAgentFeatures(), roomId, userId)
 	}
 
-	if !insightsFeatures.IsAllow || !insightsFeatures.AiFeatures.IsAllow || !insightsFeatures.AiFeatures.AiTextChatFeatures.IsAllow || !insightsFeatures.AiFeatures.AiTextChatFeatures.IsEnabled {
+	aiFeatures := insightsFeatures.GetAiFeatures()
+	aiTextChatFeatures := aiFeatures.GetAiTextChatFeatures()
+	if !insightsFeatures.GetIsAllow() || !aiFeatures.GetIsAllow() || !aiTextChatFeatures.GetIsAllow() || !aiTextChatFeatures.GetIsEnabled() {
 		// The client translates the sentinel key; log the full sentence here.
 		s.logger.WithField("roomId", roomId).WithField("userId", userId).Warn("AI text chat features are not enabled for this room")
 		return fmt.Errorf("insights.ai-text-chat.feature-disabled")
 	}
-	aiTextChatFeatures := insightsFeatures.AiFeatures.AiTextChatFeatures
 	foundUser := aiTextChatFeatures.IsAllowedEveryone
 
 	if !aiTextChatFeatures.IsAllowedEveryone {
@@ -434,7 +442,7 @@ func (s *InsightsModel) handleAIAgentChatMessage(req *plugnmeet.InsightsAITextCh
 	if userInfo, _ := s.natsService.GetUserInfo(roomId, userId); userInfo.GetName() != "" {
 		userName = userInfo.GetName()
 	}
-	if err := agent.HandleParticipantChatMessage(userId, userName, req.GetText()); err != nil {
+	if err := agent.HandleParticipantChatMessage(userId, userName, clampAIAgentChatText(req.GetText())); err != nil {
 		logger.WithError(err).Error("failed to pass the chat message to the AI agent")
 		return err
 	}
@@ -489,15 +497,16 @@ func (s *InsightsModel) AIMeetingSummarizationConfig(req *plugnmeet.InsightsAIMe
 		return fmt.Errorf("empty room medata")
 	}
 
-	endToEndEncryptionFeatures := metadata.RoomFeatures.EndToEndEncryptionFeatures
-	if endToEndEncryptionFeatures.EnabledSelfInsertEncryptionKey {
+	endToEndEncryptionFeatures := metadata.GetRoomFeatures().GetEndToEndEncryptionFeatures()
+	if endToEndEncryptionFeatures.GetEnabledSelfInsertEncryptionKey() {
 		return fmt.Errorf("insights.feature-disable-while-e2ee-self-key-enabled")
 	}
-	insightsFeatures := metadata.RoomFeatures.InsightsFeatures
-	if !insightsFeatures.IsAllow || !insightsFeatures.AiFeatures.IsAllow || !insightsFeatures.AiFeatures.MeetingSummarizationFeatures.IsAllow {
+	insightsFeatures := metadata.GetRoomFeatures().GetInsightsFeatures()
+	aiFeatures := insightsFeatures.GetAiFeatures()
+	aiMeetingSummarizationFeatures := aiFeatures.GetMeetingSummarizationFeatures()
+	if !insightsFeatures.GetIsAllow() || !aiFeatures.GetIsAllow() || !aiMeetingSummarizationFeatures.GetIsAllow() {
 		return fmt.Errorf("insights feature wasn't enabled")
 	}
-	aiMeetingSummarizationFeatures := insightsFeatures.AiFeatures.MeetingSummarizationFeatures
 
 	aiMeetingSummarizationFeatures.IsEnabled = true
 	aiMeetingSummarizationFeatures.SummarizationPrompt = req.SummarizationPrompt
@@ -510,7 +519,7 @@ func (s *InsightsModel) AIMeetingSummarizationConfig(req *plugnmeet.InsightsAIMe
 		RoomE2EEKey:                  endToEndEncryptionFeatures.EncryptionKey,
 		CaptureAllParticipantsTracks: true,
 		HiddenAgent:                  true,
-		Options:                      []byte(aiMeetingSummarizationFeatures.SummarizationPrompt),
+		Options:                      []byte(aiMeetingSummarizationFeatures.GetSummarizationPrompt()),
 	}
 
 	err = s.ConfigureAgent(payload, 5*time.Second)

@@ -75,6 +75,7 @@ func (a *AIAgent) handleEvent(session insights.RealtimeSession, ev insights.Real
 		if a.paused.Load() || len(ev.AudioPCM24k) == 0 {
 			return
 		}
+		a.markProviderHealthy()
 		if a.publisher != nil {
 			if _, err := a.publisher.Write(ev.AudioPCM24k); err != nil {
 				a.logger.WithError(err).Debug("ai agent: failed to write agent audio")
@@ -94,6 +95,7 @@ func (a *AIAgent) handleEvent(session insights.RealtimeSession, ev insights.Real
 
 	case insights.RealtimeEventTranscriptAgent:
 		if ev.Final && strings.TrimSpace(ev.Text) != "" {
+			a.markProviderHealthy()
 			a.logger.WithField("text", ev.Text).Debug("ai agent: assistant transcript")
 			a.recordTranscriptTurn(transcriptRoleAgent, ev.Text)
 		}
@@ -125,7 +127,7 @@ func (a *AIAgent) handleEvent(session insights.RealtimeSession, ev insights.Real
 
 	case insights.RealtimeEventGoAway:
 		a.logger.Info("ai agent: provider will close the session, redialling")
-		go a.redial()
+		a.handleGoAway()
 
 	case insights.RealtimeEventUsage:
 		a.recordUsage(ev)
@@ -137,6 +139,62 @@ func (a *AIAgent) handleEvent(session insights.RealtimeSession, ev insights.Real
 		// Never stop from a loop goroutine: Stop waits for the loops to finish.
 		go a.Stop("error")
 	}
+}
+
+const (
+	// maxConsecutiveRedials bounds how often a flapping provider may close a
+	// fresh session before the agent gives up.
+	maxConsecutiveRedials = 5
+	// aiAgentRedialBackoffStep is multiplied by the redial count for the wait
+	// before redialling again.
+	aiAgentRedialBackoffStep = 500 * time.Millisecond
+	// aiAgentHealthySessionUptime is how long a session must stay up before the
+	// redial budget counts as recovered.
+	aiAgentHealthySessionUptime = 30 * time.Second
+)
+
+// handleGoAway redials the provider session, backing off while the provider keeps
+// closing fresh sessions and giving up once the budget is spent.
+func (a *AIAgent) handleGoAway() {
+	a.redialMu.Lock()
+	if !a.sessionOpenedAt.IsZero() && time.Since(a.sessionOpenedAt) > aiAgentHealthySessionUptime {
+		a.consecutiveRedials = 0
+	}
+	a.consecutiveRedials++
+	count := a.consecutiveRedials
+	a.redialMu.Unlock()
+
+	if count > maxConsecutiveRedials {
+		a.logger.WithField("redials", count-1).Warn("ai agent: the provider keeps closing the session, giving up")
+		// Never stop from a loop goroutine: Stop waits for the loops to finish.
+		go a.Stop("redial_limit")
+		return
+	}
+
+	var delay time.Duration
+	if count > 1 {
+		delay = time.Duration(count-1) * aiAgentRedialBackoffStep
+	}
+	go func() {
+		if delay > 0 {
+			timer := time.NewTimer(delay)
+			defer timer.Stop()
+			select {
+			case <-a.ctx.Done():
+				return
+			case <-timer.C:
+			}
+		}
+		a.redial()
+	}()
+}
+
+// markProviderHealthy clears the redial budget: the session delivered audio or
+// text, so the provider is working again.
+func (a *AIAgent) markProviderHealthy() {
+	a.redialMu.Lock()
+	a.consecutiveRedials = 0
+	a.redialMu.Unlock()
 }
 
 // redial replaces a session the provider is about to close, keeping the LiveKit
@@ -166,6 +224,10 @@ func (a *AIAgent) redial() {
 	old := a.session
 	a.session = session
 	a.sessionMu.Unlock()
+
+	a.redialMu.Lock()
+	a.sessionOpenedAt = time.Now()
+	a.redialMu.Unlock()
 
 	if old != nil {
 		if err := old.Close(); err != nil {

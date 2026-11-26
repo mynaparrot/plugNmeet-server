@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/sirupsen/logrus"
 
@@ -18,34 +19,60 @@ import (
 // aiAgentLogPayloadRunes bounds the tool arguments and output written to the debug log.
 const aiAgentLogPayloadRunes = 300
 
+// aiAgentAutoVisionInterval is the minimum gap between two automatic vision
+// pushes, so a participant drawing quickly cannot flood the session.
+const aiAgentAutoVisionInterval = 2 * time.Second
+
+// allowAutoVision reports whether a whiteboard snapshot may be delivered. Only
+// the automatic push of the participant's own edits is throttled; a page change,
+// a notepad read and an explicit tool request always reach the session.
+func (a *AIAgent) allowAutoVision(reason string) bool {
+	if reason != "participant_edit" {
+		return true
+	}
+	now := time.Now().UnixMilli()
+	last := a.lastAutoVisionAt.Load()
+	if last != 0 && now-last < aiAgentAutoVisionInterval.Milliseconds() {
+		return false
+	}
+
+	return a.lastAutoVisionAt.CompareAndSwap(last, now)
+}
+
 // SendContext injects a server-side event that must not look like participant speech.
 func (a *AIAgent) SendContext(text, source string) error {
-	text = strings.TrimSpace(text)
-	if text == "" {
+	frame := systemContextFrame(text, source)
+	if frame == "" {
 		return nil
 	}
-	header := "[SYSTEM CONTEXT]"
-	if source = strings.TrimSpace(source); source != "" {
-		header = fmt.Sprintf("[SYSTEM CONTEXT — %s]", source)
-	}
-	return a.sendContextText(header + "\n" + text)
+	return a.sendContextText(frame)
 }
 
 // SendProactiveContext injects a server-side event and asks the provider to respond immediately.
 func (a *AIAgent) SendProactiveContext(text, source string) error {
-	text = strings.TrimSpace(text)
-	if text == "" {
+	frame := systemContextFrame(text, source)
+	if frame == "" {
 		return nil
-	}
-	header := "[SYSTEM CONTEXT]"
-	if source = strings.TrimSpace(source); source != "" {
-		header = fmt.Sprintf("[SYSTEM CONTEXT — %s]", source)
 	}
 	session := a.currentSession()
 	if session == nil {
 		return errors.New("ai agent: no active session")
 	}
-	return session.SendContextText("user", header+"\n"+text, true)
+	return session.SendContextText("user", frame, true)
+}
+
+// systemContextFrame renders a sanitized [SYSTEM CONTEXT] block, or "" when
+// there is nothing to send.
+func systemContextFrame(text, source string) string {
+	source, text = SanitizeSystemContextFrame(source, text)
+	if text == "" {
+		return ""
+	}
+	header := "[SYSTEM CONTEXT]"
+	if source != "" {
+		header = fmt.Sprintf("[SYSTEM CONTEXT — %s]", source)
+	}
+	return header + "\n" + text
 }
 
 // HandleWhiteboardScene hands a canvas snapshot to the provider, framed as
@@ -59,6 +86,9 @@ func (a *AIAgent) HandleWhiteboardScene(msg *plugnmeet.AIAgentWhiteboardSceneMsg
 	hasImage := len(msg.GetWebpImage()) > 0
 	hasSceneGraph := strings.TrimSpace(msg.GetSceneGraphJson()) != ""
 	if !hasImage && !hasSceneGraph {
+		return nil
+	}
+	if !a.allowAutoVision(msg.GetReason()) {
 		return nil
 	}
 	session := a.currentSession()
@@ -104,25 +134,50 @@ func (a *AIAgent) HandleParticipantChatMessage(userID, userName, text string) er
 	return nil
 }
 
+// pendingClientCall is one dispatched client tool call, bound to the participant
+// it was sent to so no other participant can answer it.
+type pendingClientCall struct {
+	targetUserID string
+	ch           chan *plugnmeet.AIAgentToolResultMsg
+}
+
 // HandleClientToolResult resolves the pending call with the participant's answer.
 func (a *AIAgent) HandleClientToolResult(res *plugnmeet.AIAgentToolResultMsg) {
+	a.HandleClientToolResultFromUser("", res)
+}
+
+// HandleClientToolResultFromUser resolves the pending call only for the
+// participant the call was dispatched to. It reports whether the answer was
+// accepted.
+func (a *AIAgent) HandleClientToolResultFromUser(userID string, res *plugnmeet.AIAgentToolResultMsg) bool {
 	if res == nil || res.GetCallId() == "" {
-		return
+		return false
 	}
 
 	a.pendingMu.Lock()
-	ch, ok := a.pendingCalls[res.GetCallId()]
+	entry, ok := a.pendingCalls[res.GetCallId()]
+	if ok && entry.targetUserID != "" && userID != "" && entry.targetUserID != userID {
+		a.pendingMu.Unlock()
+		a.logger.WithFields(logrus.Fields{
+			"callId":     res.GetCallId(),
+			"userId":     userID,
+			"targetUser": entry.targetUserID,
+		}).Warn("ai agent: ignoring a client tool result from a participant that does not own the call")
+		return false
+	}
 	delete(a.pendingCalls, res.GetCallId())
 	a.pendingMu.Unlock()
 
 	if !ok {
 		a.logger.WithFields(logrus.Fields{"callId": res.GetCallId(), "ok": res.GetOk()}).Warn("ai agent: received late or unknown client tool result")
-		return
+		return false
 	}
 	select {
-	case ch <- res:
+	case entry.ch <- res:
 	default:
 	}
+
+	return true
 }
 
 // CallClientTool implements mcp.ClientRPCSender: the call travels to the agent
@@ -139,13 +194,23 @@ func (a *AIAgent) CallClientTool(ctx context.Context, call mcp.ToolCall, timeout
 		return mcp.ToolResult{}, errors.New("no client is available to run this tool. Speak your instruction instead")
 	}
 
+	callID := strings.TrimSpace(call.CallID)
+	if callID == "" {
+		callID = uuid.NewString()
+	}
+	call.CallID = callID
+
 	ch := make(chan *plugnmeet.AIAgentToolResultMsg, 1)
 	a.pendingMu.Lock()
-	a.pendingCalls[call.CallID] = ch
+	if _, exists := a.pendingCalls[callID]; exists {
+		a.pendingMu.Unlock()
+		return mcp.ToolResult{}, errors.New("another tool call is already in flight with the same id. Do not retry it")
+	}
+	a.pendingCalls[callID] = pendingClientCall{targetUserID: target, ch: ch}
 	a.pendingMu.Unlock()
 	defer func() {
 		a.pendingMu.Lock()
-		delete(a.pendingCalls, call.CallID)
+		delete(a.pendingCalls, callID)
 		a.pendingMu.Unlock()
 	}()
 

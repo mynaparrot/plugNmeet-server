@@ -894,7 +894,7 @@ func appendExternalMCPText(b *strings.Builder, text string) {
 	b.WriteString(text)
 }
 
-var reExternalMCPFrameBreaker = regexp.MustCompile(`(?i)\[\s*/?\s*UNTRUSTED EXTERNAL DOCUMENT[^\]]*\]`)
+var reExternalMCPFrameBreaker = regexp.MustCompile(`(?i)\[\s*/?\s*(UNTRUSTED EXTERNAL DOCUMENT|HOST INSTRUCTION|SYSTEM CONTEXT)[^\]]*\]`)
 
 // sanitizeExternalMCPText strips control characters, defuses frame breakers and
 // truncates to the model-facing budget.

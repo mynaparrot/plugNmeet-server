@@ -21,6 +21,16 @@ import (
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 )
 
+// aiAgentSendContextMaxRunes bounds a client-supplied context injection.
+const aiAgentSendContextMaxRunes = 4000
+
+// Bounds of one client-supplied whiteboard snapshot. The image is base64 encoded and sent to the provider,
+// so an oversized frame would cost an unbounded amount of tokens.
+const (
+	aiAgentMaxWhiteboardImageBytes = 512 * 1024
+	aiAgentMaxWhiteboardSceneBytes = 128 * 1024
+)
+
 // Start activates the agent for the room. It is idempotent: it returns nil when
 // the agent already runs, either on this server or on another one.
 func (m *AIAgentModel) Start(ctx context.Context, roomId string, req *plugnmeet.AIAgentStartReq) error {
@@ -277,14 +287,15 @@ func (m *AIAgentModel) SendContext(ctx context.Context, roomId string, req *plug
 	if !ok {
 		return config.ErrAIAgentNotRunning
 	}
-	if strings.TrimSpace(req.GetText()) == "" {
+	text := truncate(strings.TrimSpace(req.GetText()), aiAgentSendContextMaxRunes)
+	if text == "" {
 		return config.ErrAIAgentInvalidRequest
 	}
 	if strings.EqualFold(strings.TrimSpace(req.GetSource()), "countdown_timer") {
-		return agent.SendProactiveContext(req.GetText(), req.GetSource())
+		return agent.SendProactiveContext(text, req.GetSource())
 	}
 
-	return agent.SendContext(req.GetText(), req.GetSource())
+	return agent.SendContext(text, req.GetSource())
 }
 
 // Pause stops the agent's audio in and out but keeps the provider session.
@@ -320,7 +331,7 @@ func (m *AIAgentModel) HandleClientToolResult(ctx context.Context, roomId, userI
 		return
 	}
 	if agent, ok := insightsservice.GetActiveAIAgent(roomId); ok {
-		agent.HandleClientToolResult(msg)
+		agent.HandleClientToolResultFromUser(userId, msg)
 	}
 }
 
@@ -339,9 +350,42 @@ func (m *AIAgentModel) HandleWhiteboardScene(ctx context.Context, roomId, userId
 	if msg.GetRoomId() == "" {
 		msg.RoomId = roomId
 	}
+	if !m.sanitizeWhiteboardScene(roomId, msg) {
+		return
+	}
 	if err := agent.HandleWhiteboardScene(msg); err != nil {
 		m.logger.WithError(err).Debug("failed to hand the whiteboard scene to the ai agent")
 	}
+}
+
+// sanitizeWhiteboardScene enforces the size limits and drops an image that is not
+// a WebP frame. It reports whether the snapshot is still worth delivering.
+func (m *AIAgentModel) sanitizeWhiteboardScene(roomId string, msg *plugnmeet.AIAgentWhiteboardSceneMsg) bool {
+	if len(msg.GetSceneGraphJson()) > aiAgentMaxWhiteboardSceneBytes {
+		m.logger.WithFields(logrus.Fields{
+			"roomId": roomId,
+			"bytes":  len(msg.GetSceneGraphJson()),
+		}).Warn("dropping an oversized whiteboard scene graph")
+		return false
+	}
+	if len(msg.GetWebpImage()) > aiAgentMaxWhiteboardImageBytes {
+		m.logger.WithFields(logrus.Fields{
+			"roomId": roomId,
+			"bytes":  len(msg.GetWebpImage()),
+		}).Warn("dropping an oversized whiteboard snapshot image")
+		msg.WebpImage = nil
+	}
+	if img := msg.GetWebpImage(); len(img) > 0 && !isWebPImage(img) {
+		m.logger.WithField("roomId", roomId).Warn("dropping a whiteboard snapshot image that is not webp")
+		msg.WebpImage = nil
+	}
+
+	return len(msg.GetWebpImage()) > 0 || strings.TrimSpace(msg.GetSceneGraphJson()) != ""
+}
+
+// isWebPImage reports whether data starts with a RIFF/WEBP header.
+func isWebPImage(data []byte) bool {
+	return len(data) >= 12 && string(data[0:4]) == "RIFF" && string(data[8:12]) == "WEBP"
 }
 
 func (m *AIAgentModel) storeState(roomId string, agent *insightsservice.AIAgent) {
