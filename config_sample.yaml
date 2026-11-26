@@ -574,3 +574,11 @@ insights:
 #    scripts:
 #      - script: "/path/to/your/script.sh"
 #        is_one_shot: false
+#  # Vets the external URLs the AI agent opens (room knowledge pages and MCP servers).
+#  # stage is "validate" during room creation and "fetch" before a runtime dial.
+#  external_url_hook:
+#    pool_size: 2
+#    hook_timeout: 15s
+#    scripts:
+#      - script: "/path/to/your/script.sh"
+#        is_one_shot: false

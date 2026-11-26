@@ -36,7 +36,7 @@ func TestValidateRoomAIAgentFeaturesAutoGenUserId(t *testing.T) {
 			},
 		}
 	}
-	m := &RoomModel{aiAgentModel: new(AIAgentModel), logger: logrus.NewEntry(logrus.New())}
+	m := &RoomModel{app: &config.AppConfig{}, aiAgentModel: new(AIAgentModel), logger: logrus.NewEntry(logrus.New())}
 	ctx := context.Background()
 
 	rejected := newReq(modeControlled, new(true), controlledConfig("learner-1"))

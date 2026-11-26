@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
-	"net/url"
 	"sort"
 	"strings"
 	"sync"
@@ -86,6 +84,10 @@ const (
 	agentMCPMaxURLChars         = 1024
 	agentMCPMaxAllowedTools     = 8
 	agentMCPMaxAllowedToolChars = 128
+
+	// aiAgentMaxKnowledgeURLChars bounds a single approved prefix only. Whether it
+	// can be fetched is decided by RoomModel.validateAiExternalUrls.
+	aiAgentMaxKnowledgeURLChars = 1024
 
 	// Shape limits of the host-supplied custom provider (BYOK/BYOP).
 	aiAgentCustomProviderGoogle      = "google"
@@ -435,7 +437,7 @@ func (m *AIAgentModel) SetArtifactModel(am *ArtifactModel) {
 // RequireQuizApproval for a text chat session) because the same backends serve
 // the voice agent and the AI text chat.
 func (m *AIAgentModel) BuildToolDependencies(roomID, actorUserID string, log *logrus.Entry) mcp.ToolDependencies {
-	return mcp.ToolDependencies{
+	deps := mcp.ToolDependencies{
 		Poll:         aiAgentPollBackend{m: m},
 		Quiz:         m.redisService,
 		Chat:         aiAgentChatBackend{m: m},
@@ -453,6 +455,9 @@ func (m *AIAgentModel) BuildToolDependencies(roomID, actorUserID string, log *lo
 		RoomID:       roomID,
 		Logger:       log,
 	}
+	// gates every external knowledge and MCP URL the session is about to dial
+	deps.ExternalURLHook = mcp.NewExternalURLHookRunner(m.appConfig.Hooks, log)
+	return deps
 }
 
 func aiAgentKey(roomId, suffix string) string {
@@ -527,6 +532,10 @@ func NormalizeAIAgentFeatures(f *plugnmeet.InsightsAIAgentFeatures) *plugnmeet.I
 		out.SpeakingRate = &rate
 	}
 
+	// The prefixes are only trimmed and de-duplicated here. Dropping an unusable
+	// one would hide it from validateAiExternalUrls, which refuses the room
+	// instead; the knowledge tools clean the list again before they dial anything.
+	out.AllowedKnowledgeUrls = cleanAgentList(out.GetAllowedKnowledgeUrls(), aiAgentMaxKnowledgeURLChars)
 	out.McpServers = NormalizeExternalMCPServers(out.GetMcpServers())
 	out.CustomProvider = NormalizeAIAgentCustomProvider(out.GetCustomProvider())
 	out.Avatar = NormalizeAIAgentAvatarConfig(out.GetAvatar())
@@ -953,41 +962,21 @@ func ValidateAIAgentSessionMode(f *plugnmeet.InsightsAIAgentFeatures) error {
 }
 
 // ValidateExternalMCPServers only checks the shape of the endpoints: https, port
-// 443, no credentials, no fragment and no obviously internal IP literal. It is
-// shared by the AI agent and the AI text chat features. The DNS lookup and the
-// dial-time address checks happen in the MCP client, so creating a room never
-// waits on a slow resolver.
+// 443, no credentials, no fragment, and a host that is neither internal nor
+// obviously resolving into the internal network. It is shared by the AI agent and
+// the AI text chat features; the dial-time address check happens again in the MCP
+// client, so a rebind after this point cannot reach a private address.
 func ValidateExternalMCPServers(servers map[string]*plugnmeet.ExternalMCPServerConfig) error {
 	if len(servers) > mcp.MaxExternalMCPServersPerRoom {
 		return config.ErrAIAgentInvalidMCPServer
 	}
 	for key, cfg := range servers {
-		if strings.TrimSpace(key) == "" || cfg == nil || !isAllowedAgentMCPEndpoint(cfg.GetUrl()) {
+		if strings.TrimSpace(key) == "" || cfg == nil || !mcp.IsAllowedExternalMCPEndpoint(cfg.GetUrl()) {
 			return config.ErrAIAgentInvalidMCPServer
 		}
 	}
 
 	return nil
-}
-
-func isAllowedAgentMCPEndpoint(raw string) bool {
-	parsed, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil || parsed.Scheme != "https" || parsed.User != nil || parsed.Fragment != "" {
-		return false
-	}
-	host := parsed.Hostname()
-	if host == "" {
-		return false
-	}
-	// Internal services listen on their own ports, so https is pinned to 443.
-	if port := parsed.Port(); port != "" && port != "443" {
-		return false
-	}
-	if ip := net.ParseIP(host); ip != nil && mcp.IsBlockedExternalIP(ip) {
-		return false
-	}
-
-	return true
 }
 
 // trimmedScope returns the host-provided scope without surrounding blanks, or
@@ -1118,7 +1107,7 @@ func (m *AIAgentModel) PrepareRoomExternalMCP(ctx context.Context, roomId string
 		return
 	}
 
-	mcp.WarmRoomExternalMCP(ctx, m.redisService, roomId, servers, agentFeatures.GetMaxSessionSeconds(), m.logger)
+	mcp.WarmRoomExternalMCP(ctx, m.redisService, roomId, servers, agentFeatures.GetMaxSessionSeconds(), m.logger, mcp.NewExternalURLHookRunner(m.appConfig.Hooks, m.logger))
 }
 
 // isOneOnOneAIAgentRoom reports whether the voice agent may run in this room.

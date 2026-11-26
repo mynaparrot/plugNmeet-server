@@ -159,11 +159,11 @@ func (s *InsightsModel) adminTextChatToolRunner(ctx context.Context, roomId, use
 	if s.aiAgentModel == nil {
 		return nil
 	}
+	deps := s.BuildToolDependencies(roomId, userId, logger)
 	// The external servers are discovered when the chat is configured; this only
 	// warms what is still missing, so a request never waits on a remote server.
-	mcp.EnsureRoomExternalMCP(ctx, s.redisService, roomId, nil, 0, logger)
+	mcp.EnsureRoomExternalMCP(ctx, s.redisService, roomId, nil, 0, logger, deps.ExternalURLHook)
 
-	deps := s.BuildToolDependencies(roomId, userId, logger)
 	reg := mcp.BuildAdminTextChatToolRegistry(s.aiAgentModel.roomAgentFeatures(roomId), deps)
 	exec := mcp.NewExecutor(mcp.ExecutorOptions{
 		Registry: reg,

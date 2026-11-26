@@ -18,6 +18,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/mynaparrot/plugnmeet-protocol/connections"
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
@@ -422,6 +423,82 @@ func testExternalMCPDeps(store *redisservice.RedisService, roomID string) ToolDe
 	}
 }
 
+func TestExternalMCPExternalURLHook(t *testing.T) {
+	ctx := context.Background()
+	roomID := "room-hook"
+
+	fixture := newTestMCPServer(t, nil)
+	fixture.addTool("search_docs", "Search the handbook.", "answer")
+	target := externalMCPServerTarget{ServerKey: "docs", ServerSlug: "docs", Endpoint: fixture.http.URL}
+
+	t.Run("hook blocks the server", func(t *testing.T) {
+		manager := NewExternalMCPManager(newTestRedis(t), ToolDependencies{
+			AllowInsecureHTTP: true,
+			ExternalURLHook: func(_ context.Context, req *hooks.ExternalUrlHookData) (*hooks.ExternalUrlHookData, error) {
+				if req.Stage != hooks.ExternalUrlHookStageFetch {
+					t.Errorf("stage = %q, want %q", req.Stage, hooks.ExternalUrlHookStageFetch)
+				}
+				if req.Type != hooks.ExternalUrlHookTypeMCP || req.RoomId != roomID || req.ServerKey != "docs" || req.Url != fixture.http.URL {
+					t.Errorf("unexpected hook request %+v", req)
+				}
+				return nil, errors.New("not on the approved mcp list")
+			},
+		})
+
+		if _, err := manager.discover(ctx, roomID, target, nil); !errors.Is(err, errExternalMCPURLBlocked) {
+			t.Fatalf("err = %v, want errExternalMCPURLBlocked", err)
+		}
+
+		store := newTestRedis(t)
+		callManager := NewExternalMCPManager(store, ToolDependencies{
+			RedisService:      store,
+			AllowInsecureHTTP: true,
+			ExternalURLHook:   manager.externalURLHook,
+		})
+		res, err := callManager.runExternalTool(ctx, ToolCall{
+			CallID:   "call-1",
+			RoomID:   roomID,
+			ToolName: "ext_docs_search_docs",
+			ArgsJSON: `{"query":"fractions"}`,
+		}, externalMCPToolTarget{externalMCPServerTarget: target, RemoteToolName: "search_docs"}, nil)
+		if err != nil {
+			t.Fatalf("runExternalTool: %v", err)
+		}
+		if !res.IsError {
+			t.Fatalf("a blocked tool call must fail: %s", res.OutputJSON)
+		}
+		if hits := fixture.calls.Load(); hits != 0 {
+			t.Errorf("the blocked server was called %d times, want 0", hits)
+		}
+	})
+
+	t.Run("hook rewrites the endpoint to a proxy", func(t *testing.T) {
+		proxy := newTestMCPServer(t, nil)
+		proxy.addTool("proxied_search", "Search through the proxy.", "answer")
+
+		manager := NewExternalMCPManager(newTestRedis(t), ToolDependencies{
+			AllowInsecureHTTP: true,
+			ExternalURLHook: func(context.Context, *hooks.ExternalUrlHookData) (*hooks.ExternalUrlHookData, error) {
+				return &hooks.ExternalUrlHookData{
+					Action:    hooks.ExternalUrlHookActionAllowFetch,
+					TargetUrl: proxy.http.URL,
+				}, nil
+			},
+		})
+
+		tools, err := manager.discover(ctx, roomID, target, nil)
+		if err != nil {
+			t.Fatalf("discover: %v", err)
+		}
+		if len(tools) != 1 || tools[0].RemoteToolName != "proxied_search" {
+			t.Fatalf("tools = %+v, want the proxy's tool", tools)
+		}
+		if got := tools[0].Spec.Name; got != "ext_docs_proxied_search" {
+			t.Errorf("tool name = %q, want ext_docs_proxied_search", got)
+		}
+	})
+}
+
 func TestExternalMCPDiscoveryAndCalls(t *testing.T) {
 	store := newTestRedis(t)
 	roomID := "room-external"
@@ -733,13 +810,13 @@ func TestEnsureRoomExternalMCPReusesWarmedTools(t *testing.T) {
 	// gone: everything must still be served from Redis.
 	fixture.http.Close()
 
-	reused := EnsureRoomExternalMCP(ctx, store, roomID, nil, 600, logger)
+	reused := EnsureRoomExternalMCP(ctx, store, roomID, nil, 600, logger, nil)
 	if len(reused) != 1 || reused[0].Spec == nil || reused[0].Spec.Name != "ext_docs_search_docs" {
 		t.Fatalf("cached tools = %+v, want the pre-warmed tool", reused)
 	}
 	if again := EnsureRoomExternalMCP(ctx, store, roomID, map[string]*plugnmeet.ExternalMCPServerConfig{
 		"docs": {Url: "https://mcp.example.com/mcp"},
-	}, 600, logger); len(again) != 1 {
+	}, 600, logger, nil); len(again) != 1 {
 		t.Fatalf("a warmed room must not be re-discovered, got %d tools", len(again))
 	}
 
@@ -751,10 +828,10 @@ func TestEnsureRoomExternalMCPReusesWarmedTools(t *testing.T) {
 		t.Errorf("the stored config must survive (err %v, stored %+v)", err, stored)
 	}
 
-	if cached := EnsureRoomExternalMCP(ctx, newTestRedis(t), "room-cold", nil, 600, logger); len(cached) != 0 {
+	if cached := EnsureRoomExternalMCP(ctx, newTestRedis(t), "room-cold", nil, 600, logger, nil); len(cached) != 0 {
 		t.Errorf("an unknown room must warm nothing, got %d tools", len(cached))
 	}
-	if cached := EnsureRoomExternalMCP(ctx, nil, roomID, nil, 600, logger); len(cached) != 0 {
+	if cached := EnsureRoomExternalMCP(ctx, nil, roomID, nil, 600, logger, nil); len(cached) != 0 {
 		t.Errorf("a missing redis store must warm nothing, got %d tools", len(cached))
 	}
 }

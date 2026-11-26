@@ -23,6 +23,7 @@ import (
 	"time"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/sirupsen/logrus"
 
@@ -228,6 +229,9 @@ type ExternalMCPManager struct {
 	// scope is the consumer scope of the session the registry serves; only the
 	// matching and shared servers are registered.
 	scope string
+	// externalURLHook vets (and may rewrite) a server endpoint before a session
+	// is opened; nil keeps the built-in checks only.
+	externalURLHook ExternalURLHookRunner
 }
 
 // NewExternalMCPManager wires a manager from the room's dependencies.
@@ -242,13 +246,42 @@ func NewExternalMCPManager(store *redisservice.RedisService, deps ToolDependenci
 		client:            newExternalMCPHTTPClient(deps.HTTPClient, deps.AllowInsecureHTTP),
 		ttl:               0,
 		scope:             deps.MCPScope,
+		externalURLHook:   deps.ExternalURLHook,
 	}
+}
+
+// resolveServerEndpoint lets the deployment's external URL hook vet the server
+// URL, or rewrite it to a proxy, and then applies the built-in endpoint checks
+// to whatever address will actually be dialled.
+func (m *ExternalMCPManager) resolveServerEndpoint(ctx context.Context, roomID string, target externalMCPServerTarget) (string, error) {
+	endpoint := strings.TrimSpace(target.Endpoint)
+	if m.externalURLHook != nil {
+		res, err := m.externalURLHook(ctx, &hooks.ExternalUrlHookData{
+			Stage:     hooks.ExternalUrlHookStageFetch,
+			Type:      hooks.ExternalUrlHookTypeMCP,
+			RoomId:    roomID,
+			ServerKey: target.ServerKey,
+			Url:       endpoint,
+		})
+		if err != nil {
+			return "", errExternalMCPURLBlocked
+		}
+		if res != nil {
+			if rewritten := strings.TrimSpace(res.TargetUrl); rewritten != "" {
+				endpoint = rewritten
+			}
+		}
+	}
+	if _, err := ValidateExternalMCPURL(ctx, endpoint, m.allowInsecureHTTP); err != nil {
+		return "", err
+	}
+	return endpoint, nil
 }
 
 // WarmRoomExternalMCP discovers the room's external servers and caches their
 // read-only tools. Failures are logged, never fatal.
-func WarmRoomExternalMCP(ctx context.Context, store *redisservice.RedisService, roomID string, servers map[string]*plugnmeet.ExternalMCPServerConfig, maxSessionSeconds uint32, logger *logrus.Entry) []*CachedExternalMCPTool {
-	manager := NewExternalMCPManager(store, ToolDependencies{RedisService: store, RoomID: roomID, Logger: logger})
+func WarmRoomExternalMCP(ctx context.Context, store *redisservice.RedisService, roomID string, servers map[string]*plugnmeet.ExternalMCPServerConfig, maxSessionSeconds uint32, logger *logrus.Entry, hook ExternalURLHookRunner) []*CachedExternalMCPTool {
+	manager := NewExternalMCPManager(store, ToolDependencies{RedisService: store, RoomID: roomID, Logger: logger, ExternalURLHook: hook})
 	if manager == nil {
 		return nil
 	}
@@ -264,7 +297,7 @@ func WarmRoomExternalMCP(ctx context.Context, store *redisservice.RedisService, 
 // costs zero network calls. When the room's metadata no longer carries the
 // servers (they are stripped before the metadata is broadcast) the stored
 // configuration is used instead.
-func EnsureRoomExternalMCP(ctx context.Context, store *redisservice.RedisService, roomID string, servers map[string]*plugnmeet.ExternalMCPServerConfig, maxSessionSeconds uint32, logger *logrus.Entry) []*CachedExternalMCPTool {
+func EnsureRoomExternalMCP(ctx context.Context, store *redisservice.RedisService, roomID string, servers map[string]*plugnmeet.ExternalMCPServerConfig, maxSessionSeconds uint32, logger *logrus.Entry, hook ExternalURLHookRunner) []*CachedExternalMCPTool {
 	if store == nil || roomID == "" {
 		return nil
 	}
@@ -281,14 +314,14 @@ func EnsureRoomExternalMCP(ctx context.Context, store *redisservice.RedisService
 		}
 		servers = stored
 	}
-	return WarmRoomExternalMCP(ctx, store, roomID, servers, maxSessionSeconds, logger)
+	return WarmRoomExternalMCP(ctx, store, roomID, servers, maxSessionSeconds, logger, hook)
 }
 
 // UpdateRoomScopedExternalMCP replaces the servers one consumer owns without
 // disturbing the other consumers' servers, then re-warms the merged set. It is
 // the update path of the live room settings, where the text chat and the AI
 // agent each manage their own servers within the room-wide budget.
-func UpdateRoomScopedExternalMCP(ctx context.Context, store *redisservice.RedisService, roomID string, scope string, servers map[string]*plugnmeet.ExternalMCPServerConfig, maxSessionSeconds uint32, logger *logrus.Entry) []*CachedExternalMCPTool {
+func UpdateRoomScopedExternalMCP(ctx context.Context, store *redisservice.RedisService, roomID string, scope string, servers map[string]*plugnmeet.ExternalMCPServerConfig, maxSessionSeconds uint32, logger *logrus.Entry, hook ExternalURLHookRunner) []*CachedExternalMCPTool {
 	if store == nil || roomID == "" {
 		return nil
 	}
@@ -344,7 +377,7 @@ func UpdateRoomScopedExternalMCP(ctx context.Context, store *redisservice.RedisS
 		_ = store.ClearExternalMCPTools(ctx, roomID)
 		return nil
 	}
-	return WarmRoomExternalMCP(ctx, store, roomID, merged, maxSessionSeconds, log)
+	return WarmRoomExternalMCP(ctx, store, roomID, merged, maxSessionSeconds, log, hook)
 }
 
 // Warm performs discovery and persists the config plus the pre-warmed tools.
@@ -393,7 +426,7 @@ func (m *ExternalMCPManager) Warm(ctx context.Context, roomID string, servers ma
 			Endpoint:   strings.TrimSpace(cfg.GetUrl()),
 			Headers:    cfg.GetHeaders(),
 		}
-		discovered, err := m.discover(ctx, target, cfg.GetAllowedTools())
+		discovered, err := m.discover(ctx, roomID, target, cfg.GetAllowedTools())
 		if err != nil {
 			m.logger.WithFields(map[string]any{"room_id": roomID, "server": key}).
 				WithError(err).Warn("external mcp server discovery failed")
@@ -499,6 +532,16 @@ func (m *ExternalMCPManager) RegisterCached(ctx context.Context, reg *Registry, 
 
 // runExternalTool serves one call, from Redis when possible.
 func (m *ExternalMCPManager) runExternalTool(ctx context.Context, call ToolCall, target externalMCPToolTarget, uncached *atomic.Int32) (ToolResult, error) {
+	// A blocked server is refused before the cache is read, so its cached
+	// answers cannot outlive the block.
+	endpoint, err := m.resolveServerEndpoint(ctx, call.RoomID, target.externalMCPServerTarget)
+	if err != nil {
+		m.logger.WithFields(map[string]any{"room_id": call.RoomID, "server": target.ServerKey}).
+			WithError(err).Warn("external mcp server address was refused")
+		return errorResult(call, "%s", err.Error()), nil
+	}
+	target.Endpoint = endpoint
+
 	field := externalMCPCacheField(target.ServerKey, target.RemoteToolName, call.ArgsJSON)
 	if cached, ok := m.store.LoadExternalMCPCachedOutput(ctx, call.RoomID, field); ok {
 		return ToolResult{CallID: call.CallID, ToolName: call.ToolName, OutputJSON: cached}, nil
@@ -582,10 +625,12 @@ func (m *ExternalMCPManager) callExternalMCP(ctx context.Context, call ToolCall,
 }
 
 // discover lists one page of tools (plus one page of resources) for a server.
-func (m *ExternalMCPManager) discover(ctx context.Context, target externalMCPServerTarget, allowed []string) ([]*CachedExternalMCPTool, error) {
-	if _, err := ValidateExternalMCPURL(ctx, target.Endpoint, m.allowInsecureHTTP); err != nil {
+func (m *ExternalMCPManager) discover(ctx context.Context, roomID string, target externalMCPServerTarget, allowed []string) ([]*CachedExternalMCPTool, error) {
+	endpoint, err := m.resolveServerEndpoint(ctx, roomID, target)
+	if err != nil {
 		return nil, err
 	}
+	target.Endpoint = endpoint
 	callCtx, cancel := context.WithTimeout(ctx, ExternalMCPRequestTimeout)
 	defer cancel()
 

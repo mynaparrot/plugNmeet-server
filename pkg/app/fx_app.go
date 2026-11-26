@@ -77,6 +77,7 @@ func ExecuteBootstrapTasks(lc fx.Lifecycle, ctx context.Context, cancel context.
 			{Name: hooks.HookNameDelete, Config: appCnf.Hooks.DeleteHook},
 			{Name: hooks.HookNameResumableUpload, Config: appCnf.Hooks.ResumableUploadHook},
 			{Name: hooks.HookNameRoomEnd, Config: appCnf.Hooks.RoomEndHook},
+			{Name: hooks.HookNameExternalUrl, Config: appCnf.Hooks.ExternalUrlHook},
 		}
 		err := appCnf.Hooks.Initialize(ctx, hooks.InitOptions{
 			RootWorkingDir: appCnf.RootWorkingDir,

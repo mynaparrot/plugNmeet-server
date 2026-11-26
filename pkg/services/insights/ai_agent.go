@@ -420,7 +420,7 @@ func NewAIAgent(args *AIAgentArgs) (*AIAgent, error) {
 	// External MCP servers are discovered once, at room creation. This only
 	// warms what is still missing, and the registry afterwards reads Redis only,
 	// so a slow remote server never delays the realtime session.
-	mcp.EnsureRoomExternalMCP(args.Ctx, args.Deps.RedisService, args.Payload.RoomId, args.Features.GetMcpServers(), args.Features.GetMaxSessionSeconds(), log)
+	mcp.EnsureRoomExternalMCP(args.Ctx, args.Deps.RedisService, args.Payload.RoomId, args.Features.GetMcpServers(), args.Features.GetMaxSessionSeconds(), log, args.Deps.ExternalURLHook)
 
 	// The provider receives the compiled envelope, never the host prompt verbatim.
 	registry := mcp.BuildRoomToolRegistry(args.Features, args.Deps)

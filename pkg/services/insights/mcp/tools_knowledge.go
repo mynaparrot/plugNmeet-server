@@ -13,6 +13,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
@@ -40,7 +41,7 @@ type cachedDocument struct {
 }
 
 func registerKnowledgeTools(reg *Registry, features *plugnmeet.InsightsAIAgentFeatures, deps ToolDependencies) {
-	allowed := cleanURLPrefixes(features.AllowedKnowledgeUrls)
+	allowed := CleanAllowedKnowledgeURLs(features.GetAllowedKnowledgeUrls())
 	if len(allowed) == 0 {
 		return
 	}
@@ -77,7 +78,7 @@ func registerKnowledgeTools(reg *Registry, features *plugnmeet.InsightsAIAgentFe
 				return errorResult(call, "%s", errKnowledgeURLBlocked.Error()), nil
 			}
 
-			doc, err := fetchKnowledgeDocument(ctx, guard, client, allowed, deps.Cache, call.RoomID, rawURL, ttl)
+			doc, err := fetchKnowledgeDocument(ctx, guard, client, allowed, deps.Cache, deps.ExternalURLHook, call.RoomID, rawURL, ttl)
 			if err != nil {
 				deps.logger().WithFields(map[string]any{"room_id": call.RoomID, "url": rawURL}).
 					WithError(err).Warn("ai agent knowledge fetch failed")
@@ -94,7 +95,7 @@ func registerKnowledgeTools(reg *Registry, features *plugnmeet.InsightsAIAgentFe
 	})
 }
 
-func fetchKnowledgeDocument(ctx context.Context, guard urlGuard, client *http.Client, allowed []string, cache CacheStore, roomID, rawURL string, ttl time.Duration) (*cachedDocument, error) {
+func fetchKnowledgeDocument(ctx context.Context, guard urlGuard, client *http.Client, allowed []string, cache CacheStore, hook ExternalURLHookRunner, roomID, rawURL string, ttl time.Duration) (*cachedDocument, error) {
 	if cache != nil {
 		if encoded, found, err := cache.GetAIKnowledgeDocument(ctx, roomID, rawURL); err == nil && found {
 			doc := &cachedDocument{}
@@ -104,7 +105,41 @@ func fetchKnowledgeDocument(ctx context.Context, guard urlGuard, client *http.Cl
 		}
 	}
 
-	target, err := guard.validate(ctx, rawURL)
+	// The deployment may vet the URL, rewrite it to a proxy, or answer with the
+	// document itself. The last case dials nothing at all.
+	provideContent := false
+	var content, mimeType string
+	fetchURL := rawURL
+	if hook != nil {
+		res, err := hook(ctx, &hooks.ExternalUrlHookData{
+			Stage:       hooks.ExternalUrlHookStageFetch,
+			Type:        hooks.ExternalUrlHookTypeKnowledge,
+			RoomId:      roomID,
+			Url:         rawURL,
+			AllowedUrls: allowed,
+		})
+		if err != nil {
+			return nil, errKnowledgeURLBlocked
+		}
+		if res != nil {
+			if res.Action == hooks.ExternalUrlHookActionProvideContent || strings.TrimSpace(res.Content) != "" {
+				provideContent = true
+				content, mimeType = res.Content, res.MimeType
+			}
+			if target := strings.TrimSpace(res.TargetUrl); target != "" {
+				fetchURL = target
+			}
+		}
+	}
+
+	if provideContent {
+		text, truncated := knowledgeHookText(content, mimeType)
+		doc := &cachedDocument{URL: rawURL, Text: text, Truncated: truncated, FetchedAt: time.Now().UTC()}
+		cacheKnowledgeDocument(ctx, cache, roomID, rawURL, doc, ttl)
+		return doc, nil
+	}
+
+	target, err := guard.validate(ctx, fetchURL)
 	if err != nil {
 		return nil, err
 	}
@@ -114,9 +149,16 @@ func fetchKnowledgeDocument(ctx context.Context, guard urlGuard, client *http.Cl
 		return nil, errKnowledgeURLBlocked
 	}
 	req.Header.Set("User-Agent", knowledgeRequestUA)
-	req.Header.Set("Accept", "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,text/plain,text/markdown;q=0.9")
+	req.Header.Set("Referer", "")
 
-	resp, err := withKnowledgeRedirectPolicy(client, guard, allowed).Do(req)
+	// A rewritten URL is the hook's own endpoint, so only the guarded client
+	// applies; the approved prefixes gate every redirect of the room's page.
+	fetchClient := client
+	if fetchURL == rawURL {
+		fetchClient = withKnowledgeRedirectPolicy(client, guard, allowed)
+	}
+	resp, err := fetchClient.Do(req)
 	if err != nil {
 		if errors.Is(err, errKnowledgeURLBlocked) || errors.Is(err, errKnowledgeURLInsecure) {
 			return nil, err
@@ -127,6 +169,9 @@ func fetchKnowledgeDocument(ctx context.Context, guard urlGuard, client *http.Cl
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("the page answered with status %d", resp.StatusCode)
+	}
+	if !isAllowedKnowledgeContentType(resp.Header.Get("Content-Type")) {
+		return nil, errKnowledgeFetchFailed
 	}
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxKnowledgeBytes+1))
@@ -144,18 +189,40 @@ func fetchKnowledgeDocument(ctx context.Context, guard urlGuard, client *http.Cl
 		textTruncated = true
 	}
 
+	// The requested URL stays the source of the document, even when the hook
+	// fetched it through a proxy, so the cache and the citation match.
 	doc := &cachedDocument{
-		URL:       target.String(),
+		URL:       rawURL,
 		Text:      text,
 		Truncated: truncated || textTruncated,
 		FetchedAt: time.Now().UTC(),
 	}
-	if cache != nil {
-		if encoded, err := json.Marshal(doc); err == nil {
-			_ = cache.SetAIKnowledgeDocument(ctx, roomID, rawURL, string(encoded), ttl)
-		}
-	}
+	cacheKnowledgeDocument(ctx, cache, roomID, rawURL, doc, ttl)
 	return doc, nil
+}
+
+// knowledgeHookText renders the document the hook supplied and keeps it inside
+// the same budget as a fetched page.
+func knowledgeHookText(content, mimeType string) (string, bool) {
+	text := content
+	if strings.Contains(strings.ToLower(mimeType), "html") {
+		text = htmlToText(text)
+	} else {
+		text = strings.TrimSpace(text)
+	}
+	if utf8.RuneCountInString(text) > maxKnowledgeTextChars {
+		return truncateRunes(text, maxKnowledgeTextChars), true
+	}
+	return text, false
+}
+
+func cacheKnowledgeDocument(ctx context.Context, cache CacheStore, roomID, rawURL string, doc *cachedDocument, ttl time.Duration) {
+	if cache == nil {
+		return
+	}
+	if encoded, err := json.Marshal(doc); err == nil {
+		_ = cache.SetAIKnowledgeDocument(ctx, roomID, rawURL, string(encoded), ttl)
+	}
 }
 
 func knowledgeCacheTTL(seconds uint32) time.Duration {
@@ -166,16 +233,6 @@ func knowledgeCacheTTL(seconds uint32) time.Duration {
 		return 24 * time.Hour
 	}
 	return time.Duration(seconds) * time.Second
-}
-
-func cleanURLPrefixes(urls []string) []string {
-	prefixes := make([]string, 0, len(urls))
-	for _, u := range urls {
-		if u = strings.TrimSpace(u); u != "" {
-			prefixes = append(prefixes, u)
-		}
-	}
-	return prefixes
 }
 
 func wrapUntrustedDocument(doc *cachedDocument) string {

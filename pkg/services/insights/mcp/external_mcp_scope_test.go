@@ -128,12 +128,12 @@ func TestUpdateRoomScopedExternalMCP(t *testing.T) {
 	agentServers := map[string]*plugnmeet.ExternalMCPServerConfig{
 		"docs": {Url: agentFixture.http.URL},
 	}
-	UpdateRoomScopedExternalMCP(ctx, store, roomID, MCPScopeAIAgent, agentServers, 600, logger)
+	UpdateRoomScopedExternalMCP(ctx, store, roomID, MCPScopeAIAgent, agentServers, 600, logger, nil)
 
 	chatServers := map[string]*plugnmeet.ExternalMCPServerConfig{
 		"lessons": {Url: firstChatFixture.http.URL},
 	}
-	UpdateRoomScopedExternalMCP(ctx, store, roomID, MCPScopeTextChat, chatServers, 600, logger)
+	UpdateRoomScopedExternalMCP(ctx, store, roomID, MCPScopeTextChat, chatServers, 600, logger, nil)
 
 	stored, err := store.LoadExternalMCPConfig(ctx, roomID)
 	if err != nil {
@@ -152,21 +152,21 @@ func TestUpdateRoomScopedExternalMCP(t *testing.T) {
 	// A text chat update replaces only its own servers.
 	UpdateRoomScopedExternalMCP(ctx, store, roomID, MCPScopeTextChat, map[string]*plugnmeet.ExternalMCPServerConfig{
 		"lessons2": {Url: secondChatFixture.http.URL},
-	}, 600, logger)
+	}, 600, logger, nil)
 	stored, _ = store.LoadExternalMCPConfig(ctx, roomID)
 	if len(stored) != 2 || stored["docs"] == nil || stored["lessons2"] == nil || stored["lessons"] != nil {
 		t.Fatalf("stored servers after the text chat update = %+v", stored)
 	}
 
 	// Removing every text chat server leaves the agent's servers configured.
-	UpdateRoomScopedExternalMCP(ctx, store, roomID, MCPScopeTextChat, nil, 600, logger)
+	UpdateRoomScopedExternalMCP(ctx, store, roomID, MCPScopeTextChat, nil, 600, logger, nil)
 	stored, _ = store.LoadExternalMCPConfig(ctx, roomID)
 	if len(stored) != 1 || stored["docs"] == nil {
 		t.Fatalf("stored servers after clearing the text chat = %+v", stored)
 	}
 
 	// Clearing the agent's servers drops the whole room state.
-	UpdateRoomScopedExternalMCP(ctx, store, roomID, MCPScopeAIAgent, nil, 600, logger)
+	UpdateRoomScopedExternalMCP(ctx, store, roomID, MCPScopeAIAgent, nil, 600, logger, nil)
 	if stored, _ = store.LoadExternalMCPConfig(ctx, roomID); len(stored) != 0 {
 		t.Errorf("stored servers after clearing everything = %+v", stored)
 	}
@@ -193,7 +193,7 @@ func TestUpdateRoomScopedExternalMCPRestampsScopeAndCapsServers(t *testing.T) {
 		}
 	}
 
-	UpdateRoomScopedExternalMCP(ctx, store, roomID, MCPScopeAIAgent, servers, 600, logger)
+	UpdateRoomScopedExternalMCP(ctx, store, roomID, MCPScopeAIAgent, servers, 600, logger, nil)
 
 	stored, err := store.LoadExternalMCPConfig(ctx, roomID)
 	if err != nil {

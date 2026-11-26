@@ -14,7 +14,7 @@ require (
 	github.com/goccy/go-json v0.12.0
 	github.com/goccy/go-yaml v1.19.2
 	github.com/gofiber/fiber/v3 v3.7.0
-	github.com/gofiber/template/html/v3 v3.1.0
+	github.com/gofiber/template/html/v3 v3.1.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/jordic/lti v0.0.0-20160211051708-2c756eacbab9
@@ -22,7 +22,7 @@ require (
 	github.com/livekit/protocol v1.54.1
 	github.com/livekit/server-sdk-go/v2 v2.20.1
 	github.com/modelcontextprotocol/go-sdk v1.8.0
-	github.com/mynaparrot/plugnmeet-protocol v1.6.4-0.20261125180814-ff9f34da045f
+	github.com/mynaparrot/plugnmeet-protocol v1.6.4-0.20261126225708-2ea0836eaa5c
 	github.com/nats-io/jwt/v2 v2.8.3
 	github.com/nats-io/nats.go v1.56.0
 	github.com/nats-io/nkeys v0.4.17
@@ -65,8 +65,8 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-sql-driver/mysql v1.10.2 // indirect
 	github.com/gofiber/schema v1.9.3 // indirect
-	github.com/gofiber/template/v2 v2.1.6 // indirect
-	github.com/gofiber/utils/v2 v2.6.4 // indirect
+	github.com/gofiber/template/v2 v2.1.7 // indirect
+	github.com/gofiber/utils/v2 v2.6.5 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
@@ -139,7 +139,7 @@ require (
 	golang.org/x/exp v0.0.0-20261014143641-f0251eb4aa3e // indirect
 	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/oauth2 v0.37.0 // indirect
-	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/time v0.16.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260825221802-da73d73af1c5 // indirect

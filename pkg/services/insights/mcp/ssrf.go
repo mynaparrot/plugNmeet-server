@@ -19,6 +19,9 @@ import (
 	"syscall"
 	"time"
 	"unicode/utf8"
+
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
+	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 )
 
 // Model-facing errors: they never echo the resolved address.
@@ -31,6 +34,10 @@ var (
 	errExternalMCPURLInsecure = errors.New("mcp servers must use https")
 	errExternalMCPPortBlocked = errors.New("mcp servers must use the default https port")
 )
+
+// ErrInvalidExternalURL marks a host-supplied external URL that fails the built-in
+// checks, so a caller can map it to the feature-specific error of its own API.
+var ErrInvalidExternalURL = errors.New("external url is not allowed")
 
 // ---------------------------------------------------------------------------
 // IP & hostname verification
@@ -230,6 +237,54 @@ func ValidateExternalMCPURL(ctx context.Context, rawURL string, allowInsecureHTT
 	return parsed, nil
 }
 
+// IsAllowedExternalMCPEndpoint checks the shape of one external MCP endpoint:
+// https, no credentials, no fragment, the default https port, and a host that is
+// neither internal nor resolves into the internal network. A failed lookup keeps
+// the name, because the MCP client re-checks the address it actually dials.
+func IsAllowedExternalMCPEndpoint(raw string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || parsed.Scheme != "https" || parsed.User != nil || parsed.Fragment != "" {
+		return false
+	}
+	host := parsed.Hostname()
+	if host == "" {
+		return false
+	}
+	// Internal services listen on their own ports, so https is pinned to 443.
+	if port := parsed.Port(); port != "" && port != "443" {
+		return false
+	}
+	return validateResolvedHost(context.Background(), host, true)
+}
+
+// ValidateExternalMCPServerURLsWithHook shows every external MCP endpoint to the
+// deployment's hook at validation time, so a script can refuse the room or vet the
+// endpoints out of band. It must run after the built-in endpoint checks, which are
+// the ones that refuse an unusable address; here only the hook can refuse.
+func ValidateExternalMCPServerURLsWithHook(ctx context.Context, roomID string, servers map[string]*plugnmeet.ExternalMCPServerConfig, hook ExternalURLHookRunner) error {
+	if hook == nil || len(servers) == 0 {
+		return nil
+	}
+
+	for _, key := range sortedServerKeys(servers) {
+		cfg := servers[key]
+		if cfg == nil {
+			continue
+		}
+		if _, err := hook(ctx, &hooks.ExternalUrlHookData{
+			Stage:     hooks.ExternalUrlHookStageValidate,
+			Type:      hooks.ExternalUrlHookTypeMCP,
+			RoomId:    roomID,
+			ServerKey: key,
+			Url:       strings.TrimSpace(cfg.GetUrl()),
+		}); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // IsAllowedCustomProviderEndpoint checks the shape of a custom provider gateway
 // endpoint: https, no credentials, no query and no fragment, a valid port, and a
 // host that does not point into the internal network. Custom https ports stay
@@ -274,6 +329,11 @@ func hasAllowedPrefix(rawURL string, allowed []string) bool {
 		if effectiveHTTPSPort(target) != effectiveHTTPSPort(p) {
 			continue
 		}
+		// A query string carries room data out of the room, so it is only
+		// allowed when the host approved that exact query.
+		if target.RawQuery != p.RawQuery {
+			continue
+		}
 		if pathUnderPrefix(target, p) {
 			return true
 		}
@@ -281,20 +341,131 @@ func hasAllowedPrefix(rawURL string, allowed []string) bool {
 	return false
 }
 
-// parseAllowedHTTPSURL accepts only a plain https URL without credentials and
-// without a path that could be re-interpreted after normalisation.
+// parseAllowedHTTPSURL accepts only a plain https URL without credentials, a
+// fragment or a path that could be re-interpreted after normalisation. Raw IP
+// literals and internal hostnames are refused, so an allow-list entry can never
+// point at the server's own network.
 func parseAllowedHTTPSURL(raw string) (*url.URL, bool) {
 	parsed, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil || parsed == nil {
 		return nil, false
 	}
-	if !strings.EqualFold(parsed.Scheme, "https") || parsed.User != nil || parsed.Hostname() == "" {
+	if !strings.EqualFold(parsed.Scheme, "https") || parsed.User != nil || parsed.Fragment != "" || parsed.RawFragment != "" {
+		return nil, false
+	}
+	host := parsed.Hostname()
+	if host == "" || net.ParseIP(host) != nil || IsInternalHost(host) {
 		return nil, false
 	}
 	if hasBackslashOrDotDot(parsed.Path) || hasBackslashOrDotDot(parsed.RawPath) {
 		return nil, false
 	}
 	return parsed, true
+}
+
+// MaxAllowedKnowledgeURLs caps how many prefixes a room may approve.
+const MaxAllowedKnowledgeURLs = 20
+
+// CleanAllowedKnowledgeURLs trims, normalises and de-duplicates the host's
+// approved knowledge prefixes, dropping every entry that could not be fetched
+// safely: non-https, credentials, fragments, raw IP literals, internal hosts
+// and non-443 ports.
+func CleanAllowedKnowledgeURLs(urls []string) []string {
+	cleaned := make([]string, 0, min(len(urls), MaxAllowedKnowledgeURLs))
+	seen := make(map[string]struct{}, len(cleaned))
+	for _, raw := range urls {
+		if len(cleaned) >= MaxAllowedKnowledgeURLs {
+			break
+		}
+		parsed, ok := parseAllowedHTTPSURL(raw)
+		if !ok || effectiveHTTPSPort(parsed) != "443" {
+			continue
+		}
+		normalized := parsed.String()
+		if _, duplicate := seen[normalized]; duplicate {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		cleaned = append(cleaned, normalized)
+	}
+	return cleaned
+}
+
+// knowledgeHostCheck memoises the host verification of one validation run, so a
+// room that approves many pages of the same host resolves it only once.
+type knowledgeHostCheck map[string]bool
+
+func (c knowledgeHostCheck) allows(ctx context.Context, host string) bool {
+	if allowed, seen := c[host]; seen {
+		return allowed
+	}
+	allowed := validateResolvedHost(ctx, host, true)
+	c[host] = allowed
+	return allowed
+}
+
+// ValidateAllowedKnowledgeURLs vets the host-supplied knowledge prefixes of a room
+// before they are normalised. CleanAllowedKnowledgeURLs drops every unusable entry,
+// so this must run on the raw request to refuse the room instead of silently
+// approving nothing. It returns ErrInvalidExternalURL for a built-in refusal and
+// the hook's own error when the deployment refuses the room.
+func ValidateAllowedKnowledgeURLs(ctx context.Context, roomID string, urls []string, hook ExternalURLHookRunner) error {
+	if len(urls) > MaxAllowedKnowledgeURLs {
+		return ErrInvalidExternalURL
+	}
+
+	hosts := make(knowledgeHostCheck, len(urls))
+	for _, raw := range urls {
+		trimmed := strings.TrimSpace(raw)
+		if trimmed == "" {
+			// an unset entry approves nothing, so it is dropped rather than refused
+			continue
+		}
+		parsed, ok := parseAllowedHTTPSURL(trimmed)
+		if !ok || effectiveHTTPSPort(parsed) != "443" || !hosts.allows(ctx, parsed.Hostname()) {
+			return ErrInvalidExternalURL
+		}
+		if hook == nil {
+			continue
+		}
+		if _, err := hook(ctx, &hooks.ExternalUrlHookData{
+			Stage:       hooks.ExternalUrlHookStageValidate,
+			Type:        hooks.ExternalUrlHookTypeKnowledge,
+			RoomId:      roomID,
+			Url:         parsed.String(),
+			AllowedUrls: urls,
+		}); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// allowedKnowledgeContentTypes are the document types htmlToText can render.
+// Everything else (images, audio, video, PDFs, binary blobs) is refused before
+// the body is read.
+var allowedKnowledgeContentTypes = map[string]struct{}{
+	"text/html":             {},
+	"text/plain":            {},
+	"text/markdown":         {},
+	"text/xml":              {},
+	"text/csv":              {},
+	"application/xhtml+xml": {},
+	"application/json":      {},
+	"application/xml":       {},
+	"application/ld+json":   {},
+}
+
+// isAllowedKnowledgeContentType reports whether the response may be read. An
+// absent Content-Type is accepted, because some documentation servers omit it.
+func isAllowedKnowledgeContentType(header string) bool {
+	mediaType := strings.ToLower(strings.TrimSpace(strings.Split(header, ";")[0]))
+	if mediaType == "" {
+		return true
+	}
+	_, ok := allowedKnowledgeContentTypes[mediaType]
+	return ok
 }
 
 func hasBackslashOrDotDot(rawPath string) bool {

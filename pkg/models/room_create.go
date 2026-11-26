@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
 	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
+	"github.com/mynaparrot/plugnmeet-server/pkg/services/insights/mcp"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cast"
@@ -93,6 +95,11 @@ func (m *RoomModel) CreateRoom(userCtx context.Context, r *plugnmeet.CreateRoomR
 	// the AI text chat may bring its own external MCP servers; they share the
 	// room-wide budget with the AI agent's servers
 	if err := m.validateAITextChatMCPServers(r, log); err != nil {
+		return plugnmeet.StatusCode_INVALID_PARAMETERS, nil, err
+	}
+
+	// every external URL the room would dial is vetted in this single place
+	if err := m.validateAiExternalUrls(userCtx, r, log); err != nil {
 		return plugnmeet.StatusCode_INVALID_PARAMETERS, nil, err
 	}
 
@@ -427,6 +434,45 @@ func (m *RoomModel) validateAITextChatMCPServers(r *plugnmeet.CreateRoomReq, log
 	if _, err := MergeExternalMCPServers(agentServers, servers); err != nil {
 		log.WithError(err).Warn("ai text chat mcp servers were refused")
 		return err
+	}
+
+	return nil
+}
+
+// validateAiExternalUrls vets every external URL a room is about to dial:
+// the AI agent's knowledge prefixes must be readable and its MCP servers, like the AI text chat's, must be dialable.
+// The deployment's external_url_hook may refuse the room or vet them too. It runs on the normalised features,
+// which keep every host-supplied knowledge prefix so an unusable one can still be refused here.
+func (m *RoomModel) validateAiExternalUrls(userCtx context.Context, r *plugnmeet.CreateRoomReq, log *logrus.Entry) error {
+	if r.GetMetadata().GetIsBreakoutRoom() {
+		// a breakout room inherits the endpoints its parent already had vetted
+		return nil
+	}
+
+	insightsFeatures := r.GetMetadata().GetRoomFeatures().GetInsightsFeatures()
+	agentFeatures := insightsFeatures.GetAiAgentFeatures()
+	chatFeatures := insightsFeatures.GetAiFeatures().GetAiTextChatFeatures()
+	hook := mcp.NewExternalURLHookRunner(m.app.Hooks, log)
+
+	if agentFeatures.GetIsAllow() {
+		if err := mcp.ValidateAllowedKnowledgeURLs(userCtx, r.RoomId, agentFeatures.GetAllowedKnowledgeUrls(), hook); err != nil {
+			log.WithError(err).Warn("allowed_knowledge_urls was refused")
+			if errors.Is(err, mcp.ErrInvalidExternalURL) {
+				return config.ErrAIAgentInvalidRequest
+			}
+			return err
+		}
+		if err := mcp.ValidateExternalMCPServerURLsWithHook(userCtx, r.RoomId, agentFeatures.GetMcpServers(), hook); err != nil {
+			log.WithError(err).Warn("mcp_servers was refused")
+			return err
+		}
+	}
+
+	if chatFeatures.GetIsAllow() || len(chatFeatures.GetMcpServers()) > 0 {
+		if err := mcp.ValidateExternalMCPServerURLsWithHook(userCtx, r.RoomId, chatFeatures.GetMcpServers(), hook); err != nil {
+			log.WithError(err).Warn("ai text chat mcp servers were refused")
+			return err
+		}
 	}
 
 	return nil

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mynaparrot/plugnmeet-protocol/hooks"
 	"github.com/sirupsen/logrus"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
@@ -88,6 +89,21 @@ type RoomOpsBackend interface {
 // ParticipantsBackend moderates the room's participants.
 type ParticipantsBackend interface {
 	ManageParticipants(ctx context.Context, roomID, requestedUserID, action, targetUserID, lockService string, locked bool) error
+}
+
+// ExternalURLHookRunner lets a deployment vet the external knowledge and MCP URLs b-server is about to dial,
+// rewrite them to a proxy, or answer with the document itself.
+type ExternalURLHookRunner func(ctx context.Context, req *hooks.ExternalUrlHookData) (*hooks.ExternalUrlHookData, error)
+
+// NewExternalURLHookRunner adapts the hook configuration to a runner. It returns nil when no external URL hook is configured,
+// so callers never branch on the script setup themselves.
+func NewExternalURLHookRunner(cfg *hooks.Config, log *logrus.Entry) ExternalURLHookRunner {
+	if !cfg.HasExternalUrlHook() {
+		return nil
+	}
+	return func(_ context.Context, req *hooks.ExternalUrlHookData) (*hooks.ExternalUrlHookData, error) {
+		return cfg.RunExternalUrlHook(req, log)
+	}
 }
 
 // CacheStore caches fetched knowledge documents.
@@ -252,6 +268,9 @@ type ToolDependencies struct {
 	HTTPClient *http.Client
 	// AllowInsecureHTTP relaxes the HTTPS-only rule; tests only.
 	AllowInsecureHTTP bool
+	// ExternalURLHook vets, proxies or answers the knowledge and MCP URLs before
+	// anything is dialled; nil keeps the built-in checks only.
+	ExternalURLHook ExternalURLHookRunner
 
 	// MCPScope is the consumer scope of the session (ai_agent, text_chat). Only
 	// the external MCP servers whose own scope matches it, plus the shared ones,

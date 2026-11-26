@@ -30,6 +30,19 @@ func activityRulesFeatures(rules *plugnmeet.InsightsAIAgentActivityRules) *plugn
 	}
 }
 
+// An unusable knowledge prefix must survive normalization: dropping it would stop
+// validateAiExternalUrls from refusing the room.
+func TestNormalizeAIAgentFeaturesKeepsKnowledgeURLsForValidation(t *testing.T) {
+	out := NormalizeAIAgentFeatures(&plugnmeet.InsightsAIAgentFeatures{
+		AllowedKnowledgeUrls: []string{" https://docs.example.com/kb ", "https://docs.example.com/kb", "http://insecure.example.com/kb"},
+	})
+
+	want := []string{"https://docs.example.com/kb", "http://insecure.example.com/kb"}
+	if got := out.GetAllowedKnowledgeUrls(); strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("knowledge urls = %v, want %v", got, want)
+	}
+}
+
 func TestNormalizeAIAgentFeaturesActivityRules(t *testing.T) {
 	long := strings.Repeat("m", maxAIAgentMilestoneRunes+10)
 	milestones := []string{" warm up ", "", "warm up", long}
