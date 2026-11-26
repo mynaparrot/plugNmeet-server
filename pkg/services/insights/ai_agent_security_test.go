@@ -92,7 +92,7 @@ func TestAIAgentClientToolResultMustComeFromTheTargetUser(t *testing.T) {
 		t.Fatal("a call id must be generated when the model left it empty")
 	}
 
-	if env.agent.HandleClientToolResultFromUser("intruder", &plugnmeet.AIAgentToolResultMsg{
+	if env.agent.HandleClientToolResult("intruder", &plugnmeet.AIAgentToolResultMsg{
 		CallId: callID, Ok: true, ResultJson: `{"ids":["evil"]}`,
 	}) {
 		t.Error("a result from a participant that does not own the call must be rejected")
@@ -101,7 +101,7 @@ func TestAIAgentClientToolResultMustComeFromTheTargetUser(t *testing.T) {
 		t.Errorf("pending calls = %d, want the rejected result to keep the call in flight", got)
 	}
 
-	if !env.agent.HandleClientToolResultFromUser("user-1", &plugnmeet.AIAgentToolResultMsg{
+	if !env.agent.HandleClientToolResult("user-1", &plugnmeet.AIAgentToolResultMsg{
 		CallId: callID, Ok: true, ResultJson: `{"ids":["a"]}`,
 	}) {
 		t.Error("the targeted participant's result must be accepted")

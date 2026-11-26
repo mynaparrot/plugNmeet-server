@@ -141,15 +141,9 @@ type pendingClientCall struct {
 	ch           chan *plugnmeet.AIAgentToolResultMsg
 }
 
-// HandleClientToolResult resolves the pending call with the participant's answer.
-func (a *AIAgent) HandleClientToolResult(res *plugnmeet.AIAgentToolResultMsg) {
-	a.HandleClientToolResultFromUser("", res)
-}
-
-// HandleClientToolResultFromUser resolves the pending call only for the
-// participant the call was dispatched to. It reports whether the answer was
-// accepted.
-func (a *AIAgent) HandleClientToolResultFromUser(userID string, res *plugnmeet.AIAgentToolResultMsg) bool {
+// HandleClientToolResult resolves the pending call only for the participant the call was dispatched to.
+// It reports whether the answer was accepted.
+func (a *AIAgent) HandleClientToolResult(userID string, res *plugnmeet.AIAgentToolResultMsg) bool {
 	if res == nil || res.GetCallId() == "" {
 		return false
 	}

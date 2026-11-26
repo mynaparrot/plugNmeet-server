@@ -522,7 +522,7 @@ func TestAIAgentClientToolRPC(t *testing.T) {
 				if calls[0].GetTargetUserId() != "user-1" {
 					t.Errorf("unexpected target: %s", calls[0].GetTargetUserId())
 				}
-				env.agent.HandleClientToolResult(&plugnmeet.AIAgentToolResultMsg{
+				env.agent.HandleClientToolResult("user-1", &plugnmeet.AIAgentToolResultMsg{
 					CallId:     calls[0].GetCallId(),
 					Ok:         true,
 					ResultJson: `{"ids":["a"]}`,

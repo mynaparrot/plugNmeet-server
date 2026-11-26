@@ -16,13 +16,11 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"regexp"
 	"sort"
 	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
-	"unicode/utf8"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -894,33 +892,7 @@ func appendExternalMCPText(b *strings.Builder, text string) {
 	b.WriteString(text)
 }
 
-var reExternalMCPFrameBreaker = regexp.MustCompile(`(?i)\[\s*/?\s*(UNTRUSTED EXTERNAL DOCUMENT|HOST INSTRUCTION|SYSTEM CONTEXT)[^\]]*\]`)
-
-// sanitizeExternalMCPText strips control characters, defuses frame breakers and
-// truncates to the model-facing budget.
-func sanitizeExternalMCPText(text string) (string, bool) {
-	text = strings.Map(func(r rune) rune {
-		switch {
-		case r == '\n' || r == '\t':
-			return r
-		case r < 0x20 || r == 0x7f:
-			return -1
-		}
-		return r
-	}, text)
-	text = reExternalMCPFrameBreaker.ReplaceAllString(text, "[removed]")
-	text = strings.TrimSpace(text)
-
-	truncated := false
-	if utf8.RuneCountInString(text) > MaxExternalMCPOutputChars {
-		text = truncateRunes(text, MaxExternalMCPOutputChars)
-		truncated = true
-	}
-	return text, truncated
-}
-
-// frameExternalMCPOutput wraps text so the model can never mistake it for host
-// instructions.
+// frameExternalMCPOutput wraps text so the model can never mistake it for host instructions.
 func frameExternalMCPOutput(serverKey, remoteTool, text string) string {
 	var b strings.Builder
 	b.WriteString(untrustedDocumentHeader)

@@ -331,7 +331,7 @@ func (m *AIAgentModel) HandleClientToolResult(ctx context.Context, roomId, userI
 		return
 	}
 	if agent, ok := insightsservice.GetActiveAIAgent(roomId); ok {
-		agent.HandleClientToolResultFromUser(userId, msg)
+		agent.HandleClientToolResult(userId, msg)
 	}
 }
 
