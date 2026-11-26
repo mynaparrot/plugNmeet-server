@@ -31,36 +31,32 @@ const (
 	// aiAgentTrackName is the published microphone track participants hear.
 	aiAgentTrackName = "ai-agent-voice"
 	// aiAgentInAudioBuffer bounds the participant audio waiting for the provider.
-	// Audio older than roughly two seconds is worthless, so overflow drops the
-	// oldest chunk instead of blocking the RTP reader.
+	// Audio older than roughly two seconds is worthless, so overflow drops the oldest chunk instead of blocking the RTP reader.
 	aiAgentInAudioBuffer = 32
 	// aiAgentWhiteboardToolPrefix marks the client-delegated whiteboard tools.
 	aiAgentWhiteboardToolPrefix = "whiteboard_"
 	// aiAgentDefaultMaxAudioMinutes mirrors the documented provider budget.
 	aiAgentDefaultMaxAudioMinutes = 120
-	// maxSessionTranscriptTurns bounds the transcript kept for the summary; the
-	// tail is what a handoff needs, and the whole call would bloat Redis.
+	// maxSessionTranscriptTurns bounds the transcript kept for the summary; the tail is what a handoff needs,
+	// and the whole call would bloat Redis.
 	maxSessionTranscriptTurns = 40
-	// maxTranscriptTurnChars bounds one turn so a rambling answer cannot dominate
-	// the payload.
+	// maxTranscriptTurnChars bounds one turn so a rambling answer cannot dominate the payload.
 	maxTranscriptTurnChars = 240
 	// aiAgentTelemetryTimeout bounds the flush that outlives a cancelled session.
 	aiAgentTelemetryTimeout = 3 * time.Second
-	// defaultAISummarizeWindow is how many unsummarized transcript turns trigger
-	// the background summary: eight turns are four question-answer exchanges.
+	// defaultAISummarizeWindow is how many unsummarized transcript turns trigger he background summary:
+	// eight turns are four question-answer exchanges.
 	defaultAISummarizeWindow = 8
-	// aiAgentSummarizeTimeout bounds one background summary, so a slow model can
-	// never hold the session.
+	// aiAgentSummarizeTimeout bounds one background summary, so a slow model can never hold the session.
 	aiAgentSummarizeTimeout = 5 * time.Second
 
 	transcriptRoleParticipant = "participant"
 	transcriptRoleAgent       = "agent"
 )
 
-// aiAgentSpeakingIdle is how long the agent may stay silent before the status
-// falls back from SPEAKING to LISTENING. Providers stream audio in 20-200ms
-// chunks, so a longer gap means the turn ended — even when no turn-complete
-// event follows. A variable so tests can shorten it.
+// aiAgentSpeakingIdle is how long the agent may stay silent before the status falls back from SPEAKING to LISTENING.
+// Providers stream audio in 20-200ms chunks, so a longer gap means the turn ended — even when no turn-complete event follows.
+// A variable so tests can shorten it.
 var aiAgentSpeakingIdle = 1500 * time.Millisecond
 
 // AIAgentTransport is the room-facing messaging an AI agent needs.
@@ -493,8 +489,7 @@ func NewAIAgent(args *AIAgentArgs) (*AIAgent, error) {
 	displayName := boundary.AgentDisplayName
 	payload.AgentName = &displayName
 
-	// Step 1: the agent joins LiveKit first, so its identity is registered and
-	// tracked by livekit-proxy before anything else is dialled.
+	// Step 1: the agent joins LiveKit first, so its identity is registered before anything else is dialed.
 	roomAgent, err := newRoomAgent(&RoomAgentArgs{
 		Ctx:             agent.ctx,
 		AppConf:         args.AppConf,
@@ -513,9 +508,8 @@ func NewAIAgent(args *AIAgentArgs) (*AIAgent, error) {
 		return nil, fmt.Errorf("ai agent: failed to join the room: %w", err)
 	}
 
-	// Step 2: open the voice path. With an avatar this dials the avatar provider
-	// immediately, so the avatar worker boots and joins the same room while the
-	// realtime session is still being opened.
+	// Step 2: open the voice path. With an avatar this dials the avatar provider immediately, so the avatar worker boots
+	// and joins the same room while the realtime session is still being opened.
 	publisher, err := startAgentAudioPublisher(args, agent, roomAgent.Room, displayName)
 	if err != nil {
 		roomAgent.Shutdown()
@@ -604,14 +598,8 @@ func startAgentAudioPublisher(args *AIAgentArgs, agent *AIAgent, room *lksdk.Roo
 }
 
 // mintAvatarLiveKitAccessToken mints the join token for the agent's native twin,
-// which is the participant the avatar provider joins the room as. It is built
-// directly from the LiveKit auth package rather than through the shared helper,
-// so the twin always carries both attributes even before the released protocol
-// package knows about them: original_user_id is how the webhooks recognise the
-// twin, and lk.publish_on_behalf is how LiveKit attributes the avatar's track to
-// the agent instead of to the twin. The twin also joins as kind AGENT, matching
-// livekit-plugins-bey which sets .with_kind("agent") on the avatar token, so
-// LiveKit treats the avatar as an agent participant.
+// built directly with lkauth so it always sets original_user_id and
+// lk.publish_on_behalf, and joins as kind AGENT (very important!).
 func mintAvatarLiveKitAccessToken(apiKey, secret string, tokenValidity time.Duration, roomId, twinIdentity, displayName, agentUserId string) (string, error) {
 	at := lkauth.NewAccessToken(apiKey, secret)
 	grant := &lkauth.VideoGrant{
@@ -634,9 +622,8 @@ func mintAvatarLiveKitAccessToken(apiKey, secret string, tokenValidity time.Dura
 }
 
 // newAIAgent builds the provider- and LiveKit-independent runtime.
-// It may be built before the provider session is open: with args.NewSession set
-// the caller opens the session later and assigns it before calling Start, which
-// is what puts the LiveKit participant and the avatar ahead of the provider.
+// It may be built before the provider session is open: with args.NewSession set the caller opens the session later and
+// assigns it before calling Start, which is what puts the LiveKit participant and the avatar ahead of the provider.
 func newAIAgent(args *aiAgentCoreArgs) (*AIAgent, error) {
 	if args == nil || args.Payload == nil || args.Payload.RoomId == "" {
 		return nil, errors.New("ai agent: room id is required")
