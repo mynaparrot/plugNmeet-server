@@ -2,18 +2,22 @@ package models
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/encoding/protojson"
 
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/insights/mcp"
+	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 )
 
 // A 1-on-1 room names its participants: an unlisted user may never be picked,
-// even when they are the only non-admin human online.
+// not even an admin who only joins to observe.
 func TestPickDelegateKeepsUnauthorizedUsersOutOfAOneOnOneRoom(t *testing.T) {
 	allowed := []string{"learner-1"}
 
@@ -22,18 +26,71 @@ func TestPickDelegateKeepsUnauthorizedUsersOutOfAOneOnOneRoom(t *testing.T) {
 		t.Fatalf("delegate = %q, want none", got.GetUserId())
 	}
 
-	// An admin supervisor may stand in, but never wins over the named participant.
-	supervisor := []*plugnmeet.NatsKvUserInfo{
+	observers := []*plugnmeet.NatsKvUserInfo{
 		{UserId: "stranger"},
 		{UserId: "teacher", IsAdmin: true},
 	}
-	if got := pickDelegate(supervisor, allowed); got.GetUserId() != "teacher" {
-		t.Errorf("delegate = %q, want the admin supervisor", got.GetUserId())
+	if got := pickDelegate(observers, allowed); got != nil {
+		t.Fatalf("delegate = %q, want none without the named participant", got.GetUserId())
 	}
 
-	withLearner := append([]*plugnmeet.NatsKvUserInfo{{UserId: "learner-1"}}, supervisor...)
+	withLearner := append([]*plugnmeet.NatsKvUserInfo{{UserId: "learner-1"}}, observers...)
 	if got := pickDelegate(withLearner, allowed); got.GetUserId() != "learner-1" {
 		t.Errorf("delegate = %q, want the named participant", got.GetUserId())
+	}
+}
+
+// newDelegateRoomNatsService builds a NATS service whose bucket holds the given
+// 1-on-1 room and its online users.
+func newDelegateRoomNatsService(t *testing.T, meta *plugnmeet.RoomMetadata, users ...*plugnmeet.NatsKvUserInfo) *natsservice.NatsService {
+	t.Helper()
+
+	rawMeta, err := protojson.Marshal(meta)
+	if err != nil {
+		t.Fatalf("marshal room metadata: %v", err)
+	}
+	entries := map[string][]byte{natsservice.RoomInfoKeyPrefix + natsservice.RoomMetadataKey: rawMeta}
+	for _, user := range users {
+		prefix := natsservice.UserKeyPrefix + user.GetUserId() + natsservice.UserKeyFieldPrefix
+		entries[prefix+natsservice.UserStatusKey] = []byte(natsservice.UserStatusOnline)
+		entries[prefix+natsservice.UserIsAdminKey] = []byte(strconv.FormatBool(user.GetIsAdmin()))
+	}
+	ttl := 2 * time.Hour
+
+	return natsservice.New(natsservice.Args{
+		Ctx:    memoryJetStreamContext(t),
+		App:    &config.AppConfig{NatsInfo: config.NatsInfo{DefaultTTL: &ttl}},
+		Js:     &memoryJetStream{entries: entries},
+		Logger: logrus.New(),
+	})
+}
+
+// TestIsEligibleDelegateKeepsAnObservingAdminOutOfAOneOnOneRoom locks in that an
+// admin who is not one of the named participants may watch the session but never
+// drives it.
+func TestIsEligibleDelegateKeepsAnObservingAdminOutOfAOneOnOneRoom(t *testing.T) {
+	room := agentRoomMetadata(agentFeatures(true, modeControlled, controlledConfig("learner-1")))
+	room.IsBreakoutRoom = true
+
+	model := newAIAgentTestModel(newAIAgentTestRedis(t))
+	model.natsService = newDelegateRoomNatsService(t, room,
+		&plugnmeet.NatsKvUserInfo{UserId: "learner-1"},
+		&plugnmeet.NatsKvUserInfo{UserId: "admin-1", IsAdmin: true},
+	)
+
+	if !model.isEligibleDelegate("room-1", "learner-1") {
+		t.Error("the named participant must be eligible")
+	}
+	if model.isEligibleDelegate("room-1", "admin-1") {
+		t.Error("an observing admin must not be eligible")
+	}
+
+	groupRoom := newAIAgentTestModel(newAIAgentTestRedis(t))
+	groupRoom.natsService = newDelegateRoomNatsService(t, agentRoomMetadata(agentFeatures(true, modeNormalRoom, nil)),
+		&plugnmeet.NatsKvUserInfo{UserId: "admin-1", IsAdmin: true},
+	)
+	if !groupRoom.isEligibleDelegate("room-1", "admin-1") {
+		t.Error("a room without a roster may delegate to its admin")
 	}
 }
 

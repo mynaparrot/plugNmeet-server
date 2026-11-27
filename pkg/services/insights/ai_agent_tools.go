@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
@@ -18,24 +19,40 @@ import (
 // aiAgentLogPayloadRunes bounds the tool arguments and output written to the debug log.
 const aiAgentLogPayloadRunes = 300
 
-// aiAgentAutoVisionInterval is the minimum gap between two automatic vision
-// pushes, so a participant drawing quickly cannot flood the session.
-const aiAgentAutoVisionInterval = 2 * time.Second
+const (
+	// aiAgentAutoVisionInterval is the minimum gap between two automatic vision pushes,
+	// so a participant drawing quickly cannot flood the session.
+	aiAgentAutoVisionInterval = 2 * time.Second
+	// aiAgentMinVisionInterval floors every other image push, so a forged reason cannot flood the image channel either.
+	aiAgentMinVisionInterval = 500 * time.Millisecond
+	// aiAgentProactiveInterval and aiAgentChatTurnInterval bound the model turns a burst of server notes or
+	// typed messages may force.
+	aiAgentProactiveInterval = 1 * time.Second
+	aiAgentChatTurnInterval  = 1 * time.Second
+)
 
-// allowAutoVision reports whether a whiteboard snapshot may be delivered. Only
-// the automatic push of the participant's own edits is throttled; a page change,
-// a notepad read and an explicit tool request always reach the session.
-func (a *AIAgent) allowAutoVision(reason string) bool {
-	if reason != "participant_edit" {
+// allowAutoVision reports whether a whiteboard snapshot may be delivered. The automatic push of
+// the participant's own edits is throttled hardest, an image of any other reason is still floored,
+// and scene-graph text is never dropped.
+func (a *AIAgent) allowAutoVision(reason string, hasImage bool) bool {
+	switch {
+	case reason == "participant_edit":
+		return claimInterval(&a.lastAutoVisionAt, aiAgentAutoVisionInterval)
+	case hasImage:
+		return claimInterval(&a.lastAutoVisionAt, aiAgentMinVisionInterval)
+	default:
 		return true
 	}
+}
+
+// claimInterval reports whether the caller may act now, and records the claim.
+func claimInterval(last *atomic.Int64, interval time.Duration) bool {
 	now := time.Now().UnixMilli()
-	last := a.lastAutoVisionAt.Load()
-	if last != 0 && now-last < aiAgentAutoVisionInterval.Milliseconds() {
+	prev := last.Load()
+	if prev != 0 && now-prev < interval.Milliseconds() {
 		return false
 	}
-
-	return a.lastAutoVisionAt.CompareAndSwap(last, now)
+	return last.CompareAndSwap(prev, now)
 }
 
 // SendContext injects a server-side event that must not look like participant speech.
@@ -52,6 +69,11 @@ func (a *AIAgent) SendProactiveContext(text, source string) error {
 	frame := systemContextFrame(text, source)
 	if frame == "" {
 		return nil
+	}
+	// A burst of server notes must not force a model turn each: the rest still reaches the record,
+	// just without asking for a reply.
+	if !claimInterval(&a.lastProactiveAt, aiAgentProactiveInterval) {
+		return a.SendContext(text, source)
 	}
 	session := a.currentSession()
 	if session == nil {
@@ -93,7 +115,7 @@ func (a *AIAgent) HandleWhiteboardScene(msg *plugnmeet.AIAgentWhiteboardSceneMsg
 	if !hasImage && !hasSceneGraph {
 		return nil
 	}
-	if !a.allowAutoVision(msg.GetReason()) {
+	if !a.allowAutoVision(msg.GetReason(), hasImage) {
 		return nil
 	}
 	session := a.currentSession()
@@ -123,6 +145,9 @@ func (a *AIAgent) HandleParticipantChatMessage(userID, userName, text string) er
 	case <-a.done:
 		return errors.New("ai agent: the session has already stopped")
 	default:
+	}
+	if !claimInterval(&a.lastChatTurnAt, aiAgentChatTurnInterval) {
+		return errors.New("ai agent: the previous message is still being answered")
 	}
 
 	session := a.currentSession()

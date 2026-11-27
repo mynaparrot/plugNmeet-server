@@ -63,8 +63,8 @@ func (m *AIAgentModel) selectDelegate(ctx context.Context, roomId, preferredUser
 }
 
 // pickDelegate chooses the participant that drives the session: a named
-// participant of a 1-on-1 room first, then an admin. A room without a named list
-// falls back to the first online human, so a group room always has a delegate.
+// participant of a 1-on-1 room, otherwise an admin, and failing that the first
+// online human, so a group room always has a delegate.
 func pickDelegate(humans []*plugnmeet.NatsKvUserInfo, allowed []string) *plugnmeet.NatsKvUserInfo {
 	if len(humans) == 0 {
 		return nil
@@ -76,13 +76,8 @@ func pickDelegate(humans []*plugnmeet.NatsKvUserInfo, allowed []string) *plugnme
 				return user
 			}
 		}
-		// Any other participant of a 1-on-1 room is unauthorized; only an admin
-		// supervisor may stand in for a missing participant.
-		for _, user := range humans {
-			if user.GetIsAdmin() {
-				return user
-			}
-		}
+		// nobody else drives a 1-on-1 session, so an observer without its
+		// participant leaves the room without a delegate
 		return nil
 	}
 
@@ -116,9 +111,8 @@ func (m *AIAgentModel) storeDelegate(ctx context.Context, roomId, userId string)
 	return userId, nil
 }
 
-// recordDelegateLearner hands the paired participant to the agent this process
-// hosts, so its telemetry carries the identity right away instead of only when
-// the session stops.
+// recordDelegateLearner hands the paired participant to the agent this process hosts,
+// so its telemetry carries the identity right away instead of only when  the session stops.
 func (m *AIAgentModel) recordDelegateLearner(roomId, userId string) {
 	if userId == "" {
 		return
@@ -151,12 +145,10 @@ func (m *AIAgentModel) isEligibleDelegate(roomId, userId string) bool {
 	if _, metadata, _ := m.natsService.GetUserWithMetadata(roomId, userId); metadata.GetWaitForApproval() {
 		return false
 	}
-	// a 1-on-1 room only delegates to its named participants; an admin may
-	// supervise, but no other user of the room may drive the session
+	// a 1-on-1 room only delegates to its named participants; an observer, an
+	// admin included, may watch but not drive the session
 	if allowed := aiAgentAllowedParticipantIds(m.roomAgentFeatures(roomId)); len(allowed) > 0 && !containsUserId(allowed, userId) {
-		if info, _ := m.natsService.GetUserInfo(roomId, userId); !info.GetIsAdmin() {
-			return false
-		}
+		return false
 	}
 
 	return true

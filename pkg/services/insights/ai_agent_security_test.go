@@ -43,10 +43,18 @@ func TestAIAgentThrottlesAutomaticVisionPushes(t *testing.T) {
 		t.Fatalf("images = %d, want the second automatic push to be dropped", got)
 	}
 
+	// A forged reason must not buy a faster channel than the automatic push.
+	time.Sleep(aiAgentMinVisionInterval + 50*time.Millisecond)
 	push("tool_request")
 	push("page_change")
+	if got := len(env.session.Images()); got != 2 {
+		t.Fatalf("images = %d, want the burst behind the forged reason to be floored", got)
+	}
+
+	time.Sleep(aiAgentMinVisionInterval + 50*time.Millisecond)
+	push("page_change")
 	if got := len(env.session.Images()); got != 3 {
-		t.Fatalf("images = %d, want the explicit pushes to be delivered", got)
+		t.Fatalf("images = %d, want the push past the floor to be delivered", got)
 	}
 }
 

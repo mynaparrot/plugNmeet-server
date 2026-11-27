@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -847,6 +848,16 @@ func startsLikeHeader(line string) bool {
 		}
 	}
 	return false
+}
+
+// untrustedHeaderRe matches the headers of the trusted frames, so free text from a client or a participant cannot fake one.
+var untrustedHeaderRe = regexp.MustCompile(`(?i)\[(system\s+context|platform\s+safety|system\s+anchor|host\s+instruction)\]?`)
+
+// SanitizeUntrustedToolText bounds free text produced outside the boundary and defuses any frame header or delimiter inside it.
+func SanitizeUntrustedToolText(s string, maxRunes int) string {
+	s = defuseFrameBreakers(strings.TrimSpace(s))
+	s = untrustedHeaderRe.ReplaceAllString(s, "($1)")
+	return truncateRunes(s, maxRunes)
 }
 
 // defuseFrameBreakers strips the tokens other blocks use as delimiters.

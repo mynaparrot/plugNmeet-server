@@ -238,9 +238,9 @@ func (m *UserModel) AssignLockSettingsToUserFromRoom(g *plugnmeet.GenerateTokenR
 	lockAIAgentRoomWorkspace(meta, g)
 }
 
-// lockAIAgentRoomWorkspace locks the workspace in a 1-on-1 AI agent room, where
-// the agent owns the whiteboard and the notepad. It overrides whatever lock
-// settings the user already carried, e.g. from the parent lobby.
+// lockAIAgentRoomWorkspace locks the workspace in a 1-on-1 AI agent room, where the agent owns the whiteboard and the notepad.
+// It overrides whatever lock settings the user already carried, e.g. from the parent lobby, and mutes anyone who joins
+// only to observe someone else's session.
 func lockAIAgentRoomWorkspace(meta *plugnmeet.RoomMetadata, g *plugnmeet.GenerateTokenReq) {
 	if !isOneOnOneAIAgentRoom(meta) {
 		return
@@ -253,6 +253,11 @@ func lockAIAgentRoomWorkspace(meta *plugnmeet.RoomMetadata, g *plugnmeet.Generat
 	g.UserInfo.UserMetadata.WaitForApproval = false
 	g.UserInfo.UserMetadata.LockSettings.LockWhiteboard = new(true)
 	g.UserInfo.UserMetadata.LockSettings.LockSharedNotepad = new(true)
+
+	// only the named participant talks to the agent; an observer, typically an admin, joins with the microphone locked
+	if allowed := aiAgentAllowedParticipantIds(meta.GetRoomFeatures().GetInsightsFeatures().GetAiAgentFeatures()); len(allowed) > 0 && !containsUserId(allowed, g.GetUserInfo().GetUserId()) {
+		g.UserInfo.UserMetadata.LockSettings.LockMicrophone = new(true)
+	}
 }
 
 // adminAISessionPreCreate reports whether an admin's own 1-on-1 room should be

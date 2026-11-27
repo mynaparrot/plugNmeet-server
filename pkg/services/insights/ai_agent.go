@@ -260,6 +260,10 @@ type AIAgent struct {
 
 	// lastAutoVisionAt throttles the automatic participant_edit snapshots.
 	lastAutoVisionAt atomic.Int64
+	// lastProactiveAt and lastChatTurnAt bound how often a burst of server notes
+	// or chat messages can force a model turn.
+	lastProactiveAt atomic.Int64
+	lastChatTurnAt  atomic.Int64
 
 	// redialMu guards the consecutive redial budget of a flapping provider.
 	redialMu           sync.Mutex
@@ -788,6 +792,7 @@ func (a *AIAgent) SetLearner(identity LearnerIdentity) {
 		a.learnerMu.Unlock()
 		return
 	}
+	previous := a.learner
 	updated := identity.WithFallback(a.learner)
 	changed := updated != a.learner
 	a.learner = updated
@@ -795,6 +800,11 @@ func (a *AIAgent) SetLearner(identity LearnerIdentity) {
 
 	if !changed {
 		return
+	}
+	// A session started before the learner was known captured the whole room;
+	// now that the pairing exists, that participant's audio is allowed.
+	if previous.UserID == "" && updated.UserID != "" && a.roomAgent != nil {
+		a.roomAgent.AllowTargetUser(updated.UserID)
 	}
 	// persistTelemetry reads the learner, so it cannot run under learnerMu.
 	a.persistTelemetry("")

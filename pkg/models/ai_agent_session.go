@@ -125,13 +125,16 @@ func (m *AIAgentModel) Start(ctx context.Context, roomId string, req *plugnmeet.
 		HiddenAgent:                  false,
 		CaptureAllParticipantsTracks: true,
 	}
-	// a 1-on-1 room listens to its named participants only, so a supervisor
-	// joining to observe is never fed to the agent
+	// a 1-on-1 room listens to its named participants only, so a supervisor joining to observe is never fed to the agent
 	if allowed := aiAgentAllowedParticipantIds(features); len(allowed) > 0 {
 		payload.TargetUsers = make(map[string]bool, len(allowed))
 		for _, id := range allowed {
 			payload.TargetUsers[id] = true
 		}
+	} else if learner.UserID != "" {
+		// Without a fixed roster the learner is the one the agent talks to, so an
+		// observing administrator is never captured either.
+		payload.TargetUsers = map[string]bool{learner.UserID: true}
 	}
 
 	// nil client RPC: the session reaches its browser through the room's delegate, which the model brokers.

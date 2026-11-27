@@ -444,12 +444,10 @@ func (s *InsightsModel) handleAIAgentChatMessage(req *plugnmeet.InsightsAITextCh
 		return fmt.Errorf("insights.ai-text-chat.feature-disabled")
 	}
 
-	// a 1-on-1 room only takes turns from its participants and the admins
+	// a 1-on-1 room only takes turns from its named participants; an observer uses public chat instead
 	if allowed := aiAgentAllowedParticipantIds(aiAgentFeatures); len(allowed) > 0 && !containsUserId(allowed, userId) {
-		if info, _ := s.natsService.GetUserInfo(roomId, userId); !info.GetIsAdmin() {
-			logger.Warn("user is not allowed to talk to the AI agent")
-			return config.ErrAIAgentUserNotAllowed
-		}
+		logger.Warn("user is not allowed to talk to the AI agent")
+		return config.ErrAIAgentUserNotAllowed
 	}
 
 	// the session may run on any node of the cluster, so only its shared state decides

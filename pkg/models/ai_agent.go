@@ -72,6 +72,11 @@ const (
 	// in the protocol.
 	aiAgentMaxAllowedParticipantIds = 32
 
+	// Bounds of a client tool answer, so a participant's browser can neither
+	// flood the model with an unbounded payload nor inject a frame header.
+	aiAgentClientToolErrorRunes  = 1024
+	aiAgentClientToolOutputRunes = 64 * 1024
+
 	// Shape limits of the host-supplied activity quotas. They mirror the
 	// uint32.lte=20 and repeated.max_items=16 constraints of activity_rules in
 	// the protocol.
@@ -361,13 +366,13 @@ func (m *AIAgentModel) CallClientToolForUser(ctx context.Context, targetUserID s
 	select {
 	case res := <-ch:
 		if !res.GetOk() {
-			reason := strings.TrimSpace(res.GetError())
+			reason := insightsservice.SanitizeUntrustedToolText(res.GetError(), aiAgentClientToolErrorRunes)
 			if reason == "" {
 				reason = "the participant's browser could not run the tool"
 			}
 			return mcp.ToolResult{}, errors.New(reason)
 		}
-		out := strings.TrimSpace(res.GetResultJson())
+		out := insightsservice.SanitizeUntrustedToolText(res.GetResultJson(), aiAgentClientToolOutputRunes)
 		if out == "" {
 			out = "{}"
 		}

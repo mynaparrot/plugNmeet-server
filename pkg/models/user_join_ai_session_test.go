@@ -59,7 +59,8 @@ func TestPerUserAISessionRoomAdminStaysInMainRoom(t *testing.T) {
 // TestLockAIAgentRoomWorkspace locks in that every participant of a 1-on-1 AI
 // agent room ends up without presenter rights, without the waiting room, and with
 // a locked whiteboard and notepad, even when the metadata already carried other
-// lock settings, as JoinBreakoutRoom hands the parent room metadata over.
+// lock settings, as JoinBreakoutRoom hands the parent room metadata over. Only
+// the named participant keeps the microphone, as an observer joins to watch.
 func TestLockAIAgentRoomWorkspace(t *testing.T) {
 	oneOnOneRoom := agentRoomMetadata(agentFeatures(true, modeControlled, controlledConfig("learner-1")))
 	oneOnOneRoom.IsBreakoutRoom = true
@@ -75,19 +76,21 @@ func TestLockAIAgentRoomWorkspace(t *testing.T) {
 			},
 		}
 	}
-	newRequest := func(md *plugnmeet.UserMetadata) *plugnmeet.GenerateTokenReq {
+	newRequest := func(userId string, md *plugnmeet.UserMetadata) *plugnmeet.GenerateTokenReq {
 		return &plugnmeet.GenerateTokenReq{
-			UserInfo: &plugnmeet.UserInfo{IsAdmin: md.GetIsAdmin(), UserMetadata: md},
+			UserInfo: &plugnmeet.UserInfo{UserId: userId, IsAdmin: md.GetIsAdmin(), UserMetadata: md},
 		}
 	}
 
 	tests := []struct {
 		name string
 		req  *plugnmeet.GenerateTokenReq
+		// wantMicLocked is true for an observer, who is not a named participant
+		wantMicLocked bool
 	}{
-		{name: "admin carrying the parent room locks", req: newRequest(carriedLocks(true))},
-		{name: "participant carrying the parent room locks", req: newRequest(carriedLocks(false))},
-		{name: "participant without lock settings", req: newRequest(new(plugnmeet.UserMetadata))},
+		{name: "observing admin carrying the parent room locks", req: newRequest("admin-1", carriedLocks(true)), wantMicLocked: true},
+		{name: "participant carrying the parent room locks", req: newRequest("learner-1", carriedLocks(false))},
+		{name: "participant without lock settings", req: newRequest("learner-1", new(plugnmeet.UserMetadata))},
 	}
 
 	for _, tt := range tests {
@@ -111,19 +114,35 @@ func TestLockAIAgentRoomWorkspace(t *testing.T) {
 			if locks.LockSharedNotepad == nil || !*locks.LockSharedNotepad {
 				t.Errorf("lock_shared_notepad = %v, want an explicit true", locks.GetLockSharedNotepad())
 			}
+			if got := locks.GetLockMicrophone(); got != tt.wantMicLocked {
+				t.Errorf("lock_microphone = %v, want %v", got, tt.wantMicLocked)
+			}
 		})
 	}
 
+	// a room without a roster has no observer, so everyone keeps the microphone
+	t.Run("open per-user room keeps the microphone", func(t *testing.T) {
+		room := agentRoomMetadata(agentFeatures(true, modeOpenPerUse, openPerUserConfig(3)))
+		room.IsBreakoutRoom = true
+		req := newRequest("admin-1", new(plugnmeet.UserMetadata))
+
+		lockAIAgentRoomWorkspace(room, req)
+
+		if req.GetUserInfo().GetUserMetadata().GetLockSettings().GetLockMicrophone() {
+			t.Error("lock_microphone = true, want the microphone kept")
+		}
+	})
+
 	// the parent lobby keeps the participant's own settings
 	t.Run("any other room is left untouched", func(t *testing.T) {
-		req := newRequest(carriedLocks(false))
+		req := newRequest("learner-1", carriedLocks(false))
 		lockAIAgentRoomWorkspace(agentRoomMetadata(agentFeatures(true, modeOpenPerUse, openPerUserConfig(3))), req)
 
 		md := req.GetUserInfo().GetUserMetadata()
 		if !md.GetIsPresenter() || !md.GetWaitForApproval() {
 			t.Errorf("is_presenter = %v, wait_for_approval = %v, want both untouched", md.GetIsPresenter(), md.GetWaitForApproval())
 		}
-		if md.GetLockSettings().GetLockWhiteboard() || md.GetLockSettings().GetLockSharedNotepad() {
+		if md.GetLockSettings().GetLockWhiteboard() || md.GetLockSettings().GetLockSharedNotepad() || md.GetLockSettings().GetLockMicrophone() {
 			t.Error("lock settings changed, want them untouched")
 		}
 	})

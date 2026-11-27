@@ -14,9 +14,13 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
+	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/insights/mcp"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 )
+
+// aiAgentPollTextRunes bounds a poll question, option or answer line.
+const aiAgentPollTextRunes = 500
 
 // aiAgentPollBackend exposes PollModel to the MCP poll tools.
 type aiAgentPollBackend struct {
@@ -160,7 +164,7 @@ func (b aiAgentPollBackend) GetPollResults(_ context.Context, roomID, pollID str
 func pollResult(rs *redisservice.RedisService, roomID string, info *plugnmeet.PollInfo) (mcp.PollResult, error) {
 	result := mcp.PollResult{
 		PollID:       info.GetId(),
-		Question:     info.GetQuestion(),
+		Question:     insightsservice.SanitizeUntrustedToolText(info.GetQuestion(), aiAgentPollTextRunes),
 		IsQuiz:       info.GetIsQuiz(),
 		IsRunning:    info.GetIsRunning(),
 		IsAnonymous:  info.GetIsAnonymous(),
@@ -183,14 +187,14 @@ func pollResult(rs *redisservice.RedisService, roomID string, info *plugnmeet.Po
 	for _, option := range info.GetOptions() {
 		result.Options = append(result.Options, mcp.PollResultOption{
 			ID:        option.GetId(),
-			Text:      option.GetText(),
+			Text:      insightsservice.SanitizeUntrustedToolText(option.GetText(), aiAgentPollTextRunes),
 			IsCorrect: option.GetIsCorrect(),
 			Votes:     votes[uint64(option.GetId())],
 		})
 	}
 	for _, answer := range details.GetTextAnswers() {
 		result.TextAnswers = append(result.TextAnswers, mcp.PollResultText{
-			Text:  answer.GetText(),
+			Text:  insightsservice.SanitizeUntrustedToolText(answer.GetText(), aiAgentPollTextRunes),
 			Count: answer.GetCount(),
 		})
 	}

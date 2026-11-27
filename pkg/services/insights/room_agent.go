@@ -348,6 +348,20 @@ func (a *RoomAgent) UpdateAllowedUsers(allowed map[string]bool) {
 	}
 }
 
+// AllowTargetUser adds a participant to the capture list of a room-wide task,
+// so a learner whose pairing became known after the session started is heard.
+func (a *RoomAgent) AllowTargetUser(userId string) {
+	if userId == "" {
+		return
+	}
+	a.lock.Lock()
+	defer a.lock.Unlock()
+	if a.payload.TargetUsers == nil {
+		a.payload.TargetUsers = make(map[string]bool)
+	}
+	a.payload.TargetUsers[config.PrimaryIdentityFromNative(userId)] = true
+}
+
 // ActivateRoomWideTask enables the agent to subscribe to all current and future audio tracks in the room.
 func (a *RoomAgent) ActivateRoomWideTask() {
 	if !a.payload.CaptureAllParticipantsTracks {
@@ -536,7 +550,7 @@ func (a *RoomAgent) stopStalePipeline(rp *lksdk.RemoteParticipant) {
 // participant's microphone tracks.
 func (a *RoomAgent) shouldSubscribeParticipantLocked(identity, primaryId string) bool {
 	if a.payload.CaptureAllParticipantsTracks {
-		return a.isCaptureAllowed(identity)
+		return a.isCaptureAllowedLocked(identity)
 	}
 	_, ok := a.activeUserTasks[primaryId]
 
@@ -919,6 +933,12 @@ func (a *RoomAgent) isSystemAgent(userId string) bool {
 // isCaptureAllowed reports whether a participant's audio belongs to this agent's
 // task. An empty target list captures everybody in the room.
 func (a *RoomAgent) isCaptureAllowed(identity string) bool {
+	a.lock.RLock()
+	defer a.lock.RUnlock()
+	return a.isCaptureAllowedLocked(identity)
+}
+
+func (a *RoomAgent) isCaptureAllowedLocked(identity string) bool {
 	if len(a.payload.TargetUsers) == 0 {
 		return true
 	}
