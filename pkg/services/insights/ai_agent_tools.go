@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/sirupsen/logrus"
 
@@ -132,124 +131,6 @@ func (a *AIAgent) HandleParticipantChatMessage(userID, userName, text string) er
 	// count it, otherwise chat-only sessions would report zero turns.
 	a.recordTranscriptTurn(transcriptRoleParticipant, text)
 	return nil
-}
-
-// pendingClientCall is one dispatched client tool call, bound to the participant
-// it was sent to so no other participant can answer it.
-type pendingClientCall struct {
-	targetUserID string
-	ch           chan *plugnmeet.AIAgentToolResultMsg
-}
-
-// HandleClientToolResult resolves the pending call only for the participant the call was dispatched to.
-// It reports whether the answer was accepted.
-func (a *AIAgent) HandleClientToolResult(userID string, res *plugnmeet.AIAgentToolResultMsg) bool {
-	if res == nil || res.GetCallId() == "" {
-		return false
-	}
-
-	a.pendingMu.Lock()
-	entry, ok := a.pendingCalls[res.GetCallId()]
-	if ok && entry.targetUserID != "" && userID != "" && entry.targetUserID != userID {
-		a.pendingMu.Unlock()
-		a.logger.WithFields(logrus.Fields{
-			"callId":     res.GetCallId(),
-			"userId":     userID,
-			"targetUser": entry.targetUserID,
-		}).Warn("ai agent: ignoring a client tool result from a participant that does not own the call")
-		return false
-	}
-	delete(a.pendingCalls, res.GetCallId())
-	a.pendingMu.Unlock()
-
-	if !ok {
-		a.logger.WithFields(logrus.Fields{"callId": res.GetCallId(), "ok": res.GetOk()}).Warn("ai agent: received late or unknown client tool result")
-		return false
-	}
-	select {
-	case entry.ch <- res:
-	default:
-	}
-
-	return true
-}
-
-// CallClientTool implements mcp.ClientRPCSender: the call travels to the agent
-// delegate's browser and its answer comes back as AI_AGENT_TOOL_RESULT.
-func (a *AIAgent) CallClientTool(ctx context.Context, call mcp.ToolCall, timeout time.Duration) (mcp.ToolResult, error) {
-	if a.transport == nil || a.delegate == nil {
-		return mcp.ToolResult{}, errors.New("no client is available to run this tool. Speak your instruction instead")
-	}
-	target, err := a.delegate()
-	if err != nil {
-		return mcp.ToolResult{}, fmt.Errorf("the participant client is not reachable: %w", err)
-	}
-	if target == "" {
-		return mcp.ToolResult{}, errors.New("no client is available to run this tool. Speak your instruction instead")
-	}
-
-	callID := strings.TrimSpace(call.CallID)
-	if callID == "" {
-		callID = uuid.NewString()
-	}
-	call.CallID = callID
-
-	ch := make(chan *plugnmeet.AIAgentToolResultMsg, 1)
-	a.pendingMu.Lock()
-	if _, exists := a.pendingCalls[callID]; exists {
-		a.pendingMu.Unlock()
-		return mcp.ToolResult{}, errors.New("another tool call is already in flight with the same id. Do not retry it")
-	}
-	a.pendingCalls[callID] = pendingClientCall{targetUserID: target, ch: ch}
-	a.pendingMu.Unlock()
-	defer func() {
-		a.pendingMu.Lock()
-		delete(a.pendingCalls, callID)
-		a.pendingMu.Unlock()
-	}()
-
-	a.logger.WithFields(logrus.Fields{
-		"callId":       call.CallID,
-		"tool":         call.ToolName,
-		"targetUserId": target,
-		"timeout":      timeout.String(),
-	}).Debug("ai agent: dispatching client tool")
-
-	msg := &plugnmeet.AIAgentToolCallMsg{
-		SessionId:      a.sessionId,
-		CallId:         call.CallID,
-		ToolName:       call.ToolName,
-		ArgumentsJson:  call.ArgsJSON,
-		TargetUserId:   target,
-		DeadlineUnixMs: time.Now().Add(timeout).UnixMilli(),
-		TraceId:        call.TraceID,
-	}
-	if err := a.transport.SendAIAgentToolCallToUser(a.roomId, target, msg); err != nil {
-		return mcp.ToolResult{}, fmt.Errorf("the tool call could not be delivered: %w", err)
-	}
-
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
-
-	select {
-	case res := <-ch:
-		if !res.GetOk() {
-			reason := strings.TrimSpace(res.GetError())
-			if reason == "" {
-				reason = "the participant's browser could not run the tool"
-			}
-			return mcp.ToolResult{}, errors.New(reason)
-		}
-		out := strings.TrimSpace(res.GetResultJson())
-		if out == "" {
-			out = "{}"
-		}
-		return mcp.ToolResult{OutputJSON: out}, nil
-	case <-ctx.Done():
-		return mcp.ToolResult{}, ctx.Err()
-	case <-timer.C:
-		return mcp.ToolResult{}, context.DeadlineExceeded
-	}
 }
 
 func (a *AIAgent) handleToolCall(session insights.RealtimeSession, ev insights.RealtimeEvent) {

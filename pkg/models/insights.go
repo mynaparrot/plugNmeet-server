@@ -90,14 +90,14 @@ func (s *InsightsModel) SetAIAgentModel(m *AIAgentModel) {
 	s.aiAgentModel = m
 }
 
-// BuildToolDependencies wires the MCP tools of an AI text chat session run by
-// userID. It returns nil when the agent model is not wired yet, so a partially
-// initialised server never registers half-configured tools.
+// BuildToolDependencies wires the MCP tools of an AI text chat session run by userID, whose own browser runs the delegated
+// tools. It returns nil when the agent model is not wired yet, so a partially initialised server never
+// registers half-configured tools.
 func (s *InsightsModel) BuildToolDependencies(roomId, userId string, log *logrus.Entry) mcp.ToolDependencies {
 	if s.aiAgentModel == nil {
 		return mcp.ToolDependencies{}
 	}
-	return s.aiAgentModel.BuildToolDependencies(roomId, userId, log)
+	return s.aiAgentModel.BuildToolDependencies(roomId, userId, s.aiAgentModel.NewUserClientRPCSender(userId), log)
 }
 
 // ConfigureAgent sends a configuration task and waits for confirmation.

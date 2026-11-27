@@ -9,7 +9,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
-	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 )
 
 // OnUserJoined runs after a human joined: it keeps the delegate valid, cancels a
@@ -33,8 +32,8 @@ func (m *AIAgentModel) OnUserJoined(ctx context.Context, roomId, userId string) 
 		return
 	}
 
-	// Somebody is back: an empty-room teardown is no longer valid.
-	m.cancelStopTimer(roomId)
+	// Somebody is back: an empty-room teardown is no longer valid on any node.
+	m.cancelClusterStopTimer(roomId)
 
 	if _, err := m.SelectOrGetDelegate(ctx, roomId); err != nil {
 		log.WithError(err).Warn("could not select a delegate")
@@ -42,8 +41,21 @@ func (m *AIAgentModel) OnUserJoined(ctx context.Context, roomId, userId string) 
 	// A per-user session may start before the learner joins, so a running agent
 	// takes the identity of the participant it talks to. Anyone else (a
 	// supervisor observing) is ignored.
-	if agent, ok := insightsservice.GetActiveAIAgent(roomId); ok && m.CanControlSession(ctx, roomId, userId) {
-		agent.SetLearner(aiAgentLearnerIdentity(m.aiAgentParticipantInfo(roomId, userId)))
+	agent, hosted := m.hostedAgent(roomId)
+	active := hosted || m.IsAgentActive(ctx, roomId)
+	if active && m.CanControlSession(ctx, roomId, userId) {
+		if hosted {
+			agent.SetLearner(aiAgentLearnerIdentity(m.aiAgentParticipantInfo(roomId, userId)))
+		} else {
+			// the session runs on another node, which has to take the identity
+			if err := m.publishClusterTask(&aiAgentClusterTaskPayload{
+				Task:   aiAgentClusterTaskSetLearner,
+				RoomId: roomId,
+				UserId: userId,
+			}); err != nil {
+				log.WithError(err).Warn("could not relay the learner identity")
+			}
+		}
 	}
 
 	if !aiAgentAutoStart(features) {
@@ -54,7 +66,8 @@ func (m *AIAgentModel) OnUserJoined(ctx context.Context, roomId, userId string) 
 	if allowed := aiAgentAllowedParticipantIds(features); len(allowed) > 0 && !containsUserId(allowed, userId) {
 		return
 	}
-	if _, ok := insightsservice.GetActiveAIAgent(roomId); ok {
+	// the session already runs, here or on the node hosting it
+	if active {
 		return
 	}
 	if err := m.Start(ctx, roomId, nil); err != nil {
@@ -101,14 +114,26 @@ func (m *AIAgentModel) onRoomEmpty(roomId string, intentional bool) {
 func (m *AIAgentModel) stopEmptyRoom(roomId string) {
 	m.cancelStopTimer(roomId)
 
-	agent, ok := m.hostedAgent(roomId)
-	if !ok {
-		// No agent runs here (already stopped or never started), so nothing
-		// triggers afterAgentStopped: the room has to be closed directly.
-		m.closeBreakoutRoomAfterStop(roomId, aiAgentStopReasonEmptyRoom)
+	if agent, ok := m.hostedAgent(roomId); ok {
+		agent.Stop(aiAgentStopReasonEmptyRoom)
 		return
 	}
-	agent.Stop(aiAgentStopReasonEmptyRoom)
+	// The agent runs on another node, which stops it and closes the room after
+	// the stop; closing the room here would cut the session short.
+	if m.IsAgentActive(m.ctx, roomId) {
+		if err := m.publishClusterTask(&aiAgentClusterTaskPayload{
+			Task:        aiAgentClusterTaskStop,
+			RoomId:      roomId,
+			Reason:      aiAgentStopReasonEmptyRoom,
+			CancelTimer: true,
+		}); err != nil {
+			m.logger.WithError(err).WithField("roomId", roomId).Warn("could not relay the empty-room stop")
+		}
+		return
+	}
+	// No agent runs anywhere (already stopped or never started), so nothing
+	// triggers afterAgentStopped: the room has to be closed directly.
+	m.closeBreakoutRoomAfterStop(roomId, aiAgentStopReasonEmptyRoom)
 }
 
 // StopForRoomEnd stops the agent because the room is ending. The Redis keys
@@ -120,13 +145,9 @@ func (m *AIAgentModel) StopForRoomEnd(ctx context.Context, roomId string) {
 	if err := m.Stop(ctx, roomId, "room_ended"); err != nil {
 		m.logger.WithError(err).Error("failed to stop the ai agent")
 	}
-	m.cancelStopTimer(roomId)
-}
-
-// OnRoomEnded is the authoritative teardown: the room is ending, so the agent
-// stops immediately and its Redis state is removed.
-func (m *AIAgentModel) OnRoomEnded(ctx context.Context, roomId string) {
-	m.FinalizeSession(ctx, 0, roomId, "")
+	// An empty-room grace timer may still be pending on the node where the last participant disconnected,
+	// so it has to be dropped cluster-wide.
+	m.cancelClusterStopTimer(roomId)
 }
 
 // cleanupRoomState removes every room-scoped key of the agent, including the
@@ -155,8 +176,8 @@ func (m *AIAgentModel) OnPollResponseSubmitted(ctx context.Context, roomId, poll
 	if m == nil || config.IsUserIdInternal(userId) {
 		return
 	}
-	agent, ok := m.hostedAgent(roomId)
-	if !ok {
+	agent, hosted := m.hostedAgent(roomId)
+	if !hosted && !m.IsAgentActive(ctx, roomId) {
 		return
 	}
 
@@ -168,8 +189,20 @@ func (m *AIAgentModel) OnPollResponseSubmitted(ctx context.Context, roomId, poll
 		return
 	}
 	// proactive: the answer alone must make the agent speak up
-	if err := agent.SendProactiveContext(note, "poll"); err != nil {
-		m.logger.WithError(err).Debug("could not send the poll context to the ai agent")
+	if hosted {
+		if err := agent.SendProactiveContext(note, string(aiAgentContextSourcePoll)); err != nil {
+			m.logger.WithError(err).Debug("could not send the poll context to the ai agent")
+		}
+		return
+	}
+	if err := m.publishClusterTask(&aiAgentClusterTaskPayload{
+		Task:      aiAgentClusterTaskSendContext,
+		RoomId:    roomId,
+		Text:      note,
+		Source:    aiAgentContextSourcePoll,
+		Proactive: true,
+	}); err != nil {
+		m.logger.WithError(err).Debug("could not relay the poll context to the hosting node")
 	}
 }
 

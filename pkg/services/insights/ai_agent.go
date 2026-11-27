@@ -63,7 +63,6 @@ var aiAgentSpeakingIdle = 1500 * time.Millisecond
 // *natsservice.NatsService implements it; tests inject a recorder.
 type AIAgentTransport interface {
 	BroadcastAIAgentState(roomId string, msg *plugnmeet.AIAgentStateMsg) error
-	SendAIAgentToolCallToUser(roomId, userId string, msg *plugnmeet.AIAgentToolCallMsg) error
 }
 
 // audioPublisher is the subset of media.AudioPublisher the agent needs.
@@ -191,7 +190,6 @@ type AIAgent struct {
 	guard     *BoundaryGuard
 	executor  *mcp.Executor
 	transport AIAgentTransport
-	delegate  func() (string, error)
 	onStopped func(reason string)
 	maxAudio  time.Duration
 	// redisService persists the session telemetry; nil in tests without a store.
@@ -252,9 +250,6 @@ type AIAgent struct {
 
 	learnerMu sync.Mutex
 	learner   LearnerIdentity
-
-	pendingMu    sync.Mutex
-	pendingCalls map[string]pendingClientCall
 
 	// lastAutoVisionAt throttles the automatic participant_edit snapshots.
 	lastAutoVisionAt atomic.Int64
@@ -326,8 +321,6 @@ type AIAgentArgs struct {
 	// Learner is the participant of the 1-on-1 session; the session telemetry
 	// carries it into the summary artifact.
 	Learner LearnerIdentity
-	// Delegate resolves the participant that executes client-delegated tools.
-	Delegate func() (string, error)
 	// OnStopped runs once after the agent has fully stopped.
 	OnStopped func(reason string)
 	// SummarizeModel refines the running conversation summary; an empty model
@@ -362,17 +355,18 @@ type AIAgentAvatarConfig struct {
 // aiAgentCoreArgs is everything the agent needs that does not depend on a
 // LiveKit connection, so the runtime loop is testable without a media server.
 type aiAgentCoreArgs struct {
-	Ctx            context.Context
-	Payload        *insights.InsightsTaskPayload
-	Features       *plugnmeet.InsightsAIAgentFeatures
-	Boundary       BoundaryConfig
-	Session        insights.RealtimeSession
-	NewSession     func(ctx context.Context) (insights.RealtimeSession, error)
-	Transport      AIAgentTransport
-	RedisService   *redisservice.RedisService
-	Logger         *logrus.Entry
-	Registry       *mcp.Registry
-	Delegate       func() (string, error)
+	Ctx          context.Context
+	Payload      *insights.InsightsTaskPayload
+	Features     *plugnmeet.InsightsAIAgentFeatures
+	Boundary     BoundaryConfig
+	Session      insights.RealtimeSession
+	NewSession   func(ctx context.Context) (insights.RealtimeSession, error)
+	Transport    AIAgentTransport
+	RedisService *redisservice.RedisService
+	Logger       *logrus.Entry
+	Registry     *mcp.Registry
+	// ClientRPC runs the tools delegated to a browser; nil disables them.
+	ClientRPC      mcp.ClientRPCSender
 	OnStopped      func(reason string)
 	SessionId      string
 	AgentUserId    string
@@ -475,7 +469,7 @@ func NewAIAgent(args *AIAgentArgs) (*AIAgent, error) {
 		RedisService:      args.RedisService,
 		Logger:            log,
 		Registry:          registry,
-		Delegate:          args.Delegate,
+		ClientRPC:         args.Deps.Client,
 		OnStopped:         args.OnStopped,
 		AgentUserId:       args.AgentUserId,
 		Learner:           args.Learner,
@@ -689,7 +683,6 @@ func newAIAgent(args *aiAgentCoreArgs) (*AIAgent, error) {
 		features:        features,
 		guard:           guard,
 		transport:       args.Transport,
-		delegate:        args.Delegate,
 		onStopped:       args.OnStopped,
 		learner:         args.Learner,
 		maxAudio:        time.Duration(maxAudioMinutes) * time.Minute,
@@ -700,7 +693,6 @@ func newAIAgent(args *aiAgentCoreArgs) (*AIAgent, error) {
 		inAudio:         make(chan mediasdk.PCM16Sample, aiAgentInAudioBuffer),
 		session:         args.Session,
 		newSession:      args.NewSession,
-		pendingCalls:    make(map[string]pendingClientCall),
 		done:            make(chan struct{}),
 		state: aiAgentRuntimeState{
 			state:     plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_CONNECTING,
@@ -733,7 +725,7 @@ func newAIAgent(args *aiAgentCoreArgs) (*AIAgent, error) {
 	registry.Register(reportOffTopicTool(guard))
 	agent.executor = mcp.NewExecutor(mcp.ExecutorOptions{
 		Registry:    registry,
-		Client:      agent,
+		Client:      args.ClientRPC,
 		ScopeLocked: guard.IsToolScopeLocked,
 	})
 
@@ -890,11 +882,6 @@ func (a *AIAgent) Stop(reason string) {
 		if a.avatarSession != nil {
 			_ = a.avatarSession.Close(context.Background())
 		}
-
-		// Waiters get context.Canceled from the cancelled context.
-		a.pendingMu.Lock()
-		a.pendingCalls = make(map[string]pendingClientCall)
-		a.pendingMu.Unlock()
 
 		// The tool serialization lock is keyed by the provider session id of the
 		// calls, so it goes with the session.

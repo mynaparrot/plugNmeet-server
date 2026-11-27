@@ -9,6 +9,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 )
 
 type sentNote struct {
@@ -16,14 +17,58 @@ type sentNote struct {
 	source string
 }
 
-// recordingAgentSender records the notes pushed into the live session.
+type sentChat struct {
+	userId   string
+	userName string
+	text     string
+}
+
+// recordingAgentSender records every request the model pushes into the live
+// session.
 type recordingAgentSender struct {
-	notes []sentNote
+	notes    []sentNote
+	contexts []sentNote
+	chats    []sentChat
+	scenes   []*plugnmeet.AIAgentWhiteboardSceneMsg
+	learners []insightsservice.LearnerIdentity
+	pauses   int
+	resumes  int
+	// err is returned by every operation that can fail.
+	err error
 }
 
 func (r *recordingAgentSender) SendProactiveContext(text, source string) error {
 	r.notes = append(r.notes, sentNote{text: text, source: source})
-	return nil
+	return r.err
+}
+
+func (r *recordingAgentSender) SendContext(text, source string) error {
+	r.contexts = append(r.contexts, sentNote{text: text, source: source})
+	return r.err
+}
+
+func (r *recordingAgentSender) HandleParticipantChatMessage(userId, userName, text string) error {
+	r.chats = append(r.chats, sentChat{userId: userId, userName: userName, text: text})
+	return r.err
+}
+
+func (r *recordingAgentSender) HandleWhiteboardScene(msg *plugnmeet.AIAgentWhiteboardSceneMsg) error {
+	r.scenes = append(r.scenes, msg)
+	return r.err
+}
+
+func (r *recordingAgentSender) SetLearner(identity insightsservice.LearnerIdentity) {
+	r.learners = append(r.learners, identity)
+}
+
+func (r *recordingAgentSender) Pause() error {
+	r.pauses++
+	return r.err
+}
+
+func (r *recordingAgentSender) Resume() error {
+	r.resumes++
+	return r.err
 }
 
 func (r *recordingAgentSender) Stop(string) {}
@@ -82,7 +127,7 @@ func TestOnPollResponseSubmittedSendsAProactiveContext(t *testing.T) {
 		t.Fatalf("sent notes = %d, want 1", len(sender.notes))
 	}
 	note := sender.notes[0]
-	if note.source != "poll" {
+	if note.source != string(aiAgentContextSourcePoll) {
 		t.Errorf("source = %q, want poll", note.source)
 	}
 	for _, want := range []string{"Sam", "option 2", `"4"`, "What is 2+2?"} {
@@ -109,7 +154,7 @@ func TestOnPollResponseSubmittedDescribesATextAnswer(t *testing.T) {
 		t.Fatalf("sent notes = %d, want 1", len(sender.notes))
 	}
 	note := sender.notes[0]
-	if note.source != "poll" {
+	if note.source != string(aiAgentContextSourcePoll) {
 		t.Errorf("source = %q, want poll", note.source)
 	}
 	if !strings.Contains(note.text, `"2 plus 2 equals 4"`) {

@@ -272,6 +272,10 @@ type ToolDependencies struct {
 	// anything is dialled; nil keeps the built-in checks only.
 	ExternalURLHook ExternalURLHookRunner
 
+	// Client runs the tools that are delegated to a browser; nil disables the
+	// client tools.
+	Client ClientRPCSender
+
 	// MCPScope is the consumer scope of the session (ai_agent, text_chat). Only
 	// the external MCP servers whose own scope matches it, plus the shared ones,
 	// are registered. Empty accepts every server.

@@ -167,7 +167,7 @@ func (s *InsightsModel) adminTextChatToolRunner(ctx context.Context, roomId, use
 	reg := mcp.BuildAdminTextChatToolRegistry(s.aiAgentModel.roomAgentFeatures(roomId), deps)
 	exec := mcp.NewExecutor(mcp.ExecutorOptions{
 		Registry: reg,
-		Client:   s.aiAgentModel.NewUserClientRPCSender(userId),
+		Client:   deps.Client,
 	})
 
 	return &insights.AITextChatToolRunner{

@@ -9,19 +9,11 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights/providers/fake"
-	"github.com/mynaparrot/plugnmeet-server/pkg/services/insights/mcp"
 )
 
 // webpFrame is a minimal RIFF/WEBP header.
 func webpFrame() []byte {
 	return []byte("RIFF\x00\x00\x00\x00WEBP")
-}
-
-func pendingCallCount(a *AIAgent) int {
-	a.pendingMu.Lock()
-	defer a.pendingMu.Unlock()
-
-	return len(a.pendingCalls)
 }
 
 // TestAIAgentThrottlesAutomaticVisionPushes locks in that a participant drawing
@@ -55,71 +47,6 @@ func TestAIAgentThrottlesAutomaticVisionPushes(t *testing.T) {
 	push("page_change")
 	if got := len(env.session.Images()); got != 3 {
 		t.Fatalf("images = %d, want the explicit pushes to be delivered", got)
-	}
-}
-
-// TestAIAgentClientToolResultMustComeFromTheTargetUser locks in that a tool call
-// is bound to the participant it was dispatched to.
-func TestAIAgentClientToolResultMustComeFromTheTargetUser(t *testing.T) {
-	env := newAgentTestEnv(t, nil, nil)
-
-	type outcome struct {
-		res mcp.ToolResult
-		err error
-	}
-	done := make(chan outcome, 1)
-	go func() {
-		res, err := env.agent.CallClientTool(context.Background(), mcp.ToolCall{
-			RoomID:    "room",
-			ToolName:  "whiteboard_draw_shapes",
-			ArgsJSON:  `{}`,
-			SessionID: "session-1",
-		}, 5*time.Second)
-		done <- outcome{res: res, err: err}
-	}()
-
-	var callID string
-	waitFor(t, func() bool {
-		calls := env.transport.toolCalls()
-		if len(calls) == 0 {
-			return false
-		}
-		callID = calls[0].GetCallId()
-		return callID != ""
-	}, "client tool dispatched")
-	// The provider left the id empty, so one is generated before dispatching.
-	if callID == "" {
-		t.Fatal("a call id must be generated when the model left it empty")
-	}
-
-	if env.agent.HandleClientToolResult("intruder", &plugnmeet.AIAgentToolResultMsg{
-		CallId: callID, Ok: true, ResultJson: `{"ids":["evil"]}`,
-	}) {
-		t.Error("a result from a participant that does not own the call must be rejected")
-	}
-	if got := pendingCallCount(env.agent); got != 1 {
-		t.Errorf("pending calls = %d, want the rejected result to keep the call in flight", got)
-	}
-
-	if !env.agent.HandleClientToolResult("user-1", &plugnmeet.AIAgentToolResultMsg{
-		CallId: callID, Ok: true, ResultJson: `{"ids":["a"]}`,
-	}) {
-		t.Error("the targeted participant's result must be accepted")
-	}
-
-	select {
-	case out := <-done:
-		if out.err != nil {
-			t.Fatalf("client tool call: %v", out.err)
-		}
-		if out.res.OutputJSON != `{"ids":["a"]}` {
-			t.Errorf("output = %q, want the targeted participant's result", out.res.OutputJSON)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("the targeted call was not resolved")
-	}
-	if got := pendingCallCount(env.agent); got != 0 {
-		t.Errorf("pending calls = %d, want the resolved call to be removed", got)
 	}
 }
 

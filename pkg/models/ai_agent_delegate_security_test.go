@@ -1,10 +1,15 @@
 package models
 
 import (
+	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/sirupsen/logrus"
+
+	"github.com/mynaparrot/plugnmeet-server/pkg/services/insights/mcp"
 )
 
 // A 1-on-1 room names its participants: an unlisted user may never be picked,
@@ -45,6 +50,76 @@ func TestPickDelegateFallsBackToTheFirstOnlineHumanInAGroupRoom(t *testing.T) {
 	withAdmin := []*plugnmeet.NatsKvUserInfo{{UserId: "b"}, {UserId: "a", IsAdmin: true}}
 	if got := pickDelegate(withAdmin, nil); got.GetUserId() != "a" {
 		t.Errorf("delegate = %q, want the admin", got.GetUserId())
+	}
+}
+
+// TestCallClientToolForUserRejectsADuplicateCallID locks in that one call id can
+// only ever be in flight once, so a retried call cannot answer itself.
+func TestCallClientToolForUserRejectsADuplicateCallID(t *testing.T) {
+	model := newAIAgentTestModel(newAIAgentTestRedis(t))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan clientCallOutcome, 1)
+	go func() {
+		res, err := model.CallClientToolForUser(ctx, "admin-1", mcp.ToolCall{
+			CallID:   "call-1",
+			RoomID:   "room-1",
+			ToolName: mcp.ToolNotepadRead,
+		}, time.Minute)
+		done <- clientCallOutcome{res: res, err: err}
+	}()
+
+	waitForPendingClientCall(t, model)
+	_, err := model.CallClientToolForUser(ctx, "admin-1", mcp.ToolCall{
+		CallID:   "call-1",
+		RoomID:   "room-1",
+		ToolName: mcp.ToolNotepadRead,
+	}, time.Second)
+	if err == nil || !strings.Contains(err.Error(), "already in flight") {
+		t.Fatalf("second call = %v, want the duplicate call id to be refused", err)
+	}
+	if got := pendingClientCallCount(model); got != 1 {
+		t.Errorf("pending calls = %d, want the refused call to leave the first one in flight", got)
+	}
+
+	cancel()
+	<-done
+}
+
+// TestDelegateClientRPCSenderNeedsAnOnlineDelegate locks in that the agent
+// session reaches a browser through the room's delegate only.
+func TestDelegateClientRPCSenderNeedsAnOnlineDelegate(t *testing.T) {
+	model := newAIAgentTestModel(newAIAgentTestRedis(t))
+
+	sender := model.NewDelegateClientRPCSender()
+	if sender == nil {
+		t.Fatal("the sender must be wired to the model")
+	}
+	if _, err := sender.CallClientTool(context.Background(), mcp.ToolCall{
+		RoomID:   "room-1",
+		ToolName: mcp.ToolNotepadRead,
+	}, time.Second); err == nil {
+		t.Fatal("a room without a delegate has no browser to run the tool")
+	}
+	if got := pendingClientCallCount(model); got != 0 {
+		t.Errorf("pending calls = %d, want no call without a delegate", got)
+	}
+}
+
+// TestBuildToolDependenciesDefaultsToTheDelegateSender locks in that a session
+// built without a client RPC still gets the model's delegate broker.
+func TestBuildToolDependenciesDefaultsToTheDelegateSender(t *testing.T) {
+	model := newAIAgentTestModel(newAIAgentTestRedis(t))
+	log := logrus.NewEntry(logrus.New())
+
+	if deps := model.BuildToolDependencies("room-1", "user-1", nil, log); deps.Client == nil {
+		t.Error("a missing client RPC must default to the delegate sender")
+	}
+
+	targeted := model.NewUserClientRPCSender("admin-1")
+	if deps := model.BuildToolDependencies("room-1", "user-1", targeted, log); deps.Client != targeted {
+		t.Error("an explicit client RPC must be kept")
 	}
 }
 

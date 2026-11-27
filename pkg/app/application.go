@@ -113,6 +113,12 @@ func (a *Application) Start(_ context.Context) error {
 		return err
 	}
 
+	// Initialize AI Agent controller.
+	if err := a.router.ctrl.AIAgentController.Initialize(); err != nil {
+		log.WithError(err).Error("Failed to initialize AI Agent controller")
+		return err
+	}
+
 	// Start the HTTP server in a background goroutine.
 	go func() {
 		log.WithFields(logrus.Fields{
@@ -146,6 +152,7 @@ func (a *Application) Stop(ctx context.Context) error {
 		defer close(done)
 		a.router.ctrl.NatsController.Stop()
 		a.router.ctrl.InsightsController.Shutdown()
+		a.router.ctrl.AIAgentController.Shutdown()
 		a.router.ctrl.WebhookController.Shutdown()
 		a.janitorModel.Shutdown()
 	}()

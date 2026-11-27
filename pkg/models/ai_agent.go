@@ -191,14 +191,25 @@ type AIAgentModel struct {
 	clientAPISubmitter func(ctx context.Context, roomID, targetUserID, route string, payload proto.Message) error
 	// activeAgentLookup overrides the hosted-agent registry in unit tests.
 	activeAgentLookup func(roomID string) (aiAgentHandle, bool)
+	// clusterPublish/clusterRequest override the NATS relay of the cluster tasks
+	// in unit tests, which run without a NATS server.
+	clusterPublish func(subject string, data []byte) error
+	clusterRequest func(subject string, data []byte, timeout time.Duration) ([]byte, error)
 	// closeBreakoutRoom overrides the 1-on-1 room teardown in unit tests.
 	closeBreakoutRoom func(roomID, reason string)
 }
 
-// aiAgentHandle is the slice of insightsservice.AIAgent the model needs: push a
-// server-side note into the live session and stop it.
+// aiAgentHandle is the slice of insightsservice.AIAgent the model drives: the
+// live session of one room, which this node either hosts or reaches over the
+// cluster channel.
 type aiAgentHandle interface {
 	SendProactiveContext(text, source string) error
+	SendContext(text, source string) error
+	HandleParticipantChatMessage(userID, userName, text string) error
+	HandleWhiteboardScene(msg *plugnmeet.AIAgentWhiteboardSceneMsg) error
+	SetLearner(identity insightsservice.LearnerIdentity)
+	Pause() error
+	Resume() error
 	Stop(reason string)
 }
 
@@ -274,9 +285,33 @@ func (m *AIAgentModel) NewUserClientRPCSender(targetUserID string) mcp.ClientRPC
 	return userClientRPCSender{model: m, targetUserID: targetUserID}
 }
 
-// CallClientToolForUser delegates one tool call to a specific participant's
-// browser and waits for its answer. It mirrors AIAgent.CallClientTool, but the
-// target is a user id instead of the agent's current delegate.
+// delegateClientRPCSender delegates every tool call to the room's current
+// delegate, so an agent session never has to broker the round-trip itself.
+type delegateClientRPCSender struct {
+	model *AIAgentModel
+}
+
+func (s delegateClientRPCSender) CallClientTool(ctx context.Context, call mcp.ToolCall, timeout time.Duration) (mcp.ToolResult, error) {
+	delegate, err := s.model.SelectOrGetDelegate(ctx, call.RoomID)
+	if err != nil {
+		return mcp.ToolResult{}, err
+	}
+	if delegate == "" {
+		return mcp.ToolResult{}, errors.New("no client is available to run this tool. Speak your instruction instead")
+	}
+
+	return s.model.CallClientToolForUser(ctx, delegate, call, timeout)
+}
+
+// NewDelegateClientRPCSender returns the mcp.ClientRPCSender that runs a tool in
+// the browser of the room's delegate, e.g. the learner of a 1-on-1 session.
+func (m *AIAgentModel) NewDelegateClientRPCSender() mcp.ClientRPCSender {
+	return delegateClientRPCSender{model: m}
+}
+
+// CallClientToolForUser delegates one tool call to a specific participant's browser and waits for its answer.
+// It is the single broker of every AI_AGENT_TOOL_CALL -> AI_AGENT_TOOL_RESULT round-trip: the agent session and
+// the AI text chat both reach their browser through it.
 func (m *AIAgentModel) CallClientToolForUser(ctx context.Context, targetUserID string, call mcp.ToolCall, timeout time.Duration) (mcp.ToolResult, error) {
 	if targetUserID == "" || call.RoomID == "" {
 		return mcp.ToolResult{}, errors.New("no client is available to run this tool")
@@ -289,12 +324,18 @@ func (m *AIAgentModel) CallClientToolForUser(ctx context.Context, targetUserID s
 	}
 
 	ch := make(chan *plugnmeet.AIAgentToolResultMsg, 1)
+
 	m.pendingClientMu.Lock()
+	if _, exists := m.pendingClientCalls[callID]; exists {
+		m.pendingClientMu.Unlock()
+		return mcp.ToolResult{}, fmt.Errorf("a client tool call with id %q is already in flight", callID)
+	}
 	if m.pendingClientCalls == nil {
 		m.pendingClientCalls = make(map[string]*pendingClientToolCall)
 	}
 	m.pendingClientCalls[callID] = &pendingClientToolCall{roomID: call.RoomID, targetUserID: targetUserID, ch: ch}
 	m.pendingClientMu.Unlock()
+
 	defer func() {
 		m.pendingClientMu.Lock()
 		delete(m.pendingClientCalls, callID)
@@ -302,6 +343,7 @@ func (m *AIAgentModel) CallClientToolForUser(ctx context.Context, targetUserID s
 	}()
 
 	msg := &plugnmeet.AIAgentToolCallMsg{
+		SessionId:      call.SessionID,
 		CallId:         callID,
 		ToolName:       call.ToolName,
 		ArgumentsJson:  call.ArgsJSON,
@@ -433,10 +475,15 @@ func (m *AIAgentModel) SetArtifactModel(am *ArtifactModel) {
 
 // BuildToolDependencies wires every MCP tool backend of a room session.
 // actorUserID is the participant the tools act as; it is used when a tool call
-// carries no user of its own. The caller sets MCPScope (and
-// RequireQuizApproval for a text chat session) because the same backends serve
-// the voice agent and the AI text chat.
-func (m *AIAgentModel) BuildToolDependencies(roomID, actorUserID string, log *logrus.Entry) mcp.ToolDependencies {
+// carries no user of its own. clientRPC reaches the browser that runs the
+// delegated tools; nil falls back to the room's delegate. The caller sets
+// MCPScope (and RequireQuizApproval for a text chat session) because the same
+// backends serve the voice agent and the AI text chat.
+func (m *AIAgentModel) BuildToolDependencies(roomID, actorUserID string, clientRPC mcp.ClientRPCSender, log *logrus.Entry) mcp.ToolDependencies {
+	if clientRPC == nil {
+		clientRPC = m.NewDelegateClientRPCSender()
+	}
+
 	deps := mcp.ToolDependencies{
 		Poll:         aiAgentPollBackend{m: m},
 		Quiz:         m.redisService,
@@ -451,6 +498,7 @@ func (m *AIAgentModel) BuildToolDependencies(roomID, actorUserID string, log *lo
 		Insights:     aiAgentInsightsBackend{m: m, actorUserID: actorUserID},
 		RoomOps:      aiAgentRoomOpsBackend{m: m, actorUserID: actorUserID},
 		Participants: aiAgentParticipantsBackend{m: m, actorUserID: actorUserID},
+		Client:       clientRPC,
 		RedisService: m.redisService,
 		RoomID:       roomID,
 		Logger:       log,

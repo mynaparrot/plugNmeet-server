@@ -12,6 +12,7 @@ import (
 
 const (
 	InsightsNatsChannel  = "plug-n-meet-insights"
+	AIAgentNatsChannel   = "plug-n-meet-insights-ai-agent"
 	SynthesisNatsChannel = "plug-n-meet-transcription-output-%s"
 
 	InsightsJobsStream          = "pnm-insights-jobs"

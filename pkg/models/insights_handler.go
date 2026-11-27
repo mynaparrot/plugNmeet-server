@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
-	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 )
 
 // clampAIAgentChatText trims a participant's AI Chat message and caps it at the same bound as the server-side context injection.
@@ -432,8 +432,8 @@ func (s *InsightsModel) handleAIAgentChatMessage(req *plugnmeet.InsightsAITextCh
 		}
 	}
 
-	agent, ok := insightsservice.GetActiveAIAgent(roomId)
-	if !ok {
+	// the session may run on any node of the cluster, so only its shared state decides
+	if s.aiAgentModel == nil || !s.aiAgentModel.IsAgentActive(s.ctx, roomId) {
 		logger.Warn("the AI agent is not running in this room")
 		return fmt.Errorf("ai-agent.errors.session-not-started")
 	}
@@ -442,7 +442,12 @@ func (s *InsightsModel) handleAIAgentChatMessage(req *plugnmeet.InsightsAITextCh
 	if userInfo, _ := s.natsService.GetUserInfo(roomId, userId); userInfo.GetName() != "" {
 		userName = userInfo.GetName()
 	}
-	if err := agent.HandleParticipantChatMessage(userId, userName, clampAIAgentChatText(req.GetText())); err != nil {
+	err := s.aiAgentModel.ForwardParticipantChatMessage(s.ctx, roomId, userId, userName, clampAIAgentChatText(req.GetText()))
+	if err != nil {
+		if errors.Is(err, config.ErrAIAgentNotRunning) {
+			logger.Warn("the AI agent is not running in this room")
+			return fmt.Errorf("ai-agent.errors.session-not-started")
+		}
 		logger.WithError(err).Error("failed to pass the chat message to the AI agent")
 		return err
 	}

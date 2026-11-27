@@ -77,20 +77,12 @@ func (p *recordingPublisher) segmentCount() int {
 type recordingTransport struct {
 	mu     sync.Mutex
 	states []*plugnmeet.AIAgentStateMsg
-	calls  []*plugnmeet.AIAgentToolCallMsg
 }
 
 func (t *recordingTransport) BroadcastAIAgentState(_ string, msg *plugnmeet.AIAgentStateMsg) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.states = append(t.states, msg)
-	return nil
-}
-
-func (t *recordingTransport) SendAIAgentToolCallToUser(_, _ string, msg *plugnmeet.AIAgentToolCallMsg) error {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.calls = append(t.calls, msg)
 	return nil
 }
 
@@ -110,12 +102,6 @@ func (t *recordingTransport) lastStateMsg() *plugnmeet.AIAgentStateMsg {
 		return nil
 	}
 	return t.states[len(t.states)-1]
-}
-
-func (t *recordingTransport) toolCalls() []*plugnmeet.AIAgentToolCallMsg {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	return append([]*plugnmeet.AIAgentToolCallMsg(nil), t.calls...)
 }
 
 type agentTestEnv struct {
@@ -148,7 +134,6 @@ func newAgentTestEnv(t *testing.T, registry *mcp.Registry, modify func(*aiAgentC
 		Registry:    registry,
 		SessionId:   "session-1",
 		AgentUserId: "pnm_agent-ai_agent-test",
-		Delegate:    func() (string, error) { return "user-1", nil },
 	}
 	if modify != nil {
 		modify(args)
@@ -508,56 +493,6 @@ func TestAIAgentSendProactiveContextTriggersAnAnswer(t *testing.T) {
 	}
 	if contexts := env.session.Contexts(); len(contexts) != 1 {
 		t.Fatalf("an empty proactive context must be ignored, got %d contexts", len(contexts))
-	}
-}
-
-func TestAIAgentClientToolRPC(t *testing.T) {
-	env := newAgentTestEnv(t, nil, nil)
-
-	go func() {
-		// The delegate answers the call from its browser.
-		deadline := time.Now().Add(2 * time.Second)
-		for time.Now().Before(deadline) {
-			if calls := env.transport.toolCalls(); len(calls) == 1 {
-				if calls[0].GetTargetUserId() != "user-1" {
-					t.Errorf("unexpected target: %s", calls[0].GetTargetUserId())
-				}
-				env.agent.HandleClientToolResult("user-1", &plugnmeet.AIAgentToolResultMsg{
-					CallId:     calls[0].GetCallId(),
-					Ok:         true,
-					ResultJson: `{"ids":["a"]}`,
-				})
-				return
-			}
-			time.Sleep(5 * time.Millisecond)
-		}
-	}()
-
-	result, err := env.agent.CallClientTool(context.Background(), mcp.ToolCall{
-		CallID:    "call-3",
-		RoomID:    "room",
-		ToolName:  "whiteboard_draw_shapes",
-		ArgsJSON:  `{}`,
-		SessionID: "session-1",
-	}, 2*time.Second)
-	if err != nil {
-		t.Fatalf("client tool call: %v", err)
-	}
-	if result.OutputJSON != `{"ids":["a"]}` {
-		t.Fatalf("unexpected result: %s", result.OutputJSON)
-	}
-}
-
-func TestAIAgentClientToolWithoutDelegateFails(t *testing.T) {
-	env := newAgentTestEnv(t, nil, func(args *aiAgentCoreArgs) {
-		args.Delegate = func() (string, error) { return "", nil }
-	})
-
-	if _, err := env.agent.CallClientTool(context.Background(), mcp.ToolCall{CallID: "call-4", ToolName: "notepad_write"}, time.Second); err == nil {
-		t.Fatal("expected an error when no delegate is available")
-	}
-	if calls := env.transport.toolCalls(); len(calls) != 0 {
-		t.Fatalf("no tool call should be published, got %d", len(calls))
 	}
 }
 

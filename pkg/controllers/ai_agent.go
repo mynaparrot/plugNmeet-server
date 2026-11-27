@@ -2,12 +2,15 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-protocol/utils"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
+	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	"github.com/mynaparrot/plugnmeet-server/pkg/models"
+	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/fx"
 	"google.golang.org/protobuf/proto"
@@ -15,20 +18,50 @@ import (
 
 // AIAgentController exposes the moderator and host controls of the AI agent.
 type AIAgentController struct {
-	aiAgentModel *models.AIAgentModel
-	logger       *logrus.Entry
+	nc             *nats.Conn
+	aiAgentModel   *models.AIAgentModel
+	clusterTaskSub *nats.Subscription
+	logger         *logrus.Entry
 }
 
 type AIAgentControllerArgs struct {
 	fx.In
+	NatsConn     *nats.Conn
 	AIAgentModel *models.AIAgentModel
 	Logger       *logrus.Logger
 }
 
 func NewAIAgentController(args AIAgentControllerArgs) *AIAgentController {
 	return &AIAgentController{
+		nc:           args.NatsConn,
 		aiAgentModel: args.AIAgentModel,
 		logger:       args.Logger.WithField("controller", "aiAgent"),
+	}
+}
+
+// Initialize subscribes to the cluster channel, so an operation that landed on a
+// node without the room's agent is relayed to the node hosting it.
+func (a *AIAgentController) Initialize() error {
+	// No queue group: every node receives the task and only the one hosting the
+	// room's agent (or the pending tool call) handles and replies.
+	sub, err := a.nc.Subscribe(insights.AIAgentNatsChannel, func(msg *nats.Msg) {
+		a.aiAgentModel.HandleIncomingClusterTask(msg)
+	})
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to NATS for ai agent cluster tasks: %w", err)
+	}
+	a.logger.Infof("Successfully connected with %s channel", sub.Subject)
+
+	a.clusterTaskSub = sub
+	return nil
+}
+
+func (a *AIAgentController) Shutdown() {
+	if a.clusterTaskSub == nil {
+		return
+	}
+	if err := a.clusterTaskSub.Unsubscribe(); err != nil {
+		a.logger.WithError(err).Errorln("failed to unsubscribe from ai agent cluster tasks")
 	}
 }
 

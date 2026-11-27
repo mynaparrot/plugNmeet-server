@@ -19,6 +19,7 @@ import (
 	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/insights/mcp"
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
+	"google.golang.org/protobuf/proto"
 )
 
 // aiAgentSendContextMaxRunes bounds a client-supplied context injection.
@@ -133,7 +134,8 @@ func (m *AIAgentModel) Start(ctx context.Context, roomId string, req *plugnmeet.
 		}
 	}
 
-	deps := m.BuildToolDependencies(roomId, delegate, log)
+	// nil client RPC: the session reaches its browser through the room's delegate, which the model brokers.
+	deps := m.BuildToolDependencies(roomId, delegate, nil, log)
 	// The 1-on-1 voice agent only needs the countdown timer from the room-admin
 	// tool set; breakout, insights, media/recording and participant moderation
 	// belong to the administrator's AI text chat.
@@ -208,9 +210,6 @@ func (m *AIAgentModel) Start(ctx context.Context, roomId string, req *plugnmeet.
 		SummarizeModel:    m.aiAgentSummarizeModel(serviceConfig),
 		PreviousTelemetry: prevTelemetry,
 		Avatar:            avatar,
-		Delegate: func() (string, error) {
-			return m.SelectOrGetDelegate(m.ctx, roomId)
-		},
 		OnStopped: func(reason string) {
 			m.afterAgentStopped(roomId, reason)
 		},
@@ -239,11 +238,30 @@ func (m *AIAgentModel) Start(ctx context.Context, roomId string, req *plugnmeet.
 	return nil
 }
 
-// Stop ends the room's agent session. It is a no-op when this server does not
-// host the agent.
+// Stop ends the room's agent session, here or on the node hosting it. It is a
+// no-op when no agent runs in the room.
 func (m *AIAgentModel) Stop(ctx context.Context, roomId, reason string) error {
 	if agent, ok := m.hostedAgent(roomId); ok {
 		agent.Stop(reason)
+		return nil
+	}
+	if !m.IsAgentActive(ctx, roomId) {
+		return nil
+	}
+	// Another node hosts the session, so it has to stop it. The stop waits for
+	// its answer: the hosting node removes the shared state and flushes the
+	// telemetry inside agent.Stop, and a finalize that runs here depends on it.
+	if err := m.requestClusterTask(&aiAgentClusterTaskPayload{
+		Task:   aiAgentClusterTaskStop,
+		RoomId: roomId,
+		Reason: reason,
+	}, aiAgentClusterRequestTimeout); err != nil {
+		if errors.Is(err, config.ErrAIAgentNotRunning) {
+			// no node hosts the session anymore, so there is nothing left to stop
+			return nil
+		}
+		m.logger.WithError(err).WithField("roomId", roomId).Warn("could not relay the ai agent stop")
+		return err
 	}
 	return nil
 }
@@ -283,42 +301,99 @@ func (m *AIAgentModel) Status(ctx context.Context, roomId string) (*plugnmeet.AI
 
 // SendContext injects a host-side event into the live session.
 func (m *AIAgentModel) SendContext(ctx context.Context, roomId string, req *plugnmeet.AIAgentSendContextReq) error {
-	agent, ok := insightsservice.GetActiveAIAgent(roomId)
-	if !ok {
-		return config.ErrAIAgentNotRunning
-	}
 	text := truncate(strings.TrimSpace(req.GetText()), aiAgentSendContextMaxRunes)
 	if text == "" {
 		return config.ErrAIAgentInvalidRequest
 	}
-	if strings.EqualFold(strings.TrimSpace(req.GetSource()), "countdown_timer") {
-		return agent.SendProactiveContext(text, req.GetSource())
-	}
+	source := req.GetSource()
+	proactive := strings.EqualFold(strings.TrimSpace(source), string(aiAgentContextSourceCountdownTimer))
 
-	return agent.SendContext(text, req.GetSource())
+	if agent, ok := m.hostedAgent(roomId); ok {
+		if proactive {
+			return agent.SendProactiveContext(text, source)
+		}
+		return agent.SendContext(text, source)
+	}
+	if !m.IsAgentActive(ctx, roomId) {
+		return config.ErrAIAgentNotRunning
+	}
+	return m.requestClusterTask(&aiAgentClusterTaskPayload{
+		Task:      aiAgentClusterTaskSendContext,
+		RoomId:    roomId,
+		Text:      text,
+		Source:    aiAgentContextSource(source),
+		Proactive: proactive,
+	}, aiAgentClusterRequestTimeout)
+}
+
+// ForwardParticipantChatMessage passes a participant's AI Chat message to the
+// room's agent, here or on the node hosting it.
+func (m *AIAgentModel) ForwardParticipantChatMessage(ctx context.Context, roomId, userId, userName, text string) error {
+	if agent, ok := m.hostedAgent(roomId); ok {
+		return agent.HandleParticipantChatMessage(userId, userName, text)
+	}
+	if !m.IsAgentActive(ctx, roomId) {
+		return config.ErrAIAgentNotRunning
+	}
+	return m.requestClusterTask(&aiAgentClusterTaskPayload{
+		Task:     aiAgentClusterTaskParticipantChat,
+		RoomId:   roomId,
+		UserId:   userId,
+		UserName: userName,
+		Text:     text,
+	}, aiAgentClusterRequestTimeout)
 }
 
 // Pause stops the agent's audio in and out but keeps the provider session.
 func (m *AIAgentModel) Pause(ctx context.Context, roomId string) error {
-	agent, ok := insightsservice.GetActiveAIAgent(roomId)
-	if !ok {
+	if agent, ok := m.hostedAgent(roomId); ok {
+		return m.pauseHostedAgent(roomId, agent)
+	}
+	if !m.IsAgentActive(ctx, roomId) {
 		return config.ErrAIAgentNotRunning
 	}
-	return agent.Pause()
+	return m.requestClusterTask(&aiAgentClusterTaskPayload{
+		Task:   aiAgentClusterTaskPause,
+		RoomId: roomId,
+	}, aiAgentClusterRequestTimeout)
 }
 
 // Resume re-enables the agent's audio after a pause.
 func (m *AIAgentModel) Resume(ctx context.Context, roomId string) error {
-	agent, ok := insightsservice.GetActiveAIAgent(roomId)
-	if !ok {
+	if agent, ok := m.hostedAgent(roomId); ok {
+		return m.resumeHostedAgent(roomId, agent)
+	}
+	if !m.IsAgentActive(ctx, roomId) {
 		return config.ErrAIAgentNotRunning
 	}
-	return agent.Resume()
+	return m.requestClusterTask(&aiAgentClusterTaskPayload{
+		Task:   aiAgentClusterTaskResume,
+		RoomId: roomId,
+	}, aiAgentClusterRequestTimeout)
 }
 
-// HandleClientToolResult resolves the tool call the answer belongs to. A call
-// delegated outside an agent session (the admin AI text chat) is answered
-// directly; anything else goes to the running agent's delegate.
+// pauseHostedAgent pauses the agent of this node and mirrors the new runtime
+// state into the shared store, so Status reports it from every node.
+func (m *AIAgentModel) pauseHostedAgent(roomId string, agent aiAgentHandle) error {
+	if err := agent.Pause(); err != nil {
+		return err
+	}
+	m.updateStoredRuntimeState(roomId, plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_PAUSED)
+	return nil
+}
+
+// resumeHostedAgent re-enables the audio of the agent of this node and mirrors
+// the new runtime state into the shared store.
+func (m *AIAgentModel) resumeHostedAgent(roomId string, agent aiAgentHandle) error {
+	if err := agent.Resume(); err != nil {
+		return err
+	}
+	m.updateStoredRuntimeState(roomId, plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING)
+	return nil
+}
+
+// HandleClientToolResult resolves the tool call the answer belongs to. Every AI_AGENT_TOOL_RESULT of the room ends here,
+// and only the participant and room  the call was dispatched to can resolve it.
 func (m *AIAgentModel) HandleClientToolResult(ctx context.Context, roomId, userId string, msg *plugnmeet.AIAgentToolResultMsg) {
 	if msg == nil {
 		return
@@ -327,21 +402,25 @@ func (m *AIAgentModel) HandleClientToolResult(ctx context.Context, roomId, userI
 		pending.ch <- msg
 		return
 	}
-	if !m.IsUserAgentDelegate(ctx, roomId, userId) {
+	// the call was dispatched by the node hosting the agent, which has to resolve it
+	encoded, err := proto.Marshal(msg)
+	if err != nil {
+		m.logger.WithError(err).Debug("could not encode the tool result for the cluster")
 		return
 	}
-	if agent, ok := insightsservice.GetActiveAIAgent(roomId); ok {
-		agent.HandleClientToolResult(userId, msg)
+	if err := m.publishClusterTask(&aiAgentClusterTaskPayload{
+		Task:         aiAgentClusterTaskToolResult,
+		RoomId:       roomId,
+		UserId:       userId,
+		ProtoPayload: encoded,
+	}); err != nil {
+		m.logger.WithError(err).Debug("could not relay the tool result to the hosting node")
 	}
 }
 
 // HandleWhiteboardScene forwards a canvas snapshot to the running agent.
 func (m *AIAgentModel) HandleWhiteboardScene(ctx context.Context, roomId, userId string, msg *plugnmeet.AIAgentWhiteboardSceneMsg) {
 	if msg == nil {
-		return
-	}
-	agent, ok := insightsservice.GetActiveAIAgent(roomId)
-	if !ok {
 		return
 	}
 	if !m.IsUserAgentDelegate(ctx, roomId, userId) && !m.natsService.IsUserPresenter(roomId, userId) {
@@ -353,8 +432,29 @@ func (m *AIAgentModel) HandleWhiteboardScene(ctx context.Context, roomId, userId
 	if !m.sanitizeWhiteboardScene(roomId, msg) {
 		return
 	}
-	if err := agent.HandleWhiteboardScene(msg); err != nil {
-		m.logger.WithError(err).Debug("failed to hand the whiteboard scene to the ai agent")
+
+	if agent, ok := m.hostedAgent(roomId); ok {
+		if err := agent.HandleWhiteboardScene(msg); err != nil {
+			m.logger.WithError(err).Debug("failed to hand the whiteboard scene to the ai agent")
+		}
+		return
+	}
+	if !m.IsAgentActive(ctx, roomId) {
+		return
+	}
+	// the snapshot travels to the node hosting the agent
+	encoded, err := proto.Marshal(msg)
+	if err != nil {
+		m.logger.WithError(err).Debug("could not encode the whiteboard scene for the cluster")
+		return
+	}
+	if err := m.publishClusterTask(&aiAgentClusterTaskPayload{
+		Task:         aiAgentClusterTaskWhiteboardScene,
+		RoomId:       roomId,
+		UserId:       userId,
+		ProtoPayload: encoded,
+	}); err != nil {
+		m.logger.WithError(err).Debug("could not relay the whiteboard scene to the hosting node")
 	}
 }
 
@@ -398,6 +498,30 @@ func (m *AIAgentModel) storeState(roomId string, agent *insightsservice.AIAgent)
 		AvatarProvider: agent.AvatarProvider(),
 	}
 	encoded, err := json.Marshal(state)
+	if err != nil {
+		m.logger.WithError(err).Error("could not encode the ai agent state")
+		return
+	}
+	if err := m.rds.Set(m.ctx, aiAgentKey(roomId, aiAgentKeyState), encoded, 0).Err(); err != nil {
+		m.logger.WithError(err).Warn("could not store the ai agent state")
+	}
+}
+
+// updateStoredRuntimeState mirrors a runtime state change into the shared store.
+// Only the hosting node tracks the live state in memory, so every other node
+// reads the pause and resume of a session from here.
+func (m *AIAgentModel) updateStoredRuntimeState(roomId string, state plugnmeet.AIAgentRuntimeState) {
+	current, err := m.readState(m.ctx, roomId)
+	if err != nil {
+		m.logger.WithError(err).Warn("could not read the ai agent state")
+		return
+	}
+	if current == nil || current.State == state {
+		return
+	}
+
+	current.State = state
+	encoded, err := json.Marshal(current)
 	if err != nil {
 		m.logger.WithError(err).Error("could not encode the ai agent state")
 		return
