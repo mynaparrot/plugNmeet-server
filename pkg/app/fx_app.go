@@ -41,7 +41,7 @@ func provideAppConfig(configFile string, port *int) (*config.AppConfig, error) {
 	}
 	appCnf.RootWorkingDir = wd
 
-	if port != nil {
+	if port != nil && *port > 0 {
 		// override the port
 		appCnf.Client.Port = *port
 	}

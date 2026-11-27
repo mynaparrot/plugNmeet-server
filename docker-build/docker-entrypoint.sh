@@ -23,5 +23,10 @@ export CGO_LDFLAGS="-L/opt/speechsdk/lib/${SPEECHSDK_ARCH_DIR} -lMicrosoft.Cogni
 mkdir -p /app
 cd /app
 
-# 5. Execute the main command (e.g., "plugnmeet-server" or "air")
+# 5. If the first argument is a flag, prepend plugnmeet-server
+if [ "${1#-}" != "$1" ]; then
+    set -- plugnmeet-server "$@"
+fi
+
+# 6. Execute the main command (e.g., "plugnmeet-server" or "air")
 exec "$@"
