@@ -24,7 +24,7 @@ import (
 )
 
 // provideAppConfig reads the config file and initializes the AppConfig.
-func provideAppConfig(configFile string) (*config.AppConfig, error) {
+func provideAppConfig(configFile string, port *int) (*config.AppConfig, error) {
 	yamlFile, err := os.ReadFile(configFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file %s: %w", configFile, err)
@@ -40,6 +40,11 @@ func provideAppConfig(configFile string) (*config.AppConfig, error) {
 		return nil, fmt.Errorf("failed to get current working directory: %w", err)
 	}
 	appCnf.RootWorkingDir = wd
+
+	if port != nil {
+		// override the port
+		appCnf.Client.Port = *port
+	}
 
 	// Initialize the configuration, setting default values and creating necessary directories.
 	initializedAppCnf, err := config.InitAppConfig(&appCnf)

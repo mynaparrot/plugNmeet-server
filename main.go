@@ -17,6 +17,7 @@ import (
 func main() {
 	configFile := flag.String("config", "config.yaml", "Configuration file")
 	showVersion := flag.Bool("version", false, "Show version info")
+	port := flag.Int("port", 0, "To override config listening port")
 	flag.Parse()
 
 	if *showVersion {
@@ -34,7 +35,7 @@ func main() {
 		fx.Provide(func() (context.Context, context.CancelFunc) {
 			return context.WithCancel(context.Background())
 		}),
-		fx.Supply(*configFile),
+		fx.Supply(*configFile, port),
 		app.ApplicationModule,
 	}
 
