@@ -287,6 +287,11 @@ func translateRealtimeServerEvent(msg realtime.RealtimeServerEventUnion) []insig
 
 	case "error":
 		ev := msg.OfRealtimeErrorEvent
+		if isRecoverableRealtimeError(ev.Error.Code) {
+			// A benign race: the session is still alive, so it must not be
+			// reported as an error.
+			return nil
+		}
 		events = append(events, insights.RealtimeEvent{
 			Type: insights.RealtimeEventError,
 			Err:  fmt.Errorf("openai realtime: %s (%s)", ev.Error.Message, ev.Error.Code),
@@ -294,6 +299,19 @@ func translateRealtimeServerEvent(msg realtime.RealtimeServerEventUnion) []insig
 	}
 
 	return events
+}
+
+// isRecoverableRealtimeError reports whether a server error only says that the
+// session raced with itself. Cancelling a response that just finished, or
+// creating one while another still runs, is harmless: the deferred queue and the
+// server settle it, so turning it into a session error would kill a live call.
+func isRecoverableRealtimeError(code string) bool {
+	switch code {
+	case "conversation_already_has_active_response", "response_cancel_not_active":
+		return true
+	default:
+		return false
+	}
 }
 
 func translateRealtimeResponseDone(ev realtime.ResponseDoneEvent) []insights.RealtimeEvent {
@@ -425,6 +443,9 @@ type realtimeAgentSession struct {
 	// deferredEvents holds context that arrived during a tool turn; it goes out
 	// right before the response.create that resumes the conversation.
 	deferredEvents []realtime.RealtimeClientEventUnionParam
+	// responseActive reports whether the server is still working on a response:
+	// response.create is rejected until it reports response.done.
+	responseActive bool
 
 	// emitMu guards eventsClosed, so a send can never race with the close.
 	emitMu       sync.Mutex
@@ -533,6 +554,25 @@ func (s *realtimeAgentSession) SendToolResult(callID, toolName, resultJSON strin
 	// response.create sent now is rejected with function_call_outputs_required.
 	settled := len(s.pendingToolCalls) == 0
 	pendingRemaining := len(s.pendingToolCalls)
+	if s.responseActive {
+		// The server still works on a response, so it rejects the item and the
+		// response.create until response.done: the batch waits for that flush.
+		s.deferredEvents = append(s.deferredEvents, item)
+		if settled && !deferredTriggersResponse(s.deferredEvents) {
+			s.deferredEvents = append(s.deferredEvents, realtime.RealtimeClientEventUnionParam{OfResponseCreate: &realtime.ResponseCreateEventParam{}})
+		}
+		s.toolMu.Unlock()
+
+		s.logger.WithFields(logrus.Fields{
+			"callId":           callID,
+			"tool":             toolName,
+			"isError":          isError,
+			"settled":          settled,
+			"pendingRemaining": pendingRemaining,
+		}).Debug("openai realtime: tool result deferred until the running response is done")
+		return nil
+	}
+
 	var deferred []realtime.RealtimeClientEventUnionParam
 	if settled {
 		deferred = s.deferredEvents
@@ -593,13 +633,14 @@ func (s *realtimeAgentSession) Close() error {
 }
 
 // dispatch sends context now, or holds it back while a tool call still misses
-// its function_call_output. A response.create in between would be rejected with
-// function_call_outputs_required.
+// its function_call_output, or while a response is still running. A
+// response.create in between would be rejected with function_call_outputs_required
+// or with "conversation already has an active response".
 func (s *realtimeAgentSession) dispatch(events ...realtime.RealtimeClientEventUnionParam) error {
 	s.toolMu.Lock()
 	defer s.toolMu.Unlock()
 
-	if len(s.pendingToolCalls) > 0 {
+	if len(s.pendingToolCalls) > 0 || s.responseActive {
 		s.deferredEvents = append(s.deferredEvents, events...)
 		return nil
 	}
@@ -609,20 +650,23 @@ func (s *realtimeAgentSession) dispatch(events ...realtime.RealtimeClientEventUn
 // completeResponse registers every tool call of the finished response and hands
 // them to the caller. The whole set is registered before the first call is
 // emitted, so a fast tool can never resume the conversation while a sibling call
-// of the same response is still unanswered.
-func (s *realtimeAgentSession) completeResponse(status realtime.RealtimeResponseStatus) []insights.RealtimeEvent {
+// of the same response is still unanswered. Context queued while the response ran
+// is released only when no tool output is missing anymore.
+func (s *realtimeAgentSession) completeResponse(status realtime.RealtimeResponseStatus) ([]insights.RealtimeEvent, []realtime.RealtimeClientEventUnionParam) {
 	calls := s.queuedToolCalls
 	s.queuedToolCalls = nil
 
 	s.toolMu.Lock()
 	defer s.toolMu.Unlock()
 
+	s.responseActive = false
+
 	if status == realtime.RealtimeResponseStatusFailed {
 		// A failed response abandons its tool turn: its calls can no longer be
 		// answered, so waiting for them would block every later turn.
 		s.pendingToolCalls = make(map[string]struct{})
 		s.deferredEvents = nil
-		return nil
+		return nil, nil
 	}
 
 	s.pendingToolCalls = make(map[string]struct{}, len(calls))
@@ -631,7 +675,14 @@ func (s *realtimeAgentSession) completeResponse(status realtime.RealtimeResponse
 			s.pendingToolCalls[call.CallID] = struct{}{}
 		}
 	}
-	return calls
+	if len(s.pendingToolCalls) > 0 {
+		// The queue keeps waiting for the last function_call_output.
+		return calls, nil
+	}
+
+	deferred := s.deferredEvents
+	s.deferredEvents = nil
+	return calls, deferred
 }
 
 func (s *realtimeAgentSession) send(events ...realtime.RealtimeClientEventUnionParam) error {
@@ -727,6 +778,16 @@ func (s *realtimeAgentSession) readLoop() {
 // handleServerMessage translates one server event, holds tool calls back until
 // the response is done and reports whether the loop may continue.
 func (s *realtimeAgentSession) handleServerMessage(msg realtime.RealtimeServerEventUnion) bool {
+	if msg.Type == "error" {
+		ev := msg.OfRealtimeErrorEvent.Error
+		if isRecoverableRealtimeError(ev.Code) {
+			s.logger.WithFields(logrus.Fields{
+				"code":    ev.Code,
+				"message": ev.Message,
+			}).Warn("openai realtime: ignoring recoverable error")
+		}
+	}
+
 	for _, ev := range translateRealtimeServerEvent(msg) {
 		if ev.Type == insights.RealtimeEventToolCall {
 			s.queuedToolCalls = append(s.queuedToolCalls, ev)
@@ -744,15 +805,25 @@ func (s *realtimeAgentSession) handleServerMessage(msg realtime.RealtimeServerEv
 
 	switch msg.Type {
 	case "response.created":
+		s.toolMu.Lock()
+		s.responseActive = true
+		s.toolMu.Unlock()
 		s.logger.WithField("responseId", msg.OfResponseCreatedEvent.Response.ID).Debug("openai realtime: response started")
 
 	case "response.done":
 		response := msg.OfResponseDoneEvent.Response
-		calls := s.completeResponse(response.Status)
+		calls, deferred := s.completeResponse(response.Status)
 		s.logResponseDone(response, len(calls))
 		for _, call := range calls {
 			if !s.emit(call) {
 				return false
+			}
+		}
+		if len(deferred) > 0 {
+			// The batch carries its own response.create when it asked for an
+			// answer, so none is added here.
+			if err := s.send(deferred...); err != nil {
+				s.logger.WithError(err).Warn("openai realtime: could not flush the context queued during the response")
 			}
 		}
 	}

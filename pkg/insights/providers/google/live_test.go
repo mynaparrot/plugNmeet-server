@@ -382,14 +382,26 @@ func TestLiveSessionSend(t *testing.T) {
 	if err := s.SendContextText("", "poll submitted", true); err != nil {
 		t.Fatalf("SendContextText: %v", err)
 	}
-	if len(conn.contents) != 2 {
-		t.Fatalf("context text not forwarded: %+v", conn.contents)
+	// A triggered context rides the realtime input timeline: a clientContent turn
+	// would stay in the history and repeat on the next voice turn.
+	if len(conn.contents) != 1 {
+		t.Fatalf("a triggered context must not become a clientContent turn: %+v", conn.contents)
+	}
+	if len(conn.realtime) != 3 || conn.realtime[2].Text != "poll submitted" {
+		t.Fatalf("triggered context not sent as realtime input: %+v", conn.realtime)
+	}
+
+	if err := s.SendContextText("", "the poll is closed", false); err != nil {
+		t.Fatalf("SendContextText: %v", err)
+	}
+	if len(conn.contents) != 2 || conn.contents[1].Turns[0].Parts[0].Text != "the poll is closed" {
+		t.Fatalf("passive context not forwarded: %+v", conn.contents)
 	}
 	if role := conn.contents[1].Turns[0].Role; role != genai.RoleUser {
 		t.Fatalf("empty role must default to user, got %s", role)
 	}
-	if conn.contents[1].TurnComplete == nil || !*conn.contents[1].TurnComplete {
-		t.Fatal("triggerResponse must set TurnComplete")
+	if conn.contents[1].TurnComplete == nil || *conn.contents[1].TurnComplete {
+		t.Fatal("a passive context must not complete the turn")
 	}
 
 	if err := s.SendToolResult("call-1", "get_poll_results", `{"votes":3}`, false); err != nil {
@@ -501,5 +513,157 @@ func TestLiveSessionMaxDurationEmitsGoAway(t *testing.T) {
 
 	if !conn.closed {
 		t.Fatal("max duration must close the socket")
+	}
+}
+
+func TestToolResponseScheduling(t *testing.T) {
+	// Write and action tools narrate themselves, so their result stays silent.
+	for _, name := range []string{
+		"notepad_write",
+		"whiteboard_write_content",
+		"whiteboard_draw_diagram",
+		"whiteboard_laser_point",
+		"create_quiz",
+		"create_poll",
+		"close_poll",
+		"send_ai_chat_message",
+	} {
+		if got := toolResponseScheduling(name, false); got != genai.FunctionResponseSchedulingSilent {
+			t.Errorf("%s: scheduling = %s, want %s", name, got, genai.FunctionResponseSchedulingSilent)
+		}
+	}
+
+	// Read tools carry the answer, so the model must speak after them.
+	for _, name := range []string{
+		"notepad_read",
+		"whiteboard_capture_snapshot",
+		"get_poll_results",
+		"get_room_info",
+		"fetch_external_knowledge",
+		"ext_lookup_school_calendar",
+	} {
+		if got := toolResponseScheduling(name, false); got != genai.FunctionResponseSchedulingWhenIdle {
+			t.Errorf("%s: scheduling = %s, want %s", name, got, genai.FunctionResponseSchedulingWhenIdle)
+		}
+	}
+
+	// A failure must be able to recover out loud, whatever the tool does.
+	if got := toolResponseScheduling("notepad_write", true); got != genai.FunctionResponseSchedulingWhenIdle {
+		t.Errorf("failed write: scheduling = %s, want %s", got, genai.FunctionResponseSchedulingWhenIdle)
+	}
+}
+
+func TestLiveSessionSendToolResultScheduling(t *testing.T) {
+	conn := &fakeConn{}
+	s := newTestLiveSession(conn)
+
+	results := []struct {
+		callID   string
+		toolName string
+		isError  bool
+	}{
+		{"call-1", "notepad_write", false},
+		{"call-2", "get_poll_results", false},
+		{"call-3", "create_quiz", true},
+	}
+	for _, r := range results {
+		if err := s.SendToolResult(r.callID, r.toolName, `{"ok":true}`, r.isError); err != nil {
+			t.Fatalf("SendToolResult(%s): %v", r.toolName, err)
+		}
+	}
+
+	want := []genai.FunctionResponseScheduling{
+		genai.FunctionResponseSchedulingSilent,
+		genai.FunctionResponseSchedulingWhenIdle,
+		genai.FunctionResponseSchedulingWhenIdle,
+	}
+	if len(conn.tools) != len(want) {
+		t.Fatalf("expected %d tool responses, got %d", len(want), len(conn.tools))
+	}
+	for i, w := range want {
+		if got := conn.tools[i].FunctionResponses[0].Scheduling; got != w {
+			t.Errorf("response %d: scheduling = %s, want %s", i, got, w)
+		}
+	}
+}
+
+func TestLiveSessionReadLoopFlushesStreamedTranscripts(t *testing.T) {
+	conn := &fakeConn{incoming: []*genai.LiveServerMessage{
+		{ServerContent: &genai.LiveServerContent{InputTranscription: &genai.Transcription{Text: "what is "}}},
+		{ServerContent: &genai.LiveServerContent{InputTranscription: &genai.Transcription{Text: "a fraction"}}},
+		{ServerContent: &genai.LiveServerContent{OutputTranscription: &genai.Transcription{Text: "a part "}}},
+		{ServerContent: &genai.LiveServerContent{OutputTranscription: &genai.Transcription{Text: "of a whole"}}},
+		{ServerContent: &genai.LiveServerContent{TurnComplete: true}},
+	}}
+	s := newTestLiveSession(conn)
+	s.wg.Add(1)
+	go s.readLoop()
+
+	var (
+		events         []insights.RealtimeEvent
+		userFinal      []string
+		agentFinal     []string
+		turnCompleteAt = -1
+	)
+	for ev := range s.Events() {
+		events = append(events, ev)
+		switch {
+		case ev.Type == insights.RealtimeEventTranscriptUser && ev.Final:
+			userFinal = append(userFinal, ev.Text)
+		case ev.Type == insights.RealtimeEventTranscriptAgent && ev.Final:
+			agentFinal = append(agentFinal, ev.Text)
+		case ev.Type == insights.RealtimeEventTurnComplete:
+			turnCompleteAt = len(events) - 1
+		}
+	}
+
+	if len(userFinal) != 1 || userFinal[0] != "what is a fraction" {
+		t.Fatalf("streamed user transcription was not joined: %v", userFinal)
+	}
+	if len(agentFinal) != 1 || agentFinal[0] != "a part of a whole" {
+		t.Fatalf("streamed agent transcription was not joined: %v", agentFinal)
+	}
+	if turnCompleteAt < 0 {
+		t.Fatalf("turn complete was not emitted: %+v", events)
+	}
+	// The agent transcript has to reach the consumer before the turn ends.
+	if prev := events[turnCompleteAt-1]; prev.Type != insights.RealtimeEventTranscriptAgent || !prev.Final {
+		t.Fatalf("the agent transcript must precede the turn complete: %+v", events)
+	}
+
+	if err := s.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+}
+
+func TestLiveSessionReadLoopFlushesOnGenerationComplete(t *testing.T) {
+	conn := &fakeConn{incoming: []*genai.LiveServerMessage{
+		{ServerContent: &genai.LiveServerContent{InputTranscription: &genai.Transcription{Text: "hello "}}},
+		{ServerContent: &genai.LiveServerContent{OutputTranscription: &genai.Transcription{Text: "hi "}}},
+		{ServerContent: &genai.LiveServerContent{GenerationComplete: true, OutputTranscription: &genai.Transcription{Text: "there"}}},
+	}}
+	s := newTestLiveSession(conn)
+	s.wg.Add(1)
+	go s.readLoop()
+
+	var finals []insights.RealtimeEvent
+	for ev := range s.Events() {
+		if ev.Final && (ev.Type == insights.RealtimeEventTranscriptUser || ev.Type == insights.RealtimeEventTranscriptAgent) {
+			finals = append(finals, ev)
+		}
+	}
+
+	if len(finals) != 2 {
+		t.Fatalf("expected 2 final transcripts, got %d: %+v", len(finals), finals)
+	}
+	if finals[0].Type != insights.RealtimeEventTranscriptUser || finals[0].Text != "hello " {
+		t.Fatalf("unexpected user transcript: %+v", finals[0])
+	}
+	if finals[1].Type != insights.RealtimeEventTranscriptAgent || finals[1].Text != "hi there" {
+		t.Fatalf("unexpected agent transcript: %+v", finals[1])
+	}
+
+	if err := s.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
 	}
 }

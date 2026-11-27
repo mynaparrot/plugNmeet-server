@@ -504,6 +504,56 @@ func TestTranslateRealtimeServerEventError(t *testing.T) {
 	}
 }
 
+// A race between a response.create and the response it collides with must not
+// kill the session: only real errors are published as errors.
+func TestTranslateRealtimeServerEventRecoverableErrors(t *testing.T) {
+	for _, code := range []string{"conversation_already_has_active_response", "response_cancel_not_active"} {
+		events := translateRealtimeServerEvent(realtime.RealtimeServerEventUnion{
+			Type:                 "error",
+			OfRealtimeErrorEvent: realtime.RealtimeErrorEvent{Error: realtime.RealtimeError{Message: "race", Code: code}},
+		})
+		if len(events) != 0 {
+			t.Fatalf("%s must not surface as an error: %+v", code, events)
+		}
+		if !isRecoverableRealtimeError(code) {
+			t.Fatalf("%s must be recoverable", code)
+		}
+	}
+
+	if isRecoverableRealtimeError("invalid_request_error") {
+		t.Fatal("a real error must stay fatal")
+	}
+}
+
+func TestRealtimeAgentSessionIgnoresRecoverableError(t *testing.T) {
+	conn := &fakeRealtimeAgentConn{}
+	s := newTestRealtimeAgentSession(conn)
+
+	if !s.handleServerMessage(realtime.RealtimeServerEventUnion{
+		Type: "error",
+		OfRealtimeErrorEvent: realtime.RealtimeErrorEvent{Error: realtime.RealtimeError{
+			Message: "conversation already has an active response",
+			Code:    "conversation_already_has_active_response",
+		}},
+	}) {
+		t.Fatal("a recoverable error must not end the read loop")
+	}
+	if events := drainRealtimeEvents(t, s.Events()); len(events) != 0 {
+		t.Fatalf("a recoverable error must not be published: %+v", events)
+	}
+
+	if !s.handleServerMessage(realtime.RealtimeServerEventUnion{
+		Type:                 "error",
+		OfRealtimeErrorEvent: realtime.RealtimeErrorEvent{Error: realtime.RealtimeError{Message: "invalid event", Code: "invalid_request_error"}},
+	}) {
+		t.Fatal("the read loop must keep running")
+	}
+	events := drainRealtimeEvents(t, s.Events())
+	if len(events) != 1 || events[0].Type != insights.RealtimeEventError {
+		t.Fatalf("a real error must still be published: %+v", events)
+	}
+}
+
 func TestRealtimeAgentSessionSendAudio(t *testing.T) {
 	conn := &fakeRealtimeAgentConn{}
 	s := newTestRealtimeAgentSession(conn)
@@ -783,6 +833,78 @@ func TestRealtimeAgentSessionDeferredContextTriggersResponseOnce(t *testing.T) {
 	}
 	if sent[1].OfConversationItemCreate == nil || sent[2].OfResponseCreate == nil {
 		t.Fatalf("unexpected order: %+v", sent)
+	}
+}
+
+// Context that arrives while the server still works on a response must wait: the
+// response.create is rejected until response.done, and the item would otherwise
+// be answered twice.
+func TestRealtimeAgentSessionSendContextTextWaitsForActiveResponse(t *testing.T) {
+	conn := &fakeRealtimeAgentConn{}
+	s := newTestRealtimeAgentSession(conn)
+
+	s.handleServerMessage(realtime.RealtimeServerEventUnion{
+		Type:                   "response.created",
+		OfResponseCreatedEvent: realtime.ResponseCreatedEvent{Response: realtime.RealtimeResponse{}},
+	})
+
+	if err := s.SendContextText("user", "poll submitted", true); err != nil {
+		t.Fatalf("SendContextText: %v", err)
+	}
+	if sent := conn.sentEvents(); len(sent) != 0 {
+		t.Fatalf("context must wait for the running response: %+v", sent)
+	}
+
+	s.handleServerMessage(realtime.RealtimeServerEventUnion{
+		Type: "response.done",
+		OfResponseDoneEvent: realtime.ResponseDoneEvent{Response: realtime.RealtimeResponse{
+			Status: realtime.RealtimeResponseStatusCompleted,
+		}},
+	})
+
+	sent := conn.sentEvents()
+	if len(sent) != 2 || sent[0].OfConversationItemCreate == nil || sent[1].OfResponseCreate == nil {
+		t.Fatalf("the flushed context must carry its own response.create: %+v", sent)
+	}
+	if sent[0].OfConversationItemCreate.Item.OfRealtimeUserMessageItem == nil {
+		t.Fatalf("triggered context must stay a user message: %+v", sent[0].OfConversationItemCreate.Item)
+	}
+}
+
+// A tool that finishes while the server still runs a response must not push its
+// output and response.create into it: both would be rejected as a race.
+func TestRealtimeAgentSessionSendToolResultWaitsForActiveResponse(t *testing.T) {
+	conn := &fakeRealtimeAgentConn{}
+	s := newTestRealtimeAgentSession(conn)
+
+	s.handleServerMessage(realtime.RealtimeServerEventUnion{
+		Type:                   "response.created",
+		OfResponseCreatedEvent: realtime.ResponseCreatedEvent{Response: realtime.RealtimeResponse{}},
+	})
+	if err := s.SendToolResult("call-1", "whiteboard_write_content", `{"ok":true}`, false); err != nil {
+		t.Fatalf("SendToolResult: %v", err)
+	}
+	if sent := conn.sentEvents(); len(sent) != 0 {
+		t.Fatalf("the tool result must wait for the running response: %+v", sent)
+	}
+
+	s.handleServerMessage(realtime.RealtimeServerEventUnion{
+		Type: "response.done",
+		OfResponseDoneEvent: realtime.ResponseDoneEvent{Response: realtime.RealtimeResponse{
+			Status: realtime.RealtimeResponseStatusCompleted,
+		}},
+	})
+
+	sent := conn.sentEvents()
+	if len(sent) != 2 {
+		t.Fatalf("expected the deferred output and its response.create: %+v", sent)
+	}
+	output := sent[0].OfConversationItemCreate.Item.OfFunctionCallOutput
+	if output == nil || output.CallID != "call-1" {
+		t.Fatalf("unexpected deferred function call output: %+v", sent[0])
+	}
+	if sent[1].OfResponseCreate == nil {
+		t.Fatalf("the deferred result must resume the conversation: %+v", sent[1])
 	}
 }
 

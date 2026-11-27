@@ -208,6 +208,10 @@ func (m *AIAgentModel) OnPollResponseSubmitted(ctx context.Context, roomId, poll
 
 const wrongQuizAnswerFollowUp = "Do not drop this concept or move on yet: explain clearly why their answer is wrong and why the correct option works using a concrete example, shared notepad notes, or a whiteboard drawing before asking the next progressive question."
 
+// pollNoteOnce is appended to every poll note: the note is delivered again with
+// the next turn's history, so reacting to it twice is the default failure.
+const pollNoteOnce = "React to this submitted answer only once: never repeat this acknowledgement on a later turn."
+
 // buildPollNote renders the [SYSTEM CONTEXT] note for a submitted answer. It
 // returns "" when the answer cannot be described (e.g. anonymous polls).
 func (m *AIAgentModel) buildPollNote(ctx context.Context, roomId, pollId, userId, userName string, selectedOption int) string {
@@ -228,8 +232,8 @@ func (m *AIAgentModel) buildPollNote(ctx context.Context, roomId, pollId, userId
 		if answer == "" {
 			return ""
 		}
-		return fmt.Sprintf("%s answered the question %q with: %q. React in one short sentence and continue the topic.",
-			who, question, answer)
+		return fmt.Sprintf("%s answered the question %q with: %q. React in one short sentence and continue the topic. %s",
+			who, question, answer, pollNoteOnce)
 	}
 
 	optionIds := respondent.GetOptionIds()
@@ -275,8 +279,8 @@ func (m *AIAgentModel) buildPollNote(ctx context.Context, roomId, pollId, userId
 		}
 	}
 
-	return fmt.Sprintf("%s answered option %d (%q) of the quiz %q. %s %s",
-		who, answerIndex+1, answerText, question, verdict, followUp)
+	return fmt.Sprintf("%s answered option %d (%q) of the quiz %q. %s %s %s",
+		who, answerIndex+1, answerText, question, verdict, followUp, pollNoteOnce)
 }
 
 // sanitizePollField flattens participant-supplied text so it cannot break the

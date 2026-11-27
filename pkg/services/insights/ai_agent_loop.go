@@ -112,6 +112,11 @@ func (a *AIAgent) handleEvent(session insights.RealtimeSession, ev insights.Real
 		if !a.paused.Load() {
 			a.setState(plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING, "")
 		}
+		// A tool call closes its own silent turn: counting it would fire the
+		// anchor on action turns that produced no speech.
+		if a.toolTurn.Swap(false) {
+			return
+		}
 		if inject, anchor := a.guard.OnTurnComplete(); inject {
 			if err := a.sendContextText(anchor); err != nil {
 				a.logger.WithError(err).Debug("ai agent: failed to inject the topic anchor")
@@ -123,6 +128,8 @@ func (a *AIAgent) handleEvent(session insights.RealtimeSession, ev insights.Real
 		if a.publisher != nil {
 			a.publisher.EndSegment()
 		}
+		// The answer of this turn is a tool call, not speech.
+		a.toolTurn.Store(true)
 		a.handleToolCall(session, ev)
 
 	case insights.RealtimeEventGoAway:

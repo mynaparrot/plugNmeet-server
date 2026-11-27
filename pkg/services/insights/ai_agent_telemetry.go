@@ -99,8 +99,12 @@ func (a *AIAgent) summarizeConversation() {
 	}
 	for _, turn := range recent {
 		role := plugnmeet.InsightsAITextChatRole_INSIGHTS_AI_TEXT_CHAT_ROLE_USER
-		if turn.Role == transcriptRoleAgent {
+		switch turn.Role {
+		case transcriptRoleAgent:
 			role = plugnmeet.InsightsAITextChatRole_INSIGHTS_AI_TEXT_CHAT_ROLE_MODEL
+		case transcriptRoleContext:
+			// A server-side note is context, not something the participant said.
+			role = plugnmeet.InsightsAITextChatRole_INSIGHTS_AI_TEXT_CHAT_ROLE_SYSTEM
 		}
 		history = append(history, &plugnmeet.InsightsAITextChatContent{Role: role, Text: turn.Text})
 	}

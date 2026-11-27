@@ -52,6 +52,9 @@ const (
 
 	transcriptRoleParticipant = "participant"
 	transcriptRoleAgent       = "agent"
+	// transcriptRoleContext marks a server-side note (a poll answer, a timer) that
+	// reached the session: it belongs to the record but is not a participant turn.
+	transcriptRoleContext = "context"
 )
 
 // aiAgentSpeakingIdle is how long the agent may stay silent before the status falls back from SPEAKING to LISTENING.
@@ -259,7 +262,12 @@ type AIAgent struct {
 	consecutiveRedials int
 	sessionOpenedAt    time.Time
 
-	paused       atomic.Bool
+	paused atomic.Bool
+
+	// toolTurn marks a turn that answered with a tool call instead of speech.
+	// Its turn-complete is silent and must not advance the anchor cadence.
+	toolTurn atomic.Bool
+
 	sessionTimer *time.Timer
 	startOnce    sync.Once
 	stopOnce     sync.Once

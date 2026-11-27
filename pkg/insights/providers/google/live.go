@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -136,16 +137,75 @@ func functionResponsePayload(resultJSON string, isError bool) map[string]any {
 	return map[string]any{key: value}
 }
 
-// translateServerMessage maps one provider message onto zero or more events.
+// translateServerMessage maps one provider message onto zero or more events
+// without keeping any streaming state: a transcription that already carries
+// Finished becomes its own final event.
 func translateServerMessage(msg *genai.LiveServerMessage) []insights.RealtimeEvent {
+	var tr liveTranscripts
+	return translateServerMessageWithState(msg, &tr)
+}
+
+// liveTranscripts accumulates the streamed transcription fragments of the
+// current turn. Gemini streams both speakers as fragments with Finished unset
+// and only reports the end of the turn, so the fragments are joined here.
+type liveTranscripts struct {
+	input  transcriptBuffer
+	output transcriptBuffer
+}
+
+// transcriptBuffer collects the transcription fragments of one speaker.
+type transcriptBuffer struct{ strings.Builder }
+
+// add records one fragment and returns the event to emit: the fragment itself
+// while the stream continues, or the whole utterance once the provider marks it
+// done.
+func (b *transcriptBuffer) add(eventType insights.RealtimeEventType, text string, finished bool) insights.RealtimeEvent {
+	if !finished {
+		b.WriteString(text)
+		return insights.RealtimeEvent{Type: eventType, Text: text}
+	}
+	if b.Len() > 0 {
+		b.WriteString(text)
+		text = b.String()
+	}
+	b.Reset()
+	return insights.RealtimeEvent{Type: eventType, Text: text, Final: true}
+}
+
+// flush returns the collected utterance as a final event, if there is one.
+func (b *transcriptBuffer) flush(eventType insights.RealtimeEventType) (insights.RealtimeEvent, bool) {
+	if b.Len() == 0 {
+		return insights.RealtimeEvent{}, false
+	}
+	ev := insights.RealtimeEvent{Type: eventType, Text: b.String(), Final: true}
+	b.Reset()
+	return ev, true
+}
+
+// translateServerMessageWithState maps one message onto events, ending the
+// streamed utterance of a speaker before the message that closes its turn.
+func translateServerMessageWithState(msg *genai.LiveServerMessage, tr *liveTranscripts) []insights.RealtimeEvent {
 	if msg == nil {
 		return nil
 	}
 
 	var events []insights.RealtimeEvent
+	endUserUtterance := func() {
+		if ev, ok := tr.input.flush(insights.RealtimeEventTranscriptUser); ok {
+			events = append(events, ev)
+		}
+	}
+	endAgentUtterance := func() {
+		if ev, ok := tr.output.flush(insights.RealtimeEventTranscriptAgent); ok {
+			events = append(events, ev)
+		}
+	}
 
 	if sc := msg.ServerContent; sc != nil {
 		if sc.Interrupted {
+			// The participant took the turn back, so both utterances end here.
+			endUserUtterance()
+			endAgentUtterance()
 			events = append(events, insights.RealtimeEvent{Type: insights.RealtimeEventInterrupted})
 		}
 		// Interim input transcription arrives before the final one; both are forwarded.
@@ -153,18 +213,14 @@ func translateServerMessage(msg *genai.LiveServerMessage) []insights.RealtimeEve
 			events = append(events, insights.RealtimeEvent{Type: insights.RealtimeEventTranscriptUser, Text: t.Text})
 		}
 		if t := sc.InputTranscription; t != nil && t.Text != "" {
-			events = append(events, insights.RealtimeEvent{
-				Type:  insights.RealtimeEventTranscriptUser,
-				Text:  t.Text,
-				Final: t.Finished,
-			})
+			events = append(events, tr.input.add(insights.RealtimeEventTranscriptUser, t.Text, t.Finished))
+		}
+		// The model only replies once the participant stopped speaking.
+		if sc.ModelTurn != nil || (sc.OutputTranscription != nil && sc.OutputTranscription.Text != "") {
+			endUserUtterance()
 		}
 		if t := sc.OutputTranscription; t != nil && t.Text != "" {
-			events = append(events, insights.RealtimeEvent{
-				Type:  insights.RealtimeEventTranscriptAgent,
-				Text:  t.Text,
-				Final: t.Finished,
-			})
+			events = append(events, tr.output.add(insights.RealtimeEventTranscriptAgent, t.Text, t.Finished))
 		}
 		if sc.ModelTurn != nil {
 			for _, part := range sc.ModelTurn.Parts {
@@ -179,12 +235,19 @@ func translateServerMessage(msg *genai.LiveServerMessage) []insights.RealtimeEve
 				})
 			}
 		}
+		if sc.TurnComplete || sc.GenerationComplete {
+			// The agent transcript must reach the consumer before the turn ends.
+			endUserUtterance()
+			endAgentUtterance()
+		}
 		if sc.TurnComplete {
 			events = append(events, insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete})
 		}
 	}
 
 	if msg.ToolCall != nil {
+		// A tool call answers the participant: the pending speech ends here.
+		endUserUtterance()
 		for _, fc := range msg.ToolCall.FunctionCalls {
 			if fc == nil {
 				continue
@@ -216,6 +279,13 @@ func translateServerMessage(msg *genai.LiveServerMessage) []insights.RealtimeEve
 	}
 
 	return events
+}
+
+// translateMessage maps one provider message onto events, carrying the streamed
+// transcription fragments across messages so every turn ends with one final
+// transcript per speaker.
+func (s *liveSession) translateMessage(msg *genai.LiveServerMessage) []insights.RealtimeEvent {
+	return translateServerMessageWithState(msg, &s.transcripts)
 }
 
 // translateUsageMetadata turns one usage report into the provider-agnostic
@@ -300,6 +370,10 @@ type liveSession struct {
 	sendMu    sync.Mutex
 	closeOnce sync.Once
 	wg        sync.WaitGroup
+
+	// transcripts holds the transcription fragments of the running turn. Only
+	// the read loop touches it.
+	transcripts liveTranscripts
 }
 
 func newLiveSession(conn liveConn, logger *logrus.Entry) *liveSession {
@@ -346,9 +420,18 @@ func (s *liveSession) SendImage(mimeType string, data []byte, caption string) er
 	return s.SendContextText("user", caption, false)
 }
 
+// SendContextText injects server-side context. A context that must trigger an
+// answer goes out as realtime input, on the same timeline as the microphone
+// audio: as a clientContent turn it would stay in the history as a user turn that
+// the model answers a second time on the next voice turn.
 func (s *liveSession) SendContextText(role, text string, triggerResponse bool) error {
 	if text == "" {
 		return nil
+	}
+	if triggerResponse {
+		return s.send(func() error {
+			return s.conn.SendRealtimeInput(genai.LiveRealtimeInput{Text: text})
+		})
 	}
 	if role == "" {
 		role = genai.RoleUser
@@ -356,9 +439,33 @@ func (s *liveSession) SendContextText(role, text string, triggerResponse bool) e
 	return s.send(func() error {
 		return s.conn.SendClientContent(genai.LiveClientContentInput{
 			Turns:        []*genai.Content{{Role: role, Parts: []*genai.Part{{Text: text}}}},
-			TurnComplete: genai.Ptr(triggerResponse),
+			TurnComplete: genai.Ptr(false),
 		})
 	})
+}
+
+// readOnlyTools return a payload the model needs in order to answer.
+var readOnlyTools = map[string]struct{}{
+	"notepad_read":                {},
+	"whiteboard_capture_snapshot": {},
+	"get_poll_results":            {},
+	"get_room_info":               {},
+	"fetch_external_knowledge":    {},
+}
+
+// toolResponseScheduling decides whether a tool result resumes generation. A
+// read tool feeds the answer, so the model must speak after it. A write tool is
+// narrated by the turn that called it, so its acknowledgement only belongs in
+// the context and must not trigger a second spoken turn.
+func toolResponseScheduling(toolName string, isError bool) genai.FunctionResponseScheduling {
+	// A failure may need a retry or a spoken recovery.
+	if isError {
+		return genai.FunctionResponseSchedulingWhenIdle
+	}
+	if _, ok := readOnlyTools[toolName]; ok || strings.HasPrefix(toolName, "ext_") {
+		return genai.FunctionResponseSchedulingWhenIdle
+	}
+	return genai.FunctionResponseSchedulingSilent
 }
 
 func (s *liveSession) SendToolResult(callID, toolName, resultJSON string, isError bool) error {
@@ -373,9 +480,10 @@ func (s *liveSession) SendToolResult(callID, toolName, resultJSON string, isErro
 	return s.send(func() error {
 		return s.conn.SendToolResponse(genai.LiveToolResponseInput{
 			FunctionResponses: []*genai.FunctionResponse{{
-				ID:       callID,
-				Name:     toolName,
-				Response: functionResponsePayload(resultJSON, isError),
+				ID:         callID,
+				Name:       toolName,
+				Response:   functionResponsePayload(resultJSON, isError),
+				Scheduling: toolResponseScheduling(toolName, isError),
 			}},
 		})
 	})
@@ -476,7 +584,7 @@ func (s *liveSession) readLoop() {
 			return
 		}
 		s.logServerMessage(msg)
-		for _, ev := range translateServerMessage(msg) {
+		for _, ev := range s.translateMessage(msg) {
 			if !s.emit(ev) {
 				return
 			}

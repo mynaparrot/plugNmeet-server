@@ -303,6 +303,45 @@ func TestAIAgentTurnCompleteInjectsAnchor(t *testing.T) {
 	}, "topic anchor injection")
 }
 
+func TestAIAgentToolTurnDoesNotAdvanceAnchorCadence(t *testing.T) {
+	env := newAgentTestEnv(t, nil, nil)
+
+	// A tool-call turn ends silently, so it must not count as a spoken turn.
+	env.session.Push(insights.RealtimeEvent{
+		Type:     insights.RealtimeEventToolCall,
+		CallID:   "call-1",
+		ToolName: "get_poll_results",
+		ArgsJSON: `{}`,
+	})
+	env.session.Push(insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete})
+
+	waitFor(t, func() bool {
+		return env.agent.guard.TurnCount() == 0
+	}, "the tool turn to be skipped")
+	for _, injected := range env.session.Contexts() {
+		if strings.Contains(injected.Text, "[SYSTEM ANCHOR") {
+			t.Fatalf("a silent tool turn must not inject the anchor: %q", injected.Text)
+		}
+	}
+
+	for i := 0; i < 3; i++ {
+		env.session.Push(insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete})
+	}
+
+	waitFor(t, func() bool {
+		for _, injected := range env.session.Contexts() {
+			if strings.Contains(injected.Text, "[SYSTEM ANCHOR") && strings.Contains(injected.Text, "TURN 3") {
+				return true
+			}
+		}
+		return false
+	}, "the anchor after three spoken turns")
+
+	if got := env.agent.guard.TurnCount(); got != 3 {
+		t.Fatalf("TurnCount = %d, want 3", got)
+	}
+}
+
 func TestAIAgentPauseAndResume(t *testing.T) {
 	env := newAgentTestEnv(t, nil, nil)
 
@@ -493,6 +532,17 @@ func TestAIAgentSendProactiveContextTriggersAnAnswer(t *testing.T) {
 	}
 	if contexts := env.session.Contexts(); len(contexts) != 1 {
 		t.Fatalf("an empty proactive context must be ignored, got %d contexts", len(contexts))
+	}
+
+	// The note is kept in the transcript as context, and it is not a participant
+	// turn: only speech and typed messages count.
+	snapshot := env.agent.TelemetrySnapshot("")
+	if snapshot.TurnsCount != 0 {
+		t.Errorf("turnsCount = %d, want 0", snapshot.TurnsCount)
+	}
+	if len(snapshot.Transcript) != 1 || snapshot.Transcript[0].Role != "context" ||
+		!strings.Contains(snapshot.Transcript[0].Text, "The countdown timer has finished.") {
+		t.Fatalf("the proactive context was not recorded: %+v", snapshot.Transcript)
 	}
 }
 

@@ -44,6 +44,14 @@ const (
 	// the speech model where the full text went.
 	liveTruncationNote = "… [truncated; full text is in the conversation]"
 
+	// liveDelegationAckDelayMs holds back the automatic spoken acknowledgement of
+	// a delegation. The default (0, request it immediately) makes the Live model
+	// promise "yep, on it, I'll open it and draw…" while a fast tool
+	// (notepad_write, whiteboard_*, create_quiz) is nearly done, and the spoken
+	// result then repeats the promise. Waiting 2.5s means a fast tool settles
+	// first; a slow one still gets its acknowledgement.
+	liveDelegationAckDelayMs int64 = 2500
+
 	// Live server events.
 	liveEventSessionStarted     = "session.started"
 	liveEventSessionClosed      = "session.closed"
@@ -134,11 +142,20 @@ func buildLiveSessionConfig(model, delegationModel, voice string, opts *insights
 	}
 
 	if delegationModel != "" || len(opts.Tools) > 0 {
+		delegation := live.ResponsesDelegationConfigParam{
+			Model: delegationModel,
+			Tools: buildLiveDelegationTools(opts.Tools),
+		}
+		if opts.SystemInstruction != "" {
+			// The delegated model plans the answer and runs the tools, so it needs
+			// the same boundary and host instructions as the speech model.
+			delegation.Instructions = param.NewOpt(opts.SystemInstruction)
+		}
 		cfg.Delegation = live.SessionConfigDelegationUnionParam{OfResponses: &live.SessionConfigDelegationResponsesParam{
-			Responses: live.ResponsesDelegationConfigParam{
-				Model: delegationModel,
-				Tools: buildLiveDelegationTools(opts.Tools),
-			},
+			Responses: delegation,
+			// Hold the automatic spoken acknowledgement back, so a fast tool
+			// finishes before the model promises the work it already did.
+			AcknowledgementDelayMs: param.NewOpt(liveDelegationAckDelayMs),
 		}}
 	}
 
@@ -250,6 +267,10 @@ type liveSession struct {
 	// deferredEvents holds context that arrived during a tool turn; it goes out
 	// right before the response.create that resumes the conversation.
 	deferredEvents []live.ClientEventUnionParam
+	// delegationActive reports whether a delegated turn still owns the answer.
+	// Context that arrives meanwhile is deferred: an append would cancel the
+	// pending acknowledgement and could collide with the running response.
+	delegationActive bool
 
 	// emitMu guards eventsClosed, so a send can never race with the close.
 	emitMu       sync.Mutex
@@ -304,12 +325,13 @@ func (s *liveSession) SendContextText(role, text string, triggerResponse bool) e
 	appendText, truncated := boundLiveAppend(text, liveAppendMaxRunes)
 
 	events := make([]live.ClientEventUnionParam, 0, 2)
-	if truncated {
+	if truncated && !triggerResponse {
 		// A whiteboard scene graph or a long message is far beyond what a session
 		// append may carry: only the delegated Responses model holds the tools, so it
 		// gets the full text as a conversation item and the speech model gets the
 		// bounded head of it. The item goes first so the text is in place before an
-		// append can trigger speech.
+		// append can trigger speech. A commentary append never gets the item: nothing
+		// would consume it, so it would fire on the participant's next spoken turn.
 		events = append(events, live.ClientEventParamOfResponseItemCreate(responses.ResponseInputItemMessageParam{
 			Type:    liveItemTypeMessage,
 			Role:    liveSpeakerUser,
@@ -395,6 +417,9 @@ func (s *liveSession) SendToolResult(callID, toolName, resultJSON string, isErro
 	pendingRemaining := len(s.pendingToolCalls)
 	var deferred []live.ClientEventUnionParam
 	if settled {
+		// The last output settles the delegation too, so the context held back
+		// during the turn can go out with it.
+		s.delegationActive = false
 		deferred = s.deferredEvents
 		s.deferredEvents = nil
 	}
@@ -442,25 +467,58 @@ func (s *liveSession) Close() error {
 	return err
 }
 
-// dispatch sends context now, or holds it back while a delegated tool call still
-// misses its function_call_output. Any event that would make the delegated model
-// answer in between is rejected with function_call_outputs_required.
+// dispatch sends context now, or holds it back while a delegated turn runs. An
+// event that would make the delegated model answer in between is rejected with
+// function_call_outputs_required, and an append would cancel the pending
+// acknowledgement of the delegation the participant is waiting for.
 func (s *liveSession) dispatch(events ...live.ClientEventUnionParam) error {
 	s.toolMu.Lock()
 	defer s.toolMu.Unlock()
 
-	if len(s.pendingToolCalls) > 0 {
+	if s.hasPendingWorkLocked() {
 		s.deferredEvents = append(s.deferredEvents, events...)
 		return nil
 	}
 	return s.send(events...)
 }
 
+// hasPendingWork reports whether a delegated turn still owns the answer, so a
+// filler promise must not close the turn before the tool output arrives.
+func (s *liveSession) hasPendingWork() bool {
+	s.toolMu.Lock()
+	defer s.toolMu.Unlock()
+	return s.hasPendingWorkLocked()
+}
+
+// hasPendingWorkLocked is hasPendingWork for callers that hold toolMu.
+func (s *liveSession) hasPendingWorkLocked() bool {
+	return len(s.pendingToolCalls) > 0 || s.delegationActive
+}
+
+// setDelegationActive records that a delegated turn started or settled.
+func (s *liveSession) setDelegationActive(active bool) {
+	s.toolMu.Lock()
+	defer s.toolMu.Unlock()
+
+	s.delegationActive = active
+}
+
+// flushDeferredEvents sends the context held back while the delegation ran.
+func (s *liveSession) flushDeferredEvents(deferred []live.ClientEventUnionParam) {
+	if len(deferred) == 0 {
+		return
+	}
+	if err := s.send(deferred...); err != nil {
+		s.logger.WithError(err).Warn("openai live: could not flush the context deferred during the delegation")
+	}
+}
+
 // completeResponse registers every tool call of the finished response and
 // reports the ones to hand to the caller. The whole set is registered before the
 // first call is emitted, so a fast tool can never resume the conversation while a
-// sibling call of the same response is still unanswered.
-func (s *liveSession) completeResponse(rawResponse any) []insights.RealtimeEvent {
+// sibling call of the same response is still unanswered. The context queued while
+// the delegation ran is released only when no tool output is missing anymore.
+func (s *liveSession) completeResponse(rawResponse any) ([]insights.RealtimeEvent, []live.ClientEventUnionParam) {
 	calls := s.queuedToolCalls
 	s.queuedToolCalls = nil
 
@@ -497,7 +555,16 @@ func (s *liveSession) completeResponse(rawResponse any) []insights.RealtimeEvent
 			s.pendingToolCalls[call.CallID] = struct{}{}
 		}
 	}
-	return calls
+	if len(s.pendingToolCalls) > 0 {
+		// The delegated turn keeps waiting for a function_call_output.
+		s.delegationActive = true
+		return calls, nil
+	}
+
+	s.delegationActive = false
+	deferred := s.deferredEvents
+	s.deferredEvents = nil
+	return calls, deferred
 }
 
 // resetToolTurn drops the bookkeeping of a failed response: its calls can no
@@ -509,6 +576,7 @@ func (s *liveSession) resetToolTurn() {
 	s.queuedToolCalls = nil
 	s.pendingToolCalls = make(map[string]struct{})
 	s.deferredEvents = nil
+	s.delegationActive = false
 }
 
 // newLiveToolCallEvent builds the tool call event of one function_call item.
@@ -611,7 +679,9 @@ func (s *liveSession) onTranscriptUpdate(u live.TranscriptUpdate) {
 			s.beginTurn()
 		}
 		s.emit(insights.RealtimeEvent{Type: insights.RealtimeEventTranscriptAgent, Text: u.Segment.Text, Final: final})
-		if final && s.endTurn() {
+		if final && s.endTurn() && !s.hasPendingWork() {
+			// A filler promise ("on it…") is not the end of the turn while the
+			// delegation still runs: its settled response closes the turn.
 			s.emit(insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete})
 		}
 	}
@@ -673,9 +743,15 @@ func (s *liveSession) stopSpeakingTimer() {
 
 // endIdleTurn reports the completion of a turn whose audio stream went silent.
 func (s *liveSession) endIdleTurn() {
-	if s.endTurn() {
-		s.emit(insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete})
+	if !s.endTurn() {
+		return
 	}
+	if s.hasPendingWork() {
+		// The spoken promise is followed by silence while the tool runs; the
+		// settled delegation completes the turn instead.
+		return
+	}
+	s.emit(insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete})
 }
 
 // endTurn closes the current agent turn and reports whether this call owns it,
@@ -787,6 +863,9 @@ func (s *liveSession) handleServerEvent(msg live.ServerEventUnion) {
 		}
 
 	case liveEventDelegationCreated:
+		// The delegated turn owns the answer from here on: context waits until
+		// it settles instead of cancelling its acknowledgement.
+		s.setDelegationActive(true)
 		s.logger.Debug("openai live: delegation created")
 
 	case liveEventError:
@@ -819,6 +898,9 @@ func (s *liveSession) handleResponseEvent(ev live.ResponseEvent) {
 
 	switch eventType {
 	case liveResponseCreated:
+		// A delegated response is running: an append now would cancel its
+		// acknowledgement and a response.create would collide with it.
+		s.setDelegationActive(true)
 		s.logger.WithField("responseId", nestedString(nestedMap(ev.Event, "response"), "id")).Debug("openai live: delegated response started")
 
 	case liveResponseOutputItemDone:
@@ -840,7 +922,7 @@ func (s *liveSession) handleResponseEvent(ev live.ResponseEvent) {
 		// The completed response reports what the delegated text model spent.
 		s.emitDelegationUsage(ev.Event["response"])
 
-		calls := s.completeResponse(ev.Event["response"])
+		calls, deferred := s.completeResponse(ev.Event["response"])
 		s.logger.WithField("toolCalls", len(calls)).Debug("openai live: delegated response completed")
 		if len(calls) > 0 {
 			// A function call turn is answered by the caller through SendToolResult.
@@ -849,6 +931,8 @@ func (s *liveSession) handleResponseEvent(ev live.ResponseEvent) {
 			}
 			return
 		}
+		// Nothing is pending any more, so the held back context goes out now.
+		s.flushDeferredEvents(deferred)
 
 		// While the agent is talking, the audio stream reports the turn end.
 		if !s.isSpeaking() {
@@ -865,7 +949,8 @@ func (s *liveSession) handleResponseEvent(ev live.ResponseEvent) {
 		}
 		s.emitDelegationUsage(response)
 
-		if calls := s.completeResponse(response); len(calls) > 0 {
+		calls, deferred := s.completeResponse(response)
+		if len(calls) > 0 {
 			s.logger.WithFields(logrus.Fields{
 				"eventType": eventType,
 				"reason":    reason,
@@ -884,6 +969,7 @@ func (s *liveSession) handleResponseEvent(ev live.ResponseEvent) {
 			"eventType": eventType,
 			"reason":    reason,
 		}).Warn("openai live: delegated response ended without completing")
+		s.flushDeferredEvents(deferred)
 		if !s.isSpeaking() {
 			s.emit(insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete})
 		}

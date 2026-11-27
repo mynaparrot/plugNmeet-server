@@ -149,12 +149,20 @@ func TestBuildLiveSessionConfig(t *testing.T) {
 	if delegation.Responses.Model != testLiveDelegationModel {
 		t.Fatalf("unexpected delegation model: %s", delegation.Responses.Model)
 	}
+	if got := delegation.Responses.Instructions.Or(""); got != "You are a tutor." {
+		t.Fatalf("delegation instructions not mapped: %q", got)
+	}
 	if len(delegation.Responses.Tools) != 1 || delegation.Responses.Tools[0].OfFunction == nil {
 		t.Fatalf("delegation tools not mapped: %+v", delegation.Responses.Tools)
 	}
 	function := delegation.Responses.Tools[0].OfFunction
 	if function.Name != "whiteboard_write_content" || function.Description.Or("") != "Write on the board" {
 		t.Fatalf("unexpected function tool: %+v", function)
+	}
+	// An immediate acknowledgement would promise work that a fast tool has
+	// already finished.
+	if got := delegation.AcknowledgementDelayMs.Or(0); got != liveDelegationAckDelayMs {
+		t.Fatalf("unexpected delegation acknowledgement delay: %d", got)
 	}
 }
 
@@ -363,11 +371,14 @@ func TestLiveSessionSendContextTextBoundsLongAppend(t *testing.T) {
 		name             string
 		role             string
 		trigger          bool
+		wantItem         bool
 		wantCommentary   bool
 		wantInstructions bool
 	}{
-		{name: "thinking", role: "user"},
-		{name: "instructions", role: "system", wantInstructions: true},
+		{name: "thinking", role: "user", wantItem: true},
+		{name: "instructions", role: "system", wantItem: true, wantInstructions: true},
+		// A commentary append is spoken by the speech model itself, so nothing
+		// consumes the delegated item: queuing it would replay on the next turn.
 		{name: "commentary", role: "user", trigger: true, wantCommentary: true},
 	}
 
@@ -384,40 +395,47 @@ func TestLiveSessionSendContextTextBoundsLongAppend(t *testing.T) {
 			}
 
 			events := conn.sentEvents()
-			if len(events) != 2 {
-				t.Fatalf("long context must append an item plus one bounded append: %+v", events)
+			wantEvents := 1
+			if tc.wantItem {
+				wantEvents = 2
+			}
+			if len(events) != wantEvents {
+				t.Fatalf("long context must send %d event(s): %+v", wantEvents, events)
 			}
 
-			item := events[0].OfResponseItemCreate
-			if item == nil || item.Item.OfInputMessage == nil {
-				t.Fatalf("the delegated model must receive the full text first: %+v", events[0])
-			}
-			message := item.Item.OfInputMessage
-			if message.Role != "user" || len(message.Content) != 1 {
-				t.Fatalf("unexpected context item: %+v", message)
-			}
-			if text := message.Content[0].OfInputText; text == nil || text.Text != scene {
-				t.Fatalf("the delegated model must receive the untruncated text")
+			if tc.wantItem {
+				item := events[0].OfResponseItemCreate
+				if item == nil || item.Item.OfInputMessage == nil {
+					t.Fatalf("the delegated model must receive the full text first: %+v", events[0])
+				}
+				message := item.Item.OfInputMessage
+				if message.Role != "user" || len(message.Content) != 1 {
+					t.Fatalf("unexpected context item: %+v", message)
+				}
+				if text := message.Content[0].OfInputText; text == nil || text.Text != scene {
+					t.Fatalf("the delegated model must receive the untruncated text")
+				}
 			}
 
+			appendEvent := events[len(events)-1]
 			var content string
 			switch {
-			case events[1].OfSessionThinkingAppend != nil:
-				content = events[1].OfSessionThinkingAppend.Content
-			case events[1].OfSessionInstructionsAppend != nil:
-				content = events[1].OfSessionInstructionsAppend.Content
-			case events[1].OfSessionCommentaryAppend != nil:
-				content = events[1].OfSessionCommentaryAppend.Content
+			case appendEvent.OfSessionThinkingAppend != nil:
+				content = appendEvent.OfSessionThinkingAppend.Content
+			case appendEvent.OfSessionInstructionsAppend != nil:
+				content = appendEvent.OfSessionInstructionsAppend.Content
+			case appendEvent.OfSessionCommentaryAppend != nil:
+				content = appendEvent.OfSessionCommentaryAppend.Content
 			}
 
 			if content == "" {
-				t.Fatalf("missing session append: %+v", events[1])
+				t.Fatalf("missing session append: %+v", appendEvent)
 			}
-			if tc.wantCommentary != (events[1].OfSessionCommentaryAppend != nil) {
-				t.Fatalf("triggered context must be commentary: %+v", events[1])
+			if tc.wantCommentary != (appendEvent.OfSessionCommentaryAppend != nil) {
+				t.Fatalf("triggered context must be commentary: %+v", appendEvent)
 			}
-			if tc.wantInstructions != (events[1].OfSessionInstructionsAppend != nil) {
-				t.Fatalf("system context must be instructions: %+v", events[1])
+			if tc.wantInstructions != (appendEvent.OfSessionInstructionsAppend != nil) {
+				t.Fatalf("system context must be instructions: %+v", appendEvent)
 			}
 			// One rune can cost a whole token, so runes are the budget.
 			if runes := len([]rune(content)); runes > liveAppendMaxRunes {
@@ -952,6 +970,72 @@ func TestLiveSessionDeferredCommentaryTriggersResponseOnce(t *testing.T) {
 	}
 	if sent[1].OfSessionCommentaryAppend == nil {
 		t.Fatalf("the deferred commentary must follow the output: %+v", sent[1])
+	}
+}
+
+// Context that arrives while a delegation still runs must wait: an append would
+// cancel its acknowledgement and cut into the answer the participant waits for.
+// The held back events go out once the delegation settles.
+func TestLiveSessionContextWaitsForDelegatedResponse(t *testing.T) {
+	conn := &fakeLiveConn{}
+	s, err := newTestLiveSession(conn)
+	if err != nil {
+		t.Fatalf("newLiveSession: %v", err)
+	}
+
+	s.handleServerEvent(live.ServerEventUnion{Type: liveEventDelegationCreated})
+	s.handleServerEvent(live.ServerEventUnion{
+		Type:            liveEventResponse,
+		OfResponseEvent: live.ResponseEvent{Event: map[string]any{"type": liveResponseCreated}},
+	})
+	if err = s.SendContextText("user", "the poll is closed", true); err != nil {
+		t.Fatalf("SendContextText: %v", err)
+	}
+	if sent := conn.sentEvents(); len(sent) != 0 {
+		t.Fatalf("context must wait for the delegated response: %+v", sent)
+	}
+
+	s.handleServerEvent(live.ServerEventUnion{
+		Type:            liveEventResponse,
+		OfResponseEvent: live.ResponseEvent{Event: map[string]any{"type": liveResponseCompleted}},
+	})
+
+	sent := conn.sentEvents()
+	if len(sent) != 1 || sent[0].OfSessionCommentaryAppend == nil {
+		t.Fatalf("the settled delegation must flush the deferred commentary: %+v", sent)
+	}
+	events := drainRealtimeEvents(t, s.Events())
+	if len(events) != 1 || events[0].Type != insights.RealtimeEventTurnComplete {
+		t.Fatalf("the settled delegation must complete the turn: %+v", events)
+	}
+}
+
+// The spoken promise that accompanies a delegation must not close the turn while
+// the tools still run, otherwise the answer is reported after the turn ended.
+func TestLiveSessionFillerTranscriptWaitsForDelegation(t *testing.T) {
+	conn := &fakeLiveConn{}
+	s, err := newTestLiveSession(conn)
+	if err != nil {
+		t.Fatalf("newLiveSession: %v", err)
+	}
+
+	s.handleServerEvent(live.ServerEventUnion{Type: liveEventDelegationCreated})
+	s.onTranscriptUpdate(live.TranscriptUpdate{
+		Segment: live.TranscriptSegment{Speaker: liveSpeakerAssistant, Text: "Yep, on it. I'll open it and draw..."},
+		Reason:  "inactivity",
+	})
+	events := drainRealtimeEvents(t, s.Events())
+	if len(events) != 1 || events[0].Type != insights.RealtimeEventTranscriptAgent || !events[0].Final {
+		t.Fatalf("the promise must be reported without completing the turn: %+v", events)
+	}
+
+	s.handleServerEvent(live.ServerEventUnion{
+		Type:            liveEventResponse,
+		OfResponseEvent: live.ResponseEvent{Event: map[string]any{"type": liveResponseCompleted}},
+	})
+	events = drainRealtimeEvents(t, s.Events())
+	if len(events) != 1 || events[0].Type != insights.RealtimeEventTurnComplete {
+		t.Fatalf("the settled delegation must complete the turn: %+v", events)
 	}
 }
 
@@ -1735,7 +1819,7 @@ func TestLiveSessionCompleteResponseMergesPendingToolCalls(t *testing.T) {
 		t.Fatalf("newLiveSession: %v", err)
 	}
 
-	if calls := s.completeResponse(map[string]any{"output": []any{
+	if calls, _ := s.completeResponse(map[string]any{"output": []any{
 		map[string]any{"type": liveItemTypeFunctionCall, "call_id": "call_1", "name": "whiteboard_manage_board"},
 	}}); len(calls) != 1 {
 		t.Fatalf("unexpected tool calls: %+v", calls)

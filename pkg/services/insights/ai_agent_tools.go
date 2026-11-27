@@ -57,7 +57,13 @@ func (a *AIAgent) SendProactiveContext(text, source string) error {
 	if session == nil {
 		return errors.New("ai agent: no active session")
 	}
-	return session.SendContextText("user", frame, true)
+	if err := session.SendContextText("user", frame, true); err != nil {
+		return err
+	}
+	// The note is part of the record, but a poll answer or a timer is not a
+	// participant turn, so it must not count as one.
+	a.recordTranscriptTurn(transcriptRoleContext, frame)
+	return nil
 }
 
 // systemContextFrame renders a sanitized [SYSTEM CONTEXT] block, or "" when
