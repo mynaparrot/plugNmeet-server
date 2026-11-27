@@ -172,6 +172,7 @@ func (r *Router) registerAuthRoutes() {
 	room.Post("/getActiveRoomInfo", r.ctrl.RoomController.HandleGetActiveRoomInfo)
 	room.Post("/getActiveRoomsInfo", r.ctrl.RoomController.HandleGetActiveRoomsInfo)
 	room.Post("/endRoom", r.ctrl.RoomController.HandleEndRoom)
+	room.Post("/endInsightsServices", r.ctrl.RoomController.HandleEndRoomInsightsServices)
 	room.Post("/fetchPastRooms", r.ctrl.RoomController.HandleFetchPastRooms)
 	room.Post("/broadcastToRoom", r.ctrl.RoomController.HandleBroadcastToRoom)
 	room.Post("/uploadWhiteboardFile", r.ctrl.FileController.HandleUploadWhiteboardFile)

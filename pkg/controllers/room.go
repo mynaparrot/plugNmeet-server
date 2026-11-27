@@ -125,6 +125,20 @@ func (rc *RoomController) HandleEndRoom(c fiber.Ctx) error {
 	return sendCommonProtoJsonResponse(c, status, msg, statusCode)
 }
 
+// HandleEndRoomInsightsServices stops the insights and AI agent services of a running room without ending the room itself.
+func (rc *RoomController) HandleEndRoomInsightsServices(c fiber.Ctx) error {
+	req := new(plugnmeet.RoomEndReq)
+	if err := parseAndValidateRequest(c.Body(), req); err != nil {
+		return sendCommonErrorJsonResponse(c, config.ErrRoomInvalidRequest.Error(), plugnmeet.StatusCode_INVALID_PARAMETERS)
+	}
+
+	status, msg, statusCode := rc.RoomModel.EndRoomInsightsServices(c.Context(), req)
+	if !status {
+		return sendCommonErrorJsonResponse(c, msg, statusCode)
+	}
+	return sendCommonProtoJsonResponse(c, status, msg, statusCode)
+}
+
 // HandleFetchPastRooms handles fetching past rooms.
 func (rc *RoomController) HandleFetchPastRooms(c fiber.Ctx) error {
 	req := new(plugnmeet.FetchPastRoomsReq)

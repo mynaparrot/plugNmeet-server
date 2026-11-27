@@ -279,7 +279,7 @@ var integratorMsgs = map[string]string{
 	ErrArtifactNoDownloadableFile.Error():  MsgAuthArtifactNoDownloadableFile,
 	ErrArtifactDeleteNotAllowed.Error():    MsgAuthArtifactDeleteNotAllowed,
 	ErrAnalyticsFetchFailed.Error():        MsgAuthAnalyticsFetchFailed,
-	// the /auth analytics endpoints of the cloud edition (pnmmanager)
+	// the /auth analytics endpoints of the cloud edition
 	ErrAnalyticsInvalidRequest.Error():      MsgAuthInvalidRequest,
 	ErrAnalyticsNotFound.Error():            MsgAuthAnalyticsNotFound,
 	ErrAnalyticsDeleteFailed.Error():        MsgAuthAnalyticsDeleteFailed,

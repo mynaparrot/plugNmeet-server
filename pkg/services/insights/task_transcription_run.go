@@ -28,6 +28,9 @@ const (
 
 	// Delay before the "ready" notice, so a user is not bothered while unmuting.
 	transcriptionReadyToastDelay = 5 * time.Second
+
+	// How often the accrued usage of a running stream is checkpointed.
+	transcriptionUsageFlushInterval = 15 * time.Second
 )
 
 type dialResult struct {
@@ -45,6 +48,7 @@ type transcriptionRun struct {
 	dial          func(context.Context) (insights.TranscriptionStream, error)
 	handleEvent   func(*insights.TranscriptionEvent)
 	setUsage      func(active bool)
+	flushUsage    func()
 	notifyReady   func()
 	notifyStopped func(failed bool)
 
@@ -66,6 +70,8 @@ type transcriptionRun struct {
 	toastC     <-chan time.Time
 	idleTimer  *time.Timer
 	idleC      <-chan time.Time
+	usageTimer *time.Ticker
+	usageC     <-chan time.Time
 
 	pending     []int16
 	writeErrs   int
@@ -85,6 +91,7 @@ func newTranscriptionRun(log *logrus.Entry, audioStream <-chan media.PCM16Sample
 		dial:           dial,
 		handleEvent:    func(*insights.TranscriptionEvent) {},
 		setUsage:       func(bool) {},
+		flushUsage:     func() {},
 		notifyReady:    func() {},
 		notifyStopped:  func(bool) {},
 		retryBaseDelay: transcriptionBaseRetryDelay,
@@ -169,6 +176,9 @@ func (r *transcriptionRun) run(ctx context.Context) error {
 				r.dropStream()
 				r.attempts = 0
 			}
+
+		case <-r.usageC:
+			r.flushUsage()
 
 		case event, ok := <-r.results:
 			if !ok {
@@ -393,14 +403,26 @@ func (r *transcriptionRun) startUsage() {
 	}
 	r.usageActive = true
 	r.setUsage(true)
+	// A running stream checkpoints its accrued seconds, so an abrupt end cannot
+	// lose more than one interval.
+	r.usageTimer = time.NewTicker(transcriptionUsageFlushInterval)
+	r.usageC = r.usageTimer.C
 }
 
 func (r *transcriptionRun) stopUsage() {
+	r.clearUsageCheckpoint()
 	if !r.usageActive {
 		return
 	}
 	r.usageActive = false
 	r.setUsage(false)
+}
+
+func (r *transcriptionRun) clearUsageCheckpoint() {
+	if r.usageTimer != nil {
+		r.usageTimer.Stop()
+	}
+	r.usageTimer, r.usageC = nil, nil
 }
 
 // armReadyNotice schedules the ready notice once per task. dropStream cancels

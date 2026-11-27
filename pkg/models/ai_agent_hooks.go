@@ -160,13 +160,15 @@ func (m *AIAgentModel) cleanupRoomState(ctx context.Context, roomId string) {
 		aiAgentKey(roomId, aiAgentKeyDelegate),
 		aiAgentKey(roomId, aiAgentKeyPrevPresenter),
 	).Err()
-	if m.redisService != nil {
-		m.redisService.CleanupRoomExternalMCP(ctx, roomId)
-		// the room's own provider credentials are the most sensitive key of the
-		// room, so they are removed with the rest of its state
-		if err := m.redisService.DeleteAIAgentCustomProvider(ctx, roomId); err != nil {
-			m.logger.WithError(err).WithField("roomId", roomId).Debug("could not delete the custom ai provider configuration")
-		}
+	// The room's insights live cost key is NOT removed here: the session can
+	// still produce usage (transcription, translation, text chat) until the room
+	// ends, and CreateAllRoomUsageArtifacts cleans the key up once every usage
+	// artifact has been harvested at the end of onAfterRoomEnded.
+	m.redisService.CleanupRoomExternalMCP(ctx, roomId)
+	// the room's own provider credentials are the most sensitive key of the
+	// room, so they are removed with the rest of its state
+	if err := m.redisService.DeleteAIAgentCustomProvider(ctx, roomId); err != nil {
+		m.logger.WithError(err).WithField("roomId", roomId).Debug("could not delete the custom ai provider configuration")
 	}
 }
 

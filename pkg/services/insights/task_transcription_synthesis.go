@@ -9,6 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
 	lksdk "github.com/livekit/server-sdk-go/v2"
 	"github.com/mynaparrot/plugnmeet-protocol/auth"
@@ -127,18 +128,37 @@ func (t *TranscriptionSynthesisTask) dispatch(fromUserId string, translations ma
 				continue
 			}
 		}
-		if err := t.redisService.UpdateTTSServiceUsage(t.ctx, t.roomId, fromUserId, lang, len(text)); err != nil {
-			t.logger.WithError(err).Error("failed to update TTS service usage")
-		}
 		// Send text to the worker's queue. Drop the text (rather than block the
 		// NATS subscriber) if the worker is saturated.
 		select {
 		case worker.workQueue <- text:
+			t.recordSynthesisUsage(fromUserId, lang, text)
 		case <-t.ctx.Done():
 			return
 		default:
 			t.logger.WithField("language", lang).Warn("tts work queue full, dropping text")
 		}
+	}
+}
+
+// recordSynthesisUsage books the characters that were actually queued for
+// synthesis, plus their price in the room's live cost.
+func (t *TranscriptionSynthesisTask) recordSynthesisUsage(fromUserId, lang, text string) {
+	charCount := utf8.RuneCountInString(text)
+	if err := t.redisService.UpdateTTSServiceUsage(t.ctx, t.roomId, fromUserId, lang, charCount); err != nil {
+		t.logger.WithError(err).Error("failed to update TTS service usage")
+	}
+
+	if charCount == 0 {
+		return
+	}
+	pricing, err := t.appCnf.Insights.GetServiceModelPricing(insights.ServiceTypeSpeechSynthesis, "default")
+	if err != nil || pricing.PricePerMillionCharacters <= 0 {
+		return
+	}
+	delta := (float64(charCount) / 1000000.0) * pricing.PricePerMillionCharacters
+	if err := t.redisService.IncrInsightsLiveCost(t.ctx, t.roomId, redisservice.LiveCostFieldTTS, delta); err != nil {
+		t.logger.WithError(err).Error("failed to update TTS live cost")
 	}
 }
 

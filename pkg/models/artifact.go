@@ -222,6 +222,11 @@ func (m *ArtifactModel) CreateAllRoomUsageArtifacts(roomId, roomSid string, room
 	if err := m.createAITextChatUsageArtifacts(roomId, ownerRoomId, ownerRoomSid, sourceTableId, ownerTableId, isBreakout, log); err != nil {
 		log.WithError(err).Error("failed to create AI text chat session usage artifact")
 	}
+
+	// The room's usage has been harvested into artifacts, so clear its live cost.
+	if err := m.rs.CleanupInsightsLiveCost(m.ctx, roomId); err != nil {
+		log.WithError(err).Warn("failed to clean up the insights live cost")
+	}
 }
 
 // setUsageArtifactProvenance records where a usage artifact originated. The

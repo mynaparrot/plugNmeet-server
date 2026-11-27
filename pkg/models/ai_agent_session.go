@@ -210,6 +210,7 @@ func (m *AIAgentModel) Start(ctx context.Context, roomId string, req *plugnmeet.
 		SummarizeModel:    m.aiAgentSummarizeModel(serviceConfig),
 		PreviousTelemetry: prevTelemetry,
 		Avatar:            avatar,
+		EstimateCost:      m.artifactModel.EstimateAIAgentLiveCost,
 		OnStopped: func(reason string) {
 			m.afterAgentStopped(roomId, reason)
 		},
@@ -547,7 +548,10 @@ func (m *AIAgentModel) superviseAgent(agent *insightsservice.AIAgent, lock *redi
 			if err := lock.Refresh(m.ctx); err != nil {
 				m.logger.WithError(err).Warn("lost the ai agent leadership, stopping")
 				agent.Stop("leadership_lost")
+				continue
 			}
+			// Keeps the live cost current between speech turns, e.g. the avatar duration of a silent session.
+			agent.FlushTelemetry()
 		}
 	}
 }

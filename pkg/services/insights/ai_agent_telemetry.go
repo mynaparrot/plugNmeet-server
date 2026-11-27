@@ -178,7 +178,7 @@ func (a *AIAgent) TelemetrySnapshot(endReason string) redisservice.AIAgentSessio
 		endedAt = time.Now().UnixMilli()
 	}
 
-	return redisservice.AIAgentSessionTelemetry{
+	snap := redisservice.AIAgentSessionTelemetry{
 		SessionID:              a.sessionId,
 		UserID:                 learner.UserID,
 		UserName:               learner.UserName,
@@ -241,6 +241,24 @@ func (a *AIAgent) TelemetrySnapshot(endReason string) redisservice.AIAgentSessio
 
 		CustomProvider: a.customProvider,
 	}
+
+	if a.estimateCost != nil {
+		snap.EstimatedTokenCost, snap.EstimatedAvatarCost = a.estimateCost(&snap)
+		snap.EstimatedTotalCost = snap.EstimatedTokenCost + snap.EstimatedAvatarCost
+	}
+
+	return snap
+}
+
+// FlushTelemetry writes the running session's telemetry and live cost now. A
+// supervisor tick racing with Stop must not overwrite the completed record.
+func (a *AIAgent) FlushTelemetry() {
+	select {
+	case <-a.Done():
+		return
+	default:
+	}
+	a.persistTelemetry("")
 }
 
 // avatarMillis is the avatar duration billed to the room: the current session
@@ -419,6 +437,9 @@ func (a *AIAgent) recordUsage(ev insights.RealtimeEvent) {
 	a.state.audioMillis += ev.AudioMillis
 	audioMillis := a.state.audioMillis
 	a.stateMu.Unlock()
+
+	// Each turn's usage reaches Redis at once, so the live cost stays current.
+	a.persistTelemetry("")
 
 	if a.maxAudio > 0 && audioMillis >= uint64(a.maxAudio/time.Millisecond) {
 		a.logger.WithField("audioMillis", audioMillis).Info("ai agent: audio budget reached")

@@ -10,6 +10,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
 	insightsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/insights"
 	"github.com/mynaparrot/plugnmeet-server/pkg/services/insights/mcp"
+	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cast"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -115,24 +116,23 @@ func (s *InsightsModel) AITextChatRequest(roomId, userId, prompt, streamId strin
 			}
 		}
 
+		if !isEphemeral {
+			// Append AI response to history
+			aiMsg := &plugnmeet.InsightsAITextChatContent{
+				Role: plugnmeet.InsightsAITextChatRole_INSIGHTS_AI_TEXT_CHAT_ROLE_MODEL,
+				Text: fullResponse.String(),
+			}
+			if err := s.redisService.AppendToAITextChatContext(ctx, roomId, userId, aiMsg); err != nil {
+				logger.WithError(err).Error("failed to append AI response to context")
+			}
+		}
+
+		// An ephemeral request spends real tokens too, so its usage and cost are
+		// always recorded; only the context and the summary are chat-only.
+		s.recordAITextChatUsageAndCost(ctx, roomId, userId, insights.AITaskTypeChat, chatModel, promptTokens, completionTokens, totalTokens)
+
 		if isEphemeral {
 			return
-		}
-
-		// Append AI response to history
-		aiMsg := &plugnmeet.InsightsAITextChatContent{
-			Role: plugnmeet.InsightsAITextChatRole_INSIGHTS_AI_TEXT_CHAT_ROLE_MODEL,
-			Text: fullResponse.String(),
-		}
-		err = s.redisService.AppendToAITextChatContext(ctx, roomId, userId, aiMsg)
-		if err != nil {
-			logger.WithError(err).Error("failed to append AI response to context")
-		}
-
-		// Update token usage
-		err = s.redisService.UpdateAITextChatUsage(ctx, roomId, userId, insights.AITaskTypeChat, promptTokens, completionTokens, totalTokens)
-		if err != nil {
-			logger.WithError(err).Error("failed to update token usage")
 		}
 
 		// Trigger background summarization
@@ -365,10 +365,28 @@ func (s *InsightsModel) CheckAndSummarize(ctx context.Context, roomId, userId st
 	}
 
 	// 6. Update token usage for the summarization task
-	err = s.redisService.UpdateAITextChatUsage(ctx, roomId, userId, insights.AITaskTypeSummarize, promptTokens, completionTokens, promptTokens+completionTokens)
-	if err != nil {
-		logger.WithError(err).Error("failed to update token usage for summarization")
-	}
+	s.recordAITextChatUsageAndCost(ctx, roomId, userId, insights.AITaskTypeSummarize, summarizeModel, promptTokens, completionTokens, promptTokens+completionTokens)
 
 	logger.Info("successfully created new summary")
+}
+
+// recordAITextChatUsageAndCost books the tokens of one AI text chat call and adds
+// their price to the room's live cost.
+func (s *InsightsModel) recordAITextChatUsageAndCost(ctx context.Context, roomId, userId string, taskType insights.AITaskType, modelName string, promptTokens, completionTokens, totalTokens uint32) {
+	if err := s.redisService.UpdateAITextChatUsage(ctx, roomId, userId, taskType, promptTokens, completionTokens, totalTokens); err != nil {
+		s.logger.WithError(err).Error("failed to update ai text chat usage")
+	}
+
+	pricing, err := s.appConfig.Insights.GetServiceModelPricing(insights.ServiceTypeAITextChat, modelName)
+	if err != nil {
+		return
+	}
+	delta := (float64(promptTokens)/1000000.0)*pricing.InputPricePerMillionTokens +
+		(float64(completionTokens)/1000000.0)*pricing.OutputPricePerMillionTokens
+	if delta <= 0 {
+		return
+	}
+	if err := s.redisService.IncrInsightsLiveCost(ctx, roomId, redisservice.LiveCostFieldAITextChat, delta); err != nil {
+		s.logger.WithError(err).Error("failed to update ai text chat live cost")
+	}
 }

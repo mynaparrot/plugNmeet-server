@@ -71,8 +71,21 @@ func (t *TranscriptionTask) RunAudioStream(ctx context.Context, audioStream <-ch
 		t.handleTranscriptionEvent(event, roomId, userId, synthesisChannel, log)
 	}
 	run.setUsage = func(active bool) {
-		if _, err := t.redisService.HandleTranscriptionUsage(roomId, userId, active); err != nil {
+		dur, err := t.redisService.HandleTranscriptionUsage(roomId, userId, active)
+		if err != nil {
 			log.WithError(err).Errorln("update user usage failed")
+		}
+		if !active && dur > 0 {
+			t.addLiveTranscriptionCost(roomId, dur, log)
+		}
+	}
+	run.flushUsage = func() {
+		dur, err := t.redisService.FlushTranscriptionUsage(roomId, userId)
+		if err != nil {
+			log.WithError(err).Errorln("flush user usage failed")
+		}
+		if dur > 0 {
+			t.addLiveTranscriptionCost(roomId, dur, log)
 		}
 	}
 	run.notifyReady = func() {
@@ -113,6 +126,23 @@ func (t *TranscriptionTask) handleTranscriptionEvent(event *insights.Transcripti
 				}
 			}
 		}
+	}
+}
+
+// addLiveTranscriptionCost adds the price of the accrued seconds to the room's
+// live cost. A service without a pricing block simply books nothing.
+func (t *TranscriptionTask) addLiveTranscriptionCost(roomId string, seconds int64, log *logrus.Entry) {
+	if seconds <= 0 {
+		return
+	}
+	pricing, err := t.appConf.Insights.GetServiceModelPricing(insights.ServiceTypeTranscription, "default")
+	if err != nil || pricing.PricePerHour <= 0 {
+		return
+	}
+
+	delta := float64(seconds) * (pricing.PricePerHour / 3600.0)
+	if err := t.redisService.IncrInsightsLiveCost(context.Background(), roomId, redisservice.LiveCostFieldTranscription, delta); err != nil {
+		log.WithError(err).Errorln("failed to update live transcription cost")
 	}
 }
 

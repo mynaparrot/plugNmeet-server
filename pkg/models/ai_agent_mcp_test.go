@@ -47,7 +47,11 @@ func newAIAgentTestModel(rc redis.UniversalClient) *AIAgentModel {
 		rds:          rc,
 		redisService: redisservice.New(redisservice.Args{Ctx: context.Background(), Rc: rc, App: app, Logger: logger}),
 		natsService:  newOfflineNatsService(),
-		logger:       logrus.NewEntry(logger),
+		artifactModel: &ArtifactModel{
+			app: app,
+			log: logger.WithField("model", "artifact"),
+		},
+		logger: logrus.NewEntry(logger),
 	}
 }
 

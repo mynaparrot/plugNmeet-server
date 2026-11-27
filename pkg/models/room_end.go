@@ -8,6 +8,7 @@ import (
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/dbmodels"
+	"github.com/mynaparrot/plugnmeet-server/pkg/helpers"
 	natsservice "github.com/mynaparrot/plugnmeet-server/pkg/services/nats"
 	"github.com/sirupsen/logrus"
 )
@@ -282,6 +283,54 @@ func (m *RoomModel) waitForAllUsersToDisconnect(roomID string, totalWait time.Du
 			log.Infof("Waiting for %d user(s) to disconnect...", len(onlineUsers))
 		}
 	}
+}
+
+// EndRoomInsightsServices stops the insights and AI agent services of a running room, disables the insights features
+// and harvests the usage produced so far, without touching the meeting itself. Rooms that exist only to run automatic
+// per-user AI sessions are ended as a whole instead, because their insights services are their only purpose.
+func (m *RoomModel) EndRoomInsightsServices(ctx context.Context, r *plugnmeet.RoomEndReq) (bool, string, plugnmeet.StatusCode) {
+	roomID := r.GetRoomId()
+	log := m.logger.WithFields(logrus.Fields{
+		"room_id": roomID,
+		"method":  "EndRoomInsightsServices",
+	})
+
+	info, meta, err := m.natsService.GetRoomInfoWithMetadata(roomID)
+	if err != nil {
+		log.WithError(err).Error("failed to get room info with metadata")
+		return false, config.ErrRoomEndFailed.Error(), plugnmeet.StatusCode_INTERNAL_SERVER_ERROR
+	}
+	if info == nil {
+		// The room is gone already, so only a stale live cost may be left behind.
+		_ = m.rs.CleanupInsightsLiveCost(ctx, roomID)
+		return false, config.ErrRoomNotFound.Error(), plugnmeet.StatusCode_ROOM_NOT_FOUND
+	}
+
+	// The lobby of an automatic per-user AI session exists only for the sessions
+	// it spawns, so stopping its insights services ends the room.
+	if isPerUserAISessionParent(meta) {
+		return m.EndRoom(ctx, r)
+	}
+
+	if meta.GetIsBreakoutRoom() {
+		parentRoomId, _, err := helpers.ParseBreakoutParentRoomRef(meta.GetParentRoomId())
+		if err != nil {
+			log.WithError(err).Warn("failed to parse the parent room reference")
+		} else {
+			parentMeta, _ := m.natsService.GetRoomMetadataStruct(parentRoomId)
+			if isPerUserAISessionParent(parentMeta) {
+				// Ending the lobby closes each of its 1-on-1 session rooms as well.
+				return m.EndRoom(ctx, &plugnmeet.RoomEndReq{RoomId: parentRoomId})
+			}
+		}
+	}
+
+	// A normal meeting room, or a breakout room of a normal meeting, keeps
+	// running: only its insights services stop. Stopping them finalizes the AI
+	// agent session with the room-ended reason, which also unlocks the workspace.
+	m.insightsModel.StopRoomInsightsServices(ctx, roomID, info.GetRoomSid(), info.GetDbTableId())
+
+	return true, config.MsgSuccess, plugnmeet.StatusCode_SUCCESS
 }
 
 // sendSessionEndedWebhook to send webhook

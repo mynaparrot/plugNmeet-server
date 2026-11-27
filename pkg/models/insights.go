@@ -213,7 +213,8 @@ func (s *InsightsModel) EndRoomAgentTaskByServiceName(serviceType insights.Servi
 func (s *InsightsModel) EndRoomAllAgentTasks(roomName string) error {
 	s.logger.Infof("Publishing end all room tasks request for room '%s'", roomName)
 	payload := &insights.InsightsTaskPayload{
-		Task: TaskEndRoomAllAgents,
+		Task:   TaskEndRoomAllAgents,
+		RoomId: roomName,
 	}
 	p, err := json.Marshal(payload)
 	if err != nil {

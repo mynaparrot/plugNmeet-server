@@ -332,9 +332,6 @@ const (
 
 // aiAgentServiceOption returns one ai_agent option, "" when it is not configured.
 func (m *ArtifactModel) aiAgentServiceOption(key string, log *logrus.Entry) string {
-	if m.app == nil || m.app.Insights == nil {
-		return ""
-	}
 	_, service, err := m.app.Insights.GetProviderAccountForService(insights.ServiceTypeAIAgent)
 	if err != nil {
 		log.WithError(err).Debug("could not get the ai_agent service config for pricing")
@@ -500,11 +497,27 @@ func (m *ArtifactModel) buildAIAgentAvatarUsageMetadata(telemetry *redisservice.
 	}
 }
 
+// EstimateAIAgentLiveCost prices a running session exactly like its summary
+// artifact will, so the live cost matches the billed cost. summaryModel and the
+// end-of-session summary tokens are left out on purpose: they do not exist yet.
+func (m *ArtifactModel) EstimateAIAgentLiveCost(telemetry *redisservice.AIAgentSessionTelemetry) (tokenCost, avatarCost float64) {
+	if telemetry == nil {
+		return 0, 0
+	}
+	if metadata := m.buildAIAgentUsageMetadata(telemetry, 0, 0, "", nil, m.log); metadata != nil {
+		tokenCost = metadata.GetTokenUsage().GetTotalTokensEstimatedCost()
+	}
+	if usage := m.buildAIAgentAvatarDurationUsage(telemetry, m.log); usage != nil {
+		avatarCost = usage.GetDurationSecEstimatedCost()
+	}
+	return tokenCost, avatarCost
+}
+
 // estimateTokensCost returns the estimated price of tokens at the rate of the
 // first pricing key that is configured for the service, 0 when no pricing
 // block matches.
 func (m *ArtifactModel) estimateTokensCost(serviceType insights.ServiceType, tokens uint64, prompt bool, log *logrus.Entry, pricingKeys ...string) float64 {
-	if tokens == 0 || m.app == nil || m.app.Insights == nil {
+	if tokens == 0 {
 		return 0
 	}
 	pricing, err := m.app.Insights.GetServiceModelPricing(serviceType, pricingKeys...)
@@ -753,9 +766,6 @@ func (m *ArtifactModel) estimateModalitiesTokenCost(modalities aiAgentModalities
 		modalities.textOutput == 0 && modalities.audioOutput == 0 {
 		return 0, 0
 	}
-	if m.app == nil || m.app.Insights == nil {
-		return 0, 0
-	}
 	pricing, err := m.app.Insights.GetServiceModelPricing(insights.ServiceTypeAIAgent, pricingKeys...)
 	if err != nil {
 		log.WithError(err).Warnf("could not calculate the cost for %s with pricing keys %v", insights.ServiceTypeAIAgent, pricingKeys)
@@ -772,7 +782,7 @@ func (m *ArtifactModel) estimateModalitiesTokenCost(modalities aiAgentModalities
 // the per-minute rate of the first pricing key that is configured for the
 // service, falling back to its hourly rate.
 func (m *ArtifactModel) estimateAudioMillisCost(serviceType insights.ServiceType, audioMillis uint64, log *logrus.Entry, pricingKeys ...string) float64 {
-	if audioMillis == 0 || m.app == nil || m.app.Insights == nil {
+	if audioMillis == 0 {
 		return 0
 	}
 	pricing, err := m.app.Insights.GetServiceModelPricing(serviceType, pricingKeys...)

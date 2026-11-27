@@ -132,6 +132,11 @@ type AIAgentSessionTelemetry struct {
 	AvatarMillis         uint64 `json:"avatar_millis,omitempty"`
 	AvatarProvider       string `json:"avatar_provider,omitempty"`
 	CustomAvatarProvider string `json:"custom_avatar_provider,omitempty"`
+
+	// Live cost estimate of the session so far, refreshed with every flush.
+	EstimatedTokenCost  float64 `json:"estimated_token_cost,omitempty"`
+	EstimatedAvatarCost float64 `json:"estimated_avatar_cost,omitempty"`
+	EstimatedTotalCost  float64 `json:"estimated_total_cost,omitempty"`
 }
 
 // GetAIKnowledgeDocument returns the cached document of rawURL, if any.
@@ -209,13 +214,28 @@ func (s *RedisService) GetAILearningProgress(ctx context.Context, roomId string)
 	return entries, nil
 }
 
-// SaveAIAgentSessionTelemetry stores the room's session telemetry.
+// SaveAIAgentSessionTelemetry stores the room's session telemetry and mirrors the
+// session's live cost into the room's live cost hash while it is running.
 func (s *RedisService) SaveAIAgentSessionTelemetry(ctx context.Context, roomId string, t AIAgentSessionTelemetry) error {
 	encoded, err := json.Marshal(t)
 	if err != nil {
 		return err
 	}
-	return s.rc.Set(ctx, aiAgentTelemetryKey(roomId), encoded, s.defaultTTL).Err()
+
+	pipe := s.rc.TxPipeline()
+	pipe.Set(ctx, aiAgentTelemetryKey(roomId), encoded, s.defaultTTL)
+
+	if t.EstimatedTokenCost > 0 || t.EstimatedAvatarCost > 0 || t.EndedAt == 0 {
+		costKey := liveCostKey(roomId)
+		pipe.HSet(ctx, costKey, LiveCostFieldAIAgent, formatLiveCost(t.EstimatedTokenCost))
+		pipe.HSet(ctx, costKey, LiveCostFieldAIAgentAvatar, formatLiveCost(t.EstimatedAvatarCost))
+		pipe.Expire(ctx, costKey, s.defaultTTL)
+		pipe.SAdd(ctx, InsightsActiveRoomsKey, roomId)
+		pipe.Expire(ctx, InsightsActiveRoomsKey, s.defaultTTL)
+	}
+
+	_, err = pipe.Exec(ctx)
+	return err
 }
 
 // GetAIAgentSessionTelemetry returns the room's telemetry; a room without a

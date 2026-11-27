@@ -297,6 +297,8 @@ func (s *InsightsModel) shutdownAndRemoveAgent(key string) bool {
 		switch serviceType {
 		case insights.ServiceTypeTranscription:
 			_ = s.broadcastEndTranscription(roomId)
+		case insights.ServiceTypeMeetingSummarizing:
+			_ = s.broadcastEndAIMeetingSummarization(roomId)
 		}
 	}
 	return ok

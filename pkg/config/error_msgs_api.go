@@ -203,9 +203,9 @@ var (
 	// two recordings
 	ErrRecordingMergeInProgress    = errors.New("recording.errors.merge-in-progress")
 	ErrRecordingMergeMinRecordings = errors.New("recording.errors.merge-min-recordings")
-	// the tenant limits of the cloud edition (pnmmanager), which answers the
-	// /api recording endpoints with them. They are catalogued here so every
-	// client locale key has a single source.
+	// the tenant limits of the cloud edition, which answers the /api recording
+	// endpoints with them. They are catalogued here so every client locale key
+	// has a single source.
 	ErrRecordingMaxTaskExceeded    = errors.New("recording.errors.max-recorder-limit-reached")
 	ErrRecordingMaxStorageExceeded = errors.New("recording.errors.max-storage-capacity-exceeded")
 )
@@ -261,7 +261,7 @@ var (
 	ErrArtifactDeleteNotAllowed   = errors.New("artifact.errors.delete-not-allowed")
 	ErrAnalyticsFetchFailed       = errors.New("analytics.errors.fetch-failed")
 	// the remaining analytics keys are the /auth analytics failures of the cloud
-	// edition (pnmmanager), catalogued here for the same reason
+	// edition, catalogued here for the same reason
 	ErrAnalyticsInvalidRequest      = errors.New("analytics.errors.invalid-request")
 	ErrAnalyticsNotFound            = errors.New("analytics.errors.not-found")
 	ErrAnalyticsDeleteFailed        = errors.New("analytics.errors.delete-failed")
@@ -269,7 +269,7 @@ var (
 )
 
 // ErrIngressNotAllowed is the /api/ingress/create refusal of the cloud edition
-// (pnmmanager) for a tenant without an ingress capacity.
+// for a tenant without an ingress capacity.
 var ErrIngressNotAllowed = errors.New("ingress.errors.not-allowed")
 
 // MsgSuccess is the generic success message of the response envelopes. It is an

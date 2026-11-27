@@ -198,6 +198,10 @@ type AIAgent struct {
 	// redisService persists the session telemetry; nil in tests without a store.
 	redisService *redisservice.RedisService
 
+	// estimateCost prices a telemetry snapshot, so the flush carries the live
+	// cost of the session; nil disables the estimate.
+	estimateCost func(t *redisservice.AIAgentSessionTelemetry) (tokenCost, avatarCost float64)
+
 	// summarize rolls the conversation summary forward in the background; nil
 	// when the service configures no summarize model.
 	summarize func(ctx context.Context, history []*plugnmeet.InsightsAITextChatContent) (summary string, promptTokens, completionTokens uint32, err error)
@@ -340,6 +344,8 @@ type AIAgentArgs struct {
 	// Avatar is the realtime avatar of the session; nil when the session runs
 	// without one.
 	Avatar *AIAgentAvatarConfig
+	// EstimateCost prices a telemetry snapshot for the live cost tracking.
+	EstimateCost func(t *redisservice.AIAgentSessionTelemetry) (tokenCost, avatarCost float64)
 }
 
 // AIAgentAvatarConfig is everything needed to start the realtime avatar of a
@@ -392,6 +398,8 @@ type aiAgentCoreArgs struct {
 	// Avatar configures the realtime avatar of the session; nil runs the agent
 	// without one, publishing its voice as a track.
 	Avatar *AIAgentAvatarConfig
+	// EstimateCost prices a telemetry snapshot for the live cost tracking.
+	EstimateCost func(t *redisservice.AIAgentSessionTelemetry) (tokenCost, avatarCost float64)
 }
 
 // NewAIAgent connects a realtime provider session plus a visible LiveKit
@@ -487,6 +495,7 @@ func NewAIAgent(args *AIAgentArgs) (*AIAgent, error) {
 		SummarizeWindow:   args.ServiceConfig.GetIntOption("context_window", defaultAISummarizeWindow),
 		PreviousTelemetry: args.PreviousTelemetry,
 		Avatar:            args.Avatar,
+		EstimateCost:      args.EstimateCost,
 	})
 	if err != nil {
 		return nil, err
@@ -695,6 +704,7 @@ func newAIAgent(args *aiAgentCoreArgs) (*AIAgent, error) {
 		learner:         args.Learner,
 		maxAudio:        time.Duration(maxAudioMinutes) * time.Minute,
 		redisService:    args.RedisService,
+		estimateCost:    args.EstimateCost,
 		customProvider:  args.CustomProvider,
 		summarize:       args.Summarize,
 		summarizeWindow: args.SummarizeWindow,

@@ -7,12 +7,15 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
+	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 )
 
 // clampAIAgentChatText trims a participant's AI Chat message and caps it at the same bound as the server-side context injection.
@@ -83,13 +86,9 @@ func (s *InsightsModel) TranscriptionConfigure(req *plugnmeet.InsightsTranscript
 }
 
 func (s *InsightsModel) EndTranscription(roomId string) error {
-	err := s.EndRoomAgentTaskByServiceName(insights.ServiceTypeTranscription, roomId, 5*time.Second)
-	if err != nil {
+	if err := s.EndRoomAgentTaskByServiceName(insights.ServiceTypeTranscription, roomId, 5*time.Second); err != nil {
 		return err
 	}
-
-	// analytics
-	s.artifactModel.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_TRANSCRIPTION_STATUS, new(plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()), nil)
 
 	return s.broadcastEndTranscription(roomId)
 }
@@ -113,6 +112,9 @@ func (s *InsightsModel) broadcastEndTranscription(roomId string) error {
 	tf.IsEnabled = false
 	tf.IsEnabledTranslation = false
 	tf.IsEnabledSpeechSynthesis = false
+
+	// analytics
+	s.artifactModel.HandleAnalyticsEvent(roomId, plugnmeet.AnalyticsEvents_ANALYTICS_EVENT_ROOM_INSIGHTS_TRANSCRIPTION_STATUS, new(plugnmeet.AnalyticsStatus_ANALYTICS_STATUS_ENDED.String()), nil)
 
 	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
 }
@@ -270,9 +272,11 @@ func (s *InsightsModel) ExecuteChatTranslation(ctx context.Context, req *plugnme
 		return nil, err
 	}
 
-	if err := s.redisService.UpdateChatTranslationUsage(ctx, roomId, userId, len(opts.Text)); err != nil {
+	charCount := utf8.RuneCountInString(opts.Text)
+	if err := s.redisService.UpdateChatTranslationUsage(ctx, roomId, userId, charCount); err != nil {
 		s.logger.WithError(err).Error("failed to update chat translation usage")
 	}
+	s.addLiveChatTranslationCost(ctx, roomId, charCount)
 
 	res := &plugnmeet.InsightsTranslateTextRes{
 		Status: true,
@@ -280,6 +284,22 @@ func (s *InsightsModel) ExecuteChatTranslation(ctx context.Context, req *plugnme
 		Result: result.(*plugnmeet.InsightsTextTranslationResult),
 	}
 	return res, nil
+}
+
+// addLiveChatTranslationCost adds the price of the translated characters to the
+// room's live cost; a service without a pricing block books nothing.
+func (s *InsightsModel) addLiveChatTranslationCost(ctx context.Context, roomId string, charCount int) {
+	if charCount <= 0 {
+		return
+	}
+	pricing, err := s.appConfig.Insights.GetServiceModelPricing(insights.ServiceTypeTranslation, "default")
+	if err != nil || pricing.PricePerMillionCharacters <= 0 {
+		return
+	}
+	delta := (float64(charCount) / 1000000.0) * pricing.PricePerMillionCharacters
+	if err := s.redisService.IncrInsightsLiveCost(ctx, roomId, redisservice.LiveCostFieldChatTranslation, delta); err != nil {
+		s.logger.WithError(err).Error("failed to update chat translation live cost")
+	}
 }
 
 func (s *InsightsModel) ChatEndTranslation(roomId string) error {
@@ -292,7 +312,7 @@ func (s *InsightsModel) ChatEndTranslation(roomId string) error {
 	}
 
 	chatTranslationFeatures := metadata.RoomFeatures.InsightsFeatures.GetChatTranslationFeatures()
-	if chatTranslationFeatures == nil {
+	if chatTranslationFeatures == nil || !chatTranslationFeatures.IsEnabled {
 		return nil
 	}
 
@@ -481,7 +501,7 @@ func (s *InsightsModel) EndAITextChat(roomId string) error {
 	}
 
 	aiTextChatFeatures := metadata.RoomFeatures.InsightsFeatures.GetAiFeatures().GetAiTextChatFeatures()
-	if aiTextChatFeatures == nil {
+	if aiTextChatFeatures == nil || !aiTextChatFeatures.IsEnabled {
 		return nil
 	}
 
@@ -552,15 +572,29 @@ func (s *InsightsModel) EndEndAIMeetingSummarization(roomId string) error {
 	if metadata == nil {
 		return fmt.Errorf("empty room medata")
 	}
-
-	meetingSummarizationFeatures := metadata.RoomFeatures.InsightsFeatures.GetAiFeatures().GetMeetingSummarizationFeatures()
-	if meetingSummarizationFeatures == nil {
+	if !metadata.RoomFeatures.InsightsFeatures.GetAiFeatures().GetMeetingSummarizationFeatures().GetIsEnabled() {
 		return nil
 	}
 
-	err = s.EndRoomAgentTaskByServiceName(insights.ServiceTypeMeetingSummarizing, roomId, 5*time.Second)
+	if err := s.EndRoomAgentTaskByServiceName(insights.ServiceTypeMeetingSummarizing, roomId, 5*time.Second); err != nil {
+		return err
+	}
+
+	return s.broadcastEndAIMeetingSummarization(roomId)
+}
+
+func (s *InsightsModel) broadcastEndAIMeetingSummarization(roomId string) error {
+	metadata, err := s.natsService.GetRoomMetadataStruct(roomId)
 	if err != nil {
 		return err
+	}
+	if metadata == nil {
+		return fmt.Errorf("empty room medata")
+	}
+
+	meetingSummarizationFeatures := metadata.RoomFeatures.InsightsFeatures.GetAiFeatures().GetMeetingSummarizationFeatures()
+	if meetingSummarizationFeatures == nil || !meetingSummarizationFeatures.IsEnabled {
+		return nil
 	}
 
 	// analytics
@@ -568,4 +602,31 @@ func (s *InsightsModel) EndEndAIMeetingSummarization(roomId string) error {
 
 	meetingSummarizationFeatures.IsEnabled = false
 	return s.natsService.UpdateAndBroadcastRoomMetadata(roomId, metadata)
+}
+
+// StopRoomInsightsServices stops every active insights service in a running room, disables the insights flags in
+// the room metadata, and harvests the usage artifacts accumulated so far without closing the room itself.
+func (s *InsightsModel) StopRoomInsightsServices(ctx context.Context, roomId, roomSid string, dbTableId uint64) {
+	log := s.logger.WithFields(logrus.Fields{
+		"room_id":       roomId,
+		"room_sid":      roomSid,
+		"room_table_id": dbTableId,
+		"method":        "StopRoomInsightsServices",
+	})
+
+	if err := s.EndRoomAllAgentTasks(roomId); err != nil {
+		log.WithError(err).Warn("failed to stop insights room agents")
+	}
+
+	_ = s.broadcastEndTranscription(roomId)
+	_ = s.ChatEndTranslation(roomId)
+	_ = s.EndAITextChat(roomId)
+	_ = s.broadcastEndAIMeetingSummarization(roomId)
+
+	// If an AI agent session ran in this room and was not an auto-closing per-user breakout room,
+	// finalize its summary and usage artifact now.
+	s.aiAgentModel.FinalizeSession(ctx, dbTableId, roomId, roomSid)
+
+	// Harvest all remaining usage artifacts and clear the room's live cost key.
+	s.artifactModel.CreateAllRoomUsageArtifacts(roomId, roomSid, dbTableId, log)
 }
