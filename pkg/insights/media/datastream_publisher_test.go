@@ -579,6 +579,62 @@ func TestDataStreamAudioPublisherFlush(t *testing.T) {
 	}
 }
 
+// SendAppMessage is how an avatar provider receives app messages: reliable, on
+// the requested topic, addressed to the avatar only.
+func TestDataStreamAudioPublisherSendAppMessage(t *testing.T) {
+	streams := &fakeStreamFactory{}
+	p := newTestPublisherWithReadiness(t, streams, func() bool { return true }, DefaultReadyTimeout)
+
+	var gotData []byte
+	var gotOptions int
+	p.publishData = func(data []byte, opts ...lksdk.DataPublishOption) error {
+		gotData = append([]byte(nil), data...)
+		gotOptions = len(opts)
+		return nil
+	}
+
+	if err := p.SendAppMessage("app_messages", []byte(`{"a":1}`)); err != nil {
+		t.Fatalf("SendAppMessage returned error: %v", err)
+	}
+	if string(gotData) != `{"a":1}` {
+		t.Errorf("published data = %q", gotData)
+	}
+	if gotOptions != 3 {
+		t.Errorf("published %d options, want reliable, topic and destination", gotOptions)
+	}
+}
+
+// A destination that has not joined yet must not block the caller for the whole
+// readiness timeout, it reports an error so the caller can retry later.
+func TestDataStreamAudioPublisherSendAppMessageDestinationMissing(t *testing.T) {
+	streams := &fakeStreamFactory{}
+	p := newTestPublisherWithReadiness(t, streams, func() bool { return false }, DefaultReadyTimeout)
+
+	published := false
+	p.publishData = func(data []byte, opts ...lksdk.DataPublishOption) error {
+		published = true
+		return nil
+	}
+
+	if err := p.SendAppMessage("app_messages", []byte(`{}`)); err == nil {
+		t.Fatal("expected an error while the destination has not joined")
+	}
+	if published {
+		t.Fatal("the message must not be published before the destination joined")
+	}
+}
+
+func TestDataStreamAudioPublisherSendAppMessageClosed(t *testing.T) {
+	p := newTestDataStreamPublisher(t, DefaultSampleRate16k, &fakeStreamFactory{}, newFakeRPC().call)
+	p.publishData = func(data []byte, opts ...lksdk.DataPublishOption) error { return nil }
+
+	p.Close()
+
+	if err := p.SendAppMessage("app_messages", []byte(`{}`)); err == nil {
+		t.Fatal("expected an error after Close")
+	}
+}
+
 func TestDataStreamAudioPublisherClose(t *testing.T) {
 	streams := &fakeStreamFactory{}
 	rpc := newFakeRPC()

@@ -88,6 +88,13 @@ type audioPublisher interface {
 	RemainingDuration() time.Duration
 }
 
+// appMessagePublisher is the publisher subset that can send a LiveKit app
+// message to the avatar. Only the datastream publisher implements it, which is
+// what every avatar session runs on.
+type appMessagePublisher interface {
+	SendAppMessage(topic string, payload []byte) error
+}
+
 // activeAIAgents holds the AI agents hosted by this process, keyed by room id.
 // Only the leader that owns the room's LiveKit connection appears here; the
 // model layer routes room-scoped control calls through it.
@@ -250,6 +257,10 @@ type AIAgent struct {
 	// priorAvatarMillis is the avatar duration of the earlier session of the
 	// room, so a restart continues the budget instead of resetting it.
 	priorAvatarMillis uint64
+	// avatarEmotion is the emotion the avatar already accepted, guarded by
+	// emotionMu. It keeps the state loop from repeating the same app message.
+	avatarEmotion string
+	emotionMu     sync.Mutex
 
 	inAudio chan mediasdk.PCM16Sample
 
@@ -1270,7 +1281,52 @@ func (a *AIAgent) setToolState(state plugnmeet.AIAgentRuntimeState, tool string)
 	a.broadcast(snapshot)
 }
 
+// tavusEmotionForState maps a runtime state to the emotion of the avatar: it smiles while speaking and stays calm otherwise.
+func tavusEmotionForState(state plugnmeet.AIAgentRuntimeState) string {
+	if state == plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_SPEAKING {
+		return avatarservice.TavusEmotionHappiness
+	}
+
+	return avatarservice.TavusEmotionNeutral
+}
+
+// syncAvatarEmotion forwards the state as an emotion to a Tavus avatar.
+// The emotion is recorded only once the avatar accepted it: a bot that is still joining drops the message,
+// so the next state change sends it again.
+func (a *AIAgent) syncAvatarEmotion(snapshot aiAgentRuntimeState) {
+	if a.avatarProvider != string(config.ProviderTavus) {
+		return
+	}
+	publisher, ok := a.publisher.(appMessagePublisher)
+	if !ok {
+		return
+	}
+
+	emotion := tavusEmotionForState(snapshot.state)
+	a.emotionMu.Lock()
+	sent := a.avatarEmotion == emotion
+	a.emotionMu.Unlock()
+	if sent {
+		return
+	}
+
+	payload, err := avatarservice.TavusEmotionPayload(emotion)
+	if err != nil {
+		return
+	}
+	if err := publisher.SendAppMessage(avatarservice.TavusAppMessagesTopic, payload); err != nil {
+		a.logger.WithError(err).Debug("ai agent: the avatar emotion could not be sent")
+		return
+	}
+
+	a.emotionMu.Lock()
+	a.avatarEmotion = emotion
+	a.emotionMu.Unlock()
+}
+
 func (a *AIAgent) broadcast(snapshot aiAgentRuntimeState) {
+	a.syncAvatarEmotion(snapshot)
+
 	if a.transport == nil {
 		return
 	}

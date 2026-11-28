@@ -2,6 +2,8 @@ package insightsservice
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -27,13 +29,21 @@ import (
 	redisservice "github.com/mynaparrot/plugnmeet-server/pkg/services/redis"
 )
 
+// recordingAppMessage is one app message sent to the avatar.
+type recordingAppMessage struct {
+	topic   string
+	payload []byte
+}
+
 type recordingPublisher struct {
-	mu           sync.Mutex
-	written      []byte
-	flushes      int
-	segments     int
-	closed       bool
-	playoutUntil time.Time
+	mu              sync.Mutex
+	written         []byte
+	flushes         int
+	segments        int
+	closed          bool
+	playoutUntil    time.Time
+	appMessages     []recordingAppMessage
+	failAppMessages bool
 }
 
 func (p *recordingPublisher) Write(data []byte) (int, error) {
@@ -78,6 +88,42 @@ func (p *recordingPublisher) Close() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.closed = true
+}
+
+// SendAppMessage records the app messages sent to the avatar; failAppMessages
+// makes them fail, as an avatar that has not joined the room yet would.
+func (p *recordingPublisher) SendAppMessage(topic string, payload []byte) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.failAppMessages {
+		return errors.New("destination participant has not joined the room")
+	}
+	p.appMessages = append(p.appMessages, recordingAppMessage{topic: topic, payload: append([]byte(nil), payload...)})
+	return nil
+}
+
+func (p *recordingPublisher) setAppMessageFailure(fail bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.failAppMessages = fail
+}
+
+func (p *recordingPublisher) emotionMessages() []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	emotions := make([]string, 0, len(p.appMessages))
+	for _, msg := range p.appMessages {
+		var payload struct {
+			Properties struct {
+				Emotion string `json:"emotion"`
+			} `json:"properties"`
+		}
+		if err := json.Unmarshal(msg.payload, &payload); err != nil {
+			continue
+		}
+		emotions = append(emotions, msg.topic+":"+payload.Properties.Emotion)
+	}
+	return emotions
 }
 
 func (p *recordingPublisher) snapshot() (written []byte, flushes int) {

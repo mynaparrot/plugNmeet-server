@@ -6,7 +6,9 @@ import (
 
 	"github.com/mynaparrot/plugnmeet-protocol/plugnmeet"
 
+	"github.com/mynaparrot/plugnmeet-server/pkg/config"
 	"github.com/mynaparrot/plugnmeet-server/pkg/insights"
+	avatarservice "github.com/mynaparrot/plugnmeet-server/pkg/insights/providers/avatar"
 )
 
 func waitForAgentState(t *testing.T, env *agentTestEnv, want plugnmeet.AIAgentRuntimeState, what string) {
@@ -194,4 +196,82 @@ func TestAIAgentThinkingFallsBackToListening(t *testing.T) {
 	env.session.Push(insights.RealtimeEvent{Type: insights.RealtimeEventThinking})
 	waitForAgentState(t, env, plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_THINKING, "thinking state")
 	waitForAgentState(t, env, plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING, "listening after the thinking timeout")
+}
+
+// newTavusAgentEnv builds an agent whose avatar runs on Tavus.
+func newTavusAgentEnv(t *testing.T) *agentTestEnv {
+	t.Helper()
+	return newAgentTestEnv(t, nil, func(args *aiAgentCoreArgs) {
+		args.Avatar = &AIAgentAvatarConfig{Provider: config.ProviderTavus}
+	})
+}
+
+// The Tavus avatar follows the runtime state as an emotion: it smiles while the
+// agent speaks and stays neutral otherwise.
+func TestAIAgentSyncsTavusEmotion(t *testing.T) {
+	env := newTavusAgentEnv(t)
+	wantTopic := avatarservice.TavusAppMessagesTopic + ":"
+
+	// The listening state of the start already reached the avatar.
+	started := len(env.publisher.emotionMessages())
+
+	env.session.Push(insights.RealtimeEvent{Type: insights.RealtimeEventAudioDelta, AudioPCM24k: []byte{1, 2, 3, 4}})
+	waitForAgentState(t, env, plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_SPEAKING, "speaking state")
+
+	emotions := env.publisher.emotionMessages()
+	if len(emotions) != started+1 || emotions[started] != wantTopic+avatarservice.TavusEmotionHappiness {
+		t.Fatalf("emotion messages = %v, want the happiness emotion", emotions)
+	}
+
+	// The rest of the turn keeps the state, so the emotion is not repeated.
+	env.session.Push(insights.RealtimeEvent{Type: insights.RealtimeEventAudioDelta, AudioPCM24k: []byte{1, 2, 3, 4}})
+	env.session.Push(insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete})
+	waitForAgentState(t, env, plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING, "listening state")
+
+	emotions = env.publisher.emotionMessages()
+	if len(emotions) != started+2 || emotions[started+1] != wantTopic+avatarservice.TavusEmotionNeutral {
+		t.Fatalf("emotion messages = %v, want a single neutral emotion after the turn", emotions)
+	}
+}
+
+// An avatar that has not joined the room drops the message, so the emotion must
+// be sent again on the next state change instead of being considered delivered.
+func TestAIAgentRetriesTavusEmotionAfterAvatarJoins(t *testing.T) {
+	env := newTavusAgentEnv(t)
+	happiness := avatarservice.TavusAppMessagesTopic + ":" + avatarservice.TavusEmotionHappiness
+	env.publisher.setAppMessageFailure(true)
+
+	env.session.Push(insights.RealtimeEvent{Type: insights.RealtimeEventAudioDelta, AudioPCM24k: []byte{1, 2, 3, 4}})
+	waitForAgentState(t, env, plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_SPEAKING, "speaking state")
+	env.session.Push(insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete})
+	waitForAgentState(t, env, plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING, "listening state")
+
+	for _, emotion := range env.publisher.emotionMessages() {
+		if emotion == happiness {
+			t.Fatalf("emotion messages = %v, want the failed emotion to be dropped", env.publisher.emotionMessages())
+		}
+	}
+
+	env.publisher.setAppMessageFailure(false)
+	env.session.Push(insights.RealtimeEvent{Type: insights.RealtimeEventAudioDelta, AudioPCM24k: []byte{1, 2, 3, 4}})
+	waitForAgentState(t, env, plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_SPEAKING, "speaking state after the avatar joined")
+
+	emotions := env.publisher.emotionMessages()
+	if emotions[len(emotions)-1] != happiness {
+		t.Fatalf("emotion messages = %v, want the happiness emotion once the avatar joined", emotions)
+	}
+}
+
+// Only a Tavus avatar understands the emotion messages of the agent.
+func TestAIAgentSkipsEmotionForOtherAvatarProviders(t *testing.T) {
+	env := newAgentTestEnv(t, nil, func(args *aiAgentCoreArgs) {
+		args.Avatar = &AIAgentAvatarConfig{Provider: config.ProviderAnam}
+	})
+
+	env.session.Push(insights.RealtimeEvent{Type: insights.RealtimeEventAudioDelta, AudioPCM24k: []byte{1, 2, 3, 4}})
+	waitForAgentState(t, env, plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_SPEAKING, "speaking state")
+
+	if emotions := env.publisher.emotionMessages(); len(emotions) != 0 {
+		t.Fatalf("emotion messages = %v, want none for another provider", emotions)
+	}
 }

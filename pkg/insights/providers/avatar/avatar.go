@@ -28,6 +28,8 @@ const (
 	defaultAnamEndpoint = "https://api.anam.ai"
 	// defaultSimliEndpoint is the Simli API base URL.
 	defaultSimliEndpoint = "https://api.simli.ai"
+	// defaultTavusEndpoint is the Tavus API base URL.
+	defaultTavusEndpoint = "https://tavusapi.com/v2"
 
 	// defaultHTTPTimeout bounds a single provider API call.
 	defaultHTTPTimeout = 15 * time.Second
@@ -89,6 +91,8 @@ func StartSession(ctx context.Context, cfg StartConfig) (Session, error) {
 		return startAnam(ctx, client, cfg, endpointOrDefault(cfg.Endpoint, defaultAnamEndpoint))
 	case config.ProviderSimli:
 		return startSimli(ctx, client, cfg, endpointOrDefault(cfg.Endpoint, defaultSimliEndpoint))
+	case config.ProviderTavus:
+		return startTavus(ctx, client, cfg, endpointOrDefault(cfg.Endpoint, defaultTavusEndpoint))
 	default:
 		return nil, fmt.Errorf("avatar: unsupported provider %q", cfg.Provider)
 	}
@@ -161,16 +165,24 @@ type session struct {
 	provider   config.ProviderType
 	sessionID  string
 	sampleRate int
+	// closeFn ends the session on the provider side. Providers that terminate
+	// their bot when it leaves the LiveKit room leave it nil.
+	closeFn func(ctx context.Context) error
 }
 
 func (s *session) Provider() config.ProviderType { return s.provider }
 func (s *session) SessionID() string             { return s.sessionID }
 func (s *session) SampleRate() int               { return s.sampleRate }
 
-// Close is a no-op: every supported provider terminates the avatar bot when the
-// bot participant is removed from the LiveKit room, so closing the room is
-// enough and there is no session endpoint to call.
-func (s *session) Close(ctx context.Context) error { return nil }
+// Close ends the session on the provider side when the provider exposes an end
+// endpoint; otherwise closing the room removes the bot and nothing is left to do.
+func (s *session) Close(ctx context.Context) error {
+	if s.closeFn == nil {
+		return nil
+	}
+
+	return s.closeFn(ctx)
+}
 
 // beyondPresenceStartResponse is the subset of the session create response used.
 type beyondPresenceStartResponse struct {

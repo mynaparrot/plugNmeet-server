@@ -19,6 +19,7 @@ const (
 	ProviderAnam           ProviderType = "anam"
 	ProviderBeyondPresence ProviderType = "beyond_presence"
 	ProviderSimli          ProviderType = "simli"
+	ProviderTavus          ProviderType = "tavus"
 )
 
 // ModelPricing holds pricing information for a service. The token rates are a
@@ -51,7 +52,7 @@ type ModelPricing struct {
 type InsightsConfig struct {
 	Enabled bool `yaml:"enabled"`
 	// The key is the provider type ("azure", "google", "openai", "beyond_presence",
-	// "anam", "simli"), the value is a list of accounts.
+	// "anam", "simli", "tavus"), the value is a list of accounts.
 	Providers map[ProviderType][]ProviderAccount      `yaml:"providers"`
 	Services  map[insights.ServiceType]*ServiceConfig `yaml:"services"`
 }

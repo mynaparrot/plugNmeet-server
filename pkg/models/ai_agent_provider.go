@@ -324,7 +324,7 @@ func (m *AIAgentModel) aiAgentServiceConfig() *config.ServiceConfig {
 // server can drive.
 func isAllowedAIAgentAvatarProvider(provider config.ProviderType) bool {
 	switch provider {
-	case config.ProviderBeyondPresence, config.ProviderAnam, config.ProviderSimli:
+	case config.ProviderBeyondPresence, config.ProviderAnam, config.ProviderSimli, config.ProviderTavus:
 		return true
 	}
 

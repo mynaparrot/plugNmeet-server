@@ -285,6 +285,7 @@ func TestStartSessionDefaultsEndpointWhenOverrideIsEmpty(t *testing.T) {
 		{config.ProviderBeyondPresence, defaultBeyondPresenceEndpoint},
 		{config.ProviderAnam, defaultAnamEndpoint},
 		{config.ProviderSimli, defaultSimliEndpoint},
+		{config.ProviderTavus, defaultTavusEndpoint},
 	}
 
 	for _, tt := range tests {
@@ -293,7 +294,7 @@ func TestStartSessionDefaultsEndpointWhenOverrideIsEmpty(t *testing.T) {
 			// Uses a stub client so the default endpoint is only inspected, not dialed.
 			var gotURL string
 			cfg.HTTPClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
-				gotURL = req.URL.Scheme + "://" + req.URL.Host
+				gotURL = req.URL.Scheme + "://" + req.URL.Host + req.URL.Path
 				if req.URL.Host == "" {
 					t.Fatalf("unexpected request url: %s", req.URL.String())
 				}
@@ -303,8 +304,10 @@ func TestStartSessionDefaultsEndpointWhenOverrideIsEmpty(t *testing.T) {
 			if _, err := StartSession(context.Background(), cfg); err == nil {
 				t.Fatal("expected an error from the stub transport")
 			}
-			if gotURL != tt.want {
-				t.Errorf("request base url = %q, want %q", gotURL, tt.want)
+			// The request must go to the default endpoint of the provider; a
+			// default that carries a version path is a prefix of it.
+			if !strings.HasPrefix(gotURL, tt.want) {
+				t.Errorf("request url = %q, want it to start with %q", gotURL, tt.want)
 			}
 		})
 	}
@@ -382,6 +385,13 @@ func TestStartSessionNon2xxError(t *testing.T) {
 			body:     `{"message":"simli boom"}`,
 			wantIn:   []string{"simli", "500", "simli boom"},
 		},
+		{
+			name:     "tavus",
+			provider: config.ProviderTavus,
+			status:   http.StatusForbidden,
+			body:     `{"message":"invalid pal"}`,
+			wantIn:   []string{"tavus", "403", "invalid pal"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -435,6 +445,7 @@ func TestStartSessionMissingResponseFields(t *testing.T) {
 		{"beyond_presence missing id", config.ProviderBeyondPresence, `{}`, "missing id"},
 		{"anam missing sessionId", config.ProviderAnam, `{}`, "missing sessionId"},
 		{"simli missing session_token", config.ProviderSimli, `{}`, "missing session_token"},
+		{"tavus missing conversation_id", config.ProviderTavus, `{}`, "missing conversation_id"},
 	}
 
 	for _, tt := range tests {
@@ -607,6 +618,15 @@ func TestStartSessionCustomAuthHeader(t *testing.T) {
 			wantValue:  testAPIKey,
 			defaults:   []string{"x-simli-api-key"},
 		},
+		{
+			name:       "tavus custom header",
+			provider:   config.ProviderTavus,
+			header:     "x-tavus-gateway",
+			apiKey:     testAPIKey,
+			wantHeader: "x-tavus-gateway",
+			wantValue:  testAPIKey,
+			defaults:   []string{"x-api-key"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -631,6 +651,8 @@ func TestStartSessionCustomAuthHeader(t *testing.T) {
 						return
 					}
 					_, _ = w.Write([]byte(`{"session_id":"simli-session-1"}`))
+				case config.ProviderTavus:
+					_, _ = w.Write([]byte(`{"conversation_id":"tavus-conversation-1"}`))
 				}
 			}))
 			defer srv.Close()

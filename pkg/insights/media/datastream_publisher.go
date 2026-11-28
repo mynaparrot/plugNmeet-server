@@ -23,6 +23,10 @@ const (
 	// so the receiver's call succeeds instead of failing with UNSUPPORTED_METHOD,
 	// which it would otherwise retry three times per segment.
 	AudioStreamPlaybackFinishedMethod = "lk.playback_finished"
+	// AudioStreamPlaybackStartedMethod is the matching RPC of the same receiver
+	// when the avatar worker waits for the playout to start. It is registered as
+	// a no-op for the same reason.
+	AudioStreamPlaybackStartedMethod = "lk.playback_started"
 	// clearBufferRPCTimeout bounds the clear RPC so a silent client cannot leave
 	// the call hanging.
 	clearBufferRPCTimeout = 1500 * time.Millisecond
@@ -51,6 +55,10 @@ type openByteStreamFunc func(options lksdk.StreamBytesOptions) byteStreamWriter
 // room.LocalParticipant.PerformRpc.
 type performRPCFunc func(params lksdk.PerformRpcParams) (*string, error)
 
+// publishDataFunc publishes a data packet. In production it wraps
+// room.LocalParticipant.PublishDataPacket.
+type publishDataFunc func(data []byte, opts ...lksdk.DataPublishOption) error
+
 // DataStreamAudioPublisher sends agent audio to a single participant over a
 // LiveKit byte stream instead of a published track. Each segment (one turn of
 // speech) is its own stream, so a client can tell where speech starts and ends,
@@ -61,8 +69,9 @@ type DataStreamAudioPublisher struct {
 	targetSampleRate    int
 	numChannels         int
 
-	openStream openByteStreamFunc
-	performRPC performRPCFunc
+	openStream  openByteStreamFunc
+	performRPC  performRPCFunc
+	publishData publishDataFunc
 
 	// waitReady reports whether the destination participant is in the room, so
 	// the stream opens only once there is someone to receive it. An avatar bot
@@ -112,6 +121,9 @@ func NewDataStreamAudioPublisher(room *lksdk.Room, destinationIdentity string, t
 		performRPC: func(params lksdk.PerformRpcParams) (*string, error) {
 			return localParticipant.PerformRpc(params)
 		},
+		publishData: func(data []byte, opts ...lksdk.DataPublishOption) error {
+			return localParticipant.PublishDataPacket(lksdk.UserData(data), opts...)
+		},
 		// Only the presence of the destination participant is required. Avatar
 		// workers built on livekit-agents' AvatarRunner use _lazy_publish = True
 		// by default, so their Camera/Mic tracks are published only after the
@@ -138,8 +150,32 @@ func NewDataStreamAudioPublisher(room *lksdk.Room, destinationIdentity string, t
 		publisher.onPlaybackFinished(data.CallerIdentity)
 		return "", nil
 	})
+	_ = room.RegisterRpcMethod(AudioStreamPlaybackStartedMethod, func(data lksdk.RpcInvocationData) (string, error) {
+		return "", nil
+	})
 
 	return publisher, nil
+}
+
+// SendAppMessage publishes payload on topic to the destination participant as
+// reliable data. A destination that has not joined yet reports an error instead
+// of blocking, so the caller can retry on its next state change.
+func (p *DataStreamAudioPublisher) SendAppMessage(topic string, payload []byte) error {
+	if p.isClosed() {
+		return errors.New("datastream audio publisher is closed")
+	}
+	if p.publishData == nil {
+		return errors.New("datastream audio publisher: data publishing is unavailable")
+	}
+	if p.waitReady != nil && !p.waitReady() {
+		return fmt.Errorf("datastream audio publisher: destination participant %q has not joined the room", p.destinationIdentity)
+	}
+
+	return p.publishData(payload,
+		lksdk.WithDataPublishReliable(true),
+		lksdk.WithDataPublishTopic(topic),
+		lksdk.WithDataPublishDestination([]string{p.destinationIdentity}),
+	)
 }
 
 // onPlaybackFinished drops the playout horizon once the destination reports that
