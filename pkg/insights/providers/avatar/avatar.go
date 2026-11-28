@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -30,6 +31,8 @@ const (
 	defaultSimliEndpoint = "https://api.simli.ai"
 	// defaultTavusEndpoint is the Tavus API base URL.
 	defaultTavusEndpoint = "https://tavusapi.com/v2"
+	// defaultHeyGenEndpoint is the HeyGen LiveAvatar sessions API base URL.
+	defaultHeyGenEndpoint = "https://api.liveavatar.com/v1/sessions"
 
 	// defaultHTTPTimeout bounds a single provider API call.
 	defaultHTTPTimeout = 15 * time.Second
@@ -51,7 +54,13 @@ type StartConfig struct {
 	AuthHeader   string
 	LiveKitURL   string
 	LiveKitToken string
-	HTTPClient   *http.Client // optional; defaults to 15s timeout client
+	// LiveKitRoom is the room id the avatar joins; only the providers that
+	// configure the room explicitly use it.
+	LiveKitRoom string
+	HTTPClient  *http.Client // optional; defaults to 15s timeout client
+	// DialContext overrides the websocket dialer, for tests or a custom
+	// network path.
+	DialContext func(ctx context.Context, network, addr string) (net.Conn, error)
 }
 
 // Session is a started avatar session.
@@ -60,6 +69,17 @@ type Session interface {
 	SessionID() string
 	SampleRate() int
 	Close(ctx context.Context) error
+}
+
+// AudioPublisher is the one shape every agent-voice sink implements: a LiveKit
+// track, a datastream segment, or an avatar session socket. EndSegment closes the
+// current utterance, which a continuous track has nothing to do for.
+type AudioPublisher interface {
+	Write(data []byte) (int, error)
+	EndSegment()
+	Flush()
+	Close()
+	RemainingDuration() time.Duration
 }
 
 // StartSession creates a provider session and returns its handle. The provider
@@ -93,6 +113,12 @@ func StartSession(ctx context.Context, cfg StartConfig) (Session, error) {
 		return startSimli(ctx, client, cfg, endpointOrDefault(cfg.Endpoint, defaultSimliEndpoint))
 	case config.ProviderTavus:
 		return startTavus(ctx, client, cfg, endpointOrDefault(cfg.Endpoint, defaultTavusEndpoint))
+	case config.ProviderHeyGen:
+		return startHeyGen(ctx, client, cfg, endpointOrDefault(cfg.Endpoint, defaultHeyGenEndpoint))
+	case config.ProviderLiveKitDataStream:
+		return startGenericDataStream(ctx, client, cfg)
+	case config.ProviderWebSocket:
+		return startGenericWebSocket(ctx, client, cfg)
 	default:
 		return nil, fmt.Errorf("avatar: unsupported provider %q", cfg.Provider)
 	}

@@ -288,8 +288,19 @@ func (m *AIAgentModel) resolveAIAgentAvatarConfig(ctx context.Context, roomId st
 	if endpoint == "" && account != nil {
 		endpoint = strings.TrimSpace(account.GetOptionsString("endpoint", ""))
 	}
-	if endpoint != "" && !isAllowedAgentCustomProviderEndpoint(endpoint) {
+	if endpoint == "" && isGenericAIAgentAvatarProvider(provider) {
 		return "", "", "", "", "", false, config.ErrAIAgentInvalidRequest
+	}
+	// A websocket provider may point at the wss endpoint of the avatar server
+	// directly; the public host check runs on the https form of the same URL.
+	if endpoint != "" {
+		checked := endpoint
+		if provider == config.ProviderWebSocket && strings.HasPrefix(strings.ToLower(endpoint), "wss://") {
+			checked = "https://" + endpoint[len("wss://"):]
+		}
+		if !isAllowedAgentCustomProviderEndpoint(checked) {
+			return "", "", "", "", "", false, config.ErrAIAgentInvalidRequest
+		}
 	}
 
 	authHeader = strings.TrimSpace(avatar.GetAuthHeader())
@@ -324,11 +335,18 @@ func (m *AIAgentModel) aiAgentServiceConfig() *config.ServiceConfig {
 // server can drive.
 func isAllowedAIAgentAvatarProvider(provider config.ProviderType) bool {
 	switch provider {
-	case config.ProviderBeyondPresence, config.ProviderAnam, config.ProviderSimli, config.ProviderTavus:
+	case config.ProviderBeyondPresence, config.ProviderAnam, config.ProviderSimli, config.ProviderTavus,
+		config.ProviderHeyGen, config.ProviderLiveKitDataStream, config.ProviderWebSocket:
 		return true
 	}
 
 	return false
+}
+
+// isGenericAIAgentAvatarProvider reports that the host supplies the endpoint of
+// the avatar server, so the provider cannot work without one.
+func isGenericAIAgentAvatarProvider(provider config.ProviderType) bool {
+	return provider == config.ProviderLiveKitDataStream || provider == config.ProviderWebSocket
 }
 
 // parentRoomID returns the plain room id of a breakout room's parent, and "" for

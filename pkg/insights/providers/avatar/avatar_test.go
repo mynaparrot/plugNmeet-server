@@ -286,6 +286,7 @@ func TestStartSessionDefaultsEndpointWhenOverrideIsEmpty(t *testing.T) {
 		{config.ProviderAnam, defaultAnamEndpoint},
 		{config.ProviderSimli, defaultSimliEndpoint},
 		{config.ProviderTavus, defaultTavusEndpoint},
+		{config.ProviderHeyGen, defaultHeyGenEndpoint},
 	}
 
 	for _, tt := range tests {
@@ -336,6 +337,10 @@ func TestStartSessionValidation(t *testing.T) {
 		{"missing livekit url", func(c *StartConfig) { c.LiveKitURL = "" }, "livekit url is required"},
 		{"missing livekit token", func(c *StartConfig) { c.LiveKitToken = "" }, "livekit token is required"},
 		{"unsupported provider", func(c *StartConfig) { c.Provider = config.ProviderOpenAI }, "unsupported provider"},
+		{"generic provider without endpoint", func(c *StartConfig) {
+			c.Provider = config.ProviderLiveKitDataStream
+			c.Endpoint = ""
+		}, "endpoint is required"},
 	}
 
 	for _, tt := range tests {
@@ -446,6 +451,8 @@ func TestStartSessionMissingResponseFields(t *testing.T) {
 		{"anam missing sessionId", config.ProviderAnam, `{}`, "missing sessionId"},
 		{"simli missing session_token", config.ProviderSimli, `{}`, "missing session_token"},
 		{"tavus missing conversation_id", config.ProviderTavus, `{}`, "missing conversation_id"},
+		{"heygen missing session_token", config.ProviderHeyGen, `{}`, "missing session_id or session_token"},
+		{"websocket missing ws_url", config.ProviderWebSocket, `{}`, "missing ws_url"},
 	}
 
 	for _, tt := range tests {

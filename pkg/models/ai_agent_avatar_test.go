@@ -553,7 +553,7 @@ func TestValidateAIAgentFeaturesAvatarRules(t *testing.T) {
 	t.Run("unknown provider", func(t *testing.T) {
 		m := newModel(newAvatarTestConfig().Insights)
 		avatar := valid()
-		avatar.Provider = ptrTo("heygen")
+		avatar.Provider = ptrTo("not_a_provider")
 		if err := m.ValidateAIAgentFeatures(avatarFeatures(avatar), nil, true); !errors.Is(err, config.ErrAIAgentInvalidRequest) {
 			t.Fatalf("err = %v, want %v", err, config.ErrAIAgentInvalidRequest)
 		}
@@ -596,4 +596,46 @@ func TestValidateAIAgentFeaturesAvatarRules(t *testing.T) {
 			t.Fatalf("err = %v, want %v", err, config.ErrAIAgentInvalidRequest)
 		}
 	})
+}
+
+// A generic avatar provider needs the endpoint of its server, and a websocket
+// endpoint is checked through the https form of the same URL.
+func TestResolveAIAgentAvatarConfigGenericProviders(t *testing.T) {
+	ctx := context.Background()
+	m := newAIAgentTestModel(newAIAgentTestRedis(t))
+	m.appConfig = newAvatarTestConfig()
+
+	features := func(provider, endpoint string) *plugnmeet.InsightsAIAgentFeatures {
+		avatar := &plugnmeet.InsightsAIAgentAvatarConfig{
+			IsEnabled: true,
+			Provider:  ptrTo(provider),
+			AvatarId:  ptrTo("avatar-1"),
+			ApiKey:    ptrTo("avatar-secret"),
+		}
+		if endpoint != "" {
+			avatar.Endpoint = ptrTo(endpoint)
+		}
+		return avatarFeatures(avatar)
+	}
+
+	for _, provider := range []config.ProviderType{config.ProviderLiveKitDataStream, config.ProviderWebSocket} {
+		if _, _, _, _, _, _, err := m.resolveAIAgentAvatarConfig(ctx, "", features(string(provider), "")); !errors.Is(err, config.ErrAIAgentInvalidRequest) {
+			t.Errorf("%s without endpoint: err = %v, want %v", provider, err, config.ErrAIAgentInvalidRequest)
+		}
+	}
+
+	provider, _, _, endpoint, _, _, err := m.resolveAIAgentAvatarConfig(ctx, "", features("websocket", "wss://8.8.8.8/avatar"))
+	if err != nil || provider != config.ProviderWebSocket || endpoint != "wss://8.8.8.8/avatar" {
+		t.Errorf("resolved = %q/%q (err %v), want the websocket endpoint kept", provider, endpoint, err)
+	}
+
+	// the same host check refuses a wss endpoint on a private address
+	if _, _, _, _, _, _, err := m.resolveAIAgentAvatarConfig(ctx, "", features("websocket", "wss://127.0.0.1/avatar")); !errors.Is(err, config.ErrAIAgentInvalidRequest) {
+		t.Errorf("private wss endpoint: err = %v, want %v", err, config.ErrAIAgentInvalidRequest)
+	}
+
+	// heygen has a base URL of its own, so it needs no endpoint
+	if provider, _, _, _, _, _, err := m.resolveAIAgentAvatarConfig(ctx, "", features("heygen", "")); err != nil || provider != config.ProviderHeyGen {
+		t.Errorf("heygen resolved = %q (err %v), want the provider without an endpoint", provider, err)
+	}
 }

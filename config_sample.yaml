@@ -316,6 +316,31 @@ insights:
     #       # "<face_id>" or "<face_id>/<pal_id>"; a bare face_id runs on the
     #       # default PAL, "/<pal_id>" uses the PAL's default face.
     #       avatar_id: "your-face-id/your-pal-id"
+    # heygen:
+    #   - id: "default-avatar"
+    #     credentials:
+    #       api_key: "YOUR_HEYGEN_API_KEY"
+    #     options:
+    #       avatar_id: "your-avatar-id"
+    # Generic avatar servers that speak the session websocket protocol; the
+    # endpoint is always required and the key is sent as "Authorization: Bearer"
+    # unless options.auth_header names another header.
+    # livekit_datastream:
+    #   - id: "default-avatar"
+    #     credentials:
+    #       api_key: "YOUR_AVATAR_SERVER_KEY"
+    #     options:
+    #       endpoint: "https://avatar.example.com/v1/session"
+    #       avatar_id: "your-avatar-id"
+    # websocket:
+    #   - id: "default-avatar"
+    #     credentials:
+    #       api_key: "YOUR_AVATAR_SERVER_KEY"
+    #     options:
+    #       # the wss:// socket itself, or an http endpoint that answers with
+    #       # one in ws_url.
+    #       endpoint: "wss://avatar.example.com/session"
+    #       avatar_id: "your-avatar-id"
 
   # 2. Define the services that USE the providers.
   # The key ("transcription", "translation", "ai_text_chat", "meeting_summarizing") is the service name.
@@ -444,7 +469,7 @@ insights:
         # Optional realtime avatar: the agent's voice drives a lip-synced video.
         # A room can override both values; the key comes from the avatar account
         # below unless the room brings its own.
-        # avatar_provider: "beyond_presence" # beyond_presence, anam, simli or tavus
+        # avatar_provider: "beyond_presence" # beyond_presence, anam, simli, tavus, heygen, livekit_datastream or websocket
         # avatar_id: "your-avatar-id"
         # avatar_account_id: "default-avatar" # account to take the key from
       pricing:

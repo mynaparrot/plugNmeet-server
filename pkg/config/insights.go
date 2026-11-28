@@ -20,6 +20,12 @@ const (
 	ProviderBeyondPresence ProviderType = "beyond_presence"
 	ProviderSimli          ProviderType = "simli"
 	ProviderTavus          ProviderType = "tavus"
+	// ProviderHeyGen is the HeyGen LiveAvatar API.
+	ProviderHeyGen ProviderType = "heygen"
+	// generic avatar providers: the host supplies the endpoint of a server that
+	// speaks the websocket session protocol (agent.speak, agent.speak_end, ...).
+	ProviderLiveKitDataStream ProviderType = "livekit_datastream"
+	ProviderWebSocket         ProviderType = "websocket"
 )
 
 // ModelPricing holds pricing information for a service. The token rates are a

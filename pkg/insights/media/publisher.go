@@ -19,15 +19,52 @@ const (
 	DefaultOutputSampleRate24k = 24000
 )
 
+// PlayoutTracker estimates when queued PCM frames finish playing out.
+type PlayoutTracker struct {
+	mu    sync.Mutex
+	until time.Time
+}
+
+// Advance pushes the playout horizon forward by the duration of numFrames at
+// sampleRate, counting from now when the queue has already drained.
+func (t *PlayoutTracker) Advance(numFrames, sampleRate int) {
+	if numFrames <= 0 || sampleRate <= 0 {
+		return
+	}
+	duration := time.Duration(numFrames) * time.Second / time.Duration(sampleRate)
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if now := time.Now(); t.until.Before(now) {
+		t.until = now
+	}
+	t.until = t.until.Add(duration)
+}
+
+// Remaining reports how much of the queued audio has still to play.
+func (t *PlayoutTracker) Remaining() time.Duration {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.until.After(time.Now()) {
+		return time.Until(t.until)
+	}
+	return 0
+}
+
+// Reset drops the horizon, for audio that has been dropped instead of played.
+func (t *PlayoutTracker) Reset() {
+	t.mu.Lock()
+	t.until = time.Time{}
+	t.mu.Unlock()
+}
+
 type AudioPublisher struct {
 	track       *lkmedia.PCMLocalTrack
 	sampleRate  int
 	numChannels int
 	closeOnce   sync.Once
 
-	mu sync.Mutex
-	// playoutUntil is when the audio handed to the track finishes playing.
-	playoutUntil time.Time
+	playout PlayoutTracker
 }
 
 // NewAudioPublisher creates and publishes a new local audio track to the room.
@@ -104,7 +141,7 @@ func (p *AudioPublisher) Write(data []byte) (n int, err error) {
 	if err != nil {
 		return 0, err
 	}
-	p.advancePlayout(len(data) / (2 * p.numChannels))
+	p.playout.Advance(len(data)/(2*p.numChannels), p.sampleRate)
 
 	return len(data), nil
 }
@@ -118,34 +155,13 @@ func (p *AudioPublisher) WriteSample(sample media.PCM16Sample) error {
 	if err := p.track.WriteSample(sample); err != nil {
 		return err
 	}
-	p.advancePlayout(len(sample) / p.numChannels)
+	p.playout.Advance(len(sample)/p.numChannels, p.sampleRate)
 	return nil
-}
-
-// advancePlayout pushes the playout horizon forward by the duration of the
-// queued frames, so the caller knows when the room has heard everything written.
-func (p *AudioPublisher) advancePlayout(numFrames int) {
-	if numFrames <= 0 || p.sampleRate <= 0 {
-		return
-	}
-	duration := time.Duration(numFrames) * time.Second / time.Duration(p.sampleRate)
-
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if now := time.Now(); p.playoutUntil.Before(now) {
-		p.playoutUntil = now
-	}
-	p.playoutUntil = p.playoutUntil.Add(duration)
 }
 
 // RemainingDuration reports how much of the written audio has not played yet.
 func (p *AudioPublisher) RemainingDuration() time.Duration {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.playoutUntil.After(time.Now()) {
-		return time.Until(p.playoutUntil)
-	}
-	return 0
+	return p.playout.Remaining()
 }
 
 // EndSegment is a no-op for a track publisher: a live audio track is a single
@@ -160,9 +176,7 @@ func (p *AudioPublisher) Flush() {
 	if p.track != nil {
 		p.track.ClearQueue()
 	}
-	p.mu.Lock()
-	p.playoutUntil = time.Time{}
-	p.mu.Unlock()
+	p.playout.Reset()
 }
 
 // Close unpublishes and closes the local track safely using sync.Once.

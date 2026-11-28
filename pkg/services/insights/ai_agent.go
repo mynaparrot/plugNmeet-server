@@ -76,23 +76,27 @@ type AIAgentTransport interface {
 	BroadcastAIAgentState(roomId string, msg *plugnmeet.AIAgentStateMsg) error
 }
 
-// audioPublisher is the subset of media.AudioPublisher the agent needs.
-// EndSegment closes the current utterance of audio: a datastream publisher
-// streams one segment per turn, while a published track has nothing to close.
-type audioPublisher interface {
-	Write(data []byte) (int, error)
-	EndSegment()
-	Flush()
-	Close()
-	// RemainingDuration reports how much of the written audio has not played out yet.
-	RemainingDuration() time.Duration
-}
+// audioPublisher is what every way of sending the agent voice implements:
+// a published track, a datastream segment, or an avatar session socket.
+type audioPublisher = avatarservice.AudioPublisher
 
 // appMessagePublisher is the publisher subset that can send a LiveKit app
 // message to the avatar. Only the datastream publisher implements it, which is
 // what every avatar session runs on.
 type appMessagePublisher interface {
 	SendAppMessage(topic string, payload []byte) error
+}
+
+// sessionAudioPublisherProvider is an avatar session that streams the voice over
+// its own connection instead of a LiveKit datastream.
+type sessionAudioPublisherProvider interface {
+	AudioPublisher() avatarservice.AudioPublisher
+}
+
+// listeningSetter is an avatar session that can be told whether the agent is
+// listening to the room.
+type listeningSetter interface {
+	SetListening(listening bool)
 }
 
 // activeAIAgents holds the AI agents hosted by this process, keyed by room id.
@@ -627,15 +631,24 @@ func startAgentAudioPublisher(args *AIAgentArgs, agent *AIAgent, room *lksdk.Roo
 		AuthHeader:   args.Avatar.AuthHeader,
 		LiveKitURL:   args.AppConf.LivekitInfo.Host,
 		LiveKitToken: twinToken,
+		LiveKitRoom:  args.Payload.RoomId,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("ai agent: failed to start the avatar: %w", err)
 	}
 
-	publisher, err := insightsmedia.NewDataStreamAudioPublisher(room, twinIdentity, avatarSession.SampleRate())
-	if err != nil {
-		_ = avatarSession.Close(context.Background())
-		return nil, fmt.Errorf("ai agent: failed to stream the voice to the avatar: %w", err)
+	// A session with its own websocket streams the voice itself; every other
+	// provider gets it over the LiveKit datastream addressed to the twin.
+	var publisher audioPublisher
+	if publisherProvider, ok := avatarSession.(sessionAudioPublisherProvider); ok {
+		publisher = publisherProvider.AudioPublisher()
+	} else {
+		datastreamPublisher, err := insightsmedia.NewDataStreamAudioPublisher(room, twinIdentity, avatarSession.SampleRate())
+		if err != nil {
+			_ = avatarSession.Close(context.Background())
+			return nil, fmt.Errorf("ai agent: failed to stream the voice to the avatar: %w", err)
+		}
+		publisher = datastreamPublisher
 	}
 
 	agent.avatarSession = avatarSession
@@ -1290,11 +1303,22 @@ func tavusEmotionForState(state plugnmeet.AIAgentRuntimeState) string {
 	return avatarservice.TavusEmotionNeutral
 }
 
-// syncAvatarEmotion forwards the state as an emotion to a Tavus avatar.
+// syncAvatarState forwards the runtime state to the avatar: a websocket avatar
+// learns when to listen, a LiveKit avatar gets the matching emotion.
+func (a *AIAgent) syncAvatarState(snapshot aiAgentRuntimeState) {
+	if setter, ok := a.avatarSession.(listeningSetter); ok {
+		setter.SetListening(snapshot.state == plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING)
+	}
+
+	a.syncAvatarEmotion(snapshot)
+}
+
+// syncAvatarEmotion forwards the state as an emotion to an avatar that listens
+// on the LiveKit app messages topic.
 // The emotion is recorded only once the avatar accepted it: a bot that is still joining drops the message,
 // so the next state change sends it again.
 func (a *AIAgent) syncAvatarEmotion(snapshot aiAgentRuntimeState) {
-	if a.avatarProvider != string(config.ProviderTavus) {
+	if a.avatarProvider != string(config.ProviderTavus) && a.avatarProvider != string(config.ProviderLiveKitDataStream) {
 		return
 	}
 	publisher, ok := a.publisher.(appMessagePublisher)
@@ -1325,7 +1349,7 @@ func (a *AIAgent) syncAvatarEmotion(snapshot aiAgentRuntimeState) {
 }
 
 func (a *AIAgent) broadcast(snapshot aiAgentRuntimeState) {
-	a.syncAvatarEmotion(snapshot)
+	a.syncAvatarState(snapshot)
 
 	if a.transport == nil {
 		return
