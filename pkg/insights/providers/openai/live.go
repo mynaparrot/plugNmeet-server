@@ -45,12 +45,12 @@ const (
 	liveTruncationNote = "… [truncated; full text is in the conversation]"
 
 	// liveDelegationAckDelayMs holds back the automatic spoken acknowledgement of
-	// a delegation. The default (0, request it immediately) makes the Live model
-	// promise "yep, on it, I'll open it and draw…" while a fast tool
-	// (notepad_write, whiteboard_*, create_quiz) is nearly done, and the spoken
-	// result then repeats the promise. Waiting 2.5s means a fast tool settles
-	// first; a slow one still gets its acknowledgement.
-	liveDelegationAckDelayMs int64 = 2500
+	// a delegation. A small delay stops the Live model from promising work
+	// ("yep, on it, I'll open it and draw…") that a fast tool
+	// (notepad_write, whiteboard_*, create_quiz) finishes first, so the spoken
+	// result does not repeat the promise. Higher values are rejected by the API,
+	// which caps this field at 800 ms.
+	liveDelegationAckDelayMs int64 = 800
 
 	// Live server events.
 	liveEventSessionStarted     = "session.started"
@@ -747,8 +747,9 @@ func (s *liveSession) endIdleTurn() {
 		return
 	}
 	if s.hasPendingWork() {
-		// The spoken promise is followed by silence while the tool runs; the
-		// settled delegation completes the turn instead.
+		// The spoken promise is followed by silence while the tool runs, so the
+		// turn stays open and the settled delegation completes it.
+		s.emit(insights.RealtimeEvent{Type: insights.RealtimeEventThinking})
 		return
 	}
 	s.emit(insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete})
@@ -866,6 +867,11 @@ func (s *liveSession) handleServerEvent(msg live.ServerEventUnion) {
 		// The delegated turn owns the answer from here on: context waits until
 		// it settles instead of cancelling its acknowledgement.
 		s.setDelegationActive(true)
+		if !s.isSpeaking() {
+			// The delegated model owns the answer now, so the voice is quiet
+			// until it settles.
+			s.emit(insights.RealtimeEvent{Type: insights.RealtimeEventThinking})
+		}
 		s.logger.Debug("openai live: delegation created")
 
 	case liveEventError:
@@ -898,9 +904,12 @@ func (s *liveSession) handleResponseEvent(ev live.ResponseEvent) {
 
 	switch eventType {
 	case liveResponseCreated:
-		// A delegated response is running: an append now would cancel its
-		// acknowledgement and a response.create would collide with it.
+		// A delegated response is running: an append now would cancel its acknowledgement and
+		// a response.create would collide with it.
 		s.setDelegationActive(true)
+		if !s.isSpeaking() {
+			s.emit(insights.RealtimeEvent{Type: insights.RealtimeEventThinking})
+		}
 		s.logger.WithField("responseId", nestedString(nestedMap(ev.Event, "response"), "id")).Debug("openai live: delegated response started")
 
 	case liveResponseOutputItemDone:

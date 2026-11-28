@@ -144,8 +144,13 @@ func TestBuildLiveConnectConfig(t *testing.T) {
 	if len(cfg.Tools) != 1 || len(cfg.Tools[0].FunctionDeclarations) != 1 {
 		t.Fatalf("tools not mapped: %+v", cfg.Tools)
 	}
-	if name := cfg.Tools[0].FunctionDeclarations[0].Name; name != "whiteboard_write_content" {
+	decl := cfg.Tools[0].FunctionDeclarations[0]
+	if name := decl.Name; name != "whiteboard_write_content" {
 		t.Fatalf("unexpected declaration name: %s", name)
+	}
+	// A blocking declaration would silence the rest of the turn.
+	if decl.Behavior != genai.BehaviorNonBlocking {
+		t.Fatalf("write tool behavior = %q, want %q", decl.Behavior, genai.BehaviorNonBlocking)
 	}
 }
 
@@ -177,6 +182,59 @@ func TestBuildFunctionDeclarations(t *testing.T) {
 	}
 	if decls[1].ParametersJsonSchema == nil {
 		t.Fatal("schema was not passed through")
+	}
+	// Behavior belongs to the live protocol only; a plain chat request must not
+	// carry it.
+	for _, decl := range decls {
+		if decl.Behavior != "" {
+			t.Fatalf("%s: chat declaration must not set behavior, got %q", decl.Name, decl.Behavior)
+		}
+	}
+}
+
+func TestBuildLiveFunctionDeclarations(t *testing.T) {
+	decls := buildLiveFunctionDeclarations([]*insights.MCPToolSpec{
+		{Name: "whiteboard_draw_diagram"},
+		{Name: "create_poll"},
+		{Name: "get_poll_results"},
+		{Name: "ext_lookup_school_calendar"},
+	})
+
+	want := map[string]genai.Behavior{
+		"whiteboard_draw_diagram":    genai.BehaviorNonBlocking,
+		"create_poll":                genai.BehaviorNonBlocking,
+		"get_poll_results":           "",
+		"ext_lookup_school_calendar": "",
+	}
+	for _, decl := range decls {
+		behavior, ok := want[decl.Name]
+		if !ok {
+			t.Fatalf("unexpected declaration %q", decl.Name)
+		}
+		if decl.Behavior != behavior {
+			t.Errorf("%s: behavior = %q, want %q", decl.Name, decl.Behavior, behavior)
+		}
+	}
+}
+
+func TestIsReadOnlyTool(t *testing.T) {
+	readOnly := []string{
+		"notepad_read",
+		"whiteboard_capture_snapshot",
+		"get_poll_results",
+		"get_room_info",
+		"fetch_external_knowledge",
+		"ext_lookup_school_calendar",
+	}
+	for _, name := range readOnly {
+		if !isReadOnlyTool(name) {
+			t.Errorf("%s must be read-only", name)
+		}
+	}
+	for _, name := range []string{"notepad_write", "whiteboard_draw_diagram", "create_poll"} {
+		if isReadOnlyTool(name) {
+			t.Errorf("%s must not be read-only", name)
+		}
 	}
 }
 
@@ -248,6 +306,7 @@ func TestTranslateServerMessage(t *testing.T) {
 		insights.RealtimeEventInterrupted,
 		insights.RealtimeEventTranscriptUser,
 		insights.RealtimeEventTranscriptUser,
+		insights.RealtimeEventThinking,
 		insights.RealtimeEventTranscriptAgent,
 		insights.RealtimeEventAudioDelta,
 		insights.RealtimeEventTurnComplete,
@@ -333,20 +392,33 @@ func TestTranslateServerMessageEmpty(t *testing.T) {
 }
 
 func TestFunctionResponsePayload(t *testing.T) {
-	ok := functionResponsePayload(`{"ok":true}`, false)
+	ok := functionResponsePayload("create_poll", `{"ok":true}`, false)
 	if _, hasError := ok["error"]; hasError {
 		t.Fatal("success must not use the error key")
 	}
 	if parsed, isMap := ok["output"].(map[string]any); !isMap || parsed["ok"] != true {
 		t.Fatalf("output was not parsed as JSON: %v", ok["output"])
 	}
+	// A finished write must tell the model the action is done, otherwise the
+	// bare acknowledgement makes it call the same tool again.
+	if ok["status"] == "" || ok["status"] == nil {
+		t.Fatal("a successful write must carry the completion status")
+	}
 
-	failed := functionResponsePayload(`{"reason":"no_delegate"}`, true)
+	failed := functionResponsePayload("create_poll", `{"reason":"no_delegate"}`, true)
 	if _, isMap := failed["error"].(map[string]any); !isMap {
 		t.Fatalf("error payload was not parsed as JSON: %v", failed["error"])
 	}
+	if _, hasStatus := failed["status"]; hasStatus {
+		t.Fatal("a failure must not claim the action is complete")
+	}
 
-	raw := functionResponsePayload("not json", false)
+	// A read tool returns the answer itself, which needs no status hint.
+	if _, hasStatus := functionResponsePayload("get_poll_results", `{"votes":3}`, false)["status"]; hasStatus {
+		t.Fatal("a read result must not carry the write status")
+	}
+
+	raw := functionResponsePayload("notepad_write", "not json", false)
 	if raw["output"] != "not json" {
 		t.Fatalf("invalid JSON must be forwarded as a string: %v", raw["output"])
 	}
@@ -517,8 +589,14 @@ func TestLiveSessionMaxDurationEmitsGoAway(t *testing.T) {
 }
 
 func TestToolResponseScheduling(t *testing.T) {
-	// Write and action tools narrate themselves, so their result stays silent.
-	for _, name := range []string{
+	const (
+		silent   = genai.FunctionResponseSchedulingSilent
+		whenIdle = genai.FunctionResponseSchedulingWhenIdle
+	)
+
+	// A write tool whose turn already narrated it keeps its result silent:
+	// resuming generation there makes Gemini re-run the same tool.
+	writeTools := []string{
 		"notepad_write",
 		"whiteboard_write_content",
 		"whiteboard_draw_diagram",
@@ -527,9 +605,15 @@ func TestToolResponseScheduling(t *testing.T) {
 		"create_poll",
 		"close_poll",
 		"send_ai_chat_message",
-	} {
-		if got := toolResponseScheduling(name, false); got != genai.FunctionResponseSchedulingSilent {
-			t.Errorf("%s: scheduling = %s, want %s", name, got, genai.FunctionResponseSchedulingSilent)
+	}
+	for _, name := range writeTools {
+		if got := toolResponseScheduling(name, false, true, true); got != silent {
+			t.Errorf("%s: narrated write scheduling = %s, want %s", name, got, silent)
+		}
+		// Called in a silent turn, the result is the only thing the model can
+		// explain from, so it has to resume generation.
+		if got := toolResponseScheduling(name, false, false, true); got != whenIdle {
+			t.Errorf("%s: unnarrated write scheduling = %s, want %s", name, got, whenIdle)
 		}
 	}
 
@@ -542,14 +626,22 @@ func TestToolResponseScheduling(t *testing.T) {
 		"fetch_external_knowledge",
 		"ext_lookup_school_calendar",
 	} {
-		if got := toolResponseScheduling(name, false); got != genai.FunctionResponseSchedulingWhenIdle {
-			t.Errorf("%s: scheduling = %s, want %s", name, got, genai.FunctionResponseSchedulingWhenIdle)
+		if got := toolResponseScheduling(name, false, false, true); got != whenIdle {
+			t.Errorf("%s: scheduling = %s, want %s", name, got, whenIdle)
 		}
 	}
 
 	// A failure must be able to recover out loud, whatever the tool does.
-	if got := toolResponseScheduling("notepad_write", true); got != genai.FunctionResponseSchedulingWhenIdle {
-		t.Errorf("failed write: scheduling = %s, want %s", got, genai.FunctionResponseSchedulingWhenIdle)
+	if got := toolResponseScheduling("notepad_write", true, true, true); got != whenIdle {
+		t.Errorf("failed write: scheduling = %s, want %s", got, whenIdle)
+	}
+
+	// A sibling call is still running: resuming here would start a second
+	// generation beside the one the last result triggers.
+	for _, name := range []string{"notepad_write", "notepad_read", "get_poll_results"} {
+		if got := toolResponseScheduling(name, false, false, false); got != silent {
+			t.Errorf("%s: unsettled scheduling = %s, want %s", name, got, silent)
+		}
 	}
 }
 
@@ -584,6 +676,155 @@ func TestLiveSessionSendToolResultScheduling(t *testing.T) {
 		if got := conn.tools[i].FunctionResponses[0].Scheduling; got != w {
 			t.Errorf("response %d: scheduling = %s, want %s", i, got, w)
 		}
+	}
+}
+
+// spokenEvent builds the model audio that marks a turn as narrated.
+func spokenEvent() *genai.LiveServerMessage {
+	return &genai.LiveServerMessage{ServerContent: &genai.LiveServerContent{
+		ModelTurn: &genai.Content{Parts: []*genai.Part{
+			{InlineData: &genai.Blob{MIMEType: "audio/pcm;rate=24000", Data: []byte{1, 2}}},
+		}},
+	}}
+}
+
+func toolCallEvent(names ...string) *genai.LiveServerMessage {
+	calls := make([]*genai.FunctionCall, 0, len(names))
+	for _, name := range names {
+		calls = append(calls, &genai.FunctionCall{ID: "call-" + name, Name: name})
+	}
+	return &genai.LiveServerMessage{ToolCall: &genai.LiveServerToolCall{FunctionCalls: calls}}
+}
+
+// scheduleOf returns the scheduling the last sent tool response carried.
+func scheduleOf(conn *fakeConn) genai.FunctionResponseScheduling {
+	return conn.tools[len(conn.tools)-1].FunctionResponses[0].Scheduling
+}
+
+func TestLiveSessionToolSchedulingFollowsNarration(t *testing.T) {
+	callID := func(tool string) string { return "call-" + tool }
+
+	tests := []struct {
+		name     string
+		tool     string
+		messages []*genai.LiveServerMessage
+		want     genai.FunctionResponseScheduling
+	}{
+		{
+			// Gemini calls a write tool without speaking and explains it once
+			// the result arrives.
+			name:     "write tool called in a silent turn resumes generation",
+			tool:     "notepad_write",
+			messages: []*genai.LiveServerMessage{toolCallEvent("notepad_write")},
+			want:     genai.FunctionResponseSchedulingWhenIdle,
+		},
+		{
+			name: "write tool called after the model spoke stays silent",
+			tool: "notepad_write",
+			messages: []*genai.LiveServerMessage{
+				spokenEvent(),
+				toolCallEvent("notepad_write"),
+			},
+			want: genai.FunctionResponseSchedulingSilent,
+		},
+		{
+			// The model can also explain the action right after calling it.
+			name: "speech after the call answers it",
+			tool: "notepad_write",
+			messages: []*genai.LiveServerMessage{
+				toolCallEvent("notepad_write"),
+				{ServerContent: &genai.LiveServerContent{OutputTranscription: &genai.Transcription{Text: " writing it down"}}},
+			},
+			want: genai.FunctionResponseSchedulingSilent,
+		},
+		{
+			// A new turn starts silent, so its own call needs a follow-up.
+			name: "a narrated turn that already ended does not silence the next one",
+			tool: "notepad_write",
+			messages: []*genai.LiveServerMessage{
+				spokenEvent(),
+				{ServerContent: &genai.LiveServerContent{TurnComplete: true}},
+				toolCallEvent("notepad_write"),
+			},
+			want: genai.FunctionResponseSchedulingWhenIdle,
+		},
+		{
+			// The read payload is the answer, so the model speaks after it.
+			name:     "read tool always resumes generation",
+			tool:     "get_poll_results",
+			messages: []*genai.LiveServerMessage{toolCallEvent("get_poll_results")},
+			want:     genai.FunctionResponseSchedulingWhenIdle,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			conn := &fakeConn{}
+			s := newTestLiveSession(conn)
+			for _, msg := range tt.messages {
+				s.translateMessage(msg)
+			}
+			if err := s.SendToolResult(callID(tt.tool), tt.tool, `{"ok":true}`, false); err != nil {
+				t.Fatalf("SendToolResult: %v", err)
+			}
+			if got := scheduleOf(conn); got != tt.want {
+				t.Fatalf("scheduling = %s, want %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLiveSessionOnlyTheLastToolResultResumesGeneration(t *testing.T) {
+	conn := &fakeConn{}
+	s := newTestLiveSession(conn)
+
+	// The board is being drawn while the workspace lock is still opening: both
+	// calls are in flight, and only the result that settles the group may speak.
+	s.translateMessage(toolCallEvent("whiteboard_draw_diagram", "set_workspace_lock"))
+
+	if err := s.SendToolResult("call-whiteboard_draw_diagram", "whiteboard_draw_diagram", `{"ok":true}`, false); err != nil {
+		t.Fatalf("SendToolResult: %v", err)
+	}
+	// The sibling is still running, so resuming here would start a second
+	// generation beside the one the last result triggers.
+	if got := scheduleOf(conn); got != genai.FunctionResponseSchedulingSilent {
+		t.Errorf("first result: scheduling = %s, want %s", got, genai.FunctionResponseSchedulingSilent)
+	}
+
+	if err := s.SendToolResult("call-set_workspace_lock", "set_workspace_lock", `{"ok":true}`, false); err != nil {
+		t.Fatalf("SendToolResult: %v", err)
+	}
+	if got := scheduleOf(conn); got != genai.FunctionResponseSchedulingWhenIdle {
+		t.Errorf("settling result: scheduling = %s, want %s", got, genai.FunctionResponseSchedulingWhenIdle)
+	}
+
+	// Only the settling result asks the caller to show the thinking status.
+	ev := <-s.Events()
+	if ev.Type != insights.RealtimeEventThinking {
+		t.Fatalf("expected a single thinking event, got %+v", ev)
+	}
+	select {
+	case extra := <-s.Events():
+		t.Fatalf("unexpected second status event: %+v", extra)
+	default:
+	}
+}
+
+func TestLiveSessionCancelledToolCallDoesNotBlockScheduling(t *testing.T) {
+	conn := &fakeConn{}
+	s := newTestLiveSession(conn)
+
+	s.translateMessage(toolCallEvent("whiteboard_draw_diagram"))
+	s.translateMessage(&genai.LiveServerMessage{
+		ToolCallCancellation: &genai.LiveServerToolCallCancellation{IDs: []string{"call-whiteboard_draw_diagram"}},
+	})
+	s.translateMessage(toolCallEvent("notepad_write"))
+
+	if err := s.SendToolResult("call-notepad_write", "notepad_write", `{"ok":true}`, false); err != nil {
+		t.Fatalf("SendToolResult: %v", err)
+	}
+	if got := scheduleOf(conn); got != genai.FunctionResponseSchedulingWhenIdle {
+		t.Fatalf("a cancelled call must not keep the session pending: %s", got)
 	}
 }
 

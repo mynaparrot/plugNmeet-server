@@ -453,6 +453,26 @@ func TestDataStreamAudioPublisherKeeps24kPayload(t *testing.T) {
 	}
 }
 
+// The playout estimate must follow the rate the audio is streamed at, so an
+// avatar target never reports more queued audio than the listener will hear.
+func TestDataStreamAudioPublisherPlayoutFollowsWireRate(t *testing.T) {
+	pcm := make([]byte, 4800) // 2400 samples @ 24 kHz mono = 100 ms of audio
+
+	for _, rate := range []int{DefaultSampleRate16k, DefaultOutputSampleRate24k} {
+		streams := &fakeStreamFactory{}
+		p := newTestDataStreamPublisher(t, rate, streams, newFakeRPC().call)
+
+		if _, err := p.Write(pcm); err != nil {
+			t.Fatalf("unexpected error at %d Hz: %v", rate, err)
+		}
+
+		rem := p.RemainingDuration()
+		if rem < 80*time.Millisecond || rem > 110*time.Millisecond {
+			t.Fatalf("remaining playout at %d Hz = %s, want about 100ms", rate, rem)
+		}
+	}
+}
+
 func TestDataStreamAudioPublisherEndSegment(t *testing.T) {
 	streams := &fakeStreamFactory{}
 	p := newTestDataStreamPublisher(t, DefaultSampleRate16k, streams, newFakeRPC().call)
@@ -481,6 +501,38 @@ func TestDataStreamAudioPublisherEndSegment(t *testing.T) {
 	}
 	if _, closed, _ := streams.writerAt(t, 1).snapshot(); closed {
 		t.Fatal("the new stream must stay open")
+	}
+}
+
+func TestDataStreamAudioPublisherPlaybackFinishedResetsPlayout(t *testing.T) {
+	streams := &fakeStreamFactory{}
+	p := newTestDataStreamPublisher(t, DefaultSampleRate16k, streams, newFakeRPC().call)
+	pcm := make([]byte, 4800) // 150 ms at 16 kHz mono
+	if _, err := p.Write(pcm); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// The closed segment played out: the estimate must drop to zero.
+	p.EndSegment()
+	p.onPlaybackFinished("user-1")
+	if rem := p.RemainingDuration(); rem != 0 {
+		t.Fatalf("the finished playback must clear the playout, got %s", rem)
+	}
+
+	// An open segment still holds audio behind it, so the estimate stands.
+	if _, err := p.Write(pcm); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	p.onPlaybackFinished("")
+	if rem := p.RemainingDuration(); rem == 0 {
+		t.Fatal("audio written after the report is still queued")
+	}
+
+	// Another caller finishing its own playback says nothing about this one.
+	p.EndSegment()
+	p.onPlaybackFinished("user-2")
+	if rem := p.RemainingDuration(); rem == 0 {
+		t.Fatal("a foreign caller must not touch the playout")
 	}
 }
 

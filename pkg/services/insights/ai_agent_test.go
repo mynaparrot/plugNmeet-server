@@ -28,11 +28,12 @@ import (
 )
 
 type recordingPublisher struct {
-	mu       sync.Mutex
-	written  []byte
-	flushes  int
-	segments int
-	closed   bool
+	mu           sync.Mutex
+	written      []byte
+	flushes      int
+	segments     int
+	closed       bool
+	playoutUntil time.Time
 }
 
 func (p *recordingPublisher) Write(data []byte) (int, error) {
@@ -54,6 +55,23 @@ func (p *recordingPublisher) Flush() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.flushes++
+	p.playoutUntil = time.Time{}
+}
+
+// setPlayout fakes audio queued for duration.
+func (p *recordingPublisher) setPlayout(duration time.Duration) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.playoutUntil = time.Now().Add(duration)
+}
+
+func (p *recordingPublisher) RemainingDuration() time.Duration {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.playoutUntil.After(time.Now()) {
+		return time.Until(p.playoutUntil)
+	}
+	return 0
 }
 
 func (p *recordingPublisher) Close() {
@@ -255,9 +273,20 @@ func TestAIAgentToolCallRunsExecutorAndAnswersProvider(t *testing.T) {
 	if result.CallID != "call-1" || result.IsError || !strings.Contains(result.ResultJSON, "echo") {
 		t.Fatalf("unexpected tool result: %+v", result)
 	}
+	// The answer is the provider's decision: the fake one resumes no turn, so
+	// the finished tool only gives up its label instead of forcing THINKING.
+	waitForAgentState(t, env, plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING, "listening after the tool result")
+	if msg := env.transport.lastStateMsg(); msg.GetToolInProgress() != "" {
+		t.Fatalf("a finished tool must give way, got tool %q", msg.GetToolInProgress())
+	}
+
+	env.session.Push(insights.RealtimeEvent{Type: insights.RealtimeEventThinking})
+	waitForAgentState(t, env, plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_THINKING, "thinking state while the answer is composed")
+
+	env.session.Push(insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete})
 	waitFor(t, func() bool {
 		return env.transport.lastState() == plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING
-	}, "state restored after tool")
+	}, "listening after the turn completed")
 }
 
 func TestAIAgentReportOffTopicRecordsStrike(t *testing.T) {
@@ -522,6 +551,9 @@ func TestAIAgentSendProactiveContextTriggersAnAnswer(t *testing.T) {
 	if contexts[0].Role != "user" || !contexts[0].TriggerResponse {
 		t.Fatalf("a proactive context must trigger an answer: %+v", contexts[0])
 	}
+	waitFor(t, func() bool {
+		return env.transport.lastState() == plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_THINKING
+	}, "thinking state while the triggered answer is composed")
 	if !strings.Contains(contexts[0].Text, "[SYSTEM CONTEXT — countdown_timer]") ||
 		!strings.Contains(contexts[0].Text, "The countdown timer has finished.") {
 		t.Fatalf("unexpected proactive context: %s", contexts[0].Text)
@@ -1026,13 +1058,17 @@ func TestAIAgentEndsAudioSegmentAtTurnComplete(t *testing.T) {
 	}, "the audio segment ended on turn complete")
 }
 
-// A tool call pauses the speech that preceded it, so it closes the segment
-// before the tool runs.
-func TestAIAgentEndsAudioSegmentBeforeToolCall(t *testing.T) {
+// A tool call can arrive while the sentence announcing it is still being heard,
+// so only a completed turn closes the audio segment.
+func TestAIAgentKeepsAudioSegmentOpenDuringToolCall(t *testing.T) {
 	registry := mcp.NewRegistry()
 	registry.Register(echoTool("whiteboard_write_content"))
 	env := newAgentTestEnv(t, registry, nil)
 
+	env.session.Push(insights.RealtimeEvent{
+		Type:        insights.RealtimeEventAudioDelta,
+		AudioPCM24k: []byte{1, 2, 3, 4},
+	})
 	env.session.Push(insights.RealtimeEvent{
 		Type:     insights.RealtimeEventToolCall,
 		CallID:   "call-segment",
@@ -1043,9 +1079,14 @@ func TestAIAgentEndsAudioSegmentBeforeToolCall(t *testing.T) {
 	waitFor(t, func() bool {
 		return len(env.session.ToolResults()) == 1
 	}, "tool result sent")
-	if got := env.publisher.segmentCount(); got != 1 {
-		t.Fatalf("segment ends = %d, want the segment closed before the tool ran", got)
+	if got := env.publisher.segmentCount(); got != 0 {
+		t.Fatalf("segment ends = %d, want the segment to stay open across the tool call", got)
 	}
+
+	env.session.Push(insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete})
+	waitFor(t, func() bool {
+		return env.publisher.segmentCount() == 1
+	}, "the completed turn closed the segment")
 }
 
 // The avatar provider reaches the browser, so the session pill can show which

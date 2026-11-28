@@ -247,6 +247,11 @@ func translateRealtimeServerEvent(msg realtime.RealtimeServerEventUnion) []insig
 	case "input_audio_buffer.speech_started":
 		events = append(events, insights.RealtimeEvent{Type: insights.RealtimeEventInterrupted})
 
+	case "input_audio_buffer.speech_stopped":
+		// VAD closed the user turn: the model composes the answer now, which is
+		// known before response.created arrives.
+		events = append(events, insights.RealtimeEvent{Type: insights.RealtimeEventThinking})
+
 	case "conversation.item.input_audio_transcription.delta":
 		if delta := msg.OfConversationItemInputAudioTranscriptionDeltaEvent.Delta; delta != "" {
 			events = append(events, insights.RealtimeEvent{Type: insights.RealtimeEventTranscriptUser, Text: delta})
@@ -281,6 +286,9 @@ func translateRealtimeServerEvent(msg realtime.RealtimeServerEventUnion) []insig
 			ToolName: ev.Name,
 			ArgsJSON: defaultArgsJSON(ev.Arguments),
 		})
+
+	case "response.created":
+		events = append(events, insights.RealtimeEvent{Type: insights.RealtimeEventThinking})
 
 	case "response.done":
 		events = append(events, translateRealtimeResponseDone(msg.OfResponseDoneEvent)...)

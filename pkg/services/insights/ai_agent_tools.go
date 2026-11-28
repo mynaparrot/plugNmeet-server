@@ -82,6 +82,7 @@ func (a *AIAgent) SendProactiveContext(text, source string) error {
 	if err := session.SendContextText("user", frame, true); err != nil {
 		return err
 	}
+	a.markThinking()
 	// The note is part of the record, but a poll answer or a timer is not a
 	// participant turn, so it must not count as one.
 	a.recordTranscriptTurn(transcriptRoleContext, frame)
@@ -158,6 +159,7 @@ func (a *AIAgent) HandleParticipantChatMessage(userID, userName, text string) er
 	if err := session.SendContextText("user", WrapUntrustedParticipantChatMessage(userID, userName, text), true); err != nil {
 		return err
 	}
+	a.markThinking()
 	// A typed message is a participant turn too: keep it in the transcript and
 	// count it, otherwise chat-only sessions would report zero turns.
 	a.recordTranscriptTurn(transcriptRoleParticipant, text)
@@ -218,8 +220,11 @@ func (a *AIAgent) handleToolCall(session insights.RealtimeSession, ev insights.R
 		if target == nil {
 			target = a.currentSession()
 		}
+		// The label goes first: the THINKING a provider reports for the turn the result resumes would otherwise
+		// be dropped by a tool that already finished. A provider that schedules no follow-up leaves the status on
+		// the speech still playing out, or on LISTENING.
+		a.finishToolCall(ev.ToolName)
 		a.sendToolResult(target, ev.CallID, ev.ToolName, res)
-		a.restoreListening()
 	}()
 }
 

@@ -788,6 +788,95 @@ func TestLiveSessionSendToolResult(t *testing.T) {
 
 // liveToolCallEvents feeds one response that calls the given tools and returns
 // the tool call events the session published.
+func TestLiveSessionResponseCreatedMarksThinking(t *testing.T) {
+	conn := &fakeLiveConn{}
+	s, err := newTestLiveSession(conn)
+	if err != nil {
+		t.Fatalf("newLiveSession: %v", err)
+	}
+
+	s.handleServerEvent(live.ServerEventUnion{
+		Type:            liveEventResponse,
+		OfResponseEvent: live.ResponseEvent{Event: map[string]any{"type": liveResponseCreated}},
+	})
+	events := drainRealtimeEvents(t, s.Events())
+	if len(events) != 1 || events[0].Type != insights.RealtimeEventThinking {
+		t.Fatalf("a started response must mark thinking: %+v", events)
+	}
+}
+
+// A response created while the agent still speaks must not turn the status into
+// THINKING: the audio already reports the turn.
+func TestLiveSessionResponseCreatedWhileSpeakingStaysSpeaking(t *testing.T) {
+	conn := &fakeLiveConn{}
+	s, err := newTestLiveSession(conn)
+	if err != nil {
+		t.Fatalf("newLiveSession: %v", err)
+	}
+	s.markSpeaking()
+
+	s.handleServerEvent(live.ServerEventUnion{
+		Type:            liveEventResponse,
+		OfResponseEvent: live.ResponseEvent{Event: map[string]any{"type": liveResponseCreated}},
+	})
+	if events := drainRealtimeEvents(t, s.Events()); len(events) != 0 {
+		t.Fatalf("the speaking turn must not be reported as thinking: %+v", events)
+	}
+}
+
+// A delegation leaves the voice quiet, so the client must learn that the answer
+// is being composed instead of inferring it from silence.
+func TestLiveSessionDelegationCreatedMarksThinking(t *testing.T) {
+	conn := &fakeLiveConn{}
+	s, err := newTestLiveSession(conn)
+	if err != nil {
+		t.Fatalf("newLiveSession: %v", err)
+	}
+
+	s.handleServerEvent(live.ServerEventUnion{Type: liveEventDelegationCreated})
+	events := drainRealtimeEvents(t, s.Events())
+	if len(events) != 1 || events[0].Type != insights.RealtimeEventThinking {
+		t.Fatalf("a created delegation must mark thinking: %+v", events)
+	}
+}
+
+// The spoken acknowledgement goes silent while the delegated tools still run, so
+// the end of that filler must hand over to THINKING instead of closing the turn.
+func TestLiveSessionIdleTurnDuringDelegationMarksThinking(t *testing.T) {
+	conn := &fakeLiveConn{}
+	s, err := newTestLiveSession(conn)
+	if err != nil {
+		t.Fatalf("newLiveSession: %v", err)
+	}
+
+	s.setDelegationActive(true)
+	s.markSpeaking()
+	s.endIdleTurn()
+
+	events := drainRealtimeEvents(t, s.Events())
+	if len(events) != 1 || events[0].Type != insights.RealtimeEventThinking {
+		t.Fatalf("the filler must hand over to thinking: %+v", events)
+	}
+	if s.isSpeaking() {
+		t.Fatal("the filler turn must be closed once it went silent")
+	}
+}
+
+// drainNonThinkingEvents drops the THINKING notices, which the state assertions
+// below do not care about.
+func drainNonThinkingEvents(t *testing.T, events <-chan insights.RealtimeEvent) []insights.RealtimeEvent {
+	t.Helper()
+
+	drained := drainRealtimeEvents(t, events)
+	filtered := make([]insights.RealtimeEvent, 0, len(drained))
+	for _, event := range drained {
+		if event.Type != insights.RealtimeEventThinking {
+			filtered = append(filtered, event)
+		}
+	}
+	return filtered
+}
+
 func liveToolCallEvents(t *testing.T, s *liveSession, calls ...[2]string) []insights.RealtimeEvent {
 	t.Helper()
 
@@ -1004,7 +1093,7 @@ func TestLiveSessionContextWaitsForDelegatedResponse(t *testing.T) {
 	if len(sent) != 1 || sent[0].OfSessionCommentaryAppend == nil {
 		t.Fatalf("the settled delegation must flush the deferred commentary: %+v", sent)
 	}
-	events := drainRealtimeEvents(t, s.Events())
+	events := drainNonThinkingEvents(t, s.Events())
 	if len(events) != 1 || events[0].Type != insights.RealtimeEventTurnComplete {
 		t.Fatalf("the settled delegation must complete the turn: %+v", events)
 	}
@@ -1020,11 +1109,16 @@ func TestLiveSessionFillerTranscriptWaitsForDelegation(t *testing.T) {
 	}
 
 	s.handleServerEvent(live.ServerEventUnion{Type: liveEventDelegationCreated})
+	events := drainNonThinkingEvents(t, s.Events())
+	if len(events) != 0 {
+		t.Fatalf("the created delegation must only report thinking: %+v", events)
+	}
+
 	s.onTranscriptUpdate(live.TranscriptUpdate{
 		Segment: live.TranscriptSegment{Speaker: liveSpeakerAssistant, Text: "Yep, on it. I'll open it and draw..."},
 		Reason:  "inactivity",
 	})
-	events := drainRealtimeEvents(t, s.Events())
+	events = drainRealtimeEvents(t, s.Events())
 	if len(events) != 1 || events[0].Type != insights.RealtimeEventTranscriptAgent || !events[0].Final {
 		t.Fatalf("the promise must be reported without completing the turn: %+v", events)
 	}

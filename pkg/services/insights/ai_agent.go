@@ -62,6 +62,14 @@ const (
 // A variable so tests can shorten it.
 var aiAgentSpeakingIdle = 1500 * time.Millisecond
 
+// aiAgentThinkingIdle is the safety net of the THINKING state: a turn that never
+// produces audio nor a turn-complete falls back to LISTENING after it.
+var aiAgentThinkingIdle = 12 * time.Second
+
+// aiAgentPlayoutGrace is added to the remaining playout before the state is
+// rechecked, so the timer lands after the last frame reached the listener.
+const aiAgentPlayoutGrace = 150 * time.Millisecond
+
 // AIAgentTransport is the room-facing messaging an AI agent needs.
 // *natsservice.NatsService implements it; tests inject a recorder.
 type AIAgentTransport interface {
@@ -76,6 +84,8 @@ type audioPublisher interface {
 	EndSegment()
 	Flush()
 	Close()
+	// RemainingDuration reports how much of the written audio has not played out yet.
+	RemainingDuration() time.Duration
 }
 
 // activeAIAgents holds the AI agents hosted by this process, keyed by room id.
@@ -254,6 +264,9 @@ type AIAgent struct {
 	stateMu    sync.Mutex
 	state      aiAgentRuntimeState
 	speakTimer *time.Timer
+	// pendingThinking defers THINKING until the audio already queued is heard,
+	// so a filler acknowledgement finishes before the status leaves SPEAKING.
+	pendingThinking bool
 
 	learnerMu sync.Mutex
 	learner   LearnerIdentity
@@ -997,9 +1010,10 @@ func (a *AIAgent) markSpeaking() {
 	a.state.speaking = true
 	a.state.state = plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_SPEAKING
 	a.state.tool = ""
-	// Every audio chunk postpones the fallback, so only a real gap ends the turn.
-	a.stopSpeakTimerLocked()
-	a.speakTimer = time.AfterFunc(aiAgentSpeakingIdle, a.endIdleSpeaking)
+	a.pendingThinking = false
+	// Every audio chunk postpones the fallback, including the queued playout, so
+	// the fallback never fires mid-sentence.
+	a.rearmSpeakingTimerLocked(a.speakingIdleDelay())
 	snapshot := a.state
 	a.stateMu.Unlock()
 
@@ -1008,22 +1022,197 @@ func (a *AIAgent) markSpeaking() {
 	}
 }
 
+// speakingIdleDelay is the silence tolerated while SPEAKING, extended by the
+// audio still queued in the publisher.
+func (a *AIAgent) speakingIdleDelay() time.Duration {
+	if rem := a.remainingPlayout(); rem > 0 {
+		return rem + aiAgentSpeakingIdle
+	}
+	return aiAgentSpeakingIdle
+}
+
 // endIdleSpeaking restores LISTENING once the agent audio stream has been silent
 // for longer than any gap between chunks, so a trailing delta or a missing
-// turn-complete cannot leave the status stuck on SPEAKING.
+// turn-complete cannot leave the status stuck on SPEAKING. A turn that was
+// deferred because its filler was still playing moves on to THINKING instead.
 func (a *AIAgent) endIdleSpeaking() {
 	if a.paused.Load() {
 		return
 	}
 
 	a.stateMu.Lock()
-	speaking := a.state.state == plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_SPEAKING
+	if a.state.state != plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_SPEAKING && !a.pendingThinking && !a.state.speaking {
+		a.stateMu.Unlock()
+		return
+	}
+	if rem := a.remainingPlayout(); rem > 0 {
+		a.rearmSpeakingTimerLocked(rem + aiAgentPlayoutGrace)
+		a.stateMu.Unlock()
+		return
+	}
+	if a.pendingThinking {
+		// The deferred turn is still composing, so the status moves on to
+		// THINKING instead of falling back to LISTENING. SPEAKING has to go
+		// first, otherwise markThinking would defer itself again.
+		a.pendingThinking = false
+		a.state.speaking = false
+		a.state.state = plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING
+		a.state.tool = ""
+		a.state.reason = ""
+		a.stateMu.Unlock()
+
+		a.markThinking()
+		return
+	}
+	// A tool or thinking state kept speaking while its audio played out, so the
+	// status now falls back to the label it already holds.
+	if a.state.speaking && a.state.state != plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_SPEAKING {
+		a.state.speaking = false
+		snapshot := a.state
+		a.stateMu.Unlock()
+		a.broadcast(snapshot)
+		return
+	}
 	a.stateMu.Unlock()
-	if !speaking {
+
+	a.setState(plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING, "")
+}
+
+// finishSpeakingOrListen ends a turn after its turn-complete. SPEAKING is held
+// while the queued audio still plays out, so the status does not reach LISTENING
+// before the listener hears the last frame.
+func (a *AIAgent) finishSpeakingOrListen() {
+	if a.paused.Load() {
 		return
 	}
 
+	a.stateMu.Lock()
+	// The turn is over, so nothing from it is left to think about.
+	a.pendingThinking = false
+	switch a.state.state {
+	case plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_SPEAKING:
+		if rem := a.remainingPlayout(); rem > 0 {
+			a.rearmSpeakingTimerLocked(rem + aiAgentPlayoutGrace)
+			a.stateMu.Unlock()
+			return
+		}
+	case plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_THINKING:
+	default:
+		a.stateMu.Unlock()
+		return
+	}
+	a.stateMu.Unlock()
+
 	a.setState(plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING, "")
+}
+
+// markThinking reports that the model is composing a turn.
+func (a *AIAgent) markThinking() {
+	a.enterThinking()
+}
+
+// finishToolCall clears a finished tool from the status. Whether the answer
+// follows is the provider's call: a tool result that resumes generation is
+// reported as THINKING by the provider, so the cleared label only gives way to
+// the speech still playing out, and then to LISTENING.
+func (a *AIAgent) finishToolCall(tool string) {
+	if a.paused.Load() {
+		return
+	}
+
+	a.stateMu.Lock()
+	if a.state.tool != tool {
+		// The provider already moved the status on, or another tool owns it.
+		a.stateMu.Unlock()
+		return
+	}
+	playout := a.remainingPlayout()
+	deferred := a.pendingThinking
+	a.state.tool = ""
+	switch {
+	case deferred:
+		// The follow-up turn waits for the queued speech to drain.
+	case playout > 0:
+		// The turn that called the tool is still being heard.
+		a.state.state = plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_SPEAKING
+		a.state.speaking = true
+		a.rearmSpeakingTimerLocked(playout + aiAgentPlayoutGrace)
+	default:
+		a.state.state = plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING
+		a.state.speaking = false
+		a.state.reason = ""
+	}
+	snapshot := a.state
+	a.stateMu.Unlock()
+
+	a.logger.WithFields(logrus.Fields{
+		"state":      snapshot.state.String(),
+		"tool":       "",
+		"isSpeaking": snapshot.speaking,
+	}).Debug("ai agent: state changed")
+	a.broadcast(snapshot)
+}
+
+func (a *AIAgent) enterThinking() {
+	if a.paused.Load() {
+		return
+	}
+
+	a.stateMu.Lock()
+	if a.state.state == plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_SPEAKING || a.remainingPlayout() > 0 {
+		// Queued audio is still heard as speech, so the transition waits until
+		// it drained (see endIdleSpeaking).
+		a.pendingThinking = true
+		a.stateMu.Unlock()
+		return
+	}
+	// A running tool, or the drawing it started, owns the status: only
+	// finishToolCall gives way to the answer.
+	if a.state.tool != "" || a.state.state == plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_DRAWING {
+		a.stateMu.Unlock()
+		return
+	}
+	changed := a.state.state != plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_THINKING || a.state.tool != ""
+	a.state.state = plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_THINKING
+	a.state.speaking = false
+	a.state.tool = ""
+	a.state.reason = ""
+	a.stopSpeakTimerLocked()
+	a.speakTimer = time.AfterFunc(aiAgentThinkingIdle, a.endIdleThinking)
+	snapshot := a.state
+	a.stateMu.Unlock()
+
+	if changed {
+		a.logger.WithField("state", snapshot.state.String()).Debug("ai agent: state changed")
+	}
+	a.broadcast(snapshot)
+}
+
+// endIdleThinking leaves THINKING when a turn neither speaks nor completes.
+func (a *AIAgent) endIdleThinking() {
+	if a.paused.Load() {
+		return
+	}
+	a.stateMu.Lock()
+	thinking := a.state.state == plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_THINKING
+	a.stateMu.Unlock()
+	if !thinking {
+		return
+	}
+	a.setState(plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING, "")
+}
+
+// remainingPlayout reports how much agent audio the listener has not heard yet.
+func (a *AIAgent) remainingPlayout() time.Duration {
+	if a.publisher == nil {
+		return 0
+	}
+	return a.publisher.RemainingDuration()
+}
+
+func (a *AIAgent) rearmSpeakingTimerLocked(delay time.Duration) {
+	a.stopSpeakTimerLocked()
+	a.speakTimer = time.AfterFunc(delay, a.endIdleSpeaking)
 }
 
 func (a *AIAgent) stopSpeakTimerLocked() {
@@ -1038,6 +1227,7 @@ func (a *AIAgent) setState(state plugnmeet.AIAgentRuntimeState, reason string) {
 	if state != plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_SPEAKING {
 		a.stopSpeakTimerLocked()
 	}
+	a.pendingThinking = false
 	changed := a.state.state != state || a.state.tool != "" || a.state.reason != reason
 	a.state.state = state
 	a.state.speaking = state == plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_SPEAKING
@@ -1054,9 +1244,21 @@ func (a *AIAgent) setState(state plugnmeet.AIAgentRuntimeState, reason string) {
 
 func (a *AIAgent) setToolState(state plugnmeet.AIAgentRuntimeState, tool string) {
 	a.stateMu.Lock()
+	a.pendingThinking = false
 	changed := a.state.state != state || a.state.tool != tool || a.state.reason != ""
 	a.state.state = state
+	// A tool call can arrive while the sentence announcing it is still playing
+	// out, so the tool label must not cut the speech short. endIdleSpeaking
+	// clears the flag and publishes the tool state once the playout drained.
 	a.state.speaking = false
+	if rem := a.remainingPlayout(); rem > 0 {
+		a.state.speaking = true
+		a.rearmSpeakingTimerLocked(rem + aiAgentPlayoutGrace)
+	} else {
+		// A running tool drives the next transition, so no idle fallback may
+		// replace its label.
+		a.stopSpeakTimerLocked()
+	}
 	a.state.tool = tool
 	a.state.reason = ""
 	snapshot := a.state
@@ -1066,20 +1268,6 @@ func (a *AIAgent) setToolState(state plugnmeet.AIAgentRuntimeState, tool string)
 		a.logger.WithFields(logrus.Fields{"state": state.String(), "tool": tool, "reason": ""}).Debug("ai agent: state changed")
 	}
 	a.broadcast(snapshot)
-}
-
-// restoreListening returns to LISTENING unless the agent is paused or speaking.
-func (a *AIAgent) restoreListening() {
-	if a.paused.Load() {
-		return
-	}
-	a.stateMu.Lock()
-	speaking := a.state.speaking
-	a.stateMu.Unlock()
-	if speaking {
-		return
-	}
-	a.setState(plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING, "")
 }
 
 func (a *AIAgent) broadcast(snapshot aiAgentRuntimeState) {

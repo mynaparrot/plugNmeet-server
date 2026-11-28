@@ -186,7 +186,7 @@ func newChatStreamWithTools(ctx context.Context, client *genai.Client, model str
 					FunctionResponse: &genai.FunctionResponse{
 						ID:       fc.ID,
 						Name:     fc.Name,
-						Response: functionResponsePayload(out, isErr),
+						Response: functionResponsePayload(fc.Name, out, isErr),
 					},
 				})
 			}

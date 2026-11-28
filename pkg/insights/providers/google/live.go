@@ -92,7 +92,7 @@ func buildLiveConnectConfig(opts *insights.RealtimeSessionOptions) *genai.LiveCo
 		cfg.SpeechConfig = speech
 	}
 
-	if decls := buildFunctionDeclarations(opts.Tools); len(decls) > 0 {
+	if decls := buildLiveFunctionDeclarations(opts.Tools); len(decls) > 0 {
 		cfg.Tools = []*genai.Tool{{FunctionDeclarations: decls}}
 	}
 
@@ -118,9 +118,35 @@ func buildFunctionDeclarations(tools []*insights.MCPToolSpec) []*genai.FunctionD
 	return decls
 }
 
+// buildLiveFunctionDeclarations declares the tools for a live session. Write and
+// action tools run in the browser while the model keeps talking, so they are
+// non-blocking: a blocking declaration makes the model drop the rest of its turn
+// and wait for the response, which leaves the user in silence. Read tools stay
+// blocking because the model needs their payload before it can answer.
+//
+// The declaration also decides whether FunctionResponse.Scheduling is honoured:
+// it only applies to non-blocking calls and is ignored (as WHEN_IDLE) otherwise.
+//
+// Behavior is only honoured by BidiGenerateContent, so the text chat path keeps
+// using buildFunctionDeclarations.
+func buildLiveFunctionDeclarations(tools []*insights.MCPToolSpec) []*genai.FunctionDeclaration {
+	decls := buildFunctionDeclarations(tools)
+	for _, decl := range decls {
+		if !isReadOnlyTool(decl.Name) {
+			decl.Behavior = genai.BehaviorNonBlocking
+		}
+	}
+	return decls
+}
+
+// writeToolHint tells the model that the effect of a write tool is already on
+// the participant's screen. Without it a bare {"ok":true} acknowledgement reads
+// like "nothing happened yet", and the model calls the tool a second time.
+const writeToolHint = "done: this action is already visible to the participant. Do not call this tool again with the same arguments; tell the participant what you did."
+
 // functionResponsePayload shapes a tool result the way Gemini expects:
 // the "output" key for results, the "error" key for failures.
-func functionResponsePayload(resultJSON string, isError bool) map[string]any {
+func functionResponsePayload(toolName, resultJSON string, isError bool) map[string]any {
 	key := "output"
 	if isError {
 		key = "error"
@@ -134,7 +160,11 @@ func functionResponsePayload(resultJSON string, isError bool) map[string]any {
 		}
 	}
 
-	return map[string]any{key: value}
+	payload := map[string]any{key: value}
+	if !isError && !isReadOnlyTool(toolName) {
+		payload["status"] = writeToolHint
+	}
+	return payload
 }
 
 // translateServerMessage maps one provider message onto zero or more events
@@ -151,6 +181,11 @@ func translateServerMessage(msg *genai.LiveServerMessage) []insights.RealtimeEve
 type liveTranscripts struct {
 	input  transcriptBuffer
 	output transcriptBuffer
+
+	// thinking and responding track the current turn, so THINKING is reported
+	// once and only while the model is still composing.
+	thinking   bool
+	responding bool
 }
 
 // transcriptBuffer collects the transcription fragments of one speaker.
@@ -200,12 +235,20 @@ func translateServerMessageWithState(msg *genai.LiveServerMessage, tr *liveTrans
 			events = append(events, ev)
 		}
 	}
+	emitThinking := func() {
+		if tr.thinking || tr.responding {
+			return
+		}
+		tr.thinking = true
+		events = append(events, insights.RealtimeEvent{Type: insights.RealtimeEventThinking})
+	}
 
 	if sc := msg.ServerContent; sc != nil {
 		if sc.Interrupted {
 			// The participant took the turn back, so both utterances end here.
 			endUserUtterance()
 			endAgentUtterance()
+			tr.thinking, tr.responding = false, false
 			events = append(events, insights.RealtimeEvent{Type: insights.RealtimeEventInterrupted})
 		}
 		// Interim input transcription arrives before the final one; both are forwarded.
@@ -214,19 +257,32 @@ func translateServerMessageWithState(msg *genai.LiveServerMessage, tr *liveTrans
 		}
 		if t := sc.InputTranscription; t != nil && t.Text != "" {
 			events = append(events, tr.input.add(insights.RealtimeEventTranscriptUser, t.Text, t.Finished))
+			// Gemini closes the speech segment once the participant stops talking,
+			// so this is where the reasoning gap starts.
+			emitThinking()
 		}
 		// The model only replies once the participant stopped speaking.
 		if sc.ModelTurn != nil || (sc.OutputTranscription != nil && sc.OutputTranscription.Text != "") {
 			endUserUtterance()
 		}
 		if t := sc.OutputTranscription; t != nil && t.Text != "" {
+			tr.responding = true
 			events = append(events, tr.output.add(insights.RealtimeEventTranscriptAgent, t.Text, t.Finished))
 		}
 		if sc.ModelTurn != nil {
 			for _, part := range sc.ModelTurn.Parts {
-				if part == nil || part.InlineData == nil || len(part.InlineData.Data) == 0 {
+				if part == nil {
 					continue
 				}
+				if part.InlineData == nil || len(part.InlineData.Data) == 0 {
+					// Reasoning and text parts precede the audio they explain.
+					if part.Thought || part.Text != "" {
+						emitThinking()
+					}
+					continue
+				}
+				// Audio is the answer itself, so the turn stopped thinking.
+				tr.responding = true
 				audio := make([]byte, len(part.InlineData.Data))
 				copy(audio, part.InlineData.Data)
 				events = append(events, insights.RealtimeEvent{
@@ -235,10 +291,20 @@ func translateServerMessageWithState(msg *genai.LiveServerMessage, tr *liveTrans
 				})
 			}
 		}
+		if sc.WaitingForInput {
+			// The model chose to stay silent, so the pending utterance is closed
+			// and the turn ended instead of leaving the state waiting.
+			endUserUtterance()
+			tr.thinking, tr.responding = false, false
+			if !sc.TurnComplete {
+				events = append(events, insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete})
+			}
+		}
 		if sc.TurnComplete || sc.GenerationComplete {
 			// The agent transcript must reach the consumer before the turn ends.
 			endUserUtterance()
 			endAgentUtterance()
+			tr.thinking, tr.responding = false, false
 		}
 		if sc.TurnComplete {
 			events = append(events, insights.RealtimeEvent{Type: insights.RealtimeEventTurnComplete})
@@ -248,6 +314,7 @@ func translateServerMessageWithState(msg *genai.LiveServerMessage, tr *liveTrans
 	if msg.ToolCall != nil {
 		// A tool call answers the participant: the pending speech ends here.
 		endUserUtterance()
+		tr.thinking, tr.responding = false, false
 		for _, fc := range msg.ToolCall.FunctionCalls {
 			if fc == nil {
 				continue
@@ -285,7 +352,15 @@ func translateServerMessageWithState(msg *genai.LiveServerMessage, tr *liveTrans
 // transcription fragments across messages so every turn ends with one final
 // transcript per speaker.
 func (s *liveSession) translateMessage(msg *genai.LiveServerMessage) []insights.RealtimeEvent {
-	return translateServerMessageWithState(msg, &s.transcripts)
+	if msg != nil && msg.ToolCallCancellation != nil {
+		// A cancelled call never gets a result, so it must not hold the session
+		// back as a pending call.
+		s.forgetToolCalls(msg.ToolCallCancellation.IDs)
+	}
+
+	events := translateServerMessageWithState(msg, &s.transcripts)
+	s.trackNarration(events)
+	return events
 }
 
 // translateUsageMetadata turns one usage report into the provider-agnostic
@@ -374,15 +449,97 @@ type liveSession struct {
 	// transcripts holds the transcription fragments of the running turn. Only
 	// the read loop touches it.
 	transcripts liveTranscripts
+
+	// toolMu guards the tool call bookkeeping, which the read loop writes and
+	// the executor reads.
+	toolMu sync.Mutex
+	// pendingCalls holds the calls the model is still waiting on a result for.
+	pendingCalls map[string]struct{}
+	// turnCalls holds the calls issued by the turn being translated.
+	turnCalls map[string]struct{}
+	// unnarrated holds the calls whose turn produced no speech yet.
+	unnarrated map[string]struct{}
+	// turnNarrated reports whether the turn being translated already spoke.
+	turnNarrated bool
 }
 
 func newLiveSession(conn liveConn, logger *logrus.Entry) *liveSession {
 	return &liveSession{
-		conn:   conn,
-		logger: logger,
-		events: make(chan insights.RealtimeEvent, liveEventBuffer),
-		done:   make(chan struct{}),
+		conn:         conn,
+		logger:       logger,
+		events:       make(chan insights.RealtimeEvent, liveEventBuffer),
+		done:         make(chan struct{}),
+		pendingCalls: make(map[string]struct{}),
+		turnCalls:    make(map[string]struct{}),
+		unnarrated:   make(map[string]struct{}),
 	}
+}
+
+// trackNarration records whether the turn that issued a tool call spoke before it.
+// Gemini usually calls a write tool in a silent turn and explains the result only after it arrives,
+// so the scheduling of that result depends on this.
+func (s *liveSession) trackNarration(events []insights.RealtimeEvent) {
+	s.toolMu.Lock()
+	defer s.toolMu.Unlock()
+
+	for _, ev := range events {
+		switch ev.Type {
+		case insights.RealtimeEventToolCall:
+			if ev.CallID == "" {
+				continue
+			}
+			s.pendingCalls[ev.CallID] = struct{}{}
+			s.turnCalls[ev.CallID] = struct{}{}
+			if !s.turnNarrated {
+				s.unnarrated[ev.CallID] = struct{}{}
+			}
+		case insights.RealtimeEventAudioDelta:
+			s.markNarrated()
+		case insights.RealtimeEventTranscriptAgent:
+			if strings.TrimSpace(ev.Text) != "" {
+				s.markNarrated()
+			}
+		case insights.RealtimeEventTurnComplete, insights.RealtimeEventInterrupted:
+			s.turnNarrated = false
+			s.turnCalls = make(map[string]struct{})
+		}
+	}
+}
+
+// markNarrated records that the running turn spoke, so its calls are already
+// explained and their results must stay silent.
+func (s *liveSession) markNarrated() {
+	s.turnNarrated = true
+	for callID := range s.turnCalls {
+		delete(s.unnarrated, callID)
+	}
+}
+
+// forgetToolCalls drops calls the provider cancelled before a result.
+func (s *liveSession) forgetToolCalls(ids []string) {
+	s.toolMu.Lock()
+	defer s.toolMu.Unlock()
+
+	for _, id := range ids {
+		delete(s.pendingCalls, id)
+		delete(s.turnCalls, id)
+		delete(s.unnarrated, id)
+	}
+}
+
+// settleToolCall forgets one answered call and reports whether its turn already
+// spoke and whether every sibling call has settled too.
+func (s *liveSession) settleToolCall(callID string) (narrated, settled bool) {
+	s.toolMu.Lock()
+	defer s.toolMu.Unlock()
+
+	delete(s.pendingCalls, callID)
+	delete(s.turnCalls, callID)
+	settled = len(s.pendingCalls) == 0
+
+	_, unnarrated := s.unnarrated[callID]
+	delete(s.unnarrated, callID)
+	return !unnarrated, settled
 }
 
 func (s *liveSession) Events() <-chan insights.RealtimeEvent {
@@ -453,16 +610,34 @@ var readOnlyTools = map[string]struct{}{
 	"fetch_external_knowledge":    {},
 }
 
-// toolResponseScheduling decides whether a tool result resumes generation. A
-// read tool feeds the answer, so the model must speak after it. A write tool is
-// narrated by the turn that called it, so its acknowledgement only belongs in
-// the context and must not trigger a second spoken turn.
-func toolResponseScheduling(toolName string, isError bool) genai.FunctionResponseScheduling {
-	// A failure may need a retry or a spoken recovery.
-	if isError {
-		return genai.FunctionResponseSchedulingWhenIdle
+// isReadOnlyTool reports whether a tool only reads state, so the model must wait
+// for its payload instead of speaking over it.
+func isReadOnlyTool(toolName string) bool {
+	_, ok := readOnlyTools[toolName]
+	return ok || strings.HasPrefix(toolName, "ext_")
+}
+
+// toolResponseScheduling decides whether a tool result resumes generation.
+//
+// A result that arrives while a sibling call is still running stays silent:
+// resuming there starts a second generation beside the one the last result will
+// trigger, which is how one tool call turns into two identical ones.
+//
+// Once settled, a read tool feeds the answer, so the model must speak after it.
+// A write tool whose turn already narrated the action only adds its
+// acknowledgement to the context; resuming generation there makes Gemini repeat
+// the tool or chain more of them. A write tool called in a silent turn is the
+// opposite case: that is exactly the turn the model wants the result for in
+// order to explain it.
+//
+// Scheduling is only honoured for NON_BLOCKING declarations (see
+// buildLiveFunctionDeclarations); the rest keeps Gemini's WHEN_IDLE default.
+func toolResponseScheduling(toolName string, isError, narrated, settled bool) genai.FunctionResponseScheduling {
+	if !settled {
+		return genai.FunctionResponseSchedulingSilent
 	}
-	if _, ok := readOnlyTools[toolName]; ok || strings.HasPrefix(toolName, "ext_") {
+	// A failure may need a retry or a spoken recovery.
+	if isError || isReadOnlyTool(toolName) || !narrated {
 		return genai.FunctionResponseSchedulingWhenIdle
 	}
 	return genai.FunctionResponseSchedulingSilent
@@ -472,21 +647,37 @@ func (s *liveSession) SendToolResult(callID, toolName, resultJSON string, isErro
 	if toolName == "" {
 		return errors.New("google: tool result requires a tool name")
 	}
+
+	narrated, settled := s.settleToolCall(callID)
+	scheduling := toolResponseScheduling(toolName, isError, narrated, settled)
 	s.logger.WithFields(logrus.Fields{
-		"callId":  callID,
-		"tool":    toolName,
-		"isError": isError,
+		"callId":     callID,
+		"tool":       toolName,
+		"isError":    isError,
+		"narrated":   narrated,
+		"settled":    settled,
+		"scheduling": scheduling,
 	}).Debug("gemini live: sending tool result")
-	return s.send(func() error {
+
+	err := s.send(func() error {
 		return s.conn.SendToolResponse(genai.LiveToolResponseInput{
 			FunctionResponses: []*genai.FunctionResponse{{
 				ID:         callID,
 				Name:       toolName,
-				Response:   functionResponsePayload(resultJSON, isError),
-				Scheduling: toolResponseScheduling(toolName, isError),
+				Response:   functionResponsePayload(toolName, resultJSON, isError),
+				Scheduling: scheduling,
 			}},
 		})
 	})
+	if err != nil {
+		return err
+	}
+	if scheduling == genai.FunctionResponseSchedulingWhenIdle {
+		// The model composes a turn from this result, so the status moves on
+		// from the tool to the answer that follows it.
+		s.emit(insights.RealtimeEvent{Type: insights.RealtimeEventThinking})
+	}
+	return nil
 }
 
 // Interrupt is a no-op: Gemini detects barge-in server side and reports it as

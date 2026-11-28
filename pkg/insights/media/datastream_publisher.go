@@ -59,6 +59,7 @@ type performRPCFunc func(params lksdk.PerformRpcParams) (*string, error)
 type DataStreamAudioPublisher struct {
 	destinationIdentity string
 	targetSampleRate    int
+	numChannels         int
 
 	openStream openByteStreamFunc
 	performRPC performRPCFunc
@@ -81,6 +82,8 @@ type DataStreamAudioPublisher struct {
 	mu     sync.Mutex
 	writer byteStreamWriter
 	closed bool
+	// playoutUntil is when the audio handed to the destination finishes playing.
+	playoutUntil time.Time
 }
 
 // NewDataStreamAudioPublisher creates a publisher that streams audio to
@@ -98,18 +101,11 @@ func NewDataStreamAudioPublisher(room *lksdk.Room, destinationIdentity string, t
 	}
 
 	localParticipant := room.LocalParticipant
-	// The avatar worker's DataStreamAudioReceiver calls back on this method after
-	// it finishes playing a segment. Without a handler the call fails with
-	// UNSUPPORTED_METHOD and is retried three times per utterance, so register a
-	// no-op. A duplicate registration (this room already serving another
-	// publisher) is harmless and not fatal for the publisher.
-	_ = room.RegisterRpcMethod(AudioStreamPlaybackFinishedMethod, func(data lksdk.RpcInvocationData) (string, error) {
-		return "", nil
-	})
 
-	return &DataStreamAudioPublisher{
+	publisher := &DataStreamAudioPublisher{
 		destinationIdentity: destinationIdentity,
 		targetSampleRate:    targetSampleRate,
+		numChannels:         1,
 		openStream: func(options lksdk.StreamBytesOptions) byteStreamWriter {
 			return localParticipant.StreamBytes(options)
 		},
@@ -131,7 +127,35 @@ func NewDataStreamAudioPublisher(room *lksdk.Room, destinationIdentity string, t
 		},
 		readyPollInterval: DefaultReadyPollInterval,
 		readyTimeout:      DefaultReadyTimeout,
-	}, nil
+	}
+
+	// The avatar worker's DataStreamAudioReceiver calls back on this method after
+	// it finishes playing a segment, which is the only exact end of the playout.
+	// Without a handler the call fails with UNSUPPORTED_METHOD and is retried
+	// three times per utterance. A duplicate registration (this room already
+	// serving another publisher) is harmless and not fatal for the publisher.
+	_ = room.RegisterRpcMethod(AudioStreamPlaybackFinishedMethod, func(data lksdk.RpcInvocationData) (string, error) {
+		publisher.onPlaybackFinished(data.CallerIdentity)
+		return "", nil
+	})
+
+	return publisher, nil
+}
+
+// onPlaybackFinished drops the playout horizon once the destination reports that
+// the segment it received has been heard.
+func (p *DataStreamAudioPublisher) onPlaybackFinished(callerIdentity string) {
+	if callerIdentity != "" && callerIdentity != p.destinationIdentity {
+		return
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	// A nil writer means EndSegment already closed the segment, so nothing new is
+	// queued behind the audio that just finished.
+	if p.writer == nil {
+		p.playoutUntil = time.Time{}
+	}
 }
 
 // waitForDestination blocks until the destination participant has joined the
@@ -240,8 +264,39 @@ func (p *DataStreamAudioPublisher) Write(pcm24k []byte) (int, error) {
 	}
 
 	p.writer.Write(payload, nil)
+	// payload is in the wire rate (targetSampleRate), while pcm24k is always 24 kHz.
+	p.advancePlayoutLocked(len(payload))
 
 	return len(pcm24k), nil
+}
+
+// advancePlayoutLocked pushes the playout horizon forward by the duration of the
+// queued PCM. The caller must hold p.mu.
+func (p *DataStreamAudioPublisher) advancePlayoutLocked(pcmBytes int) {
+	channels := p.numChannels
+	if channels <= 0 {
+		channels = 1
+	}
+	numFrames := pcmBytes / (2 * channels)
+	if numFrames <= 0 || p.targetSampleRate <= 0 {
+		return
+	}
+	duration := time.Duration(numFrames) * time.Second / time.Duration(p.targetSampleRate)
+
+	if now := time.Now(); p.playoutUntil.Before(now) {
+		p.playoutUntil = now
+	}
+	p.playoutUntil = p.playoutUntil.Add(duration)
+}
+
+// RemainingDuration reports how much of the written audio has not played yet.
+func (p *DataStreamAudioPublisher) RemainingDuration() time.Duration {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.playoutUntil.After(time.Now()) {
+		return time.Until(p.playoutUntil)
+	}
+	return 0
 }
 
 // EndSegment closes the stream of the current segment. The next Write opens a new
@@ -261,6 +316,10 @@ func (p *DataStreamAudioPublisher) EndSegment() {
 // has buffered. The RPC runs in the background so barge-in never blocks the caller.
 func (p *DataStreamAudioPublisher) Flush() {
 	p.EndSegment()
+
+	p.mu.Lock()
+	p.playoutUntil = time.Time{}
+	p.mu.Unlock()
 
 	destinationIdentity := p.destinationIdentity
 	performRPC := p.performRPC

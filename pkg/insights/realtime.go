@@ -12,6 +12,8 @@ type RealtimeEventType string
 const (
 	// RealtimeEventAudioDelta carries agent speech as 24 kHz PCM16 mono (AudioPCM24k).
 	RealtimeEventAudioDelta RealtimeEventType = "audio_delta"
+	// RealtimeEventThinking signals that the model started composing a turn.
+	RealtimeEventThinking RealtimeEventType = "thinking"
 	// RealtimeEventTranscriptUser is the transcription of participant speech.
 	RealtimeEventTranscriptUser RealtimeEventType = "transcript_user"
 	// RealtimeEventTranscriptAgent is the transcription of agent speech.
@@ -193,7 +195,10 @@ type RealtimeSession interface {
 	// text available to the model that runs the tools.
 	SendContextText(role string, text string, triggerResponse bool) error
 
-	// SendToolResult answers a RealtimeEventToolCall.
+	// SendToolResult answers a RealtimeEventToolCall. A result that resumes the
+	// model must be reported as RealtimeEventThinking: the caller clears the
+	// finished tool from its status and relies on that report for the answer,
+	// because a provider can also hand the result back without a new turn.
 	SendToolResult(callID, toolName, resultJSON string, isError bool) error
 
 	// Interrupt asks the provider to stop generating the current turn.

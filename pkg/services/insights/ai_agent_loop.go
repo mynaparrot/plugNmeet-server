@@ -83,6 +83,9 @@ func (a *AIAgent) handleEvent(session insights.RealtimeSession, ev insights.Real
 		}
 		a.markSpeaking()
 
+	case insights.RealtimeEventThinking:
+		a.markThinking()
+
 	case insights.RealtimeEventInterrupted:
 		// Barge-in: every queued millisecond is a UX bug.
 		if a.publisher != nil {
@@ -109,9 +112,7 @@ func (a *AIAgent) handleEvent(session insights.RealtimeSession, ev insights.Real
 			a.publisher.EndSegment()
 		}
 		// A turn that ends while paused must not flip the paused state back.
-		if !a.paused.Load() {
-			a.setState(plugnmeet.AIAgentRuntimeState_AI_AGENT_RUNTIME_STATE_LISTENING, "")
-		}
+		a.finishSpeakingOrListen()
 		// A tool call closes its own silent turn: counting it would fire the
 		// anchor on action turns that produced no speech.
 		if a.toolTurn.Swap(false) {
@@ -124,10 +125,8 @@ func (a *AIAgent) handleEvent(session insights.RealtimeSession, ev insights.Real
 		}
 
 	case insights.RealtimeEventToolCall:
-		// A tool may take a while and speak afterwards, so the speech before it is closed as its own segment.
-		if a.publisher != nil {
-			a.publisher.EndSegment()
-		}
+		// The segment stays open: the sentence announcing the tool may still be playing out, and
+		// a provider can keep streaming filler audio after the call. Only a completed turn closes a segment.
 		// The answer of this turn is a tool call, not speech.
 		a.toolTurn.Store(true)
 		a.handleToolCall(session, ev)

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/livekit/media-sdk"
 	"github.com/livekit/protocol/livekit"
@@ -19,8 +20,14 @@ const (
 )
 
 type AudioPublisher struct {
-	track     *lkmedia.PCMLocalTrack
-	closeOnce sync.Once
+	track       *lkmedia.PCMLocalTrack
+	sampleRate  int
+	numChannels int
+	closeOnce   sync.Once
+
+	mu sync.Mutex
+	// playoutUntil is when the audio handed to the track finishes playing.
+	playoutUntil time.Time
 }
 
 // NewAudioPublisher creates and publishes a new local audio track to the room.
@@ -67,8 +74,13 @@ func NewAudioPublisher(room *lksdk.Room, trackName string, sampleRate int, numCh
 		return nil, fmt.Errorf("failed to publish track: %w", err)
 	}
 
+	if numChannels <= 0 {
+		numChannels = 1
+	}
 	return &AudioPublisher{
-		track: localTrack,
+		track:       localTrack,
+		sampleRate:  sampleRate,
+		numChannels: numChannels,
 	}, nil
 }
 
@@ -92,6 +104,7 @@ func (p *AudioPublisher) Write(data []byte) (n int, err error) {
 	if err != nil {
 		return 0, err
 	}
+	p.advancePlayout(len(data) / (2 * p.numChannels))
 
 	return len(data), nil
 }
@@ -102,7 +115,37 @@ func (p *AudioPublisher) WriteSample(sample media.PCM16Sample) error {
 	if p.track == nil {
 		return errors.New("publisher is not initialized")
 	}
-	return p.track.WriteSample(sample)
+	if err := p.track.WriteSample(sample); err != nil {
+		return err
+	}
+	p.advancePlayout(len(sample) / p.numChannels)
+	return nil
+}
+
+// advancePlayout pushes the playout horizon forward by the duration of the
+// queued frames, so the caller knows when the room has heard everything written.
+func (p *AudioPublisher) advancePlayout(numFrames int) {
+	if numFrames <= 0 || p.sampleRate <= 0 {
+		return
+	}
+	duration := time.Duration(numFrames) * time.Second / time.Duration(p.sampleRate)
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if now := time.Now(); p.playoutUntil.Before(now) {
+		p.playoutUntil = now
+	}
+	p.playoutUntil = p.playoutUntil.Add(duration)
+}
+
+// RemainingDuration reports how much of the written audio has not played yet.
+func (p *AudioPublisher) RemainingDuration() time.Duration {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.playoutUntil.After(time.Now()) {
+		return time.Until(p.playoutUntil)
+	}
+	return 0
 }
 
 // EndSegment is a no-op for a track publisher: a live audio track is a single
@@ -117,6 +160,9 @@ func (p *AudioPublisher) Flush() {
 	if p.track != nil {
 		p.track.ClearQueue()
 	}
+	p.mu.Lock()
+	p.playoutUntil = time.Time{}
+	p.mu.Unlock()
 }
 
 // Close unpublishes and closes the local track safely using sync.Once.

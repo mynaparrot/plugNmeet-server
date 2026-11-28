@@ -342,6 +342,7 @@ func BuildLockedSystemInstruction(cfg BoundaryConfig) string {
 
 	b.WriteString("Voice-first delivery:\n")
 	b.WriteString("- Speak in 1 to 3 short sentences, then pause, draw on the whiteboard, or write structured notes in the shared notepad. Never deliver a long spoken lecture, never list more than three points aloud, and never speak longer than about 20 seconds in one turn — put detailed explanations, lists, and examples in the shared notepad instead.\n")
+	b.WriteString("- Always speak a brief explanation in the same turn whenever you draw on the whiteboard or write in the shared notepad; never call a drawing or writing tool silently without explaining it aloud.\n")
 	b.WriteString("- Ask one concrete question at a time and wait for the participant.\n\n")
 
 	b.WriteString(sessionScopeHeader + "\n")

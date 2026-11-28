@@ -316,6 +316,27 @@ func TestTranslateRealtimeServerEventAudioAndSpeech(t *testing.T) {
 	}
 }
 
+func TestTranslateRealtimeServerEventResponseCreatedMarksThinking(t *testing.T) {
+	events := translateRealtimeServerEvent(realtime.RealtimeServerEventUnion{
+		Type:                   "response.created",
+		OfResponseCreatedEvent: realtime.ResponseCreatedEvent{Response: realtime.RealtimeResponse{}},
+	})
+	if len(events) != 1 || events[0].Type != insights.RealtimeEventThinking {
+		t.Fatalf("response.created must mark thinking: %+v", events)
+	}
+}
+
+// VAD closing the user turn means the model composes the answer, which is known
+// before response.created arrives.
+func TestTranslateRealtimeServerEventSpeechStoppedMarksThinking(t *testing.T) {
+	events := translateRealtimeServerEvent(realtime.RealtimeServerEventUnion{
+		Type: "input_audio_buffer.speech_stopped",
+	})
+	if len(events) != 1 || events[0].Type != insights.RealtimeEventThinking {
+		t.Fatalf("speech stopped must mark thinking: %+v", events)
+	}
+}
+
 func TestTranslateRealtimeServerEventTranscripts(t *testing.T) {
 	events := translateRealtimeServerEvent(realtime.RealtimeServerEventUnion{
 		Type: "conversation.item.input_audio_transcription.delta",
